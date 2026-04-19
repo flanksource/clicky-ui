@@ -1,0 +1,38 @@
+node_modules
+dist
+dist-ssr
+.tmp
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+*.local
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+.claude/worktrees/
+
+# TS project refs
+*.tsbuildinfo
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+**/test-results/
+**/playwright-report/
+
+# Storybook
+storybook-static/
+
+# Probe artefacts
+.playwright-mcp/
+
+# AI agent worktrees
+.claude/

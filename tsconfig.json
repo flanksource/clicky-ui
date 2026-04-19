@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [],
+  "references": [
+    { "path": "./packages/ui" },
+    { "path": "./apps/storybook" },
+    { "path": "./apps/kitchen-sink" },
+    { "path": "./e2e" }
+  ]
+}

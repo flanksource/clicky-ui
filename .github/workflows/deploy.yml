@@ -1,0 +1,60 @@
+name: Deploy Previews
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vite+
+        run: curl -fsSL https://vite.plus | bash
+      - name: Add Vite+ to PATH
+        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+      - run: vp install
+
+      - name: Build library
+        run: pnpm --filter @flanksource/clicky-ui exec vite build
+      - name: Build Storybook
+        run: pnpm --filter storybook exec storybook build --disable-telemetry --output-dir storybook-static
+      - name: Build kitchen-sink
+        run: pnpm --filter kitchen-sink exec vite build --base /kitchen-sink/
+
+      - name: Assemble pages bundle
+        run: |
+          mkdir -p pages-bundle
+          cp -r apps/storybook/storybook-static pages-bundle/storybook
+          cp -r apps/kitchen-sink/dist pages-bundle/kitchen-sink
+          cat > pages-bundle/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8" />
+          <title>Clicky UI previews</title>
+          <h1>Clicky UI previews</h1>
+          <ul>
+            <li><a href="storybook/">Storybook</a></li>
+            <li><a href="kitchen-sink/">Kitchen Sink</a></li>
+          </ul>
+          HTML
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-bundle
+      - id: deployment
+        uses: actions/deploy-pages@v4
