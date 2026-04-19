@@ -12,6 +12,7 @@
   },
   "files": [
     "dist",
+    "src/styles",
     "README.md",
     "LICENSE"
   ],
@@ -19,22 +20,20 @@
   "sideEffects": [
     "**/*.css"
   ],
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": "./src/styles/tokens.css",
     "./tailwind-preset": {
-      "types": "./dist/tailwind-preset.d.ts",
-      "import": "./dist/tailwind-preset.js"
-    },
-    "./components/*": {
-      "types": "./dist/components/*.d.ts",
-      "import": "./dist/components/*.js"
+      "types": "./dist/tailwind-preset.d.mts",
+      "import": "./dist/tailwind-preset.mjs",
+      "require": "./dist/tailwind-preset.cjs",
+      "default": "./dist/tailwind-preset.mjs"
     }
   },
   "publishConfig": {
@@ -42,7 +41,7 @@
   },
   "scripts": {
     "dev": "vp dev",
-    "build": "vp pack",
+    "build": "vp pack src/index.ts src/tailwind-preset.ts && vp pack src/tailwind-preset.ts -f cjs --no-clean",
     "test": "vp test",
     "check": "vp check"
   },

@@ -1,4 +1,4 @@
-@layer base {
+@layer clicky-tokens {
   :root,
   [data-theme="light"] {
     --background: 0 0% 100%;

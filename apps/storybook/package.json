@@ -23,6 +23,8 @@
     "@types/react-dom": "catalog:",
     "storybook": "catalog:",
     "tailwindcss": "catalog:",
+    "postcss": "catalog:",
+    "autoprefixer": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
