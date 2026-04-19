@@ -49,3 +49,4 @@ catalog:
   cmdk: ^1.0.4
   lucide-react: ^0.469.0
   sonner: ^1.7.1
+  marked: ^15.0.0

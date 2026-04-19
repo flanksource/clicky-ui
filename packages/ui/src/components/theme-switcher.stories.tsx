@@ -29,8 +29,8 @@ export const WithPreview: Story = {
       <div className="rounded-lg border border-border bg-card p-density-4 text-card-foreground">
         <h3 className="text-lg font-semibold">Preview card</h3>
         <p className="mt-density-2 text-sm text-muted-foreground">
-          This card uses `bg-card`, `text-card-foreground`, and `border-border` — swap the
-          theme above to see it respond.
+          This card uses `bg-card`, `text-card-foreground`, and `border-border` — swap the theme
+          above to see it respond.
         </p>
         <div className="mt-density-3 flex flex-wrap gap-density-2">
           <Button>Primary</Button>

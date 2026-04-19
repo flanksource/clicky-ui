@@ -88,8 +88,12 @@ export const Content: Story = {
       <h2 className="text-2xl font-semibold tracking-tight">Heading 2</h2>
       <h3 className="text-xl font-semibold">Heading 3</h3>
       <p className="text-density-base leading-7">
-        Body copy uses <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">text-density-base</code>
-        , which scales with the density switcher above. Inline <a className="text-primary underline-offset-4 hover:underline" href="#">links</a>{" "}
+        Body copy uses{" "}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">text-density-base</code>,
+        which scales with the density switcher above. Inline{" "}
+        <a className="text-primary underline-offset-4 hover:underline" href="#">
+          links
+        </a>{" "}
         use the primary color, and <strong>emphasized text</strong> uses a heavier weight.
       </p>
       <blockquote className="border-l-2 border-border pl-density-3 italic text-muted-foreground">

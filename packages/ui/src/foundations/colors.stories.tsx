@@ -19,12 +19,22 @@ type Story = StoryObj;
 type Pair = { name: string; bg: string; fg: string; token: string };
 
 const PAIRS: Pair[] = [
-  { name: "Background / Foreground", bg: "bg-background", fg: "text-foreground", token: "--background / --foreground" },
+  {
+    name: "Background / Foreground",
+    bg: "bg-background",
+    fg: "text-foreground",
+    token: "--background / --foreground",
+  },
   { name: "Primary", bg: "bg-primary", fg: "text-primary-foreground", token: "--primary" },
   { name: "Secondary", bg: "bg-secondary", fg: "text-secondary-foreground", token: "--secondary" },
   { name: "Muted", bg: "bg-muted", fg: "text-muted-foreground", token: "--muted" },
   { name: "Accent", bg: "bg-accent", fg: "text-accent-foreground", token: "--accent" },
-  { name: "Destructive", bg: "bg-destructive", fg: "text-destructive-foreground", token: "--destructive" },
+  {
+    name: "Destructive",
+    bg: "bg-destructive",
+    fg: "text-destructive-foreground",
+    token: "--destructive",
+  },
   { name: "Card", bg: "bg-card", fg: "text-card-foreground", token: "--card" },
   { name: "Popover", bg: "bg-popover", fg: "text-popover-foreground", token: "--popover" },
 ];
