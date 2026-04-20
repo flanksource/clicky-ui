@@ -1,3 +1,39 @@
+import { parseJvmThreadDump, countThreadsByState, type ParsedThread } from "./jvm-stacktrace";
+
+export type DumpFormat = "go" | "jvm" | "unknown";
+
+export type ParsedStack =
+  | { format: "go"; goroutines: ParsedGoroutine[] }
+  | { format: "jvm"; threads: ParsedThread[] }
+  | { format: "unknown"; goroutines: []; threads: [] };
+
+export function detectDumpFormat(text: string): DumpFormat {
+  const trimmed = text.trim();
+  if (!trimmed) return "unknown";
+  // JVM header: `"name" ... prio=` OR `"name" ... tid=`
+  if (/^"[^"]*"[^\n]*\b(prio=|tid=|nid=)/m.test(trimmed)) return "jvm";
+  // Go header: `goroutine N [state]:`
+  if (/^goroutine\s+\d+\s+\[[^\]]+\]:/m.test(trimmed)) return "go";
+  return "unknown";
+}
+
+export function parseStackDump(text: string): ParsedStack {
+  const format = detectDumpFormat(text);
+  if (format === "jvm") {
+    return { format: "jvm", threads: parseJvmThreadDump(text) };
+  }
+  if (format === "go") {
+    return { format: "go", goroutines: parseGoroutineDump(text) };
+  }
+  return { format: "unknown", goroutines: [], threads: [] };
+}
+
+export function countStackByState(stack: ParsedStack): Map<string, number> {
+  if (stack.format === "jvm") return countThreadsByState(stack.threads);
+  if (stack.format === "go") return countGoroutinesByState(stack.goroutines);
+  return new Map();
+}
+
 export interface ParsedGoroutineFrame {
   functionName: string;
   displayName: string;

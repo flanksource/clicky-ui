@@ -3,8 +3,9 @@ import { Icon } from "../Icon";
 import type { GaugeTone } from "../Gauge";
 import type { ProcessNode, RunMeta } from "./types";
 import { formatBytes, processLabel, processStateColor, processStateIcon } from "./utils";
-import { countGoroutinesByState, parseGoroutineDump, type ParsedGoroutine } from "./stacktrace";
+import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
 import { GoroutineCard, goroutineStateDot } from "./GoroutineCard";
+import { ThreadCard, threadStateDot } from "./ThreadCard";
 
 const STACK_MIN_LINES = 10;
 const STACK_LINE_HEIGHT_REM = 1;
@@ -42,14 +43,24 @@ export function DiagnosticsDetailPanel({
   const [selectedStates, setSelectedStates] = useState<Set<string>>(new Set());
   const [hideRuntimeOnly, setHideRuntimeOnly] = useState(true);
   const stack = process?.stack_capture;
-  const parsed = useMemo(() => parseGoroutineDump(stack?.text || ""), [stack?.text]);
-  const stateCounts = useMemo(() => countGoroutinesByState(parsed), [parsed]);
+  const parsed = useMemo<ParsedStack>(() => parseStackDump(stack?.text || ""), [stack?.text]);
+  const stateCounts = useMemo(() => countStackByState(parsed), [parsed]);
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return parsed.filter((goroutine) => {
-      if (selectedStates.size > 0 && !selectedStates.has(goroutine.state)) return false;
-      if (hideRuntimeOnly && goroutine.userFrameCount === 0) return false;
-      if (needle && !goroutine.searchText.includes(needle)) return false;
+    const items: Array<{
+      state: string;
+      userFrameCount: number;
+      searchText: string;
+    }> =
+      parsed.format === "jvm"
+        ? parsed.threads
+        : parsed.format === "go"
+          ? parsed.goroutines
+          : [];
+    return items.filter((item) => {
+      if (selectedStates.size > 0 && !selectedStates.has(item.state)) return false;
+      if (hideRuntimeOnly && item.userFrameCount === 0) return false;
+      if (needle && !item.searchText.includes(needle)) return false;
       return true;
     });
   }, [parsed, search, selectedStates, hideRuntimeOnly]);
@@ -154,11 +165,13 @@ function RunSection({ runMeta }: { runMeta: RunMeta }) {
   );
 }
 
+type StackFilterItem = { state: string; userFrameCount: number; searchText: string };
+
 type StackBlockProps = {
   process: ProcessNode;
-  parsed: ParsedGoroutine[];
+  parsed: ParsedStack;
   stateCounts: Map<string, number>;
-  filtered: ParsedGoroutine[];
+  filtered: StackFilterItem[];
   search: string;
   setSearch: (v: string) => void;
   selectedStates: Set<string>;
@@ -168,6 +181,22 @@ type StackBlockProps = {
   collectBusy?: boolean;
   onCollectStack?: (pid: number) => void | Promise<void>;
 };
+
+function stackItemCount(parsed: ParsedStack): number {
+  if (parsed.format === "jvm") return parsed.threads.length;
+  if (parsed.format === "go") return parsed.goroutines.length;
+  return 0;
+}
+
+function stackItemLabel(parsed: ParsedStack): string {
+  if (parsed.format === "jvm") return "threads";
+  if (parsed.format === "go") return "goroutines";
+  return "frames";
+}
+
+function stackStateDot(parsed: ParsedStack, state: string): string {
+  return parsed.format === "jvm" ? threadStateDot(state) : goroutineStateDot(state);
+}
 
 function StackBlock(props: StackBlockProps) {
   const {
@@ -223,9 +252,9 @@ function StackBlock(props: StackBlockProps) {
           <div className="flex items-center gap-density-2 flex-wrap">
             <StackStatusBadge status={stack.status} />
             {stack.collected_at && <span>{new Date(stack.collected_at).toLocaleString()}</span>}
-            {parsed.length > 0 && (
+            {stackItemCount(parsed) > 0 && (
               <span>
-                {filtered.length} / {parsed.length} goroutines
+                {filtered.length} / {stackItemCount(parsed)} {stackItemLabel(parsed)}
               </span>
             )}
           </div>
@@ -233,7 +262,7 @@ function StackBlock(props: StackBlockProps) {
             <CollectButton pid={process.pid} busy={collectBusy} onClick={onCollectStack} />
           )}
         </div>
-        {parsed.length > 0 && (
+        {stackItemCount(parsed) > 0 && (
           <>
             <div className="flex items-center gap-1.5 flex-wrap">
               <div className="relative min-w-[14rem] flex-1">
@@ -243,7 +272,11 @@ function StackBlock(props: StackBlockProps) {
                 />
                 <input
                   className="w-full rounded-md border border-border bg-muted/50 py-1 pl-7 pr-2 text-xs outline-none focus:border-primary focus:bg-background"
-                  placeholder="Filter by goroutine id, function, or file"
+                  placeholder={
+                    parsed.format === "jvm"
+                      ? "Filter by thread name, function, or file"
+                      : "Filter by goroutine id, function, or file"
+                  }
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -291,7 +324,7 @@ function StackBlock(props: StackBlockProps) {
                         });
                       }}
                     >
-                      <span className={`h-2 w-2 rounded-full ${goroutineStateDot(state)}`} />
+                      <span className={`h-2 w-2 rounded-full ${stackStateDot(parsed, state)}`} />
                       {state}
                       <span className="text-[10px] opacity-70">{count}</span>
                     </button>
@@ -304,7 +337,7 @@ function StackBlock(props: StackBlockProps) {
       {stack.error && (
         <div className="mt-density-2 text-xs text-red-600 whitespace-pre-wrap">{stack.error}</div>
       )}
-      {parsed.length === 0 ? (
+      {stackItemCount(parsed) === 0 ? (
         <pre
           className="flex-1 min-h-0 overflow-auto py-1 text-[11px] text-foreground whitespace-pre-wrap font-mono leading-4"
           style={{ minHeight: STACK_MIN_HEIGHT }}
@@ -318,10 +351,24 @@ function StackBlock(props: StackBlockProps) {
         >
           {filtered.length === 0 && (
             <div className="py-density-3 text-center text-xs text-muted-foreground">
-              No goroutines match the current filters.
+              No {stackItemLabel(parsed)} match the current filters.
             </div>
           )}
-          {filtered.map((goroutine) => (
+          {parsed.format === "jvm" &&
+            parsed.threads
+              .filter((t) => filtered.includes(t))
+              .map((t) => (
+                <ThreadCard
+                  key={t.id}
+                  thread={t}
+                  search={search}
+                  hideRuntimeOnly={hideRuntimeOnly}
+                />
+              ))}
+          {parsed.format === "go" &&
+            parsed.goroutines
+              .filter((g) => filtered.includes(g))
+              .map((goroutine) => (
             <GoroutineCard
               key={goroutine.id}
               goroutine={goroutine}

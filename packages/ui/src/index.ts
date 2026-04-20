@@ -18,6 +18,7 @@ export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-histor
 
 // Existing components
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { Select, type SelectProps, type SelectOption } from "./components/select";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
 
@@ -71,9 +72,20 @@ export {
 export {
   parseGoroutineDump,
   countGoroutinesByState,
+  parseStackDump,
+  detectDumpFormat,
+  countStackByState,
   type ParsedGoroutine,
   type ParsedGoroutineFrame,
+  type ParsedStack,
+  type DumpFormat,
 } from "./data/diagnostics/stacktrace";
+export {
+  parseJvmThreadDump,
+  countThreadsByState,
+  type ParsedThread,
+  type ParsedThreadFrame,
+} from "./data/diagnostics/jvm-stacktrace";
 
 // HAR (HTTP archive viewer)
 export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";

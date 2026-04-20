@@ -41,7 +41,7 @@
   },
   "scripts": {
     "dev": "vp dev",
-    "build": "vp pack src/index.ts src/tailwind-preset.ts && vp pack src/tailwind-preset.ts -f cjs --no-clean",
+    "build": "vp pack src/index.ts src/tailwind-preset.ts --sourcemap --no-minify && vp pack src/tailwind-preset.ts -f cjs --no-clean --sourcemap --no-minify",
     "test": "vp test",
     "check": "vp check"
   },
