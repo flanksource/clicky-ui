@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { HarPanel, type HAREntry } from "@flanksource/clicky-ui";
-import { DemoSection, DemoRow } from "./Section";
+import { DemoSection } from "./Section";
 
 const entries: HAREntry[] = [
   {
@@ -64,24 +63,14 @@ const entries: HAREntry[] = [
 ];
 
 export function HarPanelDemo() {
-  const [q, setQ] = useState("");
   return (
     <DemoSection
       id="har-panel"
       title="HarPanel"
-      description="HTTP archive (HAR) viewer — sortable, searchable, expandable rows with JSON body pretty-printing."
+      description="HTTP archive (HAR) viewer using the shared sortable/filterable table with expandable rows."
     >
-      <DemoRow>
-        <input
-          className="border border-border rounded-md px-density-2 py-1 text-sm min-w-[16rem]"
-          placeholder="Filter URL, method, or body..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <span className="text-xs text-muted-foreground">{entries.length} entries</span>
-      </DemoRow>
       <div className="h-[calc(100vh-10rem)] min-h-[320px] border border-border rounded-md overflow-hidden">
-        <HarPanel entries={entries} search={q} />
+        <HarPanel entries={entries} />
       </div>
     </DemoSection>
   );

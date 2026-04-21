@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "node": {
+    "kind": "map",
+    "fields": [
+      {
+        "name": "summary",
+        "label": "Summary",
+        "value": {
+          "kind": "text",
+          "text": "Clicky rich text rendered by native clicky-ui components",
+          "plain": "Clicky rich text rendered by native clicky-ui components",
+          "style": {
+            "bold": true
+          }
+        }
+      },
+      {
+        "name": "services",
+        "label": "Services",
+        "value": {
+          "kind": "table",
+          "autoFilter": true,
+          "columns": [
+            {
+              "name": "name",
+              "label": "Name",
+              "grow": true
+            },
+            {
+              "name": "status",
+              "label": "Status",
+              "shrink": true
+            },
+            {
+              "name": "restarts",
+              "label": "Restarts",
+              "align": "right",
+              "shrink": true
+            }
+          ],
+          "rows": [
+            {
+              "cells": {
+                "name": {
+                  "kind": "text",
+                  "text": "api",
+                  "plain": "api"
+                },
+                "status": {
+                  "kind": "text",
+                  "text": "healthy",
+                  "plain": "healthy",
+                  "style": {
+                    "color": "#166534",
+                    "bold": true
+                  }
+                },
+                "restarts": {
+                  "kind": "text",
+                  "text": "0",
+                  "plain": "0",
+                  "style": {
+                    "monospace": true
+                  }
+                }
+              },
+              "detail": {
+                "kind": "code",
+                "language": "yaml",
+                "source": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api",
+                "plain": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api"
+              }
+            },
+            {
+              "cells": {
+                "name": {
+                  "kind": "text",
+                  "text": "worker",
+                  "plain": "worker"
+                },
+                "status": {
+                  "kind": "text",
+                  "text": "degraded",
+                  "plain": "degraded",
+                  "style": {
+                    "color": "#b45309",
+                    "bold": true
+                  }
+                },
+                "restarts": {
+                  "kind": "text",
+                  "text": "3",
+                  "plain": "3",
+                  "style": {
+                    "monospace": true
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "topology",
+        "label": "Topology",
+        "value": {
+          "kind": "tree",
+          "roots": [
+            {
+              "id": "cluster",
+              "label": {
+                "kind": "text",
+                "text": "cluster / prod-eu",
+                "plain": "cluster / prod-eu"
+              },
+              "children": [
+                {
+                  "id": "api",
+                  "label": {
+                    "kind": "text",
+                    "text": "api",
+                    "plain": "api"
+                  }
+                },
+                {
+                  "id": "worker",
+                  "label": {
+                    "kind": "text",
+                    "text": "worker",
+                    "plain": "worker"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "actions",
+        "label": "Actions",
+        "value": {
+          "kind": "button-group",
+          "items": [
+            {
+              "kind": "button",
+              "href": "https://example.com/docs",
+              "label": {
+                "kind": "text",
+                "text": "Docs",
+                "plain": "Docs"
+              }
+            },
+            {
+              "kind": "button",
+              "id": "restart-worker",
+              "payload": "{\"service\":\"worker\"}",
+              "label": {
+                "kind": "text",
+                "text": "Restart Worker",
+                "plain": "Restart Worker"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

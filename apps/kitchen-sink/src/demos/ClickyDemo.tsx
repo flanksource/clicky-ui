@@ -21,10 +21,11 @@ const demo: ClickyDocument = {
         label: "Services",
         value: {
           kind: "table",
+          autoFilter: true,
           columns: [
-            { name: "name", label: "Name" },
-            { name: "status", label: "Status" },
-            { name: "restarts", label: "Restarts", align: "right" },
+            { name: "name", label: "Name", grow: true },
+            { name: "status", label: "Status", shrink: true },
+            { name: "restarts", label: "Restarts", align: "right", shrink: true },
           ],
           rows: [
             {
@@ -106,10 +107,53 @@ export function ClickyDemo() {
     <DemoSection
       id="clicky"
       title="Clicky"
-      description="Versioned Clicky AST renderer with native tree, table, and code blocks."
+      description="Versioned Clicky AST renderer with native tree, shared table filters, code blocks, and an optional URL-backed fetch mode."
     >
-      <div className="rounded-md border border-border bg-background p-density-3">
-        <Clicky data={demo} />
+      <div className="space-y-density-4">
+        <div className="space-y-density-2">
+          <p className="text-sm text-muted-foreground">
+            This example renders a local fallback payload immediately, then refreshes from a
+            fetched URL using the remote Clicky mode.
+          </p>
+          <div className="rounded-md border border-border bg-background p-density-3">
+            <Clicky
+              url="/samples/clicky/services.json"
+              data={demo}
+              view={{ pdf: false, json: true }}
+              download={{ all: true }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-density-2">
+          <p className="text-sm text-muted-foreground">
+            This remote example uses `view={[]}` to suppress the mode switcher and only expose the
+            download action.
+          </p>
+          <div className="rounded-md border border-border bg-background p-density-3">
+            <Clicky
+              url="/samples/clicky/services.json"
+              data={demo}
+              view={[]}
+              download={{ all: true, label: "report" }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-density-2">
+          <p className="text-sm text-muted-foreground">
+            This remote example keeps the rendered output fixed while the split download menu still
+            exposes every supported format.
+          </p>
+          <div className="rounded-md border border-border bg-background p-density-3">
+            <Clicky
+              url="/samples/clicky/services.json"
+              data={demo}
+              view={[]}
+              download={{ all: true, label: "artifact" }}
+            />
+          </div>
+        </div>
       </div>
     </DemoSection>
   );
