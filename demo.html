@@ -16,6 +16,20 @@
 
     <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
 
+    <link
+      id="prism-light"
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css"
+    />
+    <link
+      id="prism-dark"
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
+      disabled
+    />
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" data-manual></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
     <style>
       /* Iconify web component needs a baseline inline sizing. */
       iconify-icon {
@@ -25,22 +39,13 @@
         vertical-align: -0.125em;
       }
 
-      /* Shiki: keep the library's container chrome, strip Shiki's own background/padding. */
-      .shiki,
-      .shiki code {
+      /* Prism: keep the library's container chrome, strip Prism theme's own padding/bg. */
+      pre[class*="language-"],
+      code[class*="language-"] {
         background: transparent !important;
         padding: 0 !important;
         font-size: inherit;
-        line-height: 1.5;
-      }
-
-      /* Dual-theme output: pick the right variables based on data-theme. */
-      html[data-theme="dark"] .shiki,
-      html[data-theme="dark"] .shiki span {
-        color: var(--shiki-dark) !important;
-        font-style: var(--shiki-dark-font-style) !important;
-        font-weight: var(--shiki-dark-font-weight) !important;
-        text-decoration: var(--shiki-dark-text-decoration) !important;
+        text-shadow: none;
       }
     </style>
 
@@ -177,7 +182,6 @@
     <script type="module">
       import { h, render } from "preact";
       import { Clicky } from "@flanksource/clicky-ui";
-      import { codeToHtml } from "https://esm.sh/shiki@1";
 
       const t = (text, style) => ({ kind: "text", text, plain: text, ...(style ? { style } : {}) });
       const doc = (node) => ({ version: 1, node });
@@ -326,44 +330,123 @@
         },
         {
           id: "nested-tree",
-          label: "Nested tree (filesystem)",
-          description: "Tree rendering with expand/collapse, nested children, and inline labels.",
-          data: doc({
-            kind: "tree",
-            roots: [
-              {
-                id: "src",
-                label: t("src/", { bold: true }),
-                children: [
-                  {
-                    id: "src/components",
-                    label: t("components/"),
-                    children: [
-                      { id: "Button.tsx", label: t("Button.tsx") },
-                      { id: "Select.tsx", label: t("Select.tsx") },
-                    ],
-                  },
-                  {
-                    id: "src/data",
-                    label: t("data/"),
-                    children: [
-                      { id: "Clicky.tsx", label: t("Clicky.tsx", { bold: true }) },
-                      { id: "Tree.tsx", label: t("Tree.tsx") },
-                    ],
-                  },
-                  { id: "src/index.ts", label: t("index.ts", { italic: true }) },
-                ],
-              },
-              {
-                id: "package.json",
-                label: t("package.json"),
-              },
-              {
-                id: "README.md",
-                label: t("README.md", { faint: true }),
-              },
-            ],
-          }),
+          label: "Nested tree (file-type icons)",
+          description:
+            "Tree rendering with file-type icons from the VSCode Iconify set, nested children, and styled labels.",
+          data: (() => {
+            const icon = (name) => ({ kind: "icon", iconify: name });
+            const folder = (name, opts) => ({
+              kind: "text",
+              children: [icon("vscode-icons:default-folder"), t(" " + name, opts)],
+            });
+            const rootFolder = (name, iconName) => ({
+              kind: "text",
+              children: [icon(iconName), t(" " + name, { bold: true })],
+            });
+            const file = (name, iconName, opts) => ({
+              kind: "text",
+              children: [icon(iconName), t(" " + name, opts)],
+            });
+            return doc({
+              kind: "tree",
+              roots: [
+                {
+                  id: "src",
+                  label: rootFolder("src/", "vscode-icons:folder-type-src"),
+                  children: [
+                    {
+                      id: "src/components",
+                      label: folder("components/"),
+                      children: [
+                        {
+                          id: "Button.tsx",
+                          label: file("Button.tsx", "vscode-icons:file-type-reactts"),
+                        },
+                        {
+                          id: "Select.tsx",
+                          label: file("Select.tsx", "vscode-icons:file-type-reactts"),
+                        },
+                      ],
+                    },
+                    {
+                      id: "src/data",
+                      label: folder("data/"),
+                      children: [
+                        {
+                          id: "Clicky.tsx",
+                          label: file("Clicky.tsx", "vscode-icons:file-type-reactts", {
+                            bold: true,
+                          }),
+                        },
+                        {
+                          id: "Tree.tsx",
+                          label: file("Tree.tsx", "vscode-icons:file-type-reactts"),
+                        },
+                      ],
+                    },
+                    {
+                      id: "src/styles",
+                      label: folder("styles/"),
+                      children: [
+                        {
+                          id: "tokens.css",
+                          label: file("tokens.css", "vscode-icons:file-type-css"),
+                        },
+                      ],
+                    },
+                    {
+                      id: "src/index.ts",
+                      label: file("index.ts", "vscode-icons:file-type-typescript", {
+                        italic: true,
+                      }),
+                    },
+                  ],
+                },
+                {
+                  id: "public",
+                  label: folder("public/"),
+                  children: [
+                    {
+                      id: "favicon.svg",
+                      label: file("favicon.svg", "vscode-icons:file-type-svg"),
+                    },
+                    {
+                      id: "logo.png",
+                      label: file("logo.png", "vscode-icons:file-type-image"),
+                    },
+                  ],
+                },
+                {
+                  id: "package.json",
+                  label: file("package.json", "vscode-icons:file-type-npm"),
+                },
+                {
+                  id: "tsconfig.json",
+                  label: file("tsconfig.json", "vscode-icons:file-type-tsconfig"),
+                },
+                {
+                  id: "vite.config.ts",
+                  label: file("vite.config.ts", "vscode-icons:file-type-vite"),
+                },
+                {
+                  id: "tailwind.config.ts",
+                  label: file("tailwind.config.ts", "vscode-icons:file-type-tailwind"),
+                },
+                {
+                  id: ".gitignore",
+                  label: file(".gitignore", "vscode-icons:file-type-git", { faint: true }),
+                },
+                {
+                  id: "README.md",
+                  label: file("README.md", "vscode-icons:file-type-markdown"),
+                },
+                {
+                  id: "LICENSE",
+                  label: file("LICENSE", "vscode-icons:file-type-license", { faint: true }),
+                },
+              ],
+            });
+          })(),
         },
         {
           id: "lists",
@@ -427,9 +510,9 @@
         },
         {
           id: "code-block",
-          label: "Code block (syntax-highlighted)",
+          label: "Code blocks (syntax-highlighted, multi-language)",
           description:
-            "A code node with language tag. Pass pre-rendered highlightedHtml for real highlighting.",
+            "kind:\"code\" nodes in bash, tsx, ts, go, java. Prism autoloader fetches each grammar on demand.",
           data: doc({
             kind: "map",
             fields: [
@@ -444,7 +527,7 @@
               },
               {
                 name: "usage",
-                label: "Usage",
+                label: "React usage",
                 value: {
                   kind: "code",
                   language: "tsx",
@@ -460,6 +543,26 @@
                   language: "ts",
                   source:
                     "import preset from '@flanksource/clicky-ui/tailwind-preset';\n\nexport default {\n  presets: [preset],\n  content: ['./src/**/*.{ts,tsx}'],\n};",
+                },
+              },
+              {
+                name: "go-server",
+                label: "Go — emit a Clicky document from a server",
+                value: {
+                  kind: "code",
+                  language: "go",
+                  source:
+                    "package main\n\nimport (\n\t\"encoding/json\"\n\t\"net/http\"\n)\n\ntype ClickyDoc struct {\n\tVersion int         `json:\"version\"`\n\tNode    interface{} `json:\"node\"`\n}\n\nfunc main() {\n\thttp.HandleFunc(\"/status\", func(w http.ResponseWriter, _ *http.Request) {\n\t\tdoc := ClickyDoc{\n\t\t\tVersion: 1,\n\t\t\tNode: map[string]any{\n\t\t\t\t\"kind\": \"text\",\n\t\t\t\t\"text\": \"healthy\",\n\t\t\t\t\"style\": map[string]any{\"color\": \"#166534\", \"bold\": true},\n\t\t\t},\n\t\t}\n\t\tw.Header().Set(\"Content-Type\", \"application/json\")\n\t\t_ = json.NewEncoder(w).Encode(doc)\n\t})\n\t_ = http.ListenAndServe(\":8080\", nil)\n}",
+                },
+              },
+              {
+                name: "java-server",
+                label: "Java — emit a Clicky document",
+                value: {
+                  kind: "code",
+                  language: "java",
+                  source:
+                    "import com.fasterxml.jackson.databind.ObjectMapper;\nimport java.util.Map;\n\npublic class ClickyEmitter {\n    private static final ObjectMapper MAPPER = new ObjectMapper();\n\n    public static String render(String status) throws Exception {\n        var node = Map.of(\n            \"kind\", \"text\",\n            \"text\", status,\n            \"style\", Map.of(\"color\", \"#166534\", \"bold\", true)\n        );\n        var doc = Map.of(\"version\", 1, \"node\", node);\n        return MAPPER.writeValueAsString(doc);\n    }\n\n    public static void main(String[] args) throws Exception {\n        System.out.println(render(\"healthy\"));\n    }\n}",
                 },
               },
             ],
@@ -621,6 +724,82 @@
             ],
           }),
         },
+        {
+          id: "inline-code",
+          label: "Inline code within prose",
+          description:
+            "kind:\"text\" nodes can nest code blocks + inline monospace tokens inside their children array.",
+          data: (() => {
+            const inlineCode = (text) =>
+              t(text, {
+                monospace: true,
+                backgroundColor: "#f1f5f9",
+                color: "#0f172a",
+              });
+            return doc({
+              kind: "map",
+              fields: [
+                {
+                  name: "intro",
+                  label: "Getting started",
+                  value: {
+                    kind: "text",
+                    children: [
+                      t("Install the package with "),
+                      inlineCode("npm install @flanksource/clicky-ui"),
+                      t(", import "),
+                      inlineCode("Clicky"),
+                      t(" from "),
+                      inlineCode("@flanksource/clicky-ui"),
+                      t(", then pass any Clicky document to the "),
+                      inlineCode("data"),
+                      t(" prop. A document is either a versioned envelope or a bare "),
+                      inlineCode("ClickyNode"),
+                      t("."),
+                    ],
+                  },
+                },
+                {
+                  name: "mixed",
+                  label: "Prose with a code block embedded",
+                  value: {
+                    kind: "text",
+                    children: [
+                      t("Here is a minimal React component. Note that "),
+                      inlineCode("data"),
+                      t(" accepts objects, strings (parsed as JSON), or pre-built nodes:"),
+                      {
+                        kind: "code",
+                        language: "tsx",
+                        source:
+                          "import { Clicky } from '@flanksource/clicky-ui';\n\nexport function Status({ doc }) {\n  return <Clicky data={doc} />;\n}",
+                      },
+                      t("Components are built on shadcn/ui primitives, so any "),
+                      inlineCode("className"),
+                      t(" on the root passes through."),
+                    ],
+                  },
+                },
+                {
+                  name: "shell",
+                  label: "Shell snippet in a sentence",
+                  value: {
+                    kind: "text",
+                    children: [
+                      t("Run "),
+                      inlineCode("pnpm --filter @flanksource/clicky-ui dev"),
+                      t(" to start the dev server, then open "),
+                      inlineCode("http://localhost:5173"),
+                      t(". The kitchen-sink app hot-reloads on any change to "),
+                      inlineCode("packages/ui/src/**/*"),
+                      t("."),
+                    ],
+                  },
+                },
+              ],
+            });
+          })(),
+        },
       ];
 
       const SAMPLES_BY_ID = Object.fromEntries(SAMPLES.map((s) => [s.id, s]));
@@ -635,37 +814,41 @@
         sh: "bash",
         shell: "bash",
         yml: "yaml",
+        ts: "typescript",
+        js: "javascript",
+        py: "python",
       };
 
-      async function highlightCodeBlocks(root) {
-        const pres = root.querySelectorAll("pre:not([data-shiki])");
-        await Promise.all(
-          [...pres].map(async (pre) => {
-            pre.dataset.shiki = "true";
-            const label =
-              pre.parentElement?.firstElementChild?.textContent?.trim().toLowerCase() ?? "";
-            const lang = LANGUAGE_ALIASES[label] ?? label ?? "text";
-            const source = pre.textContent ?? "";
-            try {
-              const html = await codeToHtml(source, {
-                lang,
-                themes: { light: "github-light", dark: "github-dark" },
-                defaultColor: false,
-              });
-              const wrapper = document.createElement("div");
-              wrapper.innerHTML = html;
-              const shikiPre = wrapper.querySelector("pre");
-              if (shikiPre) {
-                shikiPre.className = pre.className + " " + (shikiPre.className ?? "");
-                shikiPre.dataset.shiki = "true";
-                pre.replaceWith(shikiPre);
-              }
-            } catch {
-              /* unknown language — leave the plain <pre> in place */
-            }
-          }),
-        );
+      function highlightCodeBlocks(root) {
+        if (typeof Prism === "undefined") return;
+        for (const pre of root.querySelectorAll("pre:not([data-prism])")) {
+          pre.dataset.prism = "true";
+          const wrapper = pre.parentElement;
+          const label = wrapper?.firstElementChild?.textContent?.trim().toLowerCase() ?? "";
+          const lang = LANGUAGE_ALIASES[label] ?? label;
+          // Unwrap: drop Clicky's border + language-tag header chrome so the <pre> sits flush.
+          if (wrapper && wrapper.firstElementChild !== pre && wrapper.lastElementChild === pre) {
+            wrapper.replaceWith(pre);
+          }
+          if (!lang) continue;
+          const existingCode = pre.querySelector(":scope > code");
+          const code = existingCode ?? document.createElement("code");
+          if (!existingCode) {
+            code.textContent = pre.textContent ?? "";
+            pre.textContent = "";
+            pre.appendChild(code);
+          }
+          pre.className = `${pre.className} language-${lang}`.trim();
+          code.className = `language-${lang}`;
+          Prism.highlightElement(code);
+        }
       }
+
+      // Highlight code blocks that get mounted lazily (e.g. when a table row expands its detail pane).
+      new MutationObserver(() => highlightCodeBlocks(output)).observe(output, {
+        childList: true,
+        subtree: true,
+      });
 
       function renderFromText(text) {
         try {
@@ -707,6 +890,15 @@
 
       picker.addEventListener("change", () => loadSample(picker.value));
 
+      window.addEventListener("hashchange", () => {
+        const match = location.hash.match(/sample=([^&]+)/);
+        const id = match ? decodeURIComponent(match[1]) : null;
+        if (id && SAMPLES_BY_ID[id] && id !== picker.value) {
+          picker.value = id;
+          loadSample(id);
+        }
+      });
+
       let timer;
       input.addEventListener("input", () => {
         clearTimeout(timer);
@@ -723,9 +915,19 @@
         }
       });
 
+      function applyPrismTheme(theme) {
+        const light = $("prism-light");
+        const dark = $("prism-dark");
+        if (!light || !dark) return;
+        light.disabled = theme === "dark";
+        dark.disabled = theme !== "dark";
+      }
+      applyPrismTheme(document.documentElement.dataset.theme);
+
       $("btn-theme").addEventListener("click", () => {
         const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
         document.documentElement.dataset.theme = next;
+        applyPrismTheme(next);
       });
 
       input.addEventListener("paste", (e) => {
