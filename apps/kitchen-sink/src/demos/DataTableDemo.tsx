@@ -56,7 +56,7 @@ export function DataTableDemo() {
     <DemoSection
       id="data-table"
       title="DataTable"
-      description="Shared sortable table using FilterBar natively for search, filters, and range controls."
+      description="Shared sortable table using FilterBar natively for search, numeric and categorical filters, and range controls."
     >
       <DataTable
         data={rows}

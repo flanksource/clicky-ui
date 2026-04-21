@@ -3,7 +3,12 @@ import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
+import { DatePicker } from "./DatePicker";
+import { DateTimePicker } from "./DateTimePicker";
 import type { MultiSelectOption } from "./MultiSelect";
+import { RangeSlider } from "./RangeSlider";
+
+const FILTER_INPUT_DEBOUNCE_MS = 500;
 
 export type FilterBarSearchProps = {
   value: string;
@@ -35,7 +40,30 @@ export type FilterBarMultiFilter = {
   className?: string;
 };
 
-export type FilterBarFilter = FilterBarTextFilter | FilterBarMultiFilter;
+export type FilterBarNumberValue = {
+  min?: string;
+  max?: string;
+};
+
+export type FilterBarNumberFilter = {
+  key: string;
+  kind: "number";
+  label: string;
+  value: FilterBarNumberValue;
+  onChange: (value: FilterBarNumberValue) => void;
+  domainMin?: number;
+  domainMax?: number;
+  step?: number;
+  formatValue?: (value: number) => string;
+  minPlaceholder?: string;
+  maxPlaceholder?: string;
+  className?: string;
+};
+
+export type FilterBarFilter =
+  | FilterBarTextFilter
+  | FilterBarMultiFilter
+  | FilterBarNumberFilter;
 
 export type FilterBarRangePreset = {
   label: string;
@@ -96,30 +124,7 @@ export function FilterBar({
       {leading && <div className="flex items-center gap-2">{leading}</div>}
 
       {search && (
-        <div className="flex min-w-[14rem] max-w-[24rem] flex-1 items-center gap-2">
-          <label
-            className={cn(
-              "flex h-8 min-w-0 flex-1 items-center rounded-md border border-input bg-background px-3 text-sm",
-              search.className,
-            )}
-          >
-            {search.value.trim() ? (
-              <span className="mr-2 whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {search.ariaLabel ?? "Search"}
-              </span>
-            ) : (
-              <Icon name="codicon:search" className="mr-2 shrink-0 text-muted-foreground" />
-            )}
-            <input
-              type="search"
-              aria-label={search.ariaLabel ?? search.placeholder ?? "Search"}
-              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-              placeholder={search.placeholder ?? "Search…"}
-              value={search.value}
-              onChange={(event) => search.onChange(event.target.value)}
-            />
-          </label>
-        </div>
+        <SearchField search={search} />
       )}
 
       {children}
@@ -127,11 +132,15 @@ export function FilterBar({
       {filters?.map((filter, index) => {
         const grow = !search && index === 0;
 
-        return filter.kind === "multi" ? (
-          <MultiFilterField key={filter.key} filter={filter} grow={grow} />
-        ) : (
-          <TextFilterField key={filter.key} filter={filter} grow={grow} />
-        );
+        if (filter.kind === "multi") {
+          return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
+        }
+
+        if (filter.kind === "number") {
+          return <NumberFilterField key={filter.key} filter={filter} grow={grow} />;
+        }
+
+        return <TextFilterField key={filter.key} filter={filter} grow={grow} />;
       })}
 
       {(hasRangeControls || trailing) && (
@@ -145,6 +154,37 @@ export function FilterBar({
   );
 }
 
+function SearchField({ search }: { search: FilterBarSearchProps }) {
+  const [draft, setDraft] = useDebouncedTextDraft(search.value, search.onChange);
+
+  return (
+    <div className="flex min-w-[14rem] max-w-[24rem] flex-1 items-center gap-2">
+      <label
+        className={cn(
+          "flex h-8 min-w-0 flex-1 items-center rounded-md border border-input bg-background px-3 text-sm",
+          search.className,
+        )}
+      >
+        {draft.trim() ? (
+          <span className="mr-2 whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {search.ariaLabel ?? "Search"}
+          </span>
+        ) : (
+          <Icon name="codicon:search" className="mr-2 shrink-0 text-muted-foreground" />
+        )}
+        <input
+          type="search"
+          aria-label={search.ariaLabel ?? search.placeholder ?? "Search"}
+          className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+          placeholder={search.placeholder ?? "Search…"}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      </label>
+    </div>
+  );
+}
+
 function TextFilterField({
   filter,
   grow,
@@ -152,6 +192,8 @@ function TextFilterField({
   filter: FilterBarTextFilter;
   grow: boolean;
 }) {
+  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+
   return (
     <label
       className={cn(
@@ -168,10 +210,161 @@ function TextFilterField({
         aria-label={filter.label}
         className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
         placeholder={filter.placeholder ?? "Filter…"}
-        value={filter.value}
-        onChange={(event) => filter.onChange(event.target.value)}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
       />
     </label>
+  );
+}
+
+function NumberFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarNumberFilter;
+  grow: boolean;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+
+  const bounds = resolveNumberFilterBounds(filter);
+  const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
+  const sliderMin = clampNumber(
+    parseFilterNumber(draft.min) ?? bounds.min,
+    bounds.min,
+    bounds.max,
+  );
+  const sliderMax = clampNumber(
+    parseFilterNumber(draft.max) ?? bounds.max,
+    bounds.min,
+    bounds.max,
+  );
+  const activeMin = Math.min(sliderMin, sliderMax);
+  const activeMax = Math.max(sliderMin, sliderMax);
+  const summary = summarizeNumberFilter(filter, bounds, draft);
+
+  return (
+    <div
+      ref={rootRef}
+      className={cn(
+        "relative min-w-0",
+        grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
+        filter.className,
+      )}
+    >
+      <Button
+        ref={triggerRef}
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`${filter.label} filter`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "min-w-0 gap-2 font-normal",
+          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[9.5rem] px-2.5",
+          summary === filter.label && "text-muted-foreground",
+        )}
+      >
+        <span className="truncate">{summary}</span>
+        <Icon
+          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          className="text-muted-foreground"
+        />
+      </Button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg shadow-black/5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {filter.label}
+            </div>
+            <button
+              type="button"
+              className="text-[10px] text-primary disabled:text-muted-foreground"
+              onClick={() => {
+                setDraft({});
+                filter.onChange({});
+              }}
+              disabled={!String(draft.min ?? "").trim() && !String(draft.max ?? "").trim()}
+            >
+              Clear all
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{formatNumberValue(bounds.min, filter)}</span>
+                <span>{formatNumberValue(bounds.max, filter)}</span>
+              </div>
+              <div className="relative h-6">
+                <RangeSlider
+                  min={bounds.min}
+                  max={bounds.max}
+                  step={bounds.step}
+                  value={[activeMin, activeMax]}
+                  ariaLabelMin={`${filter.label} minimum slider`}
+                  ariaLabelMax={`${filter.label} maximum slider`}
+                  onChange={([nextMin, nextMax]) =>
+                    setDraft(numberFilterValueFromSlider([nextMin, nextMax], bounds))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Min</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step={bounds.step}
+                  aria-label={`${filter.label} minimum`}
+                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+                  value={draft.min ?? ""}
+                  onChange={(event) =>
+                    setDraft(
+                      normalizeNumberFilterValue(
+                        { min: event.target.value, max: draft.max ?? "" },
+                        bounds,
+                        "min-input",
+                      ),
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Max</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step={bounds.step}
+                  aria-label={`${filter.label} maximum`}
+                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+                  value={draft.max ?? ""}
+                  onChange={(event) =>
+                    setDraft(
+                      normalizeNumberFilterValue(
+                        { min: draft.min ?? "", max: event.target.value },
+                        bounds,
+                        "max-input",
+                      ),
+                    )
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -471,6 +664,175 @@ function summarizeMultiFilter(
   return `${label} ${counts.join(" ")}`;
 }
 
+function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {
+  const [draft, setDraft] = useState(value);
+  const latestOnChange = useRef(onChange);
+
+  useEffect(() => {
+    latestOnChange.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (draft === value) return;
+
+    const timeoutId = window.setTimeout(() => {
+      latestOnChange.current(draft);
+    }, FILTER_INPUT_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [draft, value]);
+
+  return [draft, setDraft] as const;
+}
+
+function useDebouncedNumberDraft(
+  value: FilterBarNumberValue,
+  onChange: (value: FilterBarNumberValue) => void,
+) {
+  const [draft, setDraft] = useState(value);
+  const latestOnChange = useRef(onChange);
+
+  useEffect(() => {
+    latestOnChange.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value.max, value.min]);
+
+  useEffect(() => {
+    if (sameNumberFilterValue(draft, value)) return;
+
+    const timeoutId = window.setTimeout(() => {
+      latestOnChange.current(draft);
+    }, FILTER_INPUT_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [draft, value]);
+
+  return [draft, setDraft] as const;
+}
+
+function sameNumberFilterValue(left: FilterBarNumberValue, right: FilterBarNumberValue) {
+  return (left.min ?? "") === (right.min ?? "") && (left.max ?? "") === (right.max ?? "");
+}
+
+type NumberFilterBounds = {
+  min: number;
+  max: number;
+  step: number;
+};
+
+type NumberFilterSource = "min-input" | "max-input";
+
+function resolveNumberFilterBounds(filter: FilterBarNumberFilter): NumberFilterBounds {
+  const parsedMin = parseFilterNumber(filter.value.min);
+  const parsedMax = parseFilterNumber(filter.value.max);
+  const fallbackMin = parsedMin ?? 0;
+  const fallbackMax = parsedMax ?? Math.max(fallbackMin + 100, 100);
+  const min = filter.domainMin ?? Math.min(fallbackMin, fallbackMax);
+  const max = filter.domainMax ?? Math.max(fallbackMax, min + 100);
+  const step = filter.step && filter.step > 0 ? filter.step : 1;
+
+  return {
+    min,
+    max: max <= min ? min + step : max,
+    step,
+  };
+}
+
+function summarizeNumberFilter(
+  filter: FilterBarNumberFilter,
+  bounds: NumberFilterBounds,
+  value: FilterBarNumberValue,
+) {
+  const parsedMin = parseFilterNumber(value.min);
+  const parsedMax = parseFilterNumber(value.max);
+  const hasMin = String(value.min ?? "").trim() !== "";
+  const hasMax = String(value.max ?? "").trim() !== "";
+
+  if (!hasMin && !hasMax) {
+    return filter.label;
+  }
+
+  const minLabel =
+    parsedMin == null ? formatNumberValue(bounds.min, filter) : formatNumberValue(parsedMin, filter);
+  const maxLabel =
+    parsedMax == null ? formatNumberValue(bounds.max, filter) : formatNumberValue(parsedMax, filter);
+
+  if (hasMin && hasMax) {
+    if (minLabel === maxLabel) {
+      return `${filter.label} ${minLabel}`;
+    }
+    return `${filter.label} ${minLabel}-${maxLabel}`;
+  }
+
+  if (hasMin) {
+    return `${filter.label} >=${minLabel}`;
+  }
+
+  return `${filter.label} <=${maxLabel}`;
+}
+
+function normalizeNumberFilterValue(
+  nextValue: FilterBarNumberValue,
+  bounds: NumberFilterBounds,
+  source: NumberFilterSource,
+): FilterBarNumberValue {
+  let min = nextValue.min ?? "";
+  let max = nextValue.max ?? "";
+
+  const parsedMin = parseFilterNumber(min);
+  const parsedMax = parseFilterNumber(max);
+
+  if (parsedMin != null && parsedMax != null && parsedMin > parsedMax) {
+    if (source.startsWith("min")) {
+      max = min;
+    } else {
+      min = max;
+    }
+  }
+
+  return { min, max };
+}
+
+function numberFilterValueFromSlider(
+  value: [number, number],
+  bounds: NumberFilterBounds,
+): FilterBarNumberValue {
+  const [min, max] = value;
+  return {
+    min: min <= bounds.min ? "" : formatRawNumber(clampNumber(min, bounds.min, bounds.max)),
+    max: max >= bounds.max ? "" : formatRawNumber(clampNumber(max, bounds.min, bounds.max)),
+  };
+}
+
+function parseFilterNumber(value: string | undefined) {
+  if (!value?.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatNumberValue(value: number, filter: FilterBarNumberFilter) {
+  if (filter.formatValue) {
+    return filter.formatValue(value);
+  }
+
+  return formatRawNumber(value);
+}
+
+function formatRawNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
+}
+
 function updateMultiFilterValue(
   current: Record<string, FilterBarMultiFilterMode>,
   optionValue: string,
@@ -561,33 +923,26 @@ function RangeInput({
   onChange: (value: string) => void;
   placeholder: string;
 }) {
-  return (
-    <div className="relative">
-      <input
+  if (kind === "date") {
+    return (
+      <DatePicker
         ref={inputRef}
-        type={kind === "date" ? "date" : "text"}
-        className={cn(
-          "h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          kind === "date" && "pr-8",
-        )}
-        placeholder={placeholder}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
+        placeholder={placeholder}
+        inputClassName="pr-8"
       />
-      {kind === "date" && (
-        <button
-          type="button"
-          aria-label="Open date picker"
-          className="absolute inset-y-0 right-1 inline-flex items-center text-muted-foreground"
-          onClick={() => {
-            inputRef.current?.focus();
-            inputRef.current?.showPicker?.();
-          }}
-        >
-          <Icon name="codicon:calendar" className="text-sm" />
-        </button>
-      )}
-    </div>
+    );
+  }
+
+  return (
+    <DateTimePicker
+      ref={inputRef}
+      inputClassName="pr-8"
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 

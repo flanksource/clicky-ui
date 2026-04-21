@@ -12,6 +12,7 @@ import {
   FilterBar,
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
+  type FilterBarNumberValue,
   type FilterBarProps,
 } from "../components/FilterBar";
 import type { MultiSelectOption } from "../components/MultiSelect";
@@ -26,8 +27,13 @@ type InternalRow<T> = {
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
-  kind: "text" | "multi";
+  kind: "text" | "multi" | "number";
   options: MultiSelectOption[];
+  numberBounds?: {
+    min: number;
+    max: number;
+    step: number;
+  };
 };
 
 export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = {
@@ -84,6 +90,7 @@ export function DataTable<T extends Record<string, unknown>>({
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
   >({});
+  const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarNumberValue>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
 
@@ -105,6 +112,16 @@ export function DataTable<T extends Record<string, unknown>>({
     if (!autoFilter) return [];
 
     return filterableColumns.map((column) => {
+      const numberBounds = getNumericFilterBounds(rows, column);
+      if (numberBounds) {
+        return {
+          column,
+          kind: "number" as const,
+          options: [],
+          numberBounds,
+        };
+      }
+
       const values = new Set<string>();
 
       for (const record of rows) {
@@ -128,6 +145,7 @@ export function DataTable<T extends Record<string, unknown>>({
   useEffect(() => {
     setTextFilters((current) => pruneTextFilterState(current, generatedFilters));
     setMultiFilters((current) => pruneMultiFilterState(current, generatedFilters));
+    setNumberFilters((current) => pruneNumberFilterState(current, generatedFilters));
   }, [generatedFilters]);
 
   const growColumnCount = useMemo(() => countGrowColumns(columns), [columns]);
@@ -149,6 +167,18 @@ export function DataTable<T extends Record<string, unknown>>({
                 setMultiFilters((current) => updateFilterRecord(current, filter.column.key, next)),
               options: filter.options,
             }
+          : filter.kind === "number"
+            ? {
+                key: filter.column.key,
+                kind: "number",
+                label: labelText(filter.column),
+                value: numberFilters[filter.column.key] ?? {},
+                domainMin: filter.numberBounds?.min,
+                domainMax: filter.numberBounds?.max,
+                step: filter.numberBounds?.step,
+                onChange: (next: FilterBarNumberValue) =>
+                  setNumberFilters((current) => updateNumberFilterValue(current, filter.column.key, next)),
+              }
           : {
               key: filter.column.key,
               kind: "text",
@@ -158,7 +188,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 setTextFilters((current) => updateFilterValue(current, filter.column.key, next)),
             },
       ),
-    [generatedFilters, multiFilters, textFilters],
+    [generatedFilters, multiFilters, numberFilters, textFilters],
   );
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
@@ -193,6 +223,23 @@ export function DataTable<T extends Record<string, unknown>>({
           if (needle && !tokens.some((token) => token.toLowerCase().includes(needle))) {
             return false;
           }
+        } else if (filter.kind === "number") {
+          const range = numberFilters[filter.column.key] ?? {};
+          const min = parseNumberInput(range.min);
+          const max = parseNumberInput(range.max);
+          const hasMin = String(range.min ?? "").trim() !== "";
+          const hasMax = String(range.max ?? "").trim() !== "";
+
+          if (hasMin || hasMax) {
+            const values = getFilterNumbers(row, filter.column);
+            const matches = values.some(
+              (value) => (min == null || value >= min) && (max == null || value <= max),
+            );
+
+            if (!matches) {
+              return false;
+            }
+          }
         } else {
           const selected = multiFilters[filter.column.key] ?? {};
           const include = Object.entries(selected)
@@ -214,7 +261,15 @@ export function DataTable<T extends Record<string, unknown>>({
 
       return true;
     });
-  }, [effectiveGlobalFilter, filterableColumns, generatedFilters, multiFilters, rows, textFilters]);
+  }, [
+    effectiveGlobalFilter,
+    filterableColumns,
+    generatedFilters,
+    multiFilters,
+    numberFilters,
+    rows,
+    textFilters,
+  ]);
 
   const sortResolvers = useMemo(
     () =>
@@ -400,10 +455,17 @@ function getSortValue<T extends Record<string, unknown>>(row: T, column: DataTab
   return column.sortValue ? column.sortValue(rawValue, row) : rawValue;
 }
 
-function getFilterTokens<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+function getFilterCandidate<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
   const rawValue = resolvePath(row, column.key);
-  const value = column.filterValue ? column.filterValue(rawValue, row) : rawValue;
-  return normalizeTokens(value);
+  return column.filterValue ? column.filterValue(rawValue, row) : rawValue;
+}
+
+function getFilterTokens<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+  return normalizeTokens(getFilterCandidate(row, column));
+}
+
+function getFilterNumbers<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+  return normalizeNumbers(getFilterCandidate(row, column));
 }
 
 function normalizeTokens(value: FilterValue | unknown): string[] {
@@ -416,6 +478,15 @@ function normalizeTokens(value: FilterValue | unknown): string[] {
 
   const token = String(value).trim();
   return token ? [token] : [];
+}
+
+function normalizeNumbers(value: FilterValue | unknown): number[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeNumbers(item));
+  }
+
+  const parsed = parseNumberInput(value);
+  return parsed == null ? [] : [parsed];
 }
 
 function updateFilterValue<T extends Record<string, string>>(
@@ -450,6 +521,24 @@ function updateFilterRecord<T extends Record<string, Record<string, FilterBarMul
   return next;
 }
 
+function updateNumberFilterValue<T extends Record<string, FilterBarNumberValue>>(
+  state: T,
+  key: string,
+  nextValue: FilterBarNumberValue,
+) {
+  const next = { ...state };
+  const hasMin = String(nextValue.min ?? "").trim() !== "";
+  const hasMax = String(nextValue.max ?? "").trim() !== "";
+
+  if (hasMin || hasMax) {
+    next[key] = nextValue;
+  } else {
+    delete next[key];
+  }
+
+  return next;
+}
+
 function pruneTextFilterState(
   state: Record<string, string>,
   filters: GeneratedFilter<any>[],
@@ -462,6 +551,18 @@ function pruneMultiFilterState(
   filters: GeneratedFilter<any>[],
 ) {
   return pruneFilterState(state, filters, "multi", (value) => Object.keys(value).length === 0);
+}
+
+function pruneNumberFilterState(
+  state: Record<string, FilterBarNumberValue>,
+  filters: GeneratedFilter<any>[],
+) {
+  return pruneFilterState(
+    state,
+    filters,
+    "number",
+    (value) => !String(value.min ?? "").trim() && !String(value.max ?? "").trim(),
+  );
 }
 
 function pruneFilterState<T>(
@@ -509,6 +610,66 @@ function prettifyKey(key: string) {
 function labelText(column: DataTableColumn) {
   if (typeof column.label === "string") return column.label;
   return prettifyKey(column.key.split(".").at(-1) ?? column.key);
+}
+
+function getNumericFilterBounds<T extends Record<string, unknown>>(
+  rows: InternalRow<T>[],
+  column: DataTableColumn<T>,
+) {
+  const values = rows.flatMap((record) => collectFilterValues(getFilterCandidate(record.row, column)));
+  const populated = values.filter(hasFilterValue);
+  const numericValues = populated.map((value) => parseNumberInput(value)).filter((value) => value != null);
+
+  if (populated.length === 0 || numericValues.length !== populated.length) {
+    return null;
+  }
+
+  return {
+    min: Math.min(...numericValues),
+    max: Math.max(...numericValues),
+    step: inferNumericStep(numericValues),
+  };
+}
+
+function collectFilterValues(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectFilterValues(item));
+  }
+
+  return [value];
+}
+
+function hasFilterValue(value: unknown) {
+  return value != null && !(typeof value === "string" && value.trim() === "");
+}
+
+function parseNumberInput(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function inferNumericStep(values: number[]) {
+  if (values.every(Number.isInteger)) {
+    return 1;
+  }
+
+  const maxFractionDigits = values.reduce((current, value) => {
+    const [, fraction = ""] = String(value).split(".");
+    return Math.max(current, fraction.length);
+  }, 0);
+
+  return 10 ** -Math.min(maxFractionDigits || 2, 6);
 }
 
 function alignmentClass(align?: DataTableColumn["align"]) {

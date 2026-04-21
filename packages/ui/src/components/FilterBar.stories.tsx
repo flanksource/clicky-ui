@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { FilterBar, type FilterBarFilter } from "./FilterBar";
+import { FilterBar, type FilterBarFilter, type FilterBarNumberValue } from "./FilterBar";
 
 function FilterBarShowcase() {
   const [search, setSearch] = useState("");
@@ -8,6 +8,7 @@ function FilterBarShowcase() {
     healthy: "include",
   });
   const [owner, setOwner] = useState("");
+  const [restarts, setRestarts] = useState<FilterBarNumberValue>({ min: "1", max: "5" });
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
   const [dateFrom, setDateFrom] = useState("");
@@ -32,6 +33,16 @@ function FilterBarShowcase() {
       value: owner,
       onChange: setOwner,
       placeholder: "platform",
+    },
+    {
+      key: "restarts",
+      kind: "number",
+      label: "Restarts",
+      value: restarts,
+      domainMin: 0,
+      domainMax: 6,
+      step: 1,
+      onChange: (next) => setRestarts(next),
     },
   ];
 

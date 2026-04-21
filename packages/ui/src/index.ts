@@ -18,11 +18,16 @@ export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-histor
 
 // Existing components
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { DatePicker, type DatePickerProps } from "./components/DatePicker";
+export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
+export { RangeSlider, type RangeSliderProps, type RangeSliderValue } from "./components/RangeSlider";
 export {
   FilterBar,
   type FilterBarFilter,
   type FilterBarMultiFilter,
   type FilterBarMultiFilterMode,
+  type FilterBarNumberFilter,
+  type FilterBarNumberValue,
   type FilterBarProps,
   type FilterBarRangePreset,
   type FilterBarRangeProps,

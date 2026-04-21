@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
 
@@ -68,17 +68,23 @@ describe("DataTable", () => {
   });
 
   it("applies the built-in global search", () => {
+    vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
     fireEvent.change(screen.getByPlaceholderText("Search all columns…"), {
       target: { value: "nightly" },
     });
 
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.getByText("cron")).toBeInTheDocument();
     expect(screen.queryByText("worker")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("generates multi-select and text filters automatically", () => {
+    vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
     fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
@@ -94,8 +100,28 @@ describe("DataTable", () => {
 
     fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "batch-21" } });
 
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.getByText("cron")).toBeInTheDocument();
     expect(screen.queryByText("api")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("generates number range filters for numeric columns", () => {
+    vi.useFakeTimers();
+    render(<DataTable data={rows} columns={columns} autoFilter />);
+
+    fireEvent.click(screen.getByRole("button", { name: /restarts filter/i }));
+    fireEvent.change(screen.getByLabelText("Restarts minimum"), { target: { value: "2" } });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.queryByText("api")).not.toBeInTheDocument();
+    expect(screen.queryByText("cron")).not.toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("applies grow and shrink cell behavior", () => {

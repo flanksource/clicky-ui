@@ -1,4 +1,8 @@
-import { FilterBar, type FilterBarFilter } from "@flanksource/clicky-ui";
+import {
+  FilterBar,
+  type FilterBarFilter,
+  type FilterBarNumberValue,
+} from "@flanksource/clicky-ui";
 import { useState } from "react";
 import { DemoSection } from "./Section";
 
@@ -8,6 +12,7 @@ export function FilterBarDemo() {
     healthy: "include",
   });
   const [owner, setOwner] = useState("");
+  const [restarts, setRestarts] = useState<FilterBarNumberValue>({ min: "1", max: "4" });
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
   const [dateFrom, setDateFrom] = useState("");
@@ -33,13 +38,23 @@ export function FilterBarDemo() {
       onChange: setOwner,
       placeholder: "platform",
     },
+    {
+      key: "restarts",
+      kind: "number",
+      label: "Restarts",
+      value: restarts,
+      domainMin: 0,
+      domainMax: 6,
+      step: 1,
+      onChange: (next) => setRestarts(next),
+    },
   ];
 
   return (
     <DemoSection
       id="filter-bar"
       title="FilterBar / MultiSelect"
-      description="Compact native filter chrome with search, compact selects, and built-in date/time range controls."
+      description="Compact native filter chrome with search, tri-state selects, number ranges, and built-in date/time range controls."
     >
       <FilterBar
         search={{
