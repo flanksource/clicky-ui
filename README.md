@@ -14,8 +14,8 @@ Toolchain: [Vite+](https://viteplus.dev) (`vp`) + pnpm workspaces + Changesets.
 ```bash
 vp install
 vp run -r build
-vp run storybook#dev   # http://localhost:6006
-vp run kitchen-sink#dev # http://localhost:5173
+vp run storybook#dev   # http://localhost:5270
+vp run kitchen-sink#dev # http://localhost:5273
 ```
 
 ## Workspace scripts

@@ -20,7 +20,7 @@ export default defineConfig({
     exclude: ["@flanksource/clicky-ui"],
   },
   server: {
-    port: 5173,
+    port: 5273,
     strictPort: true,
   },
 });

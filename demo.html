@@ -512,7 +512,7 @@
           id: "code-block",
           label: "Code blocks (syntax-highlighted, multi-language)",
           description:
-            "kind:\"code\" nodes in bash, tsx, ts, go, java. Prism autoloader fetches each grammar on demand.",
+            'kind:"code" nodes in bash, tsx, ts, go, java. Prism autoloader fetches each grammar on demand.',
           data: doc({
             kind: "map",
             fields: [
@@ -552,7 +552,7 @@
                   kind: "code",
                   language: "go",
                   source:
-                    "package main\n\nimport (\n\t\"encoding/json\"\n\t\"net/http\"\n)\n\ntype ClickyDoc struct {\n\tVersion int         `json:\"version\"`\n\tNode    interface{} `json:\"node\"`\n}\n\nfunc main() {\n\thttp.HandleFunc(\"/status\", func(w http.ResponseWriter, _ *http.Request) {\n\t\tdoc := ClickyDoc{\n\t\t\tVersion: 1,\n\t\t\tNode: map[string]any{\n\t\t\t\t\"kind\": \"text\",\n\t\t\t\t\"text\": \"healthy\",\n\t\t\t\t\"style\": map[string]any{\"color\": \"#166534\", \"bold\": true},\n\t\t\t},\n\t\t}\n\t\tw.Header().Set(\"Content-Type\", \"application/json\")\n\t\t_ = json.NewEncoder(w).Encode(doc)\n\t})\n\t_ = http.ListenAndServe(\":8080\", nil)\n}",
+                    'package main\n\nimport (\n\t"encoding/json"\n\t"net/http"\n)\n\ntype ClickyDoc struct {\n\tVersion int         `json:"version"`\n\tNode    interface{} `json:"node"`\n}\n\nfunc main() {\n\thttp.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {\n\t\tdoc := ClickyDoc{\n\t\t\tVersion: 1,\n\t\t\tNode: map[string]any{\n\t\t\t\t"kind": "text",\n\t\t\t\t"text": "healthy",\n\t\t\t\t"style": map[string]any{"color": "#166534", "bold": true},\n\t\t\t},\n\t\t}\n\t\tw.Header().Set("Content-Type", "application/json")\n\t\t_ = json.NewEncoder(w).Encode(doc)\n\t})\n\t_ = http.ListenAndServe(":8080", nil)\n}',
                 },
               },
               {
@@ -562,7 +562,7 @@
                   kind: "code",
                   language: "java",
                   source:
-                    "import com.fasterxml.jackson.databind.ObjectMapper;\nimport java.util.Map;\n\npublic class ClickyEmitter {\n    private static final ObjectMapper MAPPER = new ObjectMapper();\n\n    public static String render(String status) throws Exception {\n        var node = Map.of(\n            \"kind\", \"text\",\n            \"text\", status,\n            \"style\", Map.of(\"color\", \"#166534\", \"bold\", true)\n        );\n        var doc = Map.of(\"version\", 1, \"node\", node);\n        return MAPPER.writeValueAsString(doc);\n    }\n\n    public static void main(String[] args) throws Exception {\n        System.out.println(render(\"healthy\"));\n    }\n}",
+                    'import com.fasterxml.jackson.databind.ObjectMapper;\nimport java.util.Map;\n\npublic class ClickyEmitter {\n    private static final ObjectMapper MAPPER = new ObjectMapper();\n\n    public static String render(String status) throws Exception {\n        var node = Map.of(\n            "kind", "text",\n            "text", status,\n            "style", Map.of("color", "#166534", "bold", true)\n        );\n        var doc = Map.of("version", 1, "node", node);\n        return MAPPER.writeValueAsString(doc);\n    }\n\n    public static void main(String[] args) throws Exception {\n        System.out.println(render("healthy"));\n    }\n}',
                 },
               },
             ],
@@ -728,7 +728,7 @@
           id: "inline-code",
           label: "Inline code within prose",
           description:
-            "kind:\"text\" nodes can nest code blocks + inline monospace tokens inside their children array.",
+            'kind:"text" nodes can nest code blocks + inline monospace tokens inside their children array.',
           data: (() => {
             const inlineCode = (text) =>
               t(text, {
@@ -789,7 +789,7 @@
                       t("Run "),
                       inlineCode("pnpm --filter @flanksource/clicky-ui dev"),
                       t(" to start the dev server, then open "),
-                      inlineCode("http://localhost:5173"),
+                      inlineCode("http://localhost:5273"),
                       t(". The kitchen-sink app hot-reloads on any change to "),
                       inlineCode("packages/ui/src/**/*"),
                       t("."),
