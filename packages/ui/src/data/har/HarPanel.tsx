@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { useSort } from "../../hooks/use-sort";
-import { SortableHeader } from "../SortableHeader";
+import { useMemo } from "react";
+import { DataTable, type DataTableColumn } from "../DataTable";
 import { JsonView } from "../JsonView";
 import type { HAREntry } from "./types";
 
@@ -11,13 +10,48 @@ export type HarPanelProps = {
   className?: string;
 };
 
-const COLS: { key: string; label: string; cls: string; align?: "left" | "right" }[] = [
-  { key: "request.method", label: "Method", cls: "px-2 py-2 w-16" },
-  { key: "request.url", label: "URL", cls: "px-2 py-2" },
-  { key: "response.status", label: "Status", cls: "px-2 py-2 w-20" },
-  { key: "time", label: "Time", cls: "px-2 py-2 w-16 text-right", align: "right" },
-  { key: "response.bodySize", label: "Size", cls: "px-2 py-2 w-16 text-right", align: "right" },
-  { key: "response.content.mimeType", label: "Type", cls: "px-2 py-2 w-40" },
+const COLS: DataTableColumn<HAREntry>[] = [
+  {
+    key: "request.method",
+    label: "Method",
+    shrink: true,
+  },
+  {
+    key: "request.url",
+    label: "URL",
+    grow: true,
+    render: (value) => <span title={String(value ?? "")}>{String(value ?? "")}</span>,
+  },
+  {
+    key: "response.status",
+    label: "Status",
+    shrink: true,
+    render: (value) => (
+      <span className={statusColor(Number(value ?? 0))}>{String(value ?? "")}</span>
+    ),
+    sortValue: (value) => Number(value ?? 0),
+  },
+  {
+    key: "time",
+    label: "Time",
+    align: "right",
+    shrink: true,
+    render: (value) => `${Number(value ?? 0).toFixed(0)}ms`,
+    sortValue: (value) => Number(value ?? 0),
+  },
+  {
+    key: "response.bodySize",
+    label: "Size",
+    align: "right",
+    shrink: true,
+    render: (value) => formatBytes(Number(value ?? 0)),
+    sortValue: (value) => Number(value ?? 0),
+  },
+  {
+    key: "response.content.mimeType",
+    label: "Type",
+    shrink: true,
+  },
 ];
 
 export function HarPanel({
@@ -26,12 +60,10 @@ export function HarPanel({
   emptyLabel = "No HTTP traffic captured",
   className,
 }: HarPanelProps) {
-  const filtered = useMemo(() => {
-    if (!search) return entries;
-    const needle = search.toLowerCase();
-    return entries.filter((e) => matchesSearch(needle, e));
+  const filteredEntries = useMemo(() => {
+    if (search === undefined || search.trim() === "") return entries;
+    return entries.filter((entry) => matchesSearch(search.trim().toLowerCase(), entry));
   }, [entries, search]);
-  const { sorted, sort, toggle } = useSort(filtered, { defaultKey: "time" });
 
   if (!entries || entries.length === 0) {
     return (
@@ -40,74 +72,21 @@ export function HarPanel({
   }
 
   return (
-    <div className={`overflow-auto h-full ${className ?? ""}`}>
-      <table className="w-full text-left table-fixed">
-        <thead className="bg-muted/50 sticky top-0">
-          <tr className="text-xs text-muted-foreground border-b border-border">
-            {COLS.map((c) => (
-              <th
-                key={c.key}
-                className={`${c.cls} cursor-pointer select-none whitespace-nowrap font-medium`}
-              >
-                <SortableHeader
-                  active={sort?.key === c.key}
-                  dir={sort?.dir}
-                  onClick={() => toggle(c.key)}
-                  align={c.align}
-                >
-                  {c.label}
-                </SortableHeader>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((entry, i) => (
-            <HarRow key={i} entry={entry} />
-          ))}
-        </tbody>
-      </table>
+    <div className={`h-full ${className ?? ""}`}>
+      <DataTable
+        data={filteredEntries}
+        columns={COLS}
+        autoFilter
+        showGlobalFilter={search === undefined}
+        globalFilterPlaceholder="Filter URL, method, or body…"
+        defaultSort={{ key: "time", dir: "asc" }}
+        emptyMessage={emptyLabel}
+        getRowId={(entry, index) =>
+          `${entry.startedDateTime ?? index}-${entry.request.method}-${entry.request.url}-${entry.time}`
+        }
+        renderExpandedRow={(entry) => <HarRowDetails entry={entry} />}
+      />
     </div>
-  );
-}
-
-function HarRow({ entry }: { entry: HAREntry }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <tr
-        className="hover:bg-accent cursor-pointer text-xs border-b border-border"
-        onClick={() => setOpen(!open)}
-      >
-        <td className="px-2 py-1.5 font-mono font-medium whitespace-nowrap">
-          {entry.request.method}
-        </td>
-        <td className="px-2 py-1.5 font-mono truncate max-w-0" title={entry.request.url}>
-          {entry.request.url}
-        </td>
-        <td
-          className={`px-2 py-1.5 font-medium whitespace-nowrap ${statusColor(entry.response.status)}`}
-        >
-          {entry.response.status}
-        </td>
-        <td className="px-2 py-1.5 text-right text-muted-foreground whitespace-nowrap tabular-nums">
-          {entry.time.toFixed(0)}ms
-        </td>
-        <td className="px-2 py-1.5 text-right text-muted-foreground whitespace-nowrap tabular-nums">
-          {formatBytes(entry.response.bodySize)}
-        </td>
-        <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
-          {entry.response.content?.mimeType || ""}
-        </td>
-      </tr>
-      {open && (
-        <tr>
-          <td colSpan={COLS.length} className="bg-muted/50 p-density-3 text-xs">
-            <HarRowDetails entry={entry} />
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 
@@ -189,14 +168,13 @@ function isJsonType(mime?: string): boolean {
   return !!mime && (mime.includes("json") || mime.includes("javascript"));
 }
 
-function matchesSearch(needle: string, e: HAREntry): boolean {
-  const haystacks = [
-    e.request.url,
-    e.request.method,
-    e.request.postData?.text,
-    e.response.content?.text,
-  ];
-  return haystacks.some((h) => !!h && h.toLowerCase().includes(needle));
+function matchesSearch(needle: string, entry: HAREntry): boolean {
+  return [
+    entry.request.method,
+    entry.request.url,
+    entry.request.postData?.text,
+    entry.response.content?.text,
+  ].some((value) => !!value && value.toLowerCase().includes(needle));
 }
 
 function formatBytes(bytes: number): string {

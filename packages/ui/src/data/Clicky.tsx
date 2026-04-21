@@ -1,6 +1,15 @@
-import { Fragment, useState, type CSSProperties } from "react";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { cn } from "../lib/utils";
-import { SortableHeader } from "./SortableHeader";
+import { DataTable, type DataTableColumn } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
 
@@ -31,6 +40,10 @@ export type ClickyColumn = {
   label?: string;
   header?: ClickyNode;
   align?: "left" | "right" | "center";
+  sortable?: boolean;
+  filterable?: boolean;
+  grow?: boolean;
+  shrink?: boolean;
 };
 
 export type ClickyRow = {
@@ -72,6 +85,7 @@ export type ClickyNode = {
   fields?: ClickyField[];
   columns?: ClickyColumn[];
   rows?: ClickyRow[];
+  autoFilter?: boolean;
   roots?: ClickyTreeItem[];
   label?: ClickyNode;
   content?: ClickyNode;
@@ -91,8 +105,25 @@ export type ClickyDocument = {
   node: ClickyNode;
 };
 
+export type ClickyRemoteFormat = "json" | "pdf";
+
+export type ClickyViewOptions = {
+  json?: boolean;
+  pdf?: boolean;
+};
+
+export type ClickyViewConfig = ClickyViewOptions | ClickyRemoteFormat[];
+
+export type ClickyDownloadOptions = {
+  all?: boolean;
+  label?: string;
+};
+
 export type ClickyProps = {
-  data: ClickyDocument | ClickyNode | string;
+  data?: ClickyDocument | ClickyNode | string;
+  url?: string;
+  view?: ClickyViewConfig;
+  download?: ClickyDownloadOptions;
   className?: string;
 };
 
@@ -100,26 +131,51 @@ type ParsedClicky =
   | { ok: true; document: ClickyDocument }
   | { ok: false; message: string; raw: string };
 
-type SortDir = "asc" | "desc";
+export function Clicky(props: ClickyProps) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 30_000,
+            retry: 1,
+          },
+        },
+      }),
+  );
 
-export function Clicky({ data, className }: ClickyProps) {
+  if (props.url) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ClickyRemoteRenderer {...props} url={props.url} />
+      </QueryClientProvider>
+    );
+  }
+
+  return <ClickyContent data={props.data} className={props.className} />;
+}
+
+function ClickyContent({
+  data,
+  className,
+}: {
+  data: ClickyProps["data"];
+  className?: string;
+}) {
+  if (data === undefined) {
+    return (
+      <ClickyNotice
+        className={className}
+        title="No Clicky data"
+        message="Provide either a local data payload or a URL."
+      />
+    );
+  }
+
   const parsed = parseClickyData(data);
 
   if (!parsed.ok) {
-    return (
-      <div
-        className={cn(
-          "rounded-md border border-destructive/30 bg-destructive/5 p-density-3",
-          className,
-        )}
-      >
-        <div className="text-sm font-medium text-destructive">Invalid Clicky payload</div>
-        <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground">
-          {parsed.message}
-          {parsed.raw ? `\n\n${parsed.raw}` : ""}
-        </pre>
-      </div>
-    );
+    return <ClickyInvalidPayload parsed={parsed} className={className} />;
   }
 
   return (
@@ -127,6 +183,223 @@ export function Clicky({ data, className }: ClickyProps) {
       <ClickyNodeRenderer node={parsed.document.node} />
     </div>
   );
+}
+
+function ClickyRemoteRenderer({
+  data,
+  url,
+  view,
+  download,
+  className,
+}: ClickyProps & { url: string }) {
+  const availableViews = useMemo(
+    () => getAvailableViews({ data, url, view }),
+    [data, url, view],
+  );
+  const downloadFormats = useMemo(
+    () => getDownloadFormats({ url, download, availableViews }),
+    [availableViews, download, url],
+  );
+  const [activeView, setActiveView] = useState<ClickyRemoteFormat>(() => availableViews[0] ?? "json");
+
+  useEffect(() => {
+    if (!availableViews.includes(activeView)) {
+      setActiveView(availableViews[0] ?? "json");
+    }
+  }, [activeView, availableViews]);
+
+  const formattedUrl = buildFormatUrl(url, activeView);
+  const jsonQuery = useQuery({
+    queryKey: ["clicky", formattedUrl],
+    enabled: activeView === "json",
+    queryFn: async () => fetchClickyPayload(formattedUrl),
+  });
+
+  const effectiveData = activeView === "json" ? (jsonQuery.data ?? data) : undefined;
+  const canDownload = downloadFormats.length > 0;
+
+  return (
+    <div className={cn("space-y-density-3", className)}>
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-density-3 py-density-2">
+        {availableViews.length > 1 && (
+          <div
+            role="radiogroup"
+            aria-label="Clicky view mode"
+            className="inline-flex items-center rounded-md border border-input bg-background p-1"
+          >
+            {availableViews.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={activeView === mode}
+                onClick={() => setActiveView(mode)}
+                className={cn(
+                  "rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+                  activeView === mode
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                {formatViewLabel(mode)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs text-muted-foreground">
+          {formattedUrl}
+        </code>
+
+        {activeView === "json" && jsonQuery.isFetching && (
+          <span className="text-xs text-muted-foreground">Refreshing…</span>
+        )}
+
+        {canDownload && (
+          <ClickyDownloadSplitButton
+            className="ml-auto"
+            activeFormat={activeView}
+            url={url}
+            formats={downloadFormats}
+            label={download?.label}
+          />
+        )}
+      </div>
+
+      {activeView === "pdf" ? (
+        <ClickyPdfPreview src={formattedUrl} />
+      ) : jsonQuery.isPending && effectiveData === undefined ? (
+        <ClickyNotice title="Loading Clicky" message={`Fetching ${formattedUrl}`} />
+      ) : jsonQuery.isError && effectiveData === undefined ? (
+        <ClickyNotice
+          title="Clicky request failed"
+          message={jsonQuery.error instanceof Error ? jsonQuery.error.message : "Request failed"}
+          tone="destructive"
+        />
+      ) : (
+        <>
+          {jsonQuery.isError && data !== undefined && (
+            <ClickyNotice
+              title="Remote refresh failed"
+              message="Showing the local fallback payload instead."
+              tone="warning"
+            />
+          )}
+          <ClickyContent data={effectiveData} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ClickyDownloadSplitButton({
+  activeFormat,
+  url,
+  formats,
+  label,
+  className,
+}: {
+  activeFormat: ClickyRemoteFormat;
+  url: string;
+  formats: ClickyRemoteFormat[];
+  label?: string;
+  className?: string;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+
+  return (
+    <div ref={rootRef} className={cn("relative", className)}>
+      <div className="inline-flex overflow-hidden rounded-md border border-input bg-background shadow-sm">
+        <button
+          type="button"
+          aria-label={label ? `Download ${label}` : "Download"}
+          className="inline-flex h-8 items-center gap-2 border-r border-input px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          onClick={() => submitDownloadRequest(buildFormatUrl(url, activeFormat))}
+        >
+          <Icon name="codicon:cloud-download" className="text-sm" />
+          <span>Download</span>
+        </button>
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-label="Open download menu"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          onClick={() => setOpen((current) => !current)}
+        >
+          <Icon name={open ? "codicon:chevron-up" : "codicon:chevron-down"} className="text-sm" />
+        </button>
+      </div>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[11rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+        >
+          {formats.map((format) => {
+            const active = format === activeFormat;
+            return (
+              <button
+                key={format}
+                type="button"
+                role="menuitem"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
+                  active && "bg-accent font-medium",
+                )}
+                onClick={() => {
+                  submitDownloadRequest(buildFormatUrl(url, format));
+                  setOpen(false);
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name={getFormatIconName(format)} className="text-sm" />
+                  <span>{formatViewLabel(format)}</span>
+                </span>
+                {active && <Icon name="codicon:check" className="text-xs text-muted-foreground" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useDismissablePopup(
+  open: boolean,
+  rootRef: RefObject<HTMLElement | null>,
+  triggerRef: RefObject<HTMLElement | null>,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, open, rootRef, triggerRef]);
 }
 
 function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
@@ -143,6 +416,175 @@ function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
   }
 
   return normalizeClickyDocument(data);
+}
+
+function fetchClickyPayload(url: string) {
+  return fetch(url, {
+    headers: {
+      Accept: "application/json, text/plain;q=0.9,*/*;q=0.8",
+    },
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw new Error(`Request failed with ${response.status} ${response.statusText}`.trim());
+    }
+    return response.text();
+  });
+}
+
+function ClickyInvalidPayload({
+  parsed,
+  className,
+}: {
+  parsed: Extract<ParsedClicky, { ok: false }>;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md border border-destructive/30 bg-destructive/5 p-density-3",
+        className,
+      )}
+    >
+      <div className="text-sm font-medium text-destructive">Invalid Clicky payload</div>
+      <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground">
+        {parsed.message}
+        {parsed.raw ? `\n\n${parsed.raw}` : ""}
+      </pre>
+    </div>
+  );
+}
+
+function ClickyNotice({
+  title,
+  message,
+  tone = "default",
+  className,
+}: {
+  title: string;
+  message: string;
+  tone?: "default" | "warning" | "destructive";
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md border p-density-3",
+        tone === "destructive" && "border-destructive/30 bg-destructive/5",
+        tone === "warning" && "border-yellow-500/30 bg-yellow-500/5",
+        tone === "default" && "border-border bg-muted/30",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "text-sm font-medium",
+          tone === "destructive" && "text-destructive",
+          tone === "warning" && "text-yellow-700 dark:text-yellow-400",
+        )}
+      >
+        {title}
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">{message}</div>
+    </div>
+  );
+}
+
+function ClickyPdfPreview({ src }: { src: string }) {
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
+        <span>PDF preview</span>
+        <a href={src} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+          Open in new tab
+        </a>
+      </div>
+      <iframe title="Clicky PDF preview" src={src} className="h-[720px] w-full bg-white" />
+    </div>
+  );
+}
+
+function getAvailableViews({
+  data,
+  url,
+  view,
+}: Pick<ClickyProps, "data" | "url" | "view">): ClickyRemoteFormat[] {
+  const allowJson = Array.isArray(view) ? view.includes("json") : (view?.json ?? true);
+  const allowPdf = Array.isArray(view) ? view.includes("pdf") : (view?.pdf ?? false);
+  const next: ClickyRemoteFormat[] = [];
+
+  if (allowJson && (url || data !== undefined)) {
+    next.push("json");
+  }
+
+  if (allowPdf && url) {
+    next.push("pdf");
+  }
+
+  if (next.length === 0 && (url || data !== undefined)) {
+    next.push("json");
+  }
+
+  return next;
+}
+
+function getDownloadFormats({
+  url,
+  download,
+  availableViews,
+}: {
+  url?: string;
+  download?: ClickyDownloadOptions;
+  availableViews: ClickyRemoteFormat[];
+}): ClickyRemoteFormat[] {
+  if (!download?.all) {
+    return [];
+  }
+
+  if (!url) {
+    return availableViews;
+  }
+
+  return ["json", "pdf"];
+}
+
+function getFormatIconName(format: ClickyRemoteFormat) {
+  if (format === "pdf") {
+    return "vscode-icons:file-type-pdf2";
+  }
+
+  return "vscode-icons:file-type-json";
+}
+
+function formatViewLabel(mode: ClickyRemoteFormat) {
+  return mode.toUpperCase();
+}
+
+function buildFormatUrl(url: string, format: ClickyRemoteFormat) {
+  const base = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const resolved = new URL(url, base);
+  resolved.searchParams.set("format", format);
+
+  if (isAbsoluteUrl(url)) {
+    return resolved.toString();
+  }
+
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+}
+
+function submitDownloadRequest(url: string) {
+  if (typeof document === "undefined") return;
+
+  const form = document.createElement("form");
+  form.method = "GET";
+  form.action = url;
+  form.style.display = "none";
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+}
+
+function isAbsoluteUrl(url: string) {
+  return /^[a-z][a-z\d+\-.]*:/i.test(url) || url.startsWith("//");
 }
 
 function normalizeClickyDocument(data: unknown): ParsedClicky {
@@ -347,111 +789,44 @@ function ClickyMap({ node }: { node: ClickyNode }) {
 function ClickyTable({ node }: { node: ClickyNode }) {
   const columns = node.columns ?? [];
   const rows = node.rows ?? [];
-  const hasDetail = rows.some((row) => !!row.detail);
-  const [sortKey, setSortKey] = useState(columns[0]?.name ?? "");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
   }
 
-  const sortedRows = [...rows].sort((left, right) => {
-    if (!sortKey) return 0;
-    const leftValue = left.cells[sortKey]?.plain ?? left.cells[sortKey]?.text ?? "";
-    const rightValue = right.cells[sortKey]?.plain ?? right.cells[sortKey]?.text ?? "";
-    return sortDir === "asc"
-      ? compareClickyValues(leftValue, rightValue)
-      : compareClickyValues(rightValue, leftValue);
-  });
+  const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => ({
+    key: `cells.${column.name}`,
+    label: column.header ? <ClickyNodeRenderer node={column.header} /> : column.label || prettifyName(column.name),
+    align: column.align,
+    sortable: column.sortable,
+    filterable: column.filterable,
+    grow: column.grow,
+    shrink: column.shrink,
+    render: (value) => <ClickyNodeRenderer node={value as ClickyNode} />,
+    sortValue: (value) => clickyNodeText(value as ClickyNode),
+    filterValue: (value) => clickyNodeText(value as ClickyNode),
+  }));
+
+  const defaultSortColumn = columns.find((column) => column.sortable !== false) ?? columns[0];
 
   return (
-    <div className="overflow-auto rounded-md border border-border">
-      <table className="w-full text-left text-sm table-fixed">
-        <thead className="sticky top-0 bg-muted/50">
-          <tr className="border-b border-border text-xs text-muted-foreground">
-            {hasDetail && <th className="w-8 px-2 py-2" />}
-            {columns.map((column) => (
-              <th key={column.name} className="px-2 py-2 font-medium">
-                <SortableHeader
-                  active={sortKey === column.name}
-                  dir={sortKey === column.name ? sortDir : undefined}
-                  align={column.align ?? "left"}
-                  onClick={() => {
-                    if (sortKey === column.name) {
-                      setSortDir((current) => (current === "asc" ? "desc" : "asc"));
-                    } else {
-                      setSortKey(column.name);
-                      setSortDir("asc");
-                    }
-                  }}
-                >
-                  {column.header ? (
-                    <ClickyNodeRenderer node={column.header} />
-                  ) : (
-                    column.label || prettifyName(column.name)
-                  )}
-                </SortableHeader>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRows.map((row, index) => (
-            <ClickyTableRow
-              key={`${index}-${row.cells[columns[0]?.name ?? ""]?.plain ?? ""}`}
-              row={row}
-              columns={columns}
-              hasDetail={hasDetail}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ClickyTableRow({
-  row,
-  columns,
-  hasDetail,
-}: {
-  row: ClickyRow;
-  columns: ClickyColumn[];
-  hasDetail: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const expandable = !!row.detail;
-
-  return (
-    <>
-      <tr
-        className={cn(
-          "border-b border-border align-top",
-          expandable && "cursor-pointer hover:bg-accent/50",
-        )}
-        onClick={expandable ? () => setOpen((current) => !current) : undefined}
-      >
-        {hasDetail && (
-          <td className="px-2 py-2 text-center text-muted-foreground">
-            {expandable ? (open ? "▼" : "▶") : ""}
-          </td>
-        )}
-        {columns.map((column) => (
-          <td key={column.name} className={cn("px-2 py-2", alignmentClass(column.align))}>
-            <ClickyNodeRenderer node={row.cells[column.name]} />
-          </td>
-        ))}
-      </tr>
-      {open && row.detail && (
-        <tr>
-          <td colSpan={columns.length + (hasDetail ? 1 : 0)} className="bg-muted/40 p-density-3">
-            <div className="rounded-md border border-border bg-background p-density-3">
-              <ClickyNodeRenderer node={row.detail} />
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+    <DataTable
+      data={rows}
+      columns={tableColumns}
+      autoFilter={node.autoFilter}
+      defaultSort={
+        defaultSortColumn ? { key: `cells.${defaultSortColumn.name}`, dir: "asc" } : undefined
+      }
+      getRowId={(row, index) =>
+        `${index}-${columns
+          .map((column) => clickyNodeText(row.cells[column.name]))
+          .filter(Boolean)
+          .join("|")}`
+      }
+      renderExpandedRow={(row) =>
+        row.detail ? <ClickyNodeRenderer node={row.detail} /> : null
+      }
+    />
   );
 }
 
@@ -660,15 +1035,20 @@ function prettifyName(name: string): string {
     .replace(/\b\w/g, (value) => value.toUpperCase());
 }
 
-function compareClickyValues(left: string, right: string): number {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
-
-  if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
-    return leftNumber - rightNumber;
+function clickyNodeText(node: ClickyNode | null | undefined): string {
+  if (!node) return "";
+  if (node.plain) return node.plain;
+  if (node.text) return node.text;
+  if (node.kind === "html") return sanitizeHtml(node.html ?? "").replace(/<[^>]+>/g, " ").trim();
+  if (node.kind === "code") return node.source ?? "";
+  if (node.kind === "button" && node.label) return clickyNodeText(node.label);
+  if (node.kind === "button-group") {
+    return (node.items ?? []).map((item) => clickyNodeText(item)).join(" ");
   }
-
-  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+  if (node.kind === "text" && node.children?.length) {
+    return [node.text, ...node.children.map((child) => clickyNodeText(child))].join("");
+  }
+  return "";
 }
 
 function isInlineNode(node: ClickyNode): boolean {
@@ -679,12 +1059,6 @@ function isInlineNode(node: ClickyNode): boolean {
     node.kind === "button" ||
     node.kind === "button-group"
   );
-}
-
-function alignmentClass(align?: ClickyColumn["align"]): string | undefined {
-  if (align === "right") return "text-right";
-  if (align === "center") return "text-center";
-  return undefined;
 }
 
 function isBlockHtml(html: string): boolean {

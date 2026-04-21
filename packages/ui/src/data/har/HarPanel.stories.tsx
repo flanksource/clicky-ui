@@ -19,7 +19,7 @@ export const Default: Story = {
   ),
 };
 
-export const WithSearch: Story = {
+export const WithExternalSearch: Story = {
   render: () => {
     const [q, setQ] = useState("");
     return (

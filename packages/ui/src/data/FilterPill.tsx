@@ -20,6 +20,7 @@ export type FilterPillProps = {
   /** Legacy single-click handler, used when onModeChange is not provided. */
   onClick?: () => void;
   title?: string;
+  togglePosition?: "left" | "right";
   className?: string;
 };
 
@@ -40,9 +41,9 @@ function bodyClasses(mode: FilterMode): string {
 type SlotMode = "exclude" | "neutral" | "include";
 
 const SLOT_TRANSLATE: Record<SlotMode, string> = {
-  exclude: "-translate-x-[21px]",
-  neutral: "translate-x-0",
-  include: "translate-x-[21px]",
+  exclude: "translate-x-0",
+  neutral: "translate-x-4",
+  include: "translate-x-8",
 };
 
 function TristateSwitch({
@@ -56,65 +57,47 @@ function TristateSwitch({
 }) {
   const slot: SlotMode =
     mode === "exclude" ? "exclude" : mode === "include" ? "include" : "neutral";
-  const bg = slot === "exclude" ? "bg-red-500" : slot === "include" ? "bg-green-500" : "bg-muted";
-  const fg = slot === "neutral" ? "text-muted-foreground" : "text-white";
-
-  const onSlot = (target: SlotMode) => {
-    if (target === "neutral") {
-      onChange("neutral");
-      return;
-    }
-    onChange(slot === target ? "neutral" : target);
-  };
+  const bg =
+    slot === "exclude"
+      ? "bg-red-500/80"
+      : slot === "include"
+        ? "bg-green-500/80"
+        : "bg-muted";
 
   return (
-    <span
-      role="radiogroup"
+    <button
+      type="button"
       aria-label={ariaLabel}
+      title={ariaLabel}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onChange(nextTriStateMode(mode));
+      }}
       className={cn(
-        "relative inline-flex items-center justify-center w-[66px] h-6 rounded-full overflow-hidden transition-colors duration-200 shrink-0",
+        "relative inline-flex h-5 w-[52px] shrink-0 overflow-hidden rounded-full transition-colors duration-200",
         bg,
       )}
     >
-      {(["exclude", "neutral", "include"] as SlotMode[]).map((target) => (
-        <button
-          key={target}
-          type="button"
-          role="radio"
-          aria-checked={slot === target}
-          title={
-            target === "exclude" ? "Exclude" : target === "include" ? "Include" : "Do not filter"
-          }
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onSlot(target);
-          }}
-          className={cn(
-            "relative z-10 flex h-full flex-1 items-center justify-center transition-colors duration-100",
-            fg,
-          )}
-        >
-          <Icon
-            name={
-              target === "exclude"
-                ? "codicon:close"
-                : target === "include"
-                  ? "codicon:check"
-                  : "codicon:primitive-dot"
-            }
-            className="text-sm"
-          />
-        </button>
-      ))}
       <span
         aria-hidden
         className={cn(
-          "pointer-events-none absolute w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-150",
+          "pointer-events-none absolute left-0.5 top-0.5 z-20 flex size-4 items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-150",
           SLOT_TRANSLATE[slot],
         )}
-      />
-    </span>
+      >
+        {slot !== "neutral" && (
+          <Icon
+            name={slot === "exclude" ? "codicon:close" : "codicon:check"}
+            className={cn(
+              "text-[10px]",
+              slot === "exclude" && "text-red-600",
+              slot === "include" && "text-green-600",
+            )}
+          />
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -127,6 +110,7 @@ export function FilterPill({
   onModeChange,
   onClick,
   title,
+  togglePosition = "left",
   className,
 }: FilterPillProps) {
   const triState = !!onModeChange;
@@ -154,10 +138,26 @@ export function FilterPill({
         : mode === "exclude"
           ? "text-red-700 dark:text-red-400"
           : "text-foreground";
+    const control = <TristateSwitch mode={mode} onChange={onModeChange!} ariaLabel={title} />;
+    const labelContent = (
+      <span className={cn("inline-flex min-w-0 items-center gap-1.5 text-xs", labelTone)}>
+        {content}
+      </span>
+    );
+
     return (
-      <span className={cn("inline-flex items-center gap-2 select-none", className)} title={title}>
-        <TristateSwitch mode={mode} onChange={onModeChange!} ariaLabel={title} />
-        <span className={cn("inline-flex items-center gap-1.5 text-xs", labelTone)}>{content}</span>
+      <span className={cn("inline-flex items-center gap-1.5 select-none", className)} title={title}>
+        {togglePosition === "right" ? (
+          <>
+            {labelContent}
+            {control}
+          </>
+        ) : (
+          <>
+            {control}
+            {labelContent}
+          </>
+        )}
       </span>
     );
   }
@@ -184,6 +184,12 @@ function LegacyMarker({ mode }: { mode: FilterMode }) {
   if (mode === "exclude") return <Icon name="codicon:remove" className="text-xs" />;
   if (mode === "active") return <span className="w-2 h-2 rounded-full bg-current" />;
   return <span className="w-2 h-2 rounded-full bg-current opacity-30" />;
+}
+
+function nextTriStateMode(mode: FilterMode): FilterMode {
+  if (mode === "include") return "exclude";
+  if (mode === "exclude") return "neutral";
+  return "include";
 }
 
 export type FilterPillGroupProps = {

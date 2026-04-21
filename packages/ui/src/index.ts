@@ -18,6 +18,22 @@ export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-histor
 
 // Existing components
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export {
+  FilterBar,
+  type FilterBarFilter,
+  type FilterBarMultiFilter,
+  type FilterBarMultiFilterMode,
+  type FilterBarProps,
+  type FilterBarRangePreset,
+  type FilterBarRangeProps,
+  type FilterBarSearchProps,
+  type FilterBarTextFilter,
+} from "./components/FilterBar";
+export {
+  MultiSelect,
+  type MultiSelectOption,
+  type MultiSelectProps,
+} from "./components/MultiSelect";
 export { Select, type SelectProps, type SelectOption } from "./components/select";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
@@ -38,14 +54,23 @@ export { Badge, badgeVariants, type BadgeProps } from "./data/Badge";
 export {
   Clicky,
   type ClickyColumn,
+  type ClickyDownloadOptions,
   type ClickyDocument,
   type ClickyField,
   type ClickyNode,
   type ClickyProps,
+  type ClickyRemoteFormat,
   type ClickyRow,
   type ClickyStyle,
   type ClickyTreeItem,
+  type ClickyViewOptions,
 } from "./data/Clicky";
+export {
+  DataTable,
+  inferColumns,
+  type DataTableColumn,
+  type DataTableProps,
+} from "./data/DataTable";
 export {
   FilterPill,
   FilterPillGroup,
