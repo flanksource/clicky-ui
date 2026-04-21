@@ -43,6 +43,7 @@ jobs:
           mkdir -p pages-bundle
           cp -r apps/storybook/storybook-static pages-bundle/storybook
           cp -r apps/kitchen-sink/dist pages-bundle/kitchen-sink
+          cp demo.html pages-bundle/demo.html
           echo "clicky-ui.flanksource.com" > pages-bundle/CNAME
           cat > pages-bundle/index.html <<'HTML'
           <!doctype html>
@@ -50,6 +51,7 @@ jobs:
           <title>Clicky UI previews</title>
           <h1>Clicky UI previews</h1>
           <ul>
+            <li><a href="demo.html">Live JSON demo</a> (paste a Clicky document, see it rendered)</li>
             <li><a href="storybook/">Storybook</a></li>
             <li><a href="kitchen-sink/">Kitchen Sink</a></li>
           </ul>

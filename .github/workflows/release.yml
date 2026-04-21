@@ -19,11 +19,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm to >=11.5.1 (required for OIDC trusted publishing)
-        run: npm install -g npm@latest
 
       - name: Install Vite+
         run: curl -fsSL https://vite.plus | bash

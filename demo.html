@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-density="comfortable">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clicky UI — live JSON demo</title>
+    <meta name="description" content="Paste a Clicky JSON document and see it rendered live by @flanksource/clicky-ui running in-browser via Preact + Tailwind CDN." />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flanksource/clicky-ui@0.1.0/src/styles/tokens.css" />
+
+    <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+
+    <style>
+      /* Iconify web component needs a baseline inline sizing. */
+      iconify-icon {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.125em;
+      }
+
+      /* Shiki: keep the library's container chrome, strip Shiki's own background/padding. */
+      .shiki,
+      .shiki code {
+        background: transparent !important;
+        padding: 0 !important;
+        font-size: inherit;
+        line-height: 1.5;
+      }
+
+      /* Dual-theme output: pick the right variables based on data-theme. */
+      html[data-theme='dark'] .shiki,
+      html[data-theme='dark'] .shiki span {
+        color: var(--shiki-dark) !important;
+        font-style: var(--shiki-dark-font-style) !important;
+        font-weight: var(--shiki-dark-font-weight) !important;
+        text-decoration: var(--shiki-dark-text-decoration) !important;
+      }
+    </style>
+
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+      tailwind.config = {
+        darkMode: ['selector', '[data-theme="dark"]'],
+        theme: {
+          extend: {
+            colors: {
+              border: 'hsl(var(--border))',
+              input: 'hsl(var(--input))',
+              ring: 'hsl(var(--ring))',
+              background: 'hsl(var(--background))',
+              foreground: 'hsl(var(--foreground))',
+              primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+              secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+              destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+              muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+              accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+              popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
+              card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+            },
+            borderRadius: {
+              lg: 'var(--radius)',
+              md: 'calc(var(--radius) - 2px)',
+              sm: 'calc(var(--radius) - 4px)',
+            },
+            spacing: {
+              'control-h': 'var(--control-height)',
+              'control-px': 'var(--control-padding-x)',
+              'density-1': 'var(--spacing-unit)',
+              'density-2': 'calc(var(--spacing-unit) * 2)',
+              'density-3': 'calc(var(--spacing-unit) * 3)',
+              'density-4': 'calc(var(--spacing-unit) * 4)',
+            },
+            fontSize: { 'density-base': 'var(--font-size-base)' },
+          },
+        },
+      };
+    </script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "preact": "https://esm.sh/preact@10.24.3",
+          "preact/": "https://esm.sh/preact@10.24.3/",
+          "preact/hooks": "https://esm.sh/preact@10.24.3/hooks",
+          "preact/compat": "https://esm.sh/preact@10.24.3/compat",
+          "preact/jsx-runtime": "https://esm.sh/preact@10.24.3/jsx-runtime",
+          "react": "https://esm.sh/preact@10.24.3/compat",
+          "react/": "https://esm.sh/preact@10.24.3/compat/",
+          "react/jsx-runtime": "https://esm.sh/preact@10.24.3/jsx-runtime",
+          "react-dom": "https://esm.sh/preact@10.24.3/compat",
+          "react-dom/client": "https://esm.sh/preact@10.24.3/compat",
+          "@flanksource/clicky-ui": "https://esm.sh/@flanksource/clicky-ui@0.1.0?alias=react:preact/compat,react-dom:preact/compat&deps=preact@10.24.3&external=preact"
+        }
+      }
+    </script>
+  </head>
+
+  <body class="bg-background text-foreground antialiased">
+    <header class="border-b border-border bg-background/80 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <div>
+          <h1 class="text-lg font-semibold">Clicky UI — live JSON demo</h1>
+          <p class="text-xs text-muted-foreground">
+            Paste a Clicky document on the left, see it rendered on the right. Powered by
+            <a class="underline" href="https://www.npmjs.com/package/@flanksource/clicky-ui">@flanksource/clicky-ui</a>
+            + Preact via CDN.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <label for="sample-picker" class="sr-only">Sample</label>
+          <select
+            id="sample-picker"
+            class="rounded-md border border-border bg-background px-2 py-1.5 text-xs hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+          ></select>
+          <button id="btn-copy" class="rounded-md border border-border bg-background px-3 py-1.5 hover:bg-accent">Copy JSON</button>
+          <button id="btn-theme" class="rounded-md border border-border bg-background px-3 py-1.5 hover:bg-accent">Toggle theme</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto grid max-w-7xl gap-4 px-4 py-4 md:grid-cols-2">
+      <section class="flex min-h-[70vh] flex-col">
+        <div class="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Input (Clicky document or node)</span>
+          <span id="parse-status" class="font-mono"></span>
+        </div>
+        <textarea
+          id="input"
+          spellcheck="false"
+          class="h-full min-h-[60vh] w-full flex-1 resize-none rounded-md border border-border bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+        ></textarea>
+      </section>
+
+      <section class="flex min-h-[70vh] flex-col">
+        <div class="mb-1 text-xs text-muted-foreground">Rendered output</div>
+        <div id="output" class="h-full min-h-[60vh] flex-1 overflow-auto rounded-md border border-border bg-background p-4"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { h, render } from 'preact';
+      import { Clicky } from '@flanksource/clicky-ui';
+      import { codeToHtml } from 'https://esm.sh/shiki@1';
+
+      const t = (text, style) => ({ kind: 'text', text, plain: text, ...(style ? { style } : {}) });
+      const doc = (node) => ({ version: 1, node });
+
+      const SAMPLES = [
+        {
+          id: 'cluster-status',
+          label: 'Cluster status (map + table + buttons)',
+          description: 'A map of fields mixing inline status, a sortable table, and a button group.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'title', label: 'Title', value: t('Cluster Status', { bold: true }) },
+              {
+                name: 'status',
+                label: 'Status',
+                value: { ...t('Healthy', { bold: true, color: '#166534' }), children: [t(' in '), t('production', { italic: true })] },
+              },
+              {
+                name: 'services',
+                label: 'Services',
+                value: {
+                  kind: 'table',
+                  columns: [
+                    { name: 'name', label: 'Name' },
+                    { name: 'status', label: 'Status' },
+                    { name: 'latency', label: 'Latency (ms)', align: 'right' },
+                  ],
+                  rows: [
+                    { cells: { name: t('api'), status: t('healthy', { color: '#166534', bold: true }), latency: t('42') } },
+                    {
+                      cells: { name: t('worker'), status: t('degraded', { color: '#92400e', bold: true }), latency: t('180') },
+                      detail: t('Queue backlog is 1,204 jobs; retries elevated in the past 5 minutes.'),
+                    },
+                    { cells: { name: t('scheduler'), status: t('healthy', { color: '#166534', bold: true }), latency: t('18') } },
+                  ],
+                },
+              },
+              {
+                name: 'actions',
+                label: 'Actions',
+                value: {
+                  kind: 'button-group',
+                  items: [
+                    { kind: 'button', href: 'https://www.npmjs.com/package/@flanksource/clicky-ui', label: t('View on npm') },
+                    { kind: 'button', href: 'https://github.com/flanksource/clicky-ui', label: t('GitHub') },
+                  ],
+                },
+              },
+            ],
+          }),
+        },
+        {
+          id: 'styled-text',
+          label: 'Styled text (ANSI-like colors, bold/italic, links)',
+          description: 'Every field of ClickyStyle exercised: color, bold, italic, underline, strikethrough, monospace, truncation.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'bold', label: 'Bold', value: t('The quick brown fox', { bold: true }) },
+              { name: 'italic', label: 'Italic', value: t('The quick brown fox', { italic: true }) },
+              { name: 'underline', label: 'Underline', value: t('The quick brown fox', { underline: true }) },
+              { name: 'strike', label: 'Strikethrough', value: t('Deprecated value', { strikethrough: true, faint: true }) },
+              { name: 'mono', label: 'Monospace', value: t('sha256:deadbeef…', { monospace: true }) },
+              { name: 'colors', label: 'Colors', value: {
+                kind: 'list', inline: true, items: [
+                  t('info', { color: '#1d4ed8', bold: true }),
+                  t('warn', { color: '#b45309', bold: true }),
+                  t('error', { color: '#b91c1c', bold: true }),
+                  t('ok', { color: '#166534', bold: true }),
+                ],
+              } },
+              { name: 'bg', label: 'Background', value: t('  highlighted  ', { backgroundColor: '#fef3c7', color: '#78350f' }) },
+              { name: 'truncate', label: 'Truncated (maxWidth=20)', value: t('this-is-a-very-long-identifier-that-will-be-cut', { maxWidth: 20, truncateMode: 'suffix' }) },
+              { name: 'multiline', label: 'Multiline + maxLines=2', value: t('Line one.\nLine two.\nLine three.\nLine four.', { maxLines: 2 }) },
+            ],
+          }),
+        },
+        {
+          id: 'nested-tree',
+          label: 'Nested tree (filesystem)',
+          description: 'Tree rendering with expand/collapse, nested children, and inline labels.',
+          data: doc({
+            kind: 'tree',
+            roots: [
+              {
+                id: 'src', label: t('src/', { bold: true }),
+                children: [
+                  { id: 'src/components', label: t('components/'), children: [
+                    { id: 'Button.tsx', label: t('Button.tsx') },
+                    { id: 'Select.tsx', label: t('Select.tsx') },
+                  ] },
+                  { id: 'src/data', label: t('data/'), children: [
+                    { id: 'Clicky.tsx', label: t('Clicky.tsx', { bold: true }) },
+                    { id: 'Tree.tsx', label: t('Tree.tsx') },
+                  ] },
+                  { id: 'src/index.ts', label: t('index.ts', { italic: true }) },
+                ],
+              },
+              {
+                id: 'package.json', label: t('package.json'),
+              },
+              {
+                id: 'README.md', label: t('README.md', { faint: true }),
+              },
+            ],
+          }),
+        },
+        {
+          id: 'lists',
+          label: 'Lists (ordered, unordered, inline)',
+          description: 'All three list modes with custom bullets and ordered variants.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'unordered', label: 'Unordered', value: {
+                kind: 'list', items: [t('Install with npm'), t('Import the Tailwind preset'), t('Wrap your app in <ThemeProvider>')],
+              } },
+              { name: 'ordered', label: 'Ordered', value: {
+                kind: 'list', ordered: true, items: [t('Clone repo'), t('Run pnpm install'), t('Run pnpm dev')],
+              } },
+              { name: 'inline', label: 'Inline (tags)', value: {
+                kind: 'list', inline: true, items: [
+                  t('react', { backgroundColor: '#dbeafe', color: '#1e40af' }),
+                  t('tailwind', { backgroundColor: '#dcfce7', color: '#166534' }),
+                  t('storybook', { backgroundColor: '#fce7f3', color: '#9d174d' }),
+                  t('vite', { backgroundColor: '#fef3c7', color: '#78350f' }),
+                ],
+              } },
+              { name: 'custom-bullet', label: 'Custom bullet', value: {
+                kind: 'list', unstyled: true,
+                bullet: { kind: 'icon', unicode: '✓', style: { color: '#166534', bold: true } },
+                items: [t('Dark mode'), t('Density tokens'), t('Theme + density switchers'), t('Tailwind preset')],
+              } },
+            ],
+          }),
+        },
+        {
+          id: 'code-block',
+          label: 'Code block (syntax-highlighted)',
+          description: 'A code node with language tag. Pass pre-rendered highlightedHtml for real highlighting.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'install', label: 'Install', value: { kind: 'code', language: 'bash', source: 'npm install @flanksource/clicky-ui' } },
+              { name: 'usage', label: 'Usage', value: { kind: 'code', language: 'tsx', source:
+                'import { Clicky } from \'@flanksource/clicky-ui\';\n\nexport default function App() {\n  return <Clicky data={doc} />;\n}' } },
+              { name: 'config', label: 'Tailwind config', value: { kind: 'code', language: 'ts', source:
+                'import preset from \'@flanksource/clicky-ui/tailwind-preset\';\n\nexport default {\n  presets: [preset],\n  content: [\'./src/**/*.{ts,tsx}\'],\n};' } },
+            ],
+          }),
+        },
+        {
+          id: 'collapsed',
+          label: 'Collapsed sections (details)',
+          description: 'Use kind:"collapsed" to hide dense content behind a click.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'summary', label: 'Summary', value: t('Build completed in 42s with 3 warnings.') },
+              { name: 'warnings', label: 'Warnings', value: {
+                kind: 'collapsed',
+                label: t('3 warnings (click to expand)', { faint: true }),
+                content: {
+                  kind: 'list', items: [
+                    t('Unused import in src/foo.ts:12'),
+                    t('Implicit any in src/bar.ts:44'),
+                    t('Missing key prop in src/list.tsx:18'),
+                  ],
+                },
+              } },
+              { name: 'logs', label: 'Raw logs', value: {
+                kind: 'collapsed',
+                label: t('stdout (2.3 KB)'),
+                content: { kind: 'code', language: 'text', source: '[00:00:00] starting build\n[00:00:01] resolving modules\n[00:00:12] type-checking\n[00:00:42] done' },
+              } },
+            ],
+          }),
+        },
+        {
+          id: 'table-with-detail',
+          label: 'Table with expandable rows',
+          description: 'Click any row to reveal its detail pane. Sortable by column.',
+          data: doc({
+            kind: 'table',
+            columns: [
+              { name: 'pr', label: 'PR', align: 'right' },
+              { name: 'title', label: 'Title' },
+              { name: 'author', label: 'Author' },
+              { name: 'ci', label: 'CI' },
+            ],
+            rows: [
+              { cells: { pr: t('#412'), title: t('Add density switcher'), author: t('alice'), ci: t('pass', { color: '#166534', bold: true }) },
+                detail: { kind: 'map', fields: [
+                  { name: 'branch', label: 'Branch', value: t('feat/density', { monospace: true }) },
+                  { name: 'changed', label: 'Changed files', value: t('7') },
+                  { name: 'diff', label: 'Diff', value: { kind: 'code', language: 'diff', source: '+ 128 lines\n- 42 lines' } },
+                ] },
+              },
+              { cells: { pr: t('#411'), title: t('Fix storybook base path'), author: t('bob'), ci: t('pass', { color: '#166534', bold: true }) },
+                detail: t('Passed CI after rebase on main.') },
+              { cells: { pr: t('#410'), title: t('Experiment: tree virtualization'), author: t('carol'), ci: t('fail', { color: '#b91c1c', bold: true }) },
+                detail: { kind: 'code', language: 'text', source: 'TypeError: cannot read property \'children\' of undefined\n  at Tree.tsx:44' },
+              },
+            ],
+          }),
+        },
+        {
+          id: 'icons-html',
+          label: 'Icons + inline HTML',
+          description: 'Icon nodes (unicode or iconify) and sanitized inline HTML nodes.',
+          data: doc({
+            kind: 'map',
+            fields: [
+              { name: 'unicode', label: 'Unicode icons', value: {
+                kind: 'list', inline: true, items: [
+                  { kind: 'icon', unicode: '⚡', style: { color: '#b45309' } },
+                  { kind: 'icon', unicode: '✓', style: { color: '#166534' } },
+                  { kind: 'icon', unicode: '✗', style: { color: '#b91c1c' } },
+                  { kind: 'icon', unicode: '★', style: { color: '#b45309' } },
+                  { kind: 'icon', unicode: '☁' },
+                  { kind: 'icon', unicode: '🔒' },
+                ],
+              } },
+              { name: 'iconify', label: 'Iconify', value: {
+                kind: 'list', inline: true, items: [
+                  { kind: 'icon', iconify: 'lucide:github' },
+                  { kind: 'icon', iconify: 'lucide:cloud' },
+                  { kind: 'icon', iconify: 'lucide:database' },
+                  { kind: 'icon', iconify: 'lucide:shield-check' },
+                ],
+              } },
+              { name: 'html', label: 'Sanitized HTML', value: {
+                kind: 'html',
+                html: '<p>Supports <strong>bold</strong>, <em>italic</em>, <code>inline code</code>, and <a href="https://flanksource.com" target="_blank">links</a>. Scripts and event handlers are stripped.</p>',
+              } },
+            ],
+          }),
+        },
+      ];
+
+      const SAMPLES_BY_ID = Object.fromEntries(SAMPLES.map((s) => [s.id, s]));
+
+      const $ = (id) => document.getElementById(id);
+      const input = $('input');
+      const output = $('output');
+      const status = $('parse-status');
+      const picker = $('sample-picker');
+
+      const LANGUAGE_ALIASES = {
+        sh: 'bash',
+        shell: 'bash',
+        yml: 'yaml',
+      };
+
+      async function highlightCodeBlocks(root) {
+        const pres = root.querySelectorAll('pre:not([data-shiki])');
+        await Promise.all([...pres].map(async (pre) => {
+          pre.dataset.shiki = 'true';
+          const label = pre.parentElement?.firstElementChild?.textContent?.trim().toLowerCase() ?? '';
+          const lang = LANGUAGE_ALIASES[label] ?? label ?? 'text';
+          const source = pre.textContent ?? '';
+          try {
+            const html = await codeToHtml(source, {
+              lang,
+              themes: { light: 'github-light', dark: 'github-dark' },
+              defaultColor: false,
+            });
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            const shikiPre = wrapper.querySelector('pre');
+            if (shikiPre) {
+              shikiPre.className = pre.className + ' ' + (shikiPre.className ?? '');
+              shikiPre.dataset.shiki = 'true';
+              pre.replaceWith(shikiPre);
+            }
+          } catch {
+            /* unknown language — leave the plain <pre> in place */
+          }
+        }));
+      }
+
+      function renderFromText(text) {
+        try {
+          const parsed = JSON.parse(text);
+          status.textContent = 'ok';
+          status.className = 'font-mono text-emerald-600';
+          render(h(Clicky, { data: parsed }), output);
+          highlightCodeBlocks(output);
+        } catch (err) {
+          status.textContent = err.message;
+          status.className = 'font-mono text-destructive';
+        }
+      }
+
+      function loadSample(id) {
+        const sample = SAMPLES_BY_ID[id];
+        if (!sample) return;
+        input.value = JSON.stringify(sample.data, null, 2);
+        renderFromText(input.value);
+        const hash = '#sample=' + encodeURIComponent(id);
+        if (location.hash !== hash) history.replaceState(null, '', hash);
+      }
+
+      for (const sample of SAMPLES) {
+        const option = document.createElement('option');
+        option.value = sample.id;
+        option.textContent = sample.label;
+        option.title = sample.description;
+        picker.appendChild(option);
+      }
+
+      const initialId = (location.hash.match(/sample=([^&]+)/)?.[1] && SAMPLES_BY_ID[decodeURIComponent(location.hash.match(/sample=([^&]+)/)[1])])
+        ? decodeURIComponent(location.hash.match(/sample=([^&]+)/)[1])
+        : SAMPLES[0].id;
+      picker.value = initialId;
+      loadSample(initialId);
+
+      picker.addEventListener('change', () => loadSample(picker.value));
+
+      let timer;
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => renderFromText(input.value), 150);
+      });
+
+      $('btn-copy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(input.value);
+          $('btn-copy').textContent = 'Copied!';
+          setTimeout(() => ($('btn-copy').textContent = 'Copy JSON'), 1200);
+        } catch {
+          $('btn-copy').textContent = 'Copy failed';
+        }
+      });
+
+      $('btn-theme').addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+      });
+
+      input.addEventListener('paste', (e) => {
+        const text = e.clipboardData?.getData('text');
+        if (!text) return;
+        try {
+          JSON.parse(text);
+          e.preventDefault();
+          input.value = text;
+          renderFromText(text);
+        } catch {}
+      });
+    </script>
+  </body>
+</html>
