@@ -91,7 +91,7 @@ const demo: ClickyDocument = {
             {
               kind: "button",
               id: "restart-worker",
-              payload: "{\"service\":\"worker\"}",
+              payload: '{"service":"worker"}',
               label: { kind: "text", text: "Restart Worker", plain: "Restart Worker" },
             },
           ],

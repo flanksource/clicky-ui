@@ -35,7 +35,7 @@ export function Tree<T>({
 }: TreeProps<T>) {
   const [internalExpandAll, setInternalExpandAll] = useState<boolean | null>(null);
   const isControlled = onExpandAllChange !== undefined;
-  const expandAll = isControlled ? controlledExpandAll ?? null : internalExpandAll;
+  const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
   const setExpandAll = (next: boolean | null) => {
     if (isControlled) onExpandAllChange?.(next);
     else setInternalExpandAll(next);

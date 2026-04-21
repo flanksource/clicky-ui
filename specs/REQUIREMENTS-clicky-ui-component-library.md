@@ -7,6 +7,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **Problem solved**: Flanksource needs a single, versioned, tree-shakeable UI package with first-class light/dark theming and density presets so product teams stop rebuilding primitives. Publishing publicly also lets external users and the broader open-source community benefit.
 
 **Target users**:
+
 - **Primary**: Flanksource frontend engineers composing product UIs.
 - **Secondary**: External consumers pulling the package from npm.
 - **Tertiary**: Designers reviewing visual/behavioral states via Storybook and the kitchen-sink.
@@ -22,6 +23,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a Flanksource frontend engineer, I want to install `@flanksource/clicky-ui` and import vetted components so that I stop re-implementing primitives.
 
 **Acceptance Criteria**:
+
 - [ ] Library is authored in React 18+ with TypeScript strict mode.
 - [ ] Components present: Card, Separator, Tabs, Accordion, Collapsible, Sheet, Dialog.
 - [ ] Components present: Table, Badge, Avatar, Tooltip, Progress, Skeleton.
@@ -36,6 +38,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As an end user of a product built with clicky-ui, I want to switch themes at runtime so that the app matches my system preference or my personal choice.
 
 **Acceptance Criteria**:
+
 - [ ] Tokens are CSS variables scoped by `data-theme`.
 - [ ] `useTheme()` returns `{ theme, setTheme, resolvedTheme }`.
 - [ ] System preference is respected when `theme === 'system'`.
@@ -49,6 +52,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a product engineer, I want to adapt the UI's density to match dashboard vs. settings contexts so that I can reuse components without visual overrides.
 
 **Acceptance Criteria**:
+
 - [ ] Three presets available: `compact`, `comfortable` (default), `spacious`.
 - [ ] Applied via `data-density` attribute on `<html>`.
 - [ ] CSS variables include at least `--spacing-unit`, `--control-height`, `--font-size-base`.
@@ -62,6 +66,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a downstream app maintainer, I want one-line Tailwind integration so that my app's utilities stay in sync with the design system.
 
 **Acceptance Criteria**:
+
 - [ ] Exported at subpath `@flanksource/clicky-ui/tailwind-preset`.
 - [ ] Exposes theme tokens (colors, radii, fonts) matching the library's CSS variables.
 - [ ] Defines Tailwind variants for `data-theme="dark"` and each `data-density` value.
@@ -74,6 +79,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a consumer, I want ESM-only, tree-shakeable imports and accurate types so that my bundle stays small and my editor autocompletes correctly.
 
 **Acceptance Criteria**:
+
 - [ ] `"type": "module"`; no CJS output.
 - [ ] `exports` map: `.`, `./tailwind-preset`, `./styles.css`, `./components/*`.
 - [ ] `.d.ts` generated via `vite-plugin-dts` and referenced in `exports`.
@@ -87,6 +93,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a maintainer, I want a guarded, automated release flow so that versions, changelogs, and npm publishes stay consistent.
 
 **Acceptance Criteria**:
+
 - [ ] Changesets configured with `access: public`, `baseBranch: main`.
 - [ ] `storybook` and `kitchen-sink` workspaces ignored (not published).
 - [ ] A Version PR is opened automatically when changesets are pending.
@@ -101,6 +108,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a designer or reviewer, I want to inspect every component state interactively and see interaction tests pass so that I trust the component's behavior.
 
 **Acceptance Criteria**:
+
 - [ ] One `*.stories.tsx` file per component in `packages/ui/src/components`.
 - [ ] Each story defines Args/Controls for all meaningful props.
 - [ ] States covered: default, hover, focus, disabled, loading where applicable.
@@ -115,6 +123,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a prospective adopter, I want to browse a demo site and see real-world usage next to source snippets so that I can evaluate the library quickly.
 
 **Acceptance Criteria**:
+
 - [ ] Vite config aliases `react`, `react-dom`, and `react/jsx-runtime` to `preact/compat` (and `preact/jsx-runtime`).
 - [ ] Each library component has a showcase page with every variant and state.
 - [ ] Realistic templates exist: dashboard, settings, form-heavy page.
@@ -129,6 +138,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a library maintainer, I want fast jsdom tests for logic and real-browser tests for DOM-sensitive code so that regressions are caught without over-mocking.
 
 **Acceptance Criteria**:
+
 - [ ] `vp test` runs jsdom tests using `@testing-library/react`.
 - [ ] `vp test --browser` runs browser-mode tests for portal/focus-dependent components.
 - [ ] Hooks (`useTheme`, `useDensity`) have dedicated unit tests.
@@ -142,6 +152,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a release manager, I want E2E coverage of the demo so that I know the published package works in a real Preact runtime.
 
 **Acceptance Criteria**:
+
 - [ ] Playwright config boots the kitchen-sink via `vp run --filter kitchen-sink dev`.
 - [ ] Tests cover: theme toggle + persistence, density switch + persistence, dashboard template navigation, form-heavy template submit with validation + toast.
 - [ ] Runs across chromium, firefox, webkit projects.
@@ -154,6 +165,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a contributor, I want every PR checked automatically and previews deployed so that review is fast and confident.
 
 **Acceptance Criteria**:
+
 - [ ] `ci.yml` runs `vp check`, `vp test` (unit + browser), `vp build`, `playwright test` on every PR.
 - [ ] `deploy.yml` builds and publishes Storybook + kitchen-sink to GitHub Pages.
 - [ ] `release.yml` runs `changesets/action` — opens Version PR; on merge publishes to npm.
@@ -166,6 +178,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 **User Story**: As a consumer, I want accurate types and safe indexing so that I catch bugs at compile time.
 
 **Acceptance Criteria**:
+
 - [ ] `strict: true`, `noUncheckedIndexedAccess: true`, `moduleResolution: "bundler"`.
 - [ ] Every public API export has an explicit type.
 - [ ] `vp check` is green before merge.
@@ -218,6 +231,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 ## Implementation Checklist
 
 ### Phase 1: Setup & Planning
+
 - [ ] Initialize Vite Plus workspace with `packages/ui`, `apps/storybook`, `apps/kitchen-sink`, `e2e`.
 - [ ] Create `tsconfig.base.json` with strict options; per-workspace `tsconfig.json` extends it.
 - [ ] Configure root `package.json` (pnpm workspace, devDeps: `vite-plus`, `typescript`, `changesets`).
@@ -225,6 +239,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] Scaffold shadcn components into `packages/ui/src/components`.
 
 ### Phase 2: Core Library
+
 - [ ] Implement `cn()` helper in `lib/utils.ts`.
 - [ ] Implement `styles/tokens.css` (theme + density CSS variables).
 - [ ] Implement `hooks/use-theme.ts` + `ThemeProvider` with persistence + no-flash boot script.
@@ -236,6 +251,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] Configure `packages/ui/package.json` `exports` map and `peerDependencies`.
 
 ### Phase 3: Storybook
+
 - [ ] Scaffold `apps/storybook` with Storybook 8 React renderer.
 - [ ] Import tokens.css + Tailwind preset into `.storybook/preview.ts`.
 - [ ] Add `*.stories.tsx` for every component with Args/Controls.
@@ -243,6 +259,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] Add `play()` interaction tests using `@storybook/test`.
 
 ### Phase 4: Kitchen-Sink (Preact)
+
 - [ ] Scaffold `apps/kitchen-sink` with `@preact/preset-vite`.
 - [ ] Configure Vite alias `react`/`react-dom`/`react/jsx-runtime` → `preact/compat`.
 - [ ] Build showcase pages for every component (all variants + states).
@@ -251,6 +268,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] Implement code preview panels beside each example.
 
 ### Phase 5: Tests
+
 - [ ] Unit tests (jsdom) for hooks and utilities.
 - [ ] Browser-mode tests for Dialog/Sheet/Dropdown/Tooltip/Command.
 - [ ] Storybook interaction tests green under `vp test --filter storybook`.
@@ -258,6 +276,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] E2E tests: theme persistence, density switch, dashboard flow, form submit with validation + toast.
 
 ### Phase 6: CI/CD & Release
+
 - [ ] `.github/workflows/ci.yml` — `vp check`, `vp test`, `vp build`, `playwright test`.
 - [ ] `.github/workflows/deploy.yml` — publish Storybook + kitchen-sink to GitHub Pages.
 - [ ] `.github/workflows/release.yml` — `changesets/action` Version PR + npm publish via `NPM_TOKEN`.
@@ -265,6 +284,7 @@ Build `@flanksource/clicky-ui`, an **internal design system** that is also publi
 - [ ] Verify `npm pack` output; dry-run a release; confirm published version on npm.
 
 ### Phase 7: Documentation & Cleanup
+
 - [ ] Root `README.md` with install + quickstart + links to Storybook and kitchen-sink.
 - [ ] `packages/ui/README.md` with props-table highlights, theming guide, density guide.
 - [ ] Verify all acceptance criteria met before cutting v0.1.0.

@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - run: corepack enable
 
       - name: Install Vite+
         run: curl -fsSL https://vite.plus | bash

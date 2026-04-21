@@ -3,7 +3,11 @@ import { DemoRow, DemoSection } from "./Section";
 
 export function ButtonDemo() {
   return (
-    <DemoSection id="button" title="Button" description="shadcn-style button with variants and sizes.">
+    <DemoSection
+      id="button"
+      title="Button"
+      description="shadcn-style button with variants and sizes."
+    >
       <DemoRow label="Variants">
         <Button>Default</Button>
         <Button variant="destructive">Destructive</Button>

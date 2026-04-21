@@ -18,8 +18,8 @@ export function IconDemo() {
       title="Icon"
       description={
         <>
-          Thin wrapper over the <code>&lt;iconify-icon&gt;</code> web component. Add the iconify script
-          tag to your host HTML.
+          Thin wrapper over the <code>&lt;iconify-icon&gt;</code> web component. Add the iconify
+          script tag to your host HTML.
         </>
       }
     >

@@ -107,7 +107,12 @@ export function Clicky({ data, className }: ClickyProps) {
 
   if (!parsed.ok) {
     return (
-      <div className={cn("rounded-md border border-destructive/30 bg-destructive/5 p-density-3", className)}>
+      <div
+        className={cn(
+          "rounded-md border border-destructive/30 bg-destructive/5 p-density-3",
+          className,
+        )}
+      >
         <div className="text-sm font-medium text-destructive">Invalid Clicky payload</div>
         <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground">
           {parsed.message}
@@ -146,7 +151,12 @@ function normalizeClickyDocument(data: unknown): ParsedClicky {
   }
 
   const candidate = data as Partial<ClickyDocument> & Partial<ClickyNode>;
-  if ("version" in candidate && candidate.version === 1 && candidate.node && isClickyNode(candidate.node)) {
+  if (
+    "version" in candidate &&
+    candidate.version === 1 &&
+    candidate.node &&
+    isClickyNode(candidate.node)
+  ) {
     return { ok: true, document: candidate as ClickyDocument };
   }
 
@@ -162,7 +172,9 @@ function normalizeClickyDocument(data: unknown): ParsedClicky {
 }
 
 function isClickyNode(value: unknown): value is ClickyNode {
-  return !!value && typeof value === "object" && typeof (value as { kind?: unknown }).kind === "string";
+  return (
+    !!value && typeof value === "object" && typeof (value as { kind?: unknown }).kind === "string"
+  );
 }
 
 function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
@@ -223,7 +235,10 @@ function ClickyText({ node }: { node: ClickyNode }) {
     <span
       style={inlineStyle}
       title={node.tooltip?.plain}
-      className={cn(node.style?.className, (node.text ?? "").includes("\n") && "whitespace-pre-wrap")}
+      className={cn(
+        node.style?.className,
+        (node.text ?? "").includes("\n") && "whitespace-pre-wrap",
+      )}
     >
       {content}
     </span>
@@ -235,11 +250,7 @@ function ClickyIconNode({ node }: { node: ClickyNode }) {
 
   return (
     <span style={inlineStyle} title={node.tooltip?.plain} className="inline-flex items-center">
-      {node.iconify ? (
-        <Icon name={node.iconify} />
-      ) : (
-        <span>{node.unicode ?? node.plain}</span>
-      )}
+      {node.iconify ? <Icon name={node.iconify} /> : <span>{node.unicode ?? node.plain}</span>}
     </span>
   );
 }
@@ -348,7 +359,9 @@ function ClickyTable({ node }: { node: ClickyNode }) {
     if (!sortKey) return 0;
     const leftValue = left.cells[sortKey]?.plain ?? left.cells[sortKey]?.text ?? "";
     const rightValue = right.cells[sortKey]?.plain ?? right.cells[sortKey]?.text ?? "";
-    return sortDir === "asc" ? compareClickyValues(leftValue, rightValue) : compareClickyValues(rightValue, leftValue);
+    return sortDir === "asc"
+      ? compareClickyValues(leftValue, rightValue)
+      : compareClickyValues(rightValue, leftValue);
   });
 
   return (
@@ -412,7 +425,10 @@ function ClickyTableRow({
   return (
     <>
       <tr
-        className={cn("border-b border-border align-top", expandable && "cursor-pointer hover:bg-accent/50")}
+        className={cn(
+          "border-b border-border align-top",
+          expandable && "cursor-pointer hover:bg-accent/50",
+        )}
         onClick={expandable ? () => setOpen((current) => !current) : undefined}
       >
         {hasDetail && (
@@ -561,7 +577,11 @@ function toInlineStyle(style?: ClickyStyle, text?: string): CSSProperties | unde
   if (style.strikethrough) decorations.push("line-through");
   if (decorations.length > 0) inlineStyle.textDecoration = decorations.join(" ");
 
-  if (style.textTransform === "uppercase" || style.textTransform === "lowercase" || style.textTransform === "capitalize") {
+  if (
+    style.textTransform === "uppercase" ||
+    style.textTransform === "lowercase" ||
+    style.textTransform === "capitalize"
+  ) {
     inlineStyle.textTransform = style.textTransform;
   }
 
@@ -577,7 +597,11 @@ function toInlineStyle(style?: ClickyStyle, text?: string): CSSProperties | unde
     inlineStyle.whiteSpace = "pre-wrap";
   }
 
-  if (style.truncateMode === "suffix" && style.maxWidth && (!style.maxLines || style.maxLines <= 1)) {
+  if (
+    style.truncateMode === "suffix" &&
+    style.maxWidth &&
+    (!style.maxLines || style.maxLines <= 1)
+  ) {
     inlineStyle.overflow = "hidden";
     inlineStyle.textOverflow = "ellipsis";
     inlineStyle.whiteSpace = "nowrap";

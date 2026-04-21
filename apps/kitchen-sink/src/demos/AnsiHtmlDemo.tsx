@@ -16,7 +16,8 @@ export function AnsiHtmlDemo() {
       />
       <DemoRow label="Inline span">
         <span className="text-sm">
-          level=<AnsiHtml as="span" text={"\x1b[31merror\x1b[0m"} /> msg="boom"
+          level=
+          <AnsiHtml as="span" text={"\x1b[31merror\x1b[0m"} /> msg="boom"
         </span>
       </DemoRow>
     </DemoSection>

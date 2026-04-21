@@ -51,12 +51,7 @@ export function DiagnosticsDetailPanel({
       state: string;
       userFrameCount: number;
       searchText: string;
-    }> =
-      parsed.format === "jvm"
-        ? parsed.threads
-        : parsed.format === "go"
-          ? parsed.goroutines
-          : [];
+    }> = parsed.format === "jvm" ? parsed.threads : parsed.format === "go" ? parsed.goroutines : [];
     return items.filter((item) => {
       if (selectedStates.size > 0 && !selectedStates.has(item.state)) return false;
       if (hideRuntimeOnly && item.userFrameCount === 0) return false;
@@ -369,13 +364,13 @@ function StackBlock(props: StackBlockProps) {
             parsed.goroutines
               .filter((g) => filtered.includes(g))
               .map((goroutine) => (
-            <GoroutineCard
-              key={goroutine.id}
-              goroutine={goroutine}
-              search={search}
-              hideRuntimeOnly={hideRuntimeOnly}
-            />
-          ))}
+                <GoroutineCard
+                  key={goroutine.id}
+                  goroutine={goroutine}
+                  search={search}
+                  hideRuntimeOnly={hideRuntimeOnly}
+                />
+              ))}
         </div>
       )}
     </div>

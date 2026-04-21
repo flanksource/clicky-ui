@@ -78,9 +78,7 @@ export function HarPanelDemo() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <span className="text-xs text-muted-foreground">
-          {entries.length} entries
-        </span>
+        <span className="text-xs text-muted-foreground">{entries.length} entries</span>
       </DemoRow>
       <div className="h-[calc(100vh-10rem)] min-h-[320px] border border-border rounded-md overflow-hidden">
         <HarPanel entries={entries} search={q} />

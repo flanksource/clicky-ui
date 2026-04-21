@@ -163,7 +163,7 @@ function parseThreadBlock(block: string): ParsedThread | null {
 function extractHeaderStateTrail(rest: string): string | undefined {
   // Example header tails: "... nid=0x1903 waiting on condition [0x...]"
   // Capture the descriptor between nid=... and the trailing [address].
-  const tail = rest.match(/nid=0x[0-9a-f]+\s+(?<desc>[^\[]+?)(?:\s+\[0x[0-9a-f]+\])?\s*$/i);
+  const tail = rest.match(/nid=0x[0-9a-f]+\s+(?<desc>[^[]+?)(?:\s+\[0x[0-9a-f]+\])?\s*$/i);
   return tail?.groups?.desc?.trim();
 }
 

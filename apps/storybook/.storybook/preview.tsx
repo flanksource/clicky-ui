@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import type { Preview } from '@storybook/react-vite';
+import { useEffect } from "react";
+import type { Preview } from "@storybook/react-vite";
 import {
   ThemeProvider,
   DensityProvider,
@@ -7,9 +7,9 @@ import {
   useDensity,
   type Theme,
   type Density,
-} from '@flanksource/clicky-ui';
-import '@flanksource/clicky-ui/styles.css';
-import './preview.css';
+} from "@flanksource/clicky-ui";
+import "@flanksource/clicky-ui/styles.css";
+import "./preview.css";
 
 function GlobalSync({ theme, density }: { theme: Theme; density: Density }) {
   const { setTheme } = useTheme();
@@ -26,27 +26,27 @@ const preview: Preview = {
   },
   globalTypes: {
     theme: {
-      description: 'Theme',
-      defaultValue: 'light',
+      description: "Theme",
+      defaultValue: "light",
       toolbar: {
-        icon: 'paintbrush',
+        icon: "paintbrush",
         items: [
-          { value: 'light', title: 'Light' },
-          { value: 'dark', title: 'Dark' },
-          { value: 'system', title: 'System' },
+          { value: "light", title: "Light" },
+          { value: "dark", title: "Dark" },
+          { value: "system", title: "System" },
         ],
         dynamicTitle: true,
       },
     },
     density: {
-      description: 'Density',
-      defaultValue: 'comfortable',
+      description: "Density",
+      defaultValue: "comfortable",
       toolbar: {
-        icon: 'component',
+        icon: "component",
         items: [
-          { value: 'compact', title: 'Compact' },
-          { value: 'comfortable', title: 'Comfortable' },
-          { value: 'spacious', title: 'Spacious' },
+          { value: "compact", title: "Compact" },
+          { value: "comfortable", title: "Comfortable" },
+          { value: "spacious", title: "Spacious" },
         ],
         dynamicTitle: true,
       },
@@ -54,8 +54,8 @@ const preview: Preview = {
   },
   decorators: [
     (Story, ctx) => {
-      const theme = (ctx.globals.theme ?? 'light') as Theme;
-      const density = (ctx.globals.density ?? 'comfortable') as Density;
+      const theme = (ctx.globals.theme ?? "light") as Theme;
+      const density = (ctx.globals.density ?? "comfortable") as Density;
       return (
         <ThemeProvider defaultTheme={theme}>
           <DensityProvider defaultDensity={density}>

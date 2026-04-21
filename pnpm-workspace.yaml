@@ -6,46 +6,46 @@ packages:
 catalogMode: prefer
 
 catalog:
-  '@types/node': ^24
-  '@types/react': ^18.3.12
-  '@types/react-dom': ^18.3.1
+  "@types/node": ^24
+  "@types/react": ^18.3.12
+  "@types/react-dom": ^18.3.1
   typescript: ^5.7.2
   vite: ^6.0.3
   vite-plus: ^0.1.18
   react: ^18.3.1
   react-dom: ^18.3.1
   preact: ^10.25.3
-  '@preact/preset-vite': ^2.9.3
+  "@preact/preset-vite": ^2.9.3
   tailwindcss: ^3.4.17
-  '@tailwindcss/forms': ^0.5.9
+  "@tailwindcss/forms": ^0.5.9
   postcss: ^8.4.49
   autoprefixer: ^10.4.20
   clsx: ^2.1.1
   tailwind-merge: ^2.6.0
   class-variance-authority: ^0.7.1
-  '@testing-library/react': ^16.1.0
-  '@testing-library/jest-dom': ^6.6.3
+  "@testing-library/react": ^16.1.0
+  "@testing-library/jest-dom": ^6.6.3
   vitest: ^3.0.5
   jsdom: ^26.0.0
-  '@playwright/test': ^1.49.1
-  '@storybook/react': ^8.6.18
-  '@storybook/react-vite': ^8.6.18
-  '@storybook/addon-essentials': ^8.6.18
-  '@storybook/test': ^8.6.18
+  "@playwright/test": ^1.49.1
+  "@storybook/react": ^8.6.18
+  "@storybook/react-vite": ^8.6.18
+  "@storybook/addon-essentials": ^8.6.18
+  "@storybook/test": ^8.6.18
   storybook: ^8.6.18
   vite-plugin-dts: ^4.3.0
-  '@changesets/cli': ^2.27.11
-  '@radix-ui/react-accordion': ^1.2.2
-  '@radix-ui/react-avatar': ^1.1.2
-  '@radix-ui/react-collapsible': ^1.1.2
-  '@radix-ui/react-dialog': ^1.1.4
-  '@radix-ui/react-dropdown-menu': ^2.1.4
-  '@radix-ui/react-menubar': ^1.1.4
-  '@radix-ui/react-progress': ^1.1.1
-  '@radix-ui/react-separator': ^1.1.1
-  '@radix-ui/react-slot': ^1.1.1
-  '@radix-ui/react-tabs': ^1.1.2
-  '@radix-ui/react-tooltip': ^1.1.6
+  "@changesets/cli": ^2.27.11
+  "@radix-ui/react-accordion": ^1.2.2
+  "@radix-ui/react-avatar": ^1.1.2
+  "@radix-ui/react-collapsible": ^1.1.2
+  "@radix-ui/react-dialog": ^1.1.4
+  "@radix-ui/react-dropdown-menu": ^2.1.4
+  "@radix-ui/react-menubar": ^1.1.4
+  "@radix-ui/react-progress": ^1.1.1
+  "@radix-ui/react-separator": ^1.1.1
+  "@radix-ui/react-slot": ^1.1.1
+  "@radix-ui/react-tabs": ^1.1.2
+  "@radix-ui/react-tooltip": ^1.1.6
   cmdk: ^1.0.4
   lucide-react: ^0.469.0
   sonner: ^1.7.1

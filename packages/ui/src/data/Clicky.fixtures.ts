@@ -52,7 +52,7 @@ export const clickyFixture: ClickyDocument = {
             {
               kind: "button",
               id: "restart",
-              payload: "{\"service\":\"api\"}",
+              payload: '{"service":"api"}',
               label: { kind: "text", text: "Restart", plain: "Restart" },
             },
           ],
@@ -153,8 +153,16 @@ export const clickyFixture: ClickyDocument = {
           content: {
             kind: "list",
             items: [
-              { kind: "text", text: "Deployment paused during database migration", plain: "Deployment paused during database migration" },
-              { kind: "text", text: "Worker pool drained before restart", plain: "Worker pool drained before restart" },
+              {
+                kind: "text",
+                text: "Deployment paused during database migration",
+                plain: "Deployment paused during database migration",
+              },
+              {
+                kind: "text",
+                text: "Worker pool drained before restart",
+                plain: "Worker pool drained before restart",
+              },
             ],
           },
         },

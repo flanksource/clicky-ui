@@ -81,17 +81,15 @@ export function TreeDemo() {
                 ? "codicon:error"
                 : "codicon:debug-pause";
           const tone =
-            node.status === "passed"
-              ? "success"
-              : node.status === "failed"
-                ? "danger"
-                : "warning";
+            node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
           return (
             <>
               <Icon name={icon} />
               <span className="truncate flex-1">{node.name}</span>
               {node.duration !== undefined && (
-                <span className="text-xs text-muted-foreground tabular-nums">{node.duration}ms</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {node.duration}ms
+                </span>
               )}
               <Badge tone={tone} size="sm">
                 {node.status}

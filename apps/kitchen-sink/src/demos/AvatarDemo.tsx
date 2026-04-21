@@ -21,7 +21,12 @@ export function AvatarDemo() {
         ))}
       </DemoRow>
       <DemoRow label="Square">
-        <Avatar alt="flanksource/clicky-ui" rounded="md" size={28} colorKey="flanksource/clicky-ui" />
+        <Avatar
+          alt="flanksource/clicky-ui"
+          rounded="md"
+          size={28}
+          colorKey="flanksource/clicky-ui"
+        />
         <Avatar alt="other-org/clicky-ui" rounded="md" size={28} colorKey="other-org/clicky-ui" />
       </DemoRow>
     </DemoSection>

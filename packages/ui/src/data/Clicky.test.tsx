@@ -25,7 +25,9 @@ describe("Clicky", () => {
 
     expect(screen.getByText("platform")).toBeInTheDocument();
     expect(
-      screen.getAllByText((_, element) => element?.textContent?.includes("apiVersion: v1") ?? false)[0],
+      screen.getAllByText(
+        (_, element) => element?.textContent?.includes("apiVersion: v1") ?? false,
+      )[0],
     ).toBeInTheDocument();
   });
 
