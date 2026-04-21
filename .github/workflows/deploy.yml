@@ -35,7 +35,7 @@ jobs:
       - run: vp install
 
       - name: Build library
-        run: pnpm --filter @flanksource/clicky-ui exec vite build
+        run: pnpm --filter @flanksource/clicky-ui run build
       - name: Build Storybook
         run: pnpm --filter storybook exec storybook build --disable-telemetry --output-dir storybook-static
         env:

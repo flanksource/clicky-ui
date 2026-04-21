@@ -31,7 +31,7 @@ jobs:
       - run: vp install
 
       - name: Build library
-        run: pnpm --filter @flanksource/clicky-ui exec vite build
+        run: pnpm --filter @flanksource/clicky-ui run build
 
       - name: Create Release Pull Request or Publish
         uses: changesets/action@v1

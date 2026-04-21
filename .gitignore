@@ -36,3 +36,4 @@ storybook-static/
 
 # AI agent worktrees
 .claude/
+hack/

@@ -58,7 +58,7 @@ jobs:
 
       - run: vp install
       - name: Build library
-        run: pnpm --filter @flanksource/clicky-ui exec vite build
+        run: pnpm --filter @flanksource/clicky-ui run build
       - name: Build Storybook
         run: pnpm --filter storybook exec storybook build --disable-telemetry
       - name: Build kitchen-sink
@@ -93,7 +93,7 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter e2e exec playwright install --with-deps chromium
       - name: Build library
-        run: pnpm --filter @flanksource/clicky-ui exec vite build
+        run: pnpm --filter @flanksource/clicky-ui run build
       - name: Run Playwright tests
         run: pnpm --filter e2e exec playwright test --project=chromium
       - name: Upload Playwright report
