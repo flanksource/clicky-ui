@@ -36,6 +36,17 @@ export { AnsiHtml, type AnsiHtmlProps } from "./data/AnsiHtml";
 export { Avatar, type AvatarProps } from "./data/Avatar";
 export { Badge, badgeVariants, type BadgeProps } from "./data/Badge";
 export {
+  Clicky,
+  type ClickyColumn,
+  type ClickyDocument,
+  type ClickyField,
+  type ClickyNode,
+  type ClickyProps,
+  type ClickyRow,
+  type ClickyStyle,
+  type ClickyTreeItem,
+} from "./data/Clicky";
+export {
   FilterPill,
   FilterPillGroup,
   FilterSeparator,

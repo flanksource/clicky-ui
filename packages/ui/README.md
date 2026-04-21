@@ -25,6 +25,27 @@ export function App() {
 }
 ```
 
+## Clicky AST Renderer
+
+```tsx
+import { Clicky, type ClickyDocument } from "@flanksource/clicky-ui";
+
+const document: ClickyDocument = {
+  version: 1,
+  node: {
+    kind: "text",
+    text: "hello from clicky",
+    plain: "hello from clicky",
+  },
+};
+
+export function ClickyPanel() {
+  return <Clicky data={document} />;
+}
+```
+
+`Clicky` also accepts a JSON string payload. The intended producer is the sibling `clicky` repo's tagged `html-react` AST, which preserves structural types such as trees, tables, code blocks, collapsed sections, buttons, and nested text content.
+
 ## Tailwind preset
 
 ```ts

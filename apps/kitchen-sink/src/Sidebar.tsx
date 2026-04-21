@@ -17,6 +17,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { id: "badge", label: "Badge" },
       { id: "avatar", label: "Avatar" },
       { id: "progress", label: "ProgressBar" },
+      { id: "clicky", label: "Clicky" },
       { id: "json-view", label: "JsonView" },
       { id: "ansi-html", label: "AnsiHtml" },
       { id: "log-viewer", label: "LogViewer" },

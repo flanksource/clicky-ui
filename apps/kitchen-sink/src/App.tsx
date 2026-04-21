@@ -8,6 +8,7 @@ import { AvatarDemo } from "./demos/AvatarDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
+import { ClickyDemo } from "./demos/ClickyDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
@@ -44,6 +45,7 @@ export function App() {
             <BadgeDemo />
             <AvatarDemo />
             <ProgressBarDemo />
+            <ClickyDemo />
             <JsonViewDemo />
             <AnsiHtmlDemo />
             <LogViewerDemo />
