@@ -10,6 +10,12 @@ const config: StorybookConfig = {
   typescript: {
     reactDocgen: 'react-docgen-typescript',
   },
+  viteFinal: async (viteConfig) => {
+    if (process.env.STORYBOOK_BASE_PATH) {
+      viteConfig.base = process.env.STORYBOOK_BASE_PATH;
+    }
+    return viteConfig;
+  },
 };
 
 export default config;

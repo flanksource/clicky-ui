@@ -33,6 +33,8 @@ jobs:
         run: pnpm --filter @flanksource/clicky-ui exec vite build
       - name: Build Storybook
         run: pnpm --filter storybook exec storybook build --disable-telemetry --output-dir storybook-static
+        env:
+          STORYBOOK_BASE_PATH: /storybook/
       - name: Build kitchen-sink
         run: pnpm --filter kitchen-sink exec vite build --base /kitchen-sink/
 
@@ -41,6 +43,7 @@ jobs:
           mkdir -p pages-bundle
           cp -r apps/storybook/storybook-static pages-bundle/storybook
           cp -r apps/kitchen-sink/dist pages-bundle/kitchen-sink
+          echo "clicky-ui.flanksource.com" > pages-bundle/CNAME
           cat > pages-bundle/index.html <<'HTML'
           <!doctype html>
           <meta charset="utf-8" />
