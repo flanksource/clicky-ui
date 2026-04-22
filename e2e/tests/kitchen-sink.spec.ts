@@ -41,3 +41,17 @@ test("density switcher updates <html data-density> and persists", async ({ page 
   await page.reload();
   await expect(html).toHaveAttribute("data-density", "compact");
 });
+
+test("tree demo shows the large-tree filter and narrows results", async ({ page }) => {
+  await page.goto("/?demo=tree", { waitUntil: "domcontentloaded" });
+
+  const filter = page.getByLabel("Filter tree nodes");
+  await expect(filter).toBeVisible();
+
+  await filter.fill("ledger");
+
+  await expect(page.getByText("group: billing")).toBeVisible();
+  await expect(page.getByText("syncs ledger export")).toBeVisible();
+  await expect(page.getByText("my-suite")).toBeVisible();
+  await expect(page.getByText("group: auth")).toHaveCount(0);
+});

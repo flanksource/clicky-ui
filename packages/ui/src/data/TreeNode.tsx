@@ -15,6 +15,7 @@ export type TreeNodeProps<T> = {
   node: T;
   depth?: number;
   expandAll?: boolean | null;
+  forcedOpenKeys?: Set<string | number> | null;
   selected?: T | null;
   defaultOpen?: (node: T, depth: number) => boolean;
   getChildren: (node: T) => T[] | undefined;
@@ -30,6 +31,7 @@ export function TreeNode<T>({
   node,
   depth = 0,
   expandAll = null,
+  forcedOpenKeys = null,
   selected = null,
   defaultOpen,
   getChildren,
@@ -46,6 +48,9 @@ export function TreeNode<T>({
   const [open, setOpen] = useState(initialOpen);
   const prevExpandAll = useRef(expandAll);
   const isSelected = selected === node;
+  const key = getKey(node);
+  const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
+  const isOpen = isForcedOpen || open;
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current) {
@@ -62,7 +67,7 @@ export function TreeNode<T>({
   const rowClassName = rowClass ? rowClass(node, isSelected) : defaultRowBg;
 
   return (
-    <div role="treeitem" aria-expanded={hasChildren ? open : undefined} aria-selected={isSelected}>
+    <div role="treeitem" aria-expanded={hasChildren ? isOpen : undefined} aria-selected={isSelected}>
       <div
         className={cn("flex items-center gap-1.5 py-1 px-2 cursor-pointer text-sm", rowClassName)}
         style={{ paddingLeft: `${depth * indentPx + basePaddingPx}px` }}
@@ -74,15 +79,15 @@ export function TreeNode<T>({
       >
         {hasChildren ? (
           <Icon
-            name={open ? "codicon:chevron-down" : "codicon:chevron-right"}
+            name={isOpen ? "codicon:chevron-down" : "codicon:chevron-right"}
             className="text-muted-foreground text-xs w-3"
           />
         ) : (
           <span className="w-3 shrink-0" aria-hidden />
         )}
-        {renderRow({ node, depth, open, selected: isSelected, hasChildren, toggle })}
+        {renderRow({ node, depth, open: isOpen, selected: isSelected, hasChildren, toggle })}
       </div>
-      {open && hasChildren && (
+      {isOpen && hasChildren && (
         <div role="group">
           {children!.map((child) => (
             <TreeNode
@@ -90,6 +95,7 @@ export function TreeNode<T>({
               node={child}
               depth={depth + 1}
               expandAll={expandAll}
+              forcedOpenKeys={forcedOpenKeys}
               selected={selected}
               defaultOpen={defaultOpen}
               getChildren={getChildren}

@@ -16,16 +16,16 @@ describe("MethodBadge", () => {
 
   it("applies the info tone for GET", () => {
     render(<MethodBadge method="get" />);
-    expect(screen.getByText("GET").className).toMatch(/border-blue-500/);
+    expect(screen.getByText("GET").parentElement?.className).toMatch(/border-blue-500/);
   });
 
   it("applies the danger tone for DELETE", () => {
     render(<MethodBadge method="DELETE" />);
-    expect(screen.getByText("DELETE").className).toMatch(/border-red-500/);
+    expect(screen.getByText("DELETE").parentElement?.className).toMatch(/border-red-500/);
   });
 
   it("falls back to neutral tone for unknown methods", () => {
     render(<MethodBadge method="OPTIONS" />);
-    expect(screen.getByText("OPTIONS").className).toMatch(/border-border/);
+    expect(screen.getByText("OPTIONS").parentElement?.className).toMatch(/border-border/);
   });
 });

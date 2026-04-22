@@ -1,5 +1,70 @@
-import { Clicky, type ClickyDocument } from "@flanksource/clicky-ui";
+import { Clicky, type ClickyDocument, type ClickyTreeItem } from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
+
+const topologyRoots: ClickyTreeItem[] = [
+  {
+    id: "cluster-prod-eu",
+    label: { kind: "text", text: "cluster / prod-eu", plain: "cluster / prod-eu" },
+    children: [
+      {
+        id: "payments-namespace",
+        label: { kind: "text", text: "namespace / payments", plain: "namespace / payments" },
+        children: [
+          { id: "payments-api", label: { kind: "text", text: "deployment / payments-api", plain: "deployment / payments-api" } },
+          { id: "payments-worker", label: { kind: "text", text: "deployment / payments-worker", plain: "deployment / payments-worker" } },
+          { id: "payments-ledger", label: { kind: "text", text: "job / ledger-sync", plain: "job / ledger-sync" } },
+          { id: "payments-db", label: { kind: "text", text: "statefulset / payments-db", plain: "statefulset / payments-db" } },
+        ],
+      },
+      {
+        id: "edge-namespace",
+        label: { kind: "text", text: "namespace / edge", plain: "namespace / edge" },
+        children: [
+          { id: "edge-gateway", label: { kind: "text", text: "deployment / gateway", plain: "deployment / gateway" } },
+          { id: "edge-cache", label: { kind: "text", text: "deployment / edge-cache", plain: "deployment / edge-cache" } },
+          { id: "edge-worker", label: { kind: "text", text: "deployment / cache-warmer", plain: "deployment / cache-warmer" } },
+          { id: "edge-cert", label: { kind: "text", text: "job / cert-rotator", plain: "job / cert-rotator" } },
+        ],
+      },
+      {
+        id: "ops-namespace",
+        label: { kind: "text", text: "namespace / ops", plain: "namespace / ops" },
+        children: [
+          { id: "ops-alerts", label: { kind: "text", text: "deployment / alerts", plain: "deployment / alerts" } },
+          { id: "ops-metrics", label: { kind: "text", text: "deployment / metrics-scraper", plain: "deployment / metrics-scraper" } },
+          { id: "ops-reports", label: { kind: "text", text: "cronjob / nightly-report", plain: "cronjob / nightly-report" } },
+          { id: "ops-backups", label: { kind: "text", text: "cronjob / backup-check", plain: "cronjob / backup-check" } },
+        ],
+      },
+    ],
+  },
+  {
+    id: "cluster-staging-us",
+    label: { kind: "text", text: "cluster / staging-us", plain: "cluster / staging-us" },
+    children: [
+      {
+        id: "preview-namespace",
+        label: { kind: "text", text: "namespace / preview", plain: "namespace / preview" },
+        children: [
+          { id: "preview-api", label: { kind: "text", text: "deployment / preview-api", plain: "deployment / preview-api" } },
+          { id: "preview-web", label: { kind: "text", text: "deployment / preview-web", plain: "deployment / preview-web" } },
+          { id: "preview-jobs", label: { kind: "text", text: "job / preview-seed", plain: "job / preview-seed" } },
+          { id: "preview-search", label: { kind: "text", text: "deployment / search-indexer", plain: "deployment / search-indexer" } },
+        ],
+      },
+      {
+        id: "staging-qa",
+        label: { kind: "text", text: "namespace / qa", plain: "namespace / qa" },
+        children: [
+          { id: "qa-payments", label: { kind: "text", text: "deployment / qa-payments", plain: "deployment / qa-payments" } },
+          { id: "qa-worker", label: { kind: "text", text: "deployment / qa-worker", plain: "deployment / qa-worker" } },
+          { id: "qa-reports", label: { kind: "text", text: "job / report-replay", plain: "job / report-replay" } },
+          { id: "qa-smoke", label: { kind: "text", text: "job / smoke-suite", plain: "job / smoke-suite" } },
+        ],
+      },
+    ],
+  },
+];
 
 const demo: ClickyDocument = {
   version: 1,
@@ -66,16 +131,7 @@ const demo: ClickyDocument = {
         label: "Topology",
         value: {
           kind: "tree",
-          roots: [
-            {
-              id: "cluster",
-              label: { kind: "text", text: "cluster / prod-eu", plain: "cluster / prod-eu" },
-              children: [
-                { id: "api", label: { kind: "text", text: "api", plain: "api" } },
-                { id: "worker", label: { kind: "text", text: "worker", plain: "worker" } },
-              ],
-            },
-          ],
+          roots: topologyRoots,
         },
       },
       {
@@ -107,7 +163,7 @@ export function ClickyDemo() {
     <DemoSection
       id="clicky"
       title="Clicky"
-      description="Versioned Clicky AST renderer with native tree, shared table filters, code blocks, and an optional URL-backed fetch mode."
+      description="Versioned Clicky AST renderer with native tree, shared table filters, code blocks, and an optional URL-backed fetch mode. The topology tree is large enough to exercise the built-in tree filter."
     >
       <div className="space-y-density-4">
         <div className="space-y-density-2">
