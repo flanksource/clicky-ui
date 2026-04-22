@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
@@ -7,8 +16,15 @@ import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
 import type { MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
+import { Select } from "./select";
 
 const FILTER_INPUT_DEBOUNCE_MS = 500;
+
+// When `autoSubmit` is false, debounced fields forward their draft value
+// immediately (no timer) so the consumer can accumulate state locally and
+// fire one request when Apply is clicked. When true (default) fields debounce
+// upstream, matching the live-filter behaviour used in trace/log UIs.
+const FilterBarContext = createContext<{ autoSubmit: boolean }>({ autoSubmit: true });
 
 export type FilterBarSearchProps = {
   value: string;
@@ -60,10 +76,32 @@ export type FilterBarNumberFilter = {
   className?: string;
 };
 
+export type FilterBarEnumFilter = {
+  key: string;
+  kind: "enum";
+  label: string;
+  value: string;
+  options: Array<{ value: string; label?: string }>;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+};
+
+export type FilterBarBooleanFilter = {
+  key: string;
+  kind: "boolean";
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  className?: string;
+};
+
 export type FilterBarFilter =
   | FilterBarTextFilter
   | FilterBarMultiFilter
-  | FilterBarNumberFilter;
+  | FilterBarNumberFilter
+  | FilterBarEnumFilter
+  | FilterBarBooleanFilter;
 
 export type FilterBarRangePreset = {
   label: string;
@@ -91,6 +129,14 @@ export type FilterBarProps = {
   leading?: ReactNode;
   trailing?: ReactNode;
   className?: string;
+  // When false, debounced fields forward edits immediately (no timer) and
+  // an Apply button is rendered in the trailing slot. The caller is expected
+  // to accumulate field state and perform the side effect in `onApply`.
+  // Defaults to true.
+  autoSubmit?: boolean;
+  onApply?: () => void;
+  applyLabel?: string;
+  isPending?: boolean;
 };
 
 const DEFAULT_TIME_RANGE_PRESETS: FilterBarRangePreset[] = [
@@ -111,46 +157,126 @@ export function FilterBar({
   leading,
   trailing,
   className,
+  autoSubmit = true,
+  onApply,
+  applyLabel = "Apply",
+  isPending = false,
 }: FilterBarProps) {
   const hasRangeControls = Boolean(timeRange || dateRange);
+  const showApply = !autoSubmit && !!onApply;
+  const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
 
   return (
-    <div
+    <FilterBarContext.Provider value={contextValue}>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
+          className,
+        )}
+      >
+        {leading && <div className="flex items-center gap-2">{leading}</div>}
+
+        {search && <SearchField search={search} />}
+
+        {children}
+
+        {filters?.map((filter, index) => {
+          const grow = !search && index === 0;
+
+          if (filter.kind === "multi") {
+            return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
+          if (filter.kind === "number") {
+            return <NumberFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
+          if (filter.kind === "enum") {
+            return <EnumFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
+          if (filter.kind === "boolean") {
+            return <BooleanFilterField key={filter.key} filter={filter} />;
+          }
+
+          return <TextFilterField key={filter.key} filter={filter} grow={grow} />;
+        })}
+
+        {(hasRangeControls || trailing || showApply) && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
+            {timeRange && <RangeControlButton kind="time" label="Time range" {...timeRange} />}
+            {trailing}
+            {showApply && (
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={isPending}
+                onClick={onApply}
+              >
+                {isPending ? "Loading…" : applyLabel}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </FilterBarContext.Provider>
+  );
+}
+
+function EnumFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarEnumFilter;
+  grow: boolean;
+}) {
+  return (
+    <label
       className={cn(
-        "flex flex-wrap items-center gap-2 rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
-        className,
+        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
+        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.className,
       )}
     >
-      {leading && <div className="flex items-center gap-2">{leading}</div>}
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+      <Select
+        aria-label={filter.label}
+        className="h-6 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+        value={filter.value}
+        placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        onChange={(event) => filter.onChange(event.target.value)}
+        options={filter.options.map((option) => ({
+          value: option.value,
+          label: option.label ?? option.value,
+        }))}
+      />
+    </label>
+  );
+}
 
-      {search && (
-        <SearchField search={search} />
+function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
+  return (
+    <label
+      className={cn(
+        "flex h-8 shrink-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-2 text-xs",
+        filter.className,
       )}
-
-      {children}
-
-      {filters?.map((filter, index) => {
-        const grow = !search && index === 0;
-
-        if (filter.kind === "multi") {
-          return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
-        }
-
-        if (filter.kind === "number") {
-          return <NumberFilterField key={filter.key} filter={filter} grow={grow} />;
-        }
-
-        return <TextFilterField key={filter.key} filter={filter} grow={grow} />;
-      })}
-
-      {(hasRangeControls || trailing) && (
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
-          {timeRange && <RangeControlButton kind="time" label="Time range" {...timeRange} />}
-          {trailing}
-        </div>
-      )}
-    </div>
+    >
+      <input
+        type="checkbox"
+        aria-label={filter.label}
+        className="h-3.5 w-3.5 accent-primary"
+        checked={filter.value}
+        onChange={(event) => filter.onChange(event.target.checked)}
+      />
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+    </label>
   );
 }
 
@@ -665,6 +791,7 @@ function summarizeMultiFilter(
 }
 
 function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {
+  const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
   const latestOnChange = useRef(onChange);
 
@@ -679,12 +806,17 @@ function useDebouncedTextDraft(value: string, onChange: (value: string) => void)
   useEffect(() => {
     if (draft === value) return;
 
+    if (!autoSubmit) {
+      latestOnChange.current(draft);
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       latestOnChange.current(draft);
     }, FILTER_INPUT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [draft, value]);
+  }, [autoSubmit, draft, value]);
 
   return [draft, setDraft] as const;
 }
@@ -693,6 +825,7 @@ function useDebouncedNumberDraft(
   value: FilterBarNumberValue,
   onChange: (value: FilterBarNumberValue) => void,
 ) {
+  const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
   const latestOnChange = useRef(onChange);
 
@@ -707,12 +840,17 @@ function useDebouncedNumberDraft(
   useEffect(() => {
     if (sameNumberFilterValue(draft, value)) return;
 
+    if (!autoSubmit) {
+      latestOnChange.current(draft);
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       latestOnChange.current(draft);
     }, FILTER_INPUT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [draft, value]);
+  }, [autoSubmit, draft, value]);
 
   return [draft, setDraft] as const;
 }

@@ -1,10 +1,11 @@
 // Lib
 export { cn } from "./lib/utils";
 export { AVATAR_PALETTE, fnv1a32, paletteClass } from "./lib/palette";
+export { SIZE_TOKENS, resolveSize, type SizeToken } from "./lib/size";
 
 // Theming hooks
 export { ThemeProvider, useTheme, type Theme, type ResolvedTheme } from "./hooks/use-theme";
-export { DensityProvider, useDensity, type Density } from "./hooks/use-density";
+export { DensityProvider, useDensity, useDensityValue, type Density } from "./hooks/use-density";
 
 // Utility hooks
 export {
@@ -23,6 +24,8 @@ export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimeP
 export { RangeSlider, type RangeSliderProps, type RangeSliderValue } from "./components/RangeSlider";
 export {
   FilterBar,
+  type FilterBarBooleanFilter,
+  type FilterBarEnumFilter,
   type FilterBarFilter,
   type FilterBarMultiFilter,
   type FilterBarMultiFilterMode,
@@ -54,7 +57,12 @@ export {
 
 // Data
 export { AnsiHtml, type AnsiHtmlProps } from "./data/AnsiHtml";
-export { Avatar, type AvatarProps } from "./data/Avatar";
+export {
+  Avatar,
+  type AvatarKind,
+  type AvatarProps,
+  type AvatarVariant,
+} from "./data/Avatar";
 export { Badge, badgeVariants, type BadgeProps } from "./data/Badge";
 export {
   Clicky,
@@ -85,10 +93,11 @@ export {
   type FilterMode,
 } from "./data/FilterPill";
 export { Gauge, type GaugeProps, type GaugeTone } from "./data/Gauge";
-export { Icon, type IconProps } from "./data/Icon";
+export { Icon, type IconProps, type IconStyle, type IconTone } from "./data/Icon";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
+export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
 export { TabButton, type TabButtonProps } from "./data/TabButton";
@@ -142,3 +151,39 @@ export type {
 // Overlay
 export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+
+// Clicky-rpc operations browser
+export {
+  OperationCatalog,
+  type OperationCatalogProps,
+} from "./rpc/OperationCatalog";
+export {
+  EndpointList,
+  type EndpointListProps,
+  type RenderLink,
+  type RenderLinkArgs,
+} from "./rpc/EndpointList";
+export {
+  useOpenAPI,
+  useOperations,
+  useOperationById,
+  type OperationsApiClient,
+} from "./rpc/useOperations";
+export {
+  filterOperationsByDomain,
+  findDetailEndpoint,
+  findListEndpoint,
+  normalizeRows,
+  parseJsonBody,
+} from "./rpc/classify";
+export {
+  isPositionalParam,
+  type DomainDefinition,
+  type ExecutionRequest,
+  type ExecutionResponse,
+  type OpenAPIOperation,
+  type OpenAPIParameter,
+  type OpenAPISchema,
+  type OpenAPISpec,
+  type ResolvedOperation,
+} from "./rpc/types";

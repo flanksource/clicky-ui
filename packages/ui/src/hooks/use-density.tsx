@@ -69,3 +69,17 @@ export function useDensity(): DensityContextValue {
   if (!ctx) throw new Error("useDensity must be used inside <DensityProvider>");
   return ctx;
 }
+
+/**
+ * Non-throwing density read. Returns the context value if a `<DensityProvider>`
+ * is mounted, otherwise reads the current `data-density` attribute on
+ * `<html>`, falling back to `comfortable`. Use inside leaf components that
+ * should respect density without requiring their host to mount a provider.
+ */
+export function useDensityValue(): Density {
+  const ctx = useContext(DensityContext);
+  if (ctx) return ctx.density;
+  if (typeof document === "undefined") return "comfortable";
+  const raw = document.documentElement.getAttribute("data-density");
+  return raw === "compact" || raw === "spacious" ? raw : "comfortable";
+}

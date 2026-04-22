@@ -2,6 +2,7 @@ node_modules
 dist
 dist-ssr
 .tmp
+.gavel/
 *.log
 npm-debug.log*
 pnpm-debug.log*

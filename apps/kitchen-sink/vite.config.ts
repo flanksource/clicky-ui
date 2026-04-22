@@ -10,6 +10,7 @@ export default defineConfig({
   plugins: [preact({ reactAliasesEnabled: false })],
   resolve: {
     alias: [
+      { find: /^preact\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
       { find: /^react\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
       { find: /^react-dom\/test-utils$/, replacement: preactPath("test-utils") },
       { find: /^react-dom$/, replacement: preactPath("compat") },

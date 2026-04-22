@@ -145,6 +145,83 @@ describe("FilterBar", () => {
     );
   });
 
+  it("autoSubmit=false forwards text edits immediately and renders an Apply button", () => {
+    const onOwner = vi.fn();
+    const onApply = vi.fn();
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        onApply={onApply}
+        filters={[
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: onOwner,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "platform" } });
+    expect(onOwner).toHaveBeenCalledWith("platform");
+
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+  });
+
+  it("autoSubmit=false + isPending disables Apply with loading label", () => {
+    render(
+      <FilterBar
+        autoSubmit={false}
+        onApply={vi.fn()}
+        isPending
+        filters={[{ key: "q", kind: "text", label: "Q", value: "", onChange: vi.fn() }]}
+      />,
+    );
+
+    const apply = screen.getByRole("button", { name: /loading/i });
+    expect(apply).toBeDisabled();
+  });
+
+  it("renders enum and boolean filters", () => {
+    const onStatus = vi.fn();
+    const onActive = vi.fn();
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "enum",
+            label: "Status",
+            value: "",
+            options: [
+              { value: "open", label: "Open" },
+              { value: "closed", label: "Closed" },
+            ],
+            onChange: onStatus,
+          },
+          {
+            key: "active",
+            kind: "boolean",
+            label: "Active",
+            value: false,
+            onChange: onActive,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "closed" } });
+    expect(onStatus).toHaveBeenCalledWith("closed");
+
+    fireEvent.click(screen.getByLabelText("Active"));
+    expect(onActive).toHaveBeenCalledWith(true);
+  });
+
   it("opens the native date picker affordance", () => {
     render(
       <FilterBar
