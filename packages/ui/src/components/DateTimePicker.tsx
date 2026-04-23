@@ -47,7 +47,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
           type="text"
           value={value}
           className={cn(
-            "h-8 w-full rounded-md border border-input bg-background px-2 pr-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "h-8 w-full rounded-md border border-input bg-background px-2 pr-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
             inputClassName,
           )}
           onChange={(event) => onChange?.(event.target.value)}
@@ -64,8 +64,9 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
         <button
           type="button"
           aria-label={openButtonLabel}
+          disabled={props.disabled}
           className={cn(
-            "absolute inset-y-0 right-1 inline-flex items-center text-muted-foreground",
+            "absolute inset-y-0 right-1 inline-flex items-center text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
             buttonClassName,
           )}
           onClick={() => {

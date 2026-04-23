@@ -161,6 +161,11 @@ export {
   OperationCatalog,
   type OperationCatalogProps,
 } from "./rpc/OperationCatalog";
+export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
+export {
+  OperationEntityPage,
+  type OperationEntityPageProps,
+} from "./rpc/OperationEntityPage";
 export {
   OperationCommandPage,
   type OperationCommandPageProps,

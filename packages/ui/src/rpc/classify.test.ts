@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterOperationsByDomain,
   findDetailEndpoint,
+  findDetailEndpointForList,
   findListEndpoint,
   normalizeRows,
   parseJsonBody,
@@ -59,6 +60,30 @@ describe("findDetailEndpoint", () => {
       }),
     ];
     expect(findDetailEndpoint(ops)).toBeDefined();
+  });
+});
+
+describe("findDetailEndpointForList", () => {
+  it("prefers the detail route that belongs to the resolved list path", () => {
+    const list = op("/api/v1/widgets", "get", {
+      operationId: "widget_list",
+      tags: ["widget"],
+    });
+    const ops = [
+      op("/api/v1/admin/widgets/{id}", "get", {
+        operationId: "admin_widget_get",
+        tags: ["widget"],
+        parameters: [{ name: "id", in: "path" }],
+      }),
+      list,
+      op("/api/v1/widgets/{id}", "get", {
+        operationId: "widget_get",
+        tags: ["widget"],
+        parameters: [{ name: "id", in: "path" }],
+      }),
+    ];
+
+    expect(findDetailEndpointForList(ops, list)?.operation.operationId).toBe("widget_get");
   });
 });
 

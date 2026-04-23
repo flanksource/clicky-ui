@@ -156,6 +156,10 @@ describe("OperationCatalog", () => {
       {},
       { Accept: "application/json" },
     );
+    expect(screen.getByRole("link", { name: "one" })).toHaveAttribute(
+      "href",
+      "/entity/widgets/one",
+    );
   });
 
   it("autoSubmit=false: typing does not refire; Apply triggers a single execute", async () => {
@@ -164,8 +168,8 @@ describe("OperationCatalog", () => {
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("q"), { target: { value: "foo" } });
-    fireEvent.change(screen.getByLabelText("q"), { target: { value: "foobar" } });
+    fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foo" } });
+    fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foobar" } });
     // Without Apply, the query key is unchanged, so no extra request is fired.
     await new Promise((r) => setTimeout(r, 50));
     expect(client.executeMock).toHaveBeenCalledTimes(1);

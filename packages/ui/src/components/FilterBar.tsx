@@ -41,6 +41,7 @@ export type FilterBarTextFilter = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -62,6 +63,7 @@ export type FilterBarLookupFilter = {
   onChange: (value: string) => void;
   placeholder?: string;
   inputType?: FilterBarLookupInputType;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -73,6 +75,7 @@ export type FilterBarLookupMultiFilter = {
   options: FilterBarLookupOption[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -85,6 +88,7 @@ export type FilterBarMultiFilter = {
   value: Record<string, FilterBarMultiFilterMode>;
   options: MultiSelectOption[];
   onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -105,6 +109,7 @@ export type FilterBarNumberFilter = {
   formatValue?: (value: number) => string;
   minPlaceholder?: string;
   maxPlaceholder?: string;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -116,6 +121,7 @@ export type FilterBarEnumFilter = {
   options: Array<{ value: string; label?: string }>;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -125,6 +131,7 @@ export type FilterBarBooleanFilter = {
   label: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -279,6 +286,7 @@ function EnumFilterField({
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -290,6 +298,7 @@ function EnumFilterField({
         className="h-6 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         value={filter.value}
         placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.value)}
         options={filter.options.map((option) => ({
           value: option.value,
@@ -305,6 +314,7 @@ function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
     <label
       className={cn(
         "flex h-8 shrink-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-2 text-xs",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -313,6 +323,7 @@ function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
         aria-label={filter.label}
         className="h-3.5 w-3.5 accent-primary"
         checked={filter.value}
+        disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.checked)}
       />
       <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
@@ -367,6 +378,7 @@ function TextFilterField({
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -376,9 +388,10 @@ function TextFilterField({
       <input
         type="text"
         aria-label={filter.label}
-        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         placeholder={filter.placeholder ?? "Filter…"}
         value={draft}
+        disabled={filter.disabled}
         onChange={(event) => setDraft(event.target.value)}
       />
     </label>
@@ -400,6 +413,7 @@ function LookupFilterField({
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -415,16 +429,18 @@ function LookupFilterField({
           placeholder={filter.placeholder ?? "Filter…"}
           value={draft}
           list={listId}
+          disabled={filter.disabled}
           onChange={setDraft}
         />
       ) : (
         <input
           type={filter.inputType === "number" ? "number" : "text"}
           aria-label={filter.label}
-          className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           placeholder={filter.placeholder ?? "Filter…"}
           value={draft}
           list={listId}
+          disabled={filter.disabled}
           onChange={(event) => setDraft(event.target.value)}
         />
       )}
@@ -460,6 +476,7 @@ function LookupMultiFilterField({
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -469,10 +486,11 @@ function LookupMultiFilterField({
       <input
         type="text"
         aria-label={filter.label}
-        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         placeholder={filter.placeholder ?? "value-1, value-2"}
         value={draft}
         list={listId}
+        disabled={filter.disabled}
         onChange={(event) => setDraft(event.target.value)}
       />
       <datalist id={listId}>
@@ -524,6 +542,7 @@ function NumberFilterField({
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -535,6 +554,7 @@ function NumberFilterField({
         aria-label={`${filter.label} filter`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        disabled={filter.disabled}
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
@@ -661,6 +681,7 @@ function MultiFilterField({
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
+        filter.disabled && "opacity-60",
         filter.className,
       )}
     >
@@ -672,6 +693,7 @@ function MultiFilterField({
         aria-label={`${filter.label} filter`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        disabled={filter.disabled}
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
