@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { cn } from "../lib/utils";
@@ -105,12 +106,30 @@ export type ClickyDocument = {
   node: ClickyNode;
 };
 
-export type ClickyRemoteFormat = "json" | "pdf";
+const CLICKY_PRIMARY_VIEW_FORMATS = ["clicky", "json"] as const;
+const CLICKY_OVERFLOW_VIEW_FORMATS = [
+  "pdf",
+  "html",
+  "markdown",
+  "yaml",
+  "csv",
+  "pretty",
+  "excel",
+  "slack",
+] as const;
+const CLICKY_DOWNLOAD_FORMATS = [
+  "json",
+  "clicky",
+  ...CLICKY_OVERFLOW_VIEW_FORMATS,
+] as const;
 
-export type ClickyViewOptions = {
-  json?: boolean;
-  pdf?: boolean;
-};
+export type ClickyPrimaryViewFormat = (typeof CLICKY_PRIMARY_VIEW_FORMATS)[number];
+export type ClickyOverflowViewFormat = (typeof CLICKY_OVERFLOW_VIEW_FORMATS)[number];
+export type ClickyRemoteFormat =
+  | ClickyPrimaryViewFormat
+  | ClickyOverflowViewFormat;
+
+export type ClickyViewOptions = Partial<Record<ClickyRemoteFormat, boolean>>;
 
 export type ClickyViewConfig = ClickyViewOptions | ClickyRemoteFormat[];
 
@@ -130,6 +149,18 @@ export type ClickyProps = {
 type ParsedClicky =
   | { ok: true; document: ClickyDocument }
   | { ok: false; message: string; raw: string };
+
+type ClickyRemoteResponse =
+  | { kind: "text"; text: string; contentType: string }
+  | { kind: "blob"; blob: Blob; contentType: string };
+
+type JsonTreeNode = {
+  id: string;
+  key: string;
+  value: unknown;
+  preview: string;
+  children?: JsonTreeNode[];
+};
 
 export function Clicky(props: ClickyProps) {
   const [queryClient] = useState(
@@ -196,38 +227,55 @@ function ClickyRemoteRenderer({
     () => getAvailableViews({ data, url, view }),
     [data, url, view],
   );
-  const downloadFormats = useMemo(
-    () => getDownloadFormats({ url, download, availableViews }),
-    [availableViews, download, url],
+  const primaryViews = useMemo(
+    () => availableViews.filter(isPrimaryViewFormat),
+    [availableViews],
   );
-  const [activeView, setActiveView] = useState<ClickyRemoteFormat>(() => availableViews[0] ?? "json");
+  const overflowViews = useMemo(
+    () => availableViews.filter(isOverflowViewFormat),
+    [availableViews],
+  );
+  const downloadFormats = useMemo(
+    () => getDownloadFormats({ url, download }),
+    [download, url],
+  );
+  const [activeView, setActiveView] = useState<ClickyRemoteFormat>(() => availableViews[0] ?? "clicky");
 
   useEffect(() => {
     if (!availableViews.includes(activeView)) {
-      setActiveView(availableViews[0] ?? "json");
+      setActiveView(availableViews[0] ?? "clicky");
     }
   }, [activeView, availableViews]);
 
   const formattedUrl = buildFormatUrl(url, activeView);
-  const jsonQuery = useQuery({
-    queryKey: ["clicky", formattedUrl],
-    enabled: activeView === "json",
-    queryFn: async () => fetchClickyPayload(formattedUrl),
+  const activeQuery = useQuery({
+    queryKey: ["clicky", activeView, formattedUrl],
+    enabled: shouldFetchRemoteView(activeView),
+    queryFn: async () => fetchRemoteFormat(formattedUrl, activeView),
   });
-
-  const effectiveData = activeView === "json" ? (jsonQuery.data ?? data) : undefined;
+  const effectiveClickyData =
+    activeView === "clicky" && activeQuery.data?.kind === "text"
+      ? activeQuery.data.text
+      : data;
+  const fallbackJsonData = useMemo(() => parseJsonValue(data), [data]);
+  const effectiveJsonData =
+    activeView === "json" && activeQuery.data?.kind === "text"
+      ? parseJsonValue(activeQuery.data.text)
+      : fallbackJsonData;
+  const activeOverflowView = isOverflowViewFormat(activeView) ? activeView : null;
   const canDownload = downloadFormats.length > 0;
+  const loadingMessage = `Fetching ${formattedUrl}`;
 
   return (
     <div className={cn("space-y-density-3", className)}>
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-density-3 py-density-2">
-        {availableViews.length > 1 && (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
+        {primaryViews.length > 1 && (
           <div
             role="radiogroup"
             aria-label="Clicky view mode"
-            className="inline-flex items-center rounded-md border border-input bg-background p-1"
+            className="flex flex-wrap gap-1"
           >
-            {availableViews.map((mode) => (
+            {primaryViews.map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -235,10 +283,10 @@ function ClickyRemoteRenderer({
                 aria-checked={activeView === mode}
                 onClick={() => setActiveView(mode)}
                 className={cn(
-                  "rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+                  "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   activeView === mode
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    ? "border-foreground/20 bg-accent text-foreground"
+                    : "border-transparent text-muted-foreground hover:border-foreground/20 hover:text-foreground",
                 )}
               >
                 {formatViewLabel(mode)}
@@ -247,63 +295,107 @@ function ClickyRemoteRenderer({
           </div>
         )}
 
-        <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs text-muted-foreground">
-          {formattedUrl}
-        </code>
-
-        {activeView === "json" && jsonQuery.isFetching && (
-          <span className="text-xs text-muted-foreground">Refreshing…</span>
-        )}
-
-        {canDownload && (
-          <ClickyDownloadSplitButton
-            className="ml-auto"
-            activeFormat={activeView}
-            url={url}
-            formats={downloadFormats}
-            label={download?.label}
+        {overflowViews.length > 0 && (
+          <ClickyViewMenu
+            activeFormat={activeOverflowView}
+            formats={overflowViews}
+            onSelect={setActiveView}
           />
         )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {shouldFetchRemoteView(activeView) && activeQuery.isFetching && (
+            <span className="text-xs text-muted-foreground">Refreshing…</span>
+          )}
+
+          {canDownload && (
+            <ClickyDownloadMenu
+              url={url}
+              formats={downloadFormats}
+              label={download?.label}
+            />
+          )}
+        </div>
       </div>
 
       {activeView === "pdf" ? (
         <ClickyPdfPreview src={formattedUrl} />
-      ) : jsonQuery.isPending && effectiveData === undefined ? (
-        <ClickyNotice title="Loading Clicky" message={`Fetching ${formattedUrl}`} />
-      ) : jsonQuery.isError && effectiveData === undefined ? (
+      ) : activeView === "html" ? (
+        <ClickyHtmlPreview src={formattedUrl} />
+      ) : activeView === "excel" ? (
+        <ClickyUnsupportedPreview
+          title="Excel preview"
+          message="Excel output is available for download, but not inline preview."
+          href={formattedUrl}
+        />
+      ) : activeView === "clicky" ? (
+        activeQuery.isPending && effectiveClickyData === undefined ? (
+          <ClickyNotice title="Loading Clicky" message={loadingMessage} />
+        ) : activeQuery.isError && effectiveClickyData === undefined ? (
+          <ClickyNotice
+            title="Clicky request failed"
+            message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
+            tone="destructive"
+          />
+        ) : (
+          <>
+            {activeQuery.isError && data !== undefined && (
+              <ClickyNotice
+                title="Remote refresh failed"
+                message="Showing the local fallback payload instead."
+                tone="warning"
+              />
+            )}
+            <ClickyContent data={effectiveClickyData} />
+          </>
+        )
+      ) : activeView === "json" ? (
+        activeQuery.isPending && effectiveJsonData === undefined ? (
+          <ClickyNotice title="Loading JSON" message={loadingMessage} />
+        ) : activeQuery.isError && effectiveJsonData === undefined ? (
+          <ClickyNotice
+            title="JSON request failed"
+            message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
+            tone="destructive"
+          />
+        ) : (
+          <>
+            {activeQuery.isError && fallbackJsonData !== undefined && (
+              <ClickyNotice
+                title="Remote refresh failed"
+                message="Showing the local fallback payload instead."
+                tone="warning"
+              />
+            )}
+            <ClickyJsonTree value={effectiveJsonData} />
+          </>
+        )
+      ) : activeQuery.isPending ? (
+        <ClickyNotice title={`Loading ${formatViewLabel(activeView)}`} message={loadingMessage} />
+      ) : activeQuery.isError ? (
         <ClickyNotice
-          title="Clicky request failed"
-          message={jsonQuery.error instanceof Error ? jsonQuery.error.message : "Request failed"}
+          title={`${formatViewLabel(activeView)} request failed`}
+          message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
           tone="destructive"
         />
       ) : (
-        <>
-          {jsonQuery.isError && data !== undefined && (
-            <ClickyNotice
-              title="Remote refresh failed"
-              message="Showing the local fallback payload instead."
-              tone="warning"
-            />
-          )}
-          <ClickyContent data={effectiveData} />
-        </>
+        <ClickyRemotePreview
+          format={activeView}
+          response={activeQuery.data}
+        />
       )}
     </div>
   );
 }
 
-function ClickyDownloadSplitButton({
+function ClickyViewMenu({
   activeFormat,
-  url,
   formats,
-  label,
-  className,
+  onSelect,
 }: {
-  activeFormat: ClickyRemoteFormat;
-  url: string;
-  formats: ClickyRemoteFormat[];
-  label?: string;
-  className?: string;
+  activeFormat: ClickyOverflowViewFormat | null;
+  formats: ClickyOverflowViewFormat[];
+  onSelect: (format: ClickyRemoteFormat) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -312,16 +404,96 @@ function ClickyDownloadSplitButton({
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
-      <div className="inline-flex overflow-hidden rounded-md border border-input bg-background shadow-sm">
+    <div ref={rootRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label="Open additional view menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-pressed={activeFormat != null}
+        className={cn(
+          "inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          activeFormat && "border-foreground/20 bg-accent text-foreground",
+        )}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Icon name="codicon:ellipsis" className="text-sm" />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
+        >
+          {formats.map((format) => {
+            const active = format === activeFormat;
+            const meta = getRemoteFormatMeta(format);
+            return (
+              <button
+                key={format}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+                  active && "bg-accent/70",
+                )}
+                onClick={() => {
+                  onSelect(format);
+                  setOpen(false);
+                }}
+              >
+                <Icon
+                  name={meta.icon}
+                  className={cn("mt-0.5 shrink-0 text-base text-muted-foreground", active && "text-foreground")}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{meta.label}</span>
+                    {active && <Icon name="codicon:check" className="text-xs text-muted-foreground" />}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {meta.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClickyDownloadMenu({
+  url,
+  formats,
+  label,
+}: {
+  url: string;
+  formats: ClickyRemoteFormat[];
+  label?: string;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const primaryFormat: ClickyRemoteFormat = "json";
+  const primaryMeta = getRemoteFormatMeta(primaryFormat);
+
+  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+
+  return (
+    <div ref={rootRef} className="relative">
+      <div className="flex items-center gap-1">
         <button
           type="button"
-          aria-label={label ? `Download ${label}` : "Download"}
-          className="inline-flex h-8 items-center gap-2 border-r border-input px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          onClick={() => submitDownloadRequest(buildFormatUrl(url, activeFormat))}
+          aria-label={label ? `Download ${primaryMeta.label} ${label}` : `Download ${primaryMeta.label}`}
+          className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          onClick={() => submitDownloadRequest(buildFormatUrl(url, primaryFormat))}
         >
           <Icon name="codicon:cloud-download" className="text-sm" />
-          <span>Download</span>
+          <span>{`Download ${primaryMeta.label}`}</span>
         </button>
         <button
           ref={triggerRef}
@@ -329,7 +501,7 @@ function ClickyDownloadSplitButton({
           aria-label="Open download menu"
           aria-haspopup="menu"
           aria-expanded={open}
-          className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => setOpen((current) => !current)}
         >
           <Icon name={open ? "codicon:chevron-up" : "codicon:chevron-down"} className="text-sm" />
@@ -339,29 +511,33 @@ function ClickyDownloadSplitButton({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[11rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
         >
           {formats.map((format) => {
-            const active = format === activeFormat;
+            const meta = getRemoteFormatMeta(format);
             return (
               <button
                 key={format}
                 type="button"
                 role="menuitem"
                 className={cn(
-                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
-                  active && "bg-accent font-medium",
+                  "flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
                 )}
                 onClick={() => {
                   submitDownloadRequest(buildFormatUrl(url, format));
                   setOpen(false);
                 }}
               >
-                <span className="flex items-center gap-2">
-                  <Icon name={getFormatIconName(format)} className="text-sm" />
-                  <span>{formatViewLabel(format)}</span>
+                <Icon
+                  name={meta.icon}
+                  className="mt-0.5 shrink-0 text-base text-muted-foreground"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{meta.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {meta.description}
+                  </span>
                 </span>
-                {active && <Icon name="codicon:check" className="text-xs text-muted-foreground" />}
               </button>
             );
           })}
@@ -402,7 +578,7 @@ function useDismissablePopup(
   }, [onClose, open, rootRef, triggerRef]);
 }
 
-function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
+export function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
   if (typeof data === "string") {
     try {
       return normalizeClickyDocument(JSON.parse(data) as unknown);
@@ -418,16 +594,31 @@ function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
   return normalizeClickyDocument(data);
 }
 
-function fetchClickyPayload(url: string) {
+function fetchRemoteFormat(url: string, format: ClickyRemoteFormat): Promise<ClickyRemoteResponse> {
   return fetch(url, {
     headers: {
-      Accept: "application/json, text/plain;q=0.9,*/*;q=0.8",
+      Accept: getRemoteFormatMeta(format).accept,
     },
   }).then(async (response) => {
     if (!response.ok) {
       throw new Error(`Request failed with ${response.status} ${response.statusText}`.trim());
     }
-    return response.text();
+
+    const contentType = response.headers.get("Content-Type") ?? "";
+
+    if (format === "excel") {
+      return {
+        kind: "blob",
+        blob: await response.blob(),
+        contentType,
+      };
+    }
+
+    return {
+      kind: "text",
+      text: await response.text(),
+      contentType,
+    };
   });
 }
 
@@ -461,7 +652,7 @@ function ClickyNotice({
   className,
 }: {
   title: string;
-  message: string;
+  message: ReactNode;
   tone?: "default" | "warning" | "destructive";
   className?: string;
 }) {
@@ -503,25 +694,173 @@ function ClickyPdfPreview({ src }: { src: string }) {
   );
 }
 
+function ClickyHtmlPreview({ src }: { src: string }) {
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
+        <span>HTML preview</span>
+        <a href={src} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+          Open in new tab
+        </a>
+      </div>
+      <iframe
+        title="Clicky HTML preview"
+        src={src}
+        className="h-[720px] w-full bg-white"
+        sandbox="allow-same-origin"
+      />
+    </div>
+  );
+}
+
+function ClickyUnsupportedPreview({
+  title,
+  message,
+  href,
+}: {
+  title: string;
+  message: string;
+  href: string;
+}) {
+  return (
+    <ClickyNotice
+      title={title}
+      message={
+        <>
+          <span>{message} </span>
+          <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+            Open format
+          </a>
+        </>
+      }
+    />
+  );
+}
+
+function ClickyRemotePreview({
+  format,
+  response,
+}: {
+  format: ClickyOverflowViewFormat;
+  response: ClickyRemoteResponse | undefined;
+}) {
+  const meta = getRemoteFormatMeta(format);
+
+  if (format === "slack") {
+    const parsed = response?.kind === "text" ? parseJsonValue(response.text) : undefined;
+    return <ClickyJsonTree value={parsed} emptyLabel={meta.label} />;
+  }
+
+  return (
+    <ClickyTextPreview
+      title={`${meta.label} output`}
+      content={response?.kind === "text" ? response.text : ""}
+    />
+  );
+}
+
+function ClickyTextPreview({
+  title,
+  content,
+}: {
+  title: string;
+  content: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-background">
+      <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">{title}</div>
+      <pre
+        aria-label="Clicky text preview"
+        className="overflow-auto whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs text-foreground"
+      >
+        {content || "No content"}
+      </pre>
+    </div>
+  );
+}
+
+function ClickyJsonTree({
+  value,
+  emptyLabel = "JSON",
+}: {
+  value: unknown;
+  emptyLabel?: string;
+}) {
+  const roots = useMemo(() => buildJsonTree(value), [value]);
+
+  if (value === undefined) {
+    return (
+      <ClickyNotice
+        title={`No ${emptyLabel} payload`}
+        message="The response did not include a JSON body to inspect."
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-label="JSON tree"
+      className="overflow-hidden rounded-md border border-border bg-background"
+    >
+      <Tree<JsonTreeNode>
+        roots={roots}
+        className="min-h-[12rem]"
+        showControls={roots.some((node) => (node.children?.length ?? 0) > 0)}
+        getKey={(node) => node.id}
+        getChildren={(node) => node.children}
+        renderRow={({ node }) => <ClickyJsonTreeRow node={node} />}
+        rowClass={() => "hover:bg-accent"}
+        empty={<div className="px-3 py-4 text-sm text-muted-foreground">No JSON fields.</div>}
+        toolbarClassName="pl-3"
+      />
+    </div>
+  );
+}
+
+function ClickyJsonTreeRow({ node }: { node: JsonTreeNode }) {
+  const primitiveClass =
+    typeof node.value === "string"
+      ? "text-emerald-700 dark:text-emerald-400"
+      : typeof node.value === "number"
+        ? "text-sky-700 dark:text-sky-400"
+        : typeof node.value === "boolean" || node.value === null
+          ? "text-violet-700 dark:text-violet-400"
+          : "text-muted-foreground";
+
+  return (
+    <div className="flex min-w-0 items-start gap-2 font-mono text-xs">
+      <span className="shrink-0 text-foreground">{node.key}</span>
+      <span className="shrink-0 text-muted-foreground">:</span>
+      <span className={cn("min-w-0 break-words", primitiveClass)}>{node.preview}</span>
+    </div>
+  );
+}
+
 function getAvailableViews({
   data,
   url,
   view,
 }: Pick<ClickyProps, "data" | "url" | "view">): ClickyRemoteFormat[] {
-  const allowJson = Array.isArray(view) ? view.includes("json") : (view?.json ?? true);
-  const allowPdf = Array.isArray(view) ? view.includes("pdf") : (view?.pdf ?? false);
+  const allowClicky = resolveViewConfigFlag(view, "clicky", data, url);
+  const allowJson = resolveViewConfigFlag(view, "json", data, url);
   const next: ClickyRemoteFormat[] = [];
+
+  if (allowClicky && (url || data !== undefined)) {
+    next.push("clicky");
+  }
 
   if (allowJson && (url || data !== undefined)) {
     next.push("json");
   }
 
-  if (allowPdf && url) {
-    next.push("pdf");
+  for (const format of CLICKY_OVERFLOW_VIEW_FORMATS) {
+    if (resolveViewConfigFlag(view, format, data, url) && url) {
+      next.push(format);
+    }
   }
 
   if (next.length === 0 && (url || data !== undefined)) {
-    next.push("json");
+    next.push("clicky");
   }
 
   return next;
@@ -530,45 +869,246 @@ function getAvailableViews({
 function getDownloadFormats({
   url,
   download,
-  availableViews,
 }: {
   url?: string;
   download?: ClickyDownloadOptions;
-  availableViews: ClickyRemoteFormat[];
 }): ClickyRemoteFormat[] {
-  if (!download?.all) {
+  const enabled = download ? (download.all ?? true) : !!url;
+
+  if (!enabled || !url) {
     return [];
   }
 
-  if (!url) {
-    return availableViews;
-  }
-
-  return ["json", "pdf"];
+  return [...CLICKY_DOWNLOAD_FORMATS];
 }
 
-function getFormatIconName(format: ClickyRemoteFormat) {
-  if (format === "pdf") {
-    return "vscode-icons:file-type-pdf2";
+function getRemoteFormatMeta(format: ClickyRemoteFormat) {
+  switch (format) {
+    case "clicky":
+      return {
+        label: "Clicky",
+        description: "Rendered Clicky JSON with the rich Clicky viewer",
+        icon: "codicon:preview",
+        accept: "application/json+clicky, application/clicky+json;q=0.9, application/json;q=0.8,*/*;q=0.7",
+      };
+    case "json":
+      return {
+        label: "JSON",
+        description: "Plain JSON for inspecting the raw response body",
+        icon: "vscode-icons:file-type-json",
+        accept: "application/json, text/plain;q=0.8,*/*;q=0.7",
+      };
+    case "pdf":
+      return {
+        label: "PDF",
+        description: "Portable document for sharing and printing",
+        icon: "vscode-icons:file-type-pdf2",
+        accept: "application/pdf, */*;q=0.7",
+      };
+    case "html":
+      return {
+        label: "HTML",
+        description: "Browser-ready HTML preview of the formatted output",
+        icon: "vscode-icons:file-type-html",
+        accept: "text/html, */*;q=0.7",
+      };
+    case "markdown":
+      return {
+        label: "Markdown",
+        description: "Markdown formatted for docs, comments, and chat",
+        icon: "vscode-icons:file-type-markdown",
+        accept: "text/markdown, text/plain;q=0.8,*/*;q=0.7",
+      };
+    case "yaml":
+      return {
+        label: "YAML",
+        description: "YAML for config-friendly inspection and export",
+        icon: "vscode-icons:file-type-yaml",
+        accept: "application/yaml, text/yaml;q=0.9, text/plain;q=0.8,*/*;q=0.7",
+      };
+    case "csv":
+      return {
+        label: "CSV",
+        description: "Comma-separated values for spreadsheets and imports",
+        icon: "codicon:table",
+        accept: "text/csv, text/plain;q=0.8,*/*;q=0.7",
+      };
+    case "pretty":
+      return {
+        label: "Pretty",
+        description: "Human-readable plain text output from the formatter",
+        icon: "codicon:file-code",
+        accept: "text/plain, */*;q=0.7",
+      };
+    case "excel":
+      return {
+        label: "Excel",
+        description: "Spreadsheet workbook for offline analysis",
+        icon: "codicon:table",
+        accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*;q=0.7",
+      };
+    case "slack":
+      return {
+        label: "Slack",
+        description: "Slack Block Kit JSON for chat-native output",
+        icon: "codicon:comment-discussion",
+        accept: "application/vnd.slack.block-kit+json, application/json;q=0.8,*/*;q=0.7",
+      };
   }
-
-  return "vscode-icons:file-type-json";
 }
 
 function formatViewLabel(mode: ClickyRemoteFormat) {
-  return mode.toUpperCase();
+  return getRemoteFormatMeta(mode).label;
 }
 
 function buildFormatUrl(url: string, format: ClickyRemoteFormat) {
   const base = typeof window === "undefined" ? "http://localhost" : window.location.origin;
   const resolved = new URL(url, base);
-  resolved.searchParams.set("format", format);
+  resolved.searchParams.set("format", format === "clicky" ? "clicky-json" : format);
 
   if (isAbsoluteUrl(url)) {
     return resolved.toString();
   }
 
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+}
+
+function shouldFetchRemoteView(format: ClickyRemoteFormat) {
+  return format !== "pdf" && format !== "html" && format !== "excel";
+}
+
+function isPrimaryViewFormat(format: ClickyRemoteFormat): format is ClickyPrimaryViewFormat {
+  return (CLICKY_PRIMARY_VIEW_FORMATS as readonly string[]).includes(format);
+}
+
+function isOverflowViewFormat(format: ClickyRemoteFormat): format is ClickyOverflowViewFormat {
+  return (CLICKY_OVERFLOW_VIEW_FORMATS as readonly string[]).includes(format);
+}
+
+function resolveViewConfigFlag(
+  view: ClickyViewConfig | undefined,
+  format: ClickyRemoteFormat,
+  data: ClickyProps["data"],
+  url?: string,
+) {
+  const defaultEnabled =
+    format === "clicky" || format === "json"
+      ? url != null || data !== undefined
+      : !!url;
+
+  if (view === undefined) {
+    return defaultEnabled;
+  }
+
+  if (Array.isArray(view)) {
+    if (view.length === 0) {
+      return false;
+    }
+
+    if (format === "clicky") {
+      return view.includes("clicky") || view.includes("json");
+    }
+
+    return view.includes(format);
+  }
+
+  if (format in view) {
+    return Boolean(view[format]);
+  }
+
+  if (format === "clicky" && view.json === true) {
+    return true;
+  }
+
+  return defaultEnabled;
+}
+
+function parseJsonValue(data: ClickyProps["data"]): unknown {
+  if (data === undefined) {
+    return undefined;
+  }
+
+  if (typeof data !== "string") {
+    return data;
+  }
+
+  const trimmed = data.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return data;
+  }
+}
+
+function buildJsonTree(value: unknown): JsonTreeNode[] {
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => buildJsonTreeNode(String(index), entry, `$[${index}]`));
+  }
+
+  if (isPlainObject(value)) {
+    return Object.entries(value).map(([key, entry]) =>
+      buildJsonTreeNode(key, entry, `$.${key}`),
+    );
+  }
+
+  if (value === undefined) {
+    return [];
+  }
+
+  return [buildJsonTreeNode("$", value, "$")];
+}
+
+function buildJsonTreeNode(key: string, value: unknown, id: string): JsonTreeNode {
+  return {
+    id,
+    key,
+    value,
+    preview: summarizeJsonValue(value),
+    children: getJsonChildren(value, id),
+  };
+}
+
+function getJsonChildren(value: unknown, path: string) {
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => buildJsonTreeNode(String(index), entry, `${path}[${index}]`));
+  }
+
+  if (isPlainObject(value)) {
+    return Object.entries(value).map(([key, entry]) =>
+      buildJsonTreeNode(key, entry, `${path}.${key}`),
+    );
+  }
+
+  return undefined;
+}
+
+function summarizeJsonValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return `[${value.length} item${value.length === 1 ? "" : "s"}]`;
+  }
+
+  if (isPlainObject(value)) {
+    const count = Object.keys(value).length;
+    return `{${count} key${count === 1 ? "" : "s"}}`;
+  }
+
+  if (typeof value === "string") {
+    return JSON.stringify(value);
+  }
+
+  if (value === undefined) {
+    return "undefined";
+  }
+
+  return String(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
 function submitDownloadRequest(url: string) {

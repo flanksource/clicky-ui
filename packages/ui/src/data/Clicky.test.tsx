@@ -81,15 +81,45 @@ describe("Clicky", () => {
     expect(screen.getByText(/kind: Deployment/)).toBeInTheDocument();
   });
 
-  it("fetches remote clicky data, switches views, and submits downloads", async () => {
+  it("exposes Clicky and JSON primary views with overflow formats and JSON-first downloads", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(JSON.stringify(clickyFixture), {
+      .mockImplementation(async (input) => {
+        const url = String(input);
+
+        if (url.includes("format=clicky-json")) {
+          return new Response(JSON.stringify(clickyFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/json+clicky" },
+          });
+        }
+
+        if (url.includes("format=json")) {
+          return new Response(
+            JSON.stringify({
+              service: "api",
+              healthy: true,
+              replicas: 3,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        if (url.includes("format=markdown")) {
+          return new Response("# Report\n\nAll systems nominal.", {
+            status: 200,
+            headers: { "Content-Type": "text/markdown" },
+          });
+        }
+
+        return new Response("", {
           status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+          headers: { "Content-Type": "text/plain" },
+        });
+      });
     const submittedActions: string[] = [];
     const submitSpy = vi
       .spyOn(HTMLFormElement.prototype, "submit")
@@ -97,13 +127,24 @@ describe("Clicky", () => {
         submittedActions.push(this.action);
       });
 
-    render(
-      <Clicky
-        url="/api/clicky/report"
-        view={{ json: true, pdf: true }}
-        download={{ all: true }}
-      />,
+    render(<Clicky url="/api/clicky/report" />);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/clicky/report?format=clicky-json",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Accept: expect.stringContaining("application/json+clicky"),
+        }),
+      }),
     );
+    expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Clicky" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "JSON" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "PDF" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^download json/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "JSON" }));
 
     expect(fetchSpy).toHaveBeenCalledWith(
       "/api/clicky/report?format=json",
@@ -113,9 +154,20 @@ describe("Clicky", () => {
         }),
       }),
     );
-    expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
+    expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
+    expect(screen.getByText("service")).toBeInTheDocument();
+    expect(screen.getByText("\"api\"")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: /open additional view menu/i }));
+    expect(screen.getByRole("menuitemradio", { name: /pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /html/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /markdown/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /yaml/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /csv/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /pretty/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /excel/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /slack/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /pdf/i }));
 
     expect(screen.getByTitle("Clicky PDF preview")).toHaveAttribute(
       "src",
@@ -123,16 +175,31 @@ describe("Clicky", () => {
     );
     expect(screen.getByRole("button", { name: /open download menu/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^download$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open additional view menu/i }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /markdown/i }));
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/clicky/report?format=markdown",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Accept: expect.stringContaining("text/markdown"),
+        }),
+      }),
+    );
+    expect(await screen.findByLabelText("Clicky text preview")).toHaveTextContent("# Report");
+
+    fireEvent.click(screen.getByRole("button", { name: /^download json/i }));
 
     expect(submitSpy).toHaveBeenCalledTimes(1);
-    expect(submittedActions[0]).toContain("/api/clicky/report?format=pdf");
+    expect(submittedActions[0]).toContain("/api/clicky/report?format=json");
 
     fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /^json$/i }));
+    expect(screen.getByText("Rendered Clicky JSON with the rich Clicky viewer")).toBeInTheDocument();
+    expect(screen.getByText("Portable document for sharing and printing")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /clicky/i }));
 
     expect(submitSpy).toHaveBeenCalledTimes(2);
-    expect(submittedActions[1]).toContain("/api/clicky/report?format=json");
+    expect(submittedActions[1]).toContain("/api/clicky/report?format=clicky-json");
 
     fetchSpy.mockRestore();
     submitSpy.mockRestore();
@@ -141,12 +208,21 @@ describe("Clicky", () => {
   it("supports an empty remote view config without rendering the mode switcher", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(JSON.stringify(clickyFixture), {
+      .mockImplementation(async (input) => {
+        const url = String(input);
+
+        if (url.includes("format=clicky-json")) {
+          return new Response(JSON.stringify(clickyFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/json+clicky" },
+          });
+        }
+
+        return new Response("", {
           status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+          headers: { "Content-Type": "text/plain" },
+        });
+      });
     const submittedActions: string[] = [];
     const submitSpy = vi
       .spyOn(HTMLFormElement.prototype, "submit")
@@ -164,19 +240,21 @@ describe("Clicky", () => {
     );
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/clicky/report?format=json",
+      "/api/clicky/report?format=clicky-json",
       expect.objectContaining({
         headers: expect.objectContaining({
-          Accept: expect.stringContaining("application/json"),
+          Accept: expect.stringContaining("application/json+clicky"),
         }),
       }),
     );
     expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup", { name: /clicky view mode/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /download report/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open additional view menu/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download json/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /^pdf$/i }));
+    expect(screen.getByText("Portable document for sharing and printing")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /pdf/i }));
 
     expect(submitSpy).toHaveBeenCalledTimes(1);
     expect(submittedActions[0]).toContain("/api/clicky/report?format=pdf");

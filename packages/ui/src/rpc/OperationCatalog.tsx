@@ -10,6 +10,7 @@ import { FilterBar } from "../components/FilterBar";
 import { DataTable, inferColumns } from "../data/DataTable";
 import { Icon } from "../data/Icon";
 import { MethodBadge } from "../data/MethodBadge";
+import { Modal } from "../overlay/Modal";
 import {
   filterOperationsByDomain,
   findDetailEndpointForList,
@@ -17,7 +18,16 @@ import {
   normalizeRows,
   parseJsonBody,
 } from "./classify";
+import {
+  filterOperationsBySurface,
+  findSurfaceCollectionActions,
+  findSurfaceDetailOperation,
+  findSurfaceListOperation,
+  getOperationClickyMeta,
+} from "./clickyMetadata";
 import { EndpointList, type RenderLink } from "./EndpointList";
+import { ExecutionResult } from "./ExecutionResult";
+import { FilterForm } from "./FilterForm";
 import {
   type DomainDefinition,
   type ExecutionResponse,
@@ -30,6 +40,7 @@ import {
   packParameterValues,
   parametersToFormConfig,
   useDebouncedRecord,
+  type ParameterFormOptions,
 } from "./formMetadata";
 
 export type OperationCatalogProps = {
@@ -47,6 +58,7 @@ export type OperationCatalogProps = {
   // not follow the default `<entity>_list` / first-path-param GET pattern.
   listOperationId?: string;
   detailOperationId?: string;
+  surfaceKey?: string;
   getEntityHref?: (entityName: string, id: string, row: Record<string, unknown>) => string;
   getCommandHref?: (operationId: string, op: ResolvedOperation) => string;
   renderError?: (err: unknown, title: string) => ReactNode;
@@ -76,6 +88,7 @@ export function OperationCatalog({
   operationIdPrefix,
   listOperationId,
   detailOperationId,
+  surfaceKey,
   getEntityHref,
   getCommandHref = defaultCommandHref,
   renderError = defaultRenderError,
@@ -83,34 +96,59 @@ export function OperationCatalog({
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
   const [view, setView] = useState<"table" | "endpoints">("table");
+  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
+  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
+
+  const surfaceOps = useMemo(
+    () => filterOperationsBySurface(operations, surfaceKey),
+    [operations, surfaceKey],
+  );
+  const useSurfaceMetadata = surfaceOps.length > 0;
 
   const domainOps = useMemo(
-    () =>
-      (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
+    () => {
+      if (useSurfaceMetadata) {
+        return surfaceOps;
+      }
+
+      return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
         operationIdPrefix
           ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
           : true,
-      ),
-    [allOperations, entities, operationIdPrefix, operations],
+      );
+    },
+    [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata],
   );
 
   const listEndpoint = useMemo(
-    () =>
-      listOperationId
+    () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceListOperation(domainOps, surfaceKey);
+      }
+
+      return listOperationId
         ? domainOps.find(
             (op) => op.method === "get" && op.operation.operationId === listOperationId,
           )
-        : findListEndpoint(domainOps, entities),
-    [domainOps, entities, listOperationId],
+        : findListEndpoint(domainOps, entities);
+    },
+    [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata],
   );
   const detailEndpoint = useMemo(
-    () =>
-      detailOperationId
+    () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceDetailOperation(domainOps, surfaceKey);
+      }
+
+      return detailOperationId
         ? domainOps.find(
             (op) => op.method === "get" && op.operation.operationId === detailOperationId,
           )
-        : findDetailEndpointForList(domainOps, listEndpoint),
-    [detailOperationId, domainOps, listEndpoint],
+        : findDetailEndpointForList(domainOps, listEndpoint);
+    },
+    [detailOperationId, domainOps, listEndpoint, surfaceKey, useSurfaceMetadata],
   );
 
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -148,14 +186,19 @@ export function OperationCatalog({
   const columns = useMemo(() => inferColumns(rows), [rows]);
 
   const actionOps = useMemo(
-    () =>
-      domainOps.filter(
+    () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceCollectionActions(domainOps, surfaceKey);
+      }
+
+      return domainOps.filter(
         (op) =>
           op.method !== "get" &&
           !op.path.includes("{") &&
           !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
-      ),
-    [domainOps],
+      );
+    },
+    [domainOps, surfaceKey, useSurfaceMetadata],
   );
 
   const entityName = useMemo(() => {
@@ -180,11 +223,15 @@ export function OperationCatalog({
   );
 
   const filterBarConfig = useMemo(
-    () =>
-      parametersToFormConfig(listParameters, draftFilters, setDraftFilters, {
+    () => {
+      const options: ParameterFormOptions = {
         includeLocations: ["query"],
-        lookup: lookupQuery.data,
-      }),
+      };
+      if (lookupQuery.data != null) {
+        options.lookup = lookupQuery.data;
+      }
+      return parametersToFormConfig(listParameters, draftFilters, setDraftFilters, options);
+    },
     [draftFilters, listParameters, lookupQuery.data],
   );
 
@@ -194,6 +241,58 @@ export function OperationCatalog({
     kind === "configuration" || definition.key.startsWith("config-")
       ? "Configuration"
       : "Operations";
+  const activeActionMeta = activeAction ? getOperationClickyMeta(activeAction) : undefined;
+
+  const actionLockedValues = useMemo(() => {
+    const meta = activeActionMeta;
+    if (!activeAction || meta == null || !meta.supportsFilterMode) {
+      return {};
+    }
+
+    const locked: Record<string, string> = {};
+    for (const param of activeAction.operation.parameters ?? []) {
+      const value = filters[param.name];
+      if (param.in === "query" && value) {
+        locked[param.name] = value;
+      }
+    }
+
+    if (meta.idParam) {
+      locked[meta.idParam] = "all";
+    }
+
+    if ((activeAction.operation.parameters ?? []).some((param) => param.name === "filter")) {
+      locked.filter =
+        Object.entries(filters)
+          .filter(([, value]) => value)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(", ") || "current list filters";
+    }
+
+    return locked;
+  }, [activeAction, activeActionMeta, filters]);
+
+  async function executeAction(values: Record<string, string>) {
+    if (!activeAction) return;
+    setIsExecutingAction(true);
+    setActionError("");
+
+    try {
+      const response = await client.executeCommand(
+        activeAction.path,
+        activeAction.method,
+        packParameterValues(values, activeAction.operation.parameters ?? []),
+        { Accept: "application/json+clicky" },
+      );
+      setActionResult(response);
+      await listQuery.refetch();
+    } catch (err) {
+      setActionResult(null);
+      setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
+    } finally {
+      setIsExecutingAction(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -254,6 +353,26 @@ export function OperationCatalog({
             const tooltip = op.operation.description
               ? `${commandName} — ${op.operation.description}`
               : commandName;
+            if (useSurfaceMetadata) {
+              return (
+                <Button
+                  key={`${op.method}:${op.path}`}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  title={tooltip}
+                  onClick={() => {
+                    setActiveAction(op);
+                    setActionResult(null);
+                    setActionError("");
+                  }}
+                >
+                  <Icon name="codicon:add" className="text-xs" />
+                  {op.operation.summary || getOperationClickyMeta(op)?.actionName || commandName}
+                </Button>
+              );
+            }
+
             return renderLink({
               key: `${op.method}:${op.path}`,
               to: getCommandHref(op.operation.operationId ?? commandName, op),
@@ -278,8 +397,8 @@ export function OperationCatalog({
               autoSubmit={false}
               isPending={listQuery.isFetching}
               filters={filterBarConfig.filters}
-              timeRange={filterBarConfig.timeRange}
               onApply={() => setFilters(draftFilters)}
+              {...(filterBarConfig.timeRange ? { timeRange: filterBarConfig.timeRange } : {})}
             />
           )}
           {listQuery.isLoading ? (
@@ -294,7 +413,7 @@ export function OperationCatalog({
             <DataTable
               data={rows}
               columns={columns}
-              getRowHref={detailEndpoint ? getRowHref : undefined}
+              {...(detailEndpoint ? { getRowHref } : {})}
             />
           ) : listQuery.data ? (
             <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -310,6 +429,46 @@ export function OperationCatalog({
           getCommandHref={getCommandHref}
         />
       )}
+
+      <Modal
+        open={activeAction != null}
+        onClose={() => setActiveAction(null)}
+        title={
+          activeAction?.operation.summary ||
+          activeActionMeta?.actionName ||
+          activeAction?.operation.operationId ||
+          "Action"
+        }
+        size="lg"
+      >
+        {activeAction && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <MethodBadge method={activeAction.method} />
+              <code className="rounded-md bg-muted px-2 py-1 text-sm">{activeAction.path}</code>
+            </div>
+            <FilterForm
+              client={client}
+              path={activeAction.path}
+              method={activeAction.method}
+              parameters={activeAction.operation.parameters ?? []}
+              lockedValues={actionLockedValues}
+              enableLookup={Boolean(activeActionMeta?.supportsLookup)}
+              submitLabel="Execute request"
+              submittingLabel="Executing…"
+              isSubmitting={isExecutingAction}
+              onSubmit={executeAction}
+            />
+            {actionError ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                {actionError}
+              </div>
+            ) : actionResult ? (
+              <ExecutionResult response={actionResult} className="mt-0" />
+            ) : null}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

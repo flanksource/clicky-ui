@@ -7,12 +7,18 @@ import {
   filterOperationsByDomain,
   findDetailEndpointForList,
   findListEndpoint,
-  parseJsonBody,
 } from "./classify";
+import {
+  filterOperationsBySurface,
+  findSurfaceDetailOperation,
+  findSurfaceEntityActions,
+  findSurfaceListOperation,
+} from "./clickyMetadata";
+import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
 import { packParameterValues } from "./formMetadata";
 import type { RenderLink } from "./EndpointList";
-import type { DomainDefinition, ResolvedOperation } from "./types";
+import type { DomainDefinition, ExecutionResponse, ResolvedOperation } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
 
 export type OperationEntityPageProps = {
@@ -25,6 +31,7 @@ export type OperationEntityPageProps = {
   operationIdPrefix?: string;
   listOperationId?: string;
   detailOperationId?: string;
+  surfaceKey?: string;
   backHref?: string;
   backLabel?: string;
   renderError?: (err: unknown, title: string) => ReactNode;
@@ -40,15 +47,6 @@ function defaultRenderError(err: unknown, title: string) {
   );
 }
 
-function renderBody(resultText: string) {
-  if (!resultText) return "";
-  const parsed = parseJsonBody({ success: true, exit_code: 0, stdout: resultText });
-  if (parsed != null) {
-    return JSON.stringify(parsed, null, 2);
-  }
-  return resultText;
-}
-
 export function OperationEntityPage({
   id,
   definition,
@@ -59,28 +57,43 @@ export function OperationEntityPage({
   operationIdPrefix,
   listOperationId,
   detailOperationId,
+  surfaceKey,
   backHref,
   backLabel = "Back",
   renderError = defaultRenderError,
 }: OperationEntityPageProps) {
   const { operations, isLoading } = useOperations(client);
   const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
-  const [actionResultText, setActionResultText] = useState("");
+  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
   const [actionError, setActionError] = useState("");
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const surfaceOps = useMemo(
+    () => filterOperationsBySurface(operations, surfaceKey),
+    [operations, surfaceKey],
+  );
+  const useSurfaceMetadata = surfaceOps.length > 0;
 
   const domainOps = useMemo(
-    () =>
-      (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
+    () => {
+      if (useSurfaceMetadata) {
+        return surfaceOps;
+      }
+
+      return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
         operationIdPrefix
           ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
           : true,
-      ),
-    [allOperations, entities, operationIdPrefix, operations],
+      );
+    },
+    [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata],
   );
 
   const listEndpoint = useMemo(
     () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceListOperation(domainOps, surfaceKey);
+      }
+
       const explicitList = listOperationId
         ? domainOps.find(
             (op) => op.method === "get" && op.operation.operationId === listOperationId,
@@ -88,17 +101,22 @@ export function OperationEntityPage({
         : undefined;
       return explicitList ?? findListEndpoint(domainOps, entities);
     },
-    [domainOps, entities, listOperationId],
+    [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata],
   );
 
   const resolvedDetailEndpoint = useMemo(
-    () =>
-      detailOperationId
+    () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceDetailOperation(domainOps, surfaceKey);
+      }
+
+      return detailOperationId
         ? domainOps.find(
             (op) => op.method === "get" && op.operation.operationId === detailOperationId,
           )
-        : findDetailEndpointForList(domainOps, listEndpoint),
-    [detailOperationId, domainOps, listEndpoint],
+        : findDetailEndpointForList(domainOps, listEndpoint);
+    },
+    [detailOperationId, domainOps, listEndpoint, surfaceKey, useSurfaceMetadata],
   );
 
   const idParameterName = useMemo(
@@ -112,13 +130,18 @@ export function OperationEntityPage({
     [id, idParameterName],
   );
   const actionOps = useMemo(
-    () =>
-      resolvedDetailEndpoint == null
+    () => {
+      if (useSurfaceMetadata) {
+        return findSurfaceEntityActions(domainOps, surfaceKey);
+      }
+
+      return resolvedDetailEndpoint == null
         ? []
         : domainOps.filter(
             (op) => op.method !== "get" && op.path.startsWith(`${resolvedDetailEndpoint.path}/`),
-          ),
-    [domainOps, resolvedDetailEndpoint],
+          );
+    },
+    [domainOps, resolvedDetailEndpoint, surfaceKey, useSurfaceMetadata],
   );
 
   const detailQuery = useQuery({
@@ -128,7 +151,7 @@ export function OperationEntityPage({
         resolvedDetailEndpoint!.path,
         resolvedDetailEndpoint!.method,
         detailValues,
-        { Accept: "application/json" },
+        { Accept: "application/json+clicky" },
       ),
     enabled: !!resolvedDetailEndpoint && !!id,
     staleTime: 30_000,
@@ -160,11 +183,12 @@ export function OperationEntityPage({
         activeAction.path,
         activeAction.method,
         packParameterValues(values, activeAction.operation.parameters ?? []),
+        { Accept: "application/json+clicky" },
       );
-      setActionResultText(response.stdout || response.output || response.message || "");
+      setActionResult(response);
       await detailQuery.refetch();
     } catch (err) {
-      setActionResultText("");
+      setActionResult(null);
       setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
     } finally {
       setIsExecutingAction(false);
@@ -212,7 +236,7 @@ export function OperationEntityPage({
               size="sm"
               onClick={() => {
                 setActiveAction(op);
-                setActionResultText("");
+                setActionResult(null);
                 setActionError("");
               }}
             >
@@ -229,12 +253,7 @@ export function OperationEntityPage({
       ) : (
         <section className="rounded-xl border bg-card p-4">
           <h2 className="text-lg font-medium">Entity detail</h2>
-          <pre
-            aria-label="Response body"
-            className="mt-3 overflow-auto rounded-md bg-muted p-4 text-xs"
-          >
-            {renderBody(detailQuery.data?.stdout || detailQuery.data?.output || detailQuery.data?.message || "")}
-          </pre>
+          <ExecutionResult response={detailQuery.data ?? null} />
         </section>
       )}
 
@@ -266,13 +285,8 @@ export function OperationEntityPage({
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                 {actionError}
               </div>
-            ) : actionResultText ? (
-              <pre
-                aria-label="Response body"
-                className="overflow-auto rounded-md bg-muted p-4 text-xs"
-              >
-                {renderBody(actionResultText)}
-              </pre>
+            ) : actionResult ? (
+              <ExecutionResult response={actionResult} className="mt-0" />
             ) : null}
           </div>
         )}

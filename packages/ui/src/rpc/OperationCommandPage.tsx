@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { MethodBadge } from "../data/MethodBadge";
-import { parseJsonBody } from "./classify";
+import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
 import type { RenderLink } from "./EndpointList";
 import { packParameterValues } from "./formMetadata";
+import type { ExecutionResponse } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
 
 export type OperationCommandPageProps = {
@@ -23,13 +24,8 @@ export function OperationCommandPage({
 }: OperationCommandPageProps) {
   const { operation, isLoading } = useOperationById(client, operationId);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [resultText, setResultText] = useState("");
+  const [result, setResult] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState("");
-  const parsedResult = resultText
-    ? parseJsonBody({ success: true, exit_code: 0, stdout: resultText })
-    : null;
-  const renderedResult =
-    !resultText ? "" : parsedResult != null ? JSON.stringify(parsedResult, null, 2) : resultText;
 
   async function executeOperation(values: Record<string, string>) {
     if (!operation) {
@@ -44,10 +40,11 @@ export function OperationCommandPage({
         operation.path,
         operation.method,
         packParameterValues(values, operation.operation.parameters ?? []),
+        { Accept: "application/json+clicky" },
       );
-      setResultText(response.stdout || response.output || response.message || "");
+      setResult(response);
     } catch (err) {
-      setResultText("");
+      setResult(null);
       setError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
     } finally {
       setIsExecuting(false);
@@ -128,15 +125,8 @@ export function OperationCommandPage({
           <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
           </div>
-        ) : renderedResult ? (
-          <pre
-            aria-label="Response body"
-            className="mt-3 overflow-auto rounded-md bg-muted p-4 text-xs"
-          >
-            {renderedResult}
-          </pre>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">No response yet.</p>
+          <ExecutionResult response={result} />
         )}
       </section>
     </div>

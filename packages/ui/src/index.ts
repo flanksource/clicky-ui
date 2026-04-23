@@ -171,6 +171,10 @@ export {
   type OperationCommandPageProps,
 } from "./rpc/OperationCommandPage";
 export {
+  EntityExplorerApp,
+  type EntityExplorerAppProps,
+} from "./rpc/EntityExplorerApp";
+export {
   EndpointList,
   type EndpointListProps,
   type RenderLink,
@@ -190,6 +194,9 @@ export {
   parseJsonBody,
 } from "./rpc/classify";
 export {
+  type ClickyOperationMeta,
+  type ClickySpecMeta,
+  type ClickySurface,
   isPositionalParam,
   type DomainDefinition,
   type ExecutionRequest,

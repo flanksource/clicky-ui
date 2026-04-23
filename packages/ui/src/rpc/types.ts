@@ -16,6 +16,7 @@ export interface ExecutionResponse {
   cli?: string;
   input?: ExecutionRequest;
   contentType?: string;
+  requestUrl?: string;
   blob?: Blob;
   parsed?: unknown;
 }
@@ -47,6 +48,7 @@ export interface OpenAPIOperation {
     content?: Record<string, { schema?: OpenAPISchema }>;
   };
   responses: Record<string, unknown>;
+  "x-clicky"?: ClickyOperationMeta;
 }
 
 export interface OpenAPISpec {
@@ -54,6 +56,7 @@ export interface OpenAPISpec {
   info: { title: string; description?: string; version: string };
   paths: Record<string, Record<string, OpenAPIOperation>>;
   tags?: Array<{ name: string; description?: string }>;
+  "x-clicky"?: ClickySpecMeta;
 }
 
 export interface ResolvedOperation {
@@ -68,6 +71,29 @@ export interface DomainDefinition {
   description: string;
   emptyTitle?: string;
   emptyDescription?: string;
+}
+
+export interface ClickySpecMeta {
+  surfaces?: ClickySurface[];
+}
+
+export interface ClickySurface {
+  key: string;
+  entity: string;
+  title: string;
+  parent?: string;
+  admin?: boolean;
+  description?: string;
+}
+
+export interface ClickyOperationMeta {
+  surface: string;
+  verb: "list" | "get" | "create" | "update" | "delete" | "action";
+  scope: "collection" | "entity";
+  actionName?: string;
+  idParam?: string;
+  supportsLookup?: boolean;
+  supportsFilterMode?: boolean;
 }
 
 export type OperationLookupFilterType = "bool" | "number" | "date" | "from" | "to";

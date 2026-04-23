@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { OpenAPISpec } from "./types";
+import type { ClickyDocument } from "../data/Clicky";
+import type { ExecutionResponse, OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { OperationEntityPage } from "./OperationEntityPage";
 
@@ -59,31 +60,76 @@ function makeSpec(): OpenAPISpec {
   };
 }
 
-function makeClient(): OperationsApiClient & {
+function makeClickyDocument(fields: Array<{ name: string; label: string; value: string }>): ClickyDocument {
+  return {
+    version: 1,
+    node: {
+      kind: "map",
+      fields: fields.map((field) => ({
+        name: field.name,
+        label: field.label,
+        value: {
+          kind: "text",
+          text: field.value,
+          plain: field.value,
+        },
+      })),
+    },
+  };
+}
+
+function clickyResponse(document: ClickyDocument, requestUrl?: string): ExecutionResponse {
+  return {
+    success: true,
+    exit_code: 0,
+    stdout: JSON.stringify(document),
+    contentType: "application/json+clicky",
+    requestUrl,
+    parsed: document,
+  };
+}
+
+function jsonResponse(data: unknown): ExecutionResponse {
+  return {
+    success: true,
+    exit_code: 0,
+    stdout: JSON.stringify(data),
+    contentType: "application/json",
+    parsed: data,
+  };
+}
+
+function makeClient(
+  handler?: (path: string, method: string, params: Record<string, string>) => Promise<ExecutionResponse>,
+): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
 } {
   const executeMock = vi.fn(async (path: string, method: string, params: Record<string, string>) => {
+    if (handler) {
+      return handler(path, method, params);
+    }
+
     if (path === "/api/v1/widgets/{id}" && method === "get") {
-      return {
-        success: true,
-        exit_code: 0,
-        stdout: JSON.stringify({ id: params.id, name: "First widget" }),
-      };
+      return clickyResponse(
+        makeClickyDocument([
+          { name: "id", label: "ID", value: params.id },
+          { name: "name", label: "Name", value: "First widget" },
+        ]),
+        `/api/v1/widgets/${params.id}`,
+      );
     }
 
     if (path === "/api/v1/widgets/{id}/restart" && method === "post") {
-      return {
-        success: true,
-        exit_code: 0,
-        stdout: JSON.stringify({ action: "restart", id: params.id, reason: params.reason }),
-      };
+      return clickyResponse(
+        makeClickyDocument([
+          { name: "action", label: "Action", value: "restart" },
+          { name: "id", label: "ID", value: params.id },
+          { name: "reason", label: "Reason", value: params.reason },
+        ]),
+      );
     }
 
-    return {
-      success: true,
-      exit_code: 0,
-      stdout: "[]",
-    };
+    return jsonResponse([]);
   });
 
   return {
@@ -115,7 +161,23 @@ function renderPage(client: OperationsApiClient) {
 }
 
 describe("OperationEntityPage", () => {
-  it("loads detail and locks the row id for actions", async () => {
+  it("loads detail and locks the row id for actions with Clicky results", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify(
+            makeClickyDocument([
+              { name: "id", label: "ID", value: "one" },
+              { name: "name", label: "Name", value: "First widget" },
+            ]),
+          ),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json+clicky" },
+          },
+        ),
+      );
     const client = makeClient();
     renderPage(client);
 
@@ -124,10 +186,26 @@ describe("OperationEntityPage", () => {
         "/api/v1/widgets/{id}",
         "get",
         { id: "one" },
-        { Accept: "application/json" },
+        { Accept: "application/json+clicky" },
       ),
     );
-    await waitFor(() => expect(screen.getByText(/First widget/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "Response body" })).toHaveTextContent(
+        "First widget",
+      ),
+    );
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/v1/widgets/one?format=clicky-json",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: expect.stringContaining("application/json+clicky"),
+          }),
+        }),
+      ),
+    );
+    expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^download json$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restart widget" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reconcile widget" })).not.toBeInTheDocument();
 
@@ -146,8 +224,31 @@ describe("OperationEntityPage", () => {
         "/api/v1/widgets/{id}/restart",
         "post",
         { drain: "false", id: "one", reason: "manual" },
+        { Accept: "application/json+clicky" },
       ),
     );
-    await waitFor(() => expect(screen.getAllByLabelText("Response body")[1]).toHaveTextContent('"action": "restart"'));
+    await waitFor(() =>
+      expect(screen.getAllByRole("region", { name: "Response body" })[1]).toHaveTextContent(
+        "manual",
+      ),
+    );
+
+    fetchSpy.mockRestore();
+  });
+
+  it("falls back to the raw response panel when the payload is not Clicky", async () => {
+    const client = makeClient(async (path, method, params) => {
+      if (path === "/api/v1/widgets/{id}" && method === "get") {
+        return jsonResponse({ id: params.id, name: "Fallback widget" });
+      }
+
+      return jsonResponse([]);
+    });
+
+    renderPage(client);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Response body")).toHaveTextContent('"name": "Fallback widget"'),
+    );
   });
 });
