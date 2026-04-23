@@ -222,6 +222,47 @@ describe("FilterBar", () => {
     expect(onActive).toHaveBeenCalledWith(true);
   });
 
+  it("renders lookup-backed single and multi filters as freeform fields", () => {
+    const onTeam = vi.fn();
+    const onTags = vi.fn();
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        filters={[
+          {
+            key: "team",
+            kind: "lookup",
+            label: "Team",
+            value: "",
+            options: [
+              { value: "team/platform", label: "Platform" },
+              { value: "team/core", label: "Core" },
+            ],
+            onChange: onTeam,
+          },
+          {
+            key: "tags",
+            kind: "lookup-multi",
+            label: "Tags",
+            value: ["api"],
+            options: [
+              { value: "api", label: "API" },
+              { value: "worker", label: "Worker" },
+            ],
+            onChange: onTags,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "platform" } });
+    expect(onTeam).toHaveBeenCalledWith("platform");
+
+    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "api, worker" } });
+    expect(onTags).toHaveBeenCalledWith(["api", "worker"]);
+  });
+
   it("opens the native date picker affordance", () => {
     render(
       <FilterBar

@@ -6,6 +6,7 @@ import type { RenderLink } from "./EndpointList";
 import type {
   ExecutionResponse,
   OpenAPISpec,
+  OperationLookupResponse,
 } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 
@@ -25,6 +26,11 @@ function makeSpec(): OpenAPISpec {
               in: "query",
               schema: { type: "string", enum: ["big", "small"] },
             },
+            { name: "team", in: "query", schema: { type: "string" } },
+            { name: "tags", in: "query", schema: { type: "string" } },
+            { name: "include-archived", in: "query", schema: { type: "boolean" } },
+            { name: "from", in: "query", schema: { type: "string" } },
+            { name: "to", in: "query", schema: { type: "string" } },
           ],
           responses: {},
         },
@@ -54,12 +60,50 @@ function makeClient(
   },
 ): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
+  lookupMock: ReturnType<typeof vi.fn>;
 } {
   const executeMock = vi.fn().mockResolvedValue(executeResponse);
+  const lookupMock = vi.fn().mockResolvedValue(undefined);
   return {
     executeMock,
+    lookupMock,
     getOpenAPISpec: async () => makeSpec(),
     executeCommand: executeMock,
+    lookupFilters: lookupMock,
+  };
+}
+
+function makeLookupResponse(): OperationLookupResponse {
+  return {
+    filters: {
+      team: {
+        label: "Team",
+        options: {
+          "team/platform": { kind: "text", text: "Platform", plain: "Platform" },
+          "team/core": { kind: "text", text: "Core", plain: "Core" },
+        },
+      },
+      tags: {
+        label: "Tags",
+        multi: true,
+        options: {
+          api: { kind: "text", text: "API", plain: "API" },
+          worker: { kind: "text", text: "Worker", plain: "Worker" },
+        },
+      },
+      "include-archived": {
+        label: "Include archived",
+        type: "bool",
+      },
+      from: {
+        label: "From",
+        type: "from",
+      },
+      to: {
+        label: "To",
+        type: "to",
+      },
+    },
   };
 }
 
@@ -151,5 +195,47 @@ describe("OperationCatalog", () => {
     expect(screen.getByText("/api/v1/widgets/{id}")).toBeInTheDocument();
     expect(screen.getAllByText("GET").length).toBeGreaterThan(0);
     expect(screen.getAllByText("POST").length).toBeGreaterThan(0);
+  });
+
+  it("uses lookup metadata to shape list filters while keeping enum filters strict", async () => {
+    const client = makeClient();
+    client.lookupMock.mockResolvedValue(makeLookupResponse());
+    renderCatalog(client);
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByLabelText(/kind/i)).toHaveRole("combobox");
+    expect(screen.getByLabelText("Team")).toHaveAttribute("list", "team-lookup-options");
+    expect(screen.getByLabelText("Tags")).toHaveAttribute("list", "tags-lookup-options");
+    expect(screen.getByLabelText("Include archived")).toHaveAttribute("type", "checkbox");
+    expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
+  });
+
+  it("refreshes lookup metadata from draft edits without refetching the list until Apply", async () => {
+    const client = makeClient();
+    client.lookupMock.mockResolvedValue(makeLookupResponse());
+    renderCatalog(client);
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "platform" } });
+    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "api, worker" } });
+
+    await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(2));
+    expect(client.executeMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2));
+    expect(client.executeMock).toHaveBeenLastCalledWith(
+      "/api/v1/widgets",
+      "get",
+      { tags: "api,worker", team: "platform" },
+      { Accept: "application/json" },
+    );
   });
 });

@@ -21,6 +21,18 @@ export type TreeProps<T> = Omit<TreeNodeProps<T>, "node" | "depth" | "expandAll"
   expandAll?: boolean | null;
   onExpandAllChange?: (next: boolean | null) => void;
   toolbarClassName?: string;
+  /**
+   * Override the text the filter matches against for a given node.
+   * Defaults to a recursive walk of the node's own fields (excluding
+   * its `children` and any secondary children), which works for
+   * plain-shape trees but leaks text from nested domain objects —
+   * e.g. a SQL Table's Field rows are marked secondary, yet the
+   * parent record still carries `record.fields[].field` strings that
+   * the default walker would collect. Callers that need precise
+   * control over search behaviour should return only the text they
+   * want surfaced (the node's own display label / id / type).
+   */
+  getSearchText?: (node: T) => string;
 };
 
 function countTreeEdges<T>(
@@ -97,6 +109,8 @@ function filterTreeRoots<T>(
   getChildren: TreeProps<T>["getChildren"],
   getKey: TreeProps<T>["getKey"],
   query: string,
+  isSecondary?: (node: T) => boolean,
+  getSearchText?: (node: T) => string,
 ) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
@@ -110,10 +124,30 @@ function filterTreeRoots<T>(
   const filteredChildren = new Map<string | number, T[]>();
   const forcedOpenKeys = new Set<string | number>();
 
+  function matchText(node: T, children: T[]): string {
+    // Honour the caller-supplied text extractor first — it's the
+    // only way to get precise control over what the filter sees when
+    // the node carries domain data whose fields would otherwise leak
+    // into the default walker.
+    if (getSearchText) return getSearchText(node).trim().toLowerCase();
+    // Match-text skips secondary children so e.g. a Table's search
+    // text only draws from the Table itself, not from its Field
+    // rows. The Table is primary, so its own text still counts.
+    const searchChildren = children.filter((c) => !isSecondary?.(c));
+    return nodeSearchText(node, searchChildren);
+  }
+
   function visit(node: T): boolean {
+    // A secondary node never drives a filter match — it's
+    // effectively invisible to search. Still rendered when the
+    // caller opens the parent manually. This is what lets a 28k-row
+    // field tree stay searchable at the record level without "field
+    // name contains 'x'" matches spamming the results.
+    if (isSecondary?.(node)) return false;
+
     const key = getKey(node);
     const children = getChildren(node) ?? [];
-    const matches = nodeSearchText(node, children).includes(normalizedQuery);
+    const matches = matchText(node, children).includes(normalizedQuery);
     const visibleChildren: T[] = [];
 
     for (const child of children) {
@@ -152,6 +186,7 @@ export function Tree<T>({
   expandAll: controlledExpandAll,
   onExpandAllChange,
   toolbarClassName,
+  getSearchText,
   ...nodeProps
 }: TreeProps<T>) {
   const [internalExpandAll, setInternalExpandAll] = useState<boolean | null>(null);
@@ -166,8 +201,23 @@ export function Tree<T>({
   const showFilter = totalEdges > 20;
   const activeFilter = showFilter ? filterQuery : "";
   const filteredTree = useMemo(
-    () => filterTreeRoots(roots, nodeProps.getChildren, nodeProps.getKey, activeFilter),
-    [roots, nodeProps.getChildren, nodeProps.getKey, activeFilter],
+    () =>
+      filterTreeRoots(
+        roots,
+        nodeProps.getChildren,
+        nodeProps.getKey,
+        activeFilter,
+        nodeProps.isSecondary,
+        getSearchText,
+      ),
+    [
+      roots,
+      nodeProps.getChildren,
+      nodeProps.getKey,
+      activeFilter,
+      nodeProps.isSecondary,
+      getSearchText,
+    ],
   );
   const treeRoots = filteredTree.roots;
   const filteredChildren = filteredTree.filteredChildren;

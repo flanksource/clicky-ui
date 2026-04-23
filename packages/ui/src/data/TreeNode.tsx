@@ -25,6 +25,23 @@ export type TreeNodeProps<T> = {
   rowClass?: (node: T, selected: boolean) => string;
   indentPx?: number;
   basePaddingPx?: number;
+  /**
+   * Marks a node as a **secondary child** of its parent. Secondary
+   * children keep the full tree structure (they render, they can be
+   * opened manually) but opt out of the bulk behaviours a caller
+   * typically wants when they click the toolbar:
+   *
+   *  - Tree-wide filter: their text is skipped during match detection
+   *    so typing in the search box never surfaces a row because one
+   *    of its secondary children happened to match.
+   *  - Expand all: secondary nodes stay at their default-open state
+   *    instead of being forced open, preventing 28k field rows from
+   *    flooding the viewport when an operator hits the button on a
+   *    schema with hundreds of tables.
+   *
+   * Default: every node is primary (returns false).
+   */
+  isSecondary?: (node: T) => boolean;
 };
 
 export function TreeNode<T>({
@@ -41,6 +58,7 @@ export function TreeNode<T>({
   rowClass,
   indentPx = 16,
   basePaddingPx = 8,
+  isSecondary,
 }: TreeNodeProps<T>) {
   const children = getChildren(node);
   const hasChildren = (children?.length ?? 0) > 0;
@@ -51,13 +69,30 @@ export function TreeNode<T>({
   const key = getKey(node);
   const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
   const isOpen = isForcedOpen || open;
+  // A node opts out of bulk expand-all in two distinct cases:
+  //
+  //  1. The node itself is secondary (its edge from the parent is
+  //     secondary) — rare at the root, but the rule is symmetric.
+  //  2. All of the node's children are secondary — the common case.
+  //     This is what keeps an "Expand all" on a schema tree from
+  //     flooding the viewport with every table's field rows: the
+  //     table opens to nothing structural worth seeing in bulk, so
+  //     we leave it closed until the operator clicks it manually.
+  //
+  // In both cases the manual toggle still works, and filter matches
+  // still force the row open via forcedOpenKeys, so users never
+  // lose access — they just don't get auto-flooded.
+  const secondaryNode = isSecondary?.(node) ?? false;
+  const childrenAllSecondary =
+    hasChildren && isSecondary != null && children!.every((c) => isSecondary(c));
+  const skipExpandAll = secondaryNode || childrenAllSecondary;
 
   useEffect(() => {
-    if (expandAll !== null && expandAll !== prevExpandAll.current) {
+    if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
       setOpen(expandAll);
     }
     prevExpandAll.current = expandAll;
-  }, [expandAll]);
+  }, [expandAll, skipExpandAll]);
 
   function toggle() {
     if (hasChildren) setOpen((o) => !o);
@@ -105,6 +140,7 @@ export function TreeNode<T>({
               rowClass={rowClass}
               indentPx={indentPx}
               basePaddingPx={basePaddingPx}
+              isSecondary={isSecondary}
             />
           ))}
         </div>

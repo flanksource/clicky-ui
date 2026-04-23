@@ -1,14 +1,18 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import {
   FilterBar,
   type FilterBarFilter,
+  type FilterBarRangeProps,
 } from "../components/FilterBar";
 import { DataTable, inferColumns } from "../data/DataTable";
 import { Icon } from "../data/Icon";
@@ -25,6 +29,8 @@ import {
   isPositionalParam,
   type DomainDefinition,
   type ExecutionResponse,
+  type OperationLookupFilter,
+  type OperationLookupResponse,
   type OpenAPIParameter,
   type ResolvedOperation,
 } from "./types";
@@ -38,6 +44,13 @@ export type OperationCatalogProps = {
   // Override to return all operations (e.g. for an "API explorer" domain
   // that shouldn't be filtered by entity tags).
   allOperations?: boolean;
+  // Restrict the domain to operationIds with a shared prefix when tags alone
+  // are too coarse (for example admin_ or catalog_ surfaces).
+  operationIdPrefix?: string;
+  // Explicit operation ids for domains whose canonical list/detail routes do
+  // not follow the default `<entity>_list` / first-path-param GET pattern.
+  listOperationId?: string;
+  detailOperationId?: string;
   getEntityHref?: (entityName: string, id: string, row: Record<string, unknown>) => string;
   getCommandHref?: (operationId: string, op: ResolvedOperation) => string;
   renderError?: (err: unknown, title: string) => ReactNode;
@@ -64,6 +77,9 @@ export function OperationCatalog({
   client,
   renderLink,
   allOperations = false,
+  operationIdPrefix,
+  listOperationId,
+  detailOperationId,
   getEntityHref = defaultEntityHref,
   getCommandHref = defaultCommandHref,
   renderError = defaultRenderError,
@@ -74,20 +90,37 @@ export function OperationCatalog({
 
   const domainOps = useMemo(
     () =>
-      allOperations
-        ? operations
-        : filterOperationsByDomain(operations, entities),
-    [allOperations, entities, operations],
+      (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
+        operationIdPrefix
+          ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
+          : true,
+      ),
+    [allOperations, entities, operationIdPrefix, operations],
   );
 
   const listEndpoint = useMemo(
-    () => findListEndpoint(domainOps, entities),
-    [domainOps, entities],
+    () =>
+      listOperationId
+        ? domainOps.find(
+            (op) => op.method === "get" && op.operation.operationId === listOperationId,
+          )
+        : findListEndpoint(domainOps, entities),
+    [domainOps, entities, listOperationId],
   );
-  const detailEndpoint = useMemo(() => findDetailEndpoint(domainOps), [domainOps]);
+  const detailEndpoint = useMemo(
+    () =>
+      detailOperationId
+        ? domainOps.find(
+            (op) => op.method === "get" && op.operation.operationId === detailOperationId,
+          )
+        : findDetailEndpoint(domainOps),
+    [detailOperationId, domainOps],
+  );
 
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [draftFilters, setDraftFilters] = useState<Record<string, string>>({});
+  const debouncedDraftFilters = useDebouncedRecord(draftFilters, 250);
+  const listParameters = listEndpoint?.operation.parameters ?? [];
 
   const listQuery = useQuery<ExecutionResponse>({
     queryKey: ["operation-list", listEndpoint?.method, listEndpoint?.path, filters],
@@ -99,6 +132,20 @@ export function OperationCatalog({
         { Accept: "application/json" },
       ),
     enabled: !!listEndpoint && view === "table",
+    staleTime: 30_000,
+    retry: 0,
+  });
+
+  const lookupQuery = useQuery<OperationLookupResponse>({
+    queryKey: ["operation-lookup", listEndpoint?.method, listEndpoint?.path, debouncedDraftFilters],
+    queryFn: async () =>
+      (await client.lookupFilters?.(
+        listEndpoint!.path,
+        listEndpoint!.method,
+        packFilters(debouncedDraftFilters, listParameters),
+        { Accept: "application/json+clicky" },
+      )) ?? { filters: {} },
+    enabled: !!listEndpoint && view === "table" && !!client.lookupFilters,
     staleTime: 30_000,
     retry: 0,
   });
@@ -120,8 +167,9 @@ export function OperationCatalog({
 
   const entityName = useMemo(() => {
     if (!listEndpoint) return "";
-    const match = listEndpoint.path.match(/\/api\/v1\/([^/]+)/);
-    return match?.[1] || "";
+    const segments = listEndpoint.path.split("/").filter(Boolean);
+    const tail = segments[0] === "api" && segments[1] === "v1" ? segments.slice(2) : segments;
+    return tail[tail.length - 1] || "";
   }, [listEndpoint]);
 
   const getRowHref = useCallback(
@@ -136,10 +184,9 @@ export function OperationCatalog({
     [detailEndpoint, entityName, getEntityHref],
   );
 
-  const listParameters = listEndpoint?.operation.parameters ?? [];
-  const filterBarFilters = useMemo(
-    () => parametersToFilters(listParameters, draftFilters, setDraftFilters),
-    [listParameters, draftFilters],
+  const filterBarConfig = useMemo(
+    () => parametersToFilters(listParameters, draftFilters, setDraftFilters, lookupQuery.data),
+    [draftFilters, listParameters, lookupQuery.data],
   );
 
   const hasTable = !!listEndpoint;
@@ -227,11 +274,12 @@ export function OperationCatalog({
 
       {showTable ? (
         <>
-          {filterBarFilters.length > 0 && (
+          {(filterBarConfig.filters.length > 0 || filterBarConfig.timeRange != null) && (
             <FilterBar
               autoSubmit={false}
               isPending={listQuery.isFetching}
-              filters={filterBarFilters}
+              filters={filterBarConfig.filters}
+              timeRange={filterBarConfig.timeRange}
               onApply={() => setFilters(draftFilters)}
             />
           )}
@@ -271,6 +319,12 @@ function SkeletonBlock({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
 }
 
+type FilterValuesSetter = Dispatch<SetStateAction<Record<string, string>>>;
+type FilterBarConfig = {
+  filters: FilterBarFilter[];
+  timeRange?: FilterBarRangeProps;
+};
+
 // parametersToFilters maps OpenAPI query parameters to FilterBar filter
 // definitions. Positional params (name === "args" or description hints) are
 // packed into the `args` field at submit time by packFilters; they are also
@@ -278,20 +332,33 @@ function SkeletonBlock({ className }: { className?: string }) {
 function parametersToFilters(
   parameters: OpenAPIParameter[],
   values: Record<string, string>,
-  setValues: (next: Record<string, string>) => void,
-): FilterBarFilter[] {
+  setValues: FilterValuesSetter,
+  lookup?: OperationLookupResponse,
+): FilterBarConfig {
   const emitFilters: FilterBarFilter[] = [];
+  const lookupFilters = lookup?.filters ?? {};
+  const rangeStart = parameters.find(
+    (param) => param.in === "query" && lookupFilters[param.name]?.type === "from",
+  );
+  const rangeEnd = parameters.find(
+    (param) => param.in === "query" && lookupFilters[param.name]?.type === "to",
+  );
+  const hasTimeRange = rangeStart != null && rangeEnd != null;
 
   for (const param of parameters) {
     if (param.in !== "query") continue;
+    if (hasTimeRange && (param.name === rangeStart?.name || param.name === rangeEnd?.name)) {
+      continue;
+    }
 
     const value = values[param.name] ?? "";
     const onChange = (next: string | boolean) => {
       const stringValue = typeof next === "boolean" ? (next ? "true" : "false") : next;
-      setValues({ ...values, [param.name]: stringValue });
+      setValues((current) => ({ ...current, [param.name]: stringValue }));
     };
 
     const schema = param.schema;
+    const lookupFilter = lookupFilters[param.name];
 
     if (schema?.enum) {
       emitFilters.push({
@@ -308,13 +375,46 @@ function parametersToFilters(
       continue;
     }
 
-    if (schema?.type === "boolean") {
+    if (lookupFilter?.type === "bool" || schema?.type === "boolean") {
       emitFilters.push({
         key: param.name,
         kind: "boolean",
-        label: param.name,
+        label: lookupFilter?.label ?? param.name,
         value: value === "true",
         onChange: (v) => onChange(v),
+      });
+      continue;
+    }
+
+    if (lookupFilter != null) {
+      if (lookupFilter.multi) {
+        emitFilters.push({
+          key: param.name,
+          kind: "lookup-multi",
+          label: lookupFilter.label ?? param.name,
+          value: splitCommaValues(value),
+          options: lookupOptionsToFieldOptions(lookupFilter),
+          placeholder: param.description ?? "value-1, value-2",
+          onChange: (next) =>
+            setValues((current) => ({ ...current, [param.name]: next.join(",") })),
+        });
+        continue;
+      }
+
+      emitFilters.push({
+        key: param.name,
+        kind: "lookup",
+        label: lookupFilter.label ?? param.name,
+        value,
+        options: lookupOptionsToFieldOptions(lookupFilter),
+        placeholder: param.description ?? param.name,
+        inputType:
+          lookupFilter.type === "number"
+            ? "number"
+            : lookupFilter.type === "date"
+              ? "date"
+              : "text",
+        onChange: (next) => onChange(next),
       });
       continue;
     }
@@ -329,7 +429,24 @@ function parametersToFilters(
     });
   }
 
-  return emitFilters;
+  return {
+    filters: emitFilters,
+    timeRange:
+      hasTimeRange && rangeStart != null && rangeEnd != null
+        ? {
+            from: values[rangeStart.name] ?? "",
+            to: values[rangeEnd.name] ?? "",
+            onApply: (from, to) =>
+              setValues((current) => ({
+                ...current,
+                [rangeStart.name]: from,
+                [rangeEnd.name]: to,
+              })),
+            fromPlaceholder: rangeStart.description,
+            toPlaceholder: rangeEnd.description,
+          }
+        : undefined,
+  };
 }
 
 // packFilters collapses user-entered parameter values into the shape the
@@ -354,4 +471,60 @@ function packFilters(
   }
   if (args.length > 0) params.args = args.join(",");
   return params;
+}
+
+function splitCommaValues(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
+  const merged = new Map<string, { label?: string; title?: string }>();
+
+  for (const [value, node] of Object.entries(filter.options ?? {})) {
+    merged.set(value, {
+      label: clickyNodeToPlainText(node) || value,
+      title: clickyNodeToPlainText(node) || value,
+    });
+  }
+
+  for (const [value, node] of Object.entries(filter.selected ?? {})) {
+    if (!merged.has(value)) {
+      merged.set(value, {
+        label: clickyNodeToPlainText(node) || value,
+        title: clickyNodeToPlainText(node) || value,
+      });
+    }
+  }
+
+  return Array.from(merged.entries()).map(([value, meta]) => ({
+    value,
+    label: meta.label ?? value,
+    title: meta.title ?? value,
+  }));
+}
+
+function clickyNodeToPlainText(node: {
+  plain?: string;
+  text?: string;
+  children?: Array<{ plain?: string; text?: string; children?: unknown[] }>;
+  tooltip?: { plain?: string; text?: string };
+} | null | undefined): string {
+  if (node == null) return "";
+  if (node.plain) return node.plain;
+  if (node.text) return node.text;
+  return (node.children ?? []).map((child) => clickyNodeToPlainText(child)).join("");
+}
+
+function useDebouncedRecord<T>(value: T, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
 }

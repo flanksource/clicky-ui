@@ -44,6 +44,38 @@ export type FilterBarTextFilter = {
   className?: string;
 };
 
+export type FilterBarLookupOption = {
+  value: string;
+  label?: string;
+  disabled?: boolean;
+  title?: string;
+};
+
+export type FilterBarLookupInputType = "text" | "number" | "date";
+
+export type FilterBarLookupFilter = {
+  key: string;
+  kind: "lookup";
+  label: string;
+  value: string;
+  options: FilterBarLookupOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  inputType?: FilterBarLookupInputType;
+  className?: string;
+};
+
+export type FilterBarLookupMultiFilter = {
+  key: string;
+  kind: "lookup-multi";
+  label: string;
+  value: string[];
+  options: FilterBarLookupOption[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+  className?: string;
+};
+
 export type FilterBarMultiFilterMode = Extract<FilterMode, "include" | "exclude">;
 
 export type FilterBarMultiFilter = {
@@ -98,6 +130,8 @@ export type FilterBarBooleanFilter = {
 
 export type FilterBarFilter =
   | FilterBarTextFilter
+  | FilterBarLookupFilter
+  | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
@@ -182,6 +216,14 @@ export function FilterBar({
 
         {filters?.map((filter, index) => {
           const grow = !search && index === 0;
+
+          if (filter.kind === "lookup") {
+            return <LookupFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
+          if (filter.kind === "lookup-multi") {
+            return <LookupMultiFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
 
           if (filter.kind === "multi") {
             return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
@@ -339,6 +381,110 @@ function TextFilterField({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
       />
+    </label>
+  );
+}
+
+function LookupFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarLookupFilter;
+  grow: boolean;
+}) {
+  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+  const listId = `${filter.key}-lookup-options`;
+
+  return (
+    <label
+      className={cn(
+        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
+        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.className,
+      )}
+    >
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+      {filter.inputType === "date" ? (
+        <DateTimePicker
+          aria-label={filter.label}
+          className="w-full"
+          inputClassName="w-full min-w-0 border-0 bg-transparent px-0 pr-6 text-sm text-foreground shadow-none focus-visible:ring-0"
+          buttonClassName="right-0"
+          placeholder={filter.placeholder ?? "Filter…"}
+          value={draft}
+          list={listId}
+          onChange={setDraft}
+        />
+      ) : (
+        <input
+          type={filter.inputType === "number" ? "number" : "text"}
+          aria-label={filter.label}
+          className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          placeholder={filter.placeholder ?? "Filter…"}
+          value={draft}
+          list={listId}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      )}
+      <datalist id={listId}>
+        {filter.options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            label={option.label ?? option.value}
+            disabled={option.disabled}
+          />
+        ))}
+      </datalist>
+    </label>
+  );
+}
+
+function LookupMultiFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarLookupMultiFilter;
+  grow: boolean;
+}) {
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value.join(", "),
+    (next) => filter.onChange(parseLookupMultiValue(next)),
+  );
+  const listId = `${filter.key}-lookup-options`;
+
+  return (
+    <label
+      className={cn(
+        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
+        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.className,
+      )}
+    >
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+      <input
+        type="text"
+        aria-label={filter.label}
+        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        placeholder={filter.placeholder ?? "value-1, value-2"}
+        value={draft}
+        list={listId}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <datalist id={listId}>
+        {filter.options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            label={option.label ?? option.value}
+            disabled={option.disabled}
+          />
+        ))}
+      </datalist>
     </label>
   );
 }
@@ -788,6 +934,13 @@ function summarizeMultiFilter(
   ].filter(Boolean);
 
   return `${label} ${counts.join(" ")}`;
+}
+
+function parseLookupMultiValue(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {

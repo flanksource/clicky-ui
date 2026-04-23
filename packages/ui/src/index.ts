@@ -27,6 +27,10 @@ export {
   type FilterBarBooleanFilter,
   type FilterBarEnumFilter,
   type FilterBarFilter,
+  type FilterBarLookupFilter,
+  type FilterBarLookupInputType,
+  type FilterBarLookupMultiFilter,
+  type FilterBarLookupOption,
   type FilterBarMultiFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberFilter,
@@ -158,6 +162,10 @@ export {
   type OperationCatalogProps,
 } from "./rpc/OperationCatalog";
 export {
+  OperationCommandPage,
+  type OperationCommandPageProps,
+} from "./rpc/OperationCommandPage";
+export {
   EndpointList,
   type EndpointListProps,
   type RenderLink,
@@ -182,6 +190,9 @@ export {
   type ExecutionRequest,
   type ExecutionResponse,
   type OpenAPIOperation,
+  type OperationLookupFilter,
+  type OperationLookupFilterType,
+  type OperationLookupResponse,
   type OpenAPIParameter,
   type OpenAPISchema,
   type OpenAPISpec,

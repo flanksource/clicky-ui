@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ExecutionResponse, OpenAPISpec, ResolvedOperation } from "./types";
+import type {
+  ExecutionResponse,
+  OpenAPISpec,
+  OperationLookupResponse,
+  ResolvedOperation,
+} from "./types";
 
 export interface OperationsApiClient {
   getOpenAPISpec(): Promise<OpenAPISpec>;
@@ -9,6 +14,12 @@ export interface OperationsApiClient {
     params: Record<string, string>,
     headers?: Record<string, string>,
   ): Promise<ExecutionResponse>;
+  lookupFilters?(
+    path: string,
+    method: string,
+    params: Record<string, string>,
+    headers?: Record<string, string>,
+  ): Promise<OperationLookupResponse>;
 }
 
 export function useOpenAPI(client: OperationsApiClient) {
