@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MethodBadge } from "../data/MethodBadge";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
 import type { RenderLink } from "./EndpointList";
-import { packParameterValues } from "./formMetadata";
+import {
+  buildInitialParameterValues,
+  packParameterValues,
+  type ParameterValues,
+} from "./formMetadata";
 import type { ExecutionResponse } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
 
 export type OperationCommandPageProps = {
   client: OperationsApiClient;
   operationId?: string;
+  initialValues?: ParameterValues;
+  autoRun?: boolean;
   backHref?: string;
   backLabel?: string;
   renderLink?: RenderLink;
@@ -18,6 +24,8 @@ export type OperationCommandPageProps = {
 export function OperationCommandPage({
   client,
   operationId,
+  initialValues = {},
+  autoRun = false,
   backHref,
   backLabel = "Back",
   renderLink,
@@ -26,8 +34,26 @@ export function OperationCommandPage({
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState("");
+  const [hasAutoRun, setHasAutoRun] = useState(false);
+  const parameters = operation?.operation.parameters ?? [];
+  const parameterSignature = JSON.stringify(
+    parameters.map((param) => ({
+      name: param.name,
+      in: param.in,
+      required: param.required ?? false,
+      default: param.schema?.default ?? null,
+    })),
+  );
+  const operationKey = `${operation?.method ?? ""}:${operation?.path ?? ""}:${operation?.operation.operationId ?? ""}`;
+  const effectiveInitialValues = useMemo(
+    () =>
+      operation
+        ? buildInitialParameterValues(parameters, operation.method, {}, initialValues)
+        : initialValues,
+    [initialValues, operation?.method, parameterSignature],
+  );
 
-  async function executeOperation(values: Record<string, string>) {
+  async function executeOperation(values: ParameterValues) {
     if (!operation) {
       return;
     }
@@ -50,6 +76,29 @@ export function OperationCommandPage({
       setIsExecuting(false);
     }
   }
+
+  useEffect(() => {
+    setHasAutoRun(false);
+    setResult(null);
+    setError("");
+  }, [autoRun, operationId]);
+
+  useEffect(() => {
+    if (!autoRun || !operation || hasAutoRun) {
+      return;
+    }
+
+    const missingRequired = parameters.filter((param) => {
+      if (!param.required) return false;
+      return (effectiveInitialValues[param.name] ?? "").trim() === "";
+    });
+    if (missingRequired.length > 0) {
+      return;
+    }
+
+    setHasAutoRun(true);
+    void executeOperation(effectiveInitialValues);
+  }, [autoRun, effectiveInitialValues, hasAutoRun, operationKey, parameterSignature]);
 
   const backLink =
     backHref == null
@@ -113,7 +162,8 @@ export function OperationCommandPage({
           client={client}
           path={operation.path}
           method={operation.method}
-          parameters={operation.operation.parameters ?? []}
+          parameters={parameters}
+          initialValues={effectiveInitialValues}
           isSubmitting={isExecuting}
           onSubmit={executeOperation}
         />

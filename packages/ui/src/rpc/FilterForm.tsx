@@ -19,13 +19,14 @@ export type FilterFormProps = {
   path: string;
   method: string;
   parameters?: OpenAPIParameter[];
-  lockedValues?: ParameterValues;
-  enableLookup?: boolean;
-  submitLabel?: string;
-  submittingLabel?: string;
-  emptyMessage?: string;
-  isSubmitting?: boolean;
-  className?: string;
+  initialValues?: ParameterValues | undefined;
+  lockedValues?: ParameterValues | undefined;
+  enableLookup?: boolean | undefined;
+  submitLabel?: string | undefined;
+  submittingLabel?: string | undefined;
+  emptyMessage?: string | undefined;
+  isSubmitting?: boolean | undefined;
+  className?: string | undefined;
   onSubmit: (values: ParameterValues) => void | Promise<void>;
 };
 
@@ -34,6 +35,7 @@ export function FilterForm({
   path,
   method,
   parameters = [],
+  initialValues = {},
   lockedValues = {},
   enableLookup = method.toUpperCase() === "GET",
   submitLabel = "Execute request",
@@ -44,11 +46,11 @@ export function FilterForm({
   onSubmit,
 }: FilterFormProps) {
   const resetKey = useMemo(
-    () => `${method}:${path}:${JSON.stringify(lockedValues)}`,
-    [lockedValues, method, path],
+    () => `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
+    [initialValues, lockedValues, method, path],
   );
   const [values, setValues] = useState<ParameterValues>(() =>
-    buildInitialParameterValues(parameters, method, lockedValues),
+    buildInitialParameterValues(parameters, method, lockedValues, initialValues),
   );
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
@@ -100,7 +102,7 @@ export function FilterForm({
   }
 
   useEffect(() => {
-    setValues(buildInitialParameterValues(parameters, method, lockedValues));
+    setValues(buildInitialParameterValues(parameters, method, lockedValues, initialValues));
     setError("");
   }, [resetKey]);
 
@@ -110,11 +112,11 @@ export function FilterForm({
         <FilterBar
           autoSubmit={false}
           filters={formConfig.filters}
-          timeRange={formConfig.timeRange}
           onApply={handleSubmit}
           applyLabel={submitLabel}
           isPending={isSubmitting}
-          className={className}
+          {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}
+          {...(className ? { className } : {})}
         />
       ) : (
         <div className="flex items-center justify-between gap-4">

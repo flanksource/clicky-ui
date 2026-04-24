@@ -1,18 +1,37 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
+  createContext,
   Fragment,
+  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type RefObject,
 } from "react";
+import { FilterForm } from "../rpc/FilterForm";
+import { parseJsonBody } from "../rpc/classify";
+import {
+  packParameterValues,
+  pruneParameterValues,
+  type ParameterValues,
+} from "../rpc/formMetadata";
+import {
+  type ExecutionResponse,
+  isPositionalParam,
+  type OpenAPIParameter,
+  type ResolvedOperation,
+} from "../rpc/types";
+import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
 import { cn } from "../lib/utils";
 import { DataTable, type DataTableColumn } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
+import { HoverCard } from "../overlay/HoverCard";
+import { Modal } from "../overlay/Modal";
 
 export type ClickyStyle = {
   className?: string;
@@ -61,6 +80,8 @@ export type ClickyTreeItem = {
 export type ClickyNode = {
   kind:
     | "text"
+    | "link"
+    | "link-command"
     | "icon"
     | "list"
     | "map"
@@ -91,6 +112,11 @@ export type ClickyNode = {
   label?: ClickyNode;
   content?: ClickyNode;
   href?: string;
+  target?: ClickyLinkTarget;
+  command?: string;
+  args?: string[];
+  flags?: Record<string, string>;
+  autoRun?: boolean;
   id?: string;
   payload?: string;
   variant?: string;
@@ -104,6 +130,38 @@ export type ClickyNode = {
 export type ClickyDocument = {
   version: 1;
   node: ClickyNode;
+};
+
+export type ClickyLinkTarget =
+  | "Dialog"
+  | "Hover"
+  | "Expand"
+  | "_clicky"
+  | "_self"
+  | "_window"
+  | "_tab";
+
+export type ClickyCommandRequest = {
+  command: string;
+  args?: string[];
+  flags?: Record<string, string>;
+  target?: ClickyLinkTarget;
+  autoRun?: boolean;
+};
+
+export type ClickyResolvedCommand = {
+  request: ClickyCommandRequest;
+  operation: ResolvedOperation | undefined;
+};
+
+export type ClickyCommandRuntime = {
+  client: OperationsApiClient;
+  resolveCommand?: (
+    request: ClickyCommandRequest,
+    operations: ResolvedOperation[],
+  ) => ResolvedOperation | undefined;
+  hrefForCommand?: (resolved: ClickyResolvedCommand) => string | undefined;
+  onNavigate?: (resolved: ClickyResolvedCommand) => void;
 };
 
 const CLICKY_PRIMARY_VIEW_FORMATS = ["clicky", "json"] as const;
@@ -143,6 +201,7 @@ export type ClickyProps = {
   url?: string;
   view?: ClickyViewConfig;
   download?: ClickyDownloadOptions;
+  commandRuntime?: ClickyCommandRuntime;
   className?: string;
 };
 
@@ -162,6 +221,19 @@ type JsonTreeNode = {
   children?: JsonTreeNode[];
 };
 
+type ClickyRuntimeContextValue = {
+  commandRuntime?: ClickyCommandRuntime | undefined;
+  operations: ResolvedOperation[];
+  operationsLoading: boolean;
+};
+
+const clickyRuntimeContextDefault: ClickyRuntimeContextValue = {
+  operations: [],
+  operationsLoading: false,
+};
+
+const ClickyRuntimeContext = createContext<ClickyRuntimeContextValue>(clickyRuntimeContextDefault);
+
 export function Clicky(props: ClickyProps) {
   const [queryClient] = useState(
     () =>
@@ -175,15 +247,67 @@ export function Clicky(props: ClickyProps) {
       }),
   );
 
-  if (props.url) {
+  const content = (
+    <ClickyRuntimeProvider {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}>
+      {props.url ? (
+        <ClickyRemoteRenderer {...props} url={props.url} />
+      ) : (
+        <ClickyContent data={props.data} {...(props.className ? { className: props.className } : {})} />
+      )}
+    </ClickyRuntimeProvider>
+  );
+
+  if (props.url || props.commandRuntime) {
     return (
       <QueryClientProvider client={queryClient}>
-        <ClickyRemoteRenderer {...props} url={props.url} />
+        {content}
       </QueryClientProvider>
     );
   }
 
-  return <ClickyContent data={props.data} className={props.className} />;
+  return content;
+}
+
+function ClickyRuntimeProvider({
+  commandRuntime,
+  children,
+}: {
+  commandRuntime?: ClickyCommandRuntime | undefined;
+  children: ReactNode;
+}) {
+  if (!commandRuntime) {
+    return (
+      <ClickyRuntimeContext.Provider value={clickyRuntimeContextDefault}>
+        {children}
+      </ClickyRuntimeContext.Provider>
+    );
+  }
+
+  return (
+    <ClickyCommandRuntimeProvider commandRuntime={commandRuntime}>
+      {children}
+    </ClickyCommandRuntimeProvider>
+  );
+}
+
+function ClickyCommandRuntimeProvider({
+  commandRuntime,
+  children,
+}: {
+  commandRuntime: ClickyCommandRuntime;
+  children: ReactNode;
+}) {
+  const { operations, isLoading } = useOperations(commandRuntime.client);
+  const value = useMemo(
+    () => ({
+      commandRuntime,
+      operations,
+      operationsLoading: isLoading,
+    }),
+    [commandRuntime, isLoading, operations],
+  );
+
+  return <ClickyRuntimeContext.Provider value={value}>{children}</ClickyRuntimeContext.Provider>;
 }
 
 function ClickyContent({
@@ -191,7 +315,7 @@ function ClickyContent({
   className,
 }: {
   data: ClickyProps["data"];
-  className?: string;
+  className?: string | undefined;
 }) {
   if (data === undefined) {
     return (
@@ -473,7 +597,7 @@ function ClickyDownloadMenu({
 }: {
   url: string;
   formats: ClickyRemoteFormat[];
-  label?: string;
+  label?: string | undefined;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -627,7 +751,7 @@ function ClickyInvalidPayload({
   className,
 }: {
   parsed: Extract<ParsedClicky, { ok: false }>;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <div
@@ -654,7 +778,7 @@ function ClickyNotice({
   title: string;
   message: ReactNode;
   tone?: "default" | "warning" | "destructive";
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <div
@@ -840,7 +964,11 @@ function getAvailableViews({
   data,
   url,
   view,
-}: Pick<ClickyProps, "data" | "url" | "view">): ClickyRemoteFormat[] {
+}: {
+  data: ClickyProps["data"] | undefined;
+  url?: string | undefined;
+  view?: ClickyViewConfig | undefined;
+}): ClickyRemoteFormat[] {
   const allowClicky = resolveViewConfigFlag(view, "clicky", data, url);
   const allowJson = resolveViewConfigFlag(view, "json", data, url);
   const next: ClickyRemoteFormat[] = [];
@@ -870,8 +998,8 @@ function getDownloadFormats({
   url,
   download,
 }: {
-  url?: string;
-  download?: ClickyDownloadOptions;
+  url?: string | undefined;
+  download?: ClickyDownloadOptions | undefined;
 }): ClickyRemoteFormat[] {
   const enabled = download ? (download.all ?? true) : !!url;
 
@@ -1063,12 +1191,13 @@ function buildJsonTree(value: unknown): JsonTreeNode[] {
 }
 
 function buildJsonTreeNode(key: string, value: unknown, id: string): JsonTreeNode {
+  const children = getJsonChildren(value, id);
   return {
     id,
     key,
     value,
     preview: summarizeJsonValue(value),
-    children: getJsonChildren(value, id),
+    ...(children ? { children } : {}),
   };
 }
 
@@ -1165,6 +1294,10 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
   switch (node.kind) {
     case "text":
       return <ClickyText node={node} />;
+    case "link":
+      return <ClickyLinkNode node={node} />;
+    case "link-command":
+      return <ClickyLinkCommandNode node={node} />;
     case "icon":
       return <ClickyIconNode node={node} />;
     case "list":
@@ -1198,16 +1331,7 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
 
 function ClickyText({ node }: { node: ClickyNode }) {
   const inlineStyle = toInlineStyle(node.style, node.text ?? node.plain);
-  const content = (
-    <>
-      {node.text}
-      {node.children?.map((child, index) => (
-        <Fragment key={index}>
-          <ClickyNodeRenderer node={child} />
-        </Fragment>
-      ))}
-    </>
-  );
+  const content = <ClickyInlineContent node={node} />;
 
   if (!node.style && !node.tooltip) {
     return <>{content}</>;
@@ -1225,6 +1349,430 @@ function ClickyText({ node }: { node: ClickyNode }) {
       {content}
     </span>
   );
+}
+
+function ClickyInlineContent({ node }: { node: ClickyNode }) {
+  return (
+    <>
+      {node.text}
+      {node.children?.map((child, index) => (
+        <Fragment key={index}>
+          <ClickyNodeRenderer node={child} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+function ClickyLinkNode({ node }: { node: ClickyNode }) {
+  const content = <ClickyInlineContent node={node} />;
+  const inlineStyle = toInlineStyle(node.style, node.text ?? node.plain);
+  const target = browserAnchorTarget(node.target);
+  const rel = target === "_blank" ? "noopener noreferrer" : undefined;
+
+  if (!node.href) {
+    return <span style={inlineStyle}>{content}</span>;
+  }
+
+  return (
+    <a
+      href={node.href}
+      target={target}
+      rel={rel}
+      title={node.tooltip?.plain}
+      style={inlineStyle}
+      className={cn(node.style?.className, "inline cursor-pointer")}
+    >
+      {content}
+    </a>
+  );
+}
+
+function ClickyLinkCommandNode({ node }: { node: ClickyNode }) {
+  const runtime = useContext(ClickyRuntimeContext);
+  const request = useMemo(() => clickyNodeToCommandRequest(node), [node]);
+  const resolved = useMemo(
+    () => resolveClickyCommand(request, runtime.commandRuntime, runtime.operations),
+    [request, runtime.commandRuntime, runtime.operations],
+  );
+  const target = request.target ?? "Dialog";
+  const hasRuntime = runtime.commandRuntime != null;
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  if (!hasRuntime) {
+    return (
+      <span title={node.tooltip?.plain} className={cn(node.style?.className)}>
+        <ClickyInlineContent node={node} />
+      </span>
+    );
+  }
+
+  if (target === "_self" || target === "_window" || target === "_tab") {
+    const href =
+      runtime.commandRuntime?.hrefForCommand?.(resolved) ??
+      buildCommandExecutionHref(resolved);
+
+    if (!href) {
+      return (
+        <span title={node.tooltip?.plain} className={cn(node.style?.className)}>
+          <ClickyInlineContent node={node} />
+        </span>
+      );
+    }
+
+    return (
+      <a
+        href={href}
+        target={browserAnchorTarget(target)}
+        rel={target === "_self" ? undefined : "noopener noreferrer"}
+        title={node.tooltip?.plain}
+        style={toInlineStyle(node.style, node.text ?? node.plain)}
+        className={cn(node.style?.className, "inline cursor-pointer")}
+      >
+        <ClickyInlineContent node={node} />
+      </a>
+    );
+  }
+
+  if (target === "_clicky") {
+    return (
+      <ClickyLinkCommandTrigger
+        node={node}
+        onClick={() => runtime.commandRuntime?.onNavigate?.(resolved)}
+      />
+    );
+  }
+
+  if (target === "Hover") {
+    return (
+      <HoverCard
+        delay={75}
+        cardClassName="w-[28rem] max-w-[calc(100vw-2rem)] whitespace-normal p-0"
+        trigger={<ClickyLinkCommandTrigger node={node} />}
+      >
+        <div className="max-h-[26rem] overflow-auto p-density-3">
+          <ClickyAsyncCommandResult resolved={resolved} />
+        </div>
+      </HoverCard>
+    );
+  }
+
+  if (target === "Expand") {
+    return (
+      <span className="inline">
+        <ClickyLinkCommandTrigger
+          node={node}
+          ariaExpanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        />
+        {expanded && (
+          <div className="mt-2 rounded-md border border-border bg-background p-density-3">
+            <ClickyAsyncCommandResult resolved={resolved} />
+          </div>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <ClickyLinkCommandTrigger
+        node={node}
+        ariaExpanded={dialogOpen}
+        onClick={() => setDialogOpen(true)}
+      />
+      <ClickyCommandDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        resolved={resolved}
+      />
+    </>
+  );
+}
+
+function ClickyLinkCommandTrigger({
+  node,
+  onClick,
+  ariaExpanded,
+}: {
+  node: ClickyNode;
+  onClick?: () => void;
+  ariaExpanded?: boolean;
+}) {
+  const inlineStyle = toInlineStyle(node.style, node.text ?? node.plain);
+
+  const handleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    onClick?.();
+  };
+
+  return (
+    <button
+      type="button"
+      title={node.tooltip?.plain}
+      aria-expanded={ariaExpanded}
+      onClick={handleClick}
+      style={inlineStyle}
+      className={cn(
+        "inline cursor-pointer appearance-none border-0 bg-transparent p-0 text-left align-baseline text-inherit",
+        node.style?.className,
+      )}
+    >
+      <ClickyInlineContent node={node} />
+    </button>
+  );
+}
+
+function ClickyCommandDialog({
+  open,
+  onClose,
+  resolved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  resolved: ClickyResolvedCommand;
+}) {
+  const runtime = useContext(ClickyRuntimeContext);
+  const operation = resolved.operation;
+  const parameters = operation?.operation.parameters ?? [];
+  const initialValues = useMemo(
+    () => buildCommandParameterValues(parameters, resolved.request),
+    [parameters, resolved.request],
+  );
+  const [result, setResult] = useState<unknown>(null);
+  const [error, setError] = useState("");
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const shouldAutoRun =
+    open &&
+    resolved.request.autoRun === true &&
+    operation != null &&
+    missingRequiredParameters(parameters, initialValues).length === 0;
+
+  useEffect(() => {
+    if (!open) {
+      setHasAutoStarted(false);
+      setResult(null);
+      setError("");
+    }
+  }, [open, resolved.request.command]);
+
+  async function runCommand(values: ParameterValues) {
+    if (!runtime.commandRuntime || !operation) {
+      return;
+    }
+
+    setIsExecuting(true);
+    setError("");
+
+    try {
+      const response = await executeClickyCommand(
+        runtime.commandRuntime.client,
+        operation,
+        values,
+      );
+      setResult(response);
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
+    } finally {
+      setIsExecuting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!shouldAutoRun || hasAutoStarted) {
+      return;
+    }
+
+    setHasAutoStarted(true);
+    void runCommand(initialValues);
+  }, [hasAutoStarted, initialValues, shouldAutoRun]);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={operation?.operation.summary || resolved.request.command}
+      size="xl"
+    >
+      <div className="space-y-4">
+        {operation ? (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="rounded-md border border-border bg-muted px-2 py-1 font-medium uppercase">
+              {operation.method}
+            </span>
+            <code>{operation.path}</code>
+          </div>
+        ) : runtime.operationsLoading ? (
+          <ClickyNotice title="Loading commands" message="Resolving the command definition." />
+        ) : (
+          <ClickyNotice
+            title="Unknown command"
+            message={`No operation matched "${resolved.request.command}".`}
+            tone="destructive"
+          />
+        )}
+
+        {operation && (
+          <div className="rounded-md border border-border bg-muted/20 p-density-3">
+            <FilterForm
+              client={runtime.commandRuntime!.client}
+              path={operation.path}
+              method={operation.method}
+              parameters={parameters}
+              initialValues={initialValues}
+              isSubmitting={isExecuting}
+              submitLabel="Run command"
+              submittingLabel="Running…"
+              onSubmit={runCommand}
+            />
+          </div>
+        )}
+
+        {error ? (
+          <ClickyNotice title="Command failed" message={error} tone="destructive" />
+        ) : (
+          <ClickyCommandResponse
+            response={result}
+            pending={isExecuting}
+            emptyMessage="Run the command to load a Clicky response."
+          />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function ClickyAsyncCommandResult({
+  resolved,
+}: {
+  resolved: ClickyResolvedCommand;
+}) {
+  const runtime = useContext(ClickyRuntimeContext);
+  const operation = resolved.operation;
+  const parameters = operation?.operation.parameters ?? [];
+  const initialValues = useMemo(
+    () => buildCommandParameterValues(parameters, resolved.request),
+    [parameters, resolved.request],
+  );
+  const missing = useMemo(
+    () => missingRequiredParameters(parameters, initialValues),
+    [initialValues, parameters],
+  );
+
+  const query = useQuery({
+    queryKey: [
+      "clicky-command",
+      resolved.request.command,
+      operation?.method,
+      operation?.path,
+      initialValues,
+    ],
+    enabled:
+      runtime.commandRuntime != null &&
+      operation != null &&
+      missing.length === 0,
+    retry: 0,
+    queryFn: async () =>
+      executeClickyCommand(runtime.commandRuntime!.client, operation!, initialValues),
+  });
+
+  if (!runtime.commandRuntime) {
+    return (
+      <ClickyNotice
+        title="Command runtime unavailable"
+        message="This Clicky view was rendered without a command runtime."
+        tone="warning"
+      />
+    );
+  }
+
+  if (!operation) {
+    if (runtime.operationsLoading) {
+      return <ClickyNotice title="Loading commands" message="Resolving the command definition." />;
+    }
+    return (
+      <ClickyNotice
+        title="Unknown command"
+        message={`No operation matched "${resolved.request.command}".`}
+        tone="destructive"
+      />
+    );
+  }
+
+  if (missing.length > 0) {
+    return (
+      <ClickyNotice
+        title="Missing required parameters"
+        message={`This link is missing: ${missing.map((param) => prettifyName(param.name)).join(", ")}.`}
+        tone="warning"
+      />
+    );
+  }
+
+  if (query.isPending) {
+    return <ClickyNotice title="Running command" message="Loading Clicky response…" />;
+  }
+
+  if (query.isError) {
+    return (
+      <ClickyNotice
+        title="Command failed"
+        message={query.error instanceof Error ? query.error.message : "Request failed"}
+        tone="destructive"
+      />
+    );
+  }
+
+  return <ClickyCommandResponse response={query.data} emptyMessage="No response body returned." />;
+}
+
+function ClickyCommandResponse({
+  response,
+  pending = false,
+  emptyMessage,
+}: {
+  response: unknown;
+  pending?: boolean;
+  emptyMessage: string;
+}) {
+  if (pending) {
+    return <ClickyNotice title="Running command" message="Loading Clicky response…" />;
+  }
+
+  if (!response) {
+    return <ClickyNotice title="No response" message={emptyMessage} />;
+  }
+
+  const parsedPayload =
+    isExecutionResponse(response) ? (response.parsed ?? parseJsonBody(response)) : response;
+  const rawText =
+    isExecutionResponse(response)
+      ? response.stdout || response.output || response.message || ""
+      : typeof response === "string"
+        ? response
+        : JSON.stringify(response, null, 2);
+  const clickyPayload =
+    typeof parsedPayload === "string" || (parsedPayload != null && typeof parsedPayload === "object")
+      ? parsedPayload
+      : rawText;
+  const parsedClicky = clickyPayload === "" ? null : parseClickyData(clickyPayload as ClickyProps["data"]);
+
+  if (parsedClicky?.ok) {
+    return (
+      <div className="rounded-md border border-border bg-background p-density-3">
+        <ClickyNodeRenderer node={parsedClicky.document.node} />
+      </div>
+    );
+  }
+
+  if (parsedPayload != null && typeof parsedPayload === "object") {
+    return <ClickyJsonTree value={parsedPayload} />;
+  }
+
+  return <ClickyTextPreview title="Response body" content={rawText} />;
 }
 
 function ClickyIconNode({ node }: { node: ClickyNode }) {
@@ -1575,12 +2123,165 @@ function prettifyName(name: string): string {
     .replace(/\b\w/g, (value) => value.toUpperCase());
 }
 
+function clickyNodeToCommandRequest(node: ClickyNode): ClickyCommandRequest {
+  return {
+    command: node.command ?? "",
+    args: node.args ?? [],
+    flags: node.flags ?? {},
+    target: node.target ?? "Dialog",
+    autoRun: node.autoRun ?? false,
+  };
+}
+
+function resolveClickyCommand(
+  request: ClickyCommandRequest,
+  runtime: ClickyCommandRuntime | undefined,
+  operations: ResolvedOperation[],
+): ClickyResolvedCommand {
+  const resolved = runtime?.resolveCommand?.(request, operations) ?? defaultResolveClickyCommand(request, operations);
+  return { request, operation: resolved };
+}
+
+function defaultResolveClickyCommand(
+  request: ClickyCommandRequest,
+  operations: ResolvedOperation[],
+): ResolvedOperation | undefined {
+  const wanted = normalizeCommandPath(request.command);
+  if (!wanted) return undefined;
+
+  return operations.find((operation) => {
+    const metaCommand = normalizeCommandPath(operation.operation["x-clicky"]?.command);
+    if (metaCommand && metaCommand === wanted) {
+      return true;
+    }
+
+    const operationId = normalizeCommandPath(operation.operation.operationId?.replaceAll("_", "/"));
+    return operationId === wanted;
+  });
+}
+
+function normalizeCommandPath(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .replace(/^\//, "")
+    .replace(/\s+/g, "/")
+    .replace(/\/+/g, "/")
+    .toLowerCase();
+}
+
+function buildCommandParameterValues(
+  parameters: OpenAPIParameter[],
+  request: ClickyCommandRequest,
+): ParameterValues {
+  const values: ParameterValues = { ...(request.flags ?? {}) };
+  const args = [...(request.args ?? [])];
+  const positionalParams = parameters.filter((param) => isPositionalParam(param));
+  let argIndex = 0;
+
+  for (const param of positionalParams) {
+    if (param.name === "args") {
+      const remaining = args.slice(argIndex);
+      if (remaining.length > 0) {
+        values.args = remaining.join(",");
+      }
+      argIndex = args.length;
+      continue;
+    }
+
+    if (argIndex < args.length) {
+      values[param.name] = args[argIndex] ?? "";
+      argIndex += 1;
+    }
+  }
+
+  return values;
+}
+
+function missingRequiredParameters(
+  parameters: OpenAPIParameter[],
+  values: ParameterValues,
+) {
+  return parameters.filter((param) => param.required && (values[param.name] ?? "").trim() === "");
+}
+
+async function executeClickyCommand(
+  client: OperationsApiClient,
+  operation: ResolvedOperation,
+  values: ParameterValues,
+) {
+  return client.executeCommand(
+    operation.path,
+    operation.method,
+    packParameterValues(pruneParameterValues(values), operation.operation.parameters ?? []),
+    { Accept: "application/json+clicky" },
+  );
+}
+
+function buildCommandExecutionHref(resolved: ClickyResolvedCommand): string | undefined {
+  const operation = resolved.operation;
+  if (!operation) {
+    return undefined;
+  }
+
+  const values = buildCommandParameterValues(operation.operation.parameters ?? [], resolved.request);
+  const params = packParameterValues(pruneParameterValues(values), operation.operation.parameters ?? []);
+  const url = substituteOperationPath(operation.path, params);
+
+  if (operation.method.toUpperCase() !== "GET") {
+    return url;
+  }
+
+  return url;
+}
+
+function substituteOperationPath(
+  path: string,
+  params: Record<string, string>,
+) {
+  const url = new URL(path, "http://localhost");
+  const remaining = { ...params };
+
+  for (const [key, value] of Object.entries(params)) {
+    if (url.pathname.includes(`{${key}}`)) {
+      url.pathname = url.pathname.replace(`{${key}}`, encodeURIComponent(value));
+      delete remaining[key];
+    }
+  }
+
+  for (const [key, value] of Object.entries(remaining)) {
+    url.searchParams.set(key, value);
+  }
+
+  return `${url.pathname}${url.search}`;
+}
+
+function browserAnchorTarget(target: ClickyLinkTarget | undefined) {
+  if (target === "_self") {
+    return "_self";
+  }
+
+  if (target === "_window" || target === "_tab") {
+    return "_blank";
+  }
+
+  return undefined;
+}
+
+function isExecutionResponse(
+  value: unknown,
+): value is ExecutionResponse {
+  return value != null && typeof value === "object" && ("stdout" in value || "output" in value || "message" in value);
+}
+
 function clickyNodeText(node: ClickyNode | null | undefined): string {
   if (!node) return "";
   if (node.plain) return node.plain;
   if (node.text) return node.text;
   if (node.kind === "html") return sanitizeHtml(node.html ?? "").replace(/<[^>]+>/g, " ").trim();
   if (node.kind === "code") return node.source ?? "";
+  if ((node.kind === "link" || node.kind === "link-command") && node.children?.length) {
+    return [node.text, ...node.children.map((child) => clickyNodeText(child))].join("");
+  }
   if (node.kind === "button" && node.label) return clickyNodeText(node.label);
   if (node.kind === "button-group") {
     return (node.items ?? []).map((item) => clickyNodeText(item)).join(" ");
@@ -1594,6 +2295,8 @@ function clickyNodeText(node: ClickyNode | null | undefined): string {
 function isInlineNode(node: ClickyNode): boolean {
   return (
     node.kind === "text" ||
+    node.kind === "link" ||
+    node.kind === "link-command" ||
     node.kind === "icon" ||
     node.kind === "html" ||
     node.kind === "button" ||

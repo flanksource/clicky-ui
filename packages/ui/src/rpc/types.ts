@@ -87,7 +87,8 @@ export interface ClickySurface {
 }
 
 export interface ClickyOperationMeta {
-  surface: string;
+  command?: string;
+  surface?: string;
   verb: "list" | "get" | "create" | "update" | "delete" | "action";
   scope: "collection" | "entity";
   actionName?: string;

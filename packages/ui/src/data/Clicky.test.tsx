@@ -1,7 +1,62 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { vi } from "vitest";
 import { Clicky, type ClickyDocument } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
+
+function createCommandClient() {
+  const executeCommand = vi.fn().mockResolvedValue({
+    success: true,
+    exit_code: 0,
+    stdout: JSON.stringify({
+      version: 1,
+      node: {
+        kind: "text",
+        text: "Loaded descendants",
+        plain: "Loaded descendants",
+      },
+    }),
+  });
+
+  return {
+    getOpenAPISpec: vi.fn().mockResolvedValue({
+      openapi: "3.0.3",
+      info: {
+        title: "Clicky test",
+        version: "1.0.0",
+      },
+      paths: {
+        "/api/v1/stacks/{id}/descendants": {
+          get: {
+            operationId: "stack_get_descendants",
+            summary: "List descendants",
+            parameters: [
+              {
+                name: "id",
+                in: "path",
+                required: true,
+                description: "Positional argument from command",
+                schema: { type: "string" },
+              },
+              {
+                name: "events",
+                in: "query",
+                schema: { type: "string" },
+              },
+            ],
+            responses: { "200": {} },
+            "x-clicky": {
+              command: "stack/get-descendants",
+              verb: "action",
+              scope: "entity",
+            },
+          },
+        },
+      },
+    }),
+    executeCommand,
+    lookupFilters: vi.fn().mockResolvedValue({ filters: {} }),
+  };
+}
 
 describe("Clicky", () => {
   it("renders a JSON string payload", () => {
@@ -293,5 +348,131 @@ describe("Clicky", () => {
     render(<Clicky data={"{"} />);
 
     expect(screen.getByText("Invalid Clicky payload")).toBeInTheDocument();
+  });
+
+  it("navigates link-command nodes through the clicky runtime", async () => {
+    const client = createCommandClient();
+    const onNavigate = vi.fn();
+
+    render(
+      <Clicky
+        data={{
+          version: 1,
+          node: {
+            kind: "link-command",
+            command: "stack/get-descendants",
+            target: "_clicky",
+            args: ["stack-42"],
+            flags: { events: "1" },
+            text: "stack-42",
+            plain: "stack-42",
+          },
+        }}
+        commandRuntime={{ client, onNavigate }}
+      />,
+    );
+
+    await waitFor(() => expect(client.getOpenAPISpec).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "stack-42" }));
+
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
+    expect(onNavigate.mock.calls[0][0].request.command).toBe("stack/get-descendants");
+    expect(onNavigate.mock.calls[0][0].request.flags).toEqual({ events: "1" });
+  });
+
+  it("auto-runs dialog link-command nodes when required params are prefilled", async () => {
+    const client = createCommandClient();
+
+    render(
+      <Clicky
+        data={{
+          version: 1,
+          node: {
+            kind: "link-command",
+            command: "stack/get-descendants",
+            target: "Dialog",
+            autoRun: true,
+            args: ["stack-42"],
+            flags: { events: "1" },
+            text: "stack-42",
+            plain: "stack-42",
+          },
+        }}
+        commandRuntime={{ client }}
+      />,
+    );
+
+    await waitFor(() => expect(client.getOpenAPISpec).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "stack-42" }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(client.executeCommand).toHaveBeenCalledWith(
+        "/api/v1/stacks/{id}/descendants",
+        "get",
+        { id: "stack-42", events: "1" },
+        expect.objectContaining({ Accept: "application/json+clicky" }),
+      ),
+    );
+    expect(await screen.findByText("Loaded descendants")).toBeInTheDocument();
+  });
+
+  it("opens dialog link-command nodes without auto-running when required params are missing", async () => {
+    const client = createCommandClient();
+
+    render(
+      <Clicky
+        data={{
+          version: 1,
+          node: {
+            kind: "link-command",
+            command: "stack/get-descendants",
+            target: "Dialog",
+            autoRun: true,
+            text: "show descendants",
+            plain: "show descendants",
+          },
+        }}
+        commandRuntime={{ client }}
+      />,
+    );
+
+    await waitFor(() => expect(client.getOpenAPISpec).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "show descendants" }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /run command/i })).toBeInTheDocument();
+    await waitFor(() => expect(client.executeCommand).not.toHaveBeenCalled());
+  });
+
+  it("executes expand link-command nodes asynchronously inline", async () => {
+    const client = createCommandClient();
+
+    render(
+      <Clicky
+        data={{
+          version: 1,
+          node: {
+            kind: "link-command",
+            command: "stack/get-descendants",
+            target: "Expand",
+            args: ["stack-42"],
+            text: "expand descendants",
+            plain: "expand descendants",
+          },
+        }}
+        commandRuntime={{ client }}
+      />,
+    );
+
+    await waitFor(() => expect(client.getOpenAPISpec).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "expand descendants" }));
+
+    await waitFor(() => expect(client.executeCommand).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Loaded descendants")).toBeInTheDocument();
   });
 });

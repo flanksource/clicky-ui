@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ClickyDocument } from "../data/Clicky";
+import type { ParameterValues } from "./formMetadata";
 import type { ExecutionResponse, OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { OperationCommandPage } from "./OperationCommandPage";
@@ -77,14 +78,20 @@ function makeClient(responseFactory: (params: Record<string, string>) => Executi
   };
 }
 
-function renderPage(client: OperationsApiClient) {
+function renderPage(
+  client: OperationsApiClient,
+  props: {
+    initialValues?: ParameterValues;
+    autoRun?: boolean;
+  } = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <OperationCommandPage client={client} operationId="widget_get" />
+      <OperationCommandPage client={client} operationId="widget_get" {...props} />
     </QueryClientProvider>,
   );
 }
@@ -166,5 +173,64 @@ describe("OperationCommandPage", () => {
         '"name": "Fallback widget"',
       ),
     );
+  });
+
+  it("prefills command parameters from initial values", async () => {
+    const client = makeClient((params) =>
+      clickyResponse(
+        makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
+        `/api/v1/widgets/${params.id}`,
+      ),
+    );
+
+    renderPage(client, { initialValues: { id: "prefilled-widget" } });
+
+    expect(await screen.findByDisplayValue("prefilled-widget")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenCalledWith(
+        "/api/v1/widgets/{id}",
+        "get",
+        { id: "prefilled-widget" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+  });
+
+  it("auto-runs when deep-link initial values satisfy required parameters", async () => {
+    const client = makeClient((params) =>
+      clickyResponse(
+        makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
+        `/api/v1/widgets/${params.id}`,
+      ),
+    );
+
+    renderPage(client, { initialValues: { id: "autorun-widget" }, autoRun: true });
+
+    await screen.findByRole("heading", { name: "Get widget" });
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenCalledWith(
+        "/api/v1/widgets/{id}",
+        "get",
+        { id: "autorun-widget" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+  });
+
+  it("does not auto-run when required deep-link values are missing", async () => {
+    const client = makeClient((params) =>
+      clickyResponse(
+        makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
+        `/api/v1/widgets/${params.id}`,
+      ),
+    );
+
+    renderPage(client, { autoRun: true });
+
+    await screen.findByRole("heading", { name: "Get widget" });
+    expect(screen.getByLabelText("Id")).toHaveValue("");
+    await waitFor(() => expect(client.executeMock).not.toHaveBeenCalled());
   });
 });

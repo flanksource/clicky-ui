@@ -70,6 +70,10 @@ export {
 export { Badge, badgeVariants, type BadgeProps } from "./data/Badge";
 export {
   Clicky,
+  type ClickyCommandRequest,
+  type ClickyCommandRuntime,
+  type ClickyLinkTarget,
+  type ClickyResolvedCommand,
   type ClickyColumn,
   type ClickyDownloadOptions,
   type ClickyDocument,

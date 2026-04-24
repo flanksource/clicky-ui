@@ -15,8 +15,8 @@ export type ParameterFormConfig = {
 };
 export type ParameterFormOptions = {
   includeLocations?: OpenAPIParameter["in"][];
-  lookup?: OperationLookupResponse;
-  lockedValues?: ParameterValues;
+  lookup?: OperationLookupResponse | undefined;
+  lockedValues?: ParameterValues | undefined;
 };
 
 export function titleCase(value: string) {
@@ -49,11 +49,12 @@ export function buildInitialParameterValues(
   parameters: OpenAPIParameter[],
   method: string,
   lockedValues: ParameterValues = {},
+  initialValues: ParameterValues = {},
 ): ParameterValues {
   const values = Object.fromEntries(
     parameters.map((param) => [param.name, defaultValueForParameter(param, method)]),
   );
-  return { ...values, ...lockedValues };
+  return { ...values, ...initialValues, ...lockedValues };
 }
 
 export function pruneParameterValues(values: ParameterValues) {
