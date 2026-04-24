@@ -18,7 +18,8 @@
   ],
   "type": "module",
   "sideEffects": [
-    "**/*.css"
+    "**/*.css",
+    "./src/styles/**"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -46,6 +47,7 @@
     "check": "vp check"
   },
   "dependencies": {
+    "@radix-ui/react-compose-refs": "catalog:",
     "@radix-ui/react-slot": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -79,6 +81,9 @@
     "tailwindcss": "^3.4.0"
   },
   "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    },
     "marked": {
       "optional": true
     }

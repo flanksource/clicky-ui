@@ -94,6 +94,9 @@ describe("DataTable", () => {
     }
     fireEvent.click(healthyFilter);
 
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.getByText("api")).toBeInTheDocument();
     expect(screen.getByText("cron")).toBeInTheDocument();
     expect(screen.queryByText("worker")).not.toBeInTheDocument();

@@ -211,11 +211,11 @@ describe("OperationEntityPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Restart widget" }));
 
-    const idInput = await screen.findByLabelText("Id");
-    expect(idInput).toHaveValue("one");
-    expect(idInput).toBeDisabled();
+    // The id is locked and hidden from the form.
+    const reasonInput = await screen.findByLabelText("Reason");
+    expect(screen.queryByLabelText("Id")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "manual" } });
+    fireEvent.change(reasonInput, { target: { value: "manual" } });
     fireEvent.click(screen.getByLabelText("Drain"));
     fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
 

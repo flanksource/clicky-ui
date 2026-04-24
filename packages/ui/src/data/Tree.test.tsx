@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Tree } from "./Tree";
 
 type Node = { id: string; label: string; children?: Node[] };
+type SecondaryNode = Node & { secondary?: boolean };
 
 function makeLargeTree(): Node[] {
   return [
@@ -65,6 +66,18 @@ function renderTree(roots: Node[]) {
       roots={roots}
       getChildren={(node) => node.children}
       getKey={(node) => node.id}
+      renderRow={({ node }) => <span>{node.label}</span>}
+    />,
+  );
+}
+
+function renderSecondaryTree(roots: SecondaryNode[]) {
+  return render(
+    <Tree<SecondaryNode>
+      roots={roots}
+      getChildren={(node) => node.children}
+      getKey={(node) => node.id}
+      isSecondary={(node) => node.secondary === true}
       renderRow={({ node }) => <span>{node.label}</span>}
     />,
   );
@@ -141,5 +154,36 @@ describe("Tree", () => {
     expect(screen.getByText("nested parent")).toBeInTheDocument();
     expect(screen.getByText("deep matching node")).toBeInTheDocument();
     expect(screen.queryByText("other branch")).toBeNull();
+  });
+
+  it("does not auto-expand matched nodes whose children are secondary-only", () => {
+    renderSecondaryTree([
+      {
+        id: "root",
+        label: "root",
+        children: [
+          {
+            id: "users",
+            label: "users",
+            children: Array.from({ length: 21 }, (_, index) => ({
+              id: `col-${index}`,
+              label: index === 0 ? "id" : `col_${index}`,
+              secondary: true,
+            })),
+          },
+        ],
+      },
+    ]);
+
+    fireEvent.change(screen.getByLabelText("Filter tree nodes"), {
+      target: { value: "users" },
+    });
+
+    expect(screen.getByText("users")).toBeInTheDocument();
+    expect(screen.queryByText("id")).toBeNull();
+
+    fireEvent.click(screen.getByText("users"));
+
+    expect(screen.getByText("id")).toBeInTheDocument();
   });
 });

@@ -56,9 +56,9 @@ type StageStatusSpec = {
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: "codicon:check", cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: "mdi:hourglass-sand", cellBg: "bg-amber-50/85", tone: "amber" },
-  rejected: { icon: "codicon:close", cellBg: "bg-rose-50/85", tone: "rose" },
+  approved: { icon: "ph:check-thin", cellBg: "bg-emerald-50/80", tone: "emerald" },
+  pending: { icon: "ph:hourglass-medium-thin", cellBg: "bg-amber-50/85", tone: "amber" },
+  rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
 const STAGE_STATES: Array<{ state: StageStatus; user: SampleUser }> = [
@@ -244,9 +244,51 @@ export function AvatarDemo() {
       </DemoRow>
 
       <DemoRow label="Sizes">
-        {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
-          <Avatar key={size} alt="Chen, Nora" initials="CN" size={size} variant="duotone" />
-        ))}
+        <div className="flex flex-col gap-3">
+          {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
+            const px = resolveSize(size, density);
+            return (
+              <div key={size} className="flex items-center gap-2">
+                <Avatar alt="Chen, Nora" initials="CN" size={size} variant="duotone" />
+                <span
+                  className="font-medium leading-none text-foreground"
+                  style={{ fontSize: Math.round(px * 0.85) }}
+                >
+                  Chen, Nora
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {size} · {px}px
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </DemoRow>
+
+      <DemoRow label="Sizes · variants">
+        <div className="grid gap-x-6 gap-y-3" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {VARIANTS.map((entry) => (
+            <div key={`size-${entry.variant}`} className="space-y-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                {entry.title}
+              </div>
+              {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
+                const px = resolveSize(size, density);
+                return (
+                  <div key={`${entry.variant}-${size}`} className="flex items-center gap-2">
+                    <Avatar alt="Chen, Nora" initials="CN" size={size} variant={entry.variant} />
+                    <span
+                      className="font-medium leading-none text-foreground"
+                      style={{ fontSize: Math.round(px * 0.85) }}
+                    >
+                      Chen, Nora
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </DemoRow>
 
       <div className="space-y-3 rounded-lg border border-border bg-background p-4">

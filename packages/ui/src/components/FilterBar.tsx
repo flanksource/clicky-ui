@@ -670,10 +670,11 @@ function MultiFilterField({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
-  const summary = summarizeMultiFilter(filter.label, filter.value);
+  const summary = summarizeMultiFilter(filter.label, draft);
 
   return (
     <div
@@ -717,8 +718,8 @@ function MultiFilterField({
             <button
               type="button"
               className="text-[10px] text-primary disabled:text-muted-foreground"
-              onClick={() => filter.onChange({})}
-              disabled={Object.keys(filter.value).length === 0}
+              onClick={() => setDraft({})}
+              disabled={Object.keys(draft).length === 0}
             >
               Clear all
             </button>
@@ -726,7 +727,7 @@ function MultiFilterField({
 
           <div className="max-h-72 space-y-1 overflow-auto">
             {filter.options.map((option) => {
-              const mode = filter.value[option.value] ?? "neutral";
+              const mode = draft[option.value] ?? "neutral";
               const title = typeof option.label === "string" ? option.label : option.value;
 
               return (
@@ -737,15 +738,15 @@ function MultiFilterField({
                   data-filter-option={option.value}
                   className="rounded-md px-1.5 py-1 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                   onClick={() =>
-                    filter.onChange(
-                      updateMultiFilterValue(filter.value, option.value, nextFilterMode(mode)),
+                    setDraft(
+                      updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
                     )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      filter.onChange(
-                        updateMultiFilterValue(filter.value, option.value, nextFilterMode(mode)),
+                      setDraft(
+                        updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
                       );
                     }
                   }}
@@ -757,7 +758,7 @@ function MultiFilterField({
                     title={title}
                     togglePosition="right"
                     onModeChange={(next) =>
-                      filter.onChange(updateMultiFilterValue(filter.value, option.value, next))
+                      setDraft(updateMultiFilterValue(draft, option.value, next))
                     }
                   />
                 </div>
@@ -963,6 +964,53 @@ function parseLookupMultiValue(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function useDebouncedMultiDraft(
+  value: Record<string, FilterBarMultiFilterMode>,
+  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void,
+) {
+  const { autoSubmit } = useContext(FilterBarContext);
+  const [draft, setDraft] = useState(value);
+  const latestOnChange = useRef(onChange);
+
+  useEffect(() => {
+    latestOnChange.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (sameMultiFilterValue(draft, value)) return;
+
+    if (!autoSubmit) {
+      latestOnChange.current(draft);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      latestOnChange.current(draft);
+    }, FILTER_INPUT_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [autoSubmit, draft, value]);
+
+  return [draft, setDraft] as const;
+}
+
+function sameMultiFilterValue(
+  a: Record<string, FilterBarMultiFilterMode>,
+  b: Record<string, FilterBarMultiFilterMode>,
+) {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
 }
 
 function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {

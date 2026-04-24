@@ -1,6 +1,7 @@
 import {
   Clicky,
   parseClickyData,
+  type ClickyCommandRuntime,
   type ClickyDocument,
   type ClickyNode,
 } from "../data/Clicky";
@@ -13,6 +14,7 @@ export type ExecutionResultProps = {
   emptyMessage?: string;
   ariaLabel?: string;
   className?: string;
+  commandRuntime?: ClickyCommandRuntime;
 };
 
 export function ExecutionResult({
@@ -20,6 +22,7 @@ export function ExecutionResult({
   emptyMessage = "No response yet.",
   ariaLabel = "Response body",
   className,
+  commandRuntime,
 }: ExecutionResultProps) {
   if (!response) {
     return <p className={cn("mt-3 text-sm text-muted-foreground", className)}>{emptyMessage}</p>;
@@ -39,6 +42,7 @@ export function ExecutionResult({
         <Clicky
           data={parsedClicky.document}
           {...(response.requestUrl ? { url: response.requestUrl } : {})}
+          {...(commandRuntime ? { commandRuntime } : {})}
         />
       </div>
     );

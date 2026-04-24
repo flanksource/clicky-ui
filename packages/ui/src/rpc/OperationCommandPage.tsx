@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
@@ -19,6 +20,7 @@ export type OperationCommandPageProps = {
   backHref?: string;
   backLabel?: string;
   renderLink?: RenderLink;
+  commandRuntime?: ClickyCommandRuntime;
 };
 
 export function OperationCommandPage({
@@ -29,6 +31,7 @@ export function OperationCommandPage({
   backHref,
   backLabel = "Back",
   renderLink,
+  commandRuntime,
 }: OperationCommandPageProps) {
   const { operation, isLoading } = useOperationById(client, operationId);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -176,7 +179,10 @@ export function OperationCommandPage({
             {error}
           </div>
         ) : (
-          <ExecutionResult response={result} />
+          <ExecutionResult
+            response={result}
+            {...(commandRuntime ? { commandRuntime } : {})}
+          />
         )}
       </section>
     </div>

@@ -78,9 +78,9 @@ type StageStatusSpec = {
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: "codicon:check", cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: "mdi:hourglass-sand", cellBg: "bg-amber-50/85", tone: "amber" },
-  rejected: { icon: "codicon:close", cellBg: "bg-rose-50/85", tone: "rose" },
+  approved: { icon: "ph:check-thin", cellBg: "bg-emerald-50/80", tone: "emerald" },
+  pending: { icon: "ph:hourglass-medium-thin", cellBg: "bg-amber-50/85", tone: "amber" },
+  rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
 const STAGE_STATES: Array<{ state: StageStatus; user: SampleUser }> = [
@@ -435,4 +435,73 @@ export const Linked: Story = {
     size: "md",
     variant: "stamp",
   },
+};
+
+function SizesWithNamesView() {
+  const density = useDensityValue();
+  return (
+    <div className="space-y-8">
+      <div className="max-w-2xl space-y-1">
+        <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+          Size scale · name pairing
+        </div>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          Avatar sizes with companion text
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Each row pairs the avatar with the identity label sized so the glyph is only a touch taller
+          than the cap height (font-size ≈ 85% of the avatar box).
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
+          const px = resolveSize(size, density);
+          return (
+            <div key={size} className="flex items-center gap-3">
+              <Avatar alt="Chen, Nora" initials="CN" size={size} variant="duotone" />
+              <span
+                className="font-medium leading-none text-foreground"
+                style={{ fontSize: Math.round(px * 0.85) }}
+              >
+                Chen, Nora
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                {size} · {px}px
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {VARIANTS.map((entry) => (
+          <div key={entry.variant} className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div className="space-y-1 border-b border-border pb-2">
+              <div className="text-sm font-semibold text-foreground">{entry.title}</div>
+              <div className="text-xs leading-5 text-muted-foreground">{entry.description}</div>
+            </div>
+            {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
+              const px = resolveSize(size, density);
+              return (
+                <div key={`${entry.variant}-${size}`} className="flex items-center gap-2">
+                  <Avatar alt="Chen, Nora" initials="CN" size={size} variant={entry.variant} />
+                  <span
+                    className="font-medium leading-none text-foreground"
+                    style={{ fontSize: Math.round(px * 0.85) }}
+                  >
+                    Chen, Nora
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export const SizesWithNames: Story = {
+  render: () => <SizesWithNamesView />,
 };

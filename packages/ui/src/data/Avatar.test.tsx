@@ -45,6 +45,11 @@ describe("Avatar", () => {
     expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(/^C$/);
   });
 
+  it("renders a single initial at size=sm", () => {
+    render(<Avatar alt="Chen, Nora" initials="CN" size="sm" />);
+    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(/^C$/);
+  });
+
   it("uses a lighter font weight at size=sm", () => {
     render(<Avatar alt="Chen, Nora" size="sm" />);
     expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveStyle({ fontWeight: "500" });

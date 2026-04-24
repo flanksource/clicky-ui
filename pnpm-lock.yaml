@@ -15,6 +15,9 @@ catalogs:
     '@preact/preset-vite':
       specifier: ^2.9.3
       version: 2.10.5
+    '@radix-ui/react-compose-refs':
+      specifier: ^1.1.2
+      version: 1.1.2
     '@radix-ui/react-slot':
       specifier: ^1.1.1
       version: 1.2.4
@@ -45,6 +48,9 @@ catalogs:
     '@types/react-dom':
       specifier: ^18.3.1
       version: 18.3.7
+    '@voidzero-dev/vite-plus-darwin-arm64':
+      specifier: ^0.1.19
+      version: 0.1.19
     autoprefixer:
       specifier: ^10.4.20
       version: 10.5.0
@@ -100,6 +106,10 @@ catalogs:
 importers:
 
   .:
+    dependencies:
+      '@voidzero-dev/vite-plus-darwin-arm64':
+        specifier: 'catalog:'
+        version: 0.1.19
     devDependencies:
       '@changesets/cli':
         specifier: 'catalog:'
@@ -217,6 +227,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@radix-ui/react-compose-refs':
+        specifier: 'catalog:'
+        version: 1.1.2(@types/react@18.3.28)(react@18.3.1)
       '@radix-ui/react-slot':
         specifier: 'catalog:'
         version: 1.2.4(@types/react@18.3.28)(react@18.3.1)
@@ -1588,6 +1601,12 @@ packages:
 
   '@voidzero-dev/vite-plus-darwin-arm64@0.1.18':
     resolution: {integrity: sha512-bw2pWWE8RZRELWjXcdxdmRaOaYjmGmsxEm23TxvGxQXFb7k9l51W8tpjxariPGLxrEl+Cw5u601IL5LASaPJ5w==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@voidzero-dev/vite-plus-darwin-arm64@0.1.19':
+    resolution: {integrity: sha512-6MY/RiaRXKJ6wD/ftZnf+ohEqU68zHp3bVWetIw9dakcPL7TXoiIkDoechmZXCh+5eqxehvap4eh2eNEvWSM1Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
@@ -4592,6 +4611,8 @@ snapshots:
 
   '@voidzero-dev/vite-plus-darwin-arm64@0.1.18':
     optional: true
+
+  '@voidzero-dev/vite-plus-darwin-arm64@0.1.19': {}
 
   '@voidzero-dev/vite-plus-darwin-x64@0.1.18':
     optional: true

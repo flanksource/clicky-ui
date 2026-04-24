@@ -21,6 +21,7 @@ export type FilterFormProps = {
   parameters?: OpenAPIParameter[];
   initialValues?: ParameterValues | undefined;
   lockedValues?: ParameterValues | undefined;
+  hideLocked?: boolean | undefined;
   enableLookup?: boolean | undefined;
   submitLabel?: string | undefined;
   submittingLabel?: string | undefined;
@@ -37,6 +38,7 @@ export function FilterForm({
   parameters = [],
   initialValues = {},
   lockedValues = {},
+  hideLocked = false,
   enableLookup = method.toUpperCase() === "GET",
   submitLabel = "Execute request",
   submittingLabel = "Executing…",
@@ -77,8 +79,9 @@ export function FilterForm({
       parametersToFormConfig(parameters, values, setValues, {
         lookup: lookupQuery.data,
         lockedValues,
+        hideLocked,
       }),
-    [lockedValues, lookupQuery.data, parameters, values],
+    [hideLocked, lockedValues, lookupQuery.data, parameters, values],
   );
 
   const hasFields = formConfig.filters.length > 0 || formConfig.timeRange != null;

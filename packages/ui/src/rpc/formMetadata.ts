@@ -17,6 +17,7 @@ export type ParameterFormOptions = {
   includeLocations?: OpenAPIParameter["in"][];
   lookup?: OperationLookupResponse | undefined;
   lockedValues?: ParameterValues | undefined;
+  hideLocked?: boolean;
 };
 
 export function titleCase(value: string) {
@@ -97,6 +98,7 @@ export function parametersToFormConfig(
   const lookupFilters = options.lookup?.filters ?? {};
   const includeLocations = new Set(options.includeLocations ?? ["path", "query", "header"]);
   const lockedValues = options.lockedValues ?? {};
+  const hideLocked = options.hideLocked ?? false;
   const rangeStart = parameters.find(
     (param) =>
       includeLocations.has(param.in) &&
@@ -118,6 +120,7 @@ export function parametersToFormConfig(
     }
 
     const disabled = Object.prototype.hasOwnProperty.call(lockedValues, param.name);
+    if (disabled && hideLocked) continue;
     const value = disabled ? lockedValues[param.name] ?? "" : values[param.name] ?? "";
     const label = lookupFilters[param.name]?.label ?? titleCase(param.name);
     const onChange = (next: string | boolean) => {

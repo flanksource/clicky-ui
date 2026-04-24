@@ -52,12 +52,38 @@ function makeSpec(): OpenAPISpec {
   };
 }
 
+const clickyTableResponse: ExecutionResponse = {
+  success: true,
+  exit_code: 0,
+  stdout: JSON.stringify({
+    version: 1,
+    node: {
+      kind: "table",
+      columns: [
+        { name: "ID", label: "ID" },
+        { name: "Name", label: "Name" },
+      ],
+      rows: [
+        {
+          cells: {
+            ID: {
+              kind: "link-command",
+              command: "widget/get",
+              args: ["one"],
+              autoRun: true,
+              text: "one",
+              plain: "one",
+            },
+            Name: { kind: "text", text: "First", plain: "First" },
+          },
+        },
+      ],
+    },
+  }),
+};
+
 function makeClient(
-  executeResponse: ExecutionResponse = {
-    success: true,
-    exit_code: 0,
-    stdout: JSON.stringify([{ id: "one", name: "First" }]),
-  },
+  executeResponse: ExecutionResponse = clickyTableResponse,
 ): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
   lookupMock: ReturnType<typeof vi.fn>;
@@ -137,6 +163,7 @@ describe("OperationCatalog", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    window.history.replaceState(null, "", "/");
   });
 
   it("renders the table with rows from the list endpoint", async () => {
@@ -154,15 +181,14 @@ describe("OperationCatalog", () => {
       "/api/v1/widgets",
       "get",
       {},
-      { Accept: "application/json" },
+      { Accept: "application/json+clicky" },
     );
-    expect(screen.getByRole("link", { name: "one" })).toHaveAttribute(
-      "href",
-      "/entity/widgets/one",
-    );
+    // ID cell rendered as a link-command node (no command runtime in the
+    // test harness, so it falls back to an inline span containing the id).
+    expect(screen.getByText("one")).toBeInTheDocument();
   });
 
-  it("autoSubmit=false: typing does not refire; Apply triggers a single execute", async () => {
+  it("live-filters: typing debounces then refires with the final value", async () => {
     const client = makeClient();
     renderCatalog(client);
 
@@ -170,20 +196,19 @@ describe("OperationCatalog", () => {
 
     fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foo" } });
     fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foobar" } });
-    // Without Apply, the query key is unchanged, so no extra request is fired.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(client.executeMock).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+    // No Apply button exists.
+    expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(client.executeMock).toHaveBeenCalledTimes(2);
-    });
+    await waitFor(
+      () => expect(client.executeMock).toHaveBeenCalledTimes(2),
+      { timeout: 2_000 },
+    );
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",
       { q: "foobar" },
-      { Accept: "application/json" },
+      { Accept: "application/json+clicky" },
     );
   });
 
@@ -218,7 +243,7 @@ describe("OperationCatalog", () => {
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
   });
 
-  it("refreshes lookup metadata from draft edits without refetching the list until Apply", async () => {
+  it("live-filters: a debounced lookup field refires the list", async () => {
     const client = makeClient();
     client.lookupMock.mockResolvedValue(makeLookupResponse());
     renderCatalog(client);
@@ -227,19 +252,16 @@ describe("OperationCatalog", () => {
     await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
 
     fireEvent.change(screen.getByLabelText("Team"), { target: { value: "platform" } });
-    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "api, worker" } });
 
-    await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(2));
-    expect(client.executeMock).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
-
-    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2));
-    expect(client.executeMock).toHaveBeenLastCalledWith(
-      "/api/v1/widgets",
-      "get",
-      { tags: "api,worker", team: "platform" },
-      { Accept: "application/json" },
+    await waitFor(
+      () =>
+        expect(client.executeMock).toHaveBeenLastCalledWith(
+          "/api/v1/widgets",
+          "get",
+          { team: "platform" },
+          { Accept: "application/json+clicky" },
+        ),
+      { timeout: 2_000 },
     );
   });
 });

@@ -167,7 +167,7 @@ export function Avatar({
   const key = colorKey ?? alt;
   const hue = hueForKey(key);
   const tone = fallbackTone(variant, kind, hue);
-  const maxLetters = size === "xs" ? 1 : 2;
+  const maxLetters = size === "xs" || size === "sm" ? 1 : 2;
   const text = resolveInitials(alt, initials, maxLetters);
   const base = cn("inline-flex shrink-0 select-none items-center justify-center overflow-hidden border", shape);
   const frameStyle: CSSProperties = {

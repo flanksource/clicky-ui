@@ -87,7 +87,7 @@ describe("Clicky", () => {
     ).toBeInTheDocument();
   });
 
-  it("supports auto-filtered clicky tables", () => {
+  it("supports auto-filtered clicky tables", async () => {
     const clickyDocument: ClickyDocument = {
       version: 1,
       node: {
@@ -128,8 +128,11 @@ describe("Clicky", () => {
     }
     fireEvent.click(healthyFilter);
 
+    await waitFor(
+      () => expect(screen.queryByText("worker")).not.toBeInTheDocument(),
+      { timeout: 1_500 },
+    );
     expect(screen.getByText("api")).toBeInTheDocument();
-    expect(screen.queryByText("worker")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("api"));
 

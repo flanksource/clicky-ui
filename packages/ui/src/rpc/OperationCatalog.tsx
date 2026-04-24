@@ -1,5 +1,5 @@
 import {
-  useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -7,24 +7,20 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { FilterBar } from "../components/FilterBar";
-import { DataTable, inferColumns } from "../data/DataTable";
 import { Icon } from "../data/Icon";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import {
   filterOperationsByDomain,
-  findDetailEndpointForList,
   findListEndpoint,
-  normalizeRows,
-  parseJsonBody,
 } from "./classify";
 import {
   filterOperationsBySurface,
   findSurfaceCollectionActions,
-  findSurfaceDetailOperation,
   findSurfaceListOperation,
   getOperationClickyMeta,
 } from "./clickyMetadata";
+import type { ClickyCommandRuntime } from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
@@ -39,7 +35,6 @@ import { useOperations, type OperationsApiClient } from "./useOperations";
 import {
   packParameterValues,
   parametersToFormConfig,
-  useDebouncedRecord,
   type ParameterFormOptions,
 } from "./formMetadata";
 
@@ -54,19 +49,16 @@ export type OperationCatalogProps = {
   // Restrict the domain to operationIds with a shared prefix when tags alone
   // are too coarse (for example admin_ or catalog_ surfaces).
   operationIdPrefix?: string;
-  // Explicit operation ids for domains whose canonical list/detail routes do
-  // not follow the default `<entity>_list` / first-path-param GET pattern.
+  // Explicit operation id for domains whose canonical list route does not
+  // follow the default `<entity>_list` pattern.
   listOperationId?: string;
-  detailOperationId?: string;
   surfaceKey?: string;
-  getEntityHref?: (entityName: string, id: string, row: Record<string, unknown>) => string;
   getCommandHref?: (operationId: string, op: ResolvedOperation) => string;
   renderError?: (err: unknown, title: string) => ReactNode;
   kind?: "operations" | "configuration";
+  commandRuntime?: ClickyCommandRuntime;
 };
 
-const defaultEntityHref = (domainKey: string, id: string) =>
-  `/entity/${domainKey}/${encodeURIComponent(id)}`;
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
 
 function defaultRenderError(err: unknown, title: string) {
@@ -87,12 +79,11 @@ export function OperationCatalog({
   allOperations = false,
   operationIdPrefix,
   listOperationId,
-  detailOperationId,
   surfaceKey,
-  getEntityHref,
   getCommandHref = defaultCommandHref,
   renderError = defaultRenderError,
   kind,
+  commandRuntime,
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
   const [view, setView] = useState<"table" | "endpoints">("table");
@@ -136,31 +127,18 @@ export function OperationCatalog({
     },
     [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata],
   );
-  const detailEndpoint = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceDetailOperation(domainOps, surfaceKey);
-      }
-
-      return detailOperationId
-        ? domainOps.find(
-            (op) => op.method === "get" && op.operation.operationId === detailOperationId,
-          )
-        : findDetailEndpointForList(domainOps, listEndpoint);
-    },
-    [detailOperationId, domainOps, listEndpoint, surfaceKey, useSurfaceMetadata],
-  );
-
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [draftFilters, setDraftFilters] = useState<Record<string, string>>({});
-  const debouncedDraftFilters = useDebouncedRecord(draftFilters, 250);
+  const [filters, setFilters] = useState<Record<string, string>>(() => readFiltersFromUrl());
   const listParameters = listEndpoint?.operation.parameters ?? [];
+
+  useEffect(() => {
+    writeFiltersToUrl(filters);
+  }, [filters]);
 
   const listQuery = useQuery<ExecutionResponse>({
     queryKey: ["operation-list", listEndpoint?.method, listEndpoint?.path, filters],
     queryFn: () =>
       client.executeCommand(listEndpoint!.path, listEndpoint!.method, packParameterValues(filters, listEndpoint!.operation.parameters ?? []), {
-        Accept: "application/json",
+        Accept: "application/json+clicky",
       }),
     enabled: !!listEndpoint && view === "table",
     staleTime: 30_000,
@@ -168,22 +146,18 @@ export function OperationCatalog({
   });
 
   const lookupQuery = useQuery<OperationLookupResponse>({
-    queryKey: ["operation-lookup", listEndpoint?.method, listEndpoint?.path, debouncedDraftFilters],
+    queryKey: ["operation-lookup", listEndpoint?.method, listEndpoint?.path, filters],
     queryFn: async () =>
       (await client.lookupFilters?.(
         listEndpoint!.path,
         listEndpoint!.method,
-        packParameterValues(debouncedDraftFilters, listParameters),
+        packParameterValues(filters, listParameters),
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
     enabled: !!listEndpoint && view === "table" && !!client.lookupFilters,
     staleTime: 30_000,
     retry: 0,
   });
-
-  const parsedListData = useMemo(() => parseJsonBody(listQuery.data), [listQuery.data]);
-  const rows = useMemo(() => normalizeRows(parsedListData), [parsedListData]);
-  const columns = useMemo(() => inferColumns(rows), [rows]);
 
   const actionOps = useMemo(
     () => {
@@ -201,27 +175,6 @@ export function OperationCatalog({
     [domainOps, surfaceKey, useSurfaceMetadata],
   );
 
-  const entityName = useMemo(() => {
-    if (!listEndpoint) return "";
-    const segments = listEndpoint.path.split("/").filter(Boolean);
-    const tail = segments[0] === "api" && segments[1] === "v1" ? segments.slice(2) : segments;
-    return tail[tail.length - 1] || "";
-  }, [listEndpoint]);
-
-  const getRowHref = useCallback(
-    (row: Record<string, unknown>): string | undefined => {
-      if (!detailEndpoint || !entityName) return undefined;
-      const id = row["_id"] ?? row["id"] ?? row["ID"];
-      if (id != null) {
-        return getEntityHref
-          ? getEntityHref(entityName, String(id), row)
-          : defaultEntityHref(definition.key, String(id));
-      }
-      return undefined;
-    },
-    [definition.key, detailEndpoint, entityName, getEntityHref],
-  );
-
   const filterBarConfig = useMemo(
     () => {
       const options: ParameterFormOptions = {
@@ -230,9 +183,9 @@ export function OperationCatalog({
       if (lookupQuery.data != null) {
         options.lookup = lookupQuery.data;
       }
-      return parametersToFormConfig(listParameters, draftFilters, setDraftFilters, options);
+      return parametersToFormConfig(listParameters, filters, setFilters, options);
     },
-    [draftFilters, listParameters, lookupQuery.data],
+    [filters, listParameters, lookupQuery.data],
   );
 
   const hasTable = !!listEndpoint;
@@ -394,10 +347,9 @@ export function OperationCatalog({
         <>
           {(filterBarConfig.filters.length > 0 || filterBarConfig.timeRange != null) && (
             <FilterBar
-              autoSubmit={false}
+              autoSubmit
               isPending={listQuery.isFetching}
               filters={filterBarConfig.filters}
-              onApply={() => setFilters(draftFilters)}
               {...(filterBarConfig.timeRange ? { timeRange: filterBarConfig.timeRange } : {})}
             />
           )}
@@ -409,16 +361,14 @@ export function OperationCatalog({
             </div>
           ) : listQuery.isError ? (
             renderError(listQuery.error, `Failed to load ${listEndpoint?.path ?? ""}`)
-          ) : rows.length > 0 ? (
-            <DataTable
-              data={rows}
-              columns={columns}
-              {...(detailEndpoint ? { getRowHref } : {})}
-            />
           ) : listQuery.data ? (
-            <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No records returned
-            </div>
+            <ExecutionResult
+              response={listQuery.data}
+              emptyMessage="No records returned"
+              ariaLabel={`${definition.title} results`}
+              className="mt-0"
+              {...(commandRuntime ? { commandRuntime } : {})}
+            />
           ) : null}
         </>
       ) : (
@@ -464,7 +414,11 @@ export function OperationCatalog({
                 {actionError}
               </div>
             ) : actionResult ? (
-              <ExecutionResult response={actionResult} className="mt-0" />
+              <ExecutionResult
+                response={actionResult}
+                className="mt-0"
+                {...(commandRuntime ? { commandRuntime } : {})}
+              />
             ) : null}
           </div>
         )}
@@ -475,4 +429,28 @@ export function OperationCatalog({
 
 function SkeletonBlock({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
+}
+
+function readFiltersFromUrl(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const search = new URLSearchParams(window.location.search);
+  const values: Record<string, string> = {};
+  for (const [key, value] of search.entries()) {
+    if (key.startsWith("__")) continue;
+    if (value !== "") values[key] = value;
+  }
+  return values;
+}
+
+function writeFiltersToUrl(filters: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== "") search.set(key, value);
+  }
+  const query = search.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+    window.history.replaceState(window.history.state, "", next);
+  }
 }

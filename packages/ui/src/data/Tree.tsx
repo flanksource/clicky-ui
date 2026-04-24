@@ -147,6 +147,8 @@ function filterTreeRoots<T>(
 
     const key = getKey(node);
     const children = getChildren(node) ?? [];
+    const childrenAllSecondary =
+      children.length > 0 && children.every((child) => isSecondary?.(child));
     const matches = matchText(node, children).includes(normalizedQuery);
     const visibleChildren: T[] = [];
 
@@ -157,7 +159,7 @@ function filterTreeRoots<T>(
     if (matches) {
       if (children.length > 0) {
         filteredChildren.set(key, children);
-        forcedOpenKeys.add(key);
+        if (!childrenAllSecondary) forcedOpenKeys.add(key);
       }
       return true;
     }

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
+import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import {
@@ -35,6 +36,7 @@ export type OperationEntityPageProps = {
   backHref?: string;
   backLabel?: string;
   renderError?: (err: unknown, title: string) => ReactNode;
+  commandRuntime?: ClickyCommandRuntime;
 };
 
 function defaultRenderError(err: unknown, title: string) {
@@ -61,6 +63,7 @@ export function OperationEntityPage({
   backHref,
   backLabel = "Back",
   renderError = defaultRenderError,
+  commandRuntime,
 }: OperationEntityPageProps) {
   const { operations, isLoading } = useOperations(client);
   const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
@@ -210,41 +213,42 @@ export function OperationEntityPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        {backLink}
-        <div className="flex items-center gap-3">
-          <MethodBadge method={resolvedDetailEndpoint.method} />
-          <code className="rounded-md bg-muted px-2 py-1 text-sm">
-            {resolvedDetailEndpoint.path}
-          </code>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-2">
+          {backLink}
+          <div className="flex items-center gap-3">
+            <MethodBadge method={resolvedDetailEndpoint.method} />
+            <code className="rounded-md bg-muted px-2 py-1 text-sm">
+              {resolvedDetailEndpoint.path}
+            </code>
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {definition.title}: {id}
+            </h1>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{definition.description}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {definition.title}: {id}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{definition.description}</p>
-        </div>
+        {actionOps.length > 0 && (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {actionOps.map((op) => (
+              <Button
+                key={`${op.method}:${op.path}`}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setActiveAction(op);
+                  setActionResult(null);
+                  setActionError("");
+                }}
+              >
+                {op.operation.summary || op.operation.operationId || op.path}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
-
-      {actionOps.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {actionOps.map((op) => (
-            <Button
-              key={`${op.method}:${op.path}`}
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setActiveAction(op);
-                setActionResult(null);
-                setActionError("");
-              }}
-            >
-              {op.operation.summary || op.operation.operationId || op.path}
-            </Button>
-          ))}
-        </div>
-      )}
 
       {detailQuery.isLoading ? (
         <div className="text-sm text-muted-foreground">Loading detail…</div>
@@ -253,7 +257,10 @@ export function OperationEntityPage({
       ) : (
         <section className="rounded-xl border bg-card p-4">
           <h2 className="text-lg font-medium">Entity detail</h2>
-          <ExecutionResult response={detailQuery.data ?? null} />
+          <ExecutionResult
+            response={detailQuery.data ?? null}
+            {...(commandRuntime ? { commandRuntime } : {})}
+          />
         </section>
       )}
 
@@ -275,6 +282,7 @@ export function OperationEntityPage({
               method={activeAction.method}
               parameters={activeAction.operation.parameters ?? []}
               lockedValues={{ [idParameterName]: id }}
+              hideLocked
               enableLookup={false}
               submitLabel="Execute request"
               submittingLabel="Executing…"
@@ -286,7 +294,11 @@ export function OperationEntityPage({
                 {actionError}
               </div>
             ) : actionResult ? (
-              <ExecutionResult response={actionResult} className="mt-0" />
+              <ExecutionResult
+                response={actionResult}
+                className="mt-0"
+                {...(commandRuntime ? { commandRuntime } : {})}
+              />
             ) : null}
           </div>
         )}

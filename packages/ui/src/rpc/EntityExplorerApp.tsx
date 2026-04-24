@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { ThemeSwitcher } from "../components/theme-switcher";
+import type { ClickyCommandRuntime, ClickyResolvedCommand } from "../data/Clicky";
 import { getClickySurfaces, makeSurfaceDefinition } from "./clickyMetadata";
 import type { RenderLink } from "./EndpointList";
 import { OperationCatalog } from "./OperationCatalog";
@@ -33,6 +34,23 @@ export function EntityExplorerApp({
   const relativePath = useMemo(() => stripBasePath(pathname, basePath), [basePath, pathname]);
   const route = useMemo(() => parseExplorerRoute(relativePath), [relativePath]);
   const resolvedRoute = useMemo(() => resolveRouteSurface(route, surfaces), [route, surfaces]);
+  const commandRuntime = useMemo<ClickyCommandRuntime>(
+    () => ({
+      client,
+      hrefForCommand: (resolved) => buildCommandHref(basePath, resolved),
+      onNavigate: (resolved) => {
+        const href = buildCommandHref(basePath, resolved);
+        if (!href || typeof window === "undefined") return;
+        window.history.pushState(window.history.state, "", href);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      },
+    }),
+    [basePath, client],
+  );
+  const { initialValues: commandInitialValues, autoRun: commandAutoRun } = useMemo(
+    () => (resolvedRoute.kind === "command" ? readCommandQueryParams() : { initialValues: {}, autoRun: false }),
+    [resolvedRoute.kind, pathname],
+  );
   const explorerDefinition = useMemo(
     () => ({
       key: "explorer",
@@ -98,6 +116,7 @@ export function EntityExplorerApp({
               client={client}
               renderLink={renderLink}
               surfaceKey={resolvedRoute.surface.key}
+              commandRuntime={commandRuntime}
             />
           ) : (
             <UnknownSurface surfaceKey={resolvedRoute.surfaceKey} />
@@ -112,6 +131,7 @@ export function EntityExplorerApp({
               surfaceKey={resolvedRoute.surface.key}
               backHref={withBasePath(basePath, `/${resolvedRoute.surface.key}`)}
               backLabel={`Back to ${resolvedRoute.surface.title}`}
+              commandRuntime={commandRuntime}
               {...(resolvedRoute.id ? { id: resolvedRoute.id } : {})}
             />
           ) : (
@@ -123,6 +143,9 @@ export function EntityExplorerApp({
             backHref={withBasePath(basePath, "/explorer")}
             backLabel="Back to API Explorer"
             renderLink={renderLink}
+            commandRuntime={commandRuntime}
+            initialValues={commandInitialValues}
+            autoRun={commandAutoRun}
             {...(resolvedRoute.operationId ? { operationId: resolvedRoute.operationId } : {})}
           />
         ) : resolvedRoute.kind === "explorer" ? (
@@ -132,6 +155,7 @@ export function EntityExplorerApp({
             allOperations
             client={client}
             renderLink={renderLink}
+            commandRuntime={commandRuntime}
           />
         ) : defaultSurface == null ? (
           <div className="text-sm text-muted-foreground">Loading surfaces…</div>
@@ -170,17 +194,15 @@ function parseExplorerRoute(pathname: string): ExplorerRoute {
       ? { kind: "command", operationId: segments[1] }
       : { kind: "command" };
   }
-  if (segments[0] === "entity") {
-    const entityRoute: ExplorerRoute = {
+  const surfaceKey = segments[0] ?? "";
+  if (segments[1]) {
+    return {
       kind: "entity",
-      surfaceKey: segments[1] ?? "",
+      surfaceKey,
+      id: decodeURIComponent(segments[1]),
     };
-    if (segments[2]) {
-      entityRoute.id = decodeURIComponent(segments[2]);
-    }
-    return entityRoute;
   }
-  return { kind: "surface", surfaceKey: segments[0] ?? "" };
+  return { kind: "surface", surfaceKey };
 }
 
 function resolveRouteSurface(route: ExplorerRoute, surfaces: ClickySurface[]): ExplorerRoute {
@@ -238,4 +260,80 @@ function UnknownSurface({ surfaceKey }: { surfaceKey: string }) {
       Unknown surface: <code>{surfaceKey}</code>
     </div>
   );
+}
+
+const AUTORUN_QUERY_PARAM = "__autoRun";
+const ARG_QUERY_PREFIX = "__arg";
+
+function buildCommandHref(basePath: string, resolved: ClickyResolvedCommand): string | undefined {
+  const commandId = resolved.operation?.operation.operationId ?? resolved.request.command;
+  if (!commandId) return undefined;
+
+  const meta = resolved.operation?.operation["x-clicky"];
+  const args = resolved.request.args ?? [];
+  const flags = resolved.request.flags ?? {};
+
+  // Entity `get` commands route to the surface detail URL: /<surface>/<id>?<flags>
+  if (meta?.verb === "get" && meta?.scope === "entity" && meta.surface && args[0]) {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(flags)) {
+      if (value !== undefined && value !== "") {
+        search.set(key, value);
+      }
+    }
+    const query = search.toString();
+    const suffix = query ? `?${query}` : "";
+    return withBasePath(basePath, `/${encodeURIComponent(meta.surface)}/${encodeURIComponent(args[0])}${suffix}`);
+  }
+
+  const search = new URLSearchParams();
+  args.forEach((value, index) => {
+    if (value !== undefined && value !== "") {
+      search.set(`${ARG_QUERY_PREFIX}${index}`, value);
+    }
+  });
+  for (const [key, value] of Object.entries(flags)) {
+    if (value !== undefined && value !== "") {
+      search.set(key, value);
+    }
+  }
+  if (resolved.request.autoRun) {
+    search.set(AUTORUN_QUERY_PARAM, "1");
+  }
+
+  const query = search.toString();
+  const suffix = query ? `?${query}` : "";
+  return withBasePath(basePath, `/commands/${encodeURIComponent(commandId)}${suffix}`);
+}
+
+function readCommandQueryParams(): { initialValues: Record<string, string>; autoRun: boolean } {
+  if (typeof window === "undefined") {
+    return { initialValues: {}, autoRun: false };
+  }
+  const search = new URLSearchParams(window.location.search);
+  const initialValues: Record<string, string> = {};
+  let autoRun = false;
+  const positional: string[] = [];
+
+  for (const [key, value] of search.entries()) {
+    if (key === AUTORUN_QUERY_PARAM) {
+      autoRun = value === "1" || value === "true";
+      continue;
+    }
+    if (key.startsWith(ARG_QUERY_PREFIX)) {
+      const index = Number.parseInt(key.slice(ARG_QUERY_PREFIX.length), 10);
+      if (Number.isFinite(index) && index >= 0) {
+        positional[index] = value;
+      }
+      continue;
+    }
+    initialValues[key] = value;
+  }
+
+  const packedArgs = positional.filter((value) => value !== undefined).join(" ");
+  if (packedArgs !== "") {
+    initialValues.args = packedArgs;
+  }
+
+  return { initialValues, autoRun };
 }
