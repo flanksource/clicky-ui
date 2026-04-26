@@ -22,7 +22,7 @@ function GlobalSync({ theme, density }: { theme: Theme; density: Density }) {
 const preview: Preview = {
   parameters: {
     controls: { expanded: true },
-    backgrounds: { disable: true },
+    backgrounds: { disabled: true },
   },
   globalTypes: {
     theme: {

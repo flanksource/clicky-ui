@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ComponentType } from "react";
+import { Icon as IconifyReactIcon, iconLoaded } from "@iconify/react";
 import { cn } from "../lib/utils";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -46,6 +47,92 @@ const TONE_CLASSES: Record<IconTone, string> = {
   neutral: "text-foreground ring-border",
 };
 
+/**
+ * Optional secondary icon provider. Consumers can plug in a component
+ * (e.g. `Icon` from `@flanksource/icons/icon`) to supply glyphs that the
+ * iconify registry doesn't know about (brand logos, k8s resource icons,
+ * etc.). Clicky-ui never imports the package directly so consumers that
+ * don't need it avoid the dependency entirely.
+ */
+export type FallbackIconProps = {
+  name?: string;
+  className?: string;
+  size?: string | number;
+  alt?: string;
+};
+
+type FallbackIconComponent = ComponentType<FallbackIconProps>;
+
+let fallbackIcon: FallbackIconComponent | null = null;
+
+/**
+ * Register a secondary glyph provider. Pass the flanksource Icon (or any
+ * compatible component) to resolve names that `@iconify/react` hasn't
+ * loaded. Call this once at app bootstrap.
+ */
+export function setFallbackIconProvider(component: FallbackIconComponent | null): void {
+  fallbackIcon = component;
+}
+
+function renderGlyph(
+  name: string,
+  glyphWidth: number | string | undefined,
+  glyphHeight: number | string | undefined,
+  rotate: string | number | undefined,
+  flip: string | undefined,
+  inline: boolean | undefined,
+  glyphClassName: string | undefined,
+  title: string | undefined,
+): JSX.Element {
+  // 1. @iconify/react — build-time lookup via consumer-registered collections.
+  //    Only used when the icon is already in the registry so we never trigger
+  //    a network fetch during SSR.
+  if (iconLoaded(name)) {
+    return (
+      <IconifyReactIcon
+        icon={name}
+        className={glyphClassName}
+        width={glyphWidth}
+        height={glyphHeight}
+        rotate={rotate}
+        flip={flip}
+        inline={inline}
+        title={title}
+      />
+    );
+  }
+
+  // 2. Consumer-supplied fallback (e.g. @flanksource/icons/icon) — for
+  //    brand/platform glyphs not carried by iconify collections.
+  if (fallbackIcon) {
+    const Fallback = fallbackIcon;
+    const glyphSize = typeof glyphWidth === "number" ? glyphWidth : glyphHeight;
+    return (
+      <Fallback
+        name={name}
+        className={glyphClassName}
+        size={glyphSize}
+        alt={title}
+      />
+    );
+  }
+
+  // 3. <iconify-icon> web component — runtime fallback. Requires the script
+  //    to be loaded on the host page.
+  const iconifyProps: Record<string, unknown> = {
+    icon: name,
+    className: glyphClassName,
+    "aria-hidden": title ? undefined : true,
+  };
+  if (glyphWidth != null) iconifyProps.width = glyphWidth;
+  if (glyphHeight != null) iconifyProps.height = glyphHeight;
+  if (rotate != null) iconifyProps.rotate = rotate;
+  if (flip != null) iconifyProps.flip = flip;
+  if (inline != null) iconifyProps.inline = inline;
+  if (title != null) iconifyProps.title = title;
+  return <iconify-icon {...iconifyProps} />;
+}
+
 export function Icon({
   name,
   className,
@@ -65,19 +152,19 @@ export function Icon({
   const resolvedWidth = width ?? (style === "badge" ? glyphSize : pxSize);
   const resolvedHeight = height ?? (style === "badge" ? glyphSize : pxSize);
 
-  const iconProps: Record<string, unknown> = {
-    icon: name,
-    className: cn("shrink-0", style === "plain" ? className : undefined),
-    "aria-hidden": title && style === "plain" ? undefined : true,
-  };
-  if (resolvedWidth != null) iconProps.width = resolvedWidth;
-  if (resolvedHeight != null) iconProps.height = resolvedHeight;
-  if (rotate != null) iconProps.rotate = rotate;
-  if (flip != null) iconProps.flip = flip;
-  if (inline != null) iconProps.inline = inline;
-  if (style === "plain" && title != null) iconProps.title = title;
+  const glyphClassName = cn("shrink-0", style === "plain" ? className : undefined);
+  const glyphTitle = style === "plain" ? title : undefined;
 
-  const icon = <iconify-icon {...iconProps} />;
+  const icon = renderGlyph(
+    name,
+    resolvedWidth,
+    resolvedHeight,
+    rotate,
+    flip,
+    inline,
+    glyphClassName,
+    glyphTitle,
+  );
 
   if (style === "plain") {
     return icon;

@@ -148,7 +148,6 @@ export function DataTable<T extends Record<string, unknown>>({
     setNumberFilters((current) => pruneNumberFilterState(current, generatedFilters));
   }, [generatedFilters]);
 
-  const growColumnCount = useMemo(() => countGrowColumns(columns), [columns]);
   const globalFilterControlled = globalFilter !== undefined;
   const effectiveGlobalFilter = globalFilterControlled ? globalFilter : localGlobalFilter;
   const setEffectiveGlobalFilter = globalFilterControlled
@@ -321,14 +320,11 @@ export function DataTable<T extends Record<string, unknown>>({
       ) : (
         <>
           <div className="overflow-auto rounded-md border border-border">
-            <table className="w-full table-auto text-left text-sm">
+            <table className="w-max min-w-full table-auto text-left text-sm">
               <colgroup>
                 {columns.map((column) => (
                   <col
                     key={column.key}
-                    style={{
-                      width: column.grow ? `${100 / Math.max(1, growColumnCount)}%` : undefined,
-                    }}
                     className={column.shrink && !column.grow ? "w-px" : undefined}
                   />
                 ))}
@@ -679,13 +675,9 @@ function alignmentClass(align?: DataTableColumn["align"]) {
 }
 
 function cellContentClassName(column: DataTableColumn): TdHTMLAttributes<HTMLTableCellElement>["className"] {
-  if (column.grow) return "min-w-0 whitespace-normal break-words";
-  if (column.shrink) return "whitespace-nowrap";
+  if (column.grow) return "min-w-56 max-w-[36rem] truncate";
+  if (column.shrink) return "max-w-[16rem] truncate whitespace-nowrap";
   return "max-w-[18rem] truncate";
-}
-
-function countGrowColumns(columns: DataTableColumn[]) {
-  return columns.filter((column) => column.grow).length;
 }
 
 export function inferColumns<T extends Record<string, unknown>>(data: T[]): DataTableColumn<T>[] {

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
+    "check:arch": "node hack/check-arch.mjs",
+    "predev:storybook": "node hack/check-arch.mjs",
     "dev:storybook": "vp run storybook#dev",
     "dev:kitchen-sink": "vp run kitchen-sink#dev",
     "build": "vp run -r build",

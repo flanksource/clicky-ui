@@ -101,9 +101,26 @@ export {
   type FilterMode,
 } from "./data/FilterPill";
 export { Gauge, type GaugeProps, type GaugeTone } from "./data/Gauge";
-export { Icon, type IconProps, type IconStyle, type IconTone } from "./data/Icon";
+export {
+  Icon,
+  setFallbackIconProvider,
+  type FallbackIconProps,
+  type IconProps,
+  type IconStyle,
+  type IconTone,
+} from "./data/Icon";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
+export {
+  KeyValueList,
+  type KeyValueListItem,
+  type KeyValueListProps,
+} from "./data/KeyValueList";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
+export {
+  MatrixTable,
+  type MatrixTableProps,
+  type MatrixTableRow,
+} from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
