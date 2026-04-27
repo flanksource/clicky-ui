@@ -4,11 +4,7 @@ import { Button } from "../components/button";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
-import {
-  filterOperationsByDomain,
-  findDetailEndpointForList,
-  findListEndpoint,
-} from "./classify";
+import { filterOperationsByDomain, findDetailEndpointForList, findListEndpoint } from "./classify";
 import {
   filterOperationsBySurface,
   findSurfaceDetailOperation,
@@ -76,51 +72,39 @@ export function OperationEntityPage({
   );
   const useSurfaceMetadata = surfaceOps.length > 0;
 
-  const domainOps = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return surfaceOps;
-      }
+  const domainOps = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return surfaceOps;
+    }
 
-      return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
-        operationIdPrefix
-          ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
-          : true,
-      );
-    },
-    [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata],
-  );
+    return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter(
+      (op) =>
+        operationIdPrefix ? (op.operation.operationId ?? "").startsWith(operationIdPrefix) : true,
+    );
+  }, [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata]);
 
-  const listEndpoint = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceListOperation(domainOps, surfaceKey);
-      }
+  const listEndpoint = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return findSurfaceListOperation(domainOps, surfaceKey);
+    }
 
-      const explicitList = listOperationId
-        ? domainOps.find(
-            (op) => op.method === "get" && op.operation.operationId === listOperationId,
-          )
-        : undefined;
-      return explicitList ?? findListEndpoint(domainOps, entities);
-    },
-    [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata],
-  );
+    const explicitList = listOperationId
+      ? domainOps.find((op) => op.method === "get" && op.operation.operationId === listOperationId)
+      : undefined;
+    return explicitList ?? findListEndpoint(domainOps, entities);
+  }, [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata]);
 
-  const resolvedDetailEndpoint = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceDetailOperation(domainOps, surfaceKey);
-      }
+  const resolvedDetailEndpoint = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return findSurfaceDetailOperation(domainOps, surfaceKey);
+    }
 
-      return detailOperationId
-        ? domainOps.find(
-            (op) => op.method === "get" && op.operation.operationId === detailOperationId,
-          )
-        : findDetailEndpointForList(domainOps, listEndpoint);
-    },
-    [detailOperationId, domainOps, listEndpoint, surfaceKey, useSurfaceMetadata],
-  );
+    return detailOperationId
+      ? domainOps.find(
+          (op) => op.method === "get" && op.operation.operationId === detailOperationId,
+        )
+      : findDetailEndpointForList(domainOps, listEndpoint);
+  }, [detailOperationId, domainOps, listEndpoint, surfaceKey, useSurfaceMetadata]);
 
   const idParameterName = useMemo(
     () =>
@@ -128,24 +112,18 @@ export function OperationEntityPage({
       "id",
     [resolvedDetailEndpoint],
   );
-  const detailValues = useMemo(
-    () => (id ? { [idParameterName]: id } : {}),
-    [id, idParameterName],
-  );
-  const actionOps = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceEntityActions(domainOps, surfaceKey);
-      }
+  const detailValues = useMemo(() => (id ? { [idParameterName]: id } : {}), [id, idParameterName]);
+  const actionOps = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return findSurfaceEntityActions(domainOps, surfaceKey);
+    }
 
-      return resolvedDetailEndpoint == null
-        ? []
-        : domainOps.filter(
-            (op) => op.method !== "get" && op.path.startsWith(`${resolvedDetailEndpoint.path}/`),
-          );
-    },
-    [domainOps, resolvedDetailEndpoint, surfaceKey, useSurfaceMetadata],
-  );
+    return resolvedDetailEndpoint == null
+      ? []
+      : domainOps.filter(
+          (op) => op.method !== "get" && op.path.startsWith(`${resolvedDetailEndpoint.path}/`),
+        );
+  }, [domainOps, resolvedDetailEndpoint, surfaceKey, useSurfaceMetadata]);
 
   const detailQuery = useQuery({
     queryKey: ["entity-detail", definition.key, id, resolvedDetailEndpoint?.path],
@@ -162,19 +140,17 @@ export function OperationEntityPage({
   });
 
   const backLink =
-    backHref == null
-      ? null
-      : renderLink
-        ? renderLink({
-            to: backHref,
-            className: "text-sm text-primary underline-offset-4 hover:underline",
-            children: backLabel,
-          })
-        : (
-            <a href={backHref} className="text-sm text-primary underline-offset-4 hover:underline">
-              {backLabel}
-            </a>
-          );
+    backHref == null ? null : renderLink ? (
+      renderLink({
+        to: backHref,
+        className: "text-sm text-primary underline-offset-4 hover:underline",
+        children: backLabel,
+      })
+    ) : (
+      <a href={backHref} className="text-sm text-primary underline-offset-4 hover:underline">
+        {backLabel}
+      </a>
+    );
 
   async function executeAction(values: Record<string, string>) {
     if (!activeAction) return;

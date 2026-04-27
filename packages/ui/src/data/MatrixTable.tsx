@@ -66,13 +66,16 @@ export function MatrixTable({
             >
               {corner}
             </th>
-            {columns.map((column, index) => (
+            {columns.map((column, index) =>
               angledHeaders ? (
                 <th
                   key={index}
                   scope="col"
                   title={columnTitle(column)}
-                  className={cn("relative overflow-visible border-b border-border p-0 align-bottom", columnClassName)}
+                  className={cn(
+                    "relative overflow-visible border-b border-border p-0 align-bottom",
+                    columnClassName,
+                  )}
                   style={{
                     width: columnWidth,
                     minWidth: columnWidth,
@@ -123,8 +126,8 @@ export function MatrixTable({
                 >
                   {column}
                 </th>
-              )
-            ))}
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
@@ -143,7 +146,9 @@ export function MatrixTable({
                 <td
                   key={index}
                   className={cn(
-                    angledHeaders ? "p-0 text-center align-middle" : "px-density-3 py-density-2 text-center align-middle",
+                    angledHeaders
+                      ? "p-0 text-center align-middle"
+                      : "px-density-3 py-density-2 text-center align-middle",
                     cellClassName,
                   )}
                   style={

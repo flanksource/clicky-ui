@@ -45,10 +45,7 @@ export function useOperations(client: OperationsApiClient) {
   return { operations, spec, ...rest };
 }
 
-export function useOperationById(
-  client: OperationsApiClient,
-  operationId: string | undefined,
-) {
+export function useOperationById(client: OperationsApiClient, operationId: string | undefined) {
   const { operations, ...rest } = useOperations(client);
   const operation = operationId
     ? operations.find((op) => op.operation.operationId === operationId)

@@ -3,11 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationCatalog } from "./OperationCatalog";
 import type { RenderLink } from "./EndpointList";
-import type {
-  ExecutionResponse,
-  OpenAPISpec,
-  OperationLookupResponse,
-} from "./types";
+import type { ExecutionResponse, OpenAPISpec, OperationLookupResponse } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 
 function makeSpec(): OpenAPISpec {
@@ -200,10 +196,7 @@ describe("OperationCatalog", () => {
     // No Apply button exists.
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
 
-    await waitFor(
-      () => expect(client.executeMock).toHaveBeenCalledTimes(2),
-      { timeout: 2_000 },
-    );
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), { timeout: 2_000 });
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",

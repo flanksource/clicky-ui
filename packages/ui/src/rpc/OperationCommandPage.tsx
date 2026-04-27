@@ -104,19 +104,17 @@ export function OperationCommandPage({
   }, [autoRun, effectiveInitialValues, hasAutoRun, operationKey, parameterSignature]);
 
   const backLink =
-    backHref == null
-      ? null
-      : renderLink
-        ? renderLink({
-            to: backHref,
-            className: "text-sm text-primary underline-offset-4 hover:underline",
-            children: backLabel,
-          })
-        : (
-            <a href={backHref} className="text-sm text-primary underline-offset-4 hover:underline">
-              {backLabel}
-            </a>
-          );
+    backHref == null ? null : renderLink ? (
+      renderLink({
+        to: backHref,
+        className: "text-sm text-primary underline-offset-4 hover:underline",
+        children: backLabel,
+      })
+    ) : (
+      <a href={backHref} className="text-sm text-primary underline-offset-4 hover:underline">
+        {backLabel}
+      </a>
+    );
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading operation…</div>;
@@ -179,10 +177,7 @@ export function OperationCommandPage({
             {error}
           </div>
         ) : (
-          <ExecutionResult
-            response={result}
-            {...(commandRuntime ? { commandRuntime } : {})}
-          />
+          <ExecutionResult response={result} {...(commandRuntime ? { commandRuntime } : {})} />
         )}
       </section>
     </div>

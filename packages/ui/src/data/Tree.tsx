@@ -3,7 +3,10 @@ import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import { TreeNode, type TreeNodeProps } from "./TreeNode";
 
-export type TreeProps<T> = Omit<TreeNodeProps<T>, "node" | "depth" | "expandAll" | "forcedOpenKeys"> & {
+export type TreeProps<T> = Omit<
+  TreeNodeProps<T>,
+  "node" | "depth" | "expandAll" | "forcedOpenKeys"
+> & {
   roots: T[];
   empty?: ReactNode;
   className?: string;
@@ -35,10 +38,7 @@ export type TreeProps<T> = Omit<TreeNodeProps<T>, "node" | "depth" | "expandAll"
   getSearchText?: (node: T) => string;
 };
 
-function countTreeEdges<T>(
-  roots: T[],
-  getChildren: TreeProps<T>["getChildren"],
-) {
+function countTreeEdges<T>(roots: T[], getChildren: TreeProps<T>["getChildren"]) {
   let total = 0;
   const stack = [...roots];
 
@@ -196,10 +196,10 @@ export function Tree<T>({
   const basePaddingPx = nodeProps.basePaddingPx ?? 8;
   const isControlled = onExpandAllChange !== undefined;
   const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
-  const totalEdges = useMemo(() => countTreeEdges(roots, nodeProps.getChildren), [
-    roots,
-    nodeProps.getChildren,
-  ]);
+  const totalEdges = useMemo(
+    () => countTreeEdges(roots, nodeProps.getChildren),
+    [roots, nodeProps.getChildren],
+  );
   const showFilter = totalEdges > 20;
   const activeFilter = showFilter ? filterQuery : "";
   const filteredTree = useMemo(
@@ -322,7 +322,7 @@ export function Tree<T>({
         )}
 
         {treeRoots.length === 0 ? (
-          effectiveEmpty ?? null
+          (effectiveEmpty ?? null)
         ) : (
           <>
             {treeRoots.map((root) => (

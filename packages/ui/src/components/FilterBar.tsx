@@ -274,13 +274,7 @@ export function FilterBar({
   );
 }
 
-function EnumFilterField({
-  filter,
-  grow,
-}: {
-  filter: FilterBarEnumFilter;
-  grow: boolean;
-}) {
+function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
   return (
     <label
       className={cn(
@@ -364,13 +358,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
   );
 }
 
-function TextFilterField({
-  filter,
-  grow,
-}: {
-  filter: FilterBarTextFilter;
-  grow: boolean;
-}) {
+function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: boolean }) {
   const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
 
   return (
@@ -398,13 +386,7 @@ function TextFilterField({
   );
 }
 
-function LookupFilterField({
-  filter,
-  grow,
-}: {
-  filter: FilterBarLookupFilter;
-  grow: boolean;
-}) {
+function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; grow: boolean }) {
   const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
   const listId = `${filter.key}-lookup-options`;
 
@@ -465,9 +447,8 @@ function LookupMultiFilterField({
   filter: FilterBarLookupMultiFilter;
   grow: boolean;
 }) {
-  const [draft, setDraft] = useDebouncedTextDraft(
-    filter.value.join(", "),
-    (next) => filter.onChange(parseLookupMultiValue(next)),
+  const [draft, setDraft] = useDebouncedTextDraft(filter.value.join(", "), (next) =>
+    filter.onChange(parseLookupMultiValue(next)),
   );
   const listId = `${filter.key}-lookup-options`;
 
@@ -507,13 +488,7 @@ function LookupMultiFilterField({
   );
 }
 
-function NumberFilterField({
-  filter,
-  grow,
-}: {
-  filter: FilterBarNumberFilter;
-  grow: boolean;
-}) {
+function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; grow: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -522,16 +497,8 @@ function NumberFilterField({
 
   const bounds = resolveNumberFilterBounds(filter);
   const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
-  const sliderMin = clampNumber(
-    parseFilterNumber(draft.min) ?? bounds.min,
-    bounds.min,
-    bounds.max,
-  );
-  const sliderMax = clampNumber(
-    parseFilterNumber(draft.max) ?? bounds.max,
-    bounds.min,
-    bounds.max,
-  );
+  const sliderMin = clampNumber(parseFilterNumber(draft.min) ?? bounds.min, bounds.min, bounds.max);
+  const sliderMax = clampNumber(parseFilterNumber(draft.max) ?? bounds.max, bounds.min, bounds.max);
   const activeMin = Math.min(sliderMin, sliderMax);
   const activeMax = Math.max(sliderMin, sliderMax);
   const summary = summarizeNumberFilter(filter, bounds, draft);
@@ -660,13 +627,7 @@ function NumberFilterField({
   );
 }
 
-function MultiFilterField({
-  filter,
-  grow,
-}: {
-  filter: FilterBarMultiFilter;
-  grow: boolean;
-}) {
+function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -738,16 +699,12 @@ function MultiFilterField({
                   data-filter-option={option.value}
                   className="rounded-md px-1.5 py-1 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                   onClick={() =>
-                    setDraft(
-                      updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
-                    )
+                    setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setDraft(
-                        updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
-                      );
+                      setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
                     }
                   }}
                 >
@@ -831,10 +788,7 @@ function RangeControlButton({
         onClick={() => setOpen((current) => !current)}
         className="w-fit max-w-[11rem] min-w-0 gap-2 font-normal"
       >
-        <Icon
-          name="codicon:calendar"
-          className="text-muted-foreground"
-        />
+        <Icon name="codicon:calendar" className="text-muted-foreground" />
         <span className="truncate">{buttonLabel}</span>
       </Button>
 
@@ -1121,9 +1075,13 @@ function summarizeNumberFilter(
   }
 
   const minLabel =
-    parsedMin == null ? formatNumberValue(bounds.min, filter) : formatNumberValue(parsedMin, filter);
+    parsedMin == null
+      ? formatNumberValue(bounds.min, filter)
+      : formatNumberValue(parsedMin, filter);
   const maxLabel =
-    parsedMax == null ? formatNumberValue(bounds.max, filter) : formatNumberValue(parsedMax, filter);
+    parsedMax == null
+      ? formatNumberValue(bounds.max, filter)
+      : formatNumberValue(parsedMax, filter);
 
   if (hasMin && hasMax) {
     if (minLabel === maxLabel) {

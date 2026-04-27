@@ -107,14 +107,7 @@ function renderGlyph(
   if (fallbackIcon) {
     const Fallback = fallbackIcon;
     const glyphSize = typeof glyphWidth === "number" ? glyphWidth : glyphHeight;
-    return (
-      <Fallback
-        name={name}
-        className={glyphClassName}
-        size={glyphSize}
-        alt={title}
-      />
-    );
+    return <Fallback name={name} className={glyphClassName} size={glyphSize} alt={title} />;
   }
 
   // 3. <iconify-icon> web component — runtime fallback. Requires the script

@@ -31,7 +31,8 @@ export function ExecutionResult({
   const rawText = response.stdout || response.output || response.message || "";
   const parsedPayload = response.parsed ?? parseJsonBody(response);
   const clickyPayload: string | ClickyNode | ClickyDocument | undefined =
-    typeof parsedPayload === "string" || (parsedPayload != null && typeof parsedPayload === "object")
+    typeof parsedPayload === "string" ||
+    (parsedPayload != null && typeof parsedPayload === "object")
       ? (parsedPayload as ClickyNode | ClickyDocument)
       : rawText;
   const parsedClicky = clickyPayload === "" ? null : parseClickyData(clickyPayload);
@@ -48,8 +49,7 @@ export function ExecutionResult({
     );
   }
 
-  const renderedText =
-    parsedPayload != null ? JSON.stringify(parsedPayload, null, 2) : rawText;
+  const renderedText = parsedPayload != null ? JSON.stringify(parsedPayload, null, 2) : rawText;
 
   if (!renderedText) {
     return (

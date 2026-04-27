@@ -1,8 +1,4 @@
-import {
-  FilterBar,
-  type FilterBarFilter,
-  type FilterBarNumberValue,
-} from "@flanksource/clicky-ui";
+import { FilterBar, type FilterBarFilter, type FilterBarNumberValue } from "@flanksource/clicky-ui";
 import { useState } from "react";
 import { DemoSection } from "./Section";
 

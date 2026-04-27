@@ -1,10 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { FilterBarFilter, FilterBarRangeProps } from "../components/FilterBar";
-import type {
-  OpenAPIParameter,
-  OperationLookupFilter,
-  OperationLookupResponse,
-} from "./types";
+import type { OpenAPIParameter, OperationLookupFilter, OperationLookupResponse } from "./types";
 import { isPositionalParam } from "./types";
 
 export type ParameterValues = Record<string, string>;
@@ -67,7 +63,9 @@ export function packParameterValues(
   parameters: OpenAPIParameter[],
 ): ParameterValues {
   const positionalNames = new Set(
-    parameters.filter((param) => param.in !== "path" && isPositionalParam(param)).map((p) => p.name),
+    parameters
+      .filter((param) => param.in !== "path" && isPositionalParam(param))
+      .map((p) => p.name),
   );
   const params: ParameterValues = {};
   const args: string[] = [];
@@ -121,7 +119,7 @@ export function parametersToFormConfig(
 
     const disabled = Object.prototype.hasOwnProperty.call(lockedValues, param.name);
     if (disabled && hideLocked) continue;
-    const value = disabled ? lockedValues[param.name] ?? "" : values[param.name] ?? "";
+    const value = disabled ? (lockedValues[param.name] ?? "") : (values[param.name] ?? "");
     const label = lookupFilters[param.name]?.label ?? titleCase(param.name);
     const onChange = (next: string | boolean) => {
       if (disabled) return;
@@ -270,12 +268,17 @@ function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
   }));
 }
 
-function clickyNodeToPlainText(node: {
-  plain?: string;
-  text?: string;
-  children?: Array<{ plain?: string; text?: string; children?: unknown[] }>;
-  tooltip?: { plain?: string; text?: string };
-} | null | undefined): string {
+function clickyNodeToPlainText(
+  node:
+    | {
+        plain?: string;
+        text?: string;
+        children?: Array<{ plain?: string; text?: string; children?: unknown[] }>;
+        tooltip?: { plain?: string; text?: string };
+      }
+    | null
+    | undefined,
+): string {
   if (node == null) return "";
   if (node.plain) return node.plain;
   if (node.text) return node.text;

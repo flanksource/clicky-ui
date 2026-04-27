@@ -15,6 +15,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@storybook/addon-docs": "10.3.5",
     "@storybook/react": "10.3.5",
     "@storybook/react-vite": "10.3.5",
     "@storybook/test": "catalog:",
@@ -27,7 +28,6 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "vitest": "catalog:",
-    "@storybook/addon-docs": "10.3.5"
+    "vitest": "catalog:"
   }
 }

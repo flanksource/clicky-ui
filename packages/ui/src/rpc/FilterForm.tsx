@@ -67,9 +67,7 @@ export function FilterForm({
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
     enabled:
-      enableLookup &&
-      !!client.lookupFilters &&
-      parameters.some((param) => param.in === "query"),
+      enableLookup && !!client.lookupFilters && parameters.some((param) => param.in === "query"),
     staleTime: 30_000,
     retry: 0,
   });

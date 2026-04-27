@@ -25,7 +25,9 @@ function makeSpec(): OpenAPISpec {
   };
 }
 
-function makeClickyDocument(fields: Array<{ name: string; label: string; value: string }>): ClickyDocument {
+function makeClickyDocument(
+  fields: Array<{ name: string; label: string; value: string }>,
+): ClickyDocument {
   return {
     version: 1,
     node: {
@@ -64,11 +66,14 @@ function jsonResponse(data: unknown): ExecutionResponse {
   };
 }
 
-function makeClient(responseFactory: (params: Record<string, string>) => ExecutionResponse): OperationsApiClient & {
+function makeClient(
+  responseFactory: (params: Record<string, string>) => ExecutionResponse,
+): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
 } {
   const executeMock = vi.fn(
-    async (_path: string, _method: string, params: Record<string, string>) => responseFactory(params),
+    async (_path: string, _method: string, params: Record<string, string>) =>
+      responseFactory(params),
   );
 
   return {
@@ -98,22 +103,20 @@ function renderPage(
 
 describe("OperationCommandPage", () => {
   it("renders Clicky responses when the endpoint returns Clicky JSON", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify(
-            makeClickyDocument([
-              { name: "id", label: "ID", value: "one" },
-              { name: "name", label: "Name", value: "First widget" },
-            ]),
-          ),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json+clicky" },
-          },
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify(
+          makeClickyDocument([
+            { name: "id", label: "ID", value: "one" },
+            { name: "name", label: "Name", value: "First widget" },
+          ]),
         ),
-      );
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json+clicky" },
+        },
+      ),
+    );
     const client = makeClient((params) =>
       clickyResponse(
         makeClickyDocument([
@@ -169,9 +172,7 @@ describe("OperationCommandPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Response body")).toHaveTextContent(
-        '"name": "Fallback widget"',
-      ),
+      expect(screen.getByLabelText("Response body")).toHaveTextContent('"name": "Fallback widget"'),
     );
   });
 

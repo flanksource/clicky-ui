@@ -102,7 +102,11 @@ export function TreeNode<T>({
   const rowClassName = rowClass ? rowClass(node, isSelected) : defaultRowBg;
 
   return (
-    <div role="treeitem" aria-expanded={hasChildren ? isOpen : undefined} aria-selected={isSelected}>
+    <div
+      role="treeitem"
+      aria-expanded={hasChildren ? isOpen : undefined}
+      aria-selected={isSelected}
+    >
       <div
         className={cn("flex items-center gap-1.5 py-1 px-2 cursor-pointer text-sm", rowClassName)}
         style={{ paddingLeft: `${depth * indentPx + basePaddingPx}px` }}

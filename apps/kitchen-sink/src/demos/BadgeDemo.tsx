@@ -7,7 +7,12 @@ const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
   { label: "Healthy", value: "ready", status: "success" as const, icon: "lucide:check" },
-  { label: "Degraded", value: "latency", status: "warning" as const, icon: "lucide:triangle-alert" },
+  {
+    label: "Degraded",
+    value: "latency",
+    status: "warning" as const,
+    icon: "lucide:triangle-alert",
+  },
   { label: "Failed", value: "blocked", status: "error" as const, icon: "lucide:circle-x" },
   { label: "Pending", value: "queued", status: "info" as const, icon: "lucide:info" },
 ];
@@ -72,13 +77,7 @@ const TRUNCATION_BADGES = [
   },
 ] as const;
 
-function DemoGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function DemoGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-density-2">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -120,11 +119,33 @@ export function BadgeDemo() {
       <DemoGroup title="Semantic status and metadata badges">
         <div className="flex flex-wrap gap-density-2">
           {STATUS_BADGES.map(({ label, value, status, icon }) => (
-            <Badge key={label} variant="status" status={status} label={label} value={value} icon={icon} size="xs" />
+            <Badge
+              key={label}
+              variant="status"
+              status={status}
+              label={label}
+              value={value}
+              icon={icon}
+              size="xs"
+            />
           ))}
           <Badge variant="metric" label="Latency" value="45ms" icon="lucide:activity" size="xs" />
-          <Badge variant="custom" label="v2.4.1" icon="lucide:git-branch" color="#eef2ff" textColor="#4338ca" size="xs" />
-          <Badge variant="outlined" label="Kubernetes" icon="lucide:boxes" borderColor="#326ce5" textColor="#326ce5" size="xs" />
+          <Badge
+            variant="custom"
+            label="v2.4.1"
+            icon="lucide:git-branch"
+            color="#eef2ff"
+            textColor="#4338ca"
+            size="xs"
+          />
+          <Badge
+            variant="outlined"
+            label="Kubernetes"
+            icon="lucide:boxes"
+            borderColor="#326ce5"
+            textColor="#326ce5"
+            size="xs"
+          />
         </div>
       </DemoGroup>
 
@@ -170,9 +191,34 @@ export function BadgeDemo() {
             ))}
           </div>
           <div className="flex flex-wrap gap-density-2">
-            <Badge variant="outlined" label="Docs" size="xs" href="https://flanksource.com" target="_blank" borderColor="#326ce5" textColor="#326ce5" />
-            <Badge variant="custom" label="release notes" size="xs" href="#release-notes" color="#f5f3ff" textColor="#6d28d9" borderColor="#ddd6fe" />
-            <Badge variant="label" label="run" value="3482" size="xs" href="#run-3482" className="bg-background" color="#dbeafe" textColor="#1d4ed8" />
+            <Badge
+              variant="outlined"
+              label="Docs"
+              size="xs"
+              href="https://flanksource.com"
+              target="_blank"
+              borderColor="#326ce5"
+              textColor="#326ce5"
+            />
+            <Badge
+              variant="custom"
+              label="release notes"
+              size="xs"
+              href="#release-notes"
+              color="#f5f3ff"
+              textColor="#6d28d9"
+              borderColor="#ddd6fe"
+            />
+            <Badge
+              variant="label"
+              label="run"
+              value="3482"
+              size="xs"
+              href="#run-3482"
+              className="bg-background"
+              color="#dbeafe"
+              textColor="#1d4ed8"
+            />
           </div>
         </div>
       </DemoGroup>
