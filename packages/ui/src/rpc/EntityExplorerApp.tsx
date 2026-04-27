@@ -48,7 +48,10 @@ export function EntityExplorerApp({
     [basePath, client],
   );
   const { initialValues: commandInitialValues, autoRun: commandAutoRun } = useMemo(
-    () => (resolvedRoute.kind === "command" ? readCommandQueryParams() : { initialValues: {}, autoRun: false }),
+    () =>
+      resolvedRoute.kind === "command"
+        ? readCommandQueryParams()
+        : { initialValues: {}, autoRun: false },
     [resolvedRoute.kind, pathname],
   );
   const explorerDefinition = useMemo(
@@ -95,10 +98,9 @@ export function EntityExplorerApp({
             renderLink({
               key: explorerDefinition.key,
               to: withBasePath(basePath, "/explorer"),
-              className:
-                navLinkClassName(
-                  resolvedRoute.kind === "explorer" || resolvedRoute.kind === "command",
-                ),
+              className: navLinkClassName(
+                resolvedRoute.kind === "explorer" || resolvedRoute.kind === "command",
+              ),
               children: explorerDefinition.title,
             })}
         </nav>
@@ -190,9 +192,7 @@ function parseExplorerRoute(pathname: string): ExplorerRoute {
     return { kind: "explorer" };
   }
   if (segments[0] === "commands") {
-    return segments[1]
-      ? { kind: "command", operationId: segments[1] }
-      : { kind: "command" };
+    return segments[1] ? { kind: "command", operationId: segments[1] } : { kind: "command" };
   }
   const surfaceKey = segments[0] ?? "";
   if (segments[1]) {
@@ -283,7 +283,10 @@ function buildCommandHref(basePath: string, resolved: ClickyResolvedCommand): st
     }
     const query = search.toString();
     const suffix = query ? `?${query}` : "";
-    return withBasePath(basePath, `/${encodeURIComponent(meta.surface)}/${encodeURIComponent(args[0])}${suffix}`);
+    return withBasePath(
+      basePath,
+      `/${encodeURIComponent(meta.surface)}/${encodeURIComponent(args[0])}${suffix}`,
+    );
   }
 
   const search = new URLSearchParams();

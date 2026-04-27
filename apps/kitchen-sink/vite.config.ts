@@ -12,6 +12,7 @@ export default defineConfig({
     alias: [
       { find: /^preact\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
       { find: /^react\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
+      { find: /^react\/jsx-dev-runtime$/, replacement: preactPath("jsx-runtime") },
       { find: /^react-dom\/test-utils$/, replacement: preactPath("test-utils") },
       { find: /^react-dom$/, replacement: preactPath("compat") },
       { find: /^react$/, replacement: preactPath("compat") },

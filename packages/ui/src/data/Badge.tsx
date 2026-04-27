@@ -106,7 +106,13 @@ export type RichBadgeVariant = "status" | "metric" | "custom" | "outlined" | "la
 export type BadgeVariant = LegacyBadgeVariant | RichBadgeVariant;
 
 const LEGACY_VARIANTS = new Set<LegacyBadgeVariant>(["soft", "solid", "outline"]);
-const RICH_VARIANTS = new Set<RichBadgeVariant>(["status", "metric", "custom", "outlined", "label"]);
+const RICH_VARIANTS = new Set<RichBadgeVariant>([
+  "status",
+  "metric",
+  "custom",
+  "outlined",
+  "label",
+]);
 
 type RichSizeClasses = {
   frame: string;
@@ -250,7 +256,8 @@ function applyColorValue(
 ) {
   if (value == null) return;
   if (isCssColor(value)) {
-    (style as Record<"backgroundColor" | "borderColor" | "color", string | undefined>)[property] = value;
+    (style as Record<"backgroundColor" | "borderColor" | "color", string | undefined>)[property] =
+      value;
     return;
   }
   classes.push(value);
@@ -409,7 +416,9 @@ function truncateUrl(text: string, budget: number): string {
     const tail = pathSegments[pathSegments.length - 1] ?? host;
     const firstSegment = pathSegments[0] ?? "";
     const summarizedMiddle =
-      pathSegments.length > 2 ? summarizeMiddlePathSegment(pathSegments.slice(1, -1).join("/")) : undefined;
+      pathSegments.length > 2
+        ? summarizeMiddlePathSegment(pathSegments.slice(1, -1).join("/"))
+        : undefined;
     const candidates = [
       [host, firstSegment, summarizedMiddle, tail].filter(Boolean).join("/"),
       `${host}/…/${tail}`,
@@ -474,9 +483,15 @@ function truncateImage(text: string, budget: number): string {
   }
   const head = `${segments[0]}/${segments[1] ?? ""}`.replace(/\/$/, "");
   const tail =
-    tailParts.suffix.length > 0 && smartBudget >= tailSegment.length ? tailSegment : tailParts.name || tailSegment;
+    tailParts.suffix.length > 0 && smartBudget >= tailSegment.length
+      ? tailSegment
+      : tailParts.name || tailSegment;
   const middle =
-    segments.length > 3 ? summarizeMiddlePathSegment(segments.slice(2, -1).join("/")) : segments.length === 3 ? "…" : undefined;
+    segments.length > 3
+      ? summarizeMiddlePathSegment(segments.slice(2, -1).join("/"))
+      : segments.length === 3
+        ? "…"
+        : undefined;
   return compressStructuredText(head, middle, tail, smartBudget, "/");
 }
 
@@ -502,7 +517,10 @@ function truncateArn(text: string, budget: number): string {
   if (preferred.length <= smartBudget) return preferred;
 
   const separatorBudget = 2;
-  const resourceBudget = Math.max(4, Math.min(resourceNameTail.length, smartBudget - separatorBudget - 2));
+  const resourceBudget = Math.max(
+    4,
+    Math.min(resourceNameTail.length, smartBudget - separatorBudget - 2),
+  );
   const serviceBudget = Math.max(2, smartBudget - resourceBudget - separatorBudget);
 
   return `${truncateSegmentStart(service, serviceBudget)}:…${truncateMiddle(resourceNameTail, resourceBudget)}`;
@@ -516,7 +534,11 @@ function detectTruncateStyle(text: string): Exclude<BadgeTruncate, "auto"> {
   return "suffix";
 }
 
-function truncateText(text: string, truncate: BadgeTruncate, maxWidth: BadgeProps["maxWidth"]): string {
+function truncateText(
+  text: string,
+  truncate: BadgeTruncate,
+  maxWidth: BadgeProps["maxWidth"],
+): string {
   const budget = deriveCharacterBudget(maxWidth);
   const mode = truncate === "auto" ? detectTruncateStyle(text) : truncate;
 
@@ -549,7 +571,7 @@ function resolveDisplayNode(
     return {
       content: node,
       fullText,
-      title: alwaysTitle ? fullText ?? undefined : undefined,
+      title: alwaysTitle ? (fullText ?? undefined) : undefined,
     };
   }
 
@@ -684,22 +706,23 @@ export function Badge({
       canCopy,
       copyText: legacyCopyText,
       className: cn(
-          badgeVariants({ tone, variant: resolvedVariant, size }),
-          (normalizedMaxWidth != null || shouldWrapText || truncate != null) && "min-w-0 max-w-full",
-          shouldWrapText && "whitespace-normal",
-          canCopy && "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-          className,
+        badgeVariants({ tone, variant: resolvedVariant, size }),
+        (normalizedMaxWidth != null || shouldWrapText || truncate != null) && "min-w-0 max-w-full",
+        shouldWrapText && "whitespace-normal",
+        canCopy &&
+          "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        className,
       ),
       style: legacyStyle,
       content: (
         <>
-        {icon && <Icon name={icon} className="text-[1em]" />}
-        {count !== undefined && <span>{count}</span>}
-        {children != null && (
-          <span className={textBehaviorClasses} title={legacyChildren.title}>
-            {legacyChildren.content}
-          </span>
-        )}
+          {icon && <Icon name={icon} className="text-[1em]" />}
+          {count !== undefined && <span>{count}</span>}
+          {children != null && (
+            <span className={textBehaviorClasses} title={legacyChildren.title}>
+              {legacyChildren.content}
+            </span>
+          )}
         </>
       ),
     });
@@ -719,13 +742,16 @@ export function Badge({
       : {
           content: richLabel,
           fullText: toPlainText(richLabel),
-          title: showFullTextTitle ? toPlainText(richLabel) ?? undefined : undefined,
+          title: showFullTextTitle ? (toPlainText(richLabel) ?? undefined) : undefined,
         };
   const resolvedValue =
     richValue != null
       ? resolveDisplayNode(richValue, truncate, maxWidth, showFullTextTitle)
       : { content: richValue, fullText: undefined, title: undefined as string | undefined };
-  const copyText = resolvedValue.fullText ?? resolvedLabel.fullText ?? (count !== undefined ? String(count) : undefined);
+  const copyText =
+    resolvedValue.fullText ??
+    resolvedLabel.fullText ??
+    (count !== undefined ? String(count) : undefined);
   const canCopy = href == null && (clickToCopy ?? true) && copyText != null;
   const shapeClass = getShapeClasses(shape ?? "pill");
   const wrapperStyle: CSSProperties = {};
@@ -737,7 +763,9 @@ export function Badge({
     shapeClass,
     shouldWrapText ? "whitespace-normal" : "whitespace-nowrap",
     href ? "transition-opacity hover:opacity-80" : "",
-    canCopy ? "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1" : "",
+    canCopy
+      ? "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      : "",
   ];
 
   if (normalizedMaxWidth != null) {
@@ -760,13 +788,21 @@ export function Badge({
     wrapperClasses.push("border-border bg-background text-foreground");
   }
 
-  if (resolvedVariant === "custom" || (resolvedVariant === "outlined" && status == null && toneToStatus(tone) == null)) {
+  if (
+    resolvedVariant === "custom" ||
+    (resolvedVariant === "outlined" && status == null && toneToStatus(tone) == null)
+  ) {
     applyColorValue(color, "backgroundColor", wrapperStyle, wrapperClasses);
     applyColorValue(textColor, "color", wrapperStyle, wrapperClasses);
     applyColorValue(borderColor, "borderColor", wrapperStyle, wrapperClasses);
   }
 
-  if (resolvedVariant !== "label" && borderColor != null && status == null && toneToStatus(tone) == null) {
+  if (
+    resolvedVariant !== "label" &&
+    borderColor != null &&
+    status == null &&
+    toneToStatus(tone) == null
+  ) {
     applyColorValue(borderColor, "borderColor", wrapperStyle, wrapperClasses);
   }
 
@@ -805,23 +841,23 @@ export function Badge({
       style: wrapperStyle,
       content: (
         <>
-        {(richLabel != null || iconEl != null) && (
-          <span className={cn(labelClasses, labelClassName)} style={labelStyle}>
-            {iconEl}
-            {richLabel != null && (
-              <span className={textBehaviorClasses} title={resolvedLabel.title}>
-                {resolvedLabel.content}
-              </span>
-            )}
-          </span>
-        )}
-        {richValue != null && (
-          <span className={cn(valueClasses, valueClassName)}>
-            <span className={textBehaviorClasses} title={resolvedValue.title}>
-              {resolvedValue.content}
+          {(richLabel != null || iconEl != null) && (
+            <span className={cn(labelClasses, labelClassName)} style={labelStyle}>
+              {iconEl}
+              {richLabel != null && (
+                <span className={textBehaviorClasses} title={resolvedLabel.title}>
+                  {resolvedLabel.content}
+                </span>
+              )}
             </span>
-          </span>
-        )}
+          )}
+          {richValue != null && (
+            <span className={cn(valueClasses, valueClassName)}>
+              <span className={textBehaviorClasses} title={resolvedValue.title}>
+                {resolvedValue.content}
+              </span>
+            </span>
+          )}
         </>
       ),
     });
@@ -855,23 +891,23 @@ export function Badge({
     style: wrapperStyle,
     content: (
       <>
-      {(richLabel != null || iconEl != null) && (
-        <span className={cn(labelClasses, labelClassName)}>
-          {iconEl}
-          {richLabel != null && (
-            <span className={textBehaviorClasses} title={resolvedLabel.title}>
-              {resolvedLabel.content}
-            </span>
-          )}
-        </span>
-      )}
-      {richValue != null && (
-        <span className={cn(valueClasses, valueClassName)}>
-          <span className={textBehaviorClasses} title={resolvedValue.title}>
-            {resolvedValue.content}
+        {(richLabel != null || iconEl != null) && (
+          <span className={cn(labelClasses, labelClassName)}>
+            {iconEl}
+            {richLabel != null && (
+              <span className={textBehaviorClasses} title={resolvedLabel.title}>
+                {resolvedLabel.content}
+              </span>
+            )}
           </span>
-        </span>
-      )}
+        )}
+        {richValue != null && (
+          <span className={cn(valueClasses, valueClassName)}>
+            <span className={textBehaviorClasses} title={resolvedValue.title}>
+              {resolvedValue.content}
+            </span>
+          </span>
+        )}
       </>
     ),
   });

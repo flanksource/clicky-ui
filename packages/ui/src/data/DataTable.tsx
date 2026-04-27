@@ -176,25 +176,27 @@ export function DataTable<T extends Record<string, unknown>>({
                 domainMax: filter.numberBounds?.max,
                 step: filter.numberBounds?.step,
                 onChange: (next: FilterBarNumberValue) =>
-                  setNumberFilters((current) => updateNumberFilterValue(current, filter.column.key, next)),
+                  setNumberFilters((current) =>
+                    updateNumberFilterValue(current, filter.column.key, next),
+                  ),
               }
-          : {
-              key: filter.column.key,
-              kind: "text",
-              label: labelText(filter.column),
-              value: textFilters[filter.column.key] ?? "",
-              onChange: (next: string) =>
-                setTextFilters((current) => updateFilterValue(current, filter.column.key, next)),
-            },
+            : {
+                key: filter.column.key,
+                kind: "text",
+                label: labelText(filter.column),
+                value: textFilters[filter.column.key] ?? "",
+                onChange: (next: string) =>
+                  setTextFilters((current) => updateFilterValue(current, filter.column.key, next)),
+              },
       ),
     [generatedFilters, multiFilters, numberFilters, textFilters],
   );
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
-      filterBarProps?.children ||
-      filterBarProps?.trailing ||
-      filterBarProps?.timeRange ||
-      filterBarProps?.dateRange,
+    filterBarProps?.children ||
+    filterBarProps?.trailing ||
+    filterBarProps?.timeRange ||
+    filterBarProps?.dateRange,
   );
   const showFilterBar =
     (autoFilter && (showGlobalFilter || nativeFilters.length > 0)) || hasCustomFilterBarContent;
@@ -434,13 +436,7 @@ export function DataTable<T extends Record<string, unknown>>({
   );
 }
 
-function CellContent({
-  column,
-  children,
-}: {
-  column: DataTableColumn;
-  children: ReactNode;
-}) {
+function CellContent({ column, children }: { column: DataTableColumn; children: ReactNode }) {
   return (
     <div className={cn(cellContentClassName(column), alignmentClass(column.align))}>{children}</div>
   );
@@ -535,10 +531,7 @@ function updateNumberFilterValue<T extends Record<string, FilterBarNumberValue>>
   return next;
 }
 
-function pruneTextFilterState(
-  state: Record<string, string>,
-  filters: GeneratedFilter<any>[],
-) {
+function pruneTextFilterState(state: Record<string, string>, filters: GeneratedFilter<any>[]) {
   return pruneFilterState(state, filters, "text", (value) => !String(value ?? "").trim());
 }
 
@@ -571,9 +564,7 @@ function pruneFilterState<T>(
     filters.filter((filter) => filter.kind === kind).map((filter) => filter.column.key),
   );
   return Object.fromEntries(
-    Object.entries(state).filter(([key, value]) =>
-      allowed.has(key) && !isEmpty(value),
-    ),
+    Object.entries(state).filter(([key, value]) => allowed.has(key) && !isEmpty(value)),
   ) as Record<string, T>;
 }
 
@@ -612,9 +603,13 @@ function getNumericFilterBounds<T extends Record<string, unknown>>(
   rows: InternalRow<T>[],
   column: DataTableColumn<T>,
 ) {
-  const values = rows.flatMap((record) => collectFilterValues(getFilterCandidate(record.row, column)));
+  const values = rows.flatMap((record) =>
+    collectFilterValues(getFilterCandidate(record.row, column)),
+  );
   const populated = values.filter(hasFilterValue);
-  const numericValues = populated.map((value) => parseNumberInput(value)).filter((value) => value != null);
+  const numericValues = populated
+    .map((value) => parseNumberInput(value))
+    .filter((value) => value != null);
 
   if (populated.length === 0 || numericValues.length !== populated.length) {
     return null;
@@ -674,7 +669,9 @@ function alignmentClass(align?: DataTableColumn["align"]) {
   return "text-left";
 }
 
-function cellContentClassName(column: DataTableColumn): TdHTMLAttributes<HTMLTableCellElement>["className"] {
+function cellContentClassName(
+  column: DataTableColumn,
+): TdHTMLAttributes<HTMLTableCellElement>["className"] {
   if (column.grow) return "min-w-56 max-w-[36rem] truncate";
   if (column.shrink) return "max-w-[16rem] truncate whitespace-nowrap";
   return "max-w-[18rem] truncate";

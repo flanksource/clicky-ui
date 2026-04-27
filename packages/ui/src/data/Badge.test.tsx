@@ -87,20 +87,37 @@ describe("Badge", () => {
     );
 
     const badge = container.firstElementChild as HTMLElement | null;
-    const value = screen.getByText("ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12");
+    const value = screen.getByText(
+      "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12",
+    );
     expect(badge?.style.maxWidth).toBe("20ch");
     expect(badge?.className).toMatch(/min-h-4/);
     expect(badge?.className).toMatch(/rounded-sm/);
     expect(badge?.className).not.toMatch(/flex-wrap/);
     expect(value.className).toMatch(/whitespace-normal/);
-    expect(value).toHaveAttribute("title", "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12");
+    expect(value).toHaveAttribute(
+      "title",
+      "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12",
+    );
   });
 
   it("supports prefix and suffix truncation", () => {
     render(
       <>
-        <Badge variant="label" label="suffix" value="abcdefghijklmnop" maxWidth="8ch" truncate="suffix" />
-        <Badge variant="label" label="prefix" value="abcdefghijklmnop" maxWidth="8ch" truncate="prefix" />
+        <Badge
+          variant="label"
+          label="suffix"
+          value="abcdefghijklmnop"
+          maxWidth="8ch"
+          truncate="suffix"
+        />
+        <Badge
+          variant="label"
+          label="prefix"
+          value="abcdefghijklmnop"
+          maxWidth="8ch"
+          truncate="prefix"
+        />
       </>,
     );
 
@@ -151,21 +168,32 @@ describe("Badge", () => {
     );
 
     expect(
-      screen.getByTitle("arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control").textContent,
+      screen.getByTitle("arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control")
+        .textContent,
     ).toContain("mission-control");
     expect(
-      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-api:v2.4.1-build.17").textContent,
+      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-api:v2.4.1-build.17")
+        .textContent,
     ).toContain("mission-control-api");
-    expect(screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent).toContain("/configs/");
-    expect(screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent).toContain("mission-control.yaml");
     expect(
-      screen.getByTitle("https://console.flanksource.com/configs/production/mission-control.yaml?env=prod").textContent,
+      screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent,
+    ).toContain("/configs/");
+    expect(
+      screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent,
+    ).toContain("mission-control.yaml");
+    expect(
+      screen.getByTitle(
+        "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
+      ).textContent,
     ).not.toContain("https://");
     expect(
-      screen.getByTitle("https://console.flanksource.com/configs/production/mission-control.yaml?env=prod").textContent,
+      screen.getByTitle(
+        "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
+      ).textContent,
     ).toContain("console.flanksource.com");
     expect(
-      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17").textContent,
+      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17")
+        .textContent,
     ).toContain("mission-control-worker");
   });
 

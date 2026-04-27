@@ -53,7 +53,11 @@ function resolveInitials(alt: string, initials: string | undefined, maxLetters: 
 
   const cleaned = alt.replace(/^@/, "").trim();
   const lastSegment = cleaned.split(/[\\/]/).filter(Boolean).at(-1) ?? cleaned;
-  const parts = lastSegment.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  const parts = lastSegment
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   const letters = parts
     .map((part) => part.match(/[a-zA-Z0-9]/)?.[0] ?? "")
     .filter(Boolean)
@@ -169,7 +173,10 @@ export function Avatar({
   const tone = fallbackTone(variant, kind, hue);
   const maxLetters = size === "xs" || size === "sm" ? 1 : 2;
   const text = resolveInitials(alt, initials, maxLetters);
-  const base = cn("inline-flex shrink-0 select-none items-center justify-center overflow-hidden border", shape);
+  const base = cn(
+    "inline-flex shrink-0 select-none items-center justify-center overflow-hidden border",
+    shape,
+  );
   const frameStyle: CSSProperties = {
     width: px,
     height: px,

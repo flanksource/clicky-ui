@@ -1,19 +1,11 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { FilterBar } from "../components/FilterBar";
 import { Icon } from "../data/Icon";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
-import {
-  filterOperationsByDomain,
-  findListEndpoint,
-} from "./classify";
+import { filterOperationsByDomain, findListEndpoint } from "./classify";
 import {
   filterOperationsBySurface,
   findSurfaceCollectionActions,
@@ -98,35 +90,26 @@ export function OperationCatalog({
   );
   const useSurfaceMetadata = surfaceOps.length > 0;
 
-  const domainOps = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return surfaceOps;
-      }
+  const domainOps = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return surfaceOps;
+    }
 
-      return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter((op) =>
-        operationIdPrefix
-          ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
-          : true,
-      );
-    },
-    [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata],
-  );
+    return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter(
+      (op) =>
+        operationIdPrefix ? (op.operation.operationId ?? "").startsWith(operationIdPrefix) : true,
+    );
+  }, [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata]);
 
-  const listEndpoint = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceListOperation(domainOps, surfaceKey);
-      }
+  const listEndpoint = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return findSurfaceListOperation(domainOps, surfaceKey);
+    }
 
-      return listOperationId
-        ? domainOps.find(
-            (op) => op.method === "get" && op.operation.operationId === listOperationId,
-          )
-        : findListEndpoint(domainOps, entities);
-    },
-    [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata],
-  );
+    return listOperationId
+      ? domainOps.find((op) => op.method === "get" && op.operation.operationId === listOperationId)
+      : findListEndpoint(domainOps, entities);
+  }, [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata]);
   const [filters, setFilters] = useState<Record<string, string>>(() => readFiltersFromUrl());
   const listParameters = listEndpoint?.operation.parameters ?? [];
 
@@ -137,9 +120,14 @@ export function OperationCatalog({
   const listQuery = useQuery<ExecutionResponse>({
     queryKey: ["operation-list", listEndpoint?.method, listEndpoint?.path, filters],
     queryFn: () =>
-      client.executeCommand(listEndpoint!.path, listEndpoint!.method, packParameterValues(filters, listEndpoint!.operation.parameters ?? []), {
-        Accept: "application/json+clicky",
-      }),
+      client.executeCommand(
+        listEndpoint!.path,
+        listEndpoint!.method,
+        packParameterValues(filters, listEndpoint!.operation.parameters ?? []),
+        {
+          Accept: "application/json+clicky",
+        },
+      ),
     enabled: !!listEndpoint && view === "table",
     staleTime: 30_000,
     retry: 0,
@@ -159,34 +147,28 @@ export function OperationCatalog({
     retry: 0,
   });
 
-  const actionOps = useMemo(
-    () => {
-      if (useSurfaceMetadata) {
-        return findSurfaceCollectionActions(domainOps, surfaceKey);
-      }
+  const actionOps = useMemo(() => {
+    if (useSurfaceMetadata) {
+      return findSurfaceCollectionActions(domainOps, surfaceKey);
+    }
 
-      return domainOps.filter(
-        (op) =>
-          op.method !== "get" &&
-          !op.path.includes("{") &&
-          !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
-      );
-    },
-    [domainOps, surfaceKey, useSurfaceMetadata],
-  );
+    return domainOps.filter(
+      (op) =>
+        op.method !== "get" &&
+        !op.path.includes("{") &&
+        !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
+    );
+  }, [domainOps, surfaceKey, useSurfaceMetadata]);
 
-  const filterBarConfig = useMemo(
-    () => {
-      const options: ParameterFormOptions = {
-        includeLocations: ["query"],
-      };
-      if (lookupQuery.data != null) {
-        options.lookup = lookupQuery.data;
-      }
-      return parametersToFormConfig(listParameters, filters, setFilters, options);
-    },
-    [filters, listParameters, lookupQuery.data],
-  );
+  const filterBarConfig = useMemo(() => {
+    const options: ParameterFormOptions = {
+      includeLocations: ["query"],
+    };
+    if (lookupQuery.data != null) {
+      options.lookup = lookupQuery.data;
+    }
+    return parametersToFormConfig(listParameters, filters, setFilters, options);
+  }, [filters, listParameters, lookupQuery.data]);
 
   const hasTable = !!listEndpoint;
   const showTable = hasTable && view === "table";
@@ -267,9 +249,7 @@ export function OperationCatalog({
             {sectionLabel}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">{definition.title}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {definition.description}
-          </p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{definition.description}</p>
         </div>
         {hasTable && (
           <div className="flex gap-1 rounded-lg border p-1">

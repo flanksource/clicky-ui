@@ -134,9 +134,7 @@ describe("FilterBar", () => {
 
     expect(screen.getByText("Search")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /status filter/i })).toHaveTextContent("Status +1");
-    expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent(
-      "now-24h",
-    );
+    expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent("now-24h");
     expect(screen.getByRole("button", { name: /time range filter/i })).not.toHaveTextContent(
       "Time range",
     );

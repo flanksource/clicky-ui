@@ -89,9 +89,7 @@ describe("findDetailEndpointForList", () => {
 
 describe("parseJsonBody", () => {
   it("parses stdout JSON", () => {
-    expect(
-      parseJsonBody({ success: true, exit_code: 0, stdout: '{"a":1}' }),
-    ).toEqual({ a: 1 });
+    expect(parseJsonBody({ success: true, exit_code: 0, stdout: '{"a":1}' })).toEqual({ a: 1 });
   });
 
   it("returns null on empty or invalid JSON", () => {

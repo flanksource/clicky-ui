@@ -52,7 +52,12 @@ const suiteGroups = [
       { id: "ranking", name: "ranks results", status: "passed" as const, duration: 47 },
       { id: "facets", name: "updates facets", status: "passed" as const, duration: 39 },
       { id: "spellcheck", name: "suggests spellcheck", status: "skipped" as const },
-      { id: "availability", name: "shows availability badges", status: "passed" as const, duration: 52 },
+      {
+        id: "availability",
+        name: "shows availability badges",
+        status: "passed" as const,
+        duration: 52,
+      },
     ],
   },
   {

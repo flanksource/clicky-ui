@@ -20,7 +20,6 @@
   --spacing-density-8: calc(var(--spacing-unit, 0.25rem) * 8);
   --spacing-control-h: var(--control-height, 2.25rem);
   --spacing-control-px: var(--control-padding-x, 0.75rem);
-
 }
 
 /* `@theme inline` tells Tailwind to emit the `var(--...)` reference

@@ -10,30 +10,98 @@ const topologyRoots: ClickyTreeItem[] = [
         id: "payments-namespace",
         label: { kind: "text", text: "namespace / payments", plain: "namespace / payments" },
         children: [
-          { id: "payments-api", label: { kind: "text", text: "deployment / payments-api", plain: "deployment / payments-api" } },
-          { id: "payments-worker", label: { kind: "text", text: "deployment / payments-worker", plain: "deployment / payments-worker" } },
-          { id: "payments-ledger", label: { kind: "text", text: "job / ledger-sync", plain: "job / ledger-sync" } },
-          { id: "payments-db", label: { kind: "text", text: "statefulset / payments-db", plain: "statefulset / payments-db" } },
+          {
+            id: "payments-api",
+            label: {
+              kind: "text",
+              text: "deployment / payments-api",
+              plain: "deployment / payments-api",
+            },
+          },
+          {
+            id: "payments-worker",
+            label: {
+              kind: "text",
+              text: "deployment / payments-worker",
+              plain: "deployment / payments-worker",
+            },
+          },
+          {
+            id: "payments-ledger",
+            label: { kind: "text", text: "job / ledger-sync", plain: "job / ledger-sync" },
+          },
+          {
+            id: "payments-db",
+            label: {
+              kind: "text",
+              text: "statefulset / payments-db",
+              plain: "statefulset / payments-db",
+            },
+          },
         ],
       },
       {
         id: "edge-namespace",
         label: { kind: "text", text: "namespace / edge", plain: "namespace / edge" },
         children: [
-          { id: "edge-gateway", label: { kind: "text", text: "deployment / gateway", plain: "deployment / gateway" } },
-          { id: "edge-cache", label: { kind: "text", text: "deployment / edge-cache", plain: "deployment / edge-cache" } },
-          { id: "edge-worker", label: { kind: "text", text: "deployment / cache-warmer", plain: "deployment / cache-warmer" } },
-          { id: "edge-cert", label: { kind: "text", text: "job / cert-rotator", plain: "job / cert-rotator" } },
+          {
+            id: "edge-gateway",
+            label: { kind: "text", text: "deployment / gateway", plain: "deployment / gateway" },
+          },
+          {
+            id: "edge-cache",
+            label: {
+              kind: "text",
+              text: "deployment / edge-cache",
+              plain: "deployment / edge-cache",
+            },
+          },
+          {
+            id: "edge-worker",
+            label: {
+              kind: "text",
+              text: "deployment / cache-warmer",
+              plain: "deployment / cache-warmer",
+            },
+          },
+          {
+            id: "edge-cert",
+            label: { kind: "text", text: "job / cert-rotator", plain: "job / cert-rotator" },
+          },
         ],
       },
       {
         id: "ops-namespace",
         label: { kind: "text", text: "namespace / ops", plain: "namespace / ops" },
         children: [
-          { id: "ops-alerts", label: { kind: "text", text: "deployment / alerts", plain: "deployment / alerts" } },
-          { id: "ops-metrics", label: { kind: "text", text: "deployment / metrics-scraper", plain: "deployment / metrics-scraper" } },
-          { id: "ops-reports", label: { kind: "text", text: "cronjob / nightly-report", plain: "cronjob / nightly-report" } },
-          { id: "ops-backups", label: { kind: "text", text: "cronjob / backup-check", plain: "cronjob / backup-check" } },
+          {
+            id: "ops-alerts",
+            label: { kind: "text", text: "deployment / alerts", plain: "deployment / alerts" },
+          },
+          {
+            id: "ops-metrics",
+            label: {
+              kind: "text",
+              text: "deployment / metrics-scraper",
+              plain: "deployment / metrics-scraper",
+            },
+          },
+          {
+            id: "ops-reports",
+            label: {
+              kind: "text",
+              text: "cronjob / nightly-report",
+              plain: "cronjob / nightly-report",
+            },
+          },
+          {
+            id: "ops-backups",
+            label: {
+              kind: "text",
+              text: "cronjob / backup-check",
+              plain: "cronjob / backup-check",
+            },
+          },
         ],
       },
     ],
@@ -46,20 +114,64 @@ const topologyRoots: ClickyTreeItem[] = [
         id: "preview-namespace",
         label: { kind: "text", text: "namespace / preview", plain: "namespace / preview" },
         children: [
-          { id: "preview-api", label: { kind: "text", text: "deployment / preview-api", plain: "deployment / preview-api" } },
-          { id: "preview-web", label: { kind: "text", text: "deployment / preview-web", plain: "deployment / preview-web" } },
-          { id: "preview-jobs", label: { kind: "text", text: "job / preview-seed", plain: "job / preview-seed" } },
-          { id: "preview-search", label: { kind: "text", text: "deployment / search-indexer", plain: "deployment / search-indexer" } },
+          {
+            id: "preview-api",
+            label: {
+              kind: "text",
+              text: "deployment / preview-api",
+              plain: "deployment / preview-api",
+            },
+          },
+          {
+            id: "preview-web",
+            label: {
+              kind: "text",
+              text: "deployment / preview-web",
+              plain: "deployment / preview-web",
+            },
+          },
+          {
+            id: "preview-jobs",
+            label: { kind: "text", text: "job / preview-seed", plain: "job / preview-seed" },
+          },
+          {
+            id: "preview-search",
+            label: {
+              kind: "text",
+              text: "deployment / search-indexer",
+              plain: "deployment / search-indexer",
+            },
+          },
         ],
       },
       {
         id: "staging-qa",
         label: { kind: "text", text: "namespace / qa", plain: "namespace / qa" },
         children: [
-          { id: "qa-payments", label: { kind: "text", text: "deployment / qa-payments", plain: "deployment / qa-payments" } },
-          { id: "qa-worker", label: { kind: "text", text: "deployment / qa-worker", plain: "deployment / qa-worker" } },
-          { id: "qa-reports", label: { kind: "text", text: "job / report-replay", plain: "job / report-replay" } },
-          { id: "qa-smoke", label: { kind: "text", text: "job / smoke-suite", plain: "job / smoke-suite" } },
+          {
+            id: "qa-payments",
+            label: {
+              kind: "text",
+              text: "deployment / qa-payments",
+              plain: "deployment / qa-payments",
+            },
+          },
+          {
+            id: "qa-worker",
+            label: {
+              kind: "text",
+              text: "deployment / qa-worker",
+              plain: "deployment / qa-worker",
+            },
+          },
+          {
+            id: "qa-reports",
+            label: { kind: "text", text: "job / report-replay", plain: "job / report-replay" },
+          },
+          {
+            id: "qa-smoke",
+            label: { kind: "text", text: "job / smoke-suite", plain: "job / smoke-suite" },
+          },
         ],
       },
     ],
@@ -168,8 +280,8 @@ export function ClickyDemo() {
       <div className="space-y-density-4">
         <div className="space-y-density-2">
           <p className="text-sm text-muted-foreground">
-            This example renders a local fallback payload immediately, then refreshes from a
-            fetched URL using the remote Clicky mode.
+            This example renders a local fallback payload immediately, then refreshes from a fetched
+            URL using the remote Clicky mode.
           </p>
           <div className="rounded-md border border-border bg-background p-density-3">
             <Clicky

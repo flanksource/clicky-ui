@@ -112,8 +112,5 @@ export interface OperationLookupResponse {
 }
 
 export function isPositionalParam(p: OpenAPIParameter): boolean {
-  return (
-    p.name === "args" ||
-    p.description?.toLowerCase().includes("positional argument") === true
-  );
+  return p.name === "args" || p.description?.toLowerCase().includes("positional argument") === true;
 }

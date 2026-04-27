@@ -26,7 +26,9 @@ export function filterOperationsBySurface(
   surfaceKey: string | undefined,
 ): ResolvedOperation[] {
   if (!surfaceKey) return [];
-  return operations.filter((operation) => getOperationClickyMeta(operation)?.surface === surfaceKey);
+  return operations.filter(
+    (operation) => getOperationClickyMeta(operation)?.surface === surfaceKey,
+  );
 }
 
 export function findSurfaceOperation(

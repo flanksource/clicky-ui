@@ -18,7 +18,12 @@ const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
   { label: "Healthy", value: "ready", status: "success" as const, icon: "lucide:check" },
-  { label: "Degraded", value: "latency", status: "warning" as const, icon: "lucide:triangle-alert" },
+  {
+    label: "Degraded",
+    value: "latency",
+    status: "warning" as const,
+    icon: "lucide:triangle-alert",
+  },
   { label: "Failed", value: "blocked", status: "error" as const, icon: "lucide:circle-x" },
   { label: "Pending", value: "queued", status: "info" as const, icon: "lucide:info" },
 ];
@@ -117,8 +122,20 @@ export const Overview: Story = {
     <div className="flex flex-wrap gap-density-2">
       <Badge variant="status" status="success" label="Build" value="passing" icon="lucide:check" />
       <Badge variant="metric" label="Latency" value="45ms" icon="lucide:activity" />
-      <Badge variant="custom" label="v2.4.1" icon="lucide:git-branch" color="#eef2ff" textColor="#4338ca" />
-      <Badge variant="outlined" label="Kubernetes" icon="lucide:boxes" borderColor="#326ce5" textColor="#326ce5" />
+      <Badge
+        variant="custom"
+        label="v2.4.1"
+        icon="lucide:git-branch"
+        color="#eef2ff"
+        textColor="#4338ca"
+      />
+      <Badge
+        variant="outlined"
+        label="Kubernetes"
+        icon="lucide:boxes"
+        borderColor="#326ce5"
+        textColor="#326ce5"
+      />
       <Badge variant="label" label="env" value="production" color="#dcfce7" textColor="#15803d" />
     </div>
   ),
@@ -156,7 +173,15 @@ export const StatusBadges: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
       {STATUS_BADGES.map(({ label, value, status, icon }) => (
-        <Badge key={label} variant="status" status={status} label={label} value={value} icon={icon} size="xs" />
+        <Badge
+          key={label}
+          variant="status"
+          status={status}
+          label={label}
+          value={value}
+          icon={icon}
+          size="xs"
+        />
       ))}
     </div>
   ),
@@ -165,10 +190,38 @@ export const StatusBadges: Story = {
 export const CustomOutlinedColors: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="outlined" label="Kubernetes" icon="lucide:boxes" borderColor="#326ce5" textColor="#326ce5" size="xs" />
-      <Badge variant="outlined" label="Helm" icon="lucide:ship-wheel" borderColor="#0f1689" textColor="#0f1689" size="xs" />
-      <Badge variant="outlined" label="Flux" icon="lucide:zap" borderColor="#5468ff" textColor="#5468ff" size="xs" />
-      <Badge variant="outlined" label="ArgoCD" icon="lucide:route" borderColor="#ef7b4d" textColor="#ef7b4d" size="xs" />
+      <Badge
+        variant="outlined"
+        label="Kubernetes"
+        icon="lucide:boxes"
+        borderColor="#326ce5"
+        textColor="#326ce5"
+        size="xs"
+      />
+      <Badge
+        variant="outlined"
+        label="Helm"
+        icon="lucide:ship-wheel"
+        borderColor="#0f1689"
+        textColor="#0f1689"
+        size="xs"
+      />
+      <Badge
+        variant="outlined"
+        label="Flux"
+        icon="lucide:zap"
+        borderColor="#5468ff"
+        textColor="#5468ff"
+        size="xs"
+      />
+      <Badge
+        variant="outlined"
+        label="ArgoCD"
+        icon="lucide:route"
+        borderColor="#ef7b4d"
+        textColor="#ef7b4d"
+        size="xs"
+      />
     </div>
   ),
 };
@@ -230,9 +283,30 @@ export const Sizes: Story = {
 export const Shapes: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="status" status="info" label="pill" shape="pill" size="xs" icon="lucide:shield-check" />
-      <Badge variant="status" status="info" label="rounded" shape="rounded" size="xs" icon="lucide:shield-check" />
-      <Badge variant="status" status="info" label="square" shape="square" size="xs" icon="lucide:shield-check" />
+      <Badge
+        variant="status"
+        status="info"
+        label="pill"
+        shape="pill"
+        size="xs"
+        icon="lucide:shield-check"
+      />
+      <Badge
+        variant="status"
+        status="info"
+        label="rounded"
+        shape="rounded"
+        size="xs"
+        icon="lucide:shield-check"
+      />
+      <Badge
+        variant="status"
+        status="info"
+        label="square"
+        shape="square"
+        size="xs"
+        icon="lucide:shield-check"
+      />
     </div>
   ),
 };
@@ -320,9 +394,34 @@ export const WrappedMetadata: Story = {
 export const Clickable: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="outlined" label="Docs" size="xs" href="https://flanksource.com" target="_blank" borderColor="#326ce5" textColor="#326ce5" />
-      <Badge variant="custom" label="release notes" size="xs" href="#release-notes" color="#f5f3ff" textColor="#6d28d9" borderColor="#ddd6fe" />
-      <Badge variant="label" label="run" value="3482" size="xs" href="#run-3482" className="bg-background" color="#dbeafe" textColor="#1d4ed8" />
+      <Badge
+        variant="outlined"
+        label="Docs"
+        size="xs"
+        href="https://flanksource.com"
+        target="_blank"
+        borderColor="#326ce5"
+        textColor="#326ce5"
+      />
+      <Badge
+        variant="custom"
+        label="release notes"
+        size="xs"
+        href="#release-notes"
+        color="#f5f3ff"
+        textColor="#6d28d9"
+        borderColor="#ddd6fe"
+      />
+      <Badge
+        variant="label"
+        label="run"
+        value="3482"
+        size="xs"
+        href="#run-3482"
+        className="bg-background"
+        color="#dbeafe"
+        textColor="#1d4ed8"
+      />
     </div>
   ),
 };
@@ -348,19 +447,46 @@ export const BestPractices: Story = {
         <div className="grid grid-cols-[10rem_1fr_9rem] items-center border-b border-border/60 text-sm">
           <div className="px-density-3 py-density-2">api-gateway</div>
           <div className="px-density-3 py-density-2">
-            <Badge variant="status" status="success" label="Healthy" value="ready" size="xs" icon="lucide:check" />
+            <Badge
+              variant="status"
+              status="success"
+              label="Healthy"
+              value="ready"
+              size="xs"
+              icon="lucide:check"
+            />
           </div>
           <div className="px-density-3 py-density-2">
-            <Badge variant="custom" label="v2.4.1" size="xs" color="#eef2ff" textColor="#4338ca" borderColor="#c7d2fe" />
+            <Badge
+              variant="custom"
+              label="v2.4.1"
+              size="xs"
+              color="#eef2ff"
+              textColor="#4338ca"
+              borderColor="#c7d2fe"
+            />
           </div>
         </div>
         <div className="grid grid-cols-[10rem_1fr_9rem] items-center text-sm">
           <div className="px-density-3 py-density-2">worker-pool</div>
           <div className="px-density-3 py-density-2">
-            <Badge variant="status" status="warning" label="Degraded" value="backpressure" size="xs" icon="lucide:triangle-alert" />
+            <Badge
+              variant="status"
+              status="warning"
+              label="Degraded"
+              value="backpressure"
+              size="xs"
+              icon="lucide:triangle-alert"
+            />
           </div>
           <div className="px-density-3 py-density-2">
-            <Badge variant="outlined" label="canary" size="xs" borderColor="#f59e0b" textColor="#b45309" />
+            <Badge
+              variant="outlined"
+              label="canary"
+              size="xs"
+              borderColor="#f59e0b"
+              textColor="#b45309"
+            />
           </div>
         </div>
       </div>
@@ -375,10 +501,38 @@ export const MixedUsage: Story = {
       <Badge variant="metric" label="Memory" value="8.2 GB" icon="lucide:server" size="xs" />
       <Badge variant="metric" label="Uptime" value="99.9%" icon="lucide:cloud" size="xs" />
       <Badge variant="metric" label="Latency" value="12ms" icon="lucide:clock-3" size="xs" />
-      <Badge variant="custom" color="#fdf2f8" textColor="#be185d" label="Production" icon="lucide:rocket" size="xs" />
-      <Badge variant="custom" color="#ecfdf5" textColor="#065f46" label="Secured" icon="lucide:lock" size="xs" />
-      <Badge variant="custom" color="#fffbeb" textColor="#92400e" label="Beta" icon="lucide:zap" size="xs" />
-      <Badge variant="custom" color="#eef2ff" textColor="#4338ca" label="v2.4.1" icon="lucide:git-branch" size="xs" />
+      <Badge
+        variant="custom"
+        color="#fdf2f8"
+        textColor="#be185d"
+        label="Production"
+        icon="lucide:rocket"
+        size="xs"
+      />
+      <Badge
+        variant="custom"
+        color="#ecfdf5"
+        textColor="#065f46"
+        label="Secured"
+        icon="lucide:lock"
+        size="xs"
+      />
+      <Badge
+        variant="custom"
+        color="#fffbeb"
+        textColor="#92400e"
+        label="Beta"
+        icon="lucide:zap"
+        size="xs"
+      />
+      <Badge
+        variant="custom"
+        color="#eef2ff"
+        textColor="#4338ca"
+        label="v2.4.1"
+        icon="lucide:git-branch"
+        size="xs"
+      />
     </div>
   ),
 };

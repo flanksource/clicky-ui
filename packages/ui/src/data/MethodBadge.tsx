@@ -19,12 +19,7 @@ export type MethodBadgeProps = {
 export function MethodBadge({ method, className }: MethodBadgeProps) {
   const tone = METHOD_TONES[method.toLowerCase()] ?? "neutral";
   return (
-    <Badge
-      variant="outline"
-      tone={tone}
-      size="sm"
-      className={cn("font-mono uppercase", className)}
-    >
+    <Badge variant="outline" tone={tone} size="sm" className={cn("font-mono uppercase", className)}>
       {method.toUpperCase()}
     </Badge>
   );

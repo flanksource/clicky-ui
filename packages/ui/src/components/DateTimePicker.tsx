@@ -88,8 +88,7 @@ function toDateTimeLocalValue(value: string) {
   if (!trimmed) return "";
   if (trimmed === "now" || trimmed.startsWith("now")) return "";
 
-  const withTime =
-    /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? `${trimmed}T00:00` : trimmed;
+  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? `${trimmed}T00:00` : trimmed;
 
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(withTime) ? withTime.slice(0, 16) : "";
 }

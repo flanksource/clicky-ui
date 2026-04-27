@@ -60,7 +60,9 @@ function makeSpec(): OpenAPISpec {
   };
 }
 
-function makeClickyDocument(fields: Array<{ name: string; label: string; value: string }>): ClickyDocument {
+function makeClickyDocument(
+  fields: Array<{ name: string; label: string; value: string }>,
+): ClickyDocument {
   return {
     version: 1,
     node: {
@@ -100,37 +102,43 @@ function jsonResponse(data: unknown): ExecutionResponse {
 }
 
 function makeClient(
-  handler?: (path: string, method: string, params: Record<string, string>) => Promise<ExecutionResponse>,
+  handler?: (
+    path: string,
+    method: string,
+    params: Record<string, string>,
+  ) => Promise<ExecutionResponse>,
 ): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
 } {
-  const executeMock = vi.fn(async (path: string, method: string, params: Record<string, string>) => {
-    if (handler) {
-      return handler(path, method, params);
-    }
+  const executeMock = vi.fn(
+    async (path: string, method: string, params: Record<string, string>) => {
+      if (handler) {
+        return handler(path, method, params);
+      }
 
-    if (path === "/api/v1/widgets/{id}" && method === "get") {
-      return clickyResponse(
-        makeClickyDocument([
-          { name: "id", label: "ID", value: params.id },
-          { name: "name", label: "Name", value: "First widget" },
-        ]),
-        `/api/v1/widgets/${params.id}`,
-      );
-    }
+      if (path === "/api/v1/widgets/{id}" && method === "get") {
+        return clickyResponse(
+          makeClickyDocument([
+            { name: "id", label: "ID", value: params.id },
+            { name: "name", label: "Name", value: "First widget" },
+          ]),
+          `/api/v1/widgets/${params.id}`,
+        );
+      }
 
-    if (path === "/api/v1/widgets/{id}/restart" && method === "post") {
-      return clickyResponse(
-        makeClickyDocument([
-          { name: "action", label: "Action", value: "restart" },
-          { name: "id", label: "ID", value: params.id },
-          { name: "reason", label: "Reason", value: params.reason },
-        ]),
-      );
-    }
+      if (path === "/api/v1/widgets/{id}/restart" && method === "post") {
+        return clickyResponse(
+          makeClickyDocument([
+            { name: "action", label: "Action", value: "restart" },
+            { name: "id", label: "ID", value: params.id },
+            { name: "reason", label: "Reason", value: params.reason },
+          ]),
+        );
+      }
 
-    return jsonResponse([]);
-  });
+      return jsonResponse([]);
+    },
+  );
 
   return {
     executeMock,
@@ -162,22 +170,20 @@ function renderPage(client: OperationsApiClient) {
 
 describe("OperationEntityPage", () => {
   it("loads detail and locks the row id for actions with Clicky results", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify(
-            makeClickyDocument([
-              { name: "id", label: "ID", value: "one" },
-              { name: "name", label: "Name", value: "First widget" },
-            ]),
-          ),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json+clicky" },
-          },
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify(
+          makeClickyDocument([
+            { name: "id", label: "ID", value: "one" },
+            { name: "name", label: "Name", value: "First widget" },
+          ]),
         ),
-      );
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json+clicky" },
+        },
+      ),
+    );
     const client = makeClient();
     renderPage(client);
 

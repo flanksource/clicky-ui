@@ -58,11 +58,7 @@ function TristateSwitch({
   const slot: SlotMode =
     mode === "exclude" ? "exclude" : mode === "include" ? "include" : "neutral";
   const bg =
-    slot === "exclude"
-      ? "bg-red-500/80"
-      : slot === "include"
-        ? "bg-green-500/80"
-        : "bg-muted";
+    slot === "exclude" ? "bg-red-500/80" : slot === "include" ? "bg-green-500/80" : "bg-muted";
 
   return (
     <button

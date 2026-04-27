@@ -16,6 +16,9 @@
     "changeset": "vp exec changeset",
     "release": "vp run -r build && vp exec changeset publish"
   },
+  "dependencies": {
+    "@voidzero-dev/vite-plus-darwin-arm64": "catalog:"
+  },
   "devDependencies": {
     "@changesets/cli": "catalog:",
     "typescript": "catalog:",
@@ -24,8 +27,5 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "packageManager": "pnpm@10.33.0",
-  "dependencies": {
-    "@voidzero-dev/vite-plus-darwin-arm64": "catalog:"
-  }
+  "packageManager": "pnpm@10.33.0"
 }

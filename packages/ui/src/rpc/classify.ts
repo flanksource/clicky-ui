@@ -13,21 +13,15 @@ export function findListEndpoint(
   if (wanted.size === 0) return undefined;
   return operations.find(
     (op) =>
-      op.method === "get" &&
-      !!op.operation.operationId &&
-      wanted.has(op.operation.operationId),
+      op.method === "get" && !!op.operation.operationId && wanted.has(op.operation.operationId),
   );
 }
 
-export function findDetailEndpoint(
-  operations: ResolvedOperation[],
-): ResolvedOperation | undefined {
+export function findDetailEndpoint(operations: ResolvedOperation[]): ResolvedOperation | undefined {
   return operations.find(
     (op) =>
       op.method === "get" &&
-      op.operation.parameters?.some(
-        (p) => p.in === "path" || isPositionalParam(p),
-      ),
+      op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
   );
 }
 
@@ -102,7 +96,5 @@ export function filterOperationsByDomain(
 ): ResolvedOperation[] {
   if (entities.length === 0) return [];
   const wanted = new Set(entities);
-  return operations.filter((op) =>
-    (op.operation.tags ?? []).some((tag) => wanted.has(tag)),
-  );
+  return operations.filter((op) => (op.operation.tags ?? []).some((tag) => wanted.has(tag)));
 }
