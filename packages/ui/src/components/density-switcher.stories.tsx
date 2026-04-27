@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Toggle control density between `compact`, `comfortable`, and `spacious`. Writes `data-density` on `<html>` and drives the `--control-height`, `--control-padding-x`, `--spacing-unit` and `--font-size-base` tokens.",
+          "Icon-button picker that toggles control density between `compact`, `comfortable`, and `spacious`. Writes `data-density` on `<html>` and drives the `--control-height`, `--control-padding-x`, `--spacing-unit` and `--font-size-base` tokens.",
       },
     },
   },
@@ -58,14 +58,32 @@ export const ChangesDataAttribute: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step("click compact sets data-density=compact", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: /compact/i }));
+    await step("open menu and pick compact", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: /density/i }));
+      await userEvent.click(canvas.getByRole("menuitemradio", { name: /compact/i }));
       await expect(document.documentElement.getAttribute("data-density")).toBe("compact");
     });
 
-    await step("click spacious sets data-density=spacious", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: /spacious/i }));
+    await step("open menu and pick spacious", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: /density/i }));
+      await userEvent.click(canvas.getByRole("menuitemradio", { name: /spacious/i }));
       await expect(document.documentElement.getAttribute("data-density")).toBe("spacious");
+    });
+  },
+};
+
+export const KeyboardSelection: Story = {
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /density/i });
+
+    await step("open with Enter, navigate with arrows, select with Enter", async () => {
+      trigger.focus();
+      await userEvent.keyboard("{Enter}");
+      await userEvent.keyboard("{ArrowDown}");
+      await userEvent.keyboard("{Enter}");
+      const value = document.documentElement.getAttribute("data-density");
+      await expect(["compact", "comfortable", "spacious"]).toContain(value);
     });
   },
 };

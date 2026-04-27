@@ -21,7 +21,11 @@ export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-histor
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
-export { RangeSlider, type RangeSliderProps, type RangeSliderValue } from "./components/RangeSlider";
+export {
+  RangeSlider,
+  type RangeSliderProps,
+  type RangeSliderValue,
+} from "./components/RangeSlider";
 export {
   FilterBar,
   type FilterBarBooleanFilter,
@@ -61,12 +65,8 @@ export {
 
 // Data
 export { AnsiHtml, type AnsiHtmlProps } from "./data/AnsiHtml";
-export {
-  Avatar,
-  type AvatarKind,
-  type AvatarProps,
-  type AvatarVariant,
-} from "./data/Avatar";
+export { Avatar, type AvatarKind, type AvatarProps, type AvatarVariant } from "./data/Avatar";
+export { AvatarBadge, type AvatarBadgeProps } from "./data/AvatarBadge";
 export { Badge, badgeVariants, type BadgeProps } from "./data/Badge";
 export {
   Clicky,
@@ -110,17 +110,9 @@ export {
   type IconTone,
 } from "./data/Icon";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
-export {
-  KeyValueList,
-  type KeyValueListItem,
-  type KeyValueListProps,
-} from "./data/KeyValueList";
+export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
-export {
-  MatrixTable,
-  type MatrixTableProps,
-  type MatrixTableRow,
-} from "./data/MatrixTable";
+export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
@@ -178,23 +170,11 @@ export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overl
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 
 // Clicky-rpc operations browser
-export {
-  OperationCatalog,
-  type OperationCatalogProps,
-} from "./rpc/OperationCatalog";
+export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
-export {
-  OperationEntityPage,
-  type OperationEntityPageProps,
-} from "./rpc/OperationEntityPage";
-export {
-  OperationCommandPage,
-  type OperationCommandPageProps,
-} from "./rpc/OperationCommandPage";
-export {
-  EntityExplorerApp,
-  type EntityExplorerAppProps,
-} from "./rpc/EntityExplorerApp";
+export { OperationEntityPage, type OperationEntityPageProps } from "./rpc/OperationEntityPage";
+export { OperationCommandPage, type OperationCommandPageProps } from "./rpc/OperationCommandPage";
+export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
 export {
   EndpointList,
   type EndpointListProps,

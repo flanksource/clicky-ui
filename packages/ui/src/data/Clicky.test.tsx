@@ -66,6 +66,23 @@ describe("Clicky", () => {
     expect(screen.getByText(/Healthy/)).toBeInTheDocument();
   });
 
+  it("renders comments with a 50ch and three-line clamp", () => {
+    render(
+      <Clicky
+        data={{
+          kind: "comment",
+          text: "Approved after validating the deployment notes, linked change request, and release evidence.",
+          plain:
+            "Approved after validating the deployment notes, linked change request, and release evidence.",
+        }}
+      />,
+    );
+
+    const comment = screen.getByText(/Approved after validating/);
+    expect(comment).toHaveStyle({ maxWidth: "50ch" });
+    expect(comment.style.WebkitLineClamp).toBe("3");
+  });
+
   it("sorts tables and expands row detail", () => {
     render(<Clicky data={clickyFixture} />);
 
@@ -128,10 +145,9 @@ describe("Clicky", () => {
     }
     fireEvent.click(healthyFilter);
 
-    await waitFor(
-      () => expect(screen.queryByText("worker")).not.toBeInTheDocument(),
-      { timeout: 1_500 },
-    );
+    await waitFor(() => expect(screen.queryByText("worker")).not.toBeInTheDocument(), {
+      timeout: 1_500,
+    });
     expect(screen.getByText("api")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("api"));
@@ -140,44 +156,42 @@ describe("Clicky", () => {
   });
 
   it("exposes Clicky and JSON primary views with overflow formats and JSON-first downloads", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input) => {
-        const url = String(input);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
 
-        if (url.includes("format=clicky-json")) {
-          return new Response(JSON.stringify(clickyFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/json+clicky" },
-          });
-        }
-
-        if (url.includes("format=json")) {
-          return new Response(
-            JSON.stringify({
-              service: "api",
-              healthy: true,
-              replicas: 3,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
-        }
-
-        if (url.includes("format=markdown")) {
-          return new Response("# Report\n\nAll systems nominal.", {
-            status: 200,
-            headers: { "Content-Type": "text/markdown" },
-          });
-        }
-
-        return new Response("", {
+      if (url.includes("format=clicky-json")) {
+        return new Response(JSON.stringify(clickyFixture), {
           status: 200,
-          headers: { "Content-Type": "text/plain" },
+          headers: { "Content-Type": "application/json+clicky" },
         });
+      }
+
+      if (url.includes("format=json")) {
+        return new Response(
+          JSON.stringify({
+            service: "api",
+            healthy: true,
+            replicas: 3,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (url.includes("format=markdown")) {
+        return new Response("# Report\n\nAll systems nominal.", {
+          status: 200,
+          headers: { "Content-Type": "text/markdown" },
+        });
+      }
+
+      return new Response("", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
       });
+    });
     const submittedActions: string[] = [];
     const submitSpy = vi
       .spyOn(HTMLFormElement.prototype, "submit")
@@ -214,7 +228,7 @@ describe("Clicky", () => {
     );
     expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
     expect(screen.getByText("service")).toBeInTheDocument();
-    expect(screen.getByText("\"api\"")).toBeInTheDocument();
+    expect(screen.getByText('"api"')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /open additional view menu/i }));
     expect(screen.getByRole("menuitemradio", { name: /pdf/i })).toBeInTheDocument();
@@ -252,7 +266,9 @@ describe("Clicky", () => {
     expect(submittedActions[0]).toContain("/api/clicky/report?format=json");
 
     fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));
-    expect(screen.getByText("Rendered Clicky JSON with the rich Clicky viewer")).toBeInTheDocument();
+    expect(
+      screen.getByText("Rendered Clicky JSON with the rich Clicky viewer"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Portable document for sharing and printing")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("menuitem", { name: /clicky/i }));
 
@@ -264,23 +280,21 @@ describe("Clicky", () => {
   });
 
   it("supports an empty remote view config without rendering the mode switcher", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input) => {
-        const url = String(input);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
 
-        if (url.includes("format=clicky-json")) {
-          return new Response(JSON.stringify(clickyFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/json+clicky" },
-          });
-        }
-
-        return new Response("", {
+      if (url.includes("format=clicky-json")) {
+        return new Response(JSON.stringify(clickyFixture), {
           status: 200,
-          headers: { "Content-Type": "text/plain" },
+          headers: { "Content-Type": "application/json+clicky" },
         });
+      }
+
+      return new Response("", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
       });
+    });
     const submittedActions: string[] = [];
     const submitSpy = vi
       .spyOn(HTMLFormElement.prototype, "submit")
@@ -307,7 +321,9 @@ describe("Clicky", () => {
     );
     expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup", { name: /clicky view mode/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /open additional view menu/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /open additional view menu/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download json/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));

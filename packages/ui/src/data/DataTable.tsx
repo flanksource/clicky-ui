@@ -320,7 +320,7 @@ export function DataTable<T extends Record<string, unknown>>({
       ) : (
         <>
           <div className="overflow-auto rounded-md border border-border">
-            <table className="w-max min-w-full table-auto text-left text-sm">
+            <table className="w-max table-auto text-left text-sm">
               <colgroup>
                 {columns.map((column) => (
                   <col

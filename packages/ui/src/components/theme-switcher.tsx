@@ -1,51 +1,47 @@
-import { forwardRef, type HTMLAttributes } from "react";
-import { cn } from "../lib/utils";
+import { forwardRef } from "react";
+import { Icon } from "../data/Icon";
+import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 import { useTheme, type Theme } from "../hooks/use-theme";
 
-const THEMES: Theme[] = ["light", "dark", "system"];
+const THEME_OPTIONS: IconMenuOption<Theme>[] = [
+  { value: "light", icon: "ph:sun", label: "light" },
+  { value: "dark", icon: "ph:moon", label: "dark" },
+  { value: "system", icon: "ph:desktop", label: "system" },
+];
 
-export type ThemeSwitcherProps = HTMLAttributes<HTMLDivElement>;
+export type ThemeSwitcherProps = {
+  className?: string;
+  triggerClassName?: string;
+  menuClassName?: string;
+};
 
 export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, triggerClassName, menuClassName }, ref) => {
     const { theme, setTheme, resolvedTheme } = useTheme();
-    return (
-      <div
-        ref={ref}
-        role="radiogroup"
-        aria-label="Theme"
-        className={cn(
-          "inline-flex items-center gap-density-1 rounded-md border border-input bg-background p-density-1",
-          className,
-        )}
-        {...props}
-      >
-        {THEMES.map((t) => {
-          const active = theme === t;
-          return (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              data-active={active || undefined}
-              onClick={() => setTheme(t)}
-              className={cn(
-                "inline-flex h-control-h items-center justify-center rounded-sm px-density-3 text-sm capitalize transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
-            >
-              {t}
-            </button>
-          );
-        })}
-        <span className="ml-density-2 text-xs text-muted-foreground">
-          resolved: <span data-testid="resolved-theme">{resolvedTheme}</span>
+    const footer =
+      theme === "system" ? (
+        <span className="inline-flex items-center gap-1.5">
+          <Icon name={resolvedTheme === "dark" ? "ph:moon" : "ph:sun"} width={12} height={12} />
+          <span>
+            resolves to{" "}
+            <span data-testid="resolved-theme" className="font-medium text-foreground">
+              {resolvedTheme}
+            </span>
+          </span>
         </span>
-      </div>
+      ) : null;
+    return (
+      <IconMenuPicker<Theme>
+        ref={ref}
+        value={theme}
+        onChange={setTheme}
+        options={THEME_OPTIONS}
+        ariaLabel="Theme"
+        footer={footer}
+        className={className}
+        triggerClassName={triggerClassName}
+        menuClassName={menuClassName}
+      />
     );
   },
 );

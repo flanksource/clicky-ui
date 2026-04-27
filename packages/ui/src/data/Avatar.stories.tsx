@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar, type AvatarKind, type AvatarVariant } from "./Avatar";
-import { Icon } from "./Icon";
+import { AvatarBadge } from "./AvatarBadge";
 import { fnv1a32 } from "../lib/palette";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -55,12 +55,14 @@ const VARIANTS: Array<{
   {
     title: "Solid",
     variant: "solid",
-    description: "Dense monogram badge with stronger presence when the avatar needs to carry more weight.",
+    description:
+      "Dense monogram badge with stronger presence when the avatar needs to carry more weight.",
   },
   {
     title: "Stamp",
     variant: "stamp",
-    description: "Mono-leaning approval mark with a slight rotation for report and workflow contexts.",
+    description:
+      "Mono-leaning approval mark with a slight rotation for report and workflow contexts.",
   },
   {
     title: "Mono",
@@ -83,10 +85,24 @@ const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
   rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
-const STAGE_STATES: Array<{ state: StageStatus; user: SampleUser }> = [
+const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [
   { state: "approved", user: USERS[0]! },
   { state: "pending", user: USERS[1]! },
   { state: "rejected", user: USERS[2]! },
+];
+
+const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: SampleUser }> = [
+  {
+    state: "approved",
+    user: USERS[0]!,
+    comment: "Approved after smoke tests passed.",
+  },
+  {
+    state: "pending",
+    user: USERS[1]!,
+    comment:
+      "Waiting on the database migration sign-off, release notes review, and confirmation that the linked change request has the required evidence attached.",
+  },
 ];
 
 function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string {
@@ -106,11 +122,13 @@ function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string 
 }
 
 function StageCellPreview({
+  comment,
   state,
   user,
   variant,
-  size = "lg",
+  size = "sm",
 }: {
+  comment?: string;
   state: StageStatus;
   user: SampleUser;
   variant: AvatarVariant;
@@ -118,30 +136,22 @@ function StageCellPreview({
 }) {
   const spec = STAGE_STATUS[state];
   const borderColor = stageCellBorderColor(user, variant);
-  const density = useDensityValue();
-  const px = resolveSize(size, density);
 
   return (
-    <div
-      className={`flex items-center gap-2 overflow-hidden rounded-full border shadow-sm ${spec.cellBg}`}
-      style={{ borderColor, height: px }}
-    >
-      <Avatar
-        alt={user.full}
-        initials={user.initials}
-        kind={user.kind ?? "user"}
-        size={size}
-        title={user.full}
-        variant={variant}
-      />
-      <span
-        className="min-w-0 flex-1 truncate font-medium leading-none text-foreground"
-        style={{ fontSize: Math.max(11, Math.round(px * 0.32)) }}
-      >
-        {user.full}
-      </span>
-      <Icon name={spec.icon} style="badge" size={size} tone={spec.tone} title={state} />
-    </div>
+    <AvatarBadge
+      alt={user.full}
+      avatarKind={user.kind ?? "user"}
+      avatarVariant={variant}
+      badgeClassName={spec.cellBg}
+      borderColor={borderColor}
+      size={size}
+      statusIcon={spec.icon}
+      statusTitle={state}
+      statusTone={spec.tone}
+      title={user.full}
+      {...(comment !== undefined ? { comment } : {})}
+      {...(user.initials !== undefined ? { initials: user.initials } : {})}
+    />
   );
 }
 
@@ -238,6 +248,7 @@ function ExplorationCard({
           {STAGE_STATES.map((entry) => (
             <StageCellPreview
               key={`${variant}-${entry.state}`}
+              {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
               state={entry.state}
               user={entry.user}
               variant={variant}
@@ -258,10 +269,12 @@ export const Exploration: Story = {
         <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
           Exploration · Option Set A
         </div>
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">User representation</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          User representation
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Shared avatar variants derived from the pipeline-report exploration sheet. The component keeps
-          one API while letting Storybook show the distinct visual tones.
+          Shared avatar variants derived from the pipeline-report exploration sheet. The component
+          keeps one API while letting Storybook show the distinct visual tones.
         </p>
       </div>
 
@@ -288,7 +301,8 @@ export const PipelineContext: Story = {
             Deployment report
           </div>
           <div className="text-sm text-muted-foreground">
-            The duotone fallback is the default. Stamp and mono variants support denser review surfaces.
+            The duotone fallback is the default. Stamp and mono variants support denser review
+            surfaces.
           </div>
         </div>
 
@@ -313,7 +327,10 @@ export const PipelineContext: Story = {
         </div>
         <div className="space-y-2">
           {USERS.slice(0, 3).map((user) => (
-            <div key={user.initials} className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2">
+            <div
+              key={user.initials}
+              className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
+            >
               <Avatar
                 alt={user.full}
                 initials={user.initials}
@@ -372,6 +389,22 @@ function StageSizesView() {
         </p>
       </div>
       <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            comments
+          </div>
+          <div className="space-y-3">
+            {STAGE_COMMENT_STATES.map((entry) => (
+              <StageCellPreview
+                key={`comment-${entry.state}`}
+                comment={entry.comment}
+                state={entry.state}
+                user={entry.user}
+                variant="duotone"
+              />
+            ))}
+          </div>
+        </div>
         {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
           <div key={size} className="space-y-2">
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -449,8 +482,8 @@ function SizesWithNamesView() {
           Avatar sizes with companion text
         </h2>
         <p className="text-sm text-muted-foreground">
-          Each row pairs the avatar with the identity label sized so the glyph is only a touch taller
-          than the cap height (font-size ≈ 85% of the avatar box).
+          Each row pairs the avatar with the identity label sized so the glyph is only a touch
+          taller than the cap height (font-size ≈ 85% of the avatar box).
         </p>
       </div>
 
@@ -476,7 +509,10 @@ function SizesWithNamesView() {
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {VARIANTS.map((entry) => (
-          <div key={entry.variant} className="space-y-3 rounded-lg border border-border bg-card p-4">
+          <div
+            key={entry.variant}
+            className="space-y-3 rounded-lg border border-border bg-card p-4"
+          >
             <div className="space-y-1 border-b border-border pb-2">
               <div className="text-sm font-semibold text-foreground">{entry.title}</div>
               <div className="text-xs leading-5 text-muted-foreground">{entry.description}</div>

@@ -1,5 +1,9 @@
-import { Avatar, type AvatarKind, type AvatarVariant } from "../../../../packages/ui/src/data/Avatar";
-import { Icon, fnv1a32 } from "@flanksource/clicky-ui";
+import {
+  Avatar,
+  type AvatarKind,
+  type AvatarVariant,
+} from "../../../../packages/ui/src/data/Avatar";
+import { AvatarBadge, fnv1a32 } from "@flanksource/clicky-ui";
 import { resolveSize, type SizeToken } from "../../../../packages/ui/src/lib/size";
 import { useDensityValue } from "../../../../packages/ui/src/hooks/use-density";
 import { DemoRow, DemoSection } from "./Section";
@@ -61,10 +65,24 @@ const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
   rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
-const STAGE_STATES: Array<{ state: StageStatus; user: SampleUser }> = [
+const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [
   { state: "approved", user: USERS[0]! },
   { state: "pending", user: USERS[1]! },
   { state: "rejected", user: USERS[2]! },
+];
+
+const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: SampleUser }> = [
+  {
+    state: "approved",
+    user: USERS[0]!,
+    comment: "Approved after smoke tests passed.",
+  },
+  {
+    state: "pending",
+    user: USERS[1]!,
+    comment:
+      "Waiting on the database migration sign-off, release notes review, and confirmation that the linked change request has the required evidence attached.",
+  },
 ];
 
 function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string {
@@ -84,11 +102,13 @@ function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string 
 }
 
 function StageCellPreview({
+  comment,
   state,
   user,
   variant,
-  size = "lg",
+  size = "sm",
 }: {
+  comment?: string;
   state: StageStatus;
   user: SampleUser;
   variant: AvatarVariant;
@@ -96,30 +116,22 @@ function StageCellPreview({
 }) {
   const spec = STAGE_STATUS[state];
   const borderColor = stageCellBorderColor(user, variant);
-  const density = useDensityValue();
-  const px = resolveSize(size, density);
 
   return (
-    <div
-      className={`flex items-center gap-2 overflow-hidden rounded-full border shadow-sm ${spec.cellBg}`}
-      style={{ borderColor, height: px }}
-    >
-      <Avatar
-        alt={user.full}
-        initials={user.initials}
-        kind={user.kind ?? "user"}
-        size={size}
-        title={user.full}
-        variant={variant}
-      />
-      <span
-        className="min-w-0 flex-1 truncate font-medium leading-none text-foreground"
-        style={{ fontSize: Math.max(11, Math.round(px * 0.32)) }}
-      >
-        {user.full}
-      </span>
-      <Icon name={spec.icon} style="badge" size={size} tone={spec.tone} title={state} />
-    </div>
+    <AvatarBadge
+      alt={user.full}
+      avatarKind={user.kind ?? "user"}
+      avatarVariant={variant}
+      badgeClassName={spec.cellBg}
+      borderColor={borderColor}
+      size={size}
+      statusIcon={spec.icon}
+      statusTitle={state}
+      statusTone={spec.tone}
+      title={user.full}
+      {...(comment !== undefined ? { comment } : {})}
+      {...(user.initials !== undefined ? { initials: user.initials } : {})}
+    />
   );
 }
 
@@ -183,6 +195,7 @@ function VariantCard({
               state={entry.state}
               user={entry.user}
               variant={variant}
+              {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
             />
           ))}
         </div>
@@ -204,7 +217,8 @@ export function AvatarDemo() {
           Exploration · Option Set A
         </div>
         <div className="text-sm text-muted-foreground">
-          The shared avatar now supports duotone, solid, stamp, and mono treatments instead of a single pastel fallback.
+          The shared avatar now supports duotone, solid, stamp, and mono treatments instead of a
+          single pastel fallback.
         </div>
       </div>
 
@@ -266,7 +280,10 @@ export function AvatarDemo() {
       </DemoRow>
 
       <DemoRow label="Sizes · variants">
-        <div className="grid gap-x-6 gap-y-3" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+        <div
+          className="grid gap-x-6 gap-y-3"
+          style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+        >
           {VARIANTS.map((entry) => (
             <div key={`size-${entry.variant}`} className="space-y-2">
               <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -296,6 +313,20 @@ export function AvatarDemo() {
           Stage cell · badge icon scales with size
         </div>
         <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="font-mono text-[10px] text-muted-foreground">comments · sm</div>
+            <div className="space-y-3">
+              {STAGE_COMMENT_STATES.map((entry) => (
+                <StageCellPreview
+                  key={`comment-${entry.state}`}
+                  comment={entry.comment}
+                  state={entry.state}
+                  user={entry.user}
+                  variant="duotone"
+                />
+              ))}
+            </div>
+          </div>
           {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
             <div key={size} className="space-y-2">
               <div className="font-mono text-[10px] text-muted-foreground">
@@ -309,6 +340,7 @@ export function AvatarDemo() {
                     user={entry.user}
                     variant="duotone"
                     size={size}
+                    {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
                   />
                 ))}
               </div>
@@ -340,7 +372,10 @@ export function AvatarDemo() {
             Approval lane
           </div>
           {USERS.slice(0, 3).map((user) => (
-            <div key={`approval-${user.initials}`} className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2">
+            <div
+              key={`approval-${user.initials}`}
+              className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
+            >
               <Avatar
                 alt={user.full}
                 initials={user.initials}

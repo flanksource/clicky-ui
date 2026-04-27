@@ -175,17 +175,11 @@ const CLICKY_OVERFLOW_VIEW_FORMATS = [
   "excel",
   "slack",
 ] as const;
-const CLICKY_DOWNLOAD_FORMATS = [
-  "json",
-  "clicky",
-  ...CLICKY_OVERFLOW_VIEW_FORMATS,
-] as const;
+const CLICKY_DOWNLOAD_FORMATS = ["json", "clicky", ...CLICKY_OVERFLOW_VIEW_FORMATS] as const;
 
 export type ClickyPrimaryViewFormat = (typeof CLICKY_PRIMARY_VIEW_FORMATS)[number];
 export type ClickyOverflowViewFormat = (typeof CLICKY_OVERFLOW_VIEW_FORMATS)[number];
-export type ClickyRemoteFormat =
-  | ClickyPrimaryViewFormat
-  | ClickyOverflowViewFormat;
+export type ClickyRemoteFormat = ClickyPrimaryViewFormat | ClickyOverflowViewFormat;
 
 export type ClickyViewOptions = Partial<Record<ClickyRemoteFormat, boolean>>;
 
@@ -248,21 +242,22 @@ export function Clicky(props: ClickyProps) {
   );
 
   const content = (
-    <ClickyRuntimeProvider {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}>
+    <ClickyRuntimeProvider
+      {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}
+    >
       {props.url ? (
         <ClickyRemoteRenderer {...props} url={props.url} />
       ) : (
-        <ClickyContent data={props.data} {...(props.className ? { className: props.className } : {})} />
+        <ClickyContent
+          data={props.data}
+          {...(props.className ? { className: props.className } : {})}
+        />
       )}
     </ClickyRuntimeProvider>
   );
 
   if (props.url || props.commandRuntime) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        {content}
-      </QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{content}</QueryClientProvider>;
   }
 
   return content;
@@ -347,23 +342,16 @@ function ClickyRemoteRenderer({
   download,
   className,
 }: ClickyProps & { url: string }) {
-  const availableViews = useMemo(
-    () => getAvailableViews({ data, url, view }),
-    [data, url, view],
-  );
-  const primaryViews = useMemo(
-    () => availableViews.filter(isPrimaryViewFormat),
-    [availableViews],
-  );
+  const availableViews = useMemo(() => getAvailableViews({ data, url, view }), [data, url, view]);
+  const primaryViews = useMemo(() => availableViews.filter(isPrimaryViewFormat), [availableViews]);
   const overflowViews = useMemo(
     () => availableViews.filter(isOverflowViewFormat),
     [availableViews],
   );
-  const downloadFormats = useMemo(
-    () => getDownloadFormats({ url, download }),
-    [download, url],
+  const downloadFormats = useMemo(() => getDownloadFormats({ url, download }), [download, url]);
+  const [activeView, setActiveView] = useState<ClickyRemoteFormat>(
+    () => availableViews[0] ?? "clicky",
   );
-  const [activeView, setActiveView] = useState<ClickyRemoteFormat>(() => availableViews[0] ?? "clicky");
 
   useEffect(() => {
     if (!availableViews.includes(activeView)) {
@@ -378,9 +366,7 @@ function ClickyRemoteRenderer({
     queryFn: async () => fetchRemoteFormat(formattedUrl, activeView),
   });
   const effectiveClickyData =
-    activeView === "clicky" && activeQuery.data?.kind === "text"
-      ? activeQuery.data.text
-      : data;
+    activeView === "clicky" && activeQuery.data?.kind === "text" ? activeQuery.data.text : data;
   const fallbackJsonData = useMemo(() => parseJsonValue(data), [data]);
   const effectiveJsonData =
     activeView === "json" && activeQuery.data?.kind === "text"
@@ -394,11 +380,7 @@ function ClickyRemoteRenderer({
     <div className={cn("space-y-density-3", className)}>
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
         {primaryViews.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Clicky view mode"
-            className="flex flex-wrap gap-1"
-          >
+          <div role="radiogroup" aria-label="Clicky view mode" className="flex flex-wrap gap-1">
             {primaryViews.map((mode) => (
               <button
                 key={mode}
@@ -433,11 +415,7 @@ function ClickyRemoteRenderer({
           )}
 
           {canDownload && (
-            <ClickyDownloadMenu
-              url={url}
-              formats={downloadFormats}
-              label={download?.label}
-            />
+            <ClickyDownloadMenu url={url} formats={downloadFormats} label={download?.label} />
           )}
         </div>
       </div>
@@ -458,7 +436,9 @@ function ClickyRemoteRenderer({
         ) : activeQuery.isError && effectiveClickyData === undefined ? (
           <ClickyNotice
             title="Clicky request failed"
-            message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
+            message={
+              activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+            }
             tone="destructive"
           />
         ) : (
@@ -479,7 +459,9 @@ function ClickyRemoteRenderer({
         ) : activeQuery.isError && effectiveJsonData === undefined ? (
           <ClickyNotice
             title="JSON request failed"
-            message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
+            message={
+              activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+            }
             tone="destructive"
           />
         ) : (
@@ -499,14 +481,13 @@ function ClickyRemoteRenderer({
       ) : activeQuery.isError ? (
         <ClickyNotice
           title={`${formatViewLabel(activeView)} request failed`}
-          message={activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"}
+          message={
+            activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+          }
           tone="destructive"
         />
       ) : (
-        <ClickyRemotePreview
-          format={activeView}
-          response={activeQuery.data}
-        />
+        <ClickyRemotePreview format={activeView} response={activeQuery.data} />
       )}
     </div>
   );
@@ -570,12 +551,17 @@ function ClickyViewMenu({
               >
                 <Icon
                   name={meta.icon}
-                  className={cn("mt-0.5 shrink-0 text-base text-muted-foreground", active && "text-foreground")}
+                  className={cn(
+                    "mt-0.5 shrink-0 text-base text-muted-foreground",
+                    active && "text-foreground",
+                  )}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-3">
                     <span className="font-medium">{meta.label}</span>
-                    {active && <Icon name="codicon:check" className="text-xs text-muted-foreground" />}
+                    {active && (
+                      <Icon name="codicon:check" className="text-xs text-muted-foreground" />
+                    )}
                   </span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
                     {meta.description}
@@ -612,7 +598,9 @@ function ClickyDownloadMenu({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          aria-label={label ? `Download ${primaryMeta.label} ${label}` : `Download ${primaryMeta.label}`}
+          aria-label={
+            label ? `Download ${primaryMeta.label} ${label}` : `Download ${primaryMeta.label}`
+          }
           className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => submitDownloadRequest(buildFormatUrl(url, primaryFormat))}
         >
@@ -883,13 +871,7 @@ function ClickyRemotePreview({
   );
 }
 
-function ClickyTextPreview({
-  title,
-  content,
-}: {
-  title: string;
-  content: string;
-}) {
+function ClickyTextPreview({ title, content }: { title: string; content: string }) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-background">
       <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">{title}</div>
@@ -903,13 +885,7 @@ function ClickyTextPreview({
   );
 }
 
-function ClickyJsonTree({
-  value,
-  emptyLabel = "JSON",
-}: {
-  value: unknown;
-  emptyLabel?: string;
-}) {
+function ClickyJsonTree({ value, emptyLabel = "JSON" }: { value: unknown; emptyLabel?: string }) {
   const roots = useMemo(() => buildJsonTree(value), [value]);
 
   if (value === undefined) {
@@ -1017,7 +993,8 @@ function getRemoteFormatMeta(format: ClickyRemoteFormat) {
         label: "Clicky",
         description: "Rendered Clicky JSON with the rich Clicky viewer",
         icon: "codicon:preview",
-        accept: "application/json+clicky, application/clicky+json;q=0.9, application/json;q=0.8,*/*;q=0.7",
+        accept:
+          "application/json+clicky, application/clicky+json;q=0.9, application/json;q=0.8,*/*;q=0.7",
       };
     case "json":
       return {
@@ -1120,9 +1097,7 @@ function resolveViewConfigFlag(
   url?: string,
 ) {
   const defaultEnabled =
-    format === "clicky" || format === "json"
-      ? url != null || data !== undefined
-      : !!url;
+    format === "clicky" || format === "json" ? url != null || data !== undefined : !!url;
 
   if (view === undefined) {
     return defaultEnabled;
@@ -1178,9 +1153,7 @@ function buildJsonTree(value: unknown): JsonTreeNode[] {
   }
 
   if (isPlainObject(value)) {
-    return Object.entries(value).map(([key, entry]) =>
-      buildJsonTreeNode(key, entry, `$.${key}`),
-    );
+    return Object.entries(value).map(([key, entry]) => buildJsonTreeNode(key, entry, `$.${key}`));
   }
 
   if (value === undefined) {
@@ -1203,7 +1176,9 @@ function buildJsonTreeNode(key: string, value: unknown, id: string): JsonTreeNod
 
 function getJsonChildren(value: unknown, path: string) {
   if (Array.isArray(value)) {
-    return value.map((entry, index) => buildJsonTreeNode(String(index), entry, `${path}[${index}]`));
+    return value.map((entry, index) =>
+      buildJsonTreeNode(String(index), entry, `${path}[${index}]`),
+    );
   }
 
   if (isPlainObject(value)) {
@@ -1319,7 +1294,7 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
     case "html":
       return <ClickyHtmlNode node={node} />;
     case "comment":
-      return null;
+      return <ClickyComment node={node} />;
     default:
       return (
         <pre className="rounded-md border border-border bg-muted p-density-3 text-xs">
@@ -1327,6 +1302,35 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
         </pre>
       );
   }
+}
+
+function ClickyComment({ node }: { node: ClickyNode }) {
+  const text = node.text ?? node.plain;
+  const content = <ClickyInlineContent node={node} />;
+  const maxWidth =
+    node.style?.maxWidth && node.style.maxWidth > 0 ? Math.min(node.style.maxWidth, 50) : 50;
+  const maxLines =
+    node.style?.maxLines && node.style.maxLines > 0 ? Math.min(node.style.maxLines, 3) : 3;
+  const inlineStyle = toInlineStyle(
+    {
+      ...node.style,
+      maxWidth,
+      maxLines,
+    },
+    text,
+  );
+
+  if (!text && !node.children?.length) return null;
+
+  return (
+    <div
+      className={cn("mt-1 text-xs leading-snug text-muted-foreground", node.style?.className)}
+      style={inlineStyle}
+      title={node.tooltip?.plain ?? text}
+    >
+      {content}
+    </div>
+  );
 }
 
 function ClickyText({ node }: { node: ClickyNode }) {
@@ -1410,8 +1414,7 @@ function ClickyLinkCommandNode({ node }: { node: ClickyNode }) {
 
   if (target === "_self" || target === "_window" || target === "_tab") {
     const href =
-      runtime.commandRuntime?.hrefForCommand?.(resolved) ??
-      buildCommandExecutionHref(resolved);
+      runtime.commandRuntime?.hrefForCommand?.(resolved) ?? buildCommandExecutionHref(resolved);
 
     if (!href) {
       return (
@@ -1567,11 +1570,7 @@ function ClickyCommandDialog({
     setError("");
 
     try {
-      const response = await executeClickyCommand(
-        runtime.commandRuntime.client,
-        operation,
-        values,
-      );
+      const response = await executeClickyCommand(runtime.commandRuntime.client, operation, values);
       setResult(response);
     } catch (err) {
       setResult(null);
@@ -1645,11 +1644,7 @@ function ClickyCommandDialog({
   );
 }
 
-function ClickyAsyncCommandResult({
-  resolved,
-}: {
-  resolved: ClickyResolvedCommand;
-}) {
+function ClickyAsyncCommandResult({ resolved }: { resolved: ClickyResolvedCommand }) {
   const runtime = useContext(ClickyRuntimeContext);
   const operation = resolved.operation;
   const parameters = operation?.operation.parameters ?? [];
@@ -1670,10 +1665,7 @@ function ClickyAsyncCommandResult({
       operation?.path,
       initialValues,
     ],
-    enabled:
-      runtime.commandRuntime != null &&
-      operation != null &&
-      missing.length === 0,
+    enabled: runtime.commandRuntime != null && operation != null && missing.length === 0,
     retry: 0,
     queryFn: async () =>
       executeClickyCommand(runtime.commandRuntime!.client, operation!, initialValues),
@@ -1746,19 +1738,21 @@ function ClickyCommandResponse({
     return <ClickyNotice title="No response" message={emptyMessage} />;
   }
 
-  const parsedPayload =
-    isExecutionResponse(response) ? (response.parsed ?? parseJsonBody(response)) : response;
-  const rawText =
-    isExecutionResponse(response)
-      ? response.stdout || response.output || response.message || ""
-      : typeof response === "string"
-        ? response
-        : JSON.stringify(response, null, 2);
+  const parsedPayload = isExecutionResponse(response)
+    ? (response.parsed ?? parseJsonBody(response))
+    : response;
+  const rawText = isExecutionResponse(response)
+    ? response.stdout || response.output || response.message || ""
+    : typeof response === "string"
+      ? response
+      : JSON.stringify(response, null, 2);
   const clickyPayload =
-    typeof parsedPayload === "string" || (parsedPayload != null && typeof parsedPayload === "object")
+    typeof parsedPayload === "string" ||
+    (parsedPayload != null && typeof parsedPayload === "object")
       ? parsedPayload
       : rawText;
-  const parsedClicky = clickyPayload === "" ? null : parseClickyData(clickyPayload as ClickyProps["data"]);
+  const parsedClicky =
+    clickyPayload === "" ? null : parseClickyData(clickyPayload as ClickyProps["data"]);
 
   if (parsedClicky?.ok) {
     return (
@@ -1884,7 +1878,11 @@ function ClickyTable({ node }: { node: ClickyNode }) {
 
   const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => ({
     key: `cells.${column.name}`,
-    label: column.header ? <ClickyNodeRenderer node={column.header} /> : column.label || prettifyName(column.name),
+    label: column.header ? (
+      <ClickyNodeRenderer node={column.header} />
+    ) : (
+      column.label || prettifyName(column.name)
+    ),
     align: column.align,
     sortable: column.sortable,
     filterable: column.filterable,
@@ -1911,9 +1909,7 @@ function ClickyTable({ node }: { node: ClickyNode }) {
           .filter(Boolean)
           .join("|")}`
       }
-      renderExpandedRow={(row) =>
-        row.detail ? <ClickyNodeRenderer node={row.detail} /> : null
-      }
+      renderExpandedRow={(row) => (row.detail ? <ClickyNodeRenderer node={row.detail} /> : null)}
     />
   );
 }
@@ -2138,7 +2134,9 @@ function resolveClickyCommand(
   runtime: ClickyCommandRuntime | undefined,
   operations: ResolvedOperation[],
 ): ClickyResolvedCommand {
-  const resolved = runtime?.resolveCommand?.(request, operations) ?? defaultResolveClickyCommand(request, operations);
+  const resolved =
+    runtime?.resolveCommand?.(request, operations) ??
+    defaultResolveClickyCommand(request, operations);
   return { request, operation: resolved };
 }
 
@@ -2173,7 +2171,7 @@ function buildCommandParameterValues(
   parameters: OpenAPIParameter[],
   request: ClickyCommandRequest,
 ): ParameterValues {
-  const values: ParameterValues = { ...(request.flags ?? {}) };
+  const values: ParameterValues = { ...request.flags };
   const args = [...(request.args ?? [])];
   const positionalParams = parameters.filter((param) => isPositionalParam(param));
   let argIndex = 0;
@@ -2197,10 +2195,7 @@ function buildCommandParameterValues(
   return values;
 }
 
-function missingRequiredParameters(
-  parameters: OpenAPIParameter[],
-  values: ParameterValues,
-) {
+function missingRequiredParameters(parameters: OpenAPIParameter[], values: ParameterValues) {
   return parameters.filter((param) => param.required && (values[param.name] ?? "").trim() === "");
 }
 
@@ -2223,8 +2218,14 @@ function buildCommandExecutionHref(resolved: ClickyResolvedCommand): string | un
     return undefined;
   }
 
-  const values = buildCommandParameterValues(operation.operation.parameters ?? [], resolved.request);
-  const params = packParameterValues(pruneParameterValues(values), operation.operation.parameters ?? []);
+  const values = buildCommandParameterValues(
+    operation.operation.parameters ?? [],
+    resolved.request,
+  );
+  const params = packParameterValues(
+    pruneParameterValues(values),
+    operation.operation.parameters ?? [],
+  );
   const url = substituteOperationPath(operation.path, params);
 
   if (operation.method.toUpperCase() !== "GET") {
@@ -2234,10 +2235,7 @@ function buildCommandExecutionHref(resolved: ClickyResolvedCommand): string | un
   return url;
 }
 
-function substituteOperationPath(
-  path: string,
-  params: Record<string, string>,
-) {
+function substituteOperationPath(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://localhost");
   const remaining = { ...params };
 
@@ -2267,17 +2265,22 @@ function browserAnchorTarget(target: ClickyLinkTarget | undefined) {
   return undefined;
 }
 
-function isExecutionResponse(
-  value: unknown,
-): value is ExecutionResponse {
-  return value != null && typeof value === "object" && ("stdout" in value || "output" in value || "message" in value);
+function isExecutionResponse(value: unknown): value is ExecutionResponse {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    ("stdout" in value || "output" in value || "message" in value)
+  );
 }
 
 function clickyNodeText(node: ClickyNode | null | undefined): string {
   if (!node) return "";
   if (node.plain) return node.plain;
   if (node.text) return node.text;
-  if (node.kind === "html") return sanitizeHtml(node.html ?? "").replace(/<[^>]+>/g, " ").trim();
+  if (node.kind === "html")
+    return sanitizeHtml(node.html ?? "")
+      .replace(/<[^>]+>/g, " ")
+      .trim();
   if (node.kind === "code") return node.source ?? "";
   if ((node.kind === "link" || node.kind === "link-command") && node.children?.length) {
     return [node.text, ...node.children.map((child) => clickyNodeText(child))].join("");

@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Avatar } from "./Avatar";
+import { AvatarBadge } from "./AvatarBadge";
 
 describe("Avatar", () => {
   afterEach(() => {
@@ -75,5 +76,34 @@ describe("Avatar", () => {
   it("wraps the avatar in an external link when href is provided", () => {
     render(<Avatar alt="GitHub reviewers" href="https://github.com" initials="GH" />);
     expect(screen.getByRole("link")).toHaveAttribute("href", "https://github.com");
+  });
+});
+
+describe("AvatarBadge", () => {
+  it("allows the badge label to grow to 40ch before truncating", () => {
+    render(
+      <AvatarBadge
+        alt="Tokollo Mphahlele"
+        initials="T"
+        statusIcon="ph:check-thin"
+        statusTone="emerald"
+      />,
+    );
+
+    const label = screen.getByText("Tokollo Mphahlele");
+    expect(label.parentElement).toHaveClass("max-w-[40ch]", "overflow-visible");
+  });
+
+  it("limits comments under the badge to 50ch and three lines", () => {
+    render(
+      <AvatarBadge
+        alt="Tokollo Mphahlele"
+        initials="T"
+        comment="Approved after validating the deployment notes, linked change request, and release evidence."
+      />,
+    );
+
+    const comment = screen.getByText(/Approved after validating/);
+    expect(comment).toHaveClass("max-w-[50ch]", "[-webkit-line-clamp:3]");
   });
 });

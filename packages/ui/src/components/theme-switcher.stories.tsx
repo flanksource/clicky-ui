@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Toggle between light, dark, and system themes. Writes `data-theme` on `<html>` and persists to `localStorage`. Pair with `ThemeProvider` at the app root.",
+          "Icon-button picker that toggles between light, dark, and system themes. Writes `data-theme` on `<html>` and persists to `localStorage`. Pair with `ThemeProvider` at the app root.",
       },
     },
   },
@@ -47,14 +47,32 @@ export const ChangesDataAttribute: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step("click dark toggles data-theme=dark on <html>", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: /dark/i }));
+    await step("open menu and pick dark", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: /theme/i }));
+      await userEvent.click(canvas.getByRole("menuitemradio", { name: /dark/i }));
       await expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     });
 
-    await step("click light toggles data-theme=light on <html>", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: /light/i }));
+    await step("open menu and pick light", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: /theme/i }));
+      await userEvent.click(canvas.getByRole("menuitemradio", { name: /light/i }));
       await expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
+  },
+};
+
+export const KeyboardSelection: Story = {
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /theme/i });
+
+    await step("open with Enter, navigate with arrows, select with Enter", async () => {
+      trigger.focus();
+      await userEvent.keyboard("{Enter}");
+      await userEvent.keyboard("{ArrowDown}");
+      await userEvent.keyboard("{Enter}");
+      const value = document.documentElement.getAttribute("data-theme");
+      await expect(["light", "dark"]).toContain(value);
     });
   },
 };
