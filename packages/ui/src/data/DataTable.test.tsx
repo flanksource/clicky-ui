@@ -132,8 +132,9 @@ describe("DataTable", () => {
 
     expect(screen.getAllByText("healthy")[0]).toHaveClass("whitespace-nowrap");
     expect(screen.getByText("Production API service")).toHaveClass(
-      "min-w-0",
-      "break-words",
+      "min-w-56",
+      "max-w-[36rem]",
+      "truncate",
     );
   });
 
