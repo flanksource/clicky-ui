@@ -139,6 +139,9 @@ describe("FilterBar", () => {
       "Time range",
     );
     expect(screen.getByRole("button", { name: /date range filter/i })).toHaveTextContent(
+      "2026-04-21",
+    );
+    expect(screen.getByRole("button", { name: /date range filter/i })).not.toHaveTextContent(
       "Date range:",
     );
   });
@@ -218,6 +221,35 @@ describe("FilterBar", () => {
 
     fireEvent.click(screen.getByLabelText("Active"));
     expect(onActive).toHaveBeenCalledWith(true);
+  });
+
+  it("renders include-only multi-select filters", () => {
+    const onGroupBy = vi.fn();
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "groupBy",
+            kind: "select-multi",
+            label: "Group By",
+            value: ["type"],
+            options: [
+              { value: "type", label: "Type" },
+              { value: "health", label: "Health" },
+            ],
+            onChange: onGroupBy,
+          },
+        ]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /group by filter/i });
+    expect(trigger).toHaveTextContent("Type");
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText("Health"));
+    expect(onGroupBy).toHaveBeenCalledWith(["type", "health"]);
   });
 
   it("renders lookup-backed single and multi filters as freeform fields", () => {

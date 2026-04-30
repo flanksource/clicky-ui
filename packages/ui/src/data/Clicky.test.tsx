@@ -104,6 +104,32 @@ describe("Clicky", () => {
     ).toBeInTheDocument();
   });
 
+  it("passes raw table rows to the row click handler", () => {
+    const onTableRowClick = vi.fn();
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "name", label: "Name" }],
+        rows: [
+          {
+            cells: {
+              _id: { kind: "text", text: "widget-1", plain: "widget-1" },
+              name: { kind: "text", text: "First widget", plain: "First widget" },
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} onTableRowClick={onTableRowClick} />);
+
+    fireEvent.click(screen.getByText("First widget"));
+
+    expect(onTableRowClick).toHaveBeenCalledTimes(1);
+    expect(onTableRowClick.mock.calls[0][0].cells._id.plain).toBe("widget-1");
+  });
+
   it("supports auto-filtered clicky tables", async () => {
     const clickyDocument: ClickyDocument = {
       version: 1,
@@ -153,6 +179,76 @@ describe("Clicky", () => {
     fireEvent.click(screen.getByText("api"));
 
     expect(screen.getByText(/kind: Deployment/)).toBeInTheDocument();
+  });
+
+  it("renders table rows with struct cells as collapsed sections", () => {
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [
+          { name: "agreement", label: "agreement" },
+          { name: "company", label: "company" },
+          { name: "definition", label: "definition" },
+        ],
+        rows: [
+          {
+            cells: {
+              agreement: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "agreementName",
+                    value: {
+                      kind: "text",
+                      text: "Group Scheme Contract",
+                      plain: "Group Scheme Contract",
+                    },
+                  },
+                  {
+                    name: "agreementGUID",
+                    value: { kind: "text", text: "agreement-1", plain: "agreement-1" },
+                  },
+                ],
+              },
+              company: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "companyName",
+                    value: {
+                      kind: "text",
+                      text: "Old Mutual Africa Holdings",
+                      plain: "Old Mutual Africa Holdings",
+                    },
+                  },
+                ],
+              },
+              definition: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "typeCode",
+                    value: { kind: "text", text: "MSTR-INS", plain: "MSTR-INS" },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} />);
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("Agreement 1: Group Scheme Contract")).toBeInTheDocument();
+    expect(screen.queryByText("Old Mutual Africa Holdings")).not.toBeVisible();
+
+    fireEvent.click(screen.getByText("Agreement 1: Group Scheme Contract"));
+
+    expect(screen.getByText("Old Mutual Africa Holdings")).toBeVisible();
+    expect(screen.getByText("MSTR-INS")).toBeVisible();
   });
 
   it("exposes Clicky and JSON primary views with overflow formats and JSON-first downloads", async () => {

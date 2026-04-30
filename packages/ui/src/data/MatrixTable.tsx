@@ -13,6 +13,7 @@ export type MatrixTableProps = {
   corner?: ReactNode;
   emptyMessage?: ReactNode;
   angledHeaders?: boolean;
+  density?: "default" | "compact";
   columnWidth?: number;
   headerHeight?: number;
   className?: string;
@@ -27,6 +28,7 @@ export function MatrixTable({
   corner,
   emptyMessage = "No data",
   angledHeaders = false,
+  density = "default",
   columnWidth = 48,
   headerHeight = 120,
   className,
@@ -40,13 +42,17 @@ export function MatrixTable({
 
   const textWidth = Math.round(headerHeight * 1.41);
   const diagonalOverhang = Math.round(headerHeight * 0.71);
+  const compact = density === "compact";
+  const headerCellPadding = compact ? "px-density-2 py-density-1" : "px-density-3 py-density-2";
+  const rowLabelPadding = compact ? "px-density-2 py-1" : "px-density-3 py-density-2";
+  const bodyCellPadding = compact ? "px-density-2 py-1" : "px-density-3 py-density-2";
 
   return (
     <div
       className={cn("overflow-auto rounded-md border border-border", className)}
       style={angledHeaders ? { paddingRight: diagonalOverhang } : undefined}
     >
-      <table className="w-max border-collapse text-sm">
+      <table className={cn("w-max border-collapse", compact ? "text-xs" : "text-sm")}>
         {angledHeaders && (
           <colgroup>
             <col />
@@ -60,7 +66,8 @@ export function MatrixTable({
             <th
               scope="col"
               className={cn(
-                "sticky left-0 z-10 min-w-44 border-r border-border bg-muted/40 px-density-3 py-density-2 text-left font-medium",
+                "sticky left-0 z-10 min-w-44 border-r border-border bg-muted/40 text-left font-medium",
+                headerCellPadding,
                 angledHeaders ? "align-bottom" : columnClassName,
               )}
             >
@@ -120,7 +127,8 @@ export function MatrixTable({
                   key={index}
                   scope="col"
                   className={cn(
-                    "min-w-24 whitespace-nowrap px-density-3 py-density-2 text-center text-xs font-medium text-muted-foreground",
+                    "min-w-24 whitespace-nowrap text-center text-xs font-medium text-muted-foreground",
+                    headerCellPadding,
                     columnClassName,
                   )}
                 >
@@ -136,7 +144,8 @@ export function MatrixTable({
               <th
                 scope="row"
                 className={cn(
-                  "sticky left-0 z-10 border-r border-border bg-background px-density-3 py-density-2 text-left font-medium",
+                  "sticky left-0 z-10 border-r border-border bg-background text-left font-medium",
+                  rowLabelPadding,
                   rowLabelClassName,
                 )}
               >
@@ -148,7 +157,7 @@ export function MatrixTable({
                   className={cn(
                     angledHeaders
                       ? "p-0 text-center align-middle"
-                      : "px-density-3 py-density-2 text-center align-middle",
+                      : cn(bodyCellPadding, "text-center align-middle"),
                     cellClassName,
                   )}
                   style={

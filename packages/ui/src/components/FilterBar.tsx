@@ -14,7 +14,7 @@ import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
-import type { MultiSelectOption } from "./MultiSelect";
+import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { Select } from "./select";
 
@@ -92,6 +92,18 @@ export type FilterBarMultiFilter = {
   className?: string;
 };
 
+export type FilterBarSelectMultiFilter = {
+  key: string;
+  kind: "select-multi";
+  label: string;
+  value: string[];
+  options: MultiSelectOption[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+};
+
 export type FilterBarNumberValue = {
   min?: string;
   max?: string;
@@ -140,6 +152,7 @@ export type FilterBarFilter =
   | FilterBarLookupFilter
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
+  | FilterBarSelectMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
   | FilterBarBooleanFilter;
@@ -234,6 +247,10 @@ export function FilterBar({
 
           if (filter.kind === "multi") {
             return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
+          if (filter.kind === "select-multi") {
+            return <SelectMultiFilterField key={filter.key} filter={filter} grow={grow} />;
           }
 
           if (filter.kind === "number") {
@@ -728,6 +745,38 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   );
 }
 
+function SelectMultiFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarSelectMultiFilter;
+  grow: boolean;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
+        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
+        filter.className,
+      )}
+    >
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+      <MultiSelect
+        options={filter.options}
+        value={filter.value}
+        onChange={filter.onChange}
+        placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        disabled={filter.disabled}
+        triggerClassName="h-6 min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+        menuClassName="left-auto right-0"
+      />
+    </label>
+  );
+}
+
 function RangeControlButton({
   kind,
   label,
@@ -762,10 +811,7 @@ function RangeControlButton({
     [kind, presets],
   );
 
-  const buttonLabel =
-    kind === "time"
-      ? formatRangeLabel(kind, from, to, emptyLabel)
-      : formatRangeButtonLabel(label, kind, from, to, emptyLabel);
+  const buttonLabel = formatRangeLabel(kind, from, to, emptyLabel);
 
   function applyRange(nextFrom: string, nextTo: string) {
     onApply(
@@ -786,18 +832,18 @@ function RangeControlButton({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((current) => !current)}
-        className="w-fit max-w-[11rem] min-w-0 gap-2 font-normal"
+        className="h-7 w-fit max-w-[11rem] min-w-0 gap-2 px-2 text-xs font-normal"
       >
-        <Icon name="codicon:calendar" className="text-muted-foreground" />
-        <span className="truncate">{buttonLabel}</span>
+        <Icon name="codicon:calendar" className="text-muted-foreground text-[14px]" />
+        <span className="truncate font-normal tabular-nums">{buttonLabel}</span>
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-lg shadow-black/5">
+        <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-md shadow-black/5 outline-none">
           {rangePresets.length > 0 && (
             <div className="border-b border-border p-1">
               <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {label} presets
+                Quick ranges
               </div>
               {rangePresets.map((preset) => {
                 const active = from === preset.from && to === preset.to;
@@ -819,12 +865,12 @@ function RangeControlButton({
             </div>
           )}
 
-          <div className="space-y-3 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Custom {label.toLowerCase()}
+          <div className="p-3">
+            <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Custom range
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-muted-foreground">From</label>
                 <RangeInput
                   inputRef={fromInputRef}
@@ -834,7 +880,7 @@ function RangeControlButton({
                   onChange={setDraftFrom}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-muted-foreground">To</label>
                 <RangeInput
                   inputRef={toInputRef}
@@ -845,10 +891,10 @@ function RangeControlButton({
                 />
               </div>
             </div>
-            <div className="flex justify-end">
+            <div className="mt-3 flex justify-end">
               <Button
                 type="button"
-                variant="outline"
+                variant="default"
                 size="sm"
                 className="h-8 px-3 text-xs"
                 onClick={() => applyRange(draftFrom, draftTo)}
@@ -1213,20 +1259,6 @@ function formatRangeLabel(
   if (!trimmedFrom) return trimmedTo;
   if (!trimmedTo) return trimmedFrom;
   return `${trimmedFrom} → ${trimmedTo}`;
-}
-
-function formatRangeButtonLabel(
-  label: string,
-  kind: "date" | "time",
-  from: string,
-  to: string,
-  emptyLabel?: string,
-) {
-  const summary = formatRangeLabel(kind, from, to, emptyLabel);
-  const defaultEmptyLabel = emptyLabel ?? (kind === "date" ? "Any date" : "now-24h");
-  const isEmpty = !from.trim() && !to.trim() && summary === defaultEmptyLabel;
-
-  return isEmpty ? label : `${label}: ${summary}`;
 }
 
 function RangeInput({

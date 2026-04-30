@@ -164,6 +164,10 @@ export type ClickyCommandRuntime = {
   onNavigate?: (resolved: ClickyResolvedCommand) => void;
 };
 
+export type ClickyTableRowClick = (row: ClickyRow) => void;
+export type ClickyTableRowHref = (row: ClickyRow) => string | undefined;
+export type ClickyTableRowPredicate = (row: ClickyRow) => boolean;
+
 const CLICKY_PRIMARY_VIEW_FORMATS = ["clicky", "json"] as const;
 const CLICKY_OVERFLOW_VIEW_FORMATS = [
   "pdf",
@@ -196,6 +200,9 @@ export type ClickyProps = {
   view?: ClickyViewConfig;
   download?: ClickyDownloadOptions;
   commandRuntime?: ClickyCommandRuntime;
+  onTableRowClick?: ClickyTableRowClick;
+  getTableRowHref?: ClickyTableRowHref;
+  isTableRowClickable?: ClickyTableRowPredicate;
   className?: string;
 };
 
@@ -217,6 +224,9 @@ type JsonTreeNode = {
 
 type ClickyRuntimeContextValue = {
   commandRuntime?: ClickyCommandRuntime | undefined;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
 };
@@ -244,6 +254,9 @@ export function Clicky(props: ClickyProps) {
   const content = (
     <ClickyRuntimeProvider
       {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}
+      {...(props.onTableRowClick ? { onTableRowClick: props.onTableRowClick } : {})}
+      {...(props.getTableRowHref ? { getTableRowHref: props.getTableRowHref } : {})}
+      {...(props.isTableRowClickable ? { isTableRowClickable: props.isTableRowClickable } : {})}
     >
       {props.url ? (
         <ClickyRemoteRenderer {...props} url={props.url} />
@@ -265,21 +278,43 @@ export function Clicky(props: ClickyProps) {
 
 function ClickyRuntimeProvider({
   commandRuntime,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
   children,
 }: {
   commandRuntime?: ClickyCommandRuntime | undefined;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   children: ReactNode;
 }) {
   if (!commandRuntime) {
     return (
-      <ClickyRuntimeContext.Provider value={clickyRuntimeContextDefault}>
+      <ClickyRuntimeContext.Provider
+        value={
+          onTableRowClick || getTableRowHref || isTableRowClickable
+            ? {
+                ...clickyRuntimeContextDefault,
+                onTableRowClick,
+                getTableRowHref,
+                isTableRowClickable,
+              }
+            : clickyRuntimeContextDefault
+        }
+      >
         {children}
       </ClickyRuntimeContext.Provider>
     );
   }
 
   return (
-    <ClickyCommandRuntimeProvider commandRuntime={commandRuntime}>
+    <ClickyCommandRuntimeProvider
+      commandRuntime={commandRuntime}
+      {...(onTableRowClick ? { onTableRowClick } : {})}
+      {...(getTableRowHref ? { getTableRowHref } : {})}
+      {...(isTableRowClickable ? { isTableRowClickable } : {})}
+    >
       {children}
     </ClickyCommandRuntimeProvider>
   );
@@ -287,19 +322,28 @@ function ClickyRuntimeProvider({
 
 function ClickyCommandRuntimeProvider({
   commandRuntime,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
   children,
 }: {
   commandRuntime: ClickyCommandRuntime;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   children: ReactNode;
 }) {
   const { operations, isLoading } = useOperations(commandRuntime.client);
   const value = useMemo(
     () => ({
       commandRuntime,
+      onTableRowClick,
+      getTableRowHref,
+      isTableRowClickable,
       operations,
       operationsLoading: isLoading,
     }),
-    [commandRuntime, isLoading, operations],
+    [commandRuntime, getTableRowHref, isLoading, isTableRowClickable, onTableRowClick, operations],
   );
 
   return <ClickyRuntimeContext.Provider value={value}>{children}</ClickyRuntimeContext.Provider>;
@@ -1233,7 +1277,11 @@ function isAbsoluteUrl(url: string) {
 
 function normalizeClickyDocument(data: unknown): ParsedClicky {
   if (!data || typeof data !== "object") {
-    return { ok: false, message: "Payload must be an object", raw: String(data ?? "") };
+    return {
+      ok: false,
+      message: "Payload must be an object",
+      raw: String(data ?? ""),
+    };
   }
 
   const candidate = data as Partial<ClickyDocument> & Partial<ClickyNode>;
@@ -1869,11 +1917,16 @@ function ClickyMap({ node }: { node: ClickyNode }) {
 }
 
 function ClickyTable({ node }: { node: ClickyNode }) {
+  const runtime = useContext(ClickyRuntimeContext);
   const columns = node.columns ?? [];
   const rows = node.rows ?? [];
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
+  }
+
+  if (shouldRenderRowsAsCollapsedStructs(columns, rows)) {
+    return <ClickyCollapsedStructRows columns={columns} rows={rows} />;
   }
 
   const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => ({
@@ -1910,8 +1963,162 @@ function ClickyTable({ node }: { node: ClickyNode }) {
           .join("|")}`
       }
       renderExpandedRow={(row) => (row.detail ? <ClickyNodeRenderer node={row.detail} /> : null)}
+      {...(runtime.onTableRowClick ? { onRowClick: runtime.onTableRowClick } : {})}
+      {...(runtime.getTableRowHref ? { getRowHref: runtime.getTableRowHref } : {})}
+      {...(runtime.onTableRowClick && (runtime.isTableRowClickable || runtime.getTableRowHref)
+        ? {
+            isRowClickable:
+              runtime.isTableRowClickable ?? ((row) => Boolean(runtime.getTableRowHref?.(row))),
+          }
+        : {})}
     />
   );
+}
+
+function ClickyCollapsedStructRows({
+  columns,
+  rows,
+}: {
+  columns: ClickyColumn[];
+  rows: ClickyRow[];
+}) {
+  return (
+    <div className="space-y-2">
+      {rows.map((row, index) => {
+        const label = rowStructLabel(row, columns, index);
+        const content = rowAsMap(row, columns);
+
+        return (
+          <details
+            key={rowStructKey(row, columns, index)}
+            className="rounded-md border border-border bg-background"
+          >
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
+              {label}
+            </summary>
+            <div className="border-t border-border p-3">
+              <ClickyMap node={content} />
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function shouldRenderRowsAsCollapsedStructs(columns: ClickyColumn[], rows: ClickyRow[]) {
+  if (rows.length === 0) return false;
+
+  return rows.every((row) => {
+    const cells = columns.map((column) => row.cells[column.name]).filter(Boolean);
+    if (cells.length === 0) return false;
+
+    const complexCells = cells.filter(isStructCellNode);
+    return complexCells.length > 0 && complexCells.length === cells.length;
+  });
+}
+
+function isStructCellNode(node: ClickyNode | undefined) {
+  if (!node) return false;
+  if (node.kind === "map") return (node.fields ?? []).length > 0;
+  if (node.kind === "table") return (node.rows ?? []).length > 0;
+  if (node.kind !== "list") return false;
+
+  const items = node.items ?? [];
+  return items.length > 0 && items.every(isStructCellNode);
+}
+
+function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
+  return {
+    kind: "map",
+    fields: columns
+      .filter((column) => row.cells[column.name])
+      .map((column) => ({
+        name: column.name,
+        label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
+        value: row.cells[column.name],
+      })),
+  };
+}
+
+function rowStructLabel(row: ClickyRow, columns: ClickyColumn[], index: number) {
+  const entityLabel = singularizeLabel(
+    columns.find((column) => hasMeaningfulText(row.cells[column.name]))?.label ??
+      columns[0]?.label ??
+      columns[0]?.name ??
+      "Item",
+  );
+  const title = rowTitle(row, columns);
+  return title ? `${entityLabel} ${index + 1}: ${title}` : `${entityLabel} ${index + 1}`;
+}
+
+function rowStructKey(row: ClickyRow, columns: ClickyColumn[], index: number) {
+  const title = rowTitle(row, columns);
+  return `${index}-${title || columns.map((column) => clickyNodeText(row.cells[column.name])).join("|")}`;
+}
+
+function rowTitle(row: ClickyRow, columns: ClickyColumn[]) {
+  const preferredFieldNames = [
+    "name",
+    "title",
+    "agreementname",
+    "companyname",
+    "customernumber",
+    "id",
+    "guid",
+  ];
+
+  for (const preferred of preferredFieldNames) {
+    for (const column of columns) {
+      const candidate = findFieldText(row.cells[column.name], preferred);
+      if (candidate) return candidate;
+    }
+  }
+
+  for (const column of columns) {
+    const candidate = clickyNodeText(row.cells[column.name]).trim();
+    if (candidate) return candidate;
+  }
+
+  return "";
+}
+
+function findFieldText(node: ClickyNode | undefined, preferredName: string): string {
+  if (!node) return "";
+
+  if (node.kind === "map") {
+    for (const field of node.fields ?? []) {
+      if (normalizeFieldName(field.name) === preferredName) {
+        const text = clickyNodeText(field.value).trim();
+        if (text) return text;
+      }
+    }
+  }
+
+  for (const field of node.fields ?? []) {
+    const text = findFieldText(field.value, preferredName);
+    if (text) return text;
+  }
+
+  for (const item of node.items ?? []) {
+    const text = findFieldText(item, preferredName);
+    if (text) return text;
+  }
+
+  return "";
+}
+
+function hasMeaningfulText(node: ClickyNode | undefined) {
+  return Boolean(clickyNodeText(node).trim() || (node?.fields ?? []).length > 0);
+}
+
+function normalizeFieldName(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function singularizeLabel(label: string) {
+  const normalized = prettifyName(label).trim();
+  return normalized.endsWith("s") ? normalized.slice(0, -1) : normalized;
 }
 
 function ClickyTreeNode({ node }: { node: ClickyNode }) {

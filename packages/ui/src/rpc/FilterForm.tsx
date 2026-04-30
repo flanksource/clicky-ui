@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { FilterBar } from "../components/FilterBar";
@@ -23,6 +23,7 @@ export type FilterFormProps = {
   lockedValues?: ParameterValues | undefined;
   hideLocked?: boolean | undefined;
   enableLookup?: boolean | undefined;
+  autoSubmit?: boolean | undefined;
   submitLabel?: string | undefined;
   submittingLabel?: string | undefined;
   emptyMessage?: string | undefined;
@@ -40,6 +41,7 @@ export function FilterForm({
   lockedValues = {},
   hideLocked = false,
   enableLookup = method.toUpperCase() === "GET",
+  autoSubmit = false,
   submitLabel = "Execute request",
   submittingLabel = "Executing…",
   emptyMessage = "This operation does not require input.",
@@ -56,6 +58,7 @@ export function FilterForm({
   );
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
+  const lastAutoSubmitted = useRef<string | null>(null);
 
   const lookupQuery = useQuery({
     queryKey: ["filter-form-lookup", method, path, debouncedValues],
@@ -105,15 +108,41 @@ export function FilterForm({
   useEffect(() => {
     setValues(buildInitialParameterValues(parameters, method, lockedValues, initialValues));
     setError("");
+    lastAutoSubmitted.current = null;
   }, [resetKey]);
+
+  useEffect(() => {
+    if (!autoSubmit) {
+      return;
+    }
+
+    const missingRequired = parameters.filter((param) => {
+      if (!param.required) return false;
+      const value = lockedValues[param.name] ?? debouncedValues[param.name] ?? "";
+      return value.trim() === "";
+    });
+    if (missingRequired.length > 0) {
+      return;
+    }
+
+    const submittedValues = pruneParameterValues(debouncedValues);
+    const signature = JSON.stringify(submittedValues);
+    if (lastAutoSubmitted.current === signature) {
+      return;
+    }
+
+    lastAutoSubmitted.current = signature;
+    setError("");
+    void onSubmit(submittedValues);
+  }, [autoSubmit, debouncedValues, lockedValues, onSubmit, parameters]);
 
   return (
     <div className="space-y-3">
       {hasFields ? (
         <FilterBar
-          autoSubmit={false}
+          autoSubmit={autoSubmit}
           filters={formConfig.filters}
-          onApply={handleSubmit}
+          {...(!autoSubmit ? { onApply: handleSubmit } : {})}
           applyLabel={submitLabel}
           isPending={isSubmitting}
           {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}

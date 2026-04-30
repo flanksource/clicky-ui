@@ -50,6 +50,7 @@
     "@iconify/react": "catalog:",
     "@radix-ui/react-compose-refs": "catalog:",
     "@radix-ui/react-slot": "catalog:",
+    "@scalar/api-reference-react": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "lucide-react": "catalog:",

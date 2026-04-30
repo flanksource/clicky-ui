@@ -16,6 +16,7 @@ const meta = {
       options: ["default", "sm", "lg", "icon"],
     },
     disabled: { control: "boolean" },
+    loading: { control: "boolean" },
     onClick: { action: "click" },
   },
   args: { children: "Button", onClick: fn() },
@@ -53,6 +54,8 @@ export const Sizes: Story = {
 };
 
 export const Disabled: Story = { args: { disabled: true } };
+
+export const Loading: Story = { args: { loading: true, children: "Saving" } };
 
 export const ClickInteraction: Story = {
   args: { children: "Click me" },

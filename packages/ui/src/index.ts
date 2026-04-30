@@ -43,6 +43,7 @@ export {
   type FilterBarRangePreset,
   type FilterBarRangeProps,
   type FilterBarSearchProps,
+  type FilterBarSelectMultiFilter,
   type FilterBarTextFilter,
 } from "./components/FilterBar";
 export {
@@ -83,6 +84,9 @@ export {
   type ClickyRemoteFormat,
   type ClickyRow,
   type ClickyStyle,
+  type ClickyTableRowHref,
+  type ClickyTableRowClick,
+  type ClickyTableRowPredicate,
   type ClickyTreeItem,
   type ClickyViewOptions,
 } from "./data/Clicky";
@@ -153,6 +157,11 @@ export {
   type ParsedThread,
   type ParsedThreadFrame,
 } from "./data/diagnostics/jvm-stacktrace";
+export {
+  JvmStackTrace,
+  JvmStackFrameRow,
+  type JvmStackTraceProps,
+} from "./data/diagnostics/JvmStackTrace";
 
 // HAR (HTTP archive viewer)
 export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";
@@ -170,6 +179,7 @@ export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overl
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 
 // Clicky-rpc operations browser
+export { ApiExplorer, DEFAULT_OPENAPI_URL, type ApiExplorerProps } from "./rpc/ApiExplorer";
 export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
 export { OperationEntityPage, type OperationEntityPageProps } from "./rpc/OperationEntityPage";
