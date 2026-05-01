@@ -129,3 +129,79 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* Inline-source styling for the rendered stack trace (RenderedStackTrace).
+ * Shiki emits one <span class="line"> per source line plus a `.error` class
+ * on lines marked with `// [!code error]` (via transformerNotationErrorLevel).
+ * We layer a CSS counter over the lines to render an absolute-line-number
+ * gutter, and override Shiki's per-theme background so the snippet sits on
+ * the surrounding muted card instead of Shiki's white. */
+.stacktrace-source pre.shiki {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  counter-reset: shiki-line var(--shiki-start, 0);
+  /* Shiki separates each <span class="line"> with a literal "\n". Inside a
+   * <pre> that newline becomes a real line break, so combined with our
+   * `display: block` on .line we end up with double-spaced output. Switch
+   * the wrapper to normal whitespace and re-enable `pre` only on the line
+   * itself so indentation inside the line is preserved. */
+  white-space: normal;
+}
+
+.stacktrace-source pre.shiki code {
+  display: block;
+  white-space: normal;
+}
+
+.stacktrace-source pre.shiki .line {
+  display: block;
+  counter-increment: shiki-line;
+  padding-left: 3.5rem;
+  position: relative;
+  white-space: pre;
+  /* Empty lines (a deliberate blank between methods, or trailing newlines)
+   * collapse to 0 height without this — losing the visual structure of
+   * the source. min-height keeps them visible at the body line-height. */
+  min-height: 1lh;
+}
+
+.stacktrace-source pre.shiki .line::before {
+  content: counter(shiki-line);
+  position: absolute;
+  left: 0;
+  width: 3rem;
+  padding-right: 0.5rem;
+  text-align: right;
+  color: hsl(var(--muted-foreground));
+  user-select: none;
+}
+
+/* When the transformer marks a line as `error`, Shiki adds `has-highlighted`
+ * to the wrapping <pre>. We use that to dim every other line so the focal
+ * line pops without the extra `>>>` gutter marker. Keeps the structure
+ * scannable while drawing the eye to the actual frame line. */
+.stacktrace-source pre.shiki.has-highlighted .line {
+  opacity: 0.55;
+}
+
+.stacktrace-source pre.shiki .line.error {
+  background-color: rgb(239 68 68 / 0.1);
+  font-weight: 700;
+  color: rgb(185 28 28);
+  opacity: 1;
+}
+
+[data-theme="dark"] .stacktrace-source pre.shiki .line.error {
+  color: rgb(248 113 113);
+}
+
+.stacktrace-source pre.shiki .line.error::before {
+  color: rgb(185 28 28);
+}
+
+[data-theme="dark"] .stacktrace-source pre.shiki .line.error::before {
+  color: rgb(248 113 113);
+}

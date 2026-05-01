@@ -23,6 +23,7 @@ catalog:
   "@radix-ui/react-tabs": ^1.1.2
   "@radix-ui/react-tooltip": ^1.1.6
   '@scalar/api-reference-react': ^0.9.31
+  "@shikijs/transformers": ^1.24.0
   "@storybook/addon-essentials": ^8.6.18
   "@storybook/react": ^8.6.18
   "@storybook/react-vite": ^8.6.18
@@ -46,6 +47,7 @@ catalog:
   preact: ^10.25.3
   react: ^18.3.1
   react-dom: ^18.3.1
+  shiki: ^1.24.0
   sonner: ^1.7.1
   storybook: ^8.6.18
   tailwind-merge: ^2.6.0

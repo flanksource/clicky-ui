@@ -8,6 +8,7 @@ import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
 import { ClickyDemo } from "./demos/ClickyDemo";
+import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
@@ -22,6 +23,7 @@ import { TreeGroupHeaderDemo } from "./demos/TreeGroupHeaderDemo";
 import { HoverCardDemo } from "./demos/HoverCardDemo";
 import { ModalDemo } from "./demos/ModalDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
+import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
 
 export type DemoEntry = {
@@ -51,6 +53,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "avatar", label: "Avatar", component: AvatarDemo },
       { id: "progress", label: "ProgressBar", component: ProgressBarDemo },
       { id: "clicky", label: "Clicky", component: ClickyDemo },
+      { id: "code-blocks", label: "CodeBlocks", component: CodeBlocksDemo },
       { id: "json-view", label: "JsonView", component: JsonViewDemo },
       { id: "ansi-html", label: "AnsiHtml", component: AnsiHtmlDemo },
       { id: "log-viewer", label: "LogViewer", component: LogViewerDemo },
@@ -87,6 +90,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     title: "Diagnostics",
     items: [
       { id: "diagnostics", label: "Process & Stack", component: DiagnosticsDemo },
+      { id: "stacktrace", label: "StackTrace", component: StackTraceDemo },
       { id: "har-panel", label: "HarPanel", component: HarPanelDemo },
     ],
   },

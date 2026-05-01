@@ -162,6 +162,16 @@ export {
   JvmStackFrameRow,
   type JvmStackTraceProps,
 } from "./data/diagnostics/JvmStackTrace";
+export {
+  StackTrace,
+  type StackTraceProps,
+  type StackTraceSourceResolver,
+} from "./data/diagnostics/RenderedStackTrace";
+export {
+  parseJavaStackTrace,
+  type ParsedStackFrame,
+  type ParsedStackTrace,
+} from "./data/diagnostics/stacktrace-parse";
 
 // HAR (HTTP archive viewer)
 export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";
@@ -181,7 +191,20 @@ export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 // Clicky-rpc operations browser
 export { ApiExplorer, DEFAULT_OPENAPI_URL, type ApiExplorerProps } from "./rpc/ApiExplorer";
 export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
+export {
+  ACCEPT_OPTIONS,
+  AcceptPicker,
+  VIEW_OPTIONS,
+  type AcceptOption,
+  type AcceptPickerProps,
+  type AcceptValue,
+  type OperationPreviewMode,
+} from "./rpc/AcceptPicker";
+export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
+export { CommandOutput, type CommandOutputProps } from "./rpc/CommandOutput";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
+export { InlineError, type InlineErrorProps } from "./rpc/InlineError";
+export { OperationActionDialog, type OperationActionDialogProps } from "./rpc/OperationActionDialog";
 export { OperationEntityPage, type OperationEntityPageProps } from "./rpc/OperationEntityPage";
 export { OperationCommandPage, type OperationCommandPageProps } from "./rpc/OperationCommandPage";
 export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
