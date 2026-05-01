@@ -26,6 +26,7 @@ import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
 import { ApiExplorerDemo } from "./demos/ApiExplorerDemo";
+import { CommandFormDemo } from "./demos/CommandFormDemo";
 import { OperationDialogsDemo } from "./demos/OperationDialogsDemo";
 
 export type DemoEntry = {
@@ -99,6 +100,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Clicky-RPC",
     items: [
+      { id: "command-form", label: "CommandForm", component: CommandFormDemo },
       { id: "operation-dialogs", label: "OperationDialogs", component: OperationDialogsDemo },
       { id: "api-explorer", label: "ApiExplorer", component: ApiExplorerDemo },
     ],

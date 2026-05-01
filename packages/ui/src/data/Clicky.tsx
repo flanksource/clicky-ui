@@ -32,6 +32,8 @@ import { Tree } from "./Tree";
 import { Icon } from "./Icon";
 import { JsonView } from "./JsonView";
 import { highlightCode } from "./code-highlight";
+import { StackTrace } from "./diagnostics/RenderedStackTrace";
+import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 
@@ -91,6 +93,7 @@ export type ClickyNode = {
     | "tree"
     | "code"
     | "collapsed"
+    | "stacktrace"
     | "button"
     | "button-group"
     | "html"
@@ -127,6 +130,10 @@ export type ClickyNode = {
   language?: string;
   source?: string;
   highlightedHtml?: string;
+  exceptionClass?: string;
+  message?: string;
+  causedBy?: string[];
+  frames?: ParsedStackFrame[];
 };
 
 export type ClickyDocument = {
@@ -1337,6 +1344,8 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
       return <ClickyCodeBlock node={node} />;
     case "collapsed":
       return <ClickyCollapsed node={node} />;
+    case "stacktrace":
+      return <ClickyStackTraceNode node={node} />;
     case "button":
       return <ClickyButtonNode node={node} />;
     case "button-group":
@@ -2246,6 +2255,21 @@ function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
   } catch {
     return JSON_PARSE_FAILED;
   }
+}
+
+function ClickyStackTraceNode({ node }: { node: ClickyNode }) {
+  return (
+    <StackTrace
+      input={{
+        exceptionClass: node.exceptionClass,
+        message: node.message,
+        causedBy: node.causedBy ?? [],
+        frames: node.frames ?? [],
+        language: "java",
+      }}
+      className="space-y-1"
+    />
+  );
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {

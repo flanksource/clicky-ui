@@ -39,6 +39,7 @@ export function CommandForm({
   const formParameters = normalizeParameters(parameters, path);
   const visibleParams = formParameters.filter((p) => !(p.in === "path" && initialValues?.[p.name]));
   const positionalNames = new Set(formParameters.filter(isPositionalParam).map((p) => p.name));
+  const inlineLayout = visibleParams.length >= INLINE_LAYOUT_THRESHOLD;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -60,32 +61,45 @@ export function CommandForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {visibleParams.length > 0 && (
-        <div className="grid gap-4">
+        <div className={inlineLayout ? "grid gap-2" : "grid gap-4"}>
           {visibleParams.map((param) => (
             <ParameterField
               key={param.name}
               param={param}
               value={values[param.name] || ""}
+              inline={inlineLayout}
               onChange={(value) => dispatch({ name: param.name, value })}
             />
           ))}
         </div>
       )}
 
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Executing..." : "Execute"}
-      </Button>
+      <div
+        className={
+          inlineLayout
+            ? "sticky bottom-0 z-10 -mx-2 flex justify-end border-t border-border bg-background/95 px-2 py-3 backdrop-blur-sm"
+            : "flex justify-end"
+        }
+      >
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Executing..." : "Execute"}
+        </Button>
+      </div>
     </form>
   );
 }
 
+const INLINE_LAYOUT_THRESHOLD = 6;
+
 function ParameterField({
   param,
   value,
+  inline,
   onChange,
 }: {
   param: OpenAPIParameter;
   value: string;
+  inline: boolean;
   onChange: (value: string) => void;
 }) {
   const schema = param.schema;
@@ -93,7 +107,7 @@ function ParameterField({
 
   if (isMultiValueParam(param)) {
     return (
-      <FieldWrapper param={param} fieldId={fieldId}>
+      <FieldWrapper param={param} fieldId={fieldId} inline={inline}>
         <TagInput
           id={fieldId}
           value={value}
@@ -106,7 +120,7 @@ function ParameterField({
 
   if (schema?.enum) {
     return (
-      <FieldWrapper param={param} fieldId={fieldId}>
+      <FieldWrapper param={param} fieldId={fieldId} inline={inline}>
         <select
           id={fieldId}
           value={value}
@@ -125,15 +139,25 @@ function ParameterField({
   }
 
   if (schema?.type === "boolean") {
+    const checkbox = (
+      <input
+        id={fieldId}
+        type="checkbox"
+        className="h-4 w-4 accent-primary"
+        checked={value === "true"}
+        onChange={(event) => onChange(event.target.checked ? "true" : "false")}
+      />
+    );
+    if (inline) {
+      return (
+        <FieldWrapper param={param} fieldId={fieldId} inline>
+          <div className="flex h-9 items-center">{checkbox}</div>
+        </FieldWrapper>
+      );
+    }
     return (
       <div className="flex items-center gap-2">
-        <input
-          id={fieldId}
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={value === "true"}
-          onChange={(event) => onChange(event.target.checked ? "true" : "false")}
-        />
+        {checkbox}
         <label htmlFor={fieldId} className="text-sm font-medium">
           {param.name}
           {param.required && <span className="text-destructive"> *</span>}
@@ -146,7 +170,7 @@ function ParameterField({
   if (isDateParam(param)) {
     const dateTime = schema?.format === "date-time";
     return (
-      <FieldWrapper param={param} fieldId={fieldId}>
+      <FieldWrapper param={param} fieldId={fieldId} inline={inline}>
         <div className="flex gap-2">
           <input
             id={fieldId}
@@ -174,7 +198,7 @@ function ParameterField({
   const inputType = schema?.type === "integer" || schema?.type === "number" ? "number" : "text";
 
   return (
-    <FieldWrapper param={param} fieldId={fieldId}>
+    <FieldWrapper param={param} fieldId={fieldId} inline={inline}>
       <input
         id={fieldId}
         type={inputType}
@@ -260,18 +284,36 @@ function TagInput({
 function FieldWrapper({
   param,
   fieldId,
+  inline,
   children,
 }: {
   param: OpenAPIParameter;
   fieldId: string;
+  inline?: boolean;
   children: ReactNode;
 }) {
+  const label = (
+    <label htmlFor={fieldId} className="text-sm font-medium">
+      {param.name}
+      {param.required && <span className="text-destructive"> *</span>}
+    </label>
+  );
+
+  if (inline) {
+    return (
+      <div className="grid grid-cols-[10rem_1fr] items-start gap-x-3 gap-y-0.5">
+        <div className="flex h-9 items-center">{label}</div>
+        <div className="min-w-0">{children}</div>
+        {param.description && (
+          <p className="col-start-2 text-xs text-muted-foreground">{param.description}</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1.5">
-      <label htmlFor={fieldId} className="text-sm font-medium">
-        {param.name}
-        {param.required && <span className="text-destructive"> *</span>}
-      </label>
+      {label}
       {children}
       {param.description && <p className="text-xs text-muted-foreground">{param.description}</p>}
     </div>

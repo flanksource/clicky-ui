@@ -4,6 +4,7 @@ packages:
   - e2e
 allowBuilds:
   esbuild: true
+  vue-demi: true
 
 catalog:
   "@changesets/cli": ^2.27.11

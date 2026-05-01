@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
-import { AcceptPicker } from "./AcceptPicker";
 import { CommandForm } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
 import { InlineError } from "./InlineError";
@@ -28,14 +26,9 @@ export function OperationActionDialog({
   onNavigateAction,
 }: OperationActionDialogProps) {
   const [open, setOpen] = useState(false);
-  const [accept, setAccept] = useState(defaultAccept);
   const [isExecuting, setIsExecuting] = useState(false);
   const [response, setResponse] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const description =
-    operation.operation.description && operation.operation.description !== operation.operation.summary
-      ? operation.operation.description
-      : undefined;
 
   async function handleExecute(params: Record<string, string>, headers: Record<string, string>) {
     if (onNavigateAction) {
@@ -67,32 +60,13 @@ export function OperationActionDialog({
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title={label} size="lg">
         <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 space-y-2">
-              <div className="flex items-center gap-3">
-                <MethodBadge method={operation.method} />
-                <code className="rounded-md bg-muted px-2 py-1 text-sm">{operation.path}</code>
-              </div>
-              <p className="font-mono text-xs text-muted-foreground">
-                {operation.method.toUpperCase()} {operation.path}
-              </p>
-              {description && <p className="text-sm text-muted-foreground">{description}</p>}
-            </div>
-            <div>
-              <div className="mb-1 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Accept
-              </div>
-              <AcceptPicker value={accept} onChange={setAccept} size="sm" />
-            </div>
-          </div>
-
           <CommandForm
             parameters={operation.operation.parameters ?? []}
             onExecute={handleExecute}
             isPending={isExecuting}
             method={operation.method}
             path={operation.path}
-            accept={accept}
+            accept={defaultAccept}
             initialValues={initialValues}
           />
 
