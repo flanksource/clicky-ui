@@ -14,7 +14,7 @@ import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
-import type { MultiSelectOption } from "./MultiSelect";
+import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { Select } from "./select";
 
@@ -38,6 +38,7 @@ export type FilterBarTextFilter = {
   key: string;
   kind: "text";
   label: string;
+  description?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -58,6 +59,7 @@ export type FilterBarLookupFilter = {
   key: string;
   kind: "lookup";
   label: string;
+  description?: string;
   value: string;
   options: FilterBarLookupOption[];
   onChange: (value: string) => void;
@@ -71,6 +73,7 @@ export type FilterBarLookupMultiFilter = {
   key: string;
   kind: "lookup-multi";
   label: string;
+  description?: string;
   value: string[];
   options: FilterBarLookupOption[];
   onChange: (value: string[]) => void;
@@ -85,9 +88,23 @@ export type FilterBarMultiFilter = {
   key: string;
   kind: "multi";
   label: string;
+  description?: string;
   value: Record<string, FilterBarMultiFilterMode>;
   options: MultiSelectOption[];
   onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
+  disabled?: boolean;
+  className?: string;
+};
+
+export type FilterBarSelectMultiFilter = {
+  key: string;
+  kind: "select-multi";
+  label: string;
+  description?: string;
+  value: string[];
+  options: MultiSelectOption[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
   disabled?: boolean;
   className?: string;
 };
@@ -101,6 +118,7 @@ export type FilterBarNumberFilter = {
   key: string;
   kind: "number";
   label: string;
+  description?: string;
   value: FilterBarNumberValue;
   onChange: (value: FilterBarNumberValue) => void;
   domainMin?: number;
@@ -117,6 +135,7 @@ export type FilterBarEnumFilter = {
   key: string;
   kind: "enum";
   label: string;
+  description?: string;
   value: string;
   options: Array<{ value: string; label?: string }>;
   onChange: (value: string) => void;
@@ -129,6 +148,7 @@ export type FilterBarBooleanFilter = {
   key: string;
   kind: "boolean";
   label: string;
+  description?: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -140,6 +160,7 @@ export type FilterBarFilter =
   | FilterBarLookupFilter
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
+  | FilterBarSelectMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
   | FilterBarBooleanFilter;
@@ -236,6 +257,10 @@ export function FilterBar({
             return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
           }
 
+          if (filter.kind === "select-multi") {
+            return <SelectMultiFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
           if (filter.kind === "number") {
             return <NumberFilterField key={filter.key} filter={filter} grow={grow} />;
           }
@@ -277,6 +302,7 @@ export function FilterBar({
 function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -306,6 +332,7 @@ function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: 
 function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 shrink-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-2 text-xs",
         filter.disabled && "opacity-60",
@@ -363,6 +390,7 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -392,6 +420,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -454,6 +483,7 @@ function LookupMultiFilterField({
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -506,6 +536,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
   return (
     <div
       ref={rootRef}
+      title={filter.description}
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
@@ -631,15 +662,25 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [optionQuery, setOptionQuery] = useState("");
   const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
   const summary = summarizeMultiFilter(filter.label, draft);
+  const showOptionFilter = filter.options.length > 7;
+  const visibleOptions = useMemo(() => {
+    const query = optionQuery.trim().toLowerCase();
+    if (!query) return filter.options;
+    return filter.options.filter((option) =>
+      multiSelectOptionText(option).toLowerCase().includes(query),
+    );
+  }, [filter.options, optionQuery]);
 
   return (
     <div
       ref={rootRef}
+      title={filter.description}
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
@@ -686,10 +727,24 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
             </button>
           </div>
 
+          {showOptionFilter && (
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
+              <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+              <input
+                type="search"
+                aria-label={`Filter ${filter.label} options`}
+                className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder={`Filter ${filter.label.toLowerCase()}`}
+                value={optionQuery}
+                onChange={(event) => setOptionQuery(event.target.value)}
+              />
+            </div>
+          )}
+
           <div className="max-h-72 space-y-1 overflow-auto">
-            {filter.options.map((option) => {
+            {visibleOptions.map((option) => {
               const mode = draft[option.value] ?? "neutral";
-              const title = typeof option.label === "string" ? option.label : option.value;
+              const title = option.title ?? multiSelectOptionText(option);
 
               return (
                 <div
@@ -721,10 +776,51 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                 </div>
               );
             })}
+            {visibleOptions.length === 0 && (
+              <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+            )}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function multiSelectOptionText(option: MultiSelectOption) {
+  const label = typeof option.label === "string" ? option.label : "";
+  return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
+}
+
+function SelectMultiFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarSelectMultiFilter;
+  grow: boolean;
+}) {
+  return (
+    <label
+      title={filter.description}
+      className={cn(
+        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
+        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        filter.disabled && "opacity-60",
+        filter.className,
+      )}
+    >
+      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+        {filter.label}
+      </span>
+      <MultiSelect
+        options={filter.options}
+        value={filter.value}
+        onChange={filter.onChange}
+        placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        disabled={filter.disabled}
+        triggerClassName="h-6 min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+        menuClassName="left-auto right-0"
+      />
+    </label>
   );
 }
 
@@ -762,10 +858,7 @@ function RangeControlButton({
     [kind, presets],
   );
 
-  const buttonLabel =
-    kind === "time"
-      ? formatRangeLabel(kind, from, to, emptyLabel)
-      : formatRangeButtonLabel(label, kind, from, to, emptyLabel);
+  const buttonLabel = formatRangeLabel(kind, from, to, emptyLabel);
 
   function applyRange(nextFrom: string, nextTo: string) {
     onApply(
@@ -786,18 +879,18 @@ function RangeControlButton({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((current) => !current)}
-        className="w-fit max-w-[11rem] min-w-0 gap-2 font-normal"
+        className="h-7 w-fit max-w-[11rem] min-w-0 gap-2 px-2 text-xs font-normal"
       >
-        <Icon name="codicon:calendar" className="text-muted-foreground" />
-        <span className="truncate">{buttonLabel}</span>
+        <Icon name="codicon:calendar" className="text-muted-foreground text-[14px]" />
+        <span className="truncate font-normal tabular-nums">{buttonLabel}</span>
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-lg shadow-black/5">
+        <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-md shadow-black/5 outline-none">
           {rangePresets.length > 0 && (
             <div className="border-b border-border p-1">
               <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {label} presets
+                Quick ranges
               </div>
               {rangePresets.map((preset) => {
                 const active = from === preset.from && to === preset.to;
@@ -819,12 +912,12 @@ function RangeControlButton({
             </div>
           )}
 
-          <div className="space-y-3 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Custom {label.toLowerCase()}
+          <div className="p-3">
+            <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Custom range
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-muted-foreground">From</label>
                 <RangeInput
                   inputRef={fromInputRef}
@@ -834,7 +927,7 @@ function RangeControlButton({
                   onChange={setDraftFrom}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-muted-foreground">To</label>
                 <RangeInput
                   inputRef={toInputRef}
@@ -845,10 +938,10 @@ function RangeControlButton({
                 />
               </div>
             </div>
-            <div className="flex justify-end">
+            <div className="mt-3 flex justify-end">
               <Button
                 type="button"
-                variant="outline"
+                variant="default"
                 size="sm"
                 className="h-8 px-3 text-xs"
                 onClick={() => applyRange(draftFrom, draftTo)}
@@ -1213,20 +1306,6 @@ function formatRangeLabel(
   if (!trimmedFrom) return trimmedTo;
   if (!trimmedTo) return trimmedFrom;
   return `${trimmedFrom} → ${trimmedTo}`;
-}
-
-function formatRangeButtonLabel(
-  label: string,
-  kind: "date" | "time",
-  from: string,
-  to: string,
-  emptyLabel?: string,
-) {
-  const summary = formatRangeLabel(kind, from, to, emptyLabel);
-  const defaultEmptyLabel = emptyLabel ?? (kind === "date" ? "Any date" : "now-24h");
-  const isEmpty = !from.trim() && !to.trim() && summary === defaultEmptyLabel;
-
-  return isEmpty ? label : `${label}: ${summary}`;
 }
 
 function RangeInput({

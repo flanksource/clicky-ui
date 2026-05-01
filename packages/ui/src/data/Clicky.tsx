@@ -30,6 +30,8 @@ import { cn } from "../lib/utils";
 import { DataTable, type DataTableColumn } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
+import { JsonView } from "./JsonView";
+import { highlightCode } from "./code-highlight";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 
@@ -164,6 +166,10 @@ export type ClickyCommandRuntime = {
   onNavigate?: (resolved: ClickyResolvedCommand) => void;
 };
 
+export type ClickyTableRowClick = (row: ClickyRow) => void;
+export type ClickyTableRowHref = (row: ClickyRow) => string | undefined;
+export type ClickyTableRowPredicate = (row: ClickyRow) => boolean;
+
 const CLICKY_PRIMARY_VIEW_FORMATS = ["clicky", "json"] as const;
 const CLICKY_OVERFLOW_VIEW_FORMATS = [
   "pdf",
@@ -196,6 +202,9 @@ export type ClickyProps = {
   view?: ClickyViewConfig;
   download?: ClickyDownloadOptions;
   commandRuntime?: ClickyCommandRuntime;
+  onTableRowClick?: ClickyTableRowClick;
+  getTableRowHref?: ClickyTableRowHref;
+  isTableRowClickable?: ClickyTableRowPredicate;
   className?: string;
 };
 
@@ -217,6 +226,9 @@ type JsonTreeNode = {
 
 type ClickyRuntimeContextValue = {
   commandRuntime?: ClickyCommandRuntime | undefined;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
 };
@@ -244,6 +256,9 @@ export function Clicky(props: ClickyProps) {
   const content = (
     <ClickyRuntimeProvider
       {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}
+      {...(props.onTableRowClick ? { onTableRowClick: props.onTableRowClick } : {})}
+      {...(props.getTableRowHref ? { getTableRowHref: props.getTableRowHref } : {})}
+      {...(props.isTableRowClickable ? { isTableRowClickable: props.isTableRowClickable } : {})}
     >
       {props.url ? (
         <ClickyRemoteRenderer {...props} url={props.url} />
@@ -265,21 +280,43 @@ export function Clicky(props: ClickyProps) {
 
 function ClickyRuntimeProvider({
   commandRuntime,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
   children,
 }: {
   commandRuntime?: ClickyCommandRuntime | undefined;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   children: ReactNode;
 }) {
   if (!commandRuntime) {
     return (
-      <ClickyRuntimeContext.Provider value={clickyRuntimeContextDefault}>
+      <ClickyRuntimeContext.Provider
+        value={
+          onTableRowClick || getTableRowHref || isTableRowClickable
+            ? {
+                ...clickyRuntimeContextDefault,
+                onTableRowClick,
+                getTableRowHref,
+                isTableRowClickable,
+              }
+            : clickyRuntimeContextDefault
+        }
+      >
         {children}
       </ClickyRuntimeContext.Provider>
     );
   }
 
   return (
-    <ClickyCommandRuntimeProvider commandRuntime={commandRuntime}>
+    <ClickyCommandRuntimeProvider
+      commandRuntime={commandRuntime}
+      {...(onTableRowClick ? { onTableRowClick } : {})}
+      {...(getTableRowHref ? { getTableRowHref } : {})}
+      {...(isTableRowClickable ? { isTableRowClickable } : {})}
+    >
       {children}
     </ClickyCommandRuntimeProvider>
   );
@@ -287,19 +324,28 @@ function ClickyRuntimeProvider({
 
 function ClickyCommandRuntimeProvider({
   commandRuntime,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
   children,
 }: {
   commandRuntime: ClickyCommandRuntime;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
   children: ReactNode;
 }) {
   const { operations, isLoading } = useOperations(commandRuntime.client);
   const value = useMemo(
     () => ({
       commandRuntime,
+      onTableRowClick,
+      getTableRowHref,
+      isTableRowClickable,
       operations,
       operationsLoading: isLoading,
     }),
-    [commandRuntime, isLoading, operations],
+    [commandRuntime, getTableRowHref, isLoading, isTableRowClickable, onTableRowClick, operations],
   );
 
   return <ClickyRuntimeContext.Provider value={value}>{children}</ClickyRuntimeContext.Provider>;
@@ -1233,7 +1279,11 @@ function isAbsoluteUrl(url: string) {
 
 function normalizeClickyDocument(data: unknown): ParsedClicky {
   if (!data || typeof data !== "object") {
-    return { ok: false, message: "Payload must be an object", raw: String(data ?? "") };
+    return {
+      ok: false,
+      message: "Payload must be an object",
+      raw: String(data ?? ""),
+    };
   }
 
   const candidate = data as Partial<ClickyDocument> & Partial<ClickyNode>;
@@ -1869,11 +1919,16 @@ function ClickyMap({ node }: { node: ClickyNode }) {
 }
 
 function ClickyTable({ node }: { node: ClickyNode }) {
+  const runtime = useContext(ClickyRuntimeContext);
   const columns = node.columns ?? [];
   const rows = node.rows ?? [];
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
+  }
+
+  if (shouldRenderRowsAsCollapsedStructs(columns, rows)) {
+    return <ClickyCollapsedStructRows columns={columns} rows={rows} />;
   }
 
   const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => ({
@@ -1910,8 +1965,162 @@ function ClickyTable({ node }: { node: ClickyNode }) {
           .join("|")}`
       }
       renderExpandedRow={(row) => (row.detail ? <ClickyNodeRenderer node={row.detail} /> : null)}
+      {...(runtime.onTableRowClick ? { onRowClick: runtime.onTableRowClick } : {})}
+      {...(runtime.getTableRowHref ? { getRowHref: runtime.getTableRowHref } : {})}
+      {...(runtime.onTableRowClick && (runtime.isTableRowClickable || runtime.getTableRowHref)
+        ? {
+            isRowClickable:
+              runtime.isTableRowClickable ?? ((row) => Boolean(runtime.getTableRowHref?.(row))),
+          }
+        : {})}
     />
   );
+}
+
+function ClickyCollapsedStructRows({
+  columns,
+  rows,
+}: {
+  columns: ClickyColumn[];
+  rows: ClickyRow[];
+}) {
+  return (
+    <div className="space-y-2">
+      {rows.map((row, index) => {
+        const label = rowStructLabel(row, columns, index);
+        const content = rowAsMap(row, columns);
+
+        return (
+          <details
+            key={rowStructKey(row, columns, index)}
+            className="rounded-md border border-border bg-background"
+          >
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
+              {label}
+            </summary>
+            <div className="border-t border-border p-3">
+              <ClickyMap node={content} />
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function shouldRenderRowsAsCollapsedStructs(columns: ClickyColumn[], rows: ClickyRow[]) {
+  if (rows.length === 0) return false;
+
+  return rows.every((row) => {
+    const cells = columns.map((column) => row.cells[column.name]).filter(Boolean);
+    if (cells.length === 0) return false;
+
+    const complexCells = cells.filter(isStructCellNode);
+    return complexCells.length > 0 && complexCells.length === cells.length;
+  });
+}
+
+function isStructCellNode(node: ClickyNode | undefined) {
+  if (!node) return false;
+  if (node.kind === "map") return (node.fields ?? []).length > 0;
+  if (node.kind === "table") return (node.rows ?? []).length > 0;
+  if (node.kind !== "list") return false;
+
+  const items = node.items ?? [];
+  return items.length > 0 && items.every(isStructCellNode);
+}
+
+function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
+  return {
+    kind: "map",
+    fields: columns
+      .filter((column) => row.cells[column.name])
+      .map((column) => ({
+        name: column.name,
+        label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
+        value: row.cells[column.name],
+      })),
+  };
+}
+
+function rowStructLabel(row: ClickyRow, columns: ClickyColumn[], index: number) {
+  const entityLabel = singularizeLabel(
+    columns.find((column) => hasMeaningfulText(row.cells[column.name]))?.label ??
+      columns[0]?.label ??
+      columns[0]?.name ??
+      "Item",
+  );
+  const title = rowTitle(row, columns);
+  return title ? `${entityLabel} ${index + 1}: ${title}` : `${entityLabel} ${index + 1}`;
+}
+
+function rowStructKey(row: ClickyRow, columns: ClickyColumn[], index: number) {
+  const title = rowTitle(row, columns);
+  return `${index}-${title || columns.map((column) => clickyNodeText(row.cells[column.name])).join("|")}`;
+}
+
+function rowTitle(row: ClickyRow, columns: ClickyColumn[]) {
+  const preferredFieldNames = [
+    "name",
+    "title",
+    "agreementname",
+    "companyname",
+    "customernumber",
+    "id",
+    "guid",
+  ];
+
+  for (const preferred of preferredFieldNames) {
+    for (const column of columns) {
+      const candidate = findFieldText(row.cells[column.name], preferred);
+      if (candidate) return candidate;
+    }
+  }
+
+  for (const column of columns) {
+    const candidate = clickyNodeText(row.cells[column.name]).trim();
+    if (candidate) return candidate;
+  }
+
+  return "";
+}
+
+function findFieldText(node: ClickyNode | undefined, preferredName: string): string {
+  if (!node) return "";
+
+  if (node.kind === "map") {
+    for (const field of node.fields ?? []) {
+      if (normalizeFieldName(field.name) === preferredName) {
+        const text = clickyNodeText(field.value).trim();
+        if (text) return text;
+      }
+    }
+  }
+
+  for (const field of node.fields ?? []) {
+    const text = findFieldText(field.value, preferredName);
+    if (text) return text;
+  }
+
+  for (const item of node.items ?? []) {
+    const text = findFieldText(item, preferredName);
+    if (text) return text;
+  }
+
+  return "";
+}
+
+function hasMeaningfulText(node: ClickyNode | undefined) {
+  return Boolean(clickyNodeText(node).trim() || (node?.fields ?? []).length > 0);
+}
+
+function normalizeFieldName(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function singularizeLabel(label: string) {
+  const normalized = prettifyName(label).trim();
+  return normalized.endsWith("s") ? normalized.slice(0, -1) : normalized;
 }
 
 function ClickyTreeNode({ node }: { node: ClickyNode }) {
@@ -1934,25 +2143,109 @@ function ClickyTreeNode({ node }: { node: ClickyNode }) {
 }
 
 function ClickyCodeBlock({ node }: { node: ClickyNode }) {
-  const html = node.highlightedHtml ? sanitizeHtml(node.highlightedHtml) : "";
+  const language = (node.language ?? "").toLowerCase().replace(/^\.+/, "");
+  const source = node.source ?? node.plain ?? "";
+  const chromaHtml = node.highlightedHtml ? sanitizeHtml(node.highlightedHtml) : "";
+
+  // JSON gets the interactive collapsible viewer instead of raw chroma
+  // output — operators read structured payloads (intake XMLData decoded
+  // to JSON, OpenAPI responses, etc.) far faster when the viewer lets
+  // them fold deep objects rather than scroll through highlighted text.
+  // Falls back to the chroma / Shiki path when the source can't be parsed
+  // (truncated payload, intentional pretty-printed-with-comments, etc.).
+  const parsedJson = useMemo(
+    () => (language === "json" ? tryParseJson(source) : JSON_PARSE_FAILED),
+    [language, source],
+  );
+
+  // Hooks below must run unconditionally regardless of which render branch
+  // wins, so they live above any early returns.
+  const [shikiHtml, setShikiHtml] = useState<string | null>(null);
+  const wantsClientHighlight = !chromaHtml && !!language && !!source;
+
+  useEffect(() => {
+    if (!wantsClientHighlight) {
+      setShikiHtml(null);
+      return;
+    }
+    let cancelled = false;
+    highlightCode(source, { lang: language }).then((out) => {
+      if (!cancelled) setShikiHtml(out);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantsClientHighlight, language, source]);
+
+  if (parsedJson !== JSON_PARSE_FAILED) {
+    return (
+      <div className="overflow-hidden rounded-md border border-border bg-muted/40">
+        <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          json
+        </div>
+        <div className="overflow-auto p-3 text-xs">
+          <JsonView data={parsedJson} defaultOpenDepth={2} />
+        </div>
+      </div>
+    );
+  }
+
+  // XML gets a tighter Tailwind ruleset that targets chroma's class names
+  // (the chroma html formatter emits .nt for tags, .na for attribute
+  // names, .s for strings, .c for comments). Without this, XML renders
+  // identically to plain text and operators reading large stacks or
+  // walked AsActivity payloads can't visually pick out the structure.
+  const xmlClasses =
+    language === "xml" || language === "xslt" || language === "html"
+      ? " [&_.chroma_.nt]:text-pink-700 [&_.chroma_.nt]:dark:text-pink-300 [&_.chroma_.nt]:font-semibold" +
+        " [&_.chroma_.na]:text-amber-700 [&_.chroma_.na]:dark:text-amber-300" +
+        " [&_.chroma_.s]:text-emerald-700 [&_.chroma_.s]:dark:text-emerald-300" +
+        " [&_.chroma_.c]:text-slate-500 [&_.chroma_.c]:italic" +
+        " [&_.chroma_.cp]:text-slate-500 [&_.chroma_.cp]:italic" +
+        " [&_pre]:leading-relaxed"
+      : "";
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/40">
       <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         {node.language || "text"}
       </div>
-      {html ? (
+      {chromaHtml ? (
         <div
-          className="overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent"
-          dangerouslySetInnerHTML={{ __html: html }}
+          className={
+            "overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent" +
+            xmlClasses
+          }
+          dangerouslySetInnerHTML={{ __html: chromaHtml }}
+        />
+      ) : shikiHtml ? (
+        <div
+          className="overflow-auto p-3 text-xs font-mono [&_pre]:m-0 [&_pre.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: shikiHtml }}
         />
       ) : (
         <pre className="overflow-auto whitespace-pre-wrap break-words p-3 text-xs font-mono text-foreground">
-          {node.source ?? node.plain}
+          {source}
         </pre>
       )}
     </div>
   );
+}
+
+// JSON_PARSE_FAILED is a sentinel distinct from any value that valid
+// JSON can produce (`undefined` is not legal JSON, but a JSON document
+// could legitimately parse to `null`, `false`, `0`, `""`, etc.). Using a
+// fresh object reference lets the caller branch with strict equality.
+const JSON_PARSE_FAILED: unique symbol = Symbol("json-parse-failed");
+
+function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
+  const trimmed = source.trim();
+  if (!trimmed) return JSON_PARSE_FAILED;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return JSON_PARSE_FAILED;
+  }
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {

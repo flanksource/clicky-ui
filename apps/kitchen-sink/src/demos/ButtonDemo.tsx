@@ -16,6 +16,7 @@ export function ButtonDemo() {
         <Button variant="ghost">Ghost</Button>
         <Button variant="link">Link</Button>
         <Button disabled>Disabled</Button>
+        <Button loading>Loading</Button>
       </DemoRow>
       <DemoRow label="Sizes">
         <Button size="sm">Small</Button>

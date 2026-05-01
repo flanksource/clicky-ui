@@ -50,6 +50,7 @@
     "@iconify/react": "catalog:",
     "@radix-ui/react-compose-refs": "catalog:",
     "@radix-ui/react-slot": "catalog:",
+    "@scalar/api-reference-react": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "lucide-react": "catalog:",
@@ -73,17 +74,25 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "@shikijs/transformers": "^1.24.0",
     "@tanstack/react-query": "^5.0.0",
     "marked": "^15.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
+    "shiki": "^1.24.0",
     "tailwindcss": "^3.4.0"
   },
   "peerDependenciesMeta": {
+    "@shikijs/transformers": {
+      "optional": true
+    },
     "@tanstack/react-query": {
       "optional": true
     },
     "marked": {
+      "optional": true
+    },
+    "shiki": {
       "optional": true
     }
   }

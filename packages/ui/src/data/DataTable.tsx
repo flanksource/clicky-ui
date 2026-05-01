@@ -3,6 +3,8 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type TdHTMLAttributes,
 } from "react";
@@ -36,6 +38,12 @@ type GeneratedFilter<T extends Record<string, unknown>> = {
   };
 };
 
+const DEFAULT_COLUMN_MIN_WIDTH = 64;
+const DEFAULT_COLUMN_WIDTH = 160;
+const DEFAULT_GROW_COLUMN_WIDTH = 224;
+const DEFAULT_SHRINK_COLUMN_WIDTH = 96;
+const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
+
 export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = {
   key: string;
   label: ReactNode;
@@ -43,6 +51,9 @@ export type DataTableColumn<T extends Record<string, unknown> = Record<string, u
   filterable?: boolean;
   grow?: boolean;
   shrink?: boolean;
+  resizable?: boolean;
+  minWidth?: number;
+  maxWidth?: number;
   align?: "left" | "center" | "right";
   render?: (value: unknown, row: T) => ReactNode;
   sortValue?: (value: unknown, row: T) => unknown;
@@ -65,8 +76,12 @@ export type DataTableProps<T extends Record<string, unknown> = Record<string, un
   filterBarProps?: Omit<FilterBarProps, "search" | "filters">;
   getRowId?: (row: T, index: number) => string;
   onRowClick?: (row: T) => void;
+  isRowClickable?: (row: T) => boolean;
   getRowHref?: (row: T) => string | undefined;
   renderExpandedRow?: (row: T) => ReactNode;
+  resizableColumns?: boolean;
+  persistColumnWidths?: boolean;
+  columnResizeStorageKey?: string;
 };
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -83,9 +98,22 @@ export function DataTable<T extends Record<string, unknown>>({
   filterBarProps,
   getRowId,
   onRowClick,
+  isRowClickable,
   getRowHref,
   renderExpandedRow,
+  resizableColumns = true,
+  persistColumnWidths = true,
+  columnResizeStorageKey,
 }: DataTableProps<T>) {
+  const columnKeysSignature = useMemo(
+    () => columns.map((column) => column.key).join("|"),
+    [columns],
+  );
+  const resolvedColumnResizeStorageKey =
+    columnResizeStorageKey ?? `${COLUMN_WIDTH_STORAGE_PREFIX}:${columnKeysSignature}`;
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
+    persistColumnWidths ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns) : {},
+  );
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
@@ -93,6 +121,21 @@ export function DataTable<T extends Record<string, unknown>>({
   const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarNumberValue>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
+
+  useEffect(() => {
+    setColumnWidths((current) => {
+      const stored = persistColumnWidths
+        ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns)
+        : {};
+      const next = pruneColumnWidths({ ...stored, ...current }, columns);
+      return sameColumnWidths(current, next) ? current : next;
+    });
+  }, [columnKeysSignature, persistColumnWidths, resolvedColumnResizeStorageKey]);
+
+  useEffect(() => {
+    if (!persistColumnWidths) return;
+    writeStoredColumnWidths(resolvedColumnResizeStorageKey, columnWidths);
+  }, [columnWidths, persistColumnWidths, resolvedColumnResizeStorageKey]);
 
   const rows = useMemo<InternalRow<T>[]>(
     () =>
@@ -289,6 +332,54 @@ export function DataTable<T extends Record<string, unknown>>({
     resolvers: sortResolvers,
   });
 
+  const startColumnResize = (event: ReactMouseEvent<HTMLElement>, column: DataTableColumn<T>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const header = event.currentTarget.closest("th");
+    const measuredWidth = header?.getBoundingClientRect().width ?? 0;
+    const startWidth = measuredWidth || columnWidths[column.key] || defaultColumnWidth(column);
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const nextWidth = clampColumnWidth(column, startWidth + moveEvent.clientX - startX);
+      setColumnWidths((current) => ({
+        ...current,
+        [column.key]: nextWidth,
+      }));
+    };
+
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const autoFitColumn = (event: ReactMouseEvent<HTMLElement>, column: DataTableColumn<T>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const header = event.currentTarget.closest("th");
+    const table = event.currentTarget.closest("table");
+    if (!header || !table) return;
+
+    const columnIndex = Array.from(header.parentElement?.children ?? []).indexOf(header);
+    if (columnIndex < 0) return;
+
+    const width = measureColumnContentWidth(table, columnIndex, column);
+    setColumnWidths((current) => ({
+      ...current,
+      [column.key]: width,
+    }));
+  };
+
   if (data.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border p-density-6 text-center text-sm text-muted-foreground">
@@ -327,6 +418,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 {columns.map((column) => (
                   <col
                     key={column.key}
+                    style={columnStyle(column, columnWidths)}
                     className={column.shrink && !column.grow ? "w-px" : undefined}
                   />
                 ))}
@@ -337,8 +429,9 @@ export function DataTable<T extends Record<string, unknown>>({
                     <th
                       key={column.key}
                       className={cn(
-                        "px-3 py-2 font-medium",
+                        "group/header relative whitespace-nowrap px-3 py-2 font-medium",
                         alignmentClass(column.align),
+                        resizableColumns && column.resizable !== false && "select-none",
                         column.headerClassName,
                       )}
                     >
@@ -354,6 +447,25 @@ export function DataTable<T extends Record<string, unknown>>({
                           {column.label}
                         </SortableHeader>
                       )}
+                      {resizableColumns && column.resizable !== false && (
+                        <span
+                          role="separator"
+                          aria-label={`Resize ${labelText(column)} column`}
+                          aria-orientation="vertical"
+                          className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onDoubleClick={(event) => autoFitColumn(event, column)}
+                          onMouseDown={(event) => startColumnResize(event, column)}
+                        >
+                          <span
+                            aria-hidden
+                            className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
+                          />
+                        </span>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -364,7 +476,8 @@ export function DataTable<T extends Record<string, unknown>>({
                   const expanded = expandedRows[record.id] ?? false;
                   const expandedContent = renderExpandedRow?.(record.row) ?? null;
                   const expandable = expandedContent !== null;
-                  const clickable = !!href || !!onRowClick || expandable;
+                  const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
+                  const clickable = !!href || rowClickEnabled || expandable;
 
                   return (
                     <Fragment key={record.id}>
@@ -380,7 +493,9 @@ export function DataTable<T extends Record<string, unknown>>({
                               [record.id]: !current[record.id],
                             }));
                           }
-                          onRowClick?.(record.row);
+                          if (rowClickEnabled) {
+                            onRowClick?.(record.row);
+                          }
                         }}
                       >
                         {columns.map((column, index) => {
@@ -597,6 +712,121 @@ function prettifyKey(key: string) {
 function labelText(column: DataTableColumn) {
   if (typeof column.label === "string") return column.label;
   return prettifyKey(column.key.split(".").at(-1) ?? column.key);
+}
+
+function columnStyle(
+  column: DataTableColumn,
+  widths: Record<string, number>,
+): CSSProperties | undefined {
+  const width = widths[column.key];
+  return width ? { width: `${width}px` } : undefined;
+}
+
+function measureColumnContentWidth(
+  table: HTMLTableElement,
+  columnIndex: number,
+  column: DataTableColumn,
+) {
+  const cells = Array.from(table.querySelectorAll("th, td")).filter(
+    (cell): cell is HTMLTableCellElement =>
+      cell instanceof HTMLTableCellElement && cell.cellIndex === columnIndex && cell.colSpan === 1,
+  );
+
+  const measured = cells.reduce((current, cell) => {
+    const horizontalPadding = getHorizontalPadding(cell);
+    const contentWidths = Array.from(cell.children).map((child) =>
+      child instanceof HTMLElement ? child.scrollWidth + horizontalPadding : 0,
+    );
+    return Math.max(current, cell.scrollWidth, ...contentWidths);
+  }, 0);
+
+  return clampColumnWidth(column, measured || defaultColumnWidth(column));
+}
+
+function getHorizontalPadding(element: HTMLElement) {
+  if (typeof window === "undefined") return 0;
+  const styles = window.getComputedStyle(element);
+  return parseCssPixelValue(styles.paddingLeft) + parseCssPixelValue(styles.paddingRight);
+}
+
+function parseCssPixelValue(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readStoredColumnWidths(
+  storageKey: string,
+  columns: DataTableColumn[],
+): Record<string, number> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    return pruneColumnWidths(parsed as Record<string, unknown>, columns);
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredColumnWidths(storageKey: string, widths: Record<string, number>) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (Object.keys(widths).length === 0) {
+      window.localStorage.removeItem(storageKey);
+    } else {
+      window.localStorage.setItem(storageKey, JSON.stringify(widths));
+    }
+  } catch {}
+}
+
+function pruneColumnWidths(
+  widths: Record<string, unknown>,
+  columns: DataTableColumn[],
+): Record<string, number> {
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+  const next: Record<string, number> = {};
+
+  for (const [key, width] of Object.entries(widths)) {
+    const column = byKey.get(key);
+    if (!column || typeof width !== "number" || !Number.isFinite(width)) continue;
+
+    next[key] = clampColumnWidth(column, width);
+  }
+
+  return next;
+}
+
+function sameColumnWidths(left: Record<string, number>, right: Record<string, number>) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key],
+    )
+  );
+}
+
+function defaultColumnWidth(column: DataTableColumn) {
+  if (column.grow) return DEFAULT_GROW_COLUMN_WIDTH;
+  if (column.shrink) return DEFAULT_SHRINK_COLUMN_WIDTH;
+  return DEFAULT_COLUMN_WIDTH;
+}
+
+function clampColumnWidth(column: DataTableColumn, width: number) {
+  const minWidth = column.minWidth ?? DEFAULT_COLUMN_MIN_WIDTH;
+  const maxWidth = column.maxWidth;
+  const minimum = Number.isFinite(minWidth) ? Math.max(1, minWidth) : DEFAULT_COLUMN_MIN_WIDTH;
+  const maximum =
+    maxWidth != null && Number.isFinite(maxWidth) ? Math.max(minimum, maxWidth) : Infinity;
+
+  return Math.round(Math.max(minimum, Math.min(maximum, width)));
 }
 
 function getNumericFilterBounds<T extends Record<string, unknown>>(

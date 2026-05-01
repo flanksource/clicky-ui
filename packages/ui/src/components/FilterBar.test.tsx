@@ -35,6 +35,7 @@ describe("FilterBar", () => {
             key: "owner",
             kind: "text",
             label: "Owner",
+            description: "Filter by owner team",
             value: "",
             onChange: onOwner,
             placeholder: "platform",
@@ -76,6 +77,10 @@ describe("FilterBar", () => {
     expect(screen.getByRole("button", { name: /status filter/i })).toHaveTextContent("Status +1");
 
     fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "platform" } });
+    expect(screen.getByLabelText("Owner").closest("label")).toHaveAttribute(
+      "title",
+      "Filter by owner team",
+    );
     expect(onOwner).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(500);
@@ -139,6 +144,9 @@ describe("FilterBar", () => {
       "Time range",
     );
     expect(screen.getByRole("button", { name: /date range filter/i })).toHaveTextContent(
+      "2026-04-21",
+    );
+    expect(screen.getByRole("button", { name: /date range filter/i })).not.toHaveTextContent(
       "Date range:",
     );
   });
@@ -218,6 +226,65 @@ describe("FilterBar", () => {
 
     fireEvent.click(screen.getByLabelText("Active"));
     expect(onActive).toHaveBeenCalledWith(true);
+  });
+
+  it("renders include-only multi-select filters", () => {
+    const onGroupBy = vi.fn();
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "groupBy",
+            kind: "select-multi",
+            label: "Group By",
+            value: ["type"],
+            options: [
+              { value: "type", label: "Type" },
+              { value: "health", label: "Health" },
+            ],
+            onChange: onGroupBy,
+          },
+        ]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /group by filter/i });
+    expect(trigger).toHaveTextContent("Type");
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText("Health"));
+    expect(onGroupBy).toHaveBeenCalledWith(["type", "health"]);
+  });
+
+  it("adds typeahead filtering for long tri-state option lists", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            options: Array.from({ length: 8 }, (_, index) => ({
+              value: `status-${index}`,
+              label: `Status ${index}`,
+            })),
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
+    expect(screen.getByLabelText("Filter Status options")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Filter Status options"), {
+      target: { value: "status 7" },
+    });
+
+    expect(screen.getByText("Status 7")).toBeInTheDocument();
+    expect(screen.queryByText("Status 1")).not.toBeInTheDocument();
   });
 
   it("renders lookup-backed single and multi filters as freeform fields", () => {

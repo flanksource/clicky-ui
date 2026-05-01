@@ -7,6 +7,7 @@ export type MultiSelectOption = {
   value: string;
   label: ReactNode;
   disabled?: boolean;
+  title?: string;
 };
 
 export type MultiSelectProps = {

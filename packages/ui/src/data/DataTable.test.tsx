@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { vi } from "vitest";
+import { beforeEach, vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
 
 type ServiceRow = {
@@ -55,6 +55,10 @@ const columns: DataTableColumn<ServiceRow>[] = [
 ];
 
 describe("DataTable", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("sorts columns by default and toggles the sort order", () => {
     render(<DataTable data={rows} columns={columns} defaultSort={{ key: "restarts" }} />);
 
@@ -136,6 +140,160 @@ describe("DataTable", () => {
       "max-w-[36rem]",
       "truncate",
     );
+  });
+
+  it("uses max-content auto table layout without handle padding by default", () => {
+    render(<DataTable data={rows} columns={columns} />);
+
+    expect(screen.getByRole("table")).toHaveClass("w-max", "table-auto");
+    expect(screen.getByRole("table")).not.toHaveClass("w-full");
+    expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass("whitespace-nowrap");
+    expect(screen.getByRole("columnheader", { name: /service/i })).not.toHaveClass("pr-5");
+  });
+
+  it("renders column resize handles by default", () => {
+    render(<DataTable data={rows} columns={columns} />);
+
+    expect(screen.getAllByRole("separator", { name: /resize .* column/i })).toHaveLength(
+      columns.length,
+    );
+  });
+
+  it("updates column width when dragging a resize handle", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnResizeStorageKey="clicky-ui-test-widths-drag"
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
+      clientX: 100,
+    });
+    fireEvent.mouseMove(document, { clientX: 180 });
+    fireEvent.mouseUp(document);
+
+    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 304px");
+  });
+
+  it("auto-fits a column when double-clicking a resize handle", () => {
+    const storageKey = "clicky-ui-test-widths-autofit";
+    render(<DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />);
+
+    const notesHeader = screen.getByRole("columnheader", { name: /notes/i });
+    const notesCell = screen.getByText("Production API service").closest("td");
+    const notesContent = screen.getByText("Production API service");
+    if (!notesCell) {
+      throw new Error("Expected notes cell");
+    }
+
+    Object.defineProperty(notesHeader, "scrollWidth", { configurable: true, value: 120 });
+    Object.defineProperty(notesCell, "scrollWidth", { configurable: true, value: 280 });
+    Object.defineProperty(notesContent, "scrollWidth", { configurable: true, value: 360 });
+
+    fireEvent.doubleClick(screen.getByRole("separator", { name: /resize notes column/i }));
+
+    const notesCol = document.querySelectorAll("col")[3];
+    expect(notesCol?.getAttribute("style")).toContain("width: 360px");
+    expect(window.localStorage.getItem(storageKey)).toBe(JSON.stringify({ notes: 360 }));
+  });
+
+  it("clamps resized widths to column minWidth and maxWidth", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={[{ ...columns[0], minWidth: 120, maxWidth: 240 }, ...columns.slice(1)]}
+        columnResizeStorageKey="clicky-ui-test-widths-clamp"
+      />,
+    );
+
+    const handle = screen.getByRole("separator", { name: /resize service column/i });
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.mouseMove(document, { clientX: 1000 });
+    fireEvent.mouseUp(document);
+
+    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 240px");
+
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.mouseMove(document, { clientX: -1000 });
+    fireEvent.mouseUp(document);
+
+    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 120px");
+  });
+
+  it("persists resized widths to localStorage and restores them on remount", () => {
+    const storageKey = "clicky-ui-test-widths-persist";
+    const { unmount } = render(
+      <DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
+      clientX: 100,
+    });
+    fireEvent.mouseMove(document, { clientX: 140 });
+    fireEvent.mouseUp(document);
+
+    expect(window.localStorage.getItem(storageKey)).toBe(JSON.stringify({ service: 264 }));
+
+    unmount();
+    render(<DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />);
+
+    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 264px");
+  });
+
+  it("can resize without persisting widths", () => {
+    const storageKey = "clicky-ui-test-widths-no-persist";
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        persistColumnWidths={false}
+        columnResizeStorageKey={storageKey}
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
+      clientX: 100,
+    });
+    fireEvent.mouseMove(document, { clientX: 140 });
+    fireEvent.mouseUp(document);
+
+    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 264px");
+    expect(window.localStorage.getItem(storageKey)).toBeNull();
+  });
+
+  it("can disable all resize handles", () => {
+    render(<DataTable data={rows} columns={columns} resizableColumns={false} />);
+
+    expect(screen.queryByRole("separator", { name: /resize .* column/i })).not.toBeInTheDocument();
+  });
+
+  it("can disable resizing for a single column", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={[{ ...columns[0], resizable: false }, ...columns.slice(1)]}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("separator", { name: /resize service column/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: /resize status column/i })).toBeInTheDocument();
+  });
+
+  it("keeps sorting independent from resize handles", () => {
+    render(<DataTable data={rows} columns={columns} defaultSort={{ key: "restarts" }} />);
+
+    const table = within(screen.getByRole("table"));
+    fireEvent.click(screen.getByRole("separator", { name: /resize restarts column/i }));
+
+    expect(table.getAllByRole("row")[1]).toHaveTextContent("api");
+
+    fireEvent.click(screen.getByRole("button", { name: /restarts/i }));
+
+    expect(table.getAllByRole("row")[1]).toHaveTextContent("worker");
   });
 
   it("passes native filter bar range controls through", () => {

@@ -4,6 +4,9 @@ import {
   type ClickyCommandRuntime,
   type ClickyDocument,
   type ClickyNode,
+  type ClickyTableRowHref,
+  type ClickyTableRowClick,
+  type ClickyTableRowPredicate,
 } from "../data/Clicky";
 import { cn } from "../lib/utils";
 import { parseJsonBody } from "./classify";
@@ -15,6 +18,9 @@ export type ExecutionResultProps = {
   ariaLabel?: string;
   className?: string;
   commandRuntime?: ClickyCommandRuntime;
+  onTableRowClick?: ClickyTableRowClick;
+  getTableRowHref?: ClickyTableRowHref;
+  isTableRowClickable?: ClickyTableRowPredicate;
 };
 
 export function ExecutionResult({
@@ -23,6 +29,9 @@ export function ExecutionResult({
   ariaLabel = "Response body",
   className,
   commandRuntime,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
 }: ExecutionResultProps) {
   if (!response) {
     return <p className={cn("mt-3 text-sm text-muted-foreground", className)}>{emptyMessage}</p>;
@@ -44,6 +53,9 @@ export function ExecutionResult({
           data={parsedClicky.document}
           {...(response.requestUrl ? { url: response.requestUrl } : {})}
           {...(commandRuntime ? { commandRuntime } : {})}
+          {...(onTableRowClick ? { onTableRowClick } : {})}
+          {...(getTableRowHref ? { getTableRowHref } : {})}
+          {...(isTableRowClickable ? { isTableRowClickable } : {})}
         />
       </div>
     );

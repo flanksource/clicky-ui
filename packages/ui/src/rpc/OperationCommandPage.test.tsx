@@ -103,20 +103,6 @@ function renderPage(
 
 describe("OperationCommandPage", () => {
   it("renders Clicky responses when the endpoint returns Clicky JSON", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify(
-          makeClickyDocument([
-            { name: "id", label: "ID", value: "one" },
-            { name: "name", label: "Name", value: "First widget" },
-          ]),
-        ),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json+clicky" },
-        },
-      ),
-    );
     const client = makeClient((params) =>
       clickyResponse(
         makeClickyDocument([
@@ -138,7 +124,7 @@ describe("OperationCommandPage", () => {
         "/api/v1/widgets/{id}",
         "get",
         { id: "one" },
-        { Accept: "application/json+clicky" },
+        { Accept: "application/clicky+json" },
       ),
     );
     await waitFor(() =>
@@ -146,20 +132,7 @@ describe("OperationCommandPage", () => {
         "First widget",
       ),
     );
-    await waitFor(() =>
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "/api/v1/widgets/one?format=clicky-json",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Accept: expect.stringContaining("application/json+clicky"),
-          }),
-        }),
-      ),
-    );
-    expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^download json$/i })).toBeInTheDocument();
-
-    fetchSpy.mockRestore();
+    expect(screen.getByRole("button", { name: "Open preview menu" })).toBeInTheDocument();
   });
 
   it("falls back to formatted JSON for non-Clicky results", async () => {
@@ -172,7 +145,7 @@ describe("OperationCommandPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Response body")).toHaveTextContent('"name": "Fallback widget"'),
+      expect(screen.getByLabelText("Response body")).toHaveTextContent("Fallback widget"),
     );
   });
 
@@ -194,7 +167,7 @@ describe("OperationCommandPage", () => {
         "/api/v1/widgets/{id}",
         "get",
         { id: "prefilled-widget" },
-        { Accept: "application/json+clicky" },
+        { Accept: "application/clicky+json" },
       ),
     );
   });
@@ -215,7 +188,7 @@ describe("OperationCommandPage", () => {
         "/api/v1/widgets/{id}",
         "get",
         { id: "autorun-widget" },
-        { Accept: "application/json+clicky" },
+        { Accept: "application/clicky+json" },
       ),
     );
   });

@@ -28,4 +28,20 @@ describe("Button", () => {
     render(<Button disabled>Nope</Button>);
     expect(screen.getByRole("button", { name: "Nope" })).toBeDisabled();
   });
+
+  it("disables and marks the button busy while loading", () => {
+    render(<Button loading>Save</Button>);
+    const btn = screen.getByRole("button", { name: "Save" });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("uses a loading label when provided", () => {
+    render(
+      <Button loading loadingLabel="Saving">
+        Save
+      </Button>,
+    );
+    expect(screen.getByRole("button", { name: "Saving" })).toBeDisabled();
+  });
 });

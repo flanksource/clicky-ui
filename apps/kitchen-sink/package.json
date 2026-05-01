@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
-    "preact": "catalog:"
+    "@shikijs/transformers": "catalog:",
+    "preact": "catalog:",
+    "shiki": "catalog:"
   },
   "devDependencies": {
     "@preact/preset-vite": "catalog:",

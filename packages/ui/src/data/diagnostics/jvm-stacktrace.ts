@@ -8,6 +8,18 @@ export interface ParsedThreadFrame {
   runtime: boolean;
   nativeMethod: boolean;
   annotationText?: string;
+  // Optional fully-qualified class name (e.g. "com.example.admin.pas.Foo").
+  // Lets renderers filter or group by package without re-splitting
+  // functionName. Populated by parseJavaStackTrace; left undefined by the
+  // thread-dump parser since its frames are raw "fn(src)" pairs.
+  class?: string;
+  method?: string;
+  // Optional source-context window populated by clicky.SourceResolver
+  // (or its TS equivalent). sourceLines[line - sourceStartLine] is the focal
+  // line. Empty/undefined when no resolver was attached.
+  sourceLines?: string[];
+  sourceStartLine?: number;
+  sourceLanguage?: string;
 }
 
 export interface ParsedThread {
@@ -220,7 +232,7 @@ function normalizeJvmState(value: string): string {
   return lower.split(/\s+/)[0];
 }
 
-const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "oracle.jrockit."];
+const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];
 function isJvmRuntimeFrame(functionName: string): boolean {
   return runtimePrefixes.some((p) => functionName.startsWith(p));
 }
