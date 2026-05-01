@@ -189,7 +189,9 @@ export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overl
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 
 // Clicky-rpc operations browser
-export { ApiExplorer, DEFAULT_OPENAPI_URL, type ApiExplorerProps } from "./rpc/ApiExplorer";
+// Note: ApiExplorer and EntityExplorerApp depend on @scalar/api-reference-react and are
+// exposed via the "@flanksource/clicky-ui/api-explorer" subpath to keep that dep out of
+// consumers who don't use them.
 export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
 export {
   ACCEPT_OPTIONS,
@@ -204,10 +206,12 @@ export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
 export { CommandOutput, type CommandOutputProps } from "./rpc/CommandOutput";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
 export { InlineError, type InlineErrorProps } from "./rpc/InlineError";
-export { OperationActionDialog, type OperationActionDialogProps } from "./rpc/OperationActionDialog";
+export {
+  OperationActionDialog,
+  type OperationActionDialogProps,
+} from "./rpc/OperationActionDialog";
 export { OperationEntityPage, type OperationEntityPageProps } from "./rpc/OperationEntityPage";
 export { OperationCommandPage, type OperationCommandPageProps } from "./rpc/OperationCommandPage";
-export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
 export {
   EndpointList,
   type EndpointListProps,

@@ -21,6 +21,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(__dirname, "src/index.ts"),
+        "api-explorer": resolve(__dirname, "src/api-explorer.ts"),
         "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
         styles: resolve(__dirname, "src/styles.ts"),
       },

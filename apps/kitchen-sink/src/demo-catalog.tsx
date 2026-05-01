@@ -25,6 +25,8 @@ import { ModalDemo } from "./demos/ModalDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
+import { ApiExplorerDemo } from "./demos/ApiExplorerDemo";
+import { OperationDialogsDemo } from "./demos/OperationDialogsDemo";
 
 export type DemoEntry = {
   id: string;
@@ -92,6 +94,13 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "diagnostics", label: "Process & Stack", component: DiagnosticsDemo },
       { id: "stacktrace", label: "StackTrace", component: StackTraceDemo },
       { id: "har-panel", label: "HarPanel", component: HarPanelDemo },
+    ],
+  },
+  {
+    title: "Clicky-RPC",
+    items: [
+      { id: "operation-dialogs", label: "OperationDialogs", component: OperationDialogsDemo },
+      { id: "api-explorer", label: "ApiExplorer", component: ApiExplorerDemo },
     ],
   },
 ];

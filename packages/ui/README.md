@@ -46,6 +46,20 @@ export function ClickyPanel() {
 
 `Clicky` also accepts a JSON string payload. The intended producer is the sibling `clicky` repo's tagged `html-react` AST, which preserves structural types such as trees, tables, code blocks, collapsed sections, buttons, and nested text content.
 
+## API Explorer
+
+`ApiExplorer` and `EntityExplorerApp` depend on `@scalar/api-reference-react` and are exposed via a separate subpath so the main bundle stays free of that dependency:
+
+```tsx
+import { ApiExplorer } from "@flanksource/clicky-ui/api-explorer";
+
+export function Docs() {
+  return <ApiExplorer openApiUrl="/api/openapi.json" />;
+}
+```
+
+`@scalar/api-reference-react` is a regular dependency of `@flanksource/clicky-ui`, so importing the subpath pulls it in transitively — consumers don't need to add it to their own `package.json`. Consumers who never import this subpath pay nothing for it.
+
 ## Tailwind preset
 
 ```ts
