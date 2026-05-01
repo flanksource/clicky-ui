@@ -38,6 +38,7 @@ export type FilterBarTextFilter = {
   key: string;
   kind: "text";
   label: string;
+  description?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -58,6 +59,7 @@ export type FilterBarLookupFilter = {
   key: string;
   kind: "lookup";
   label: string;
+  description?: string;
   value: string;
   options: FilterBarLookupOption[];
   onChange: (value: string) => void;
@@ -71,6 +73,7 @@ export type FilterBarLookupMultiFilter = {
   key: string;
   kind: "lookup-multi";
   label: string;
+  description?: string;
   value: string[];
   options: FilterBarLookupOption[];
   onChange: (value: string[]) => void;
@@ -85,6 +88,7 @@ export type FilterBarMultiFilter = {
   key: string;
   kind: "multi";
   label: string;
+  description?: string;
   value: Record<string, FilterBarMultiFilterMode>;
   options: MultiSelectOption[];
   onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
@@ -96,6 +100,7 @@ export type FilterBarSelectMultiFilter = {
   key: string;
   kind: "select-multi";
   label: string;
+  description?: string;
   value: string[];
   options: MultiSelectOption[];
   onChange: (value: string[]) => void;
@@ -113,6 +118,7 @@ export type FilterBarNumberFilter = {
   key: string;
   kind: "number";
   label: string;
+  description?: string;
   value: FilterBarNumberValue;
   onChange: (value: FilterBarNumberValue) => void;
   domainMin?: number;
@@ -129,6 +135,7 @@ export type FilterBarEnumFilter = {
   key: string;
   kind: "enum";
   label: string;
+  description?: string;
   value: string;
   options: Array<{ value: string; label?: string }>;
   onChange: (value: string) => void;
@@ -141,6 +148,7 @@ export type FilterBarBooleanFilter = {
   key: string;
   kind: "boolean";
   label: string;
+  description?: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -294,6 +302,7 @@ export function FilterBar({
 function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -323,6 +332,7 @@ function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: 
 function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 shrink-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-2 text-xs",
         filter.disabled && "opacity-60",
@@ -380,6 +390,7 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -409,6 +420,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -471,6 +483,7 @@ function LookupMultiFilterField({
 
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
@@ -523,6 +536,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
   return (
     <div
       ref={rootRef}
+      title={filter.description}
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
@@ -648,15 +662,25 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [optionQuery, setOptionQuery] = useState("");
   const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
   const summary = summarizeMultiFilter(filter.label, draft);
+  const showOptionFilter = filter.options.length > 7;
+  const visibleOptions = useMemo(() => {
+    const query = optionQuery.trim().toLowerCase();
+    if (!query) return filter.options;
+    return filter.options.filter((option) =>
+      multiSelectOptionText(option).toLowerCase().includes(query),
+    );
+  }, [filter.options, optionQuery]);
 
   return (
     <div
       ref={rootRef}
+      title={filter.description}
       className={cn(
         "relative min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
@@ -703,10 +727,24 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
             </button>
           </div>
 
+          {showOptionFilter && (
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
+              <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+              <input
+                type="search"
+                aria-label={`Filter ${filter.label} options`}
+                className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder={`Filter ${filter.label.toLowerCase()}`}
+                value={optionQuery}
+                onChange={(event) => setOptionQuery(event.target.value)}
+              />
+            </div>
+          )}
+
           <div className="max-h-72 space-y-1 overflow-auto">
-            {filter.options.map((option) => {
+            {visibleOptions.map((option) => {
               const mode = draft[option.value] ?? "neutral";
-              const title = typeof option.label === "string" ? option.label : option.value;
+              const title = option.title ?? multiSelectOptionText(option);
 
               return (
                 <div
@@ -738,11 +776,19 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                 </div>
               );
             })}
+            {visibleOptions.length === 0 && (
+              <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
+}
+
+function multiSelectOptionText(option: MultiSelectOption) {
+  const label = typeof option.label === "string" ? option.label : "";
+  return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
 }
 
 function SelectMultiFilterField({
@@ -754,6 +800,7 @@ function SelectMultiFilterField({
 }) {
   return (
     <label
+      title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
         grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",

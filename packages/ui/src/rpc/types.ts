@@ -97,7 +97,7 @@ export interface ClickyOperationMeta {
   supportsFilterMode?: boolean;
 }
 
-export type OperationLookupFilterType = "bool" | "number" | "date" | "from" | "to";
+export type OperationLookupFilterType = "bool" | "number" | "date" | "from" | "to" | "multi-filter";
 
 export interface OperationLookupFilter {
   label?: string;

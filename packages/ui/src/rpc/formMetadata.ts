@@ -1,5 +1,9 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { FilterBarFilter, FilterBarRangeProps } from "../components/FilterBar";
+import type {
+  FilterBarFilter,
+  FilterBarMultiFilterMode,
+  FilterBarRangeProps,
+} from "../components/FilterBar";
 import type { OpenAPIParameter, OperationLookupFilter, OperationLookupResponse } from "./types";
 import { isPositionalParam } from "./types";
 
@@ -130,6 +134,23 @@ export function parametersToFormConfig(
     const schema = param.schema;
     const lookupFilter = lookupFilters[param.name];
 
+    if (lookupFilter?.type === "multi-filter" && param.in === "query") {
+      emitFilters.push({
+        key: param.name,
+        kind: "multi",
+        label,
+        value: parseMultiFilterValue(value),
+        disabled,
+        options: lookupOptionsToFieldOptions(lookupFilter),
+        onChange: (next) =>
+          setValues((current) => ({
+            ...current,
+            [param.name]: serializeMultiFilterValue(next),
+          })),
+      });
+      continue;
+    }
+
     if (schema?.enum) {
       emitFilters.push({
         key: param.name,
@@ -233,6 +254,28 @@ export function useDebouncedRecord<T>(value: T, delayMs: number) {
   }, [delayMs, value]);
 
   return debounced;
+}
+
+export function parseMultiFilterValue(value: string): Record<string, FilterBarMultiFilterMode> {
+  const parsed: Record<string, FilterBarMultiFilterMode> = {};
+  for (const item of splitCommaValues(value)) {
+    if (item.startsWith("!") && item.length > 1) {
+      parsed[item.slice(1)] = "exclude";
+    } else {
+      parsed[item] = "include";
+    }
+  }
+  return parsed;
+}
+
+export function serializeMultiFilterValue(value: Record<string, FilterBarMultiFilterMode>): string {
+  return Object.entries(value)
+    .flatMap(([key, mode]) => {
+      if (mode === "include") return [key];
+      if (mode === "exclude") return [`!${key}`];
+      return [];
+    })
+    .join(",");
 }
 
 function splitCommaValues(value: string) {

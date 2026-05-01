@@ -30,6 +30,8 @@ import { cn } from "../lib/utils";
 import { DataTable, type DataTableColumn } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
+import { JsonView } from "./JsonView";
+import { highlightCode } from "./code-highlight";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 
@@ -2141,25 +2143,109 @@ function ClickyTreeNode({ node }: { node: ClickyNode }) {
 }
 
 function ClickyCodeBlock({ node }: { node: ClickyNode }) {
-  const html = node.highlightedHtml ? sanitizeHtml(node.highlightedHtml) : "";
+  const language = (node.language ?? "").toLowerCase().replace(/^\.+/, "");
+  const source = node.source ?? node.plain ?? "";
+  const chromaHtml = node.highlightedHtml ? sanitizeHtml(node.highlightedHtml) : "";
+
+  // JSON gets the interactive collapsible viewer instead of raw chroma
+  // output — operators read structured payloads (intake XMLData decoded
+  // to JSON, OpenAPI responses, etc.) far faster when the viewer lets
+  // them fold deep objects rather than scroll through highlighted text.
+  // Falls back to the chroma / Shiki path when the source can't be parsed
+  // (truncated payload, intentional pretty-printed-with-comments, etc.).
+  const parsedJson = useMemo(
+    () => (language === "json" ? tryParseJson(source) : JSON_PARSE_FAILED),
+    [language, source],
+  );
+
+  // Hooks below must run unconditionally regardless of which render branch
+  // wins, so they live above any early returns.
+  const [shikiHtml, setShikiHtml] = useState<string | null>(null);
+  const wantsClientHighlight = !chromaHtml && !!language && !!source;
+
+  useEffect(() => {
+    if (!wantsClientHighlight) {
+      setShikiHtml(null);
+      return;
+    }
+    let cancelled = false;
+    highlightCode(source, { lang: language }).then((out) => {
+      if (!cancelled) setShikiHtml(out);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantsClientHighlight, language, source]);
+
+  if (parsedJson !== JSON_PARSE_FAILED) {
+    return (
+      <div className="overflow-hidden rounded-md border border-border bg-muted/40">
+        <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          json
+        </div>
+        <div className="overflow-auto p-3 text-xs">
+          <JsonView data={parsedJson} defaultOpenDepth={2} />
+        </div>
+      </div>
+    );
+  }
+
+  // XML gets a tighter Tailwind ruleset that targets chroma's class names
+  // (the chroma html formatter emits .nt for tags, .na for attribute
+  // names, .s for strings, .c for comments). Without this, XML renders
+  // identically to plain text and operators reading large stacks or
+  // walked AsActivity payloads can't visually pick out the structure.
+  const xmlClasses =
+    language === "xml" || language === "xslt" || language === "html"
+      ? " [&_.chroma_.nt]:text-pink-700 [&_.chroma_.nt]:dark:text-pink-300 [&_.chroma_.nt]:font-semibold" +
+        " [&_.chroma_.na]:text-amber-700 [&_.chroma_.na]:dark:text-amber-300" +
+        " [&_.chroma_.s]:text-emerald-700 [&_.chroma_.s]:dark:text-emerald-300" +
+        " [&_.chroma_.c]:text-slate-500 [&_.chroma_.c]:italic" +
+        " [&_.chroma_.cp]:text-slate-500 [&_.chroma_.cp]:italic" +
+        " [&_pre]:leading-relaxed"
+      : "";
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/40">
       <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         {node.language || "text"}
       </div>
-      {html ? (
+      {chromaHtml ? (
         <div
-          className="overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent"
-          dangerouslySetInnerHTML={{ __html: html }}
+          className={
+            "overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent" +
+            xmlClasses
+          }
+          dangerouslySetInnerHTML={{ __html: chromaHtml }}
+        />
+      ) : shikiHtml ? (
+        <div
+          className="overflow-auto p-3 text-xs font-mono [&_pre]:m-0 [&_pre.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: shikiHtml }}
         />
       ) : (
         <pre className="overflow-auto whitespace-pre-wrap break-words p-3 text-xs font-mono text-foreground">
-          {node.source ?? node.plain}
+          {source}
         </pre>
       )}
     </div>
   );
+}
+
+// JSON_PARSE_FAILED is a sentinel distinct from any value that valid
+// JSON can produce (`undefined` is not legal JSON, but a JSON document
+// could legitimately parse to `null`, `false`, `0`, `""`, etc.). Using a
+// fresh object reference lets the caller branch with strict equality.
+const JSON_PARSE_FAILED: unique symbol = Symbol("json-parse-failed");
+
+function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
+  const trimmed = source.trim();
+  if (!trimmed) return JSON_PARSE_FAILED;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return JSON_PARSE_FAILED;
+  }
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {

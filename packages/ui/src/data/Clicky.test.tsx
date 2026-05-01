@@ -3,6 +3,16 @@ import { vi } from "vitest";
 import { Clicky, type ClickyDocument } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
 
+// Mock the Shiki wrapper so the dynamic `import("shiki")` never executes
+// during unit tests — it pulls in the full grammar/theme bundle and slows
+// the suite. Each test that exercises the client-highlight path overrides
+// the mock with a per-case implementation via `mocked(...).mockImplementation`.
+vi.mock("./code-highlight", () => ({
+  highlightCode: vi.fn(async () => null),
+}));
+import { highlightCode } from "./code-highlight";
+const mockHighlightCode = vi.mocked(highlightCode);
+
 function createCommandClient() {
   const executeCommand = vi.fn().mockResolvedValue({
     success: true,
@@ -218,8 +228,8 @@ describe("Clicky", () => {
                     name: "companyName",
                     value: {
                       kind: "text",
-                      text: "Old Mutual Africa Holdings",
-                      plain: "Old Mutual Africa Holdings",
+                      text: "Acme Africa Holdings",
+                      plain: "Acme Africa Holdings",
                     },
                   },
                 ],
@@ -243,11 +253,11 @@ describe("Clicky", () => {
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("Agreement 1: Group Scheme Contract")).toBeInTheDocument();
-    expect(screen.queryByText("Old Mutual Africa Holdings")).not.toBeVisible();
+    expect(screen.queryByText("Acme Africa Holdings")).not.toBeVisible();
 
     fireEvent.click(screen.getByText("Agreement 1: Group Scheme Contract"));
 
-    expect(screen.getByText("Old Mutual Africa Holdings")).toBeVisible();
+    expect(screen.getByText("Acme Africa Holdings")).toBeVisible();
     expect(screen.getByText("MSTR-INS")).toBeVisible();
   });
 
@@ -589,5 +599,116 @@ describe("Clicky", () => {
 
     await waitFor(() => expect(client.executeCommand).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Loaded descendants")).toBeInTheDocument();
+  });
+
+  it("renders json code blocks with the interactive JsonView", () => {
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "code",
+        language: "json",
+        source: '{"intakeFileGUID":"2bc39b08","status":"SYSERR"}',
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    // Header still surfaces the language label so operators can tell at
+    // a glance which renderer engaged.
+    expect(within(container).getByText("json")).toBeInTheDocument();
+
+    // The JsonView path renders each scalar key as plain text (no
+    // surrounding quotes) — the chroma path would emit them inside a
+    // <pre class="chroma"> with the value inline-quoted. Looking for the
+    // unquoted key is the cleanest behavioural signal since it only
+    // appears in the JsonView output.
+    expect(within(container).getByText("intakeFileGUID")).toBeInTheDocument();
+    expect(within(container).getByText("status")).toBeInTheDocument();
+    expect(within(container).getByText('"SYSERR"')).toBeInTheDocument();
+  });
+
+  it("falls back to highlighted html when json source is malformed", () => {
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "code",
+        language: "json",
+        source: "{ this is not json }",
+        // Pre-rendered chroma html so we can confirm the fallback path
+        // engaged without depending on chroma running in the test env.
+        highlightedHtml: '<pre class="chroma">malformed-marker</pre>',
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    expect(within(container).getByText("malformed-marker")).toBeInTheDocument();
+  });
+
+  it("preserves chroma html for xml code blocks", () => {
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "code",
+        language: "xml",
+        source: "<Activity><Math/></Activity>",
+        highlightedHtml: '<pre class="chroma"><span class="nt">Activity</span> tag</pre>',
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    // The XML branch preserves chroma classes (we don't strip .nt or
+    // similar) so the targeted Tailwind rules can colour them at runtime.
+    const chromaPre = container.querySelector("pre.chroma");
+    expect(chromaPre).not.toBeNull();
+    expect(chromaPre?.querySelector(".nt")).not.toBeNull();
+  });
+
+  it("uses Shiki to highlight when only language+source provided", async () => {
+    mockHighlightCode.mockResolvedValueOnce(
+      '<pre class="shiki"><code><span class="shiki-token">type</span> SourceResolver</code></pre>',
+    );
+
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "code",
+        language: "go",
+        source: "type SourceResolver interface {}",
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    await waitFor(() => {
+      expect(container.querySelector("pre.shiki")).not.toBeNull();
+    });
+    expect(mockHighlightCode).toHaveBeenCalledWith("type SourceResolver interface {}", {
+      lang: "go",
+    });
+    expect(within(container).getByText("SourceResolver")).toBeInTheDocument();
+  });
+
+  it("falls back to plain pre when Shiki returns null", async () => {
+    mockHighlightCode.mockResolvedValueOnce(null);
+
+    const source = "fictional unknown-language source";
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "code",
+        language: "fictional-lang",
+        source,
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    await waitFor(() => expect(mockHighlightCode).toHaveBeenCalled());
+    // No shiki wrapper appears, the unhighlighted source is rendered inside
+    // a plain <pre> so operators still see something readable.
+    expect(container.querySelector("pre.shiki")).toBeNull();
+    expect(within(container).getByText(source)).toBeInTheDocument();
   });
 });
