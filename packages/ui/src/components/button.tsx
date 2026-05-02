@@ -38,7 +38,20 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children, className, disabled, loading = false, loadingLabel, variant, size, asChild = false, ...props }, ref) => {
+  (
+    {
+      children,
+      className,
+      disabled,
+      loading = false,
+      loadingLabel,
+      variant,
+      size,
+      asChild = false,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
     const content = loadingLabel !== undefined ? loadingLabel : children;
 
