@@ -84,7 +84,12 @@ export function OperationCommandPage({
   const effectiveInitialValues = useMemo(
     () =>
       operation
-        ? buildInitialParameterValues(parameters, operation.method, {}, stripRunnerParams(initialValues))
+        ? buildInitialParameterValues(
+            parameters,
+            operation.method,
+            {},
+            stripRunnerParams(initialValues),
+          )
         : stripRunnerParams(initialValues),
     [initialValues, operation?.method, parameterSignature],
   );

@@ -205,7 +205,13 @@ function JsonViewer({ data }: { data: unknown }) {
   );
 }
 
-function TextOutput({ text, variant = "default" }: { text: string; variant?: "default" | "error" }) {
+function TextOutput({
+  text,
+  variant = "default",
+}: {
+  text: string;
+  variant?: "default" | "error";
+}) {
   return (
     <pre
       className={`max-h-96 overflow-auto whitespace-pre-wrap rounded-md p-4 font-mono text-sm ${
@@ -237,7 +243,9 @@ function Tabs({
             key={tab.value}
             type="button"
             className={`rounded px-2 py-1 text-xs ${
-              tab.value === active.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+              tab.value === active.value
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
             }`}
             onClick={() => setValue(tab.value)}
           >

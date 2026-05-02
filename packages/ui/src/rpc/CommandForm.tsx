@@ -162,7 +162,9 @@ function ParameterField({
           {param.name}
           {param.required && <span className="text-destructive"> *</span>}
         </label>
-        {param.description && <span className="text-xs text-muted-foreground">{param.description}</span>}
+        {param.description && (
+          <span className="text-xs text-muted-foreground">{param.description}</span>
+        )}
       </div>
     );
   }
@@ -320,7 +322,10 @@ function FieldWrapper({
   );
 }
 
-export function normalizeParameters(parameters: OpenAPIParameter[], path: string): OpenAPIParameter[] {
+export function normalizeParameters(
+  parameters: OpenAPIParameter[],
+  path: string,
+): OpenAPIParameter[] {
   const pathParams = pathParamNames(path);
   const seen = new Set(parameters.map((param) => param.name));
   const normalized = parameters.filter(

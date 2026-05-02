@@ -20,9 +20,7 @@ export function InlineError({ title, error, className }: InlineErrorProps) {
   const hasDetails = Boolean(details.responseBody || details.status || details.url);
 
   return (
-    <div
-      className={cn("rounded-xl border border-dashed border-red-300 p-6 text-sm", className)}
-    >
+    <div className={cn("rounded-xl border border-dashed border-red-300 p-6 text-sm", className)}>
       <div className="text-center">
         <div className="font-medium text-red-600">{title}</div>
         {message && <div className="mt-1 text-muted-foreground">{message}</div>}
