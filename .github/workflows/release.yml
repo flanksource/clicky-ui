@@ -6,16 +6,18 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Skip the auto-bump commit so the workflow doesn't loop on itself.
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -30,14 +32,45 @@ jobs:
 
       - run: vp install
 
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: bump
+        working-directory: packages/ui
+        run: |
+          new_version=$(npm version patch --no-git-tag-version)
+          echo "version=${new_version#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=clicky-ui@${new_version#v}" >> "$GITHUB_OUTPUT"
+
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
 
-      - name: Create Release Pull Request or Publish
-        uses: changesets/action@v1
-        with:
-          publish: pnpm exec changeset publish
-          version: pnpm exec changeset version
+      - name: Publish to npm
+        working-directory: packages/ui
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
+        run: pnpm publish --access public --no-git-checks
+
+      - name: Commit, tag, and push
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          git add packages/ui/package.json
+          git commit -m "chore(release): @flanksource/clicky-ui@${VERSION}"
+          git tag "${TAG}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "@flanksource/clicky-ui@${VERSION}" \
+            --generate-notes

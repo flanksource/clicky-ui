@@ -12,15 +12,12 @@
     "build": "vp run -r build",
     "test": "vp run -r test",
     "test:e2e": "vp run e2e#test",
-    "check": "vp check",
-    "changeset": "vp exec changeset",
-    "release": "vp run -r build && vp exec changeset publish"
+    "check": "vp check"
   },
   "dependencies": {
     "@voidzero-dev/vite-plus-darwin-arm64": "catalog:"
   },
   "devDependencies": {
-    "@changesets/cli": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
