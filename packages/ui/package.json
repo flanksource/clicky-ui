@@ -12,7 +12,6 @@
   },
   "files": [
     "dist",
-    "src/styles",
     "README.md",
     "LICENSE"
   ],
@@ -21,24 +20,48 @@
     "**/*.css",
     "./src/styles/**"
   ],
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./hooks": {
+      "types": "./dist/hooks.d.ts",
+      "import": "./dist/hooks.js"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
+    },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "import": "./dist/data.js"
+    },
+    "./clicky": {
+      "types": "./dist/clicky.d.ts",
+      "import": "./dist/clicky.js"
+    },
+    "./rpc": {
+      "types": "./dist/rpc.d.ts",
+      "import": "./dist/rpc.js"
     },
     "./api-explorer": {
-      "types": "./dist/api-explorer.d.mts",
-      "import": "./dist/api-explorer.mjs"
+      "types": "./dist/api-explorer.d.ts",
+      "import": "./dist/api-explorer.js"
     },
-    "./styles.css": "./src/styles/tokens.css",
+    "./styles.css": "./dist/styles.css",
     "./tailwind-preset": {
-      "types": "./dist/tailwind-preset.d.mts",
-      "import": "./dist/tailwind-preset.mjs",
+      "types": "./dist/tailwind-preset.d.ts",
+      "import": "./dist/tailwind-preset.js",
       "require": "./dist/tailwind-preset.cjs",
-      "default": "./dist/tailwind-preset.mjs"
+      "default": "./dist/tailwind-preset.js"
     }
   },
   "publishConfig": {
@@ -46,7 +69,7 @@
   },
   "scripts": {
     "dev": "vp dev",
-    "build": "vp pack src/index.ts src/api-explorer.ts src/tailwind-preset.ts --sourcemap --no-minify && vp pack src/tailwind-preset.ts -f cjs --no-clean --sourcemap --no-minify",
+    "build": "vite build && vp pack src/tailwind-preset.ts -f cjs --no-clean --sourcemap --no-minify",
     "test": "vp test",
     "check": "vp check"
   },

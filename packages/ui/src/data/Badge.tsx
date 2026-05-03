@@ -710,7 +710,7 @@ export function Badge({
         (normalizedMaxWidth != null || shouldWrapText || truncate != null) && "min-w-0 max-w-full",
         shouldWrapText && "whitespace-normal",
         canCopy &&
-          "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          "cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         className,
       ),
       style: legacyStyle,
@@ -764,7 +764,7 @@ export function Badge({
     shouldWrapText ? "whitespace-normal" : "whitespace-nowrap",
     href ? "transition-opacity hover:opacity-80" : "",
     canCopy
-      ? "cursor-copy text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      ? "cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
       : "",
   ];
 

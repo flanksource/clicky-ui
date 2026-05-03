@@ -14,6 +14,7 @@ import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
 import { DataTableDemo } from "./demos/DataTableDemo";
+import { TraceLogsDemo } from "./demos/TraceLogsDemo";
 import { SortableHeaderDemo } from "./demos/SortableHeaderDemo";
 import { TabButtonDemo } from "./demos/TabButtonDemo";
 import { SectionDemo } from "./demos/SectionDemo";
@@ -70,6 +71,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "filter-pill", label: "FilterPill", component: FilterPillDemo },
       { id: "sortable", label: "SortableHeader", component: SortableHeaderDemo },
       { id: "data-table", label: "DataTable", component: DataTableDemo },
+      { id: "trace-logs", label: "Trace logs", component: TraceLogsDemo },
       { id: "tab-gauge", label: "Tabs & Gauges", component: TabButtonDemo },
     ],
   },

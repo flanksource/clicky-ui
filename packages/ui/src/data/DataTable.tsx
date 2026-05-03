@@ -12,13 +12,52 @@ import { useSort, type SortDir } from "../hooks/use-sort";
 import { cn } from "../lib/utils";
 import {
   FilterBar,
+  FilterBarFilterPanel,
+  FilterBarRangePanel,
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberValue,
   type FilterBarProps,
+  type FilterBarRangePreset,
+  type FilterBarRangeProps,
 } from "../components/FilterBar";
 import type { MultiSelectOption } from "../components/MultiSelect";
+import { Icon } from "./Icon";
 import { SortableHeader } from "./SortableHeader";
+import {
+  Timestamp,
+  chooseTimestampFormat,
+  modeToFormat,
+  parseTimestamp,
+  resolveDateMath,
+  type TimestampFormat,
+  type TimestampOptions,
+} from "./cells/Timestamp";
+import {
+  TagActionsProvider,
+  TagList,
+  normalizeTags,
+  splitTagToken,
+  tagActionsFromRecord,
+  tagFilterTokens,
+  type TagActionsContextValue,
+  type TagFilterMode,
+  type TagsOptions,
+  type TagsValue,
+} from "./cells/TagList";
+import { StatusDot } from "./cells/StatusDot";
+import { normalizeStatus } from "./cells/status-mapping";
+import type { BadgeStatus } from "./Badge";
+
+export type { TimestampOptions, TagsOptions };
+
+export type DataTableColumnKind = "timestamp" | "tags" | "status";
+
+export type StatusOptions<T extends Record<string, unknown> = Record<string, unknown>> = {
+  map?: (raw: unknown, row: T) => BadgeStatus | null;
+  showLabel?: boolean;
+  title?: (raw: unknown, row: T) => string;
+};
 
 type FilterValue = string | number | boolean | null | undefined | Array<string | number | boolean>;
 
@@ -29,8 +68,13 @@ type InternalRow<T> = {
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
-  kind: "text" | "multi" | "number";
+  kind: "text" | "multi" | "nested-multi" | "number";
   options: MultiSelectOption[];
+  groups?: Array<{
+    groupKey: string;
+    label?: string;
+    options: MultiSelectOption[];
+  }>;
   numberBounds?: {
     min: number;
     max: number;
@@ -43,6 +87,32 @@ const DEFAULT_COLUMN_WIDTH = 160;
 const DEFAULT_GROW_COLUMN_WIDTH = 224;
 const DEFAULT_SHRINK_COLUMN_WIDTH = 96;
 const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
+const COLUMN_VISIBILITY_STORAGE_PREFIX = "clicky-ui-data-table-column-visibility";
+
+type ColumnMenuState = {
+  x: number;
+  y: number;
+  columnKey?: string;
+};
+
+export type DataTableRowDetailContext<T extends Record<string, unknown> = Record<string, unknown>> =
+  {
+    columns: DataTableColumn<T>[];
+    visibleColumns: DataTableColumn<T>[];
+    tagActionsByColumn: Record<string, TagActionsContextValue>;
+  };
+
+// Mirrors the preset list used by the trace UI's TraceFilters so log/trace
+// tables share the same vocabulary out of the box.
+const TIMESTAMP_RANGE_PRESETS: FilterBarRangePreset[] = [
+  { label: "Last 5 minutes", from: "now-5m", to: "now" },
+  { label: "Last 15 minutes", from: "now-15m", to: "now" },
+  { label: "Last 1 hour", from: "now-1h", to: "now" },
+  { label: "Last 6 hours", from: "now-6h", to: "now" },
+  { label: "Last 24 hours", from: "now-24h", to: "now" },
+  { label: "Last 7 days", from: "now-7d", to: "now" },
+  { label: "Last 30 days", from: "now-30d", to: "now" },
+];
 
 export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = {
   key: string;
@@ -52,6 +122,7 @@ export type DataTableColumn<T extends Record<string, unknown> = Record<string, u
   grow?: boolean;
   shrink?: boolean;
   resizable?: boolean;
+  hideable?: boolean;
   minWidth?: number;
   maxWidth?: number;
   align?: "left" | "center" | "right";
@@ -60,11 +131,34 @@ export type DataTableColumn<T extends Record<string, unknown> = Record<string, u
   filterValue?: (value: unknown, row: T) => FilterValue;
   cellClassName?: string;
   headerClassName?: string;
+  /**
+   * Built-in cell kind. When set, DataTable supplies a default renderer,
+   * a default `sortValue` and a default `filterValue` (all overridable).
+   * - "timestamp": adaptive format (relative / time / short / iso) chosen
+   *   from the spread of values in `data`.
+   * - "tags": chip list with `+N` overflow; auto-multi-filter on tag tokens.
+   * - "status": colored dot with the standard error/warning/success palette
+   *   (token-mapped — "ERROR", "failed", "fatal" all collapse to "error").
+   */
+  kind?: DataTableColumnKind;
+  timestamp?: TimestampOptions;
+  tags?: TagsOptions;
+  status?: StatusOptions<T>;
 };
+
+export type DataTableColumnInput<T extends Record<string, unknown> = Record<string, unknown>> =
+  | DataTableColumn<T>
+  | string;
 
 export type DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> = {
   data: T[];
-  columns: DataTableColumn<T>[];
+  /**
+   * Column descriptors. Pass a bare string for a default column —
+   * `"foo"` is equivalent to `{ key: "foo", label: "foo" }` — handy for
+   * ad-hoc query results where the column metadata is just a list of names.
+   * Mix and match strings with full descriptors as needed.
+   */
+  columns: Array<DataTableColumnInput<T>>;
   emptyMessage?: string;
   className?: string;
   autoFilter?: boolean;
@@ -78,15 +172,19 @@ export type DataTableProps<T extends Record<string, unknown> = Record<string, un
   onRowClick?: (row: T) => void;
   isRowClickable?: (row: T) => boolean;
   getRowHref?: (row: T) => string | undefined;
-  renderExpandedRow?: (row: T) => ReactNode;
+  renderExpandedRow?: (row: T, context: DataTableRowDetailContext<T>) => ReactNode;
   resizableColumns?: boolean;
   persistColumnWidths?: boolean;
   columnResizeStorageKey?: string;
+  hideableColumns?: boolean;
+  persistColumnVisibility?: boolean;
+  columnVisibilityStorageKey?: string;
+  showHeaderFilters?: boolean;
 };
 
 export function DataTable<T extends Record<string, unknown>>({
   data,
-  columns,
+  columns: columnsInput,
   emptyMessage = "No data",
   className,
   autoFilter = false,
@@ -104,16 +202,36 @@ export function DataTable<T extends Record<string, unknown>>({
   resizableColumns = true,
   persistColumnWidths = true,
   columnResizeStorageKey,
+  hideableColumns = true,
+  persistColumnVisibility = true,
+  columnVisibilityStorageKey,
+  showHeaderFilters = true,
 }: DataTableProps<T>) {
+  const columns = useMemo<DataTableColumn<T>[]>(
+    () =>
+      columnsInput.map((column) =>
+        typeof column === "string" ? { key: column, label: column } : column,
+      ),
+    [columnsInput],
+  );
   const columnKeysSignature = useMemo(
     () => columns.map((column) => column.key).join("|"),
     [columns],
   );
   const resolvedColumnResizeStorageKey =
     columnResizeStorageKey ?? `${COLUMN_WIDTH_STORAGE_PREFIX}:${columnKeysSignature}`;
+  const resolvedColumnVisibilityStorageKey =
+    columnVisibilityStorageKey ?? `${COLUMN_VISIBILITY_STORAGE_PREFIX}:${columnKeysSignature}`;
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
     persistColumnWidths ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns) : {},
   );
+  const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>(() =>
+    persistColumnVisibility
+      ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
+      : {},
+  );
+  const [columnMenu, setColumnMenu] = useState<ColumnMenuState | null>(null);
+  const [headerFilterMenu, setHeaderFilterMenu] = useState<ColumnMenuState | null>(null);
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
@@ -121,6 +239,18 @@ export function DataTable<T extends Record<string, unknown>>({
   const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarNumberValue>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
+  const [timeRangeFilter, setTimeRangeFilter] = useState<{
+    from: string;
+    to: string;
+  }>(() => {
+    const seed = columns.find(
+      (column) => column.kind === "timestamp" && column.timestamp?.defaultRange,
+    );
+    return {
+      from: seed?.timestamp?.defaultRange?.from ?? "",
+      to: seed?.timestamp?.defaultRange?.to ?? "",
+    };
+  });
 
   useEffect(() => {
     setColumnWidths((current) => {
@@ -137,6 +267,40 @@ export function DataTable<T extends Record<string, unknown>>({
     writeStoredColumnWidths(resolvedColumnResizeStorageKey, columnWidths);
   }, [columnWidths, persistColumnWidths, resolvedColumnResizeStorageKey]);
 
+  useEffect(() => {
+    setHiddenColumns((current) => {
+      const stored = persistColumnVisibility
+        ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
+        : {};
+      const next = pruneHiddenColumns({ ...stored, ...current }, columns);
+      return sameHiddenColumns(current, next) ? current : next;
+    });
+  }, [columnKeysSignature, persistColumnVisibility, resolvedColumnVisibilityStorageKey]);
+
+  useEffect(() => {
+    if (!persistColumnVisibility) return;
+    writeStoredHiddenColumns(resolvedColumnVisibilityStorageKey, hiddenColumns);
+  }, [hiddenColumns, persistColumnVisibility, resolvedColumnVisibilityStorageKey]);
+
+  useEffect(() => {
+    if (!columnMenu && !headerFilterMenu) return;
+
+    const close = () => {
+      setColumnMenu(null);
+      setHeaderFilterMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [columnMenu, headerFilterMenu]);
+
   const rows = useMemo<InternalRow<T>[]>(
     () =>
       data.map((row, index) => ({
@@ -146,9 +310,87 @@ export function DataTable<T extends Record<string, unknown>>({
     [data, getRowId],
   );
 
+  const timestampFormats = useMemo<Record<string, TimestampFormat>>(() => {
+    const out: Record<string, TimestampFormat> = {};
+    for (const column of columns) {
+      if (column.kind !== "timestamp") continue;
+      const dates: Date[] = [];
+      for (const row of data) {
+        const raw = resolvePath(row, column.key);
+        const parsed = parseTimestamp(raw);
+        if (parsed) dates.push(parsed);
+      }
+      const dataFormat = chooseTimestampFormat(dates);
+      out[column.key] = modeToFormat(column.timestamp?.mode ?? "auto", dataFormat);
+    }
+    return out;
+  }, [columns, data]);
+
+  const effectiveColumns = useMemo<DataTableColumn<T>[]>(
+    () => columns.map((column) => applyKindDefaults<T>(column, timestampFormats[column.key])),
+    [columns, timestampFormats],
+  );
+
+  const visibleColumns = useMemo(() => {
+    if (!hideableColumns) return effectiveColumns;
+    const next = effectiveColumns.filter((column) => !hiddenColumns[column.key]);
+    return next.length > 0 ? next : effectiveColumns;
+  }, [effectiveColumns, hiddenColumns, hideableColumns]);
+
+  const hideableColumnCount = useMemo(
+    () => effectiveColumns.filter(isColumnHideable).length,
+    [effectiveColumns],
+  );
+
+  const visibleHideableColumnCount = useMemo(
+    () => visibleColumns.filter(isColumnHideable).length,
+    [visibleColumns],
+  );
+
+  const showColumnVisibilityControl = hideableColumns && hideableColumnCount > 1;
+
+  // For each kind:"tags" column, expose a TagActions value backed by this
+  // table's multiFilters slot. The + / − icons inside each tag mutate the
+  // same Record<token, mode> shape that the filter-bar dropdown uses, so
+  // the existing filter pipeline picks up the change without changes.
+  const tagActionsByColumn = useMemo(() => {
+    const out: Record<string, TagActionsContextValue> = {};
+    for (const column of visibleColumns) {
+      if (column.kind !== "tags") continue;
+      const columnKey = column.key;
+      const current = (multiFilters[columnKey] ?? {}) as Record<string, TagFilterMode>;
+      const handler = (next: Record<string, TagFilterMode>) =>
+        setMultiFilters((state) => updateFilterRecord(state, columnKey, next));
+      out[columnKey] = tagActionsFromRecord(current, handler);
+    }
+    return out;
+  }, [multiFilters, visibleColumns]);
+
+  // The first kind:"timestamp" column (with autoRangeFilter not disabled) gets
+  // the auto-mounted FilterBar time-range picker. The user can override by
+  // supplying their own filterBarProps.timeRange.
+  const timeRangeColumn = useMemo(() => {
+    if (filterBarProps?.timeRange) return null;
+    return (
+      visibleColumns.find(
+        (column) =>
+          column.kind === "timestamp" &&
+          column.filterable !== false &&
+          column.timestamp?.autoRangeFilter !== false,
+      ) ?? null
+    );
+  }, [filterBarProps?.timeRange, visibleColumns]);
+
   const filterableColumns = useMemo(
-    () => columns.filter((column) => column.filterable !== false),
-    [columns],
+    () =>
+      visibleColumns.filter((column) => {
+        if (column.filterable === false) return false;
+        // Timestamp columns are filtered through the time-range picker, not
+        // a per-column text/multi filter. Skip them in auto-filter generation.
+        if (column.kind === "timestamp") return false;
+        return true;
+      }),
+    [visibleColumns],
   );
 
   const generatedFilters = useMemo<GeneratedFilter<T>[]>(() => {
@@ -177,9 +419,32 @@ export function DataTable<T extends Record<string, unknown>>({
         .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
         .map((value) => ({ value, label: value }));
 
+      // Tag columns naturally have higher cardinality (e.g. infra labels);
+      // we let the multi-filter scale to 50 distinct values before falling
+      // back to free-text search.
+      const multiCap = column.kind === "tags" ? 50 : 20;
+
+      const fitsMulti = options.length >= 2 && options.length <= multiCap;
+
+      // For tag columns we group tokens by their key so the filter renders
+      // as a two-level submenu (env → prod/staging, tier → edge/core, …).
+      // Falls back to a flat multi when there's only one key (or none).
+      if (column.kind === "tags" && fitsMulti) {
+        const separator = column.tags?.separator ?? "=";
+        const groups = groupTagOptions(options, separator);
+        if (groups.length >= 2) {
+          return {
+            column,
+            kind: "nested-multi" as const,
+            options,
+            groups,
+          };
+        }
+      }
+
       return {
         column,
-        kind: options.length >= 2 && options.length <= 20 ? "multi" : "text",
+        kind: fitsMulti ? "multi" : "text",
         options,
       };
     });
@@ -198,41 +463,64 @@ export function DataTable<T extends Record<string, unknown>>({
     : setLocalGlobalFilter;
   const nativeFilters = useMemo<FilterBarFilter[]>(
     () =>
-      generatedFilters.map((filter) =>
-        filter.kind === "multi"
-          ? {
-              key: filter.column.key,
-              kind: "multi",
-              label: labelText(filter.column),
-              value: multiFilters[filter.column.key] ?? {},
-              onChange: (next: Record<string, FilterBarMultiFilterMode>) =>
-                setMultiFilters((current) => updateFilterRecord(current, filter.column.key, next)),
-              options: filter.options,
-            }
-          : filter.kind === "number"
-            ? {
-                key: filter.column.key,
-                kind: "number",
-                label: labelText(filter.column),
-                value: numberFilters[filter.column.key] ?? {},
-                domainMin: filter.numberBounds?.min,
-                domainMax: filter.numberBounds?.max,
-                step: filter.numberBounds?.step,
-                onChange: (next: FilterBarNumberValue) =>
-                  setNumberFilters((current) =>
-                    updateNumberFilterValue(current, filter.column.key, next),
-                  ),
-              }
-            : {
-                key: filter.column.key,
-                kind: "text",
-                label: labelText(filter.column),
-                value: textFilters[filter.column.key] ?? "",
-                onChange: (next: string) =>
-                  setTextFilters((current) => updateFilterValue(current, filter.column.key, next)),
-              },
-      ),
+      generatedFilters.map((filter): FilterBarFilter => {
+        const columnKey = filter.column.key;
+        if (filter.kind === "multi") {
+          return {
+            key: columnKey,
+            kind: "multi",
+            label: labelText(filter.column),
+            value: multiFilters[columnKey] ?? {},
+            onChange: (next) =>
+              setMultiFilters((current) => updateFilterRecord(current, columnKey, next)),
+            options: filter.options,
+          };
+        }
+        if (filter.kind === "nested-multi") {
+          return {
+            key: columnKey,
+            kind: "nested-multi",
+            label: labelText(filter.column),
+            value: multiFilters[columnKey] ?? {},
+            onChange: (next) =>
+              setMultiFilters((current) => updateFilterRecord(current, columnKey, next)),
+            groups: filter.groups ?? [],
+          };
+        }
+        if (filter.kind === "number") {
+          const numberFilter: Extract<FilterBarFilter, { kind: "number" }> = {
+            key: columnKey,
+            kind: "number",
+            label: labelText(filter.column),
+            value: numberFilters[columnKey] ?? {},
+            onChange: (next: FilterBarNumberValue) =>
+              setNumberFilters((current) => updateNumberFilterValue(current, columnKey, next)),
+          };
+          if (filter.numberBounds?.min !== undefined) {
+            numberFilter.domainMin = filter.numberBounds.min;
+          }
+          if (filter.numberBounds?.max !== undefined) {
+            numberFilter.domainMax = filter.numberBounds.max;
+          }
+          if (filter.numberBounds?.step !== undefined) {
+            numberFilter.step = filter.numberBounds.step;
+          }
+          return numberFilter;
+        }
+        return {
+          key: columnKey,
+          kind: "text",
+          label: labelText(filter.column),
+          value: textFilters[columnKey] ?? "",
+          onChange: (next: string) =>
+            setTextFilters((current) => updateFilterValue(current, columnKey, next)),
+        };
+      }),
     [generatedFilters, multiFilters, numberFilters, textFilters],
+  );
+  const nativeFilterByColumn = useMemo(
+    () => new Map(nativeFilters.map((filter) => [filter.key, filter])),
+    [nativeFilters],
   );
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
@@ -241,13 +529,48 @@ export function DataTable<T extends Record<string, unknown>>({
     filterBarProps?.timeRange ||
     filterBarProps?.dateRange,
   );
+  const autoTimeRange = useMemo<FilterBarRangeProps | null>(() => {
+    if (!autoFilter || !timeRangeColumn) return null;
+    return {
+      from: timeRangeFilter.from,
+      to: timeRangeFilter.to,
+      onApply: (from, to) => setTimeRangeFilter({ from, to }),
+      presets: timeRangeColumn.timestamp?.rangePresets ?? TIMESTAMP_RANGE_PRESETS,
+      fromPlaceholder: "now-24h",
+      toPlaceholder: "now",
+      emptyLabel: "Any time",
+    };
+  }, [autoFilter, timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
   const showFilterBar =
-    (autoFilter && (showGlobalFilter || nativeFilters.length > 0)) || hasCustomFilterBarContent;
+    (autoFilter && (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
+    hasCustomFilterBarContent ||
+    showColumnVisibilityControl;
+  const filterBarTrailing = showColumnVisibilityControl ? (
+    <>
+      {filterBarProps?.trailing}
+      <ColumnVisibilityTrigger onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))} />
+    </>
+  ) : (
+    filterBarProps?.trailing
+  );
+  const showHeaderFilterControls = autoFilter && showHeaderFilters;
 
   const filteredRows = useMemo(() => {
     const globalNeedle = effectiveGlobalFilter.trim().toLowerCase();
+    const now = new Date();
+    const rangeFromDate = timeRangeColumn ? resolveDateMath(timeRangeFilter.from, now) : null;
+    const rangeToDate = timeRangeColumn ? resolveDateMath(timeRangeFilter.to, now) : null;
+    const rangeColumnKey = timeRangeColumn?.key;
 
     return rows.filter(({ row }) => {
+      if (rangeColumnKey && (rangeFromDate || rangeToDate)) {
+        const raw = resolvePath(row, rangeColumnKey);
+        const ts = parseTimestamp(raw);
+        if (!ts) return false;
+        if (rangeFromDate && ts.getTime() < rangeFromDate.getTime()) return false;
+        if (rangeToDate && ts.getTime() > rangeToDate.getTime()) return false;
+      }
+
       if (globalNeedle) {
         const haystack = filterableColumns
           .flatMap((column) => getFilterTokens(row, column))
@@ -313,23 +636,26 @@ export function DataTable<T extends Record<string, unknown>>({
     numberFilters,
     rows,
     textFilters,
+    timeRangeColumn,
+    timeRangeFilter.from,
+    timeRangeFilter.to,
   ]);
 
   const sortResolvers = useMemo(
     () =>
       Object.fromEntries(
-        columns.map((column) => [
+        effectiveColumns.map((column) => [
           column.key,
           (record: InternalRow<T>) => getSortValue(record.row, column),
         ]),
       ) as Record<string, (record: InternalRow<T>) => unknown>,
-    [columns],
+    [effectiveColumns],
   );
 
   const { sorted, sort, toggle } = useSort(filteredRows, {
-    defaultKey: defaultSort?.key,
     defaultDir: defaultSort?.dir ?? "asc",
     resolvers: sortResolvers,
+    ...(defaultSort?.key ? { defaultKey: defaultSort.key } : {}),
   });
 
   const startColumnResize = (event: ReactMouseEvent<HTMLElement>, column: DataTableColumn<T>) => {
@@ -380,6 +706,41 @@ export function DataTable<T extends Record<string, unknown>>({
     }));
   };
 
+  const toggleColumnVisibility = (column: DataTableColumn<T>) => {
+    if (!isColumnHideable(column)) return;
+
+    setHiddenColumns((current) => {
+      const hidden = current[column.key] === true;
+      if (!hidden && visibleHideableColumnCount <= 1) return current;
+
+      const next = { ...current };
+      if (hidden) {
+        delete next[column.key];
+      } else {
+        next[column.key] = true;
+      }
+
+      return pruneHiddenColumns(next, columns);
+    });
+  };
+
+  const showAllColumns = () => setHiddenColumns({});
+
+  const openHeaderColumnMenu = (
+    event: ReactMouseEvent<HTMLTableCellElement>,
+    column: DataTableColumn<T>,
+  ) => {
+    if (!showColumnVisibilityControl) return;
+    event.preventDefault();
+    setColumnMenu(menuStateFromPointer(event, column.key));
+  };
+
+  const openHeaderFilterMenu = (event: ReactMouseEvent<HTMLElement>, columnKey: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setHeaderFilterMenu(menuStateFromTrigger(event, columnKey));
+  };
+
   if (data.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border p-density-6 text-center text-sm text-muted-foreground">
@@ -393,7 +754,7 @@ export function DataTable<T extends Record<string, unknown>>({
       {showFilterBar && (
         <FilterBar
           {...filterBarProps}
-          {...(showGlobalFilter
+          {...(autoFilter && showGlobalFilter
             ? {
                 search: {
                   value: effectiveGlobalFilter,
@@ -402,6 +763,8 @@ export function DataTable<T extends Record<string, unknown>>({
                 },
               }
             : {})}
+          {...(autoTimeRange ? { timeRange: autoTimeRange } : {})}
+          trailing={filterBarTrailing}
           filters={nativeFilters}
         />
       )}
@@ -415,7 +778,7 @@ export function DataTable<T extends Record<string, unknown>>({
           <div className="overflow-auto rounded-md border border-border">
             <table className="w-max table-auto text-left text-sm">
               <colgroup>
-                {columns.map((column) => (
+                {visibleColumns.map((column) => (
                   <col
                     key={column.key}
                     style={columnStyle(column, columnWidths)}
@@ -425,7 +788,7 @@ export function DataTable<T extends Record<string, unknown>>({
               </colgroup>
               <thead className="sticky top-0 bg-muted/50">
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th
                       key={column.key}
                       className={cn(
@@ -434,19 +797,43 @@ export function DataTable<T extends Record<string, unknown>>({
                         resizableColumns && column.resizable !== false && "select-none",
                         column.headerClassName,
                       )}
+                      onContextMenu={(event) => openHeaderColumnMenu(event, column)}
                     >
-                      {column.sortable === false ? (
-                        <span>{column.label}</span>
-                      ) : (
-                        <SortableHeader
-                          active={sort?.key === column.key}
-                          dir={sort?.key === column.key ? sort.dir : undefined}
-                          align={column.align}
-                          onClick={() => toggle(column.key)}
-                        >
-                          {column.label}
-                        </SortableHeader>
-                      )}
+                      <div
+                        className={cn(
+                          "flex min-w-0 items-center gap-1",
+                          headerAlignmentClass(column.align),
+                          resizableColumns && column.resizable !== false && "pr-2",
+                        )}
+                      >
+                        <span className="min-w-0">
+                          {column.sortable === false ? (
+                            <span>{column.label}</span>
+                          ) : (
+                            <SortableHeader
+                              active={sort?.key === column.key}
+                              {...(sort?.key === column.key ? { dir: sort.dir } : {})}
+                              {...(column.align ? { align: column.align } : {})}
+                              onClick={() => toggle(column.key)}
+                            >
+                              {column.label}
+                            </SortableHeader>
+                          )}
+                        </span>
+                        {showHeaderFilterControls &&
+                          (nativeFilterByColumn.has(column.key) ||
+                            (autoTimeRange && timeRangeColumn?.key === column.key)) && (
+                            <HeaderFilterButton
+                              column={column}
+                              active={
+                                nativeFilterByColumn.has(column.key)
+                                  ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
+                                  : Boolean(timeRangeFilter.from || timeRangeFilter.to)
+                              }
+                              onOpen={(event) => openHeaderFilterMenu(event, column.key)}
+                            />
+                          )}
+                      </div>
                       {resizableColumns && column.resizable !== false && (
                         <span
                           role="separator"
@@ -474,7 +861,12 @@ export function DataTable<T extends Record<string, unknown>>({
                 {sorted.map((record) => {
                   const href = getRowHref?.(record.row);
                   const expanded = expandedRows[record.id] ?? false;
-                  const expandedContent = renderExpandedRow?.(record.row) ?? null;
+                  const expandedContent =
+                    renderExpandedRow?.(record.row, {
+                      columns: effectiveColumns,
+                      visibleColumns,
+                      tagActionsByColumn,
+                    }) ?? null;
                   const expandable = expandedContent !== null;
                   const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
                   const clickable = !!href || rowClickEnabled || expandable;
@@ -498,11 +890,21 @@ export function DataTable<T extends Record<string, unknown>>({
                           }
                         }}
                       >
-                        {columns.map((column, index) => {
+                        {visibleColumns.map((column, index) => {
                           const rawValue = resolvePath(record.row, column.key);
-                          const content = column.render
+                          let content: ReactNode = column.render
                             ? column.render(rawValue, record.row)
                             : formatCell(rawValue);
+
+                          // Tag cells get the + / − filter affordance via
+                          // context; copy-to-clipboard works without it too.
+                          if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                            content = (
+                              <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                                {content}
+                              </TagActionsProvider>
+                            );
+                          }
 
                           return (
                             <td
@@ -528,7 +930,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       </tr>
                       {expanded && expandedContent && (
                         <tr>
-                          <td colSpan={columns.length} className="bg-muted/40 p-density-3">
+                          <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
                             <div className="rounded-md border border-border bg-background p-density-3">
                               {expandedContent}
                             </div>
@@ -547,11 +949,262 @@ export function DataTable<T extends Record<string, unknown>>({
           </div>
         </>
       )}
+      {columnMenu && showColumnVisibilityControl && (
+        <ColumnVisibilityMenu
+          columns={effectiveColumns}
+          hiddenColumns={hiddenColumns}
+          anchor={columnMenu}
+          visibleHideableColumnCount={visibleHideableColumnCount}
+          onToggle={toggleColumnVisibility}
+          onShowAll={showAllColumns}
+          onClose={() => setColumnMenu(null)}
+        />
+      )}
+      {headerFilterMenu && (
+        <HeaderFilterMenu
+          filter={nativeFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
+          {...(autoTimeRange && timeRangeColumn?.key === headerFilterMenu.columnKey
+            ? { timeRange: autoTimeRange }
+            : {})}
+          anchor={headerFilterMenu}
+          onClose={() => setHeaderFilterMenu(null)}
+        />
+      )}
     </div>
   );
 }
 
-function CellContent({ column, children }: { column: DataTableColumn; children: ReactNode }) {
+function HeaderFilterButton<T extends Record<string, unknown>>({
+  column,
+  active,
+  onOpen,
+}: {
+  column: DataTableColumn<T>;
+  active: boolean;
+  onOpen: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Open ${labelText(column)} column filter`}
+      aria-haspopup="dialog"
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active && "bg-accent text-foreground",
+      )}
+      onClick={onOpen}
+    >
+      <Icon name="codicon:filter" className="text-xs" />
+    </button>
+  );
+}
+
+function HeaderFilterMenu({
+  filter,
+  timeRange,
+  anchor,
+  onClose,
+}: {
+  filter: FilterBarFilter | undefined;
+  timeRange?: FilterBarRangeProps;
+  anchor: ColumnMenuState;
+  onClose: () => void;
+}) {
+  if (!filter && !timeRange) return null;
+
+  const label = filter?.label ?? "Time range";
+
+  return (
+    <div
+      role="dialog"
+      aria-label={`${label} column filter`}
+      className="fixed z-50 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+      style={{ left: anchor.x, top: anchor.y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <div className="flex items-center gap-1">
+          {filter && (
+            <button
+              type="button"
+              className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
+              onClick={() => clearFilterBarFilter(filter)}
+              disabled={!isFilterBarFilterActive(filter)}
+            >
+              Clear all
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Close column filter"
+            title="Close"
+            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+            onClick={onClose}
+          >
+            <Icon name="codicon:close" className="text-sm" />
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {filter && <FilterBarFilterPanel filter={filter} chrome="embedded" />}
+        {timeRange && <FilterBarRangePanel kind="time" label="Time range" {...timeRange} />}
+      </div>
+    </div>
+  );
+}
+
+function clearFilterBarFilter(filter: FilterBarFilter) {
+  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+    filter.onChange("");
+    return;
+  }
+
+  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
+    filter.onChange([]);
+    return;
+  }
+
+  if (filter.kind === "number") {
+    filter.onChange({});
+    return;
+  }
+
+  if (filter.kind === "boolean") {
+    filter.onChange(false);
+    return;
+  }
+
+  filter.onChange({});
+}
+
+function ColumnVisibilityTrigger({
+  onOpen,
+}: {
+  onOpen: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Open column menu"
+      aria-haspopup="menu"
+      className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen(event);
+      }}
+    >
+      <Icon name="codicon:ellipsis" className="text-sm" />
+    </button>
+  );
+}
+
+function ColumnVisibilityMenu<T extends Record<string, unknown>>({
+  columns,
+  hiddenColumns,
+  anchor,
+  visibleHideableColumnCount,
+  onToggle,
+  onShowAll,
+  onClose,
+}: {
+  columns: DataTableColumn<T>[];
+  hiddenColumns: Record<string, boolean>;
+  anchor: ColumnMenuState;
+  visibleHideableColumnCount: number;
+  onToggle: (column: DataTableColumn<T>) => void;
+  onShowAll: () => void;
+  onClose: () => void;
+}) {
+  const activeColumn = anchor.columnKey
+    ? columns.find((column) => column.key === anchor.columnKey)
+    : undefined;
+  const canHideActiveColumn =
+    activeColumn && isColumnHideable(activeColumn) && visibleHideableColumnCount > 1;
+
+  return (
+    <div
+      role="menu"
+      aria-label="Column menu"
+      className="fixed z-50 min-w-[16rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
+      style={{ left: anchor.x, top: anchor.y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        <span>Columns</span>
+        <button
+          type="button"
+          className="rounded px-1.5 py-0.5 text-xs text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+          onClick={onShowAll}
+        >
+          Show all
+        </button>
+      </div>
+
+      {activeColumn && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!canHideActiveColumn}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+              !canHideActiveColumn && "cursor-not-allowed opacity-50",
+            )}
+            onClick={() => {
+              if (!canHideActiveColumn) return;
+              onToggle(activeColumn);
+              onClose();
+            }}
+          >
+            <Icon name="codicon:eye-closed" className="text-sm text-muted-foreground" />
+            <span>Hide {labelText(activeColumn)}</span>
+          </button>
+          <div className="my-1 h-px bg-border" />
+        </>
+      )}
+
+      <div className="max-h-72 overflow-auto">
+        {columns.map((column) => {
+          const hideable = isColumnHideable(column);
+          const visible = hiddenColumns[column.key] !== true;
+          const disabled = !hideable || (visible && visibleHideableColumnCount <= 1);
+          return (
+            <label
+              key={column.key}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                disabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-border"
+                checked={visible}
+                disabled={disabled}
+                onChange={() => onToggle(column)}
+              />
+              <span className="truncate">{labelText(column)}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CellContent<T extends Record<string, unknown>>({
+  column,
+  children,
+}: {
+  column: DataTableColumn<T>;
+  children: ReactNode;
+}) {
   return (
     <div className={cn(cellContentClassName(column), alignmentClass(column.align))}>{children}</div>
   );
@@ -596,11 +1249,7 @@ function normalizeNumbers(value: FilterValue | unknown): number[] {
   return parsed == null ? [] : [parsed];
 }
 
-function updateFilterValue<T extends Record<string, string>>(
-  state: T,
-  key: string,
-  nextValue: string,
-) {
+function updateFilterValue(state: Record<string, string>, key: string, nextValue: string) {
   const next = { ...state };
 
   if (nextValue.trim()) {
@@ -612,8 +1261,8 @@ function updateFilterValue<T extends Record<string, string>>(
   return next;
 }
 
-function updateFilterRecord<T extends Record<string, Record<string, FilterBarMultiFilterMode>>>(
-  state: T,
+function updateFilterRecord(
+  state: Record<string, Record<string, FilterBarMultiFilterMode>>,
   key: string,
   nextValue: Record<string, FilterBarMultiFilterMode>,
 ) {
@@ -628,8 +1277,8 @@ function updateFilterRecord<T extends Record<string, Record<string, FilterBarMul
   return next;
 }
 
-function updateNumberFilterValue<T extends Record<string, FilterBarNumberValue>>(
-  state: T,
+function updateNumberFilterValue(
+  state: Record<string, FilterBarNumberValue>,
   key: string,
   nextValue: FilterBarNumberValue,
 ) {
@@ -654,7 +1303,18 @@ function pruneMultiFilterState(
   state: Record<string, Record<string, FilterBarMultiFilterMode>>,
   filters: GeneratedFilter<any>[],
 ) {
-  return pruneFilterState(state, filters, "multi", (value) => Object.keys(value).length === 0);
+  // multi and nested-multi share the same state slot; allow either kind to
+  // keep the entry alive.
+  const allowed = new Set(
+    filters
+      .filter((filter) => filter.kind === "multi" || filter.kind === "nested-multi")
+      .map((filter) => filter.column.key),
+  );
+  return Object.fromEntries(
+    Object.entries(state).filter(
+      ([key, value]) => allowed.has(key) && Object.keys(value).length > 0,
+    ),
+  );
 }
 
 function pruneNumberFilterState(
@@ -701,6 +1361,117 @@ function formatCell(value: unknown): ReactNode {
   return String(value);
 }
 
+// Groups flat key=value tokens by key for the nested-multi tag filter.
+// Tokens without a separator land in a synthetic "" group rendered as
+// "Other" by the filter UI.
+function groupTagOptions(
+  options: MultiSelectOption[],
+  separator: string,
+): Array<{ groupKey: string; label?: string; options: MultiSelectOption[] }> {
+  const byKey = new Map<string, MultiSelectOption[]>();
+  for (const option of options) {
+    const { key } = splitTagToken(option.value, separator);
+    const list = byKey.get(key) ?? [];
+    list.push(option);
+    byKey.set(key, list);
+  }
+  return Array.from(byKey.entries())
+    .sort(([a], [b]) => {
+      // Bare-tag bucket sinks to the bottom; otherwise alphabetical.
+      if (a === "" && b !== "") return 1;
+      if (b === "" && a !== "") return -1;
+      return a.localeCompare(b);
+    })
+    .map(([groupKey, groupOptions]) => ({
+      groupKey,
+      label: groupKey === "" ? "Other" : groupKey,
+      options: groupOptions,
+    }));
+}
+
+function applyKindDefaults<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+  timestampFormat: TimestampFormat | undefined,
+): DataTableColumn<T> {
+  if (!column.kind) return column;
+
+  if (column.kind === "timestamp") {
+    const format = timestampFormat ?? "iso";
+    return {
+      ...column,
+      render:
+        column.render ??
+        ((value) => (
+          <Timestamp
+            value={value}
+            format={format}
+            showTitleOnHover={column.timestamp?.alwaysShowFullOnHover !== false}
+          />
+        )),
+      sortValue: column.sortValue ?? ((value) => parseTimestamp(value)?.getTime() ?? null),
+      filterValue:
+        column.filterValue ??
+        ((value) => {
+          const parsed = parseTimestamp(value);
+          return parsed ? parsed.toISOString() : "";
+        }),
+    };
+  }
+
+  if (column.kind === "tags") {
+    const opts = column.tags;
+    const separator = opts?.separator ?? "=";
+    return {
+      ...column,
+      render:
+        column.render ??
+        ((value) => (
+          <TagList
+            tags={normalizeTags(value as TagsValue, separator)}
+            maxVisible={opts?.maxVisible ?? 3}
+          />
+        )),
+      filterValue:
+        column.filterValue ?? ((value) => tagFilterTokens(value as TagsValue, separator)),
+      sortValue:
+        column.sortValue ?? ((value) => tagFilterTokens(value as TagsValue, separator).length),
+    };
+  }
+
+  if (column.kind === "status") {
+    const opts = column.status;
+    const map = opts?.map ?? ((raw) => normalizeStatus(raw));
+    return {
+      ...column,
+      render:
+        column.render ??
+        ((value, row) => {
+          const status = map(value, row);
+          if (!status) return <span className="text-muted-foreground">—</span>;
+          const label = opts?.showLabel ? (typeof value === "string" ? value : status) : undefined;
+          const title =
+            opts?.title?.(value, row) ?? (typeof value === "string" ? value : undefined);
+          return (
+            <StatusDot
+              status={status}
+              {...(label ? { label } : {})}
+              {...(title ? { title } : {})}
+            />
+          );
+        }),
+      filterValue:
+        column.filterValue ??
+        ((value, row) => {
+          const status = map(value, row);
+          return status ?? "";
+        }),
+      sortValue: column.sortValue ?? ((value, row) => map(value, row) ?? ""),
+    };
+  }
+
+  return column;
+}
+
 function prettifyKey(key: string) {
   return key
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -709,23 +1480,79 @@ function prettifyKey(key: string) {
     .trim();
 }
 
-function labelText(column: DataTableColumn) {
+function labelText<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
   if (typeof column.label === "string") return column.label;
   return prettifyKey(column.key.split(".").at(-1) ?? column.key);
 }
 
-function columnStyle(
-  column: DataTableColumn,
+function isColumnHideable<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
+  return column.hideable !== false;
+}
+
+function isFilterBarFilterActive(filter: FilterBarFilter) {
+  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+    return String(filter.value ?? "").trim() !== "";
+  }
+  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
+    return filter.value.length > 0;
+  }
+  if (filter.kind === "number") {
+    return (
+      String(filter.value.min ?? "").trim() !== "" || String(filter.value.max ?? "").trim() !== ""
+    );
+  }
+  if (filter.kind === "boolean") return filter.value;
+  return Object.keys(filter.value).length > 0;
+}
+
+function menuStateFromPointer(
+  event: ReactMouseEvent<HTMLElement>,
+  columnKey?: string,
+): ColumnMenuState {
+  const padding = 8;
+  const width = 256;
+  const height = 320;
+  const viewportWidth = typeof window === "undefined" ? event.clientX + width : window.innerWidth;
+  const viewportHeight =
+    typeof window === "undefined" ? event.clientY + height : window.innerHeight;
+
+  const position = {
+    x: Math.max(padding, Math.min(event.clientX, viewportWidth - width - padding)),
+    y: Math.max(padding, Math.min(event.clientY, viewportHeight - height - padding)),
+  };
+  return columnKey ? { ...position, columnKey } : position;
+}
+
+function menuStateFromTrigger(
+  event: ReactMouseEvent<HTMLElement>,
+  columnKey?: string,
+): ColumnMenuState {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const padding = 8;
+  const width = 256;
+  const height = 320;
+  const viewportWidth = typeof window === "undefined" ? rect.right + width : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? rect.bottom + height : window.innerHeight;
+
+  const position = {
+    x: Math.max(padding, Math.min(rect.right - width, viewportWidth - width - padding)),
+    y: Math.max(padding, Math.min(rect.bottom + 6, viewportHeight - height - padding)),
+  };
+  return columnKey ? { ...position, columnKey } : position;
+}
+
+function columnStyle<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
   widths: Record<string, number>,
 ): CSSProperties | undefined {
   const width = widths[column.key];
   return width ? { width: `${width}px` } : undefined;
 }
 
-function measureColumnContentWidth(
+function measureColumnContentWidth<T extends Record<string, unknown>>(
   table: HTMLTableElement,
   columnIndex: number,
-  column: DataTableColumn,
+  column: DataTableColumn<T>,
 ) {
   const cells = Array.from(table.querySelectorAll("th, td")).filter(
     (cell): cell is HTMLTableCellElement =>
@@ -754,9 +1581,9 @@ function parseCssPixelValue(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function readStoredColumnWidths(
+function readStoredColumnWidths<T extends Record<string, unknown>>(
   storageKey: string,
-  columns: DataTableColumn[],
+  columns: DataTableColumn<T>[],
 ): Record<string, number> {
   if (typeof window === "undefined") return {};
 
@@ -785,9 +1612,40 @@ function writeStoredColumnWidths(storageKey: string, widths: Record<string, numb
   } catch {}
 }
 
-function pruneColumnWidths(
+function readStoredHiddenColumns<T extends Record<string, unknown>>(
+  storageKey: string,
+  columns: DataTableColumn<T>[],
+): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    return pruneHiddenColumns(parsed as Record<string, unknown>, columns);
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredHiddenColumns(storageKey: string, hiddenColumns: Record<string, boolean>) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (Object.keys(hiddenColumns).length === 0) {
+      window.localStorage.removeItem(storageKey);
+    } else {
+      window.localStorage.setItem(storageKey, JSON.stringify(hiddenColumns));
+    }
+  } catch {}
+}
+
+function pruneColumnWidths<T extends Record<string, unknown>>(
   widths: Record<string, unknown>,
-  columns: DataTableColumn[],
+  columns: DataTableColumn<T>[],
 ): Record<string, number> {
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const next: Record<string, number> = {};
@@ -797,6 +1655,29 @@ function pruneColumnWidths(
     if (!column || typeof width !== "number" || !Number.isFinite(width)) continue;
 
     next[key] = clampColumnWidth(column, width);
+  }
+
+  return next;
+}
+
+function pruneHiddenColumns<T extends Record<string, unknown>>(
+  hiddenColumns: Record<string, unknown>,
+  columns: DataTableColumn<T>[],
+): Record<string, boolean> {
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+  const next: Record<string, boolean> = {};
+
+  for (const [key, hidden] of Object.entries(hiddenColumns)) {
+    const column = byKey.get(key);
+    if (!column || hidden !== true || !isColumnHideable(column)) continue;
+
+    next[key] = true;
+  }
+
+  const hideable = columns.filter(isColumnHideable);
+  const visibleHideableCount = hideable.filter((column) => next[column.key] !== true).length;
+  if (hideable.length > 0 && visibleHideableCount === 0) {
+    delete next[hideable[0]!.key];
   }
 
   return next;
@@ -813,13 +1694,27 @@ function sameColumnWidths(left: Record<string, number>, right: Record<string, nu
   );
 }
 
-function defaultColumnWidth(column: DataTableColumn) {
+function sameHiddenColumns(left: Record<string, boolean>, right: Record<string, boolean>) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key],
+    )
+  );
+}
+
+function defaultColumnWidth<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
   if (column.grow) return DEFAULT_GROW_COLUMN_WIDTH;
   if (column.shrink) return DEFAULT_SHRINK_COLUMN_WIDTH;
   return DEFAULT_COLUMN_WIDTH;
 }
 
-function clampColumnWidth(column: DataTableColumn, width: number) {
+function clampColumnWidth<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+  width: number,
+) {
   const minWidth = column.minWidth ?? DEFAULT_COLUMN_MIN_WIDTH;
   const maxWidth = column.maxWidth;
   const minimum = Number.isFinite(minWidth) ? Math.max(1, minWidth) : DEFAULT_COLUMN_MIN_WIDTH;
@@ -899,8 +1794,14 @@ function alignmentClass(align?: DataTableColumn["align"]) {
   return "text-left";
 }
 
-function cellContentClassName(
-  column: DataTableColumn,
+function headerAlignmentClass(align?: DataTableColumn["align"]) {
+  if (align === "right") return "justify-end";
+  if (align === "center") return "justify-center";
+  return "justify-start";
+}
+
+function cellContentClassName<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
 ): TdHTMLAttributes<HTMLTableCellElement>["className"] {
   if (column.grow) return "min-w-56 max-w-[36rem] truncate";
   if (column.shrink) return "max-w-[16rem] truncate whitespace-nowrap";

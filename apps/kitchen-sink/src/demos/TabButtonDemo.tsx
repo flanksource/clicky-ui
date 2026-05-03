@@ -35,10 +35,38 @@ export function TabButtonDemo() {
         />
       </DemoRow>
       <DemoRow label="Gauges">
-        <Gauge label="Passed" value={92} tone="success" />
-        <Gauge label="Failed" value={3} tone="danger" />
-        <Gauge label="Skipped" value={5} tone="warning" />
-        <Gauge label="Coverage" value={78} tone="info" />
+        <Gauge
+          icon="codicon:pass"
+          label="Passed"
+          value={92}
+          tone="success"
+          subtitle="110 / 120 tests"
+          meta="fresh"
+        />
+        <Gauge
+          icon="codicon:error"
+          label="Failed"
+          value={3}
+          tone="danger"
+          subtitle="requires attention"
+          meta="3m"
+        />
+        <Gauge
+          icon="codicon:warning"
+          label="Skipped"
+          value={5}
+          tone="warning"
+          subtitle="intentionally skipped"
+          meta="cached"
+        />
+        <Gauge
+          icon="codicon:graph"
+          label="Coverage"
+          value={78}
+          tone="info"
+          subtitle="branches and statements"
+          meta="live"
+        />
       </DemoRow>
     </DemoSection>
   );

@@ -350,4 +350,62 @@ describe("FilterBar", () => {
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
     expect(screen.getAllByLabelText(/open date picker/i)).toHaveLength(2);
   });
+
+  it("renders a nested-multi filter as a key→value submenu and round-trips selection", () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "tags",
+            kind: "nested-multi",
+            label: "Tags",
+            value: {},
+            onChange,
+            groups: [
+              {
+                groupKey: "env",
+                options: [
+                  { value: "env=prod", label: "env=prod" },
+                  { value: "env=staging", label: "env=staging" },
+                ],
+              },
+              {
+                groupKey: "tier",
+                options: [
+                  { value: "tier=edge", label: "tier=edge" },
+                  { value: "tier=core", label: "tier=core" },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    // Outer panel shows keys, not raw tokens.
+    fireEvent.click(screen.getByRole("button", { name: /tags filter/i }));
+    const envGroup = screen.getByRole("button", { name: /^env$/ });
+    const tierGroup = screen.getByRole("button", { name: /^tier$/ });
+    expect(envGroup).toBeInTheDocument();
+    expect(tierGroup).toBeInTheDocument();
+    expect(screen.queryByText("env=prod")).not.toBeInTheDocument();
+
+    // Hovering a key reveals its values in the second panel.
+    fireEvent.mouseEnter(envGroup);
+    expect(screen.getByRole("button", { name: /^prod$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^staging$/ })).toBeInTheDocument();
+
+    // Toggle the value's pill into include — this mirrors the flat multi
+    // pathway exactly (same wire shape, same handler).
+    fireEvent.click(screen.getByRole("button", { name: /^prod$/ }));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(onChange).toHaveBeenCalledWith({ "env=prod": "include" });
+
+    vi.useRealTimers();
+  });
 });

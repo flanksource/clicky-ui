@@ -1,9 +1,14 @@
-import { useMemo, type CSSProperties } from "react";
-import { ApiReferenceReact, type AnyApiReferenceConfiguration } from "@scalar/api-reference-react";
-import "@scalar/api-reference-react/style.css";
+import { lazy, Suspense, useMemo, type CSSProperties } from "react";
+import type { AnyApiReferenceConfiguration } from "@scalar/api-reference-react";
 import { cn } from "../lib/utils";
 
 export const DEFAULT_OPENAPI_URL = "/api/openapi.json";
+
+const ScalarApiReference = lazy(async () => {
+  await import("@scalar/api-reference-react/style.css");
+  const mod = await import("@scalar/api-reference-react");
+  return { default: mod.ApiReferenceReact };
+});
 
 export type ApiExplorerProps = {
   openApiUrl?: string;
@@ -30,7 +35,13 @@ export function ApiExplorer({
 
   return (
     <div className={cn("h-full min-h-0 overflow-auto", className)} style={style}>
-      <ApiReferenceReact configuration={scalarConfiguration} />
+      <Suspense
+        fallback={
+          <div className="p-4 text-sm text-muted-foreground">Loading API explorer...</div>
+        }
+      >
+        <ScalarApiReference configuration={scalarConfiguration} />
+      </Suspense>
     </div>
   );
 }

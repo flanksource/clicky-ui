@@ -11,7 +11,8 @@ pnpm add @flanksource/clicky-ui react react-dom tailwindcss
 ## Usage
 
 ```tsx
-import { Button, ThemeProvider, DensityProvider } from "@flanksource/clicky-ui";
+import { Button } from "@flanksource/clicky-ui/components";
+import { ThemeProvider, DensityProvider } from "@flanksource/clicky-ui/hooks";
 import "@flanksource/clicky-ui/styles.css";
 
 export function App() {
@@ -28,7 +29,7 @@ export function App() {
 ## Clicky AST Renderer
 
 ```tsx
-import { Clicky, type ClickyDocument } from "@flanksource/clicky-ui";
+import { Clicky, type ClickyDocument } from "@flanksource/clicky-ui/clicky";
 
 const document: ClickyDocument = {
   version: 1,
@@ -48,7 +49,7 @@ export function ClickyPanel() {
 
 ## API Explorer
 
-`ApiExplorer` and `EntityExplorerApp` depend on `@scalar/api-reference-react` and are exposed via a separate subpath so the main bundle stays free of that dependency:
+`ApiExplorer` and `EntityExplorerApp` are exposed via a separate subpath and lazy-load `@scalar/api-reference-react`, so the main bundle and the initial API explorer chunk stay free of Scalar:
 
 ```tsx
 import { ApiExplorer } from "@flanksource/clicky-ui/api-explorer";
@@ -58,7 +59,19 @@ export function Docs() {
 }
 ```
 
-`@scalar/api-reference-react` is a regular dependency of `@flanksource/clicky-ui`, so importing the subpath pulls it in transitively — consumers don't need to add it to their own `package.json`. Consumers who never import this subpath pay nothing for it.
+`@scalar/api-reference-react` is a regular dependency of `@flanksource/clicky-ui`, so consumers don't need to add it to their own `package.json`. Consumers who never render this subpath avoid its runtime bundle cost, but still get it as an installed transitive dependency.
+
+## Bundle size guidance
+
+Prefer subpath imports in production apps:
+
+```tsx
+import { Button } from "@flanksource/clicky-ui/components";
+import { cn } from "@flanksource/clicky-ui/utils";
+import { DataTable } from "@flanksource/clicky-ui/data";
+```
+
+The root `@flanksource/clicky-ui` barrel remains supported for compatibility and convenience, but subpaths give bundlers a smaller entry surface. Import `@flanksource/clicky-ui/styles.css` once at the app root. Markdown parsing, code highlighting, and the Scalar API explorer are loaded asynchronously by their components.
 
 ## Tailwind preset
 

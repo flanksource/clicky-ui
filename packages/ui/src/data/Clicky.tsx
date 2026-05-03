@@ -27,7 +27,7 @@ import {
 } from "../rpc/types";
 import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
 import { cn } from "../lib/utils";
-import { DataTable, type DataTableColumn } from "./DataTable";
+import { DataTable, type DataTableColumn, type DataTableRowDetailContext } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
 import { JsonView } from "./JsonView";
@@ -36,6 +36,13 @@ import { StackTrace } from "./diagnostics/RenderedStackTrace";
 import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
+import {
+  TagActionsProvider,
+  TagList,
+  normalizeTags,
+  type NormalizedTag,
+  type TagsValue,
+} from "./cells/TagList";
 
 export type ClickyStyle = {
   className?: string;
@@ -68,6 +75,7 @@ export type ClickyColumn = {
   filterable?: boolean;
   grow?: boolean;
   shrink?: boolean;
+  kind?: "timestamp" | "tags" | "status";
 };
 
 export type ClickyRow = {
@@ -1940,40 +1948,64 @@ function ClickyTable({ node }: { node: ClickyNode }) {
     return <ClickyCollapsedStructRows columns={columns} rows={rows} />;
   }
 
-  const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => ({
-    key: `cells.${column.name}`,
-    label: column.header ? (
-      <ClickyNodeRenderer node={column.header} />
-    ) : (
-      column.label || prettifyName(column.name)
-    ),
-    align: column.align,
-    sortable: column.sortable,
-    filterable: column.filterable,
-    grow: column.grow,
-    shrink: column.shrink,
-    render: (value) => <ClickyNodeRenderer node={value as ClickyNode} />,
-    sortValue: (value) => clickyNodeText(value as ClickyNode),
-    filterValue: (value) => clickyNodeText(value as ClickyNode),
-  }));
+  const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => {
+    const tagColumn = isClickyTagColumn(column);
+    const base: DataTableColumn<ClickyRow> = {
+      key: `cells.${column.name}`,
+      label: column.header ? (
+        <ClickyNodeRenderer node={column.header} />
+      ) : (
+        column.label || prettifyName(column.name)
+      ),
+      ...(column.align ? { align: column.align } : {}),
+      ...(column.sortable !== undefined ? { sortable: column.sortable } : {}),
+      ...(column.filterable !== undefined ? { filterable: column.filterable } : {}),
+      ...(column.grow !== undefined ? { grow: column.grow } : {}),
+      ...(column.shrink !== undefined ? { shrink: column.shrink } : {}),
+    };
+
+    if (tagColumn) {
+      return {
+        ...base,
+        kind: "tags",
+        render: (value) => {
+          const tags = clickyNodeTags(value as ClickyNode, column);
+          return <TagList tags={tags} maxVisible={3} />;
+        },
+        sortValue: (value) => clickyNodeTags(value as ClickyNode, column).length,
+        filterValue: (value) =>
+          clickyNodeTags(value as ClickyNode, column).map((tag) => tag.token),
+      };
+    }
+
+    return {
+      ...base,
+      ...(column.kind ? { kind: column.kind } : {}),
+      render: (value) => <ClickyNodeRenderer node={value as ClickyNode} />,
+      sortValue: (value) => clickyNodeText(value as ClickyNode),
+      filterValue: (value) => clickyNodeText(value as ClickyNode),
+    };
+  });
 
   const defaultSortColumn = columns.find((column) => column.sortable !== false) ?? columns[0];
 
   return (
-    <DataTable
+    <DataTable<ClickyRow>
       data={rows}
       columns={tableColumns}
-      autoFilter={node.autoFilter}
-      defaultSort={
-        defaultSortColumn ? { key: `cells.${defaultSortColumn.name}`, dir: "asc" } : undefined
-      }
+      {...(node.autoFilter !== undefined ? { autoFilter: node.autoFilter } : {})}
+      {...(defaultSortColumn
+        ? { defaultSort: { key: `cells.${defaultSortColumn.name}`, dir: "asc" as const } }
+        : {})}
       getRowId={(row, index) =>
         `${index}-${columns
           .map((column) => clickyNodeText(row.cells[column.name]))
           .filter(Boolean)
           .join("|")}`
       }
-      renderExpandedRow={(row) => (row.detail ? <ClickyNodeRenderer node={row.detail} /> : null)}
+      renderExpandedRow={(row, context) => (
+        <ClickyTableRowDetail row={row} columns={columns} context={context} />
+      )}
       {...(runtime.onTableRowClick ? { onRowClick: runtime.onTableRowClick } : {})}
       {...(runtime.getTableRowHref ? { getRowHref: runtime.getTableRowHref } : {})}
       {...(runtime.onTableRowClick && (runtime.isTableRowClickable || runtime.getTableRowHref)
@@ -1983,6 +2015,91 @@ function ClickyTable({ node }: { node: ClickyNode }) {
           }
         : {})}
     />
+  );
+}
+
+function ClickyTableRowDetail({
+  row,
+  columns,
+  context,
+}: {
+  row: ClickyRow;
+  columns: ClickyColumn[];
+  context: DataTableRowDetailContext<ClickyRow>;
+}) {
+  const tagFields = columns
+    .map((column) => ({
+      column,
+      tags: clickyNodeTags(row.cells[column.name], column),
+      tableKey: `cells.${column.name}`,
+    }))
+    .filter((field) => field.tags.length > 0);
+
+  return (
+    <div className="space-y-3">
+      {tagFields.length > 0 && (
+        <section className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Tags
+          </div>
+          <div className="grid gap-2">
+            {tagFields.map(({ column, tags, tableKey }) => {
+              const tagActions = context.tagActionsByColumn[tableKey];
+              const content = (
+                <TagList tags={tags} maxVisible={tags.length} actions="inline" />
+              );
+
+              return (
+                <div
+                  key={column.name}
+                  className="grid gap-2 rounded-md border border-border bg-background p-2 md:grid-cols-[9rem_minmax(0,1fr)]"
+                >
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {column.label || prettifyName(column.name)}
+                  </div>
+                  <div className="min-w-0">
+                    {tagActions ? (
+                      <TagActionsProvider value={tagActions}>{content}</TagActionsProvider>
+                    ) : (
+                      content
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Fields
+        </div>
+        <dl className="grid gap-2 md:grid-cols-2">
+          {columns.map((column) => (
+            <div key={column.name} className="rounded-md border border-border bg-background p-2">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {column.label || prettifyName(column.name)}
+              </dt>
+              <dd className="mt-1 min-w-0 text-sm text-foreground">
+                <ClickyNodeRenderer node={row.cells[column.name]} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {row.detail && (
+        <section className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Detail
+          </div>
+          <div className="rounded-md border border-border bg-background p-density-3">
+            <ClickyNodeRenderer node={row.detail} />
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -2029,6 +2146,44 @@ function shouldRenderRowsAsCollapsedStructs(columns: ClickyColumn[], rows: Click
   });
 }
 
+function isClickyTagColumn(column: ClickyColumn) {
+  if (column.kind === "tags") return true;
+
+  const normalized = column.name.toLowerCase();
+  return /(^|[._-])(tags?|labels?|annotations?)$/.test(normalized);
+}
+
+function clickyNodeTags(node: ClickyNode | undefined, column: ClickyColumn): NormalizedTag[] {
+  if (!isClickyTagColumn(column)) return [];
+
+  const value = clickyNodeTagsValue(node);
+  return normalizeTags(value);
+}
+
+function clickyNodeTagsValue(node: ClickyNode | undefined): TagsValue {
+  if (!node) return [];
+
+  if (node.kind === "map" && node.fields?.length) {
+    return Object.fromEntries(
+      node.fields
+        .map((field) => [field.name, clickyNodeText(field.value)] as const)
+        .filter(([, value]) => value.trim() !== ""),
+    );
+  }
+
+  if (node.kind === "list" && node.items?.length) {
+    return node.items.map((item) => clickyNodeText(item)).filter(Boolean);
+  }
+
+  const text = clickyNodeText(node).trim();
+  if (!text) return [];
+
+  return text
+    .split(/[,\s]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function isStructCellNode(node: ClickyNode | undefined) {
   if (!node) return false;
   if (node.kind === "map") return (node.fields ?? []).length > 0;
@@ -2042,13 +2197,15 @@ function isStructCellNode(node: ClickyNode | undefined) {
 function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
   return {
     kind: "map",
-    fields: columns
-      .filter((column) => row.cells[column.name])
-      .map((column) => ({
+    fields: columns.flatMap((column) => {
+      const value = row.cells[column.name];
+      if (!value) return [];
+      return [{
         name: column.name,
         label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
-        value: row.cells[column.name],
-      })),
+        value,
+      }];
+    }),
   };
 }
 

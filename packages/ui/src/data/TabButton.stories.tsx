@@ -46,9 +46,30 @@ export const TabsWithCounts: Story = {
 export const Gauges: StoryObj<typeof Gauge> = {
   render: () => (
     <div className="flex gap-density-3">
-      <Gauge label="Passed" value={92} tone="success" />
-      <Gauge label="Failed" value={3} tone="danger" />
-      <Gauge label="Skipped" value={5} tone="warning" />
+      <Gauge
+        icon="codicon:pass"
+        label="Passed"
+        value={92}
+        tone="success"
+        subtitle="110 / 120 tests"
+        meta="fresh"
+      />
+      <Gauge
+        icon="codicon:error"
+        label="Failed"
+        value={3}
+        tone="danger"
+        subtitle="requires attention"
+        meta="3m"
+      />
+      <Gauge
+        icon="codicon:warning"
+        label="Skipped"
+        value={5}
+        tone="warning"
+        subtitle="intentionally skipped"
+        meta="cached"
+      />
     </div>
   ),
 };

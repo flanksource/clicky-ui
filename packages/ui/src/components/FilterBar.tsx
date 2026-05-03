@@ -24,7 +24,9 @@ const FILTER_INPUT_DEBOUNCE_MS = 500;
 // immediately (no timer) so the consumer can accumulate state locally and
 // fire one request when Apply is clicked. When true (default) fields debounce
 // upstream, matching the live-filter behaviour used in trace/log UIs.
-const FilterBarContext = createContext<{ autoSubmit: boolean }>({ autoSubmit: true });
+const FilterBarContext = createContext<{ autoSubmit: boolean }>({
+  autoSubmit: true,
+});
 
 export type FilterBarSearchProps = {
   value: string;
@@ -96,6 +98,26 @@ export type FilterBarMultiFilter = {
   className?: string;
 };
 
+export type FilterBarNestedMultiGroup = {
+  groupKey: string;
+  label?: string;
+  options: MultiSelectOption[];
+};
+
+export type FilterBarNestedMultiFilter = {
+  key: string;
+  kind: "nested-multi";
+  label: string;
+  description?: string;
+  // Same wire shape as FilterBarMultiFilter so consumers can swap kinds
+  // without changing their state slot.
+  value: Record<string, FilterBarMultiFilterMode>;
+  groups: FilterBarNestedMultiGroup[];
+  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
+  disabled?: boolean;
+  className?: string;
+};
+
 export type FilterBarSelectMultiFilter = {
   key: string;
   kind: "select-multi";
@@ -160,6 +182,7 @@ export type FilterBarFilter =
   | FilterBarLookupFilter
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
+  | FilterBarNestedMultiFilter
   | FilterBarSelectMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
@@ -257,6 +280,10 @@ export function FilterBar({
             return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
           }
 
+          if (filter.kind === "nested-multi") {
+            return <NestedMultiFilterField key={filter.key} filter={filter} grow={grow} />;
+          }
+
           if (filter.kind === "select-multi") {
             return <SelectMultiFilterField key={filter.key} filter={filter} grow={grow} />;
           }
@@ -296,6 +323,133 @@ export function FilterBar({
         )}
       </div>
     </FilterBarContext.Provider>
+  );
+}
+
+type FilterBarFilterPanelChrome = "full" | "embedded";
+
+export function FilterBarFilterPanel({
+  filter,
+  chrome = "full",
+}: {
+  filter: FilterBarFilter;
+  chrome?: FilterBarFilterPanelChrome;
+}) {
+  const contextValue = useMemo(() => ({ autoSubmit: true }), []);
+
+  return (
+    <FilterBarContext.Provider value={contextValue}>
+      {filter.kind === "lookup" && <LookupFilterField filter={filter} grow />}
+      {filter.kind === "lookup-multi" && <LookupMultiFilterField filter={filter} grow />}
+      {filter.kind === "multi" && <MultiFilterPanel filter={filter} chrome={chrome} />}
+      {filter.kind === "nested-multi" && <NestedMultiFilterPanel filter={filter} chrome={chrome} />}
+      {filter.kind === "select-multi" && <SelectMultiFilterField filter={filter} grow />}
+      {filter.kind === "number" && <NumberFilterPanel filter={filter} chrome={chrome} />}
+      {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
+      {filter.kind === "boolean" && <BooleanFilterField filter={filter} />}
+      {filter.kind === "text" && <TextFilterField filter={filter} grow />}
+    </FilterBarContext.Provider>
+  );
+}
+
+export function FilterBarRangePanel({
+  kind,
+  label,
+  from = "",
+  to = "",
+  onApply,
+  presets,
+  fromPlaceholder,
+  toPlaceholder,
+  emptyLabel: _emptyLabel,
+}: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
+  const fromInputRef = useRef<HTMLInputElement>(null);
+  const toInputRef = useRef<HTMLInputElement>(null);
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
+  const rangePresets = useMemo(
+    () => presets ?? (kind === "date" ? buildDateRangePresets() : DEFAULT_TIME_RANGE_PRESETS),
+    [kind, presets],
+  );
+
+  useEffect(() => {
+    setDraftFrom(from);
+    setDraftTo(to);
+  }, [from, to]);
+
+  function applyRange(nextFrom: string, nextTo: string) {
+    onApply(
+      kind === "time" ? normalizeDateMath(nextFrom) : nextFrom.trim(),
+      kind === "time" ? normalizeDateMath(nextTo) : nextTo.trim(),
+    );
+  }
+
+  return (
+    <div className="w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-sm shadow-black/5">
+      {rangePresets.length > 0 && (
+        <div className="border-b border-border p-1">
+          <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Quick ranges
+          </div>
+          {rangePresets.map((preset) => {
+            const active = from === preset.from && to === preset.to;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => applyRange(preset.from, preset.to)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
+                  active && "bg-accent font-medium",
+                )}
+              >
+                <span>{preset.label}</span>
+                <span className="text-[11px] text-muted-foreground">{preset.from}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="p-3">
+        <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-muted-foreground">From</label>
+            <RangeInput
+              inputRef={fromInputRef}
+              kind={kind}
+              placeholder={fromPlaceholder ?? (kind === "date" ? "" : "now-24h")}
+              value={draftFrom}
+              onChange={setDraftFrom}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-muted-foreground">To</label>
+            <RangeInput
+              inputRef={toInputRef}
+              kind={kind}
+              placeholder={toPlaceholder ?? (kind === "date" ? "" : "now")}
+              value={draftTo}
+              onChange={setDraftTo}
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="h-8 px-3 text-xs"
+            onClick={() => applyRange(draftFrom, draftTo)}
+          >
+            Apply
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -622,7 +776,6 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                     setDraft(
                       normalizeNumberFilterValue(
                         { min: event.target.value, max: draft.max ?? "" },
-                        bounds,
                         "min-input",
                       ),
                     )
@@ -643,7 +796,6 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                     setDraft(
                       normalizeNumberFilterValue(
                         { min: draft.min ?? "", max: event.target.value },
-                        bounds,
                         "max-input",
                       ),
                     )
@@ -654,6 +806,118 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function NumberFilterPanel({
+  filter,
+  chrome = "full",
+}: {
+  filter: FilterBarNumberFilter;
+  chrome?: FilterBarFilterPanelChrome;
+}) {
+  const bounds = resolveNumberFilterBounds(filter);
+  const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
+  const sliderMin = clampNumber(parseFilterNumber(draft.min) ?? bounds.min, bounds.min, bounds.max);
+  const sliderMax = clampNumber(parseFilterNumber(draft.max) ?? bounds.max, bounds.min, bounds.max);
+  const activeMin = Math.min(sliderMin, sliderMax);
+  const activeMax = Math.max(sliderMin, sliderMax);
+  const embedded = chrome === "embedded";
+
+  return (
+    <div
+      data-filter-panel-chrome={chrome}
+      className={cn(
+        "min-w-[18rem] max-w-[22rem] text-popover-foreground",
+        embedded
+          ? "p-0"
+          : "rounded-md border border-border bg-popover p-3 shadow-sm shadow-black/5",
+      )}
+    >
+      {!embedded && (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {filter.label}
+          </div>
+          <button
+            type="button"
+            className="text-[10px] text-primary disabled:text-muted-foreground"
+            onClick={() => {
+              setDraft({});
+              filter.onChange({});
+            }}
+            disabled={!String(draft.min ?? "").trim() && !String(draft.max ?? "").trim()}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>{formatNumberValue(bounds.min, filter)}</span>
+            <span>{formatNumberValue(bounds.max, filter)}</span>
+          </div>
+          <div className="relative h-6">
+            <RangeSlider
+              min={bounds.min}
+              max={bounds.max}
+              step={bounds.step}
+              value={[activeMin, activeMax]}
+              ariaLabelMin={`${filter.label} minimum slider`}
+              ariaLabelMax={`${filter.label} maximum slider`}
+              onChange={([nextMin, nextMax]) =>
+                setDraft(numberFilterValueFromSlider([nextMin, nextMax], bounds))
+              }
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className="text-[10px] text-muted-foreground">Min</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step={bounds.step}
+              aria-label={`${filter.label} minimum`}
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+              value={draft.min ?? ""}
+              onChange={(event) =>
+                setDraft(
+                  normalizeNumberFilterValue(
+                    { min: event.target.value, max: draft.max ?? "" },
+                    "min-input",
+                  ),
+                )
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-muted-foreground">Max</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step={bounds.step}
+              aria-label={`${filter.label} maximum`}
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+              value={draft.max ?? ""}
+              onChange={(event) =>
+                setDraft(
+                  normalizeNumberFilterValue(
+                    { min: draft.min ?? "", max: event.target.value },
+                    "max-input",
+                  ),
+                )
+              }
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -741,7 +1005,7 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
             </div>
           )}
 
-          <div className="max-h-72 space-y-1 overflow-auto">
+          <div className="max-h-72 space-y-0.5 overflow-auto">
             {visibleOptions.map((option) => {
               const mode = draft[option.value] ?? "neutral";
               const title = option.title ?? multiSelectOptionText(option);
@@ -752,7 +1016,7 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                   role="button"
                   tabIndex={0}
                   data-filter-option={option.value}
-                  className="rounded-md px-1.5 py-1 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+                  className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                   onClick={() =>
                     setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
                   }
@@ -786,9 +1050,542 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   );
 }
 
+function MultiFilterPanel({
+  filter,
+  chrome = "full",
+}: {
+  filter: FilterBarMultiFilter;
+  chrome?: FilterBarFilterPanelChrome;
+}) {
+  const [optionQuery, setOptionQuery] = useState("");
+  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const showOptionFilter = filter.options.length > 7;
+  const embedded = chrome === "embedded";
+  const visibleOptions = useMemo(() => {
+    const query = optionQuery.trim().toLowerCase();
+    if (!query) return filter.options;
+    return filter.options.filter((option) =>
+      multiSelectOptionText(option).toLowerCase().includes(query),
+    );
+  }, [filter.options, optionQuery]);
+
+  return (
+    <div
+      data-filter-panel-chrome={chrome}
+      className={cn(
+        "min-w-[18rem] max-w-[22rem] text-popover-foreground",
+        embedded
+          ? "p-0"
+          : "rounded-md border border-border bg-popover p-2 shadow-sm shadow-black/5",
+      )}
+    >
+      {!embedded && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {filter.label}
+          </div>
+          <button
+            type="button"
+            className="text-[10px] text-primary disabled:text-muted-foreground"
+            onClick={() => setDraft({})}
+            disabled={Object.keys(draft).length === 0}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {showOptionFilter && (
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
+          <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+          <input
+            type="search"
+            aria-label={`Filter ${filter.label} options`}
+            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            placeholder={`Filter ${filter.label.toLowerCase()}`}
+            value={optionQuery}
+            onChange={(event) => setOptionQuery(event.target.value)}
+          />
+        </div>
+      )}
+
+      <div className="max-h-72 space-y-0.5 overflow-auto">
+        {visibleOptions.map((option) => {
+          const mode = draft[option.value] ?? "neutral";
+          const title = option.title ?? multiSelectOptionText(option);
+
+          return (
+            <div
+              key={option.value}
+              role="button"
+              tabIndex={0}
+              data-filter-option={option.value}
+              className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+              onClick={() =>
+                setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
+                }
+              }}
+            >
+              <FilterPill
+                className="w-full justify-between"
+                label={option.label}
+                mode={mode}
+                title={title}
+                togglePosition="right"
+                onModeChange={(next) => setDraft(updateMultiFilterValue(draft, option.value, next))}
+              />
+            </div>
+          );
+        })}
+        {visibleOptions.length === 0 && (
+          <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NestedMultiFilterPanel({
+  filter,
+  chrome = "full",
+}: {
+  filter: FilterBarNestedMultiFilter;
+  chrome?: FilterBarFilterPanelChrome;
+}) {
+  const [activeGroup, setActiveGroup] = useState<string | null>(filter.groups[0]?.groupKey ?? null);
+  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const groups = filter.groups;
+  const embedded = chrome === "embedded";
+  const activeGroupData = useMemo(
+    () => groups.find((group) => group.groupKey === activeGroup) ?? groups[0] ?? null,
+    [groups, activeGroup],
+  );
+
+  const selectedByGroup = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const group of groups) {
+      let n = 0;
+      for (const option of group.options) {
+        if (draft[option.value]) n += 1;
+      }
+      counts[group.groupKey] = n;
+    }
+    return counts;
+  }, [groups, draft]);
+
+  const sortedGroups = useMemo(() => {
+    const selected: typeof groups = [];
+    const rest: typeof groups = [];
+    for (const group of groups) {
+      if ((selectedByGroup[group.groupKey] ?? 0) > 0) selected.push(group);
+      else rest.push(group);
+    }
+    return [...selected, ...rest];
+  }, [groups, selectedByGroup]);
+
+  const clearGroup = (groupKey: string) => {
+    const group = groups.find((g) => g.groupKey === groupKey);
+    if (!group) return;
+    const next = { ...draft };
+    for (const option of group.options) {
+      delete next[option.value];
+    }
+    setDraft(next);
+  };
+
+  return (
+    <div role="dialog" className="flex">
+      <div
+        data-filter-panel-chrome={chrome}
+        className={cn(
+          "min-w-[14rem] max-w-[16rem] text-popover-foreground",
+          embedded
+            ? "p-0"
+            : "rounded-md border border-border bg-popover p-2 shadow-sm shadow-black/5",
+        )}
+      >
+        {!embedded && (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {filter.label}
+            </div>
+            <button
+              type="button"
+              className="text-[10px] text-primary disabled:text-muted-foreground"
+              onClick={() => setDraft({})}
+              disabled={Object.keys(draft).length === 0}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
+        <div className="max-h-72 space-y-0.5 overflow-auto">
+          {sortedGroups.map((group) => {
+            const selected = selectedByGroup[group.groupKey] ?? 0;
+            const isActive = group.groupKey === activeGroup;
+            return (
+              <div
+                key={group.groupKey}
+                role="button"
+                tabIndex={0}
+                onMouseEnter={() => setActiveGroup(group.groupKey)}
+                onFocus={() => setActiveGroup(group.groupKey)}
+                onClick={() => setActiveGroup(group.groupKey)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
+                    event.preventDefault();
+                    setActiveGroup(group.groupKey);
+                  }
+                }}
+                className={cn(
+                  "flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-0.5 text-sm",
+                  "hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
+                  isActive && "bg-accent/60",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{group.label ?? group.groupKey}</span>
+                {selected > 0 && (
+                  <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
+                    {selected}/{group.options.length}
+                  </span>
+                )}
+                <Icon name="codicon:chevron-right" className="shrink-0 text-muted-foreground" />
+              </div>
+            );
+          })}
+          {groups.length === 0 && (
+            <div className="px-2 py-3 text-sm text-muted-foreground">No groups</div>
+          )}
+        </div>
+      </div>
+
+      {activeGroupData && (
+        <div
+          onMouseEnter={() => setActiveGroup(activeGroupData.groupKey)}
+          className="ml-1.5 min-w-[16rem] max-w-[20rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-sm shadow-black/5"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {activeGroupData.label ?? activeGroupData.groupKey}
+            </div>
+            <button
+              type="button"
+              className="text-[10px] text-primary disabled:text-muted-foreground"
+              onClick={() => clearGroup(activeGroupData.groupKey)}
+              disabled={(selectedByGroup[activeGroupData.groupKey] ?? 0) === 0}
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="max-h-72 space-y-0.5 overflow-auto">
+            {activeGroupData.options.map((option) => {
+              const mode = draft[option.value] ?? "neutral";
+              const title = option.title ?? multiSelectOptionText(option);
+              return (
+                <div
+                  key={option.value}
+                  role="button"
+                  tabIndex={0}
+                  data-filter-option={option.value}
+                  className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+                  onClick={() =>
+                    setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
+                    } else if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      setActiveGroup(null);
+                    }
+                  }}
+                >
+                  <FilterPill
+                    className="w-full justify-between"
+                    label={renderNestedOptionLabel(option, activeGroupData.groupKey)}
+                    mode={mode}
+                    title={title}
+                    togglePosition="right"
+                    onModeChange={(next) =>
+                      setDraft(updateMultiFilterValue(draft, option.value, next))
+                    }
+                  />
+                </div>
+              );
+            })}
+            {activeGroupData.options.length === 0 && (
+              <div className="px-2 py-3 text-sm text-muted-foreground">No values</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function multiSelectOptionText(option: MultiSelectOption) {
   const label = typeof option.label === "string" ? option.label : "";
   return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
+}
+
+function NestedMultiFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarNestedMultiFilter;
+  grow: boolean;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+
+  useDismissablePopup(open, rootRef, triggerRef, () => {
+    setOpen(false);
+    setActiveGroup(null);
+  });
+
+  const summary = summarizeMultiFilter(filter.label, draft);
+  const groups = filter.groups;
+  const activeGroupData = useMemo(
+    () => groups.find((group) => group.groupKey === activeGroup) ?? null,
+    [groups, activeGroup],
+  );
+
+  // Selected count per group, used in the outer list.
+  const selectedByGroup = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const group of groups) {
+      let n = 0;
+      for (const option of group.options) {
+        if (draft[option.value]) n += 1;
+      }
+      counts[group.groupKey] = n;
+    }
+    return counts;
+  }, [groups, draft]);
+
+  // Groups with active selections sort to the top so the user always sees
+  // what's filtered without scrolling. Within each partition, the original
+  // order from the consumer is preserved.
+  const sortedGroups = useMemo(() => {
+    const selected: typeof groups = [];
+    const rest: typeof groups = [];
+    for (const group of groups) {
+      if ((selectedByGroup[group.groupKey] ?? 0) > 0) selected.push(group);
+      else rest.push(group);
+    }
+    return [...selected, ...rest];
+  }, [groups, selectedByGroup]);
+
+  const clearGroup = (groupKey: string) => {
+    const group = groups.find((g) => g.groupKey === groupKey);
+    if (!group) return;
+    const next = { ...draft };
+    for (const option of group.options) {
+      delete next[option.value];
+    }
+    setDraft(next);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      title={filter.description}
+      className={cn(
+        "relative min-w-0",
+        grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
+        filter.disabled && "opacity-60",
+        filter.className,
+      )}
+    >
+      <Button
+        ref={triggerRef}
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`${filter.label} filter`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        disabled={filter.disabled}
+        onClick={() => {
+          setOpen((current) => !current);
+          if (open) setActiveGroup(null);
+        }}
+        className={cn(
+          "min-w-0 gap-2 font-normal",
+          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
+          summary === filter.label && "text-muted-foreground",
+        )}
+      >
+        <span className="truncate">{summary}</span>
+        <Icon
+          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          className="text-muted-foreground"
+        />
+      </Button>
+
+      {open && (
+        <div
+          role="dialog"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setOpen(false);
+              setActiveGroup(null);
+            }
+          }}
+          className="absolute left-0 top-[calc(100%+0.375rem)] z-50 flex"
+        >
+          <div className="min-w-[14rem] max-w-[16rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {filter.label}
+              </div>
+              <button
+                type="button"
+                className="text-[10px] text-primary disabled:text-muted-foreground"
+                onClick={() => setDraft({})}
+                disabled={Object.keys(draft).length === 0}
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div className="max-h-72 space-y-0.5 overflow-auto">
+              {sortedGroups.map((group) => {
+                const selected = selectedByGroup[group.groupKey] ?? 0;
+                const isActive = group.groupKey === activeGroup;
+                return (
+                  <div
+                    key={group.groupKey}
+                    role="button"
+                    tabIndex={0}
+                    onMouseEnter={() => setActiveGroup(group.groupKey)}
+                    onFocus={() => setActiveGroup(group.groupKey)}
+                    onClick={() => setActiveGroup(group.groupKey)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " " ||
+                        event.key === "ArrowRight"
+                      ) {
+                        event.preventDefault();
+                        setActiveGroup(group.groupKey);
+                      }
+                    }}
+                    className={cn(
+                      "flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-0.5 text-sm",
+                      "hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
+                      isActive && "bg-accent/60",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{group.label ?? group.groupKey}</span>
+                    {selected > 0 && (
+                      <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
+                        {selected}/{group.options.length}
+                      </span>
+                    )}
+                    <Icon name="codicon:chevron-right" className="shrink-0 text-muted-foreground" />
+                  </div>
+                );
+              })}
+              {groups.length === 0 && (
+                <div className="px-2 py-3 text-sm text-muted-foreground">No groups</div>
+              )}
+            </div>
+          </div>
+
+          {activeGroupData && (
+            <div
+              onMouseEnter={() => setActiveGroup(activeGroupData.groupKey)}
+              className="ml-1.5 min-w-[16rem] max-w-[20rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {activeGroupData.label ?? activeGroupData.groupKey}
+                </div>
+                <button
+                  type="button"
+                  className="text-[10px] text-primary disabled:text-muted-foreground"
+                  onClick={() => clearGroup(activeGroupData.groupKey)}
+                  disabled={(selectedByGroup[activeGroupData.groupKey] ?? 0) === 0}
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="max-h-72 space-y-0.5 overflow-auto">
+                {activeGroupData.options.map((option) => {
+                  const mode = draft[option.value] ?? "neutral";
+                  const title = option.title ?? multiSelectOptionText(option);
+                  return (
+                    <div
+                      key={option.value}
+                      role="button"
+                      tabIndex={0}
+                      data-filter-option={option.value}
+                      className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+                      onClick={() =>
+                        setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setDraft(
+                            updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
+                          );
+                        } else if (event.key === "ArrowLeft") {
+                          event.preventDefault();
+                          setActiveGroup(null);
+                        }
+                      }}
+                    >
+                      <FilterPill
+                        className="w-full justify-between"
+                        // Show only the value side here — the key is already
+                        // implied by the parent group panel.
+                        label={renderNestedOptionLabel(option, activeGroupData.groupKey)}
+                        mode={mode}
+                        title={title}
+                        togglePosition="right"
+                        onModeChange={(next) =>
+                          setDraft(updateMultiFilterValue(draft, option.value, next))
+                        }
+                      />
+                    </div>
+                  );
+                })}
+                {activeGroupData.options.length === 0 && (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">No values</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderNestedOptionLabel(option: MultiSelectOption, groupKey: string): ReactNode {
+  // If the option label already strips the key prefix, use it. Otherwise
+  // strip it here so the inner panel doesn't repeat the key on every row.
+  if (typeof option.label === "string") {
+    const prefix = `${groupKey}=`;
+    if (option.label.startsWith(prefix)) return option.label.slice(prefix.length);
+    return option.label;
+  }
+  return option.label ?? option.value;
 }
 
 function SelectMultiFilterField({
@@ -816,7 +1613,7 @@ function SelectMultiFilterField({
         value={filter.value}
         onChange={filter.onChange}
         placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
-        disabled={filter.disabled}
+        {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
         triggerClassName="h-6 min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         menuClassName="left-auto right-0"
       />
@@ -1192,7 +1989,6 @@ function summarizeNumberFilter(
 
 function normalizeNumberFilterValue(
   nextValue: FilterBarNumberValue,
-  bounds: NumberFilterBounds,
   source: NumberFilterSource,
 ): FilterBarNumberValue {
   let min = nextValue.min ?? "";
@@ -1324,7 +2120,7 @@ function RangeInput({
   if (kind === "date") {
     return (
       <DatePicker
-        ref={inputRef}
+        ref={inputRef as RefObject<HTMLInputElement>}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
@@ -1335,7 +2131,7 @@ function RangeInput({
 
   return (
     <DateTimePicker
-      ref={inputRef}
+      ref={inputRef as RefObject<HTMLInputElement>}
       inputClassName="pr-8"
       placeholder={placeholder}
       value={value}

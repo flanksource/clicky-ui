@@ -191,6 +191,59 @@ describe("Clicky", () => {
     expect(screen.getByText(/kind: Deployment/)).toBeInTheDocument();
   });
 
+  it("expands clicky table rows with all fields and inline tag actions", async () => {
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        autoFilter: true,
+        columns: [
+          { name: "service", label: "Service", grow: true },
+          { name: "tags", label: "Tags", grow: true },
+        ],
+        rows: [
+          {
+            cells: {
+              service: { kind: "text", text: "api", plain: "api" },
+              tags: {
+                kind: "list",
+                items: [
+                  { kind: "text", text: "env=prod", plain: "env=prod" },
+                  { kind: "text", text: "team=platform", plain: "team=platform" },
+                ],
+              },
+            },
+          },
+          {
+            cells: {
+              service: { kind: "text", text: "worker", plain: "worker" },
+              tags: {
+                kind: "list",
+                items: [{ kind: "text", text: "env=staging", plain: "env=staging" }],
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} />);
+
+    fireEvent.click(screen.getByText("api"));
+
+    expect(screen.getByText("Fields")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Include env=prod$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Exclude env=prod$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Copy env=prod$/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Include env=prod$/ }));
+
+    await waitFor(() => expect(screen.queryByText("worker")).not.toBeInTheDocument(), {
+      timeout: 1_500,
+    });
+    expect(screen.getAllByText("api").length).toBeGreaterThan(0);
+  });
+
   it("renders table rows with struct cells as collapsed sections", () => {
     const clickyDocument: ClickyDocument = {
       version: 1,
