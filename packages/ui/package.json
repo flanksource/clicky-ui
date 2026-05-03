@@ -1,6 +1,6 @@
 {
   "name": "@flanksource/clicky-ui",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Flanksource Clicky UI — React component library built on shadcn/ui with light/dark and density theming.",
   "homepage": "https://github.com/flanksource/clicky-ui#readme",
   "bugs": "https://github.com/flanksource/clicky-ui/issues",
