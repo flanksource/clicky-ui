@@ -39,7 +39,8 @@ export function normalizeErrorDiagnostics(
   if (nested && nested !== record) {
     return normalizeErrorDiagnostics(nested, fallback);
   }
-  const message = firstString(record, ["error", "message", "msg", "reason", "detail", "details"]) ?? fallback;
+  const message =
+    firstString(record, ["error", "message", "msg", "reason", "detail", "details"]) ?? fallback;
   const trace = firstString(record, ["trace", "trace_id", "traceId", "traceID"]);
   const stacktrace = firstString(record, ["stacktrace", "stack_trace", "stackTrace", "stack"]);
   const time = firstString(record, ["time", "timestamp", "created_at"]);
@@ -47,16 +48,19 @@ export function normalizeErrorDiagnostics(
   if (!message && !trace && !stacktrace && context.length === 0) return null;
   return {
     message: message ?? "Action failed",
-    trace: trace ?? undefined,
-    time: time ?? undefined,
-    stacktrace: stacktrace ?? undefined,
     context,
     raw: value,
+    ...(trace !== undefined ? { trace } : {}),
+    ...(time !== undefined ? { time } : {}),
+    ...(stacktrace !== undefined ? { stacktrace } : {}),
   };
 }
 
 export function parseDiagnosticsStackTrace(stacktrace: string): ParsedErrorStackTrace {
-  const lines = stacktrace.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = stacktrace
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
   const frames: ErrorStackFrame[] = [];
   const unparsed: string[] = [];
   let headline: string | undefined;
@@ -74,7 +78,12 @@ export function parseDiagnosticsStackTrace(stacktrace: string): ParsedErrorStack
     unparsed.push(line);
   }
 
-  return { headline, frames, unparsed, raw: stacktrace };
+  return {
+    frames,
+    unparsed,
+    raw: stacktrace,
+    ...(headline !== undefined ? { headline } : {}),
+  };
 }
 
 export function parseInlineJsonContextValue(value: string): unknown | null {
@@ -96,7 +105,10 @@ export function compactStackPath(file: string) {
 }
 
 export function isApplicationStackFrame(file: string) {
-  return file.includes("github.com/flanksource/incident-commander/") || file.includes("/incident-commander/");
+  return (
+    file.includes("github.com/flanksource/incident-commander/") ||
+    file.includes("/incident-commander/")
+  );
 }
 
 function parseStackTraceFrame(line: string): ErrorStackFrame | null {
@@ -104,9 +116,9 @@ function parseStackTraceFrame(line: string): ErrorStackFrame | null {
   if (!match) return null;
   return {
     raw: line,
-    file: match[1],
-    line: Number(match[2]),
-    functionName: match[3]?.trim(),
+    file: match[1] ?? "",
+    line: Number(match[2] ?? 0),
+    ...(match[3]?.trim() ? { functionName: match[3]!.trim() } : {}),
   };
 }
 
@@ -127,7 +139,9 @@ function contextEntries(value: unknown): Array<[string, string]> {
   const record = objectRecord(value);
   if (!record) return [];
   return Object.entries(record)
-    .filter(([, entryValue]) => entryValue !== undefined && entryValue !== null && entryValue !== "")
+    .filter(
+      ([, entryValue]) => entryValue !== undefined && entryValue !== null && entryValue !== "",
+    )
     .map(([key, entryValue]) => [key, stringifyValue(entryValue)]);
 }
 

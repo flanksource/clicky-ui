@@ -39,7 +39,7 @@ export async function highlightCode(
     return await codeToHtml(source, {
       lang: opts.lang,
       theme: opts.theme ?? "github-light",
-      transformers: opts.transformers,
+      ...(opts.transformers ? { transformers: opts.transformers } : {}),
     });
   } catch {
     return null;

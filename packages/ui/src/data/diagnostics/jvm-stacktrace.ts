@@ -83,6 +83,7 @@ function parseThreadBlock(block: string): ParsedThread | null {
   if (!headerMatch?.groups) return null;
 
   const name = headerMatch.groups.name;
+  if (!name) return null;
   const rest = headerMatch.groups.rest ?? "";
   const idMatch = /#(\d+)\b/.exec(rest);
   const prioMatch = /\bprio=(\d+)/.exec(rest);
@@ -96,11 +97,13 @@ function parseThreadBlock(block: string): ParsedThread | null {
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
+    if (line == null) continue;
     if (!line.trim()) continue;
 
     const stateMatch = stateRe.exec(line);
     if (stateMatch?.groups) {
       const primary = stateMatch.groups.state;
+      if (!primary) continue;
       const sub = stateMatch.groups.sub;
       rawState = sub ? `${primary} (${sub})` : primary;
       state = normalizeJvmState(primary);
@@ -111,6 +114,7 @@ function parseThreadBlock(block: string): ParsedThread | null {
     if (frameMatch?.groups) {
       const functionName = frameMatch.groups.fn;
       const src = frameMatch.groups.src;
+      if (!functionName || !src) continue;
       const frame: ParsedThreadFrame = {
         functionName,
         displayName: sanitizeJvmFunctionName(functionName),
@@ -119,7 +123,7 @@ function parseThreadBlock(block: string): ParsedThread | null {
         nativeMethod: src === "Native Method",
       };
       const srcMatch = srcLineRe.exec(src);
-      if (srcMatch?.groups) {
+      if (srcMatch?.groups?.file && srcMatch.groups.line) {
         frame.file = srcMatch.groups.file;
         frame.line = Number(srcMatch.groups.line);
         frame.location = `${frame.file}:${frame.line}`;
@@ -133,11 +137,12 @@ function parseThreadBlock(block: string): ParsedThread | null {
     }
 
     const annoMatch = annotationRe.exec(line);
-    if (annoMatch?.groups) {
-      const kind = mapAnnotationKind(annoMatch.groups.kind);
+    if (annoMatch?.groups?.kind) {
+      const annotationKind = annoMatch.groups.kind;
+      const kind = mapAnnotationKind(annotationKind);
       frames.push({
-        functionName: annoMatch.groups.kind,
-        displayName: annoMatch.groups.kind,
+        functionName: annotationKind,
+        displayName: annotationKind,
         kind,
         runtime: false,
         nativeMethod: false,
@@ -158,17 +163,17 @@ function parseThreadBlock(block: string): ParsedThread | null {
 
   return {
     id: idMatch ? Number(idMatch[1]) : deriveSyntheticId(name, rest),
-    nid: nidMatch ? nidMatch[1] : undefined,
     name,
     state: state || "unknown",
     rawState: rawState || "",
-    priority: prioMatch ? Number(prioMatch[1]) : undefined,
     daemon,
     frames,
     raw: block,
     userFrameCount,
-    topFunction,
     searchText,
+    ...(nidMatch?.[1] !== undefined ? { nid: nidMatch[1] } : {}),
+    ...(prioMatch?.[1] !== undefined ? { priority: Number(prioMatch[1]) } : {}),
+    ...(topFunction !== undefined ? { topFunction } : {}),
   };
 }
 
@@ -181,7 +186,7 @@ function extractHeaderStateTrail(rest: string): string | undefined {
 
 function deriveSyntheticId(name: string, rest: string): number {
   const tid = /\btid=(0x[0-9a-f]+)/i.exec(rest);
-  if (tid) {
+  if (tid?.[1]) {
     // stable non-negative int derived from tid hex suffix
     const hex = tid[1].slice(2);
     const n = Number.parseInt(hex.slice(-8), 16);
@@ -229,7 +234,7 @@ function normalizeJvmState(value: string): string {
   if (lower.includes("waiting on condition") || lower.includes("sleeping")) return "timed_waiting";
   if (lower.includes("waiting")) return "waiting";
   if (lower.includes("blocked")) return "blocked";
-  return lower.split(/\s+/)[0];
+  return lower.split(/\s+/)[0] ?? "";
 }
 
 const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];

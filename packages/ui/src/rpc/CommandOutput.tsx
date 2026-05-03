@@ -41,8 +41,8 @@ export function CommandOutput({
       text={text}
       parsed={parsed}
       contentType={ct}
-      blob={response.blob}
       bare={bare}
+      {...(response.blob ? { blob: response.blob } : {})}
       {...(onTableRowClick ? { onTableRowClick } : {})}
       {...(getTableRowHref ? { getTableRowHref } : {})}
       {...(isTableRowClickable ? { isTableRowClickable } : {})}
@@ -104,7 +104,7 @@ function OutputBody({
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
 }) {
-  const ct = contentType.split(";")[0].trim();
+  const ct = (contentType.split(";")[0] ?? "").trim();
 
   if (ct === "application/pdf" && blob) {
     return <PdfOutput blob={blob} />;

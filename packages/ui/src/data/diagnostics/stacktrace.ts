@@ -74,20 +74,22 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
     const match = headerRe.exec(header || "");
     if (!match) continue;
 
-    const id = Number(match[1]);
-    const rawState = match[2];
+    const id = Number(match[1] ?? 0);
+    const rawState = match[2] ?? "";
     const state = normalizeState(rawState);
     const frames: ParsedGoroutineFrame[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
+      if (line == null) continue;
       const trimmedLine = line.trim();
       if (!trimmedLine) continue;
 
       const fileMatch = fileRe.exec(trimmedLine);
-      if (fileMatch && frames.length > 0 && !frames[frames.length - 1].file) {
-        frames[frames.length - 1].file = fileMatch[1];
-        frames[frames.length - 1].line = Number(fileMatch[2]);
+      const previousFrame = frames[frames.length - 1];
+      if (fileMatch && previousFrame && !previousFrame.file) {
+        previousFrame.file = fileMatch[1] ?? "";
+        previousFrame.line = Number(fileMatch[2] ?? 0);
         continue;
       }
 
@@ -109,6 +111,8 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
       }
     }
 
+    const topFunction = frames.find((frame) => frame.kind === "frame")?.functionName;
+
     goroutines.push({
       id,
       state,
@@ -116,10 +120,10 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
       frames,
       raw: block,
       userFrameCount: frames.filter((frame) => !frame.runtime && frame.kind === "frame").length,
-      topFunction: frames.find((frame) => frame.kind === "frame")?.functionName,
       searchText: `${header}\n${frames
         .map((frame) => `${frame.functionName} ${frame.file || ""}`)
         .join("\n")}`.toLowerCase(),
+      ...(topFunction !== undefined ? { topFunction } : {}),
     });
   }
 
@@ -135,7 +139,7 @@ export function countGoroutinesByState(goroutines: ParsedGoroutine[]): Map<strin
 }
 
 function normalizeState(value: string): string {
-  return value.split(",")[0].trim().toLowerCase();
+  return (value.split(",")[0] ?? "").trim().toLowerCase();
 }
 
 function isRuntimeFrame(functionName: string): boolean {

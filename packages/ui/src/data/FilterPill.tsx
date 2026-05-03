@@ -128,7 +128,13 @@ export function FilterPill({
   );
 
   if (triState) {
-    const control = <TristateSwitch mode={mode} onChange={onModeChange!} ariaLabel={title} />;
+    const control = (
+      <TristateSwitch
+        mode={mode}
+        onChange={onModeChange!}
+        {...(title ? { ariaLabel: title } : {})}
+      />
+    );
     const labelContent = (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-foreground">
         {content}

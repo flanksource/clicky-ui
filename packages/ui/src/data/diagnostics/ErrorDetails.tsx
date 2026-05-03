@@ -18,19 +18,28 @@ export type ErrorDetailsProps = {
 };
 
 export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsProps) {
-  const scalarContext = diagnostics.context.filter(([, value]) => !parseInlineJsonContextValue(value));
+  const scalarContext = diagnostics.context.filter(
+    ([, value]) => !parseInlineJsonContextValue(value),
+  );
   const jsonContext = diagnostics.context
     .map(([label, value]) => ({ label, value, data: parseInlineJsonContextValue(value) }))
-    .filter((entry): entry is { label: string; value: string; data: unknown } => entry.data !== null);
+    .filter(
+      (entry): entry is { label: string; value: string; data: unknown } => entry.data !== null,
+    );
   return (
     <details className="group rounded-md border border-destructive/30 bg-destructive/5">
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
         <Icon name="lucide:triangle-alert" className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-destructive">Error</div>
-          <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">{diagnostics.message}</div>
+          <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">
+            {diagnostics.message}
+          </div>
         </div>
-        <Icon name="lucide:chevron-right" className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+        <Icon
+          name="lucide:chevron-right"
+          className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+        />
       </summary>
       <div className="grid gap-3 border-t border-destructive/20 p-3 pt-2">
         {(diagnostics.trace || diagnostics.time) && (
@@ -40,15 +49,21 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
             )}
             {diagnostics.time && (
               <span className="inline-flex max-w-full items-center overflow-hidden rounded-md border border-border bg-background/80 text-xs">
-                <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">Time</span>
-                <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">{diagnostics.time}</span>
+                <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">
+                  Time
+                </span>
+                <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">
+                  {diagnostics.time}
+                </span>
               </span>
             )}
           </div>
         )}
         {diagnostics.context.length > 0 && (
           <div className="min-w-0">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Context</div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Context
+            </div>
             {scalarContext.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {scalarContext.map(([label, value]) => (
@@ -62,7 +77,11 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
                   renderJsonContext ? (
                     <span key={`${entry.label}:${entry.value}`}>{renderJsonContext(entry)}</span>
                   ) : (
-                    <CopyBadge key={`${entry.label}:${entry.value}`} label={entry.label} value={entry.value} />
+                    <CopyBadge
+                      key={`${entry.label}:${entry.value}`}
+                      label={entry.label}
+                      value={entry.value}
+                    />
                   ),
                 )}
               </div>
@@ -72,7 +91,9 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
         {diagnostics.stacktrace && (
           <div className="min-w-0">
             <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stack trace</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Stack trace
+              </div>
               <button
                 type="button"
                 onClick={() => copyText(diagnostics.stacktrace ?? "")}
@@ -134,7 +155,10 @@ function StackFrameRow({ frame, index }: { frame: ErrorStackFrame; index: number
       type="button"
       onClick={() => copyText(frame.raw)}
       title="Copy stack frame"
-      className={["block w-full rounded px-1.5 py-1 text-left hover:bg-accent/50", appFrame ? "text-foreground" : "text-muted-foreground"].join(" ")}
+      className={[
+        "block w-full rounded px-1.5 py-1 text-left hover:bg-accent/50",
+        appFrame ? "text-foreground" : "text-muted-foreground",
+      ].join(" ")}
     >
       <div className="flex min-w-0 items-start gap-1.5">
         <Icon
@@ -169,7 +193,12 @@ export function CopyBadge({
       type="button"
       onClick={() => copyText(value)}
       title={`Copy ${label}`}
-      className={["inline-flex max-w-full items-center overflow-hidden rounded-md border border-border bg-background/80 text-left text-xs hover:border-primary/40 hover:bg-background", className].filter(Boolean).join(" ")}
+      className={[
+        "inline-flex max-w-full items-center overflow-hidden rounded-md border border-border bg-background/80 text-left text-xs hover:border-primary/40 hover:bg-background",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">{label}</span>
       <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">{value}</span>

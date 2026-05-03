@@ -91,13 +91,13 @@ function renderGlyph(
     return (
       <IconifyReactIcon
         icon={name}
-        className={glyphClassName}
-        width={glyphWidth}
-        height={glyphHeight}
-        rotate={rotate}
-        flip={flip}
-        inline={inline}
-        title={title}
+        {...(glyphClassName ? { className: glyphClassName } : {})}
+        {...(glyphWidth != null ? { width: glyphWidth } : {})}
+        {...(glyphHeight != null ? { height: glyphHeight } : {})}
+        {...(typeof rotate === "number" ? { rotate } : {})}
+        {...(flip != null ? { flip } : {})}
+        {...(inline != null ? { inline } : {})}
+        {...(title ? { title } : {})}
       />
     );
   }
@@ -107,7 +107,14 @@ function renderGlyph(
   if (fallbackIcon) {
     const Fallback = fallbackIcon;
     const glyphSize = typeof glyphWidth === "number" ? glyphWidth : glyphHeight;
-    return <Fallback name={name} className={glyphClassName} size={glyphSize} alt={title} />;
+    return (
+      <Fallback
+        name={name}
+        {...(glyphClassName ? { className: glyphClassName } : {})}
+        {...(glyphSize != null ? { size: glyphSize } : {})}
+        {...(title ? { alt: title } : {})}
+      />
+    );
   }
 
   // 3. <iconify-icon> web component — runtime fallback. Requires the script

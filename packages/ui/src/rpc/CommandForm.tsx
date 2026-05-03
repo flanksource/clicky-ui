@@ -24,7 +24,7 @@ export function CommandForm({
   parameters,
   onExecute,
   isPending,
-  method,
+  method: _method,
   path,
   accept,
   initialValues,
@@ -327,9 +327,10 @@ export function normalizeParameters(
   path: string,
 ): OpenAPIParameter[] {
   const pathParams = pathParamNames(path);
+  const firstPathParam = pathParams[0];
   const seen = new Set(parameters.map((param) => param.name));
   const normalized = parameters.filter(
-    (param) => !(param.name === "args" && pathParams.length > 0 && !seen.has(pathParams[0])),
+    (param) => !(param.name === "args" && firstPathParam != null && !seen.has(firstPathParam)),
   );
   for (const name of pathParams) {
     if (seen.has(name)) continue;

@@ -94,18 +94,16 @@ export function OperationCommandPage({
     [initialValues, operation?.method, parameterSignature],
   );
   const pathParameters = parameters.filter((param) => param.in === "path");
-  const lockedPathValues = useMemo(
-    () =>
-      Object.fromEntries(
-        pathParameters
-          .filter((param) => {
-            const value = effectiveInitialValues[param.name];
-            return typeof value === "string" && value.trim() !== "";
-          })
-          .map((param) => [param.name, effectiveInitialValues[param.name]]),
-      ),
-    [effectiveInitialValues, pathParameters],
-  );
+  const lockedPathValues = useMemo<ParameterValues>(() => {
+    const values: ParameterValues = {};
+    for (const param of pathParameters) {
+      const value = effectiveInitialValues[param.name];
+      if (typeof value === "string" && value.trim() !== "") {
+        values[param.name] = value;
+      }
+    }
+    return values;
+  }, [effectiveInitialValues, pathParameters]);
   const detailOperation = useMemo(
     () => (operation ? findDetailOperation(operation, operations) : undefined),
     [operation, operations],
@@ -481,7 +479,11 @@ function findRelatedOperations(
     .map((related) => {
       const method = related.method.toUpperCase();
       const href = method === "GET" ? hrefForOperation(related, [], pathValues) : undefined;
-      return { operation: related, href, label: operationLabel(related) };
+      return {
+        operation: related,
+        label: operationLabel(related),
+        ...(href ? { href } : {}),
+      };
     })
     .filter((related) => related.operation.method.toUpperCase() !== "GET" || related.href);
 }

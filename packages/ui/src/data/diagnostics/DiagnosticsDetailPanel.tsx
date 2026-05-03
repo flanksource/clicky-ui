@@ -105,8 +105,8 @@ export function DiagnosticsDetailPanel({
           setSelectedStates={setSelectedStates}
           hideRuntimeOnly={hideRuntimeOnly}
           setHideRuntimeOnly={setHideRuntimeOnly}
-          collectBusy={collectBusy}
-          onCollectStack={onCollectStack}
+          collectBusy={collectBusy ?? false}
+          {...(onCollectStack ? { onCollectStack } : {})}
         />
       </PanelSection>
     </div>
@@ -233,7 +233,12 @@ function StackBlock(props: StackBlockProps) {
                 : "No stack trace collected yet."}
           </div>
           {onCollectStack && (
-            <CollectButton pid={process.pid} busy={collectBusy} onClick={onCollectStack} primary />
+            <CollectButton
+              pid={process.pid}
+              busy={collectBusy ?? false}
+              onClick={onCollectStack}
+              primary
+            />
           )}
         </div>
       </div>
@@ -254,7 +259,7 @@ function StackBlock(props: StackBlockProps) {
             )}
           </div>
           {onCollectStack && (
-            <CollectButton pid={process.pid} busy={collectBusy} onClick={onCollectStack} />
+            <CollectButton pid={process.pid} busy={collectBusy ?? false} onClick={onCollectStack} />
           )}
         </div>
         {stackItemCount(parsed) > 0 && (

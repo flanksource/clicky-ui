@@ -36,9 +36,7 @@ export function ApiExplorer({
   return (
     <div className={cn("h-full min-h-0 overflow-auto", className)} style={style}>
       <Suspense
-        fallback={
-          <div className="p-4 text-sm text-muted-foreground">Loading API explorer...</div>
-        }
+        fallback={<div className="p-4 text-sm text-muted-foreground">Loading API explorer...</div>}
       >
         <ScalarApiReference configuration={scalarConfiguration} />
       </Suspense>

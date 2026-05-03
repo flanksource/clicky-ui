@@ -37,7 +37,7 @@ export interface HARResponse {
   bodySize: number;
 }
 
-export interface HAREntry {
+export interface HAREntry extends Record<string, unknown> {
   startedDateTime?: string;
   time: number;
   request: HARRequest;

@@ -225,24 +225,23 @@ export function parametersToFormConfig(
     });
   }
 
-  return {
-    filters: emitFilters,
-    timeRange:
-      hasTimeRange && rangeStart != null && rangeEnd != null
-        ? {
-            from: values[rangeStart.name] ?? "",
-            to: values[rangeEnd.name] ?? "",
-            onApply: (from, to) =>
-              setValues((current) => ({
-                ...current,
-                [rangeStart.name]: from,
-                [rangeEnd.name]: to,
-              })),
-            fromPlaceholder: rangeStart.description,
-            toPlaceholder: rangeEnd.description,
-          }
-        : undefined,
-  };
+  const config: ParameterFormConfig = { filters: emitFilters };
+  if (hasTimeRange && rangeStart != null && rangeEnd != null) {
+    config.timeRange = {
+      from: values[rangeStart.name] ?? "",
+      to: values[rangeEnd.name] ?? "",
+      onApply: (from, to) =>
+        setValues((current) => ({
+          ...current,
+          [rangeStart.name]: from,
+          [rangeEnd.name]: to,
+        })),
+      ...(rangeStart.description ? { fromPlaceholder: rangeStart.description } : {}),
+      ...(rangeEnd.description ? { toPlaceholder: rangeEnd.description } : {}),
+    };
+  }
+
+  return config;
 }
 
 export function useDebouncedRecord<T>(value: T, delayMs: number) {
@@ -311,17 +310,14 @@ function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
   }));
 }
 
-function clickyNodeToPlainText(
-  node:
-    | {
-        plain?: string;
-        text?: string;
-        children?: Array<{ plain?: string; text?: string; children?: unknown[] }>;
-        tooltip?: { plain?: string; text?: string };
-      }
-    | null
-    | undefined,
-): string {
+type PlainTextClickyNode = {
+  plain?: string;
+  text?: string;
+  children?: PlainTextClickyNode[];
+  tooltip?: { plain?: string; text?: string };
+};
+
+function clickyNodeToPlainText(node: PlainTextClickyNode | null | undefined): string {
   if (node == null) return "";
   if (node.plain) return node.plain;
   if (node.text) return node.text;

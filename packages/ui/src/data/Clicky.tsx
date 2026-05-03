@@ -1973,8 +1973,7 @@ function ClickyTable({ node }: { node: ClickyNode }) {
           return <TagList tags={tags} maxVisible={3} />;
         },
         sortValue: (value) => clickyNodeTags(value as ClickyNode, column).length,
-        filterValue: (value) =>
-          clickyNodeTags(value as ClickyNode, column).map((tag) => tag.token),
+        filterValue: (value) => clickyNodeTags(value as ClickyNode, column).map((tag) => tag.token),
       };
     }
 
@@ -2045,9 +2044,7 @@ function ClickyTableRowDetail({
           <div className="grid gap-2">
             {tagFields.map(({ column, tags, tableKey }) => {
               const tagActions = context.tagActionsByColumn[tableKey];
-              const content = (
-                <TagList tags={tags} maxVisible={tags.length} actions="inline" />
-              );
+              const content = <TagList tags={tags} maxVisible={tags.length} actions="inline" />;
 
               return (
                 <div
@@ -2200,11 +2197,13 @@ function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
     fields: columns.flatMap((column) => {
       const value = row.cells[column.name];
       if (!value) return [];
-      return [{
-        name: column.name,
-        label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
-        value,
-      }];
+      return [
+        {
+          name: column.name,
+          label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
+          value,
+        },
+      ];
     }),
   };
 }
@@ -2415,18 +2414,15 @@ function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
 }
 
 function ClickyStackTraceNode({ node }: { node: ClickyNode }) {
-  return (
-    <StackTrace
-      input={{
-        exceptionClass: node.exceptionClass,
-        message: node.message,
-        causedBy: node.causedBy ?? [],
-        frames: node.frames ?? [],
-        language: "java",
-      }}
-      className="space-y-1"
-    />
-  );
+  const input = {
+    causedBy: node.causedBy ?? [],
+    frames: node.frames ?? [],
+    language: "java" as const,
+    ...(node.exceptionClass !== undefined ? { exceptionClass: node.exceptionClass } : {}),
+    ...(node.message !== undefined ? { message: node.message } : {}),
+  };
+
+  return <StackTrace input={input} className="space-y-1" />;
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {

@@ -797,10 +797,7 @@ export function DataTable<T extends Record<string, unknown>>({
   };
 
   return (
-    <div
-      className={cn("flex min-h-0 flex-col gap-3", className)}
-      data-density={densityOverride}
-    >
+    <div className={cn("flex min-h-0 flex-col gap-3", className)} data-density={densityOverride}>
       {showFilterBar && (
         <FilterBar
           {...filterBarProps}

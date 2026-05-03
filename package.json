@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build",
+    "ready": "pnpm run check && pnpm run test && pnpm run build",
     "check:arch": "node hack/check-arch.mjs",
     "predev:storybook": "node hack/check-arch.mjs",
     "dev:storybook": "vp run storybook#dev",
     "dev:kitchensink": "vp run kitchen-sink#dev",
     "dev:kitchen-sink": "vp run kitchen-sink#dev",
-    "build": "vp run -r build",
-    "test": "vp run -r test",
+    "build": "pnpm --filter @flanksource/clicky-ui build",
+    "test": "pnpm --filter storybook build && pnpm --filter kitchen-sink build && pnpm --filter @flanksource/clicky-ui test && pnpm --filter storybook test && pnpm --filter e2e test",
     "test:e2e": "vp run e2e#test",
     "check": "vp check"
   },

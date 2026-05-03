@@ -95,21 +95,29 @@ function HarRowDetails({ entry }: { entry: HAREntry }) {
     <>
       <div className="grid grid-cols-2 gap-density-4">
         <div>
-          <HeaderList title="Request Headers" headers={entry.request.headers} />
+          <HeaderList
+            title="Request Headers"
+            {...(entry.request.headers ? { headers: entry.request.headers } : {})}
+          />
           {entry.request.postData?.text && (
             <div className="mt-density-2">
               <div className="font-semibold text-foreground mb-1">Request Body</div>
               <div className="bg-background p-density-2 rounded border border-border overflow-auto max-h-48">
                 <BodyView
                   text={entry.request.postData.text}
-                  mimeType={entry.request.postData.mimeType}
+                  {...(entry.request.postData.mimeType
+                    ? { mimeType: entry.request.postData.mimeType }
+                    : {})}
                 />
               </div>
             </div>
           )}
         </div>
         <div>
-          <HeaderList title="Response Headers" headers={entry.response.headers} />
+          <HeaderList
+            title="Response Headers"
+            {...(entry.response.headers ? { headers: entry.response.headers } : {})}
+          />
         </div>
       </div>
       {entry.response.content?.text && (
@@ -118,7 +126,9 @@ function HarRowDetails({ entry }: { entry: HAREntry }) {
           <div className="bg-background p-density-2 rounded border border-border overflow-auto max-h-64">
             <BodyView
               text={entry.response.content.text}
-              mimeType={entry.response.content.mimeType}
+              {...(entry.response.content.mimeType
+                ? { mimeType: entry.response.content.mimeType }
+                : {})}
             />
           </div>
         </div>

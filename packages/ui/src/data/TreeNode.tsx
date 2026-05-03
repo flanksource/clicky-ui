@@ -136,15 +136,15 @@ export function TreeNode<T>({
               expandAll={expandAll}
               forcedOpenKeys={forcedOpenKeys}
               selected={selected}
-              defaultOpen={defaultOpen}
               getChildren={getChildren}
               getKey={getKey}
-              onSelect={onSelect}
               renderRow={renderRow}
-              rowClass={rowClass}
               indentPx={indentPx}
               basePaddingPx={basePaddingPx}
-              isSecondary={isSecondary}
+              {...(defaultOpen ? { defaultOpen } : {})}
+              {...(onSelect ? { onSelect } : {})}
+              {...(rowClass ? { rowClass } : {})}
+              {...(isSecondary ? { isSecondary } : {})}
             />
           ))}
         </div>

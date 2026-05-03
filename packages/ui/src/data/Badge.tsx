@@ -291,7 +291,11 @@ function shouldExposeFullTextTitle({
   maxWidth,
   truncate,
   wrap,
-}: Pick<BadgeProps, "maxWidth" | "truncate" | "wrap">) {
+}: {
+  maxWidth: BadgeProps["maxWidth"] | undefined;
+  truncate: BadgeProps["truncate"] | undefined;
+  wrap: BadgeProps["wrap"] | undefined;
+}) {
   return maxWidth != null || truncate != null || wrap;
 }
 
@@ -373,12 +377,6 @@ function compressStructuredText(
   compactPieces.push(compactTail);
   const compact = compactPieces.join(separator);
   return compact.length <= budget ? compact : truncateMiddle(preferred, budget);
-}
-
-function compactTrailingSegments(text: string, separator: "/" | ":"): string {
-  const segments = text.split(separator).filter(Boolean);
-  if (segments.length <= 2) return text;
-  return segments.slice(-2).join(separator);
 }
 
 function getStructuredBudget(budget: number): number {
@@ -755,11 +753,11 @@ export function Badge({
   const canCopy = href == null && (clickToCopy ?? true) && copyText != null;
   const shapeClass = getShapeClasses(shape ?? "pill");
   const wrapperStyle: CSSProperties = {};
-  const wrapperClasses = [
+  const wrapperClasses: string[] = [
     "inline-flex align-middle items-stretch border font-medium shadow-none",
     sizeClasses.frame,
     sizeClasses.text,
-    (normalizedMaxWidth != null || shouldWrapText || truncate != null) && "min-w-0 max-w-full",
+    normalizedMaxWidth != null || shouldWrapText || truncate != null ? "min-w-0 max-w-full" : "",
     shapeClass,
     shouldWrapText ? "whitespace-normal" : "whitespace-nowrap",
     href ? "transition-opacity hover:opacity-80" : "",
