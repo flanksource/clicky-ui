@@ -71,6 +71,13 @@ export {
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
+export {
+  LogsTable,
+  normalizeLogsTableRows,
+  type LogsTableInput,
+  type LogsTableProps,
+  type LogsTableRow,
+} from "./data/LogsTable";
 export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
@@ -126,6 +133,22 @@ export {
   type ParsedStackFrame,
   type ParsedStackTrace,
 } from "./data/diagnostics/stacktrace-parse";
+export {
+  ErrorDetails,
+  PrettyStackTrace,
+  CopyBadge,
+  type ErrorDetailsProps,
+} from "./data/diagnostics/ErrorDetails";
+export {
+  normalizeErrorDiagnostics,
+  parseDiagnosticsStackTrace,
+  parseInlineJsonContextValue,
+  compactStackPath,
+  isApplicationStackFrame,
+  type ErrorDiagnostics,
+  type ErrorStackFrame,
+  type ParsedErrorStackTrace,
+} from "./data/diagnostics/error-diagnostics";
 
 export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";
 export type {

@@ -96,11 +96,21 @@ describe("FilterBar", () => {
     expect(onRestarts).toHaveBeenCalledWith({ min: "2", max: "" });
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
-    fireEvent.click(screen.getByRole("button", { name: /last 1 hour/i }));
+    expect(screen.queryByText("Quick ranges")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Time range from"), { target: { value: "now-1h" } });
+    fireEvent.change(screen.getByLabelText("Time range to"), { target: { value: "now" } });
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
     expect(onTimeRange).toHaveBeenCalledWith("now-1h", "now");
 
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
-    fireEvent.click(screen.getByRole("button", { name: /today/i }));
+    expect(screen.queryByText("Quick ranges")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Date range from"), {
+      target: { value: "2026-04-21" },
+    });
+    fireEvent.change(screen.getByLabelText("Date range to"), {
+      target: { value: "2026-04-21" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
     expect(onDateRange).toHaveBeenCalledWith("2026-04-21", "2026-04-21");
 
     vi.useRealTimers();

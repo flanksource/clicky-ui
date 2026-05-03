@@ -87,6 +87,35 @@ describe("DataTable", () => {
     vi.useRealTimers();
   });
 
+  it("keeps the table shell visible when a filter matches no rows", () => {
+    vi.useFakeTimers();
+    render(<DataTable data={rows} columns={columns} autoFilter />);
+
+    fireEvent.change(screen.getByPlaceholderText("Search all columns…"), {
+      target: { value: "not-a-real-service" },
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(1);
+    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    expect(screen.getByText("0 of 3 rows")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("keeps the table shell visible with empty source data", () => {
+    render(<DataTable data={[]} columns={columns} />);
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /service/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(1);
+    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
+  });
+
   it("generates multi-select and text filters automatically", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
@@ -196,6 +225,7 @@ describe("DataTable", () => {
 
     expect(screen.getAllByText("healthy")[0]).toHaveClass("whitespace-nowrap");
     expect(screen.getByText("Production API service")).toHaveClass(
+      "w-full",
       "min-w-56",
       "max-w-[36rem]",
       "truncate",
@@ -209,6 +239,20 @@ describe("DataTable", () => {
     expect(screen.getByRole("table")).not.toHaveClass("w-full");
     expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass("whitespace-nowrap");
     expect(screen.getByRole("columnheader", { name: /service/i })).not.toHaveClass("pr-5");
+  });
+
+  it("uses distinct table row padding for compact and spacious density", () => {
+    render(<DataTable data={rows} columns={columns} density="compact" />);
+
+    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass(
+      "density-compact:py-1",
+      "density-spacious:py-3",
+    );
+    expect(screen.getAllByText("api")[0]?.closest("td")).toHaveClass(
+      "density-compact:py-0.5",
+      "density-spacious:py-3",
+    );
   });
 
   it("renders column resize handles by default", () => {
@@ -235,6 +279,26 @@ describe("DataTable", () => {
     fireEvent.mouseUp(document);
 
     expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 304px");
+  });
+
+  it("adapts cell truncation width when a column is resized", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnResizeStorageKey="clicky-ui-test-widths-cell-content"
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize notes column/i }), {
+      clientX: 100,
+    });
+    fireEvent.mouseMove(document, { clientX: 400 });
+    fireEvent.mouseUp(document);
+
+    const notesContent = screen.getByText("Production API service");
+    expect(notesContent).not.toHaveClass("max-w-[36rem]");
+    expect(notesContent).toHaveStyle({ maxWidth: "524px" });
   });
 
   it("auto-fits a column when double-clicking a resize handle", () => {
@@ -378,6 +442,39 @@ describe("DataTable", () => {
     expect(screen.queryByRole("button", { name: /open column menu/i })).not.toBeInTheDocument();
   });
 
+  it("overrides table density from the column menu and persists the choice", () => {
+    const storageKey = "clicky-ui-test-density-override";
+    const { unmount } = render(
+      <DataTable data={rows} columns={columns} densityStorageKey={storageKey} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /compact/i }));
+
+    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+    expect(window.localStorage.getItem(storageKey)).toBe("compact");
+
+    unmount();
+    render(<DataTable data={rows} columns={columns} densityStorageKey={storageKey} />);
+
+    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+  });
+
+  it("can clear table density back to the page density", () => {
+    const storageKey = "clicky-ui-test-density-clear";
+    window.localStorage.setItem(storageKey, "spacious");
+
+    render(<DataTable data={rows} columns={columns} densityStorageKey={storageKey} />);
+
+    expect(screen.getByRole("table").closest('[data-density="spacious"]')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /use page density/i }));
+
+    expect(screen.getByRole("table").closest("[data-density]")).toBeNull();
+    expect(window.localStorage.getItem(storageKey)).toBeNull();
+  });
+
   it("can resize without persisting widths", () => {
     const storageKey = "clicky-ui-test-widths-no-persist";
     render(
@@ -452,7 +549,10 @@ describe("DataTable", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
-    fireEvent.click(screen.getByRole("button", { name: /last 1 hour/i }));
+    expect(screen.queryByText("Quick ranges")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Time range from"), { target: { value: "now-1h" } });
+    fireEvent.change(screen.getByLabelText("Time range to"), { target: { value: "now" } });
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
     expect(onApply).toHaveBeenCalledWith("now-1h", "now");
   });
@@ -536,6 +636,18 @@ describe("DataTable", () => {
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("api"),
       expect.stringContaining("worker"),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /open timestamp column filter/i }));
+    const dialog = screen.getByRole("dialog", { name: /time range column filter/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /clear all/i }));
+
+    const clearedRows = screen.getAllByRole("row").slice(1);
+    expect(clearedRows).toHaveLength(3);
+    expect(clearedRows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("api"),
+      expect.stringContaining("worker"),
+      expect.stringContaining("cron"),
     ]);
   });
 

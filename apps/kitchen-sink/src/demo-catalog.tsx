@@ -10,6 +10,7 @@ import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
 import { ClickyDemo } from "./demos/ClickyDemo";
 import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
+import { LogsTableDemo } from "./demos/LogsTableDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
@@ -61,6 +62,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "json-view", label: "JsonView", component: JsonViewDemo },
       { id: "ansi-html", label: "AnsiHtml", component: AnsiHtmlDemo },
       { id: "log-viewer", label: "LogViewer", component: LogViewerDemo },
+      { id: "logs-table", label: "LogsTable", component: LogsTableDemo },
       { id: "markdown", label: "Markdown", component: MarkdownDemo },
     ],
   },

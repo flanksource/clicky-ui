@@ -9,6 +9,7 @@ import {
   type TdHTMLAttributes,
 } from "react";
 import { useSort, type SortDir } from "../hooks/use-sort";
+import type { Density } from "../hooks/use-density";
 import { cn } from "../lib/utils";
 import {
   FilterBar,
@@ -88,6 +89,18 @@ const DEFAULT_GROW_COLUMN_WIDTH = 224;
 const DEFAULT_SHRINK_COLUMN_WIDTH = 96;
 const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
 const COLUMN_VISIBILITY_STORAGE_PREFIX = "clicky-ui-data-table-column-visibility";
+const DENSITY_STORAGE_PREFIX = "clicky-ui-data-table-density";
+
+const DENSITY_OPTIONS: Array<{ value: Density; icon: string; label: string }> = [
+  { value: "compact", icon: "ph:rows", label: "Compact" },
+  { value: "comfortable", icon: "ph:list", label: "Comfortable" },
+  { value: "spacious", icon: "ph:list-dashes", label: "Spacious" },
+];
+
+const DATA_TABLE_HEADER_DENSITY_CLASS =
+  "px-2.5 py-1.5 density-compact:px-2 density-compact:py-1 density-comfortable:px-2.5 density-comfortable:py-1.5 density-spacious:px-4 density-spacious:py-3";
+const DATA_TABLE_CELL_DENSITY_CLASS =
+  "px-2.5 py-1.5 density-compact:px-2 density-compact:py-0.5 density-comfortable:px-2.5 density-comfortable:py-1.5 density-spacious:px-4 density-spacious:py-3";
 
 type ColumnMenuState = {
   x: number;
@@ -179,13 +192,19 @@ export type DataTableProps<T extends Record<string, unknown> = Record<string, un
   hideableColumns?: boolean;
   persistColumnVisibility?: boolean;
   columnVisibilityStorageKey?: string;
+  density?: Density;
+  defaultDensity?: Density;
+  onDensityChange?: (density: Density | undefined) => void;
+  persistDensity?: boolean;
+  densityStorageKey?: string;
+  showDensityControl?: boolean;
   showHeaderFilters?: boolean;
 };
 
 export function DataTable<T extends Record<string, unknown>>({
   data,
   columns: columnsInput,
-  emptyMessage = "No data",
+  emptyMessage: _emptyMessage = "No data",
   className,
   autoFilter = false,
   showGlobalFilter = true,
@@ -205,6 +224,12 @@ export function DataTable<T extends Record<string, unknown>>({
   hideableColumns = true,
   persistColumnVisibility = true,
   columnVisibilityStorageKey,
+  density,
+  defaultDensity,
+  onDensityChange,
+  persistDensity = true,
+  densityStorageKey,
+  showDensityControl,
   showHeaderFilters = true,
 }: DataTableProps<T>) {
   const columns = useMemo<DataTableColumn<T>[]>(
@@ -222,6 +247,8 @@ export function DataTable<T extends Record<string, unknown>>({
     columnResizeStorageKey ?? `${COLUMN_WIDTH_STORAGE_PREFIX}:${columnKeysSignature}`;
   const resolvedColumnVisibilityStorageKey =
     columnVisibilityStorageKey ?? `${COLUMN_VISIBILITY_STORAGE_PREFIX}:${columnKeysSignature}`;
+  const resolvedDensityStorageKey =
+    densityStorageKey ?? `${DENSITY_STORAGE_PREFIX}:${columnKeysSignature}`;
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
     persistColumnWidths ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns) : {},
   );
@@ -230,6 +257,13 @@ export function DataTable<T extends Record<string, unknown>>({
       ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
       : {},
   );
+  const densityControlled = density !== undefined;
+  const [localDensityOverride, setLocalDensityOverride] = useState<Density | undefined>(() => {
+    if (densityControlled) return density;
+    if (persistDensity)
+      return readStoredDensityOverride(resolvedDensityStorageKey) ?? defaultDensity;
+    return defaultDensity;
+  });
   const [columnMenu, setColumnMenu] = useState<ColumnMenuState | null>(null);
   const [headerFilterMenu, setHeaderFilterMenu] = useState<ColumnMenuState | null>(null);
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
@@ -281,6 +315,20 @@ export function DataTable<T extends Record<string, unknown>>({
     if (!persistColumnVisibility) return;
     writeStoredHiddenColumns(resolvedColumnVisibilityStorageKey, hiddenColumns);
   }, [hiddenColumns, persistColumnVisibility, resolvedColumnVisibilityStorageKey]);
+
+  useEffect(() => {
+    if (densityControlled) return;
+    setLocalDensityOverride(
+      persistDensity
+        ? (readStoredDensityOverride(resolvedDensityStorageKey) ?? defaultDensity)
+        : defaultDensity,
+    );
+  }, [defaultDensity, densityControlled, persistDensity, resolvedDensityStorageKey]);
+
+  useEffect(() => {
+    if (densityControlled || !persistDensity) return;
+    writeStoredDensityOverride(resolvedDensityStorageKey, localDensityOverride);
+  }, [densityControlled, localDensityOverride, persistDensity, resolvedDensityStorageKey]);
 
   useEffect(() => {
     if (!columnMenu && !headerFilterMenu) return;
@@ -348,6 +396,9 @@ export function DataTable<T extends Record<string, unknown>>({
   );
 
   const showColumnVisibilityControl = hideableColumns && hideableColumnCount > 1;
+  const resolvedShowDensityControl = showDensityControl ?? showColumnVisibilityControl;
+  const showTablePreferencesControl = showColumnVisibilityControl || resolvedShowDensityControl;
+  const densityOverride = densityControlled ? density : localDensityOverride;
 
   // For each kind:"tags" column, expose a TagActions value backed by this
   // table's multiFilters slot. The + / − icons inside each tag mutate the
@@ -544,8 +595,12 @@ export function DataTable<T extends Record<string, unknown>>({
   const showFilterBar =
     (autoFilter && (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
     hasCustomFilterBarContent ||
-    showColumnVisibilityControl;
-  const filterBarTrailing = showColumnVisibilityControl ? (
+    showTablePreferencesControl;
+  const setDensityOverride = (next: Density | undefined) => {
+    if (!densityControlled) setLocalDensityOverride(next);
+    onDensityChange?.(next);
+  };
+  const filterBarTrailing = showTablePreferencesControl ? (
     <>
       {filterBarProps?.trailing}
       <ColumnVisibilityTrigger onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))} />
@@ -741,16 +796,11 @@ export function DataTable<T extends Record<string, unknown>>({
     setHeaderFilterMenu(menuStateFromTrigger(event, columnKey));
   };
 
-  if (data.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed border-border p-density-6 text-center text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("space-y-3", className)}>
+    <div
+      className={cn("flex min-h-0 flex-col gap-3", className)}
+      data-density={densityOverride}
+    >
       {showFilterBar && (
         <FilterBar
           {...filterBarProps}
@@ -769,194 +819,196 @@ export function DataTable<T extends Record<string, unknown>>({
         />
       )}
 
-      {sorted.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border p-density-6 text-center text-sm text-muted-foreground">
-          {emptyMessage}
-        </div>
-      ) : (
-        <>
-          <div className="overflow-auto rounded-md border border-border">
-            <table className="w-max table-auto text-left text-sm">
-              <colgroup>
-                {visibleColumns.map((column) => (
-                  <col
-                    key={column.key}
-                    style={columnStyle(column, columnWidths)}
-                    className={column.shrink && !column.grow ? "w-px" : undefined}
-                  />
-                ))}
-              </colgroup>
-              <thead className="sticky top-0 bg-muted/50">
-                <tr className="border-b border-border text-xs text-muted-foreground">
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.key}
-                      className={cn(
-                        "group/header relative whitespace-nowrap px-3 py-2 font-medium",
-                        alignmentClass(column.align),
-                        resizableColumns && column.resizable !== false && "select-none",
-                        column.headerClassName,
-                      )}
-                      onContextMenu={(event) => openHeaderColumnMenu(event, column)}
-                    >
-                      <div
-                        className={cn(
-                          "flex min-w-0 items-center gap-1",
-                          headerAlignmentClass(column.align),
-                          resizableColumns && column.resizable !== false && "pr-2",
-                        )}
-                      >
-                        <span className="min-w-0">
-                          {column.sortable === false ? (
-                            <span>{column.label}</span>
-                          ) : (
-                            <SortableHeader
-                              active={sort?.key === column.key}
-                              {...(sort?.key === column.key ? { dir: sort.dir } : {})}
-                              {...(column.align ? { align: column.align } : {})}
-                              onClick={() => toggle(column.key)}
-                            >
-                              {column.label}
-                            </SortableHeader>
-                          )}
-                        </span>
-                        {showHeaderFilterControls &&
-                          (nativeFilterByColumn.has(column.key) ||
-                            (autoTimeRange && timeRangeColumn?.key === column.key)) && (
-                            <HeaderFilterButton
-                              column={column}
-                              active={
-                                nativeFilterByColumn.has(column.key)
-                                  ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
-                                  : Boolean(timeRangeFilter.from || timeRangeFilter.to)
-                              }
-                              onOpen={(event) => openHeaderFilterMenu(event, column.key)}
-                            />
-                          )}
-                      </div>
-                      {resizableColumns && column.resizable !== false && (
-                        <span
-                          role="separator"
-                          aria-label={`Resize ${labelText(column)} column`}
-                          aria-orientation="vertical"
-                          className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                          onDoubleClick={(event) => autoFitColumn(event, column)}
-                          onMouseDown={(event) => startColumnResize(event, column)}
+      <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
+        <table className="w-max table-auto text-left text-sm">
+          <colgroup>
+            {visibleColumns.map((column) => (
+              <col
+                key={column.key}
+                style={columnStyle(column, columnWidths)}
+                className={column.shrink && !column.grow ? "w-px" : undefined}
+              />
+            ))}
+          </colgroup>
+          <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
+            <tr className="border-b border-border text-xs text-muted-foreground">
+              {visibleColumns.map((column) => (
+                <th
+                  key={column.key}
+                  className={cn(
+                    "group/header relative whitespace-nowrap font-medium",
+                    DATA_TABLE_HEADER_DENSITY_CLASS,
+                    alignmentClass(column.align),
+                    resizableColumns && column.resizable !== false && "select-none",
+                    column.headerClassName,
+                  )}
+                  onContextMenu={(event) => openHeaderColumnMenu(event, column)}
+                >
+                  <div
+                    className={cn(
+                      "flex min-w-0 items-center gap-1",
+                      headerAlignmentClass(column.align),
+                      resizableColumns && column.resizable !== false && "pr-2",
+                    )}
+                  >
+                    <span className="min-w-0">
+                      {column.sortable === false ? (
+                        <span>{column.label}</span>
+                      ) : (
+                        <SortableHeader
+                          active={sort?.key === column.key}
+                          {...(sort?.key === column.key ? { dir: sort.dir } : {})}
+                          {...(column.align ? { align: column.align } : {})}
+                          onClick={() => toggle(column.key)}
                         >
-                          <span
-                            aria-hidden
-                            className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
-                          />
-                        </span>
+                          {column.label}
+                        </SortableHeader>
                       )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((record) => {
-                  const href = getRowHref?.(record.row);
-                  const expanded = expandedRows[record.id] ?? false;
-                  const expandedContent =
-                    renderExpandedRow?.(record.row, {
-                      columns: effectiveColumns,
-                      visibleColumns,
-                      tagActionsByColumn,
-                    }) ?? null;
-                  const expandable = expandedContent !== null;
-                  const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
-                  const clickable = !!href || rowClickEnabled || expandable;
-
-                  return (
-                    <Fragment key={record.id}>
-                      <tr
-                        className={cn(
-                          "border-b border-border/60 align-top",
-                          clickable && "cursor-pointer hover:bg-accent/40",
-                        )}
-                        onClick={() => {
-                          if (expandable) {
-                            setExpandedRows((current) => ({
-                              ...current,
-                              [record.id]: !current[record.id],
-                            }));
+                    </span>
+                    {showHeaderFilterControls &&
+                      (nativeFilterByColumn.has(column.key) ||
+                        (autoTimeRange && timeRangeColumn?.key === column.key)) && (
+                        <HeaderFilterButton
+                          column={column}
+                          active={
+                            nativeFilterByColumn.has(column.key)
+                              ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
+                              : Boolean(timeRangeFilter.from || timeRangeFilter.to)
                           }
-                          if (rowClickEnabled) {
-                            onRowClick?.(record.row);
-                          }
-                        }}
-                      >
-                        {visibleColumns.map((column, index) => {
-                          const rawValue = resolvePath(record.row, column.key);
-                          let content: ReactNode = column.render
-                            ? column.render(rawValue, record.row)
-                            : formatCell(rawValue);
+                          onOpen={(event) => openHeaderFilterMenu(event, column.key)}
+                        />
+                      )}
+                  </div>
+                  {resizableColumns && column.resizable !== false && (
+                    <span
+                      role="separator"
+                      aria-label={`Resize ${labelText(column)} column`}
+                      aria-orientation="vertical"
+                      className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onDoubleClick={(event) => autoFitColumn(event, column)}
+                      onMouseDown={(event) => startColumnResize(event, column)}
+                    >
+                      <span
+                        aria-hidden
+                        className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
+                      />
+                    </span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((record) => {
+              const href = getRowHref?.(record.row);
+              const expanded = expandedRows[record.id] ?? false;
+              const expandedContent =
+                renderExpandedRow?.(record.row, {
+                  columns: effectiveColumns,
+                  visibleColumns,
+                  tagActionsByColumn,
+                }) ?? null;
+              const expandable = expandedContent !== null;
+              const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
+              const clickable = !!href || rowClickEnabled || expandable;
 
-                          // Tag cells get the + / − filter affordance via
-                          // context; copy-to-clipboard works without it too.
-                          if (column.kind === "tags" && tagActionsByColumn[column.key]) {
-                            content = (
-                              <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+              return (
+                <Fragment key={record.id}>
+                  <tr
+                    className={cn(
+                      "border-b border-border/60 align-top",
+                      clickable && "cursor-pointer hover:bg-accent/40",
+                    )}
+                    onClick={() => {
+                      if (expandable) {
+                        setExpandedRows((current) => ({
+                          ...current,
+                          [record.id]: !current[record.id],
+                        }));
+                      }
+                      if (rowClickEnabled) {
+                        onRowClick?.(record.row);
+                      }
+                    }}
+                  >
+                    {visibleColumns.map((column, index) => {
+                      const rawValue = resolvePath(record.row, column.key);
+                      let content: ReactNode = column.render
+                        ? column.render(rawValue, record.row)
+                        : formatCell(rawValue);
+
+                      // Tag cells get the + / − filter affordance via
+                      // context; copy-to-clipboard works without it too.
+                      if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                        content = (
+                          <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                            {content}
+                          </TagActionsProvider>
+                        );
+                      }
+
+                      return (
+                        <td
+                          key={column.key}
+                          className={cn(
+                            DATA_TABLE_CELL_DENSITY_CLASS,
+                            alignmentClass(column.align),
+                            column.cellClassName,
+                          )}
+                        >
+                          <CellContent
+                            column={column}
+                            {...(columnWidths[column.key] !== undefined
+                              ? { width: columnWidths[column.key] }
+                              : {})}
+                          >
+                            {href && index === 0 ? (
+                              <a href={href} className="hover:underline">
                                 {content}
-                              </TagActionsProvider>
-                            );
-                          }
+                              </a>
+                            ) : (
+                              content
+                            )}
+                          </CellContent>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {expanded && expandedContent && (
+                    <tr>
+                      <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
+                        <div className="rounded-md border border-border bg-background p-density-3">
+                          {expandedContent}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-                          return (
-                            <td
-                              key={column.key}
-                              className={cn(
-                                "px-3 py-2",
-                                alignmentClass(column.align),
-                                column.cellClassName,
-                              )}
-                            >
-                              <CellContent column={column}>
-                                {href && index === 0 ? (
-                                  <a href={href} className="hover:underline">
-                                    {content}
-                                  </a>
-                                ) : (
-                                  content
-                                )}
-                              </CellContent>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {expanded && expandedContent && (
-                        <tr>
-                          <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
-                            <div className="rounded-md border border-border bg-background p-density-3">
-                              {expandedContent}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="px-1 text-xs text-muted-foreground">
-            {sorted.length} of {data.length} row{data.length === 1 ? "" : "s"}
-          </div>
-        </>
-      )}
-      {columnMenu && showColumnVisibilityControl && (
+      <div className="px-1 text-xs text-muted-foreground">
+        {sorted.length} of {data.length} row{data.length === 1 ? "" : "s"}
+      </div>
+      {columnMenu && showTablePreferencesControl && (
         <ColumnVisibilityMenu
           columns={effectiveColumns}
           hiddenColumns={hiddenColumns}
           anchor={columnMenu}
+          showColumnVisibilityControl={showColumnVisibilityControl}
+          showDensityControl={resolvedShowDensityControl}
+          densityOverride={densityOverride}
           visibleHideableColumnCount={visibleHideableColumnCount}
           onToggle={toggleColumnVisibility}
           onShowAll={showAllColumns}
+          onDensityChange={setDensityOverride}
           onClose={() => setColumnMenu(null)}
         />
       )}
@@ -1014,6 +1066,7 @@ function HeaderFilterMenu({
   if (!filter && !timeRange) return null;
 
   const label = filter?.label ?? "Time range";
+  const timeRangeActive = Boolean(timeRange?.from || timeRange?.to);
 
   return (
     <div
@@ -1035,6 +1088,16 @@ function HeaderFilterMenu({
               className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
               onClick={() => clearFilterBarFilter(filter)}
               disabled={!isFilterBarFilterActive(filter)}
+            >
+              Clear all
+            </button>
+          )}
+          {timeRange && (
+            <button
+              type="button"
+              className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
+              onClick={() => timeRange.onApply("", "")}
+              disabled={!timeRangeActive}
             >
               Clear all
             </button>
@@ -1107,17 +1170,25 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
   columns,
   hiddenColumns,
   anchor,
+  showColumnVisibilityControl,
+  showDensityControl,
+  densityOverride,
   visibleHideableColumnCount,
   onToggle,
   onShowAll,
+  onDensityChange,
   onClose,
 }: {
   columns: DataTableColumn<T>[];
   hiddenColumns: Record<string, boolean>;
   anchor: ColumnMenuState;
+  showColumnVisibilityControl: boolean;
+  showDensityControl: boolean;
+  densityOverride: Density | undefined;
   visibleHideableColumnCount: number;
   onToggle: (column: DataTableColumn<T>) => void;
   onShowAll: () => void;
+  onDensityChange: (density: Density | undefined) => void;
   onClose: () => void;
 }) {
   const activeColumn = anchor.columnKey
@@ -1135,78 +1206,158 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-        <span>Columns</span>
-        <button
-          type="button"
-          className="rounded px-1.5 py-0.5 text-xs text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
-          onClick={onShowAll}
-        >
-          Show all
-        </button>
-      </div>
-
-      {activeColumn && (
+      {showColumnVisibilityControl && (
         <>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canHideActiveColumn}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-              !canHideActiveColumn && "cursor-not-allowed opacity-50",
-            )}
-            onClick={() => {
-              if (!canHideActiveColumn) return;
-              onToggle(activeColumn);
-              onClose();
-            }}
-          >
-            <Icon name="codicon:eye-closed" className="text-sm text-muted-foreground" />
-            <span>Hide {labelText(activeColumn)}</span>
-          </button>
-          <div className="my-1 h-px bg-border" />
+          <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <span>Columns</span>
+            <button
+              type="button"
+              className="rounded px-1.5 py-0.5 text-xs text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+              onClick={onShowAll}
+            >
+              Show all
+            </button>
+          </div>
+
+          {activeColumn && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!canHideActiveColumn}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+                  !canHideActiveColumn && "cursor-not-allowed opacity-50",
+                )}
+                onClick={() => {
+                  if (!canHideActiveColumn) return;
+                  onToggle(activeColumn);
+                  onClose();
+                }}
+              >
+                <Icon name="codicon:eye-closed" className="text-sm text-muted-foreground" />
+                <span>Hide {labelText(activeColumn)}</span>
+              </button>
+              <div className="my-1 h-px bg-border" />
+            </>
+          )}
+
+          <div className="max-h-72 overflow-auto">
+            {columns.map((column) => {
+              const hideable = isColumnHideable(column);
+              const visible = hiddenColumns[column.key] !== true;
+              const disabled = !hideable || (visible && visibleHideableColumnCount <= 1);
+              return (
+                <label
+                  key={column.key}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                    disabled && "cursor-not-allowed opacity-50",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border"
+                    checked={visible}
+                    disabled={disabled}
+                    onChange={() => onToggle(column)}
+                  />
+                  <span className="truncate">{labelText(column)}</span>
+                </label>
+              );
+            })}
+          </div>
         </>
       )}
 
-      <div className="max-h-72 overflow-auto">
-        {columns.map((column) => {
-          const hideable = isColumnHideable(column);
-          const visible = hiddenColumns[column.key] !== true;
-          const disabled = !hideable || (visible && visibleHideableColumnCount <= 1);
-          return (
-            <label
-              key={column.key}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                disabled && "cursor-not-allowed opacity-50",
-              )}
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-border"
-                checked={visible}
-                disabled={disabled}
-                onChange={() => onToggle(column)}
-              />
-              <span className="truncate">{labelText(column)}</span>
-            </label>
-          );
-        })}
-      </div>
+      {showDensityControl && (
+        <DensityMenuSection
+          densityOverride={densityOverride}
+          separated={showColumnVisibilityControl}
+          onDensityChange={onDensityChange}
+        />
+      )}
     </div>
+  );
+}
+
+function DensityMenuSection({
+  densityOverride,
+  separated,
+  onDensityChange,
+}: {
+  densityOverride: Density | undefined;
+  separated: boolean;
+  onDensityChange: (density: Density | undefined) => void;
+}) {
+  const current = densityOverride ?? "inherit";
+
+  return (
+    <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
+      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Density</div>
+      <button
+        type="button"
+        role="menuitemradio"
+        aria-checked={current === "inherit"}
+        className={densityMenuItemClassName(current === "inherit")}
+        onClick={() => onDensityChange(undefined)}
+      >
+        <Icon name="ph:arrows-in-line-vertical" className="text-sm text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate">Use page density</span>
+        {current === "inherit" ? (
+          <Icon name="ph:check" className="text-sm text-foreground" />
+        ) : (
+          <span className="inline-block h-4 w-4" aria-hidden />
+        )}
+      </button>
+      {DENSITY_OPTIONS.map((option) => {
+        const active = current === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="menuitemradio"
+            aria-checked={active}
+            className={densityMenuItemClassName(active)}
+            onClick={() => onDensityChange(option.value)}
+          >
+            <Icon name={option.icon} className="text-sm text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            {active ? (
+              <Icon name="ph:check" className="text-sm text-foreground" />
+            ) : (
+              <span className="inline-block h-4 w-4" aria-hidden />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function densityMenuItemClassName(active: boolean) {
+  return cn(
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+    active && "text-foreground",
   );
 }
 
 function CellContent<T extends Record<string, unknown>>({
   column,
+  width,
   children,
 }: {
   column: DataTableColumn<T>;
+  width?: number;
   children: ReactNode;
 }) {
   return (
-    <div className={cn(cellContentClassName(column), alignmentClass(column.align))}>{children}</div>
+    <div
+      className={cn(cellContentClassName(column, width), alignmentClass(column.align))}
+      style={cellContentStyle(width)}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -1643,6 +1794,33 @@ function writeStoredHiddenColumns(storageKey: string, hiddenColumns: Record<stri
   } catch {}
 }
 
+function readStoredDensityOverride(storageKey: string): Density | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    return isDensity(raw) ? raw : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredDensityOverride(storageKey: string, density: Density | undefined) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (density) {
+      window.localStorage.setItem(storageKey, density);
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  } catch {}
+}
+
+function isDensity(value: unknown): value is Density {
+  return value === "compact" || value === "comfortable" || value === "spacious";
+}
+
 function pruneColumnWidths<T extends Record<string, unknown>>(
   widths: Record<string, unknown>,
   columns: DataTableColumn<T>[],
@@ -1800,12 +1978,19 @@ function headerAlignmentClass(align?: DataTableColumn["align"]) {
   return "justify-start";
 }
 
+function cellContentStyle(width: number | undefined): CSSProperties | undefined {
+  return width ? { maxWidth: `${width}px` } : undefined;
+}
+
 function cellContentClassName<T extends Record<string, unknown>>(
   column: DataTableColumn<T>,
+  width?: number,
 ): TdHTMLAttributes<HTMLTableCellElement>["className"] {
-  if (column.grow) return "min-w-56 max-w-[36rem] truncate";
-  if (column.shrink) return "max-w-[16rem] truncate whitespace-nowrap";
-  return "max-w-[18rem] truncate";
+  const resized = width !== undefined;
+  const base = "w-full truncate";
+  if (column.grow) return cn(base, resized ? "min-w-0" : "min-w-56 max-w-[36rem]");
+  if (column.shrink) return cn(base, "min-w-0 whitespace-nowrap", !resized && "max-w-[16rem]");
+  return cn(base, "min-w-0", !resized && "max-w-[18rem]");
 }
 
 export function inferColumns<T extends Record<string, unknown>>(data: T[]): DataTableColumn<T>[] {

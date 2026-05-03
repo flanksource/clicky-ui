@@ -8,6 +8,7 @@
     "check:arch": "node hack/check-arch.mjs",
     "predev:storybook": "node hack/check-arch.mjs",
     "dev:storybook": "vp run storybook#dev",
+    "dev:kitchensink": "vp run kitchen-sink#dev",
     "dev:kitchen-sink": "vp run kitchen-sink#dev",
     "build": "vp run -r build",
     "test": "vp run -r test",

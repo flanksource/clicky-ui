@@ -224,15 +224,6 @@ export type FilterBarProps = {
   isPending?: boolean;
 };
 
-const DEFAULT_TIME_RANGE_PRESETS: FilterBarRangePreset[] = [
-  { label: "Last 15 minutes", from: "now-15m", to: "now" },
-  { label: "Last 1 hour", from: "now-1h", to: "now" },
-  { label: "Last 6 hours", from: "now-6h", to: "now" },
-  { label: "Last 24 hours", from: "now-24h", to: "now" },
-  { label: "Last 7 days", from: "now-7d", to: "now" },
-  { label: "Last 30 days", from: "now-30d", to: "now" },
-];
-
 export function FilterBar({
   search,
   filters,
@@ -358,7 +349,7 @@ export function FilterBarRangePanel({
   from = "",
   to = "",
   onApply,
-  presets,
+  presets: _presets,
   fromPlaceholder,
   toPlaceholder,
   emptyLabel: _emptyLabel,
@@ -367,10 +358,6 @@ export function FilterBarRangePanel({
   const toInputRef = useRef<HTMLInputElement>(null);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
-  const rangePresets = useMemo(
-    () => presets ?? (kind === "date" ? buildDateRangePresets() : DEFAULT_TIME_RANGE_PRESETS),
-    [kind, presets],
-  );
 
   useEffect(() => {
     setDraftFrom(from);
@@ -385,32 +372,7 @@ export function FilterBarRangePanel({
   }
 
   return (
-    <div className="w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-sm shadow-black/5">
-      {rangePresets.length > 0 && (
-        <div className="border-b border-border p-1">
-          <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Quick ranges
-          </div>
-          {rangePresets.map((preset) => {
-            const active = from === preset.from && to === preset.to;
-            return (
-              <button
-                key={preset.label}
-                type="button"
-                onClick={() => applyRange(preset.from, preset.to)}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
-                  active && "bg-accent font-medium",
-                )}
-              >
-                <span>{preset.label}</span>
-                <span className="text-[11px] text-muted-foreground">{preset.from}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
+    <div className="w-72 text-popover-foreground">
       <div className="p-3">
         <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {label}
@@ -421,6 +383,7 @@ export function FilterBarRangePanel({
             <RangeInput
               inputRef={fromInputRef}
               kind={kind}
+              ariaLabel={`${label} from`}
               placeholder={fromPlaceholder ?? (kind === "date" ? "" : "now-24h")}
               value={draftFrom}
               onChange={setDraftFrom}
@@ -431,6 +394,7 @@ export function FilterBarRangePanel({
             <RangeInput
               inputRef={toInputRef}
               kind={kind}
+              ariaLabel={`${label} to`}
               placeholder={toPlaceholder ?? (kind === "date" ? "" : "now")}
               value={draftTo}
               onChange={setDraftTo}
@@ -1627,7 +1591,7 @@ function RangeControlButton({
   from = "",
   to = "",
   onApply,
-  presets,
+  presets: _presets,
   fromPlaceholder,
   toPlaceholder,
   emptyLabel,
@@ -1650,11 +1614,6 @@ function RangeControlButton({
     }
   }, [from, open, to]);
 
-  const rangePresets = useMemo(
-    () => presets ?? (kind === "date" ? buildDateRangePresets() : DEFAULT_TIME_RANGE_PRESETS),
-    [kind, presets],
-  );
-
   const buttonLabel = formatRangeLabel(kind, from, to, emptyLabel);
 
   function applyRange(nextFrom: string, nextTo: string) {
@@ -1662,6 +1621,13 @@ function RangeControlButton({
       kind === "time" ? normalizeDateMath(nextFrom) : nextFrom.trim(),
       kind === "time" ? normalizeDateMath(nextTo) : nextTo.trim(),
     );
+    setOpen(false);
+  }
+
+  function clearRange() {
+    setDraftFrom("");
+    setDraftTo("");
+    onApply("", "");
     setOpen(false);
   }
 
@@ -1684,34 +1650,9 @@ function RangeControlButton({
 
       {open && (
         <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-md shadow-black/5 outline-none">
-          {rangePresets.length > 0 && (
-            <div className="border-b border-border p-1">
-              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Quick ranges
-              </div>
-              {rangePresets.map((preset) => {
-                const active = from === preset.from && to === preset.to;
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => applyRange(preset.from, preset.to)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
-                      active && "bg-accent font-medium",
-                    )}
-                  >
-                    <span>{preset.label}</span>
-                    <span className="text-[11px] text-muted-foreground">{preset.from}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           <div className="p-3">
             <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Custom range
+              {label}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
@@ -1719,6 +1660,7 @@ function RangeControlButton({
                 <RangeInput
                   inputRef={fromInputRef}
                   kind={kind}
+                  ariaLabel={`${label} from`}
                   placeholder={fromPlaceholder ?? (kind === "date" ? "" : "now-24h")}
                   value={draftFrom}
                   onChange={setDraftFrom}
@@ -1729,13 +1671,24 @@ function RangeControlButton({
                 <RangeInput
                   inputRef={toInputRef}
                   kind={kind}
+                  ariaLabel={`${label} to`}
                   placeholder={toPlaceholder ?? (kind === "date" ? "" : "now")}
                   value={draftTo}
                   onChange={setDraftTo}
                 />
               </div>
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={!from && !to}
+                onClick={clearRange}
+              >
+                Clear
+              </Button>
               <Button
                 type="button"
                 variant="default"
@@ -2107,12 +2060,14 @@ function formatRangeLabel(
 function RangeInput({
   inputRef,
   kind,
+  ariaLabel,
   value,
   onChange,
   placeholder,
 }: {
   inputRef: RefObject<HTMLInputElement | null>;
   kind: "date" | "time";
+  ariaLabel: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
@@ -2121,6 +2076,7 @@ function RangeInput({
     return (
       <DatePicker
         ref={inputRef as RefObject<HTMLInputElement>}
+        aria-label={ariaLabel}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
@@ -2132,39 +2088,11 @@ function RangeInput({
   return (
     <DateTimePicker
       ref={inputRef as RefObject<HTMLInputElement>}
+      aria-label={ariaLabel}
       inputClassName="pr-8"
       placeholder={placeholder}
       value={value}
       onChange={onChange}
     />
   );
-}
-
-function buildDateRangePresets(now = new Date()): FilterBarRangePreset[] {
-  const today = formatDateValue(now);
-  const yesterday = formatDateValue(addDays(now, -1));
-  const last7 = formatDateValue(addDays(now, -6));
-  const last30 = formatDateValue(addDays(now, -29));
-  const monthStart = formatDateValue(new Date(now.getFullYear(), now.getMonth(), 1));
-
-  return [
-    { label: "Today", from: today, to: today },
-    { label: "Yesterday", from: yesterday, to: yesterday },
-    { label: "Last 7 days", from: last7, to: today },
-    { label: "Last 30 days", from: last30, to: today },
-    { label: "This month", from: monthStart, to: today },
-  ];
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function formatDateValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
