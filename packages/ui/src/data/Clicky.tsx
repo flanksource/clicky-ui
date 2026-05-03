@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -34,6 +35,7 @@ import { JsonView } from "./JsonView";
 import { highlightCode } from "./code-highlight";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";
 import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
+import { Badge, type BadgeShape } from "./Badge";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 import {
@@ -105,7 +107,8 @@ export type ClickyNode = {
     | "button"
     | "button-group"
     | "html"
-    | "comment";
+    | "comment"
+    | "badge";
   plain?: string;
   style?: ClickyStyle;
   text?: string;
@@ -142,6 +145,13 @@ export type ClickyNode = {
   message?: string;
   causedBy?: string[];
   frames?: ParsedStackFrame[];
+  // LabelBadge fields, set when kind === "badge".
+  badgeLabel?: string;
+  badgeValue?: string;
+  badgeColor?: string;
+  badgeText?: string;
+  badgeShape?: string;
+  badgeIcon?: string;
 };
 
 export type ClickyDocument = {
@@ -1362,6 +1372,8 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
       return <ClickyHtmlNode node={node} />;
     case "comment":
       return <ClickyComment node={node} />;
+    case "badge":
+      return <ClickyBadgeNode node={node} />;
     default:
       return (
         <pre className="rounded-md border border-border bg-muted p-density-3 text-xs">
@@ -2411,6 +2423,21 @@ function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
   } catch {
     return JSON_PARSE_FAILED;
   }
+}
+
+function isBadgeShape(value: string | undefined): value is BadgeShape {
+  return value === "pill" || value === "rounded" || value === "square";
+}
+
+function ClickyBadgeNode({ node }: { node: ClickyNode }) {
+  const props: ComponentProps<typeof Badge> = { variant: "label" };
+  if (node.badgeLabel !== undefined) props.label = node.badgeLabel;
+  if (node.badgeValue !== undefined) props.value = node.badgeValue;
+  if (node.badgeColor !== undefined) props.color = node.badgeColor;
+  if (node.badgeText !== undefined) props.textColor = node.badgeText;
+  if (node.badgeIcon !== undefined) props.icon = node.badgeIcon;
+  if (isBadgeShape(node.badgeShape)) props.shape = node.badgeShape;
+  return <Badge {...props} />;
 }
 
 function ClickyStackTraceNode({ node }: { node: ClickyNode }) {

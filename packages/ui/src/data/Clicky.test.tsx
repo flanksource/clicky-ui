@@ -93,6 +93,47 @@ describe("Clicky", () => {
     expect(comment.style.WebkitLineClamp).toBe("3");
   });
 
+  it("renders stacktrace nodes with source line gutters", () => {
+    render(
+      <Clicky
+        data={{
+          kind: "stacktrace",
+          exceptionClass: "java.lang.NullPointerException",
+          message: "name must not be null",
+          causedBy: ["com.example.ServiceException: request failed"],
+          frames: [
+            {
+              functionName: "com.example.Greeter.greet",
+              displayName: "Greeter.greet",
+              class: "com.example.Greeter",
+              method: "greet",
+              kind: "frame",
+              runtime: false,
+              nativeMethod: false,
+              file: "Greeter.java",
+              line: 14,
+              location: "Greeter.java:14",
+              sourceLines: [
+                "    public String greet(String name) {",
+                '        return prefix + ", " + name.toUpperCase();',
+              ],
+              sourceLineNumbers: [13, 14],
+              sourceStartLine: 13,
+              sourceLanguage: "java",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("java.lang.NullPointerException")).toBeInTheDocument();
+    expect(screen.getByText("name must not be null")).toBeInTheDocument();
+    expect(screen.getByText("Caused by")).toBeInTheDocument();
+    expect(screen.getByText("Greeter.greet")).toBeInTheDocument();
+    expect(screen.getByText(">14")).toBeInTheDocument();
+    expect(screen.getByText(/name\.toUpperCase/)).toBeInTheDocument();
+  });
+
   it("sorts tables and expands row detail", () => {
     render(<Clicky data={clickyFixture} />);
 

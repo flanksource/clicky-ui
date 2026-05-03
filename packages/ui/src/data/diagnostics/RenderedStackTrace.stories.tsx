@@ -59,6 +59,8 @@ const fixtureResolver: StackTraceSourceResolver = (frame: ParsedStackFrame) => {
   return { lines: fx.lines, startLine: fx.startLine, language: "java" };
 };
 
+const greeterSource = fixtureSources["com.example.hello.Greeter"];
+
 export const Default: Story = {
   args: { input: sample },
 };
@@ -98,6 +100,35 @@ export const ExcludeFilter: Story = {
 export const PreParsedInput: Story = {
   args: {
     input: parseJavaStackTrace(sample),
+  },
+};
+
+export const ClickyHtmlPayload: Story = {
+  args: {
+    input: {
+      exceptionClass: "java.lang.NullPointerException",
+      message: "name must not be null",
+      causedBy: ["com.example.ServiceException: request failed"],
+      language: "java",
+      frames: [
+        {
+          functionName: "com.example.hello.Greeter.greet",
+          displayName: "Greeter.greet",
+          class: "com.example.hello.Greeter",
+          method: "greet",
+          kind: "frame",
+          runtime: false,
+          nativeMethod: false,
+          file: "Greeter.java",
+          line: 14,
+          location: "Greeter.java:14",
+          sourceLines: greeterSource.lines,
+          sourceLineNumbers: [10, 11, 12, 13, 14, 15, 16, 17],
+          sourceStartLine: 10,
+          sourceLanguage: "java",
+        },
+      ],
+    },
   },
 };
 

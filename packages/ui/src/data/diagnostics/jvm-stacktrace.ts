@@ -18,6 +18,7 @@ export interface ParsedThreadFrame {
   // (or its TS equivalent). sourceLines[line - sourceStartLine] is the focal
   // line. Empty/undefined when no resolver was attached.
   sourceLines?: string[];
+  sourceLineNumbers?: number[];
   sourceStartLine?: number;
   sourceLanguage?: string;
 }
