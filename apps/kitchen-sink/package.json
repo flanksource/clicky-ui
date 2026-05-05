@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
+    "@shikijs/langs": "catalog:",
+    "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "preact": "catalog:",
     "shiki": "catalog:"
   },

@@ -29,7 +29,6 @@ export default defineConfig({
         data: resolve(__dirname, "src/data.ts"),
         clicky: resolve(__dirname, "src/clicky.ts"),
         rpc: resolve(__dirname, "src/rpc.ts"),
-        "api-explorer": resolve(__dirname, "src/api-explorer.ts"),
         "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
         styles: resolve(__dirname, "src/styles.ts"),
       },
