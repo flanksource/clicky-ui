@@ -12,8 +12,10 @@ import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { LogsTableDemo } from "./demos/LogsTableDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
+import { PropertiesDemo } from "./demos/PropertiesDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
+import { TimeRangeDemo } from "./demos/TimeRangeDemo";
 import { DataTableDemo } from "./demos/DataTableDemo";
 import { TraceLogsDemo } from "./demos/TraceLogsDemo";
 import { SortableHeaderDemo } from "./demos/SortableHeaderDemo";
@@ -27,9 +29,9 @@ import { ModalDemo } from "./demos/ModalDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
-import { ApiExplorerDemo } from "./demos/ApiExplorerDemo";
 import { CommandFormDemo } from "./demos/CommandFormDemo";
 import { OperationDialogsDemo } from "./demos/OperationDialogsDemo";
+import { OperationExplorerDemo } from "./demos/OperationExplorerDemo";
 
 export type DemoEntry = {
   id: string;
@@ -63,6 +65,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "ansi-html", label: "AnsiHtml", component: AnsiHtmlDemo },
       { id: "log-viewer", label: "LogViewer", component: LogViewerDemo },
       { id: "logs-table", label: "LogsTable", component: LogsTableDemo },
+      { id: "properties", label: "Properties", component: PropertiesDemo },
       { id: "markdown", label: "Markdown", component: MarkdownDemo },
     ],
   },
@@ -71,6 +74,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     items: [
       { id: "filter-bar", label: "FilterBar / MultiSelect", component: FilterBarDemo },
       { id: "filter-pill", label: "FilterPill", component: FilterPillDemo },
+      { id: "time-range", label: "TimeRange / DateField", component: TimeRangeDemo },
       { id: "sortable", label: "SortableHeader", component: SortableHeaderDemo },
       { id: "data-table", label: "DataTable", component: DataTableDemo },
       { id: "trace-logs", label: "Trace logs", component: TraceLogsDemo },
@@ -106,7 +110,11 @@ export const DEMO_GROUPS: DemoGroup[] = [
     items: [
       { id: "command-form", label: "CommandForm", component: CommandFormDemo },
       { id: "operation-dialogs", label: "OperationDialogs", component: OperationDialogsDemo },
-      { id: "api-explorer", label: "ApiExplorer", component: ApiExplorerDemo },
+      {
+        id: "operation-explorer",
+        label: "OperationCatalog",
+        component: OperationExplorerDemo,
+      },
     ],
   },
 ];

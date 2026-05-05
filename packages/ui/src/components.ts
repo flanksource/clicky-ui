@@ -1,6 +1,13 @@
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { DateField, type DateFieldMode, type DateFieldProps } from "./components/DateField";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
+export {
+  TimeRange,
+  type TimeRangeKind,
+  type TimeRangePreset,
+  type TimeRangeProps,
+} from "./components/TimeRange";
 export {
   RangeSlider,
   type RangeSliderProps,

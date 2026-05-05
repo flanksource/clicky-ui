@@ -70,6 +70,14 @@ export {
 } from "./data/Icon";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
+export {
+  Properties,
+  type PropertiesAction,
+  type PropertiesDensity,
+  type PropertiesItem,
+  type PropertiesProps,
+} from "./data/Properties";
+export { formatPropertyLabel } from "./data/properties-utils";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
 export {
   LogsTable,

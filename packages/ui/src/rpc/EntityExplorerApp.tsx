@@ -1,8 +1,6 @@
 import { useEffect, useMemo } from "react";
-import type { AnyApiReferenceConfiguration } from "@scalar/api-reference-react";
 import { ThemeSwitcher } from "../components/theme-switcher";
 import type { ClickyCommandRuntime, ClickyResolvedCommand } from "../data/Clicky";
-import { ApiExplorer } from "./ApiExplorer";
 import { getClickySurfaces, makeSurfaceDefinition } from "./clickyMetadata";
 import type { RenderLink } from "./EndpointList";
 import { OperationCatalog } from "./OperationCatalog";
@@ -18,9 +16,6 @@ export type EntityExplorerAppProps = {
   renderLink: RenderLink;
   basePath?: string;
   showApiExplorer?: boolean;
-  apiExplorerMode?: "scalar" | "operations";
-  apiExplorerUrl?: string;
-  apiExplorerConfiguration?: AnyApiReferenceConfiguration;
 };
 
 export function EntityExplorerApp({
@@ -29,9 +24,6 @@ export function EntityExplorerApp({
   renderLink,
   basePath = "",
   showApiExplorer = true,
-  apiExplorerMode = "scalar",
-  apiExplorerUrl,
-  apiExplorerConfiguration,
 }: EntityExplorerAppProps) {
   const { spec } = useOperations(client);
   const surfaces = useMemo(() => getClickySurfaces(spec), [spec]);
@@ -159,21 +151,14 @@ export function EntityExplorerApp({
             {...(resolvedRoute.operationId ? { operationId: resolvedRoute.operationId } : {})}
           />
         ) : resolvedRoute.kind === "explorer" ? (
-          apiExplorerMode === "scalar" ? (
-            <ApiExplorer
-              {...(apiExplorerUrl ? { openApiUrl: apiExplorerUrl } : {})}
-              {...(apiExplorerConfiguration ? { configuration: apiExplorerConfiguration } : {})}
-            />
-          ) : (
-            <OperationCatalog
-              definition={explorerDefinition}
-              entities={[]}
-              allOperations
-              client={client}
-              renderLink={renderLink}
-              commandRuntime={commandRuntime}
-            />
-          )
+          <OperationCatalog
+            definition={explorerDefinition}
+            entities={[]}
+            allOperations
+            client={client}
+            renderLink={renderLink}
+            commandRuntime={commandRuntime}
+          />
         ) : defaultSurface == null ? (
           <div className="text-sm text-muted-foreground">Loading surfaces…</div>
         ) : (

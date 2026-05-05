@@ -1,4 +1,5 @@
 export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
+export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
 export {
   ACCEPT_OPTIONS,
   AcceptPicker,

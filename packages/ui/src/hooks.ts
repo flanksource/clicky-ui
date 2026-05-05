@@ -1,4 +1,11 @@
-export { ThemeProvider, useTheme, type Theme, type ResolvedTheme } from "./hooks/use-theme";
+export {
+  ThemeProvider,
+  useTheme,
+  useOptionalTheme,
+  useResolvedTheme,
+  type Theme,
+  type ResolvedTheme,
+} from "./hooks/use-theme";
 export { DensityProvider, useDensity, useDensityValue, type Density } from "./hooks/use-density";
 export {
   useSort,
