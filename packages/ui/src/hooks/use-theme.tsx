@@ -96,3 +96,27 @@ export function useTheme(): ThemeContextValue {
   if (!ctx) throw new Error("useTheme must be used inside <ThemeProvider>");
   return ctx;
 }
+
+export function useOptionalTheme(): ThemeContextValue | null {
+  return useContext(ThemeContext);
+}
+
+export function useResolvedTheme(override?: Theme): ResolvedTheme {
+  const ctx = useOptionalTheme();
+  const [systemResolved, setSystemResolved] = useState<ResolvedTheme>(() =>
+    prefersDark() ? "dark" : "light",
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemResolved(mq.matches ? "dark" : "light");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  if (override && override !== "system") return override;
+  if (override === "system") return systemResolved;
+  if (ctx) return ctx.resolvedTheme;
+  return systemResolved;
+}

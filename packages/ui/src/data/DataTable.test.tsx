@@ -791,4 +791,53 @@ describe("DataTable", () => {
     expect(within(headerRow).getByText("name")).toBeInTheDocument();
     expect(within(headerRow).getByText("Count")).toBeInTheDocument();
   });
+
+  describe("compact-mode tag rendering and body-only theme", () => {
+    type TagRow = { name: string; labels: Record<string, string> };
+
+    const tagRows: TagRow[] = [{ name: "api", labels: { env: "prod", region: "us-east-1" } }];
+
+    const tagColumns: DataTableColumn<TagRow>[] = [
+      { key: "name", label: "Name" },
+      { key: "labels", label: "Labels", kind: "tags" },
+    ];
+
+    it("hides tag keys inline when density is compact (keys still in tooltip)", () => {
+      render(
+        <DataTable data={tagRows} columns={tagColumns} defaultDensity="compact" theme="light" />,
+      );
+
+      const labelsCell = screen.getByText("prod").closest("td") as HTMLElement;
+      // value-only badges in compact: 'env' / 'region' don't appear as text inside the cell.
+      expect(within(labelsCell).queryByText("env")).toBeNull();
+      expect(within(labelsCell).queryByText("region")).toBeNull();
+      expect(within(labelsCell).getByText("prod")).toBeInTheDocument();
+      expect(within(labelsCell).getByText("us-east-1")).toBeInTheDocument();
+
+      // tag.display ("env=prod") is preserved as a tooltip on the outer
+      // badge wrapper so users can still see the key on hover. Walk up
+      // ancestors until we hit a title containing "=".
+      let node: HTMLElement | null = within(labelsCell).getByText("prod");
+      let foundDisplay: string | null = null;
+      while (node) {
+        const t = node.getAttribute("title");
+        if (t && t.includes("=")) {
+          foundDisplay = t;
+          break;
+        }
+        node = node.parentElement;
+      }
+      expect(foundDisplay).toBe("env=prod");
+    });
+
+    it("renders key=value inline when density is comfortable (default)", () => {
+      render(<DataTable data={tagRows} columns={tagColumns} theme="light" />);
+
+      const labelsCell = screen.getByText("prod").closest("td") as HTMLElement;
+      expect(within(labelsCell).getByText("env")).toBeInTheDocument();
+      expect(within(labelsCell).getByText("region")).toBeInTheDocument();
+      expect(within(labelsCell).getByText("prod")).toBeInTheDocument();
+      expect(within(labelsCell).getByText("us-east-1")).toBeInTheDocument();
+    });
+  });
 });

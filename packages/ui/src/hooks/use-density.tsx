@@ -71,6 +71,24 @@ export function useDensity(): DensityContextValue {
 }
 
 /**
+ * Provide a density value to descendants without owning the storage / setter.
+ * Useful when a component (e.g. DataTable) already manages density via its
+ * own state and just needs leaf cells like TagList to read the active value
+ * via {@link useDensityValue}. Calls to `setDensity` from descendants are
+ * ignored — the host component controls density externally.
+ */
+export function DensityValueProvider({
+  density,
+  children,
+}: {
+  density: Density;
+  children: ReactNode;
+}) {
+  const value = useMemo<DensityContextValue>(() => ({ density, setDensity: () => {} }), [density]);
+  return <DensityContext.Provider value={value}>{children}</DensityContext.Provider>;
+}
+
+/**
  * Non-throwing density read. Returns the context value if a `<DensityProvider>`
  * is mounted, otherwise reads the current `data-density` attribute on
  * `<html>`, falling back to `comfortable`. Use inside leaf components that

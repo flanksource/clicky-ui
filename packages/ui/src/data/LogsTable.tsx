@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Modal } from "../overlay/Modal";
 import { AnsiHtml } from "./AnsiHtml";
 import { DataTable, type DataTableColumn, type DataTableProps } from "./DataTable";
-import { Icon } from "./Icon";
+import { Properties, type PropertiesAction, type PropertiesItem } from "./Properties";
+import { formatPropertyLabel } from "./properties-utils";
 
 export type LogsTableInput = string | Record<string, unknown>;
 
@@ -21,16 +21,10 @@ export type LogsTableRow = {
   raw: unknown;
 };
 
-export type LogsTableProps = Omit<
-  DataTableProps<LogsTableRow>,
-  "data" | "columns" | "density" | "defaultDensity"
-> & {
+export type LogsTableProps = Omit<DataTableProps<LogsTableRow>, "data" | "columns"> & {
   logs: string | LogsTableInput[];
   columns?: DataTableColumn<LogsTableRow>[];
-  dark?: boolean;
   showRawDetails?: boolean;
-  showFullscreenControl?: boolean;
-  fullscreenTitle?: ReactNode;
 };
 
 // Matches CSI / SGR escape sequences (e.g. "\x1b[31m"). Used to skip the
@@ -80,114 +74,39 @@ const JSON_PARSE_FAILED = Symbol("json-parse-failed");
 export function LogsTable({
   logs,
   columns,
-  dark = true,
   showRawDetails = true,
   className,
   autoFilter = true,
   defaultSort,
   getRowId,
   renderExpandedRow,
-  showDensityControl = false,
+  showDensityControl = true,
+  showThemeControl = true,
   showFullscreenControl = true,
   fullscreenTitle = "Logs",
+  fullscreenButtonLabel = "Open logs full screen",
+  defaultDensity = "compact",
   ...tableProps
 }: LogsTableProps) {
-  const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const rows = useMemo(() => normalizeLogsTableRows(logs), [logs]);
   const resolvedRenderExpandedRow =
     renderExpandedRow ?? (showRawDetails ? renderLogDetails : undefined);
-  const renderTable = () => (
-    <LogsDataTable
-      {...tableProps}
-      rows={rows}
-      columns={columns ?? DEFAULT_LOG_COLUMNS}
-      autoFilter={autoFilter}
-      defaultSort={defaultSort ?? DEFAULT_SORT}
-      showDensityControl={showDensityControl}
-      {...(getRowId ? { getRowId } : {})}
-      {...(resolvedRenderExpandedRow ? { renderExpandedRow: resolvedRenderExpandedRow } : {})}
-    />
-  );
-
-  return (
-    <div
-      {...(dark ? { "data-theme": "dark" } : {})}
-      className={cn(
-        "relative flex min-h-0 flex-col",
-        dark && "rounded-md bg-background p-2 text-foreground",
-        className,
-      )}
-    >
-      {showFullscreenControl && (
-        <button
-          type="button"
-          aria-label="Open logs full screen"
-          title="Open logs full screen"
-          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          onClick={() => setFullscreenOpen(true)}
-        >
-          <Icon name="codicon:screen-full" className="text-sm" />
-        </button>
-      )}
-      {renderTable()}
-      <Modal
-        open={fullscreenOpen}
-        onClose={() => setFullscreenOpen(false)}
-        title={fullscreenTitle}
-        size="full"
-        className="h-[95vh]"
-      >
-        <div
-          {...(dark ? { "data-theme": "dark" } : {})}
-          className={cn("flex h-full min-h-0 flex-col", dark && "bg-background text-foreground")}
-        >
-          {renderTable()}
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-function LogsDataTable({
-  rows,
-  columns,
-  autoFilter,
-  defaultSort,
-  getRowId,
-  renderExpandedRow,
-  showDensityControl,
-  ...tableProps
-}: Omit<
-  DataTableProps<LogsTableRow>,
-  | "data"
-  | "density"
-  | "defaultDensity"
-  | "columns"
-  | "autoFilter"
-  | "defaultSort"
-  | "getRowId"
-  | "renderExpandedRow"
-  | "showDensityControl"
-> & {
-  rows: LogsTableRow[];
-  columns: DataTableColumn<LogsTableRow>[];
-  autoFilter: boolean;
-  defaultSort: NonNullable<DataTableProps<LogsTableRow>["defaultSort"]>;
-  getRowId?: NonNullable<DataTableProps<LogsTableRow>["getRowId"]>;
-  renderExpandedRow?: NonNullable<DataTableProps<LogsTableRow>["renderExpandedRow"]>;
-  showDensityControl: boolean;
-}) {
   return (
     <DataTable
       {...tableProps}
       data={rows}
-      columns={columns}
-      density="compact"
+      columns={columns ?? DEFAULT_LOG_COLUMNS}
+      className={cn("rounded-md bg-background p-2", className)}
       autoFilter={autoFilter}
+      defaultDensity={defaultDensity}
+      defaultSort={defaultSort ?? DEFAULT_SORT}
       getRowId={getRowId ?? ((row) => row.id)}
       showDensityControl={showDensityControl}
-      defaultSort={defaultSort}
-      {...(renderExpandedRow ? { renderExpandedRow } : {})}
+      showThemeControl={showThemeControl}
+      showFullscreenControl={showFullscreenControl}
+      fullscreenTitle={fullscreenTitle}
+      fullscreenButtonLabel={fullscreenButtonLabel}
+      {...(resolvedRenderExpandedRow ? { renderExpandedRow: resolvedRenderExpandedRow } : {})}
     />
   );
 }
@@ -342,159 +261,76 @@ function LogDetails({ row }: { row: LogsTableRow }) {
   };
   const details = useMemo(() => buildProcessedLogDetails(row), [row]);
 
+  const labelForPath = (path: string) => formatPropertyLabel(path.split(".").pop() ?? path);
+
+  const prefixActions: PropertiesAction<unknown>[] = [
+    {
+      id: "expand",
+      icon: "lucide:zoom-in",
+      label: (key) => `Expand ${labelForPath(key)}`,
+      visible: (_k, _v, item) => !!item.expandable,
+      disabled: (_k, _v, item) => !!item.expanded,
+      onClick: (_k, _v, item) => item.onToggle?.(true),
+    },
+    {
+      id: "collapse",
+      icon: "lucide:zoom-out",
+      label: (key) => `Collapse ${labelForPath(key)}`,
+      visible: (_k, _v, item) => !!item.expandable,
+      disabled: (_k, _v, item) => !item.expanded,
+      onClick: (_k, _v, item) => item.onToggle?.(false),
+    },
+  ];
+
+  const suffixActions: PropertiesAction<unknown>[] = [
+    {
+      id: "copy",
+      icon: "lucide:copy",
+      label: (key) => `Copy ${labelForPath(key)}`,
+      onClick: (_k, value) => copyLogDetailsValue(value),
+    },
+  ];
+
+  const renderLabel = (key: string) => labelForPath(key);
+  const renderValue = (_key: string, value: unknown, item: PropertiesItem<unknown>) =>
+    item.expandable ? <LogValueSummary value={value} /> : <LogScalarValue value={value} />;
+
+  const toItems = (value: unknown, path: string, depth: number): PropertiesItem<unknown>[] =>
+    getValueEntries(value).map(([key, entryValue]) => {
+      const entryPath = `${path}.${String(key)}`;
+      const expandable = isExpandableValue(entryValue);
+      const open = openPaths[entryPath] ?? depth < 1;
+      return {
+        key: entryPath,
+        value: entryValue,
+        expandable,
+        expanded: open,
+        onToggle: (next) => setPathOpen(entryPath, next),
+        renderChildren: () => (
+          <Properties
+            density="compact"
+            items={toItems(entryValue, entryPath, depth + 1)}
+            renderLabel={renderLabel}
+            renderValue={renderValue}
+            prefixActions={prefixActions}
+            suffixActions={suffixActions}
+            className="mt-density-1"
+          />
+        ),
+      };
+    });
+
   return (
     <div className="space-y-density-3 text-xs">
-      <PropertiesDescriptionList
-        value={details}
-        path="details"
-        openPaths={openPaths}
-        setPathOpen={setPathOpen}
+      <Properties
+        density="compact"
+        items={toItems(details, "details", 0)}
+        renderLabel={renderLabel}
+        renderValue={renderValue}
+        prefixActions={prefixActions}
+        suffixActions={suffixActions}
       />
     </div>
-  );
-}
-
-function PropertiesDescriptionList({
-  value,
-  path,
-  openPaths,
-  setPathOpen,
-  depth = 0,
-}: {
-  value: unknown;
-  path: string;
-  openPaths: Record<string, boolean>;
-  setPathOpen: (path: string, open: boolean) => void;
-  depth?: number;
-}) {
-  const entries = getValueEntries(value);
-  if (entries.length === 0) {
-    return <LogValueSummary value={value} />;
-  }
-
-  return (
-    <dl
-      className={cn(
-        "divide-y divide-border rounded-md border border-border bg-muted/20",
-        depth > 0 && "mt-density-1",
-      )}
-    >
-      {entries.map(([key, entryValue]) => {
-        const keyText = String(key);
-        const label = formatPropertyLabel(keyText);
-        const entryPath = `${path}.${keyText}`;
-        const expandable = isExpandableValue(entryValue);
-        const open = openPaths[entryPath] ?? depth < 1;
-
-        return (
-          <div
-            key={entryPath}
-            className="grid min-w-0 grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] gap-density-3 px-density-2 py-density-1.5"
-          >
-            <dt
-              aria-label={label}
-              className="min-w-0 truncate font-mono text-[11px] text-muted-foreground"
-            >
-              {label}
-            </dt>
-            <dd className="min-w-0 space-y-density-1">
-              <LogDetailsValueLine
-                label={label}
-                path={entryPath}
-                value={entryValue}
-                expandable={expandable}
-                open={open}
-                setPathOpen={setPathOpen}
-              />
-              {expandable && open && (
-                <PropertiesDescriptionList
-                  value={entryValue}
-                  path={entryPath}
-                  openPaths={openPaths}
-                  setPathOpen={setPathOpen}
-                  depth={depth + 1}
-                />
-              )}
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-}
-
-function LogDetailsValueLine({
-  label,
-  path,
-  value,
-  expandable,
-  open,
-  setPathOpen,
-}: {
-  label: string;
-  path: string;
-  value: unknown;
-  expandable: boolean;
-  open: boolean;
-  setPathOpen: (path: string, open: boolean) => void;
-}) {
-  return (
-    <div className="flex min-w-0 items-start gap-density-1">
-      <span className="inline-flex shrink-0 items-center gap-0.5 pt-0.5">
-        <LogDetailsActionButton
-          label={`Expand ${label}`}
-          icon="lucide:zoom-in"
-          disabled={!expandable || open}
-          onClick={() => setPathOpen(path, true)}
-        />
-        <LogDetailsActionButton
-          label={`Collapse ${label}`}
-          icon="lucide:zoom-out"
-          disabled={!expandable || !open}
-          onClick={() => setPathOpen(path, false)}
-        />
-      </span>
-      <div className="min-w-0 max-w-full">
-        {expandable ? <LogValueSummary value={value} /> : <LogScalarValue value={value} />}
-      </div>
-      <LogDetailsActionButton
-        label={`Copy ${label}`}
-        icon="lucide:copy"
-        onClick={() => copyLogDetailsValue(value)}
-      />
-    </div>
-  );
-}
-
-function LogDetailsActionButton({
-  label,
-  icon,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      className={cn(
-        "inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground",
-        "hover:bg-accent hover:text-foreground",
-        "disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
-      )}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      <Icon name={icon} className="text-xs" />
-    </button>
   );
 }
 
@@ -611,13 +447,6 @@ function buildProcessedLogAttributes(row: LogsTableRow): Record<string, unknown>
   return stripEmptyProperties(
     Object.fromEntries(Object.entries(attributes).filter(([key]) => !hiddenKeys.has(key))),
   );
-}
-
-function formatPropertyLabel(key: string): string {
-  return key
-    .replace(/[_-]+/g, " ")
-    .replace(/\.+/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function stripEmptyProperties(record: Record<string, unknown>): Record<string, unknown> {
