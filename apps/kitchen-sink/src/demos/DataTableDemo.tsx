@@ -278,6 +278,24 @@ export function DataTableDemo() {
           columnResizeStorageKey="clicky-ui-kitchen-data-table-lots-of-columns"
         />
       </div>
+
+      <div className="space-y-density-2 border-t border-border pt-density-3">
+        <h3 className="text-sm font-medium">Theme + full-window controls</h3>
+        <p className="text-xs text-muted-foreground">
+          The column-menu (⋮) now exposes a Theme section, and the fullscreen toggle opens the table
+          in a full-viewport modal. Both controls work on any DataTable, not just LogsTable.
+        </p>
+        <DataTable
+          data={rows}
+          columns={columns}
+          autoFilter
+          defaultSort={{ key: "service", dir: "asc" }}
+          showThemeControl
+          showFullscreenControl
+          fullscreenTitle="Service overview"
+          columnResizeStorageKey="clicky-ui-kitchen-data-table-theme-fullscreen"
+        />
+      </div>
     </DemoSection>
   );
 }

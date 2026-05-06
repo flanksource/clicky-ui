@@ -9,8 +9,10 @@ import {
   type TdHTMLAttributes,
 } from "react";
 import { useSort, type SortDir } from "../hooks/use-sort";
-import type { Density } from "../hooks/use-density";
+import { DensityValueProvider, type Density } from "../hooks/use-density";
+import { useResolvedTheme, type Theme } from "../hooks/use-theme";
 import { cn } from "../lib/utils";
+import { Modal } from "../overlay/Modal";
 import {
   FilterBar,
   FilterBarFilterPanel,
@@ -163,7 +165,7 @@ export type DataTableColumnInput<T extends Record<string, unknown> = Record<stri
   | DataTableColumn<T>
   | string;
 
-export type DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> = {
+type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unknown>> = {
   data: T[];
   /**
    * Column descriptors. Pass a bare string for a default column —
@@ -198,10 +200,44 @@ export type DataTableProps<T extends Record<string, unknown> = Record<string, un
   persistDensity?: boolean;
   densityStorageKey?: string;
   showDensityControl?: boolean;
+  /**
+   * Current value of the theme menu shown in the column / preferences popover.
+   * The inner DataTable does not apply this value itself — it's the menu's
+   * displayed selection. The outer `DataTable` wrapper manages this state and
+   * paints a wrapper-level `data-theme`.
+   */
+  themeMenuValue?: Theme;
+  onThemeChange?: (theme: Theme) => void;
+  showThemeControl?: boolean;
   showHeaderFilters?: boolean;
 };
 
-export function DataTable<T extends Record<string, unknown>>({
+export type DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> = Omit<
+  DataTableInnerProps<T>,
+  "themeMenuValue"
+> & {
+  /**
+   * Initial / controlled theme value for the column-menu Theme section.
+   * When `onThemeChange` is omitted, the DataTable manages this internally
+   * (seeded from `theme`) and applies `data-theme` to its root so the table
+   * reflects the choice without requiring an enclosing `<ThemeProvider>`.
+   */
+  theme?: Theme;
+  /**
+   * Render a fullscreen-toggle button in the FilterBar's trailing slot
+   * (just before the column-menu trigger). When clicked, the table re-renders
+   * inside a full-viewport `<Modal>`. Defaults to `false`.
+   */
+  showFullscreenControl?: boolean;
+  fullscreenTitle?: ReactNode;
+  /**
+   * `aria-label` and `title` for the fullscreen toggle button. Defaults to
+   * "Open table full screen". LogsTable overrides to "Open logs full screen".
+   */
+  fullscreenButtonLabel?: string;
+};
+
+function DataTableInner<T extends Record<string, unknown>>({
   data,
   columns: columnsInput,
   emptyMessage: _emptyMessage = "No data",
@@ -230,8 +266,11 @@ export function DataTable<T extends Record<string, unknown>>({
   persistDensity = true,
   densityStorageKey,
   showDensityControl,
+  themeMenuValue,
+  onThemeChange,
+  showThemeControl = false,
   showHeaderFilters = true,
-}: DataTableProps<T>) {
+}: DataTableInnerProps<T>) {
   const columns = useMemo<DataTableColumn<T>[]>(
     () =>
       columnsInput.map((column) =>
@@ -397,7 +436,8 @@ export function DataTable<T extends Record<string, unknown>>({
 
   const showColumnVisibilityControl = hideableColumns && hideableColumnCount > 1;
   const resolvedShowDensityControl = showDensityControl ?? showColumnVisibilityControl;
-  const showTablePreferencesControl = showColumnVisibilityControl || resolvedShowDensityControl;
+  const showTablePreferencesControl =
+    showColumnVisibilityControl || resolvedShowDensityControl || showThemeControl;
   const densityOverride = densityControlled ? density : localDensityOverride;
 
   // For each kind:"tags" column, expose a TagActions value backed by this
@@ -797,229 +837,234 @@ export function DataTable<T extends Record<string, unknown>>({
   };
 
   return (
-    <div className={cn("flex min-h-0 flex-col gap-3", className)} data-density={densityOverride}>
-      {showFilterBar && (
-        <FilterBar
-          {...filterBarProps}
-          {...(autoFilter && showGlobalFilter
-            ? {
-                search: {
-                  value: effectiveGlobalFilter,
-                  onChange: setEffectiveGlobalFilter,
-                  placeholder: globalFilterPlaceholder,
-                },
-              }
-            : {})}
-          {...(autoTimeRange ? { timeRange: autoTimeRange } : {})}
-          trailing={filterBarTrailing}
-          filters={nativeFilters}
-        />
-      )}
+    <DensityValueProvider density={densityOverride ?? "comfortable"}>
+      <div className={cn("flex min-h-0 flex-col gap-3", className)} data-density={densityOverride}>
+        {showFilterBar && (
+          <FilterBar
+            {...filterBarProps}
+            {...(autoFilter && showGlobalFilter
+              ? {
+                  search: {
+                    value: effectiveGlobalFilter,
+                    onChange: setEffectiveGlobalFilter,
+                    placeholder: globalFilterPlaceholder,
+                  },
+                }
+              : {})}
+            {...(autoTimeRange ? { timeRange: autoTimeRange } : {})}
+            trailing={filterBarTrailing}
+            filters={nativeFilters}
+          />
+        )}
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
-        <table className="w-max table-auto text-left text-sm">
-          <colgroup>
-            {visibleColumns.map((column) => (
-              <col
-                key={column.key}
-                style={columnStyle(column, columnWidths)}
-                className={column.shrink && !column.grow ? "w-px" : undefined}
-              />
-            ))}
-          </colgroup>
-          <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
-            <tr className="border-b border-border text-xs text-muted-foreground">
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
+          <table className="w-max table-auto text-left text-sm">
+            <colgroup>
               {visibleColumns.map((column) => (
-                <th
+                <col
                   key={column.key}
-                  className={cn(
-                    "group/header relative whitespace-nowrap font-medium",
-                    DATA_TABLE_HEADER_DENSITY_CLASS,
-                    alignmentClass(column.align),
-                    resizableColumns && column.resizable !== false && "select-none",
-                    column.headerClassName,
-                  )}
-                  onContextMenu={(event) => openHeaderColumnMenu(event, column)}
-                >
-                  <div
-                    className={cn(
-                      "flex min-w-0 items-center gap-1",
-                      headerAlignmentClass(column.align),
-                      resizableColumns && column.resizable !== false && "pr-2",
-                    )}
-                  >
-                    <span className="min-w-0">
-                      {column.sortable === false ? (
-                        <span>{column.label}</span>
-                      ) : (
-                        <SortableHeader
-                          active={sort?.key === column.key}
-                          {...(sort?.key === column.key ? { dir: sort.dir } : {})}
-                          {...(column.align ? { align: column.align } : {})}
-                          onClick={() => toggle(column.key)}
-                        >
-                          {column.label}
-                        </SortableHeader>
-                      )}
-                    </span>
-                    {showHeaderFilterControls &&
-                      (nativeFilterByColumn.has(column.key) ||
-                        (autoTimeRange && timeRangeColumn?.key === column.key)) && (
-                        <HeaderFilterButton
-                          column={column}
-                          active={
-                            nativeFilterByColumn.has(column.key)
-                              ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
-                              : Boolean(timeRangeFilter.from || timeRangeFilter.to)
-                          }
-                          onOpen={(event) => openHeaderFilterMenu(event, column.key)}
-                        />
-                      )}
-                  </div>
-                  {resizableColumns && column.resizable !== false && (
-                    <span
-                      role="separator"
-                      aria-label={`Resize ${labelText(column)} column`}
-                      aria-orientation="vertical"
-                      className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      onDoubleClick={(event) => autoFitColumn(event, column)}
-                      onMouseDown={(event) => startColumnResize(event, column)}
-                    >
-                      <span
-                        aria-hidden
-                        className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
-                      />
-                    </span>
-                  )}
-                </th>
+                  style={columnStyle(column, columnWidths)}
+                  className={column.shrink && !column.grow ? "w-px" : undefined}
+                />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((record) => {
-              const href = getRowHref?.(record.row);
-              const expanded = expandedRows[record.id] ?? false;
-              const expandedContent =
-                renderExpandedRow?.(record.row, {
-                  columns: effectiveColumns,
-                  visibleColumns,
-                  tagActionsByColumn,
-                }) ?? null;
-              const expandable = expandedContent !== null;
-              const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
-              const clickable = !!href || rowClickEnabled || expandable;
-
-              return (
-                <Fragment key={record.id}>
-                  <tr
+            </colgroup>
+            <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                {visibleColumns.map((column) => (
+                  <th
+                    key={column.key}
                     className={cn(
-                      "border-b border-border/60 align-top",
-                      clickable && "cursor-pointer hover:bg-accent/40",
+                      "group/header relative whitespace-nowrap font-medium",
+                      DATA_TABLE_HEADER_DENSITY_CLASS,
+                      alignmentClass(column.align),
+                      resizableColumns && column.resizable !== false && "select-none",
+                      column.headerClassName,
                     )}
-                    onClick={() => {
-                      if (expandable) {
-                        setExpandedRows((current) => ({
-                          ...current,
-                          [record.id]: !current[record.id],
-                        }));
-                      }
-                      if (rowClickEnabled) {
-                        onRowClick?.(record.row);
-                      }
-                    }}
+                    onContextMenu={(event) => openHeaderColumnMenu(event, column)}
                   >
-                    {visibleColumns.map((column, index) => {
-                      const rawValue = resolvePath(record.row, column.key);
-                      let content: ReactNode = column.render
-                        ? column.render(rawValue, record.row)
-                        : formatCell(rawValue);
-
-                      // Tag cells get the + / − filter affordance via
-                      // context; copy-to-clipboard works without it too.
-                      if (column.kind === "tags" && tagActionsByColumn[column.key]) {
-                        content = (
-                          <TagActionsProvider value={tagActionsByColumn[column.key]!}>
-                            {content}
-                          </TagActionsProvider>
-                        );
-                      }
-
-                      return (
-                        <td
-                          key={column.key}
-                          className={cn(
-                            DATA_TABLE_CELL_DENSITY_CLASS,
-                            alignmentClass(column.align),
-                            column.cellClassName,
-                          )}
-                        >
-                          <CellContent
-                            column={column}
-                            {...(columnWidths[column.key] !== undefined
-                              ? { width: columnWidths[column.key] }
-                              : {})}
+                    <div
+                      className={cn(
+                        "flex min-w-0 items-center gap-1",
+                        headerAlignmentClass(column.align),
+                        resizableColumns && column.resizable !== false && "pr-2",
+                      )}
+                    >
+                      <span className="min-w-0">
+                        {column.sortable === false ? (
+                          <span>{column.label}</span>
+                        ) : (
+                          <SortableHeader
+                            active={sort?.key === column.key}
+                            {...(sort?.key === column.key ? { dir: sort.dir } : {})}
+                            {...(column.align ? { align: column.align } : {})}
+                            onClick={() => toggle(column.key)}
                           >
-                            {href && index === 0 ? (
-                              <a href={href} className="hover:underline">
-                                {content}
-                              </a>
-                            ) : (
-                              content
-                            )}
-                          </CellContent>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {expanded && expandedContent && (
-                    <tr>
-                      <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
-                        <div className="rounded-md border border-border bg-background p-density-3">
-                          {expandedContent}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                            {column.label}
+                          </SortableHeader>
+                        )}
+                      </span>
+                      {showHeaderFilterControls &&
+                        (nativeFilterByColumn.has(column.key) ||
+                          (autoTimeRange && timeRangeColumn?.key === column.key)) && (
+                          <HeaderFilterButton
+                            column={column}
+                            active={
+                              nativeFilterByColumn.has(column.key)
+                                ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
+                                : Boolean(timeRangeFilter.from || timeRangeFilter.to)
+                            }
+                            onOpen={(event) => openHeaderFilterMenu(event, column.key)}
+                          />
+                        )}
+                    </div>
+                    {resizableColumns && column.resizable !== false && (
+                      <span
+                        role="separator"
+                        aria-label={`Resize ${labelText(column)} column`}
+                        aria-orientation="vertical"
+                        className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onDoubleClick={(event) => autoFitColumn(event, column)}
+                        onMouseDown={(event) => startColumnResize(event, column)}
+                      >
+                        <span
+                          aria-hidden
+                          className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
+                        />
+                      </span>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((record) => {
+                const href = getRowHref?.(record.row);
+                const expanded = expandedRows[record.id] ?? false;
+                const expandedContent =
+                  renderExpandedRow?.(record.row, {
+                    columns: effectiveColumns,
+                    visibleColumns,
+                    tagActionsByColumn,
+                  }) ?? null;
+                const expandable = expandedContent !== null;
+                const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
+                const clickable = !!href || rowClickEnabled || expandable;
 
-      <div className="px-1 text-xs text-muted-foreground">
-        {sorted.length} of {data.length} row{data.length === 1 ? "" : "s"}
+                return (
+                  <Fragment key={record.id}>
+                    <tr
+                      className={cn(
+                        "border-b border-border/60 align-top",
+                        clickable && "cursor-pointer hover:bg-accent/40",
+                      )}
+                      onClick={() => {
+                        if (expandable) {
+                          setExpandedRows((current) => ({
+                            ...current,
+                            [record.id]: !current[record.id],
+                          }));
+                        }
+                        if (rowClickEnabled) {
+                          onRowClick?.(record.row);
+                        }
+                      }}
+                    >
+                      {visibleColumns.map((column, index) => {
+                        const rawValue = resolvePath(record.row, column.key);
+                        let content: ReactNode = column.render
+                          ? column.render(rawValue, record.row)
+                          : formatCell(rawValue);
+
+                        // Tag cells get the + / − filter affordance via
+                        // context; copy-to-clipboard works without it too.
+                        if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                          content = (
+                            <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                              {content}
+                            </TagActionsProvider>
+                          );
+                        }
+
+                        return (
+                          <td
+                            key={column.key}
+                            className={cn(
+                              DATA_TABLE_CELL_DENSITY_CLASS,
+                              alignmentClass(column.align),
+                              column.cellClassName,
+                            )}
+                          >
+                            <CellContent
+                              column={column}
+                              {...(columnWidths[column.key] !== undefined
+                                ? { width: columnWidths[column.key] }
+                                : {})}
+                            >
+                              {href && index === 0 ? (
+                                <a href={href} className="hover:underline">
+                                  {content}
+                                </a>
+                              ) : (
+                                content
+                              )}
+                            </CellContent>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {expanded && expandedContent && (
+                      <tr>
+                        <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
+                          <div className="rounded-md border border-border bg-background p-density-3">
+                            {expandedContent}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-1 text-xs text-muted-foreground">
+          {sorted.length} of {data.length} row{data.length === 1 ? "" : "s"}
+        </div>
+        {columnMenu && showTablePreferencesControl && (
+          <ColumnVisibilityMenu
+            columns={effectiveColumns}
+            hiddenColumns={hiddenColumns}
+            anchor={columnMenu}
+            showColumnVisibilityControl={showColumnVisibilityControl}
+            showDensityControl={resolvedShowDensityControl}
+            showThemeControl={showThemeControl}
+            themeMenuValue={themeMenuValue}
+            densityOverride={densityOverride}
+            visibleHideableColumnCount={visibleHideableColumnCount}
+            onToggle={toggleColumnVisibility}
+            onShowAll={showAllColumns}
+            onDensityChange={setDensityOverride}
+            {...(onThemeChange ? { onThemeChange } : {})}
+            onClose={() => setColumnMenu(null)}
+          />
+        )}
+        {headerFilterMenu && (
+          <HeaderFilterMenu
+            filter={nativeFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
+            {...(autoTimeRange && timeRangeColumn?.key === headerFilterMenu.columnKey
+              ? { timeRange: autoTimeRange }
+              : {})}
+            anchor={headerFilterMenu}
+            onClose={() => setHeaderFilterMenu(null)}
+          />
+        )}
       </div>
-      {columnMenu && showTablePreferencesControl && (
-        <ColumnVisibilityMenu
-          columns={effectiveColumns}
-          hiddenColumns={hiddenColumns}
-          anchor={columnMenu}
-          showColumnVisibilityControl={showColumnVisibilityControl}
-          showDensityControl={resolvedShowDensityControl}
-          densityOverride={densityOverride}
-          visibleHideableColumnCount={visibleHideableColumnCount}
-          onToggle={toggleColumnVisibility}
-          onShowAll={showAllColumns}
-          onDensityChange={setDensityOverride}
-          onClose={() => setColumnMenu(null)}
-        />
-      )}
-      {headerFilterMenu && (
-        <HeaderFilterMenu
-          filter={nativeFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
-          {...(autoTimeRange && timeRangeColumn?.key === headerFilterMenu.columnKey
-            ? { timeRange: autoTimeRange }
-            : {})}
-          anchor={headerFilterMenu}
-          onClose={() => setHeaderFilterMenu(null)}
-        />
-      )}
-    </div>
+    </DensityValueProvider>
   );
 }
 
@@ -1152,7 +1197,7 @@ function ColumnVisibilityTrigger({
       type="button"
       aria-label="Open column menu"
       aria-haspopup="menu"
-      className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={(event) => {
         event.stopPropagation();
         onOpen(event);
@@ -1169,11 +1214,14 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
   anchor,
   showColumnVisibilityControl,
   showDensityControl,
+  showThemeControl,
+  themeMenuValue,
   densityOverride,
   visibleHideableColumnCount,
   onToggle,
   onShowAll,
   onDensityChange,
+  onThemeChange,
   onClose,
 }: {
   columns: DataTableColumn<T>[];
@@ -1181,11 +1229,14 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
   anchor: ColumnMenuState;
   showColumnVisibilityControl: boolean;
   showDensityControl: boolean;
+  showThemeControl: boolean;
+  themeMenuValue: Theme | undefined;
   densityOverride: Density | undefined;
   visibleHideableColumnCount: number;
   onToggle: (column: DataTableColumn<T>) => void;
   onShowAll: () => void;
   onDensityChange: (density: Density | undefined) => void;
+  onThemeChange?: (theme: Theme) => void;
   onClose: () => void;
 }) {
   const activeColumn = anchor.columnKey
@@ -1274,6 +1325,14 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
           onDensityChange={onDensityChange}
         />
       )}
+
+      {showThemeControl && onThemeChange && (
+        <ThemeMenuSection
+          value={themeMenuValue ?? "system"}
+          separated={showColumnVisibilityControl || showDensityControl}
+          onChange={onThemeChange}
+        />
+      )}
     </div>
   );
 }
@@ -1336,6 +1395,49 @@ function densityMenuItemClassName(active: boolean) {
   return cn(
     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
     active && "text-foreground",
+  );
+}
+
+const THEME_MENU_OPTIONS: Array<{ value: Theme; icon: string; label: string }> = [
+  { value: "system", icon: "ph:desktop", label: "Use system theme" },
+  { value: "light", icon: "ph:sun", label: "Light" },
+  { value: "dark", icon: "ph:moon", label: "Dark" },
+];
+
+function ThemeMenuSection({
+  value,
+  separated,
+  onChange,
+}: {
+  value: Theme;
+  separated: boolean;
+  onChange: (theme: Theme) => void;
+}) {
+  return (
+    <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
+      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Theme</div>
+      {THEME_MENU_OPTIONS.map((option) => {
+        const active = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="menuitemradio"
+            aria-checked={active}
+            className={densityMenuItemClassName(active)}
+            onClick={() => onChange(option.value)}
+          >
+            <Icon name={option.icon} className="text-sm text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            {active ? (
+              <Icon name="ph:check" className="text-sm text-foreground" />
+            ) : (
+              <span className="inline-block h-4 w-4" aria-hidden />
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2006,4 +2108,93 @@ export function inferColumns<T extends Record<string, unknown>>(data: T[]): Data
     sortable: true,
     filterable: true,
   }));
+}
+
+export function DataTable<T extends Record<string, unknown>>({
+  theme: themeProp = "system",
+  onThemeChange,
+  showThemeControl = false,
+  showFullscreenControl = false,
+  fullscreenTitle = "Table",
+  fullscreenButtonLabel = "Open table full screen",
+  className,
+  filterBarProps,
+  ...inner
+}: DataTableProps<T>) {
+  const themeControlled = onThemeChange !== undefined;
+  const [internalTheme, setInternalTheme] = useState<Theme>(themeProp);
+  const themeValue = themeControlled ? themeProp : internalTheme;
+  const resolvedTheme = useResolvedTheme(themeValue);
+  const handleThemeChange = (next: Theme) => {
+    if (!themeControlled) setInternalTheme(next);
+    onThemeChange?.(next);
+  };
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+
+  const renderTable = ({ inFullscreen }: { inFullscreen: boolean }) => {
+    const showFullscreenButton = showFullscreenControl && !inFullscreen;
+    const callerTrailing = filterBarProps?.trailing;
+    const mergedFilterBarProps = showFullscreenButton
+      ? {
+          ...filterBarProps,
+          trailing: (
+            <>
+              {callerTrailing}
+              <FullscreenButton
+                label={fullscreenButtonLabel}
+                onClick={() => setFullscreenOpen(true)}
+              />
+            </>
+          ),
+        }
+      : filterBarProps;
+    return (
+      <DataTableInner
+        {...(inner as DataTableInnerProps<T>)}
+        {...(mergedFilterBarProps ? { filterBarProps: mergedFilterBarProps } : {})}
+        themeMenuValue={themeValue}
+        showThemeControl={showThemeControl}
+        onThemeChange={handleThemeChange}
+      />
+    );
+  };
+
+  return (
+    <div
+      data-theme={resolvedTheme}
+      className={cn("flex min-h-0 flex-col text-foreground", className)}
+    >
+      {renderTable({ inFullscreen: false })}
+      {showFullscreenControl && (
+        <Modal
+          open={fullscreenOpen}
+          onClose={() => setFullscreenOpen(false)}
+          title={fullscreenTitle}
+          size="full"
+          className="h-[95vh]"
+        >
+          <div
+            data-theme={resolvedTheme}
+            className="flex h-full min-h-0 flex-col bg-background text-foreground"
+          >
+            {renderTable({ inFullscreen: true })}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function FullscreenButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      onClick={onClick}
+    >
+      <Icon name="codicon:screen-full" className="text-sm" />
+    </button>
+  );
 }

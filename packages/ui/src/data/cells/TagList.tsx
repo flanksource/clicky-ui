@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useMemo } from "react";
 import { Badge } from "../Badge";
 import { HoverCard } from "../../overlay/HoverCard";
 import { Icon } from "../Icon";
+import { Properties, type PropertiesItem } from "../Properties";
+import { useDensityValue } from "../../hooks/use-density";
 import { cn } from "../../lib/utils";
 import type { FilterMode } from "../FilterPill";
 
@@ -151,6 +153,14 @@ export type TagListProps = {
   maxVisible?: number;
   className?: string;
   actions?: "hover" | "inline";
+  /**
+   * When `true`, visible tag badges render only their value — the key is
+   * dropped from the inline display. The full `key=value` text is still
+   * available in `tag.display` (used for tooltips, copy actions, and the
+   * overflow `+N` popover). Defaults to whether the surrounding density
+   * (via {@link useDensityValue}) is `"compact"`.
+   */
+  compact?: boolean;
 };
 
 function copyToClipboard(text: string) {
@@ -162,9 +172,11 @@ function copyToClipboard(text: string) {
 function TagBadge({
   tag,
   actions: actionMode,
+  compact = false,
 }: {
   tag: NormalizedTag;
   actions: "hover" | "inline";
+  compact?: boolean;
 }) {
   const actions = useTagActions();
   const mode = actions.getMode(tag.token);
@@ -195,8 +207,10 @@ function TagBadge({
   const includeActive = mode === "include";
   const excludeActive = mode === "exclude";
 
+  const showTooltip = compact && !!tag.key;
   const badge = (
     <span
+      {...(showTooltip ? { title: tag.display } : {})}
       className={cn(
         "inline-flex items-center rounded-md border bg-background align-middle",
         includeActive
@@ -206,7 +220,7 @@ function TagBadge({
             : "border-border",
       )}
     >
-      {tag.key ? (
+      {tag.key && !compact ? (
         <Badge
           size="xs"
           variant="label"
@@ -302,7 +316,16 @@ function TagActionButton({
   );
 }
 
-export function TagList({ tags, maxVisible = 3, className, actions = "hover" }: TagListProps) {
+export function TagList({
+  tags,
+  maxVisible = 3,
+  className,
+  actions = "hover",
+  compact,
+}: TagListProps) {
+  const density = useDensityValue();
+  const isCompact = compact ?? density === "compact";
+
   if (tags.length === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
@@ -311,28 +334,86 @@ export function TagList({ tags, maxVisible = 3, className, actions = "hover" }: 
   const overflow = tags.slice(maxVisible);
 
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-1", className)}>
-      {visible.map((tag, index) => (
-        <TagBadge key={`${tag.display}-${index}`} tag={tag} actions={actions} />
-      ))}
+    <span className={cn("flex min-w-0 items-center gap-1", className)}>
+      <span className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-hidden">
+        {visible.map((tag, index) => (
+          <TagBadge
+            key={`${tag.display}-${index}`}
+            tag={tag}
+            actions={actions}
+            compact={isCompact}
+          />
+        ))}
+      </span>
       {overflow.length > 0 && (
         <HoverCard
           placement="top"
           trigger={
-            <Badge size="xs" variant="outlined" tone="neutral" clickToCopy={false}>
+            <Badge
+              size="xs"
+              variant="outlined"
+              tone="neutral"
+              clickToCopy={false}
+              className="shrink-0"
+            >
               +{overflow.length}
             </Badge>
           }
-          cardClassName="max-w-xs whitespace-normal"
+          cardClassName="min-w-72 max-w-[90vw] whitespace-normal !p-0"
         >
-          <div className="flex flex-wrap gap-1">
-            {overflow.map((tag, index) => (
-              <TagBadge key={`${tag.display}-${index}`} tag={tag} actions={actions} />
-            ))}
-          </div>
+          <TagPropertiesList tags={overflow} />
         </HoverCard>
       )}
     </span>
+  );
+}
+
+function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
+  const tagActions = useTagActions();
+  const items = useMemo<PropertiesItem<NormalizedTag>[]>(
+    () => tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
+    [tags],
+  );
+
+  return (
+    <Properties<NormalizedTag>
+      items={items}
+      density="compact"
+      className="border-0 bg-transparent"
+      rowClassName="grid-cols-[minmax(4rem,8rem)_minmax(0,1fr)]"
+      renderLabel={(_key, tag) =>
+        tag.key ? (
+          <span className="font-mono">{tag.key}</span>
+        ) : (
+          <span className="italic text-muted-foreground">tag</span>
+        )
+      }
+      renderValue={(_key, tag) => (
+        <span className="block truncate font-mono" title={tag.value}>
+          {tag.value}
+        </span>
+      )}
+      suffixActions={[
+        {
+          id: "include",
+          icon: "lucide:zoom-in",
+          label: (_key, tag) => `Include ${tag.display}`,
+          onClick: (_key, tag) => tagActions.toggleInclude(tag.token),
+        },
+        {
+          id: "exclude",
+          icon: "lucide:zoom-out",
+          label: (_key, tag) => `Exclude ${tag.display}`,
+          onClick: (_key, tag) => tagActions.toggleExclude(tag.token),
+        },
+        {
+          id: "copy",
+          icon: "lucide:copy",
+          label: (_key, tag) => `Copy ${tag.display}`,
+          onClick: (_key, tag) => copyToClipboard(tag.value),
+        },
+      ]}
+    />
   );
 }
 
