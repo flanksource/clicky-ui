@@ -259,13 +259,25 @@ export function FilterBar({
   );
   const [visibleFilterCount, setVisibleFilterCount] = useState(allFilters.length);
 
+  // Latest-value refs so measureOverflow can be a stable useCallback. Reading
+  // the current values through refs sidesteps the closure-staleness problem
+  // without putting array references in the dep list — which is what caused
+  // the "Maximum update depth exceeded" cascade (allFilters in the deps made
+  // measureOverflow change on every render → ResizeObserver effect re-ran →
+  // setVisibleFilterCount fired → repeat).
+  const allFiltersRef = useRef(allFilters);
+  const responsiveOverflowRef = useRef(responsiveOverflow);
+  allFiltersRef.current = allFilters;
+  responsiveOverflowRef.current = responsiveOverflow;
+
   useLayoutEffect(() => {
-    setVisibleFilterCount(allFilters.length);
-  }, [allFilters.length, filterKeys]);
+    setVisibleFilterCount(allFiltersRef.current.length);
+  }, [filterKeys]);
 
   const measureOverflow = useCallback(() => {
-    if (!responsiveOverflow) {
-      setVisibleFilterCount(allFilters.length);
+    const current = allFiltersRef.current;
+    if (!responsiveOverflowRef.current) {
+      setVisibleFilterCount(current.length);
       return;
     }
 
@@ -275,7 +287,7 @@ export function FilterBar({
     const availableWidth = Math.floor(filterList.getBoundingClientRect().width);
     if (availableWidth <= 0) return;
 
-    const widths = allFilters.map((filter) => {
+    const widths = current.map((filter) => {
       const node = filterNodeRefs.current.get(filter.key);
       const measured = node?.getBoundingClientRect().width ?? 0;
       if (measured > 0) {
@@ -294,13 +306,13 @@ export function FilterBar({
     const allFiltersWidth = sumFilterWidths(widths);
     const nextVisible =
       allFiltersWidth <= availableWidth
-        ? allFilters.length
+        ? current.length
         : calculateVisibleFilterCount(
             widths,
             Math.max(0, availableWidth - triggerWidth - triggerGap),
           );
-    setVisibleFilterCount((current) => (current === nextVisible ? current : nextVisible));
-  }, [allFilters, responsiveOverflow]);
+    setVisibleFilterCount((prev) => (prev === nextVisible ? prev : nextVisible));
+  }, []);
 
   useLayoutEffect(() => {
     measureOverflow();
