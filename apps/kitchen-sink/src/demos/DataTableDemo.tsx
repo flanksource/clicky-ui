@@ -258,6 +258,19 @@ export function DataTableDemo() {
       </div>
 
       <div className="space-y-density-2 border-t border-border pt-density-3">
+        <h3 className="text-sm font-medium">Initial execution-results load</h3>
+        <DataTable
+          data={[]}
+          columns={wideColumns}
+          loading
+          loadingMessage="Loading execution results..."
+          loadingRowCount={8}
+          showGlobalFilter={false}
+          columnResizeStorageKey="clicky-ui-kitchen-data-table-loading"
+        />
+      </div>
+
+      <div className="space-y-density-2 border-t border-border pt-density-3">
         <h3 className="text-sm font-medium">Everything fits</h3>
         <DataTable
           data={fitRows}

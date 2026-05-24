@@ -54,6 +54,32 @@ const columns: DataTableColumn<ServiceRow>[] = [
   },
 ];
 
+function rect(width: number): DOMRect {
+  return {
+    width,
+    height: 32,
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: 32,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
+function mockFilterBarWidths(listWidth: number, itemWidth = 112) {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+    if (this instanceof HTMLElement) {
+      if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth);
+      if (this.hasAttribute("data-filter-bar-item")) return rect(itemWidth);
+      if (this.getAttribute("aria-label") === "More filters") return rect(44);
+    }
+    return original.call(this);
+  });
+}
+
 describe("DataTable", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -116,6 +142,24 @@ describe("DataTable", () => {
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
   });
 
+  it("renders an initial loading state inside the table shell", () => {
+    render(
+      <DataTable
+        data={[]}
+        columns={columns}
+        loading
+        loadingMessage="Loading execution results..."
+        loadingRowCount={3}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /service/i })).toBeInTheDocument();
+    expect(screen.getAllByText("Loading execution results...")).toHaveLength(2);
+    expect(screen.getByRole("table").parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("row")).toHaveLength(5);
+  });
+
   it("generates multi-select and text filters automatically", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
@@ -162,6 +206,18 @@ describe("DataTable", () => {
     expect(screen.queryByText("cron")).not.toBeInTheDocument();
     expect(screen.getByText("worker")).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it("uses responsive overflow for generated filter-bar filters", async () => {
+    const measurement = mockFilterBarWidths(260);
+    render(<DataTable data={rows} columns={columns} autoFilter />);
+
+    expect(await screen.findByRole("button", { name: /more filters/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    expect(screen.getByRole("dialog", { name: /overflow filters/i })).toBeInTheDocument();
+
+    measurement.mockRestore();
   });
 
   it("exposes generated filters from column headers", () => {

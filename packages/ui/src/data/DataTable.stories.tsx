@@ -288,6 +288,20 @@ function LotsOfColumnsShowcase() {
   );
 }
 
+function LoadingShowcase() {
+  return (
+    <DataTable
+      data={[]}
+      columns={wideColumns}
+      loading
+      loadingMessage="Loading execution results…"
+      loadingRowCount={8}
+      showGlobalFilter={false}
+      columnResizeStorageKey="clicky-ui-story-data-table-loading"
+    />
+  );
+}
+
 type LogRow = {
   ts: string;
   level: string;
@@ -445,6 +459,10 @@ export const Default: Story = {};
 
 export const FewColumns: Story = {
   render: () => <FewColumnsShowcase />,
+};
+
+export const InitialLoading: Story = {
+  render: () => <LoadingShowcase />,
 };
 
 export const EverythingFits: Story = {

@@ -1,6 +1,41 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
-import { FilterBar } from "./FilterBar";
+import { FilterBar, type FilterBarFilter } from "./FilterBar";
+
+function rect(width: number): DOMRect {
+  return {
+    width,
+    height: 32,
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: 32,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
+function mockFilterBarWidths({
+  listWidth,
+  itemWidths,
+  triggerWidth = 44,
+}: {
+  listWidth: () => number;
+  itemWidths: Record<string, number>;
+  triggerWidth?: number;
+}) {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+    if (this instanceof HTMLElement) {
+      if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth());
+      const itemKey = this.getAttribute("data-filter-bar-item");
+      if (itemKey) return rect(itemWidths[itemKey] ?? 120);
+      if (this.getAttribute("aria-label") === "More filters") return rect(triggerWidth);
+    }
+    return original.call(this);
+  });
+}
 
 describe("FilterBar", () => {
   it("renders native search, filters, and range controls", () => {
@@ -417,5 +452,194 @@ describe("FilterBar", () => {
     expect(onChange).toHaveBeenCalledWith({ "env=prod": "include" });
 
     vi.useRealTimers();
+  });
+
+  it("moves only overflowing filters behind the filter menu and restores them when space returns", async () => {
+    let width = 260;
+    const measurement = mockFilterBarWidths({
+      listWidth: () => width,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        service: 100,
+        status: 100,
+        region: 100,
+      },
+    });
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            onChange: vi.fn(),
+            options: [
+              { value: "healthy", label: "Healthy" },
+              { value: "degraded", label: "Degraded" },
+            ],
+          },
+          { key: "region", kind: "text", label: "Region", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    await screen.findByRole("button", { name: /more filters/i });
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByLabelText("Service")).toBeInTheDocument();
+    expect(screen.getByLabelText("Region")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Overflow filter")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^apply$/i })).toBeInTheDocument();
+    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(3);
+    for (const row of Array.from(dialog.querySelectorAll("[data-overflow-filter-row]"))) {
+      expect(row).toHaveClass("h-12");
+    }
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /status filter/i }));
+    expect(within(dialog).getByText("Healthy")).toBeInTheDocument();
+
+    width = 700;
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Service")).toBeInTheDocument();
+    expect(screen.getByLabelText("Region")).toBeInTheDocument();
+
+    measurement.mockRestore();
+  });
+
+  it("keeps all filters inline when the measured row has enough space", () => {
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 500,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        service: 100,
+        region: 100,
+      },
+    });
+
+    render(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
+          { key: "region", kind: "text", label: "Region", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+    expect(screen.getByLabelText("Service")).toBeInTheDocument();
+    expect(screen.getByLabelText("Region")).toBeInTheDocument();
+
+    measurement.mockRestore();
+  });
+
+  it("applies edits from overflowed filters using the bar autoSubmit mode", async () => {
+    const onService = vi.fn();
+    const onApply = vi.fn();
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 220,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        service: 100,
+      },
+    });
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        onApply={onApply}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "", onChange: onService },
+        ]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
+    expect(onService).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByRole("button", {
+        name: /^apply$/i,
+      }),
+    );
+
+    expect(onService).toHaveBeenCalledWith("api");
+    expect(onApply).toHaveBeenCalledTimes(1);
+    measurement.mockRestore();
+  });
+
+  it("cancels staged overflow edits when the popover is closed", async () => {
+    const onService = vi.fn();
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 220,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        service: 100,
+      },
+    });
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "", onChange: onService },
+        ]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByRole("button", {
+        name: /^close$/i,
+      }),
+    );
+
+    expect(onService).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    expect(screen.getByLabelText("Service")).toHaveValue("");
+
+    measurement.mockRestore();
+  });
+
+  it("keeps wrap mode available for legacy multi-row layouts", () => {
+    const filters: FilterBarFilter[] = [
+      { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+      { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+    ];
+
+    render(<FilterBar overflowMode="wrap" filters={filters} />);
+
+    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
   });
 });

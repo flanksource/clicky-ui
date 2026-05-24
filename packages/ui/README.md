@@ -47,19 +47,9 @@ export function ClickyPanel() {
 
 `Clicky` also accepts a JSON string payload. The intended producer is the sibling `clicky` repo's tagged `html-react` AST, which preserves structural types such as trees, tables, code blocks, collapsed sections, buttons, and nested text content.
 
-## API Explorer
+## Operation explorer
 
-`ApiExplorer` and `EntityExplorerApp` are exposed via a separate subpath and lazy-load `@scalar/api-reference-react`, so the main bundle and the initial API explorer chunk stay free of Scalar:
-
-```tsx
-import { ApiExplorer } from "@flanksource/clicky-ui/api-explorer";
-
-export function Docs() {
-  return <ApiExplorer openApiUrl="/api/openapi.json" />;
-}
-```
-
-`@scalar/api-reference-react` is a regular dependency of `@flanksource/clicky-ui`, so consumers don't need to add it to their own `package.json`. Consumers who never render this subpath avoid its runtime bundle cost, but still get it as an installed transitive dependency.
+`OperationCatalog` and `EntityExplorerApp` (both exported from `@flanksource/clicky-ui/rpc`) render an OpenAPI spec — fetched via an `OperationsApiClient` — as a navigable list of operations grouped by entity surface. They expect the spec to declare `x-clicky` surface metadata for the surfaces they should expose. See `apps/kitchen-sink/src/demos/OperationExplorerDemo.tsx` for a fake-client example.
 
 ## Bundle size guidance
 
@@ -71,7 +61,7 @@ import { cn } from "@flanksource/clicky-ui/utils";
 import { DataTable } from "@flanksource/clicky-ui/data";
 ```
 
-The root `@flanksource/clicky-ui` barrel remains supported for compatibility and convenience, but subpaths give bundlers a smaller entry surface. Import `@flanksource/clicky-ui/styles.css` once at the app root. Markdown parsing, code highlighting, and the Scalar API explorer are loaded asynchronously by their components.
+The root `@flanksource/clicky-ui` barrel remains supported for compatibility and convenience, but subpaths give bundlers a smaller entry surface. Import `@flanksource/clicky-ui/styles.css` once at the app root. Markdown parsing and code highlighting are loaded asynchronously by their components.
 
 ## Tailwind preset
 

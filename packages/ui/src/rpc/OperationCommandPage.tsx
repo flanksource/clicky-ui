@@ -13,6 +13,7 @@ import { AcceptPicker, type OperationPreviewMode } from "./AcceptPicker";
 import { CommandForm, pathParamNames, submitValue } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
 import type { RenderLink } from "./EndpointList";
+import { ExecutionResult } from "./ExecutionResult";
 import {
   buildInitialParameterValues,
   packParameterValues,
@@ -308,6 +309,8 @@ export function OperationCommandPage({
 
       {error ? (
         <InlineError title={`Failed to load ${path} as ${accept}`} error={error} />
+      ) : isExecuting && !result ? (
+        <ExecutionResult loading loadingMessage="Loading execution results…" className="mt-0" />
       ) : result ? (
         <div role="region" aria-label="Response body">
           <CommandOutput

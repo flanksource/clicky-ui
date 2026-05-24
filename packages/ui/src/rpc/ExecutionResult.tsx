@@ -8,12 +8,29 @@ import {
   type ClickyTableRowClick,
   type ClickyTableRowPredicate,
 } from "../data/Clicky";
+import { DataTable, type DataTableColumn } from "../data/DataTable";
 import { cn } from "../lib/utils";
 import { parseJsonBody } from "./classify";
 import type { ExecutionResponse } from "./types";
 
+type LoadingResultRow = {
+  result: string;
+  status: string;
+  updated: string;
+  details: string;
+};
+
+const LOADING_RESULT_COLUMNS: DataTableColumn<LoadingResultRow>[] = [
+  { key: "result", label: "Result", grow: true },
+  { key: "status", label: "Status", shrink: true },
+  { key: "updated", label: "Updated", shrink: true },
+  { key: "details", label: "Details", grow: true },
+];
+
 export type ExecutionResultProps = {
   response?: ExecutionResponse | null;
+  loading?: boolean;
+  loadingMessage?: string;
   emptyMessage?: string;
   ariaLabel?: string;
   className?: string;
@@ -25,6 +42,8 @@ export type ExecutionResultProps = {
 
 export function ExecutionResult({
   response,
+  loading = false,
+  loadingMessage = "Loading execution results…",
   emptyMessage = "No response yet.",
   ariaLabel = "Response body",
   className,
@@ -33,6 +52,27 @@ export function ExecutionResult({
   getTableRowHref,
   isTableRowClickable,
 }: ExecutionResultProps) {
+  if (loading) {
+    return (
+      <div role="region" aria-label={ariaLabel} className={cn("mt-3", className)}>
+        <DataTable<LoadingResultRow>
+          data={[]}
+          columns={LOADING_RESULT_COLUMNS}
+          loading
+          loadingMessage={loadingMessage}
+          loadingRowCount={8}
+          showGlobalFilter={false}
+          showDensityControl={false}
+          hideableColumns={false}
+          resizableColumns={false}
+          persistColumnWidths={false}
+          persistColumnVisibility={false}
+          persistDensity={false}
+        />
+      </div>
+    );
+  }
+
   if (!response) {
     return <p className={cn("mt-3 text-sm text-muted-foreground", className)}>{emptyMessage}</p>;
   }

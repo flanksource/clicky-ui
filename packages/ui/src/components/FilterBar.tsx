@@ -1,7 +1,9 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -19,6 +21,8 @@ import { RangeSlider } from "./RangeSlider";
 import { Select } from "./select";
 
 const FILTER_INPUT_DEBOUNCE_MS = 500;
+const FILTER_BAR_GAP_PX = 8;
+const FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX = 44;
 
 // When `autoSubmit` is false, debounced fields forward their draft value
 // immediately (no timer) so the consumer can accumulate state locally and
@@ -222,6 +226,7 @@ export type FilterBarProps = {
   onApply?: () => void;
   applyLabel?: string;
   isPending?: boolean;
+  overflowMode?: "responsive" | "wrap";
 };
 
 export function FilterBar({
@@ -237,65 +242,160 @@ export function FilterBar({
   onApply,
   applyLabel = "Apply",
   isPending = false,
+  overflowMode = "responsive",
 }: FilterBarProps) {
   const hasRangeControls = Boolean(timeRange || dateRange);
   const showApply = !autoSubmit && !!onApply;
   const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
+  const allFilters = filters ?? [];
+  const responsiveOverflow = overflowMode === "responsive" && allFilters.length > 0;
+  const filterListRef = useRef<HTMLDivElement>(null);
+  const overflowTriggerRef = useRef<HTMLButtonElement>(null);
+  const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
+  const filterWidthCache = useRef(new Map<string, number>());
+  const filterKeys = useMemo(
+    () => allFilters.map((filter) => filter.key).join("\u0000"),
+    [allFilters],
+  );
+  const [visibleFilterCount, setVisibleFilterCount] = useState(allFilters.length);
+
+  useLayoutEffect(() => {
+    setVisibleFilterCount(allFilters.length);
+  }, [allFilters.length, filterKeys]);
+
+  const measureOverflow = useCallback(() => {
+    if (!responsiveOverflow) {
+      setVisibleFilterCount(allFilters.length);
+      return;
+    }
+
+    const filterList = filterListRef.current;
+    if (!filterList) return;
+
+    const availableWidth = Math.floor(filterList.getBoundingClientRect().width);
+    if (availableWidth <= 0) return;
+
+    const widths = allFilters.map((filter) => {
+      const node = filterNodeRefs.current.get(filter.key);
+      const measured = node?.getBoundingClientRect().width ?? 0;
+      if (measured > 0) {
+        const width = Math.ceil(measured);
+        filterWidthCache.current.set(filter.key, width);
+        return width;
+      }
+      return filterWidthCache.current.get(filter.key) ?? estimateFilterWidth(filter);
+    });
+
+    const triggerWidth = Math.ceil(
+      overflowTriggerRef.current?.getBoundingClientRect().width ??
+        FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX,
+    );
+    const triggerGap = triggerWidth > 0 ? FILTER_BAR_GAP_PX : 0;
+    const allFiltersWidth = sumFilterWidths(widths);
+    const nextVisible =
+      allFiltersWidth <= availableWidth
+        ? allFilters.length
+        : calculateVisibleFilterCount(
+            widths,
+            Math.max(0, availableWidth - triggerWidth - triggerGap),
+          );
+    setVisibleFilterCount((current) => (current === nextVisible ? current : nextVisible));
+  }, [allFilters, responsiveOverflow]);
+
+  useLayoutEffect(() => {
+    measureOverflow();
+  }, [measureOverflow]);
+
+  useEffect(() => {
+    if (!responsiveOverflow) return;
+
+    const filterList = filterListRef.current;
+    const trigger = overflowTriggerRef.current;
+    const ResizeObserverCtor = typeof ResizeObserver === "undefined" ? null : ResizeObserver;
+
+    if (!ResizeObserverCtor) {
+      window.addEventListener("resize", measureOverflow);
+      measureOverflow();
+      return () => window.removeEventListener("resize", measureOverflow);
+    }
+
+    const observer = new ResizeObserverCtor(() => measureOverflow());
+    if (filterList) observer.observe(filterList);
+    if (trigger) observer.observe(trigger);
+    window.addEventListener("resize", measureOverflow);
+    measureOverflow();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measureOverflow);
+    };
+  }, [measureOverflow, responsiveOverflow]);
+
+  const inlineFilters = responsiveOverflow
+    ? allFilters.slice(0, Math.min(visibleFilterCount, allFilters.length))
+    : allFilters;
+  const overflowFilters = responsiveOverflow
+    ? allFilters.slice(Math.min(visibleFilterCount, allFilters.length))
+    : [];
+  const activeOverflowCount = overflowFilters.filter(isFilterBarFilterActive).length;
+
+  const setFilterNode = useCallback((key: string, node: HTMLDivElement | null) => {
+    if (!node) {
+      filterNodeRefs.current.delete(key);
+      return;
+    }
+    filterNodeRefs.current.set(key, node);
+  }, []);
 
   return (
     <FilterBarContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
+          "flex flex-nowrap items-center gap-2 overflow-visible rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
+          overflowMode === "wrap" && "flex-wrap",
           className,
         )}
       >
-        {leading && <div className="flex items-center gap-2">{leading}</div>}
+        {leading && <div className="flex shrink-0 items-center gap-2">{leading}</div>}
 
         {search && <SearchField search={search} />}
 
         {children}
 
-        {filters?.map((filter, index) => {
-          const grow = !search && index === 0;
+        {allFilters.length > 0 && (
+          <div
+            ref={filterListRef}
+            data-filter-bar-list
+            className={cn(
+              "flex min-w-0 items-center gap-2",
+              overflowMode === "wrap" ? "flex-wrap" : "flex-1 overflow-hidden",
+            )}
+          >
+            {inlineFilters.map((filter, index) => (
+              <div
+                key={filter.key}
+                ref={(node) => setFilterNode(filter.key, node)}
+                data-filter-bar-item={filter.key}
+                className="min-w-0 shrink-0"
+              >
+                {renderFilterField(filter, !search && index === 0)}
+              </div>
+            ))}
+          </div>
+        )}
 
-          if (filter.kind === "lookup") {
-            return <LookupFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "lookup-multi") {
-            return <LookupMultiFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "multi") {
-            return <MultiFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "nested-multi") {
-            return <NestedMultiFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "select-multi") {
-            return <SelectMultiFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "number") {
-            return <NumberFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "enum") {
-            return <EnumFilterField key={filter.key} filter={filter} grow={grow} />;
-          }
-
-          if (filter.kind === "boolean") {
-            return <BooleanFilterField key={filter.key} filter={filter} />;
-          }
-
-          return <TextFilterField key={filter.key} filter={filter} grow={grow} />;
-        })}
+        {responsiveOverflow && overflowFilters.length > 0 && (
+          <OverflowFiltersMenu
+            triggerRef={overflowTriggerRef}
+            filters={overflowFilters}
+            totalHidden={overflowFilters.length}
+            activeHidden={activeOverflowCount}
+            {...(onApply ? { onApply } : {})}
+          />
+        )}
 
         {(hasRangeControls || trailing || showApply) && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
             {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
             {timeRange && <RangeControlButton kind="time" label="Time range" {...timeRange} />}
             {trailing}
@@ -322,14 +422,30 @@ type FilterBarFilterPanelChrome = "full" | "embedded";
 export function FilterBarFilterPanel({
   filter,
   chrome = "full",
+  autoSubmit = true,
+}: {
+  filter: FilterBarFilter;
+  chrome?: FilterBarFilterPanelChrome;
+  autoSubmit?: boolean;
+}) {
+  const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
+
+  return (
+    <FilterBarContext.Provider value={contextValue}>
+      <FilterBarFilterPanelContent filter={filter} chrome={chrome} />
+    </FilterBarContext.Provider>
+  );
+}
+
+function FilterBarFilterPanelContent({
+  filter,
+  chrome = "full",
 }: {
   filter: FilterBarFilter;
   chrome?: FilterBarFilterPanelChrome;
 }) {
-  const contextValue = useMemo(() => ({ autoSubmit: true }), []);
-
   return (
-    <FilterBarContext.Provider value={contextValue}>
+    <>
       {filter.kind === "lookup" && <LookupFilterField filter={filter} grow />}
       {filter.kind === "lookup-multi" && <LookupMultiFilterField filter={filter} grow />}
       {filter.kind === "multi" && <MultiFilterPanel filter={filter} chrome={chrome} />}
@@ -339,7 +455,400 @@ export function FilterBarFilterPanel({
       {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
       {filter.kind === "boolean" && <BooleanFilterField filter={filter} />}
       {filter.kind === "text" && <TextFilterField filter={filter} grow />}
-    </FilterBarContext.Provider>
+    </>
+  );
+}
+
+function renderFilterField(filter: FilterBarFilter, grow: boolean) {
+  if (filter.kind === "lookup") {
+    return <LookupFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "lookup-multi") {
+    return <LookupMultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "multi") {
+    return <MultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "nested-multi") {
+    return <NestedMultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "select-multi") {
+    return <SelectMultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "number") {
+    return <NumberFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "enum") {
+    return <EnumFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "boolean") {
+    return <BooleanFilterField filter={filter} />;
+  }
+
+  return <TextFilterField filter={filter} grow={grow} />;
+}
+
+function OverflowFiltersMenu({
+  triggerRef,
+  filters,
+  totalHidden,
+  activeHidden,
+  onApply,
+}: {
+  triggerRef: RefObject<HTMLButtonElement>;
+  filters: FilterBarFilter[];
+  totalHidden: number;
+  activeHidden: number;
+  onApply?: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [stagedValues, setStagedValues] = useState<Record<string, FilterBarValue>>({});
+  const hasHidden = totalHidden > 0;
+  const hiddenFilterKeys = useMemo(
+    () => filters.map((filter) => filter.key).join("\u0000"),
+    [filters],
+  );
+  const openOverflowMenu = useCallback(() => {
+    setStagedValues(createFilterValueMap(filters));
+    setOpen(true);
+  }, [filters]);
+  const closeOverflowMenu = useCallback(() => {
+    setStagedValues(createFilterValueMap(filters));
+    setOpen(false);
+  }, [filters]);
+
+  useDismissablePopup(open, rootRef, triggerRef, closeOverflowMenu);
+
+  useEffect(() => {
+    if (!hasHidden) closeOverflowMenu();
+  }, [closeOverflowMenu, hasHidden]);
+
+  useEffect(() => {
+    if (!open) return;
+    setStagedValues(createFilterValueMap(filters));
+  }, [hiddenFilterKeys, open]);
+
+  const countLabel = activeHidden > 0 ? `${activeHidden}/${totalHidden}` : String(totalHidden);
+  const stagedFilters = filters.map((filter) =>
+    filterWithStagedValue(
+      filter,
+      stagedValues[filter.key] ?? filterBarFilterValue(filter),
+      (next) =>
+        setStagedValues((current) => ({
+          ...current,
+          [filter.key]: next,
+        })),
+    ),
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      className={cn("relative shrink-0", !hasHidden && "invisible pointer-events-none")}
+      aria-hidden={!hasHidden || undefined}
+    >
+      <Button
+        ref={triggerRef}
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="More filters"
+        aria-haspopup="dialog"
+        aria-expanded={hasHidden ? open : false}
+        tabIndex={hasHidden ? 0 : -1}
+        title={hasHidden ? "More filters" : undefined}
+        onClick={() => {
+          if (!hasHidden) return;
+          if (open) {
+            closeOverflowMenu();
+          } else {
+            openOverflowMenu();
+          }
+        }}
+        className={cn(
+          "h-8 min-w-0 gap-1.5 px-2 text-xs font-normal",
+          activeHidden > 0 && "border-primary/40 text-primary",
+        )}
+      >
+        <Icon name="codicon:filter" className="text-[14px]" />
+        <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+          {countLabel}
+        </span>
+      </Button>
+
+      {hasHidden && open && (
+        <div
+          role="dialog"
+          aria-label="Overflow filters"
+          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-[min(34rem,calc(100vw-2rem))] overflow-visible rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Filters
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
+                onClick={() => stagedFilters.forEach(clearFilterBarFilter)}
+                disabled={stagedFilters.every((filter) => !isFilterBarFilterActive(filter))}
+              >
+                Clear all
+              </button>
+              <button
+                type="button"
+                aria-label="Close overflow filters"
+                title="Close"
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+                onClick={closeOverflowMenu}
+              >
+                <Icon name="codicon:close" className="text-sm" />
+              </button>
+            </div>
+          </div>
+          <div className="divide-y divide-border/70 rounded-md border border-border/70">
+            {stagedFilters.map((filter) => {
+              const active = isFilterBarFilterActive(filter);
+              return (
+                <div
+                  key={filter.key}
+                  data-overflow-filter-row={filter.key}
+                  className="grid h-12 grid-cols-[minmax(7rem,10rem)_auto_minmax(0,1fr)_auto] items-center gap-2 overflow-visible p-2"
+                >
+                  <label
+                    htmlFor={filterInputId(filter)}
+                    className="min-w-0 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                    title={filter.description ?? filter.label}
+                  >
+                    {filter.label}
+                  </label>
+                  <span className="text-sm text-muted-foreground">=</span>
+                  <div className="min-w-0 overflow-visible">
+                    <FilterBarContext.Provider value={{ autoSubmit: false }}>
+                      <FilterBarKeyValueControl filter={filter} />
+                    </FilterBarContext.Provider>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Clear ${filter.label}`}
+                    title={`Clear ${filter.label}`}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none disabled:text-muted-foreground/40"
+                    onClick={() => clearFilterBarFilter(filter)}
+                    disabled={!active}
+                  >
+                    <Icon name="codicon:close" className="text-sm" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={closeOverflowMenu}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => {
+                applyStagedFilterValues(filters, stagedValues);
+                onApply?.();
+                setOpen(false);
+              }}
+            >
+              Apply
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
+  if (filter.kind === "text") {
+    return <TextFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "lookup") {
+    return <LookupFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "lookup-multi") {
+    return <LookupMultiFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "enum") {
+    return <EnumFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "boolean") {
+    return <BooleanFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "select-multi") {
+    return <SelectMultiFilterValueControl filter={filter} />;
+  }
+  if (filter.kind === "multi") {
+    return <MultiFilterField filter={filter} grow />;
+  }
+  if (filter.kind === "nested-multi") {
+    return <NestedMultiFilterField filter={filter} grow />;
+  }
+  return <NumberFilterField filter={filter} grow />;
+}
+
+function filterInputId(filter: FilterBarFilter) {
+  return `filterbar-overflow-${filter.key}`;
+}
+
+function valueInputClassName(disabled?: boolean) {
+  return cn(
+    "h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring",
+    disabled && "cursor-not-allowed opacity-60",
+  );
+}
+
+function TextFilterValueControl({ filter }: { filter: FilterBarTextFilter }) {
+  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+
+  return (
+    <input
+      id={filterInputId(filter)}
+      type="text"
+      aria-label={filter.label}
+      className={valueInputClassName(filter.disabled)}
+      placeholder={filter.placeholder ?? "Filter..."}
+      value={draft}
+      disabled={filter.disabled}
+      onChange={(event) => setDraft(event.target.value)}
+    />
+  );
+}
+
+function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter }) {
+  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+  const listId = `${filter.key}-overflow-lookup-options`;
+
+  if (filter.inputType === "date") {
+    return (
+      <DateTimePicker
+        id={filterInputId(filter)}
+        aria-label={filter.label}
+        className="w-full"
+        inputClassName={valueInputClassName(filter.disabled)}
+        buttonClassName="right-1"
+        placeholder={filter.placeholder ?? "Filter..."}
+        value={draft}
+        list={listId}
+        disabled={filter.disabled}
+        onChange={setDraft}
+      />
+    );
+  }
+
+  return (
+    <>
+      <input
+        id={filterInputId(filter)}
+        type={filter.inputType === "number" ? "number" : "text"}
+        aria-label={filter.label}
+        className={valueInputClassName(filter.disabled)}
+        placeholder={filter.placeholder ?? "Filter..."}
+        value={draft}
+        list={listId}
+        disabled={filter.disabled}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <datalist id={listId}>
+        {filter.options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            label={option.label ?? option.value}
+            disabled={option.disabled}
+          />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMultiFilter }) {
+  return (
+    <MultiSelect
+      options={filter.options.map((option) => ({
+        value: option.value,
+        label: option.label ?? option.value,
+        ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+        ...(option.title !== undefined ? { title: option.title } : {}),
+      }))}
+      value={filter.value}
+      onChange={filter.onChange}
+      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+      triggerClassName="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
+      menuClassName="left-auto right-0"
+    />
+  );
+}
+
+function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
+  return (
+    <Select
+      id={filterInputId(filter)}
+      aria-label={filter.label}
+      className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
+      value={filter.value}
+      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      disabled={filter.disabled}
+      onChange={(event) => filter.onChange(event.target.value)}
+      options={filter.options.map((option) => ({
+        value: option.value,
+        label: option.label ?? option.value,
+      }))}
+    />
+  );
+}
+
+function BooleanFilterValueControl({ filter }: { filter: FilterBarBooleanFilter }) {
+  return (
+    <div className="flex h-8 items-center">
+      <input
+        id={filterInputId(filter)}
+        type="checkbox"
+        aria-label={filter.label}
+        className="h-4 w-4 accent-primary"
+        checked={filter.value}
+        disabled={filter.disabled}
+        onChange={(event) => filter.onChange(event.target.checked)}
+      />
+    </div>
+  );
+}
+
+function SelectMultiFilterValueControl({ filter }: { filter: FilterBarSelectMultiFilter }) {
+  return (
+    <MultiSelect
+      options={filter.options}
+      value={filter.value}
+      onChange={filter.onChange}
+      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+      triggerClassName="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
+      menuClassName="left-auto right-0"
+    />
   );
 }
 
@@ -2017,6 +2526,190 @@ function nextFilterMode(mode: FilterMode): FilterMode {
   if (mode === "include") return "exclude";
   if (mode === "exclude") return "neutral";
   return "include";
+}
+
+export function clearFilterBarFilter(filter: FilterBarFilter) {
+  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+    filter.onChange("");
+    return;
+  }
+
+  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
+    filter.onChange([]);
+    return;
+  }
+
+  if (filter.kind === "number") {
+    filter.onChange({});
+    return;
+  }
+
+  if (filter.kind === "boolean") {
+    filter.onChange(false);
+    return;
+  }
+
+  filter.onChange({});
+}
+
+export function isFilterBarFilterActive(filter: FilterBarFilter) {
+  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+    return String(filter.value ?? "").trim() !== "";
+  }
+  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
+    return filter.value.length > 0;
+  }
+  if (filter.kind === "number") {
+    return (
+      String(filter.value.min ?? "").trim() !== "" || String(filter.value.max ?? "").trim() !== ""
+    );
+  }
+  if (filter.kind === "boolean") return filter.value;
+  return Object.keys(filter.value).length > 0;
+}
+
+type FilterBarValue =
+  | string
+  | string[]
+  | boolean
+  | FilterBarNumberValue
+  | Record<string, FilterBarMultiFilterMode>;
+
+function createFilterValueMap(filters: FilterBarFilter[]) {
+  return Object.fromEntries(filters.map((filter) => [filter.key, filterBarFilterValue(filter)]));
+}
+
+function filterBarFilterValue(filter: FilterBarFilter): FilterBarValue {
+  return filter.value;
+}
+
+function filterWithStagedValue(
+  filter: FilterBarFilter,
+  value: FilterBarValue,
+  onChange: (value: FilterBarValue) => void,
+): FilterBarFilter {
+  if (filter.kind === "text") {
+    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+  }
+  if (filter.kind === "lookup") {
+    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+  }
+  if (filter.kind === "lookup-multi") {
+    return {
+      ...filter,
+      value: Array.isArray(value) ? value.map(String) : [],
+      onChange: (next: string[]) => onChange(next),
+    };
+  }
+  if (filter.kind === "multi") {
+    return {
+      ...filter,
+      value: isMultiFilterValue(value) ? value : {},
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) => onChange(next),
+    };
+  }
+  if (filter.kind === "nested-multi") {
+    return {
+      ...filter,
+      value: isMultiFilterValue(value) ? value : {},
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) => onChange(next),
+    };
+  }
+  if (filter.kind === "select-multi") {
+    return {
+      ...filter,
+      value: Array.isArray(value) ? value.map(String) : [],
+      onChange: (next: string[]) => onChange(next),
+    };
+  }
+  if (filter.kind === "number") {
+    return {
+      ...filter,
+      value: isNumberFilterValue(value) ? value : {},
+      onChange: (next: FilterBarNumberValue) => onChange(next),
+    };
+  }
+  if (filter.kind === "enum") {
+    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+  }
+  return {
+    ...filter,
+    value: Boolean(value),
+    onChange: (next: boolean) => onChange(next),
+  };
+}
+
+function applyStagedFilterValues(
+  filters: FilterBarFilter[],
+  stagedValues: Record<string, FilterBarValue>,
+) {
+  for (const filter of filters) {
+    const next = stagedValues[filter.key] ?? filterBarFilterValue(filter);
+    if (sameFilterBarValue(filterBarFilterValue(filter), next)) continue;
+    applyFilterBarValue(filter, next);
+  }
+}
+
+function applyFilterBarValue(filter: FilterBarFilter, value: FilterBarValue) {
+  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+    filter.onChange(String(value ?? ""));
+    return;
+  }
+  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
+    filter.onChange(Array.isArray(value) ? value.map(String) : []);
+    return;
+  }
+  if (filter.kind === "number") {
+    filter.onChange(isNumberFilterValue(value) ? value : {});
+    return;
+  }
+  if (filter.kind === "boolean") {
+    filter.onChange(Boolean(value));
+    return;
+  }
+  filter.onChange(isMultiFilterValue(value) ? value : {});
+}
+
+function sameFilterBarValue(left: FilterBarValue, right: FilterBarValue) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isNumberFilterValue(value: FilterBarValue): value is FilterBarNumberValue {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMultiFilterValue(
+  value: FilterBarValue,
+): value is Record<string, FilterBarMultiFilterMode> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function calculateVisibleFilterCount(widths: number[], availableWidth: number) {
+  if (widths.length === 0) return 0;
+
+  let used = 0;
+  let count = 0;
+  for (const width of widths) {
+    const nextUsed = used + (count > 0 ? FILTER_BAR_GAP_PX : 0) + width;
+    if (nextUsed > availableWidth) break;
+    used = nextUsed;
+    count += 1;
+  }
+  return count;
+}
+
+function sumFilterWidths(widths: number[]) {
+  if (widths.length === 0) return 0;
+  return (
+    widths.reduce((total, width) => total + width, 0) + (widths.length - 1) * FILTER_BAR_GAP_PX
+  );
+}
+
+function estimateFilterWidth(filter: FilterBarFilter) {
+  if (filter.kind === "boolean") return Math.max(88, filter.label.length * 8 + 40);
+  if (filter.kind === "multi" || filter.kind === "nested-multi") return 136;
+  if (filter.kind === "number") return 152;
+  return Math.max(144, filter.label.length * 8 + 96);
 }
 
 function normalizeDateMath(value: string): string {

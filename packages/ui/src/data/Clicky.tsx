@@ -31,8 +31,8 @@ import { cn } from "../lib/utils";
 import { DataTable, type DataTableColumn, type DataTableRowDetailContext } from "./DataTable";
 import { Tree } from "./Tree";
 import { Icon } from "./Icon";
-import { JsonView } from "./JsonView";
-import { highlightCode } from "./code-highlight";
+import { CodeBlock } from "./CodeBlock";
+import { isBlockHtml, sanitizeHtml } from "./html-utils";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";
 import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { Badge, type BadgeShape } from "./Badge";
@@ -231,6 +231,19 @@ export type ClickyProps = {
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
   className?: string;
+};
+
+export type ClickyNodeViewProps = {
+  node: ClickyNode | null | undefined;
+};
+
+export type ClickyTableProps = {
+  columns: ClickyColumn[];
+  rows: ClickyRow[];
+  autoFilter?: boolean | undefined;
+  onTableRowClick?: ClickyTableRowClick | undefined;
+  getTableRowHref?: ClickyTableRowHref | undefined;
+  isTableRowClickable?: ClickyTableRowPredicate | undefined;
 };
 
 type ParsedClicky =
@@ -1338,7 +1351,7 @@ function isClickyNode(value: unknown): value is ClickyNode {
   );
 }
 
-function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
+function ClickyNodeRenderer({ node }: ClickyNodeViewProps) {
   if (!node) return null;
 
   switch (node.kind) {
@@ -1355,11 +1368,17 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
     case "map":
       return <ClickyMap node={node} />;
     case "table":
-      return <ClickyTable node={node} />;
+      return <ClickyTableNode node={node} />;
     case "tree":
       return <ClickyTreeNode node={node} />;
     case "code":
-      return <ClickyCodeBlock node={node} />;
+      return (
+        <CodeBlock
+          language={node.language}
+          source={node.source ?? node.plain ?? ""}
+          highlightedHtml={node.highlightedHtml}
+        />
+      );
     case "collapsed":
       return <ClickyCollapsed node={node} />;
     case "stacktrace":
@@ -1382,6 +1401,8 @@ function ClickyNodeRenderer({ node }: { node: ClickyNode | null | undefined }) {
       );
   }
 }
+
+export { ClickyNodeRenderer as ClickyNodeView };
 
 function ClickyComment({ node }: { node: ClickyNode }) {
   const text = node.text ?? node.plain;
@@ -1947,10 +1968,28 @@ function ClickyMap({ node }: { node: ClickyNode }) {
   );
 }
 
-function ClickyTable({ node }: { node: ClickyNode }) {
+function ClickyTableNode({ node }: { node: ClickyNode }) {
+  return (
+    <ClickyTable
+      columns={node.columns ?? []}
+      rows={node.rows ?? []}
+      {...(node.autoFilter !== undefined ? { autoFilter: node.autoFilter } : {})}
+    />
+  );
+}
+
+export function ClickyTable({
+  columns,
+  rows,
+  autoFilter,
+  onTableRowClick,
+  getTableRowHref,
+  isTableRowClickable,
+}: ClickyTableProps) {
   const runtime = useContext(ClickyRuntimeContext);
-  const columns = node.columns ?? [];
-  const rows = node.rows ?? [];
+  const rowClick = onTableRowClick ?? runtime.onTableRowClick;
+  const rowHref = getTableRowHref ?? runtime.getTableRowHref;
+  const rowClickable = isTableRowClickable ?? runtime.isTableRowClickable;
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
@@ -2004,7 +2043,7 @@ function ClickyTable({ node }: { node: ClickyNode }) {
     <DataTable<ClickyRow>
       data={rows}
       columns={tableColumns}
-      {...(node.autoFilter !== undefined ? { autoFilter: node.autoFilter } : {})}
+      {...(autoFilter !== undefined ? { autoFilter } : {})}
       {...(defaultSortColumn
         ? { defaultSort: { key: `cells.${defaultSortColumn.name}`, dir: "asc" as const } }
         : {})}
@@ -2017,12 +2056,11 @@ function ClickyTable({ node }: { node: ClickyNode }) {
       renderExpandedRow={(row, context) => (
         <ClickyTableRowDetail row={row} columns={columns} context={context} />
       )}
-      {...(runtime.onTableRowClick ? { onRowClick: runtime.onTableRowClick } : {})}
-      {...(runtime.getTableRowHref ? { getRowHref: runtime.getTableRowHref } : {})}
-      {...(runtime.onTableRowClick && (runtime.isTableRowClickable || runtime.getTableRowHref)
+      {...(rowClick ? { onRowClick: rowClick } : {})}
+      {...(rowHref ? { getRowHref: rowHref } : {})}
+      {...(rowClick && (rowClickable || rowHref)
         ? {
-            isRowClickable:
-              runtime.isTableRowClickable ?? ((row) => Boolean(runtime.getTableRowHref?.(row))),
+            isRowClickable: rowClickable ?? ((row) => Boolean(rowHref?.(row))),
           }
         : {})}
     />
@@ -2319,112 +2357,6 @@ function ClickyTreeNode({ node }: { node: ClickyNode }) {
   );
 }
 
-function ClickyCodeBlock({ node }: { node: ClickyNode }) {
-  const language = (node.language ?? "").toLowerCase().replace(/^\.+/, "");
-  const source = node.source ?? node.plain ?? "";
-  const chromaHtml = node.highlightedHtml ? sanitizeHtml(node.highlightedHtml) : "";
-
-  // JSON gets the interactive collapsible viewer instead of raw chroma
-  // output — operators read structured payloads (intake XMLData decoded
-  // to JSON, OpenAPI responses, etc.) far faster when the viewer lets
-  // them fold deep objects rather than scroll through highlighted text.
-  // Falls back to the chroma / Shiki path when the source can't be parsed
-  // (truncated payload, intentional pretty-printed-with-comments, etc.).
-  const parsedJson = useMemo(
-    () => (language === "json" ? tryParseJson(source) : JSON_PARSE_FAILED),
-    [language, source],
-  );
-
-  // Hooks below must run unconditionally regardless of which render branch
-  // wins, so they live above any early returns.
-  const [shikiHtml, setShikiHtml] = useState<string | null>(null);
-  const wantsClientHighlight = !chromaHtml && !!language && !!source;
-
-  useEffect(() => {
-    if (!wantsClientHighlight) {
-      setShikiHtml(null);
-      return;
-    }
-    let cancelled = false;
-    highlightCode(source, { lang: language }).then((out) => {
-      if (!cancelled) setShikiHtml(out);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [wantsClientHighlight, language, source]);
-
-  if (parsedJson !== JSON_PARSE_FAILED) {
-    return (
-      <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-        <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-          json
-        </div>
-        <div className="overflow-auto p-3 text-xs">
-          <JsonView data={parsedJson} defaultOpenDepth={2} />
-        </div>
-      </div>
-    );
-  }
-
-  // XML gets a tighter Tailwind ruleset that targets chroma's class names
-  // (the chroma html formatter emits .nt for tags, .na for attribute
-  // names, .s for strings, .c for comments). Without this, XML renders
-  // identically to plain text and operators reading large stacks or
-  // walked AsActivity payloads can't visually pick out the structure.
-  const xmlClasses =
-    language === "xml" || language === "xslt" || language === "html"
-      ? " [&_.chroma_.nt]:text-pink-700 [&_.chroma_.nt]:dark:text-pink-300 [&_.chroma_.nt]:font-semibold" +
-        " [&_.chroma_.na]:text-amber-700 [&_.chroma_.na]:dark:text-amber-300" +
-        " [&_.chroma_.s]:text-emerald-700 [&_.chroma_.s]:dark:text-emerald-300" +
-        " [&_.chroma_.c]:text-slate-500 [&_.chroma_.c]:italic" +
-        " [&_.chroma_.cp]:text-slate-500 [&_.chroma_.cp]:italic" +
-        " [&_pre]:leading-relaxed"
-      : "";
-
-  return (
-    <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-      <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-        {node.language || "text"}
-      </div>
-      {chromaHtml ? (
-        <div
-          className={
-            "overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent" +
-            xmlClasses
-          }
-          dangerouslySetInnerHTML={{ __html: chromaHtml }}
-        />
-      ) : shikiHtml ? (
-        <div
-          className="overflow-auto p-3 text-xs font-mono [&_pre]:m-0 [&_pre.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap"
-          dangerouslySetInnerHTML={{ __html: shikiHtml }}
-        />
-      ) : (
-        <pre className="overflow-auto whitespace-pre-wrap break-words p-3 text-xs font-mono text-foreground">
-          {source}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-// JSON_PARSE_FAILED is a sentinel distinct from any value that valid
-// JSON can produce (`undefined` is not legal JSON, but a JSON document
-// could legitimately parse to `null`, `false`, `0`, `""`, etc.). Using a
-// fresh object reference lets the caller branch with strict equality.
-const JSON_PARSE_FAILED: unique symbol = Symbol("json-parse-failed");
-
-function tryParseJson(source: string): unknown | typeof JSON_PARSE_FAILED {
-  const trimmed = source.trim();
-  if (!trimmed) return JSON_PARSE_FAILED;
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return JSON_PARSE_FAILED;
-  }
-}
-
 function isBadgeShape(value: string | undefined): value is BadgeShape {
   return value === "pill" || value === "rounded" || value === "square";
 }
@@ -2575,38 +2507,6 @@ function toInlineStyle(style?: ClickyStyle, text?: string): CSSProperties | unde
   }
 
   return Object.keys(inlineStyle).length > 0 ? inlineStyle : undefined;
-}
-
-function sanitizeHtml(raw: string): string {
-  if (!raw) return "";
-
-  if (typeof DOMParser === "undefined") {
-    return raw
-      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-      .replace(/\son\w+="[^"]*"/gi, "")
-      .replace(/\son\w+='[^']*'/gi, "");
-  }
-
-  const doc = new DOMParser().parseFromString(raw, "text/html");
-
-  doc.querySelectorAll("script,iframe,object,embed,form").forEach((element) => element.remove());
-
-  doc.querySelectorAll("*").forEach((element) => {
-    Array.from(element.attributes).forEach((attribute) => {
-      const name = attribute.name.toLowerCase();
-      const value = attribute.value.trim().toLowerCase();
-
-      if (name.startsWith("on") || name === "srcdoc") {
-        element.removeAttribute(attribute.name);
-      }
-
-      if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
-        element.removeAttribute(attribute.name);
-      }
-    });
-  });
-
-  return doc.body.innerHTML;
 }
 
 function prettifyName(name: string): string {
@@ -2802,8 +2702,4 @@ function isInlineNode(node: ClickyNode): boolean {
     node.kind === "button" ||
     node.kind === "button-group"
   );
-}
-
-function isBlockHtml(html: string): boolean {
-  return /<(div|p|pre|table|ul|ol|li|details|blockquote|h[1-6])/i.test(html);
 }

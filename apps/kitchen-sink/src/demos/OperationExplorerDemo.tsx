@@ -48,9 +48,7 @@ const SAMPLE_SPEC: OpenAPISpec = {
         operationId: "widget_get",
         summary: "Get widget",
         tags: ["widget"],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-        ],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: { "200": { description: "OK" } },
         "x-clicky": { surface: "widgets", verb: "get", scope: "entity", idParam: "id" },
       },
@@ -58,9 +56,7 @@ const SAMPLE_SPEC: OpenAPISpec = {
         operationId: "widget_delete",
         summary: "Delete widget",
         tags: ["widget"],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-        ],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: { "204": { description: "Deleted" } },
         "x-clicky": { surface: "widgets", verb: "delete", scope: "entity", idParam: "id" },
       },
