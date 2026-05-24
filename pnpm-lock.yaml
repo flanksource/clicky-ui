@@ -6,21 +6,12 @@ settings:
 
 catalogs:
   default:
-    '@iconify/react':
-      specifier: ^5.0.2
-      version: 5.2.1
     '@playwright/test':
       specifier: ^1.49.1
       version: 1.59.1
     '@preact/preset-vite':
       specifier: ^2.9.3
       version: 2.10.5
-    '@radix-ui/react-compose-refs':
-      specifier: ^1.1.2
-      version: 1.1.2
-    '@radix-ui/react-slot':
-      specifier: ^1.1.1
-      version: 1.2.4
     '@shikijs/langs':
       specifier: ^1.24.0
       version: 1.29.2
@@ -54,18 +45,9 @@ catalogs:
     autoprefixer:
       specifier: ^10.4.20
       version: 10.5.0
-    class-variance-authority:
-      specifier: ^0.7.1
-      version: 0.7.1
-    clsx:
-      specifier: ^2.1.1
-      version: 2.1.1
     jsdom:
       specifier: ^26.0.0
       version: 26.1.0
-    lucide-react:
-      specifier: ^0.469.0
-      version: 0.469.0
     postcss:
       specifier: ^8.4.49
       version: 8.5.10
@@ -81,9 +63,6 @@ catalogs:
     shiki:
       specifier: ^1.24.0
       version: 1.29.2
-    tailwind-merge:
-      specifier: ^2.6.0
-      version: 2.6.1
     tailwindcss:
       specifier: ^3.4.17
       version: 3.4.19
@@ -240,13 +219,13 @@ importers:
   packages/ui:
     dependencies:
       '@iconify/react':
-        specifier: 'catalog:'
+        specifier: ^5.0.2
         version: 5.2.1(react@18.3.1)
       '@radix-ui/react-compose-refs':
-        specifier: 'catalog:'
+        specifier: ^1.1.2
         version: 1.1.2(@types/react@18.3.28)(react@18.3.1)
       '@radix-ui/react-slot':
-        specifier: 'catalog:'
+        specifier: ^1.1.1
         version: 1.2.4(@types/react@18.3.28)(react@18.3.1)
       '@shikijs/langs':
         specifier: ^1.24.0
@@ -258,13 +237,13 @@ importers:
         specifier: ^1.24.0
         version: 1.29.2
       class-variance-authority:
-        specifier: 'catalog:'
+        specifier: ^0.7.1
         version: 0.7.1
       clsx:
-        specifier: 'catalog:'
+        specifier: ^2.1.1
         version: 2.1.1
       lucide-react:
-        specifier: 'catalog:'
+        specifier: ^0.469.0
         version: 0.469.0(react@18.3.1)
       marked:
         specifier: ^15.0.0
@@ -273,7 +252,7 @@ importers:
         specifier: ^1.24.0
         version: 1.29.2
       tailwind-merge:
-        specifier: 'catalog:'
+        specifier: ^2.6.0
         version: 2.6.1
     devDependencies:
       '@storybook/react-vite':

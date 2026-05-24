@@ -47,6 +47,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
           value={value}
           className={cn(
             "h-8 w-full rounded-md border border-input bg-background px-2 pr-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "[&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
             inputClassName,
           )}
           onChange={(event) => onChange?.(event.target.value)}

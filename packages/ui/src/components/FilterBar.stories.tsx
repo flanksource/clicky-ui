@@ -8,6 +8,9 @@ function FilterBarShowcase() {
     healthy: "include",
   });
   const [owner, setOwner] = useState("");
+  const [namespace, setNamespace] = useState("");
+  const [cluster, setCluster] = useState("");
+  const [component, setComponent] = useState("");
   const [restarts, setRestarts] = useState<FilterBarNumberValue>({ min: "1", max: "5" });
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
@@ -33,6 +36,30 @@ function FilterBarShowcase() {
       value: owner,
       onChange: setOwner,
       placeholder: "platform",
+    },
+    {
+      key: "namespace",
+      kind: "text",
+      label: "Namespace",
+      value: namespace,
+      onChange: setNamespace,
+      placeholder: "prod",
+    },
+    {
+      key: "cluster",
+      kind: "text",
+      label: "Cluster",
+      value: cluster,
+      onChange: setCluster,
+      placeholder: "eu-1",
+    },
+    {
+      key: "component",
+      kind: "text",
+      label: "Component",
+      value: component,
+      onChange: setComponent,
+      placeholder: "api",
     },
     {
       key: "restarts",

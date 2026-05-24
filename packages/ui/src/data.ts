@@ -12,6 +12,7 @@ export {
   type BadgeTruncate,
   type BadgeVariant,
 } from "./data/Badge";
+export { CodeBlock, type CodeBlockProps } from "./data/CodeBlock";
 export {
   DataTable,
   inferColumns,

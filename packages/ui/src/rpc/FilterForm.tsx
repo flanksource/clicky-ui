@@ -6,6 +6,7 @@ import type {
   FilterBarMultiFilter,
   FilterBarRangeProps,
 } from "../components/FilterBar";
+import { TimeRange } from "../components/TimeRange";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
@@ -432,40 +433,24 @@ function multiOptionText(option: FilterBarMultiFilter["options"][number]) {
   return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
 }
 
+// TimeRangeRow renders the paired from/to parameters as the native TimeRange
+// popover picker (relative-time presets + a date picker) rather than two bare
+// text inputs, matching how FilterBar renders its own range control.
 function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
-  const fromId = "clicky-param-from";
-  const toId = "clicky-param-to";
-  const from = timeRange.from ?? "";
-  const to = timeRange.to ?? "";
-
   return (
     <div className="grid grid-cols-1 gap-2 py-2 sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] sm:items-center">
       <div className="text-sm font-medium text-muted-foreground">Time range</div>
-      <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="min-w-0">
-          <span className="sr-only">From</span>
-          <input
-            id={fromId}
-            type="text"
-            aria-label="From"
-            className={inputClassName}
-            placeholder={timeRange.fromPlaceholder ?? "From"}
-            value={from}
-            onChange={(event) => timeRange.onApply(event.target.value, to)}
-          />
-        </label>
-        <label className="min-w-0">
-          <span className="sr-only">To</span>
-          <input
-            id={toId}
-            type="text"
-            aria-label="To"
-            className={inputClassName}
-            placeholder={timeRange.toPlaceholder ?? "To"}
-            value={to}
-            onChange={(event) => timeRange.onApply(from, event.target.value)}
-          />
-        </label>
+      <div className="min-w-0">
+        <TimeRange
+          kind="date"
+          label="Time range"
+          align="left"
+          from={timeRange.from ?? ""}
+          to={timeRange.to ?? ""}
+          onApply={timeRange.onApply}
+          {...(timeRange.fromPlaceholder ? { fromPlaceholder: timeRange.fromPlaceholder } : {})}
+          {...(timeRange.toPlaceholder ? { toPlaceholder: timeRange.toPlaceholder } : {})}
+        />
       </div>
     </div>
   );

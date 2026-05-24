@@ -8,6 +8,7 @@ import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
 import { ClickyDemo } from "./demos/ClickyDemo";
+import { ClickyNativeDemo } from "./demos/ClickyNativeDemo";
 import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { LogsTableDemo } from "./demos/LogsTableDemo";
@@ -60,6 +61,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "avatar", label: "Avatar", component: AvatarDemo },
       { id: "progress", label: "ProgressBar", component: ProgressBarDemo },
       { id: "clicky", label: "Clicky", component: ClickyDemo },
+      { id: "clicky-native", label: "Clicky Native", component: ClickyNativeDemo },
       { id: "code-blocks", label: "CodeBlocks", component: CodeBlocksDemo },
       { id: "json-view", label: "JsonView", component: JsonViewDemo },
       { id: "ansi-html", label: "AnsiHtml", component: AnsiHtmlDemo },

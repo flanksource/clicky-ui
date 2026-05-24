@@ -334,11 +334,13 @@ export function OperationCatalog({
             />
           )}
           {listQuery.isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <SkeletonBlock key={i} className="h-10" />
-              ))}
-            </div>
+            <ExecutionResult
+              loading
+              loadingMessage={`Loading ${definition.title} results…`}
+              emptyMessage="No records returned"
+              ariaLabel={`${definition.title} results`}
+              className="mt-0"
+            />
           ) : listQuery.isError ? (
             renderError(listQuery.error, `Failed to load ${listEndpoint?.path ?? ""}`)
           ) : listQuery.data ? (
@@ -407,10 +409,6 @@ export function OperationCatalog({
   );
 }
 
-function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
-}
-
 function readFiltersFromUrl(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const search = new URLSearchParams(window.location.search);
@@ -420,6 +418,10 @@ function readFiltersFromUrl(): Record<string, string> {
     if (value !== "") values[key] = value;
   }
   return values;
+}
+
+function SkeletonBlock({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
 }
 
 function writeFiltersToUrl(filters: Record<string, string>) {

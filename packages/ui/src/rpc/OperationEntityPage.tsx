@@ -227,7 +227,10 @@ export function OperationEntityPage({
       </div>
 
       {detailQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading detail…</div>
+        <section className="rounded-xl border bg-card p-4">
+          <h2 className="text-lg font-medium">Entity detail</h2>
+          <ExecutionResult loading loadingMessage="Loading entity detail…" />
+        </section>
       ) : detailQuery.isError ? (
         renderError(detailQuery.error, `Failed to load ${resolvedDetailEndpoint.path}`)
       ) : (

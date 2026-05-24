@@ -1,4 +1,4 @@
-import { Clicky, type ClickyDocument, type ClickyNode } from "@flanksource/clicky-ui";
+import { Clicky, CodeBlock, type ClickyDocument, type ClickyNode } from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
 
 // Each entry mirrors what `clicky.CodeBlock(language, source)` produces on the
@@ -140,10 +140,27 @@ export function CodeBlocksDemo() {
     <div className="space-y-density-4">
       <DemoSection
         id="codeblocks-overview"
-        title="Mixed languages in one document"
-        description="A single ClickyDocument containing one code node per language. Mirrors what a Go callsite produces by chaining api.CodeBlock(...) into a parent api.Text. When the JSON payload arrives without pre-rendered chroma HTML (the application/clicky+json default), the React renderer lazy-loads the Shiki grammar for each language on demand and caches it in memory for the rest of the session."
+        title="Native CodeBlock"
+        description="Standalone code rendering with the same Shiki, Chroma, XML, and interactive JSON behavior used by Clicky code nodes."
       >
-        <Clicky data={combinedDoc(samples)} />
+        <div className="space-y-density-3">
+          {samples.slice(0, 4).map((sample) => (
+            <div key={sample.id} className="space-y-2">
+              <div className="text-sm font-semibold text-foreground">{sample.title}</div>
+              <CodeBlock language={sample.language} source={sample.source} />
+            </div>
+          ))}
+        </div>
+      </DemoSection>
+
+      <DemoSection
+        id="codeblocks-clicky-compat"
+        title="Clicky code nodes"
+        description={
+          'The Clicky AST renderer delegates kind="code" nodes to the same native CodeBlock component.'
+        }
+      >
+        <Clicky data={combinedDoc(samples.slice(4, 7))} />
       </DemoSection>
 
       {samples.map((sample) => (

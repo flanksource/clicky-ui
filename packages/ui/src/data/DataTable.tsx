@@ -17,6 +17,8 @@ import {
   FilterBar,
   FilterBarFilterPanel,
   FilterBarRangePanel,
+  clearFilterBarFilter,
+  isFilterBarFilterActive,
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberValue,
@@ -174,6 +176,9 @@ type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unkn
    * Mix and match strings with full descriptors as needed.
    */
   columns: Array<DataTableColumnInput<T>>;
+  loading?: boolean;
+  loadingMessage?: ReactNode;
+  loadingRowCount?: number;
   emptyMessage?: string;
   className?: string;
   autoFilter?: boolean;
@@ -240,6 +245,9 @@ export type DataTableProps<T extends Record<string, unknown> = Record<string, un
 function DataTableInner<T extends Record<string, unknown>>({
   data,
   columns: columnsInput,
+  loading = false,
+  loadingMessage = "Loading results…",
+  loadingRowCount = 8,
   emptyMessage: _emptyMessage = "No data",
   className,
   autoFilter = false,
@@ -485,7 +493,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
 
   const generatedFilters = useMemo<GeneratedFilter<T>[]>(() => {
-    if (!autoFilter) return [];
+    if (!autoFilter || loading) return [];
 
     return filterableColumns.map((column) => {
       const numberBounds = getNumericFilterBounds(rows, column);
@@ -539,7 +547,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         options,
       };
     });
-  }, [autoFilter, filterableColumns, rows]);
+  }, [autoFilter, filterableColumns, loading, rows]);
 
   useEffect(() => {
     setTextFilters((current) => pruneTextFilterState(current, generatedFilters));
@@ -857,7 +865,10 @@ function DataTableInner<T extends Record<string, unknown>>({
           />
         )}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
+        <div
+          className="min-h-0 flex-1 overflow-auto rounded-md border border-border"
+          aria-busy={loading || undefined}
+        >
           <table className="w-max table-auto text-left text-sm">
             <colgroup>
               {visibleColumns.map((column) => (
@@ -941,99 +952,109 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((record) => {
-                const href = getRowHref?.(record.row);
-                const expanded = expandedRows[record.id] ?? false;
-                const expandedContent =
-                  renderExpandedRow?.(record.row, {
-                    columns: effectiveColumns,
-                    visibleColumns,
-                    tagActionsByColumn,
-                  }) ?? null;
-                const expandable = expandedContent !== null;
-                const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
-                const clickable = !!href || rowClickEnabled || expandable;
+              {loading ? (
+                <DataTableLoadingRows
+                  columns={visibleColumns}
+                  rowCount={loadingRowCount}
+                  message={loadingMessage}
+                />
+              ) : (
+                sorted.map((record) => {
+                  const href = getRowHref?.(record.row);
+                  const expanded = expandedRows[record.id] ?? false;
+                  const expandedContent =
+                    renderExpandedRow?.(record.row, {
+                      columns: effectiveColumns,
+                      visibleColumns,
+                      tagActionsByColumn,
+                    }) ?? null;
+                  const expandable = expandedContent !== null;
+                  const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
+                  const clickable = !!href || rowClickEnabled || expandable;
 
-                return (
-                  <Fragment key={record.id}>
-                    <tr
-                      className={cn(
-                        "border-b border-border/60 align-top",
-                        clickable && "cursor-pointer hover:bg-accent/40",
-                      )}
-                      onClick={() => {
-                        if (expandable) {
-                          setExpandedRows((current) => ({
-                            ...current,
-                            [record.id]: !current[record.id],
-                          }));
-                        }
-                        if (rowClickEnabled) {
-                          onRowClick?.(record.row);
-                        }
-                      }}
-                    >
-                      {visibleColumns.map((column, index) => {
-                        const rawValue = resolvePath(record.row, column.key);
-                        let content: ReactNode = column.render
-                          ? column.render(rawValue, record.row)
-                          : formatCell(rawValue);
+                  return (
+                    <Fragment key={record.id}>
+                      <tr
+                        className={cn(
+                          "border-b border-border/60 align-top",
+                          clickable && "cursor-pointer hover:bg-accent/40",
+                        )}
+                        onClick={() => {
+                          if (expandable) {
+                            setExpandedRows((current) => ({
+                              ...current,
+                              [record.id]: !current[record.id],
+                            }));
+                          }
+                          if (rowClickEnabled) {
+                            onRowClick?.(record.row);
+                          }
+                        }}
+                      >
+                        {visibleColumns.map((column, index) => {
+                          const rawValue = resolvePath(record.row, column.key);
+                          let content: ReactNode = column.render
+                            ? column.render(rawValue, record.row)
+                            : formatCell(rawValue);
 
-                        // Tag cells get the + / − filter affordance via
-                        // context; copy-to-clipboard works without it too.
-                        if (column.kind === "tags" && tagActionsByColumn[column.key]) {
-                          content = (
-                            <TagActionsProvider value={tagActionsByColumn[column.key]!}>
-                              {content}
-                            </TagActionsProvider>
-                          );
-                        }
+                          // Tag cells get the + / − filter affordance via
+                          // context; copy-to-clipboard works without it too.
+                          if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                            content = (
+                              <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                                {content}
+                              </TagActionsProvider>
+                            );
+                          }
 
-                        return (
-                          <td
-                            key={column.key}
-                            className={cn(
-                              DATA_TABLE_CELL_DENSITY_CLASS,
-                              alignmentClass(column.align),
-                              column.cellClassName,
-                            )}
-                          >
-                            <CellContent
-                              column={column}
-                              {...(columnWidths[column.key] !== undefined
-                                ? { width: columnWidths[column.key] }
-                                : {})}
-                            >
-                              {href && index === 0 ? (
-                                <a href={href} className="hover:underline">
-                                  {content}
-                                </a>
-                              ) : (
-                                content
+                          return (
+                            <td
+                              key={column.key}
+                              className={cn(
+                                DATA_TABLE_CELL_DENSITY_CLASS,
+                                alignmentClass(column.align),
+                                column.cellClassName,
                               )}
-                            </CellContent>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    {expanded && expandedContent && (
-                      <tr>
-                        <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
-                          <div className="rounded-md border border-border bg-background p-density-3">
-                            {expandedContent}
-                          </div>
-                        </td>
+                            >
+                              <CellContent
+                                column={column}
+                                {...(columnWidths[column.key] !== undefined
+                                  ? { width: columnWidths[column.key] }
+                                  : {})}
+                              >
+                                {href && index === 0 ? (
+                                  <a href={href} className="hover:underline">
+                                    {content}
+                                  </a>
+                                ) : (
+                                  content
+                                )}
+                              </CellContent>
+                            </td>
+                          );
+                        })}
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
+                      {expanded && expandedContent && (
+                        <tr>
+                          <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
+                            <div className="rounded-md border border-border bg-background p-density-3">
+                              {expandedContent}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="px-1 text-xs text-muted-foreground">
-          {sorted.length} of {data.length} row{data.length === 1 ? "" : "s"}
+          {loading
+            ? loadingMessage
+            : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`}
         </div>
         {columnMenu && showTablePreferencesControl && (
           <ColumnVisibilityMenu
@@ -1065,6 +1086,62 @@ function DataTableInner<T extends Record<string, unknown>>({
         )}
       </div>
     </DensityValueProvider>
+  );
+}
+
+function DataTableLoadingRows<T extends Record<string, unknown>>({
+  columns,
+  rowCount,
+  message,
+}: {
+  columns: DataTableColumn<T>[];
+  rowCount: number;
+  message: ReactNode;
+}) {
+  const safeRowCount = Math.max(1, rowCount);
+  const safeColumnCount = Math.max(1, columns.length);
+
+  return (
+    <>
+      <tr className="border-b border-border/60 bg-muted/20">
+        <td colSpan={safeColumnCount} className={cn(DATA_TABLE_CELL_DENSITY_CLASS, "p-0")}>
+          <div className="h-0.5 w-full overflow-hidden bg-muted">
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/70" />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+            <span
+              aria-hidden
+              className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+            />
+            <span>{message}</span>
+          </div>
+        </td>
+      </tr>
+      {Array.from({ length: safeRowCount }).map((_, rowIndex) => (
+        <tr key={rowIndex} className="border-b border-border/60">
+          {columns.map((column, columnIndex) => (
+            <td
+              key={column.key}
+              className={cn(
+                DATA_TABLE_CELL_DENSITY_CLASS,
+                alignmentClass(column.align),
+                column.cellClassName,
+              )}
+            >
+              <CellContent column={column}>
+                <span
+                  aria-hidden
+                  className={cn(
+                    "block h-3 animate-pulse rounded-full bg-muted",
+                    loadingSkeletonWidth(columnIndex),
+                  )}
+                />
+              </CellContent>
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
   );
 }
 
@@ -1161,30 +1238,6 @@ function HeaderFilterMenu({
       </div>
     </div>
   );
-}
-
-function clearFilterBarFilter(filter: FilterBarFilter) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
-    filter.onChange("");
-    return;
-  }
-
-  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
-    filter.onChange([]);
-    return;
-  }
-
-  if (filter.kind === "number") {
-    filter.onChange({});
-    return;
-  }
-
-  if (filter.kind === "boolean") {
-    filter.onChange(false);
-    return;
-  }
-
-  filter.onChange({});
 }
 
 function ColumnVisibilityTrigger({
@@ -1739,22 +1792,6 @@ function isColumnHideable<T extends Record<string, unknown>>(column: DataTableCo
   return column.hideable !== false;
 }
 
-function isFilterBarFilterActive(filter: FilterBarFilter) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
-    return String(filter.value ?? "").trim() !== "";
-  }
-  if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
-    return filter.value.length > 0;
-  }
-  if (filter.kind === "number") {
-    return (
-      String(filter.value.min ?? "").trim() !== "" || String(filter.value.max ?? "").trim() !== ""
-    );
-  }
-  if (filter.kind === "boolean") return filter.value;
-  return Object.keys(filter.value).length > 0;
-}
-
 function menuStateFromPointer(
   event: ReactMouseEvent<HTMLElement>,
   columnKey?: string,
@@ -2075,6 +2112,10 @@ function headerAlignmentClass(align?: DataTableColumn["align"]) {
   if (align === "right") return "justify-end";
   if (align === "center") return "justify-center";
   return "justify-start";
+}
+
+function loadingSkeletonWidth(index: number) {
+  return ["w-24", "w-40", "w-28", "w-56", "w-32", "w-48"][index % 6];
 }
 
 function cellContentStyle(width: number | undefined): CSSProperties | undefined {
