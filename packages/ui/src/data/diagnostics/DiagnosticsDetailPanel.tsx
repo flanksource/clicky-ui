@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import type { GaugeTone } from "../Gauge";
+import {
+  CodiconDebugAltIcon,
+  CodiconDebugAltSmallIcon,
+  CodiconRefreshIcon,
+  CodiconSearchIcon,
+  CodiconServerProcessIcon,
+  SvgSpinnerRingResizeIcon,
+} from "../static-icons";
 import type { ProcessNode, RunMeta } from "./types";
 import { formatBytes, processLabel, processStateColor, processStateIcon } from "./utils";
 import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
@@ -70,7 +78,7 @@ export function DiagnosticsDetailPanel({
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         <div className="text-center">
-          <Icon name="codicon:server-process" className="text-4xl mb-density-2" />
+          <Icon icon={CodiconServerProcessIcon} className="text-4xl mb-density-2" />
           <div>Select a process to view diagnostics</div>
         </div>
       </div>
@@ -119,7 +127,7 @@ function Header({ process }: { process: ProcessNode }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-density-2">
           <Icon
-            name={process.is_root ? "codicon:server-process" : "codicon:debug-alt"}
+            icon={process.is_root ? CodiconServerProcessIcon : CodiconDebugAltIcon}
             className="text-2xl text-blue-600"
           />
           <h2 className="text-lg font-bold text-foreground break-words">{processLabel(process)}</h2>
@@ -133,7 +141,7 @@ function Header({ process }: { process: ProcessNode }) {
                 process.status,
               )}`}
             >
-              <Icon name={processStateIcon(process.status)} />
+              <Icon icon={processStateIcon(process.status)} />
               {process.status}
             </span>
           ) : null}
@@ -267,7 +275,7 @@ function StackBlock(props: StackBlockProps) {
             <div className="flex items-center gap-1.5 flex-wrap">
               <div className="relative min-w-[14rem] flex-1">
                 <Icon
-                  name="codicon:search"
+                  icon={CodiconSearchIcon}
                   className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"
                 />
                 <input
@@ -416,12 +424,8 @@ function CollectButton({
       title={primary ? "Collect the latest stack trace" : "Refresh stack trace"}
     >
       <Icon
-        name={
-          busy
-            ? "svg-spinners:ring-resize"
-            : primary
-              ? "codicon:debug-alt-small"
-              : "codicon:refresh"
+        icon={
+          busy ? SvgSpinnerRingResizeIcon : primary ? CodiconDebugAltSmallIcon : CodiconRefreshIcon
         }
       />
       {busy ? "Collecting..." : primary ? "Collect stack trace" : "Refresh"}

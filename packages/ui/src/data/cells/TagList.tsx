@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { Badge } from "../Badge";
 import { HoverCard } from "../../overlay/HoverCard";
-import { Icon } from "../Icon";
+import { Icon, type StaticIconComponent } from "../Icon";
 import { Properties, type PropertiesItem } from "../Properties";
+import { LucideCopyIcon, LucideZoomInIcon, LucideZoomOutIcon } from "../static-icons";
 import { useDensityValue } from "../../hooks/use-density";
 import { cn } from "../../lib/utils";
 import type { FilterMode } from "../FilterPill";
@@ -254,16 +255,16 @@ function TagBadge({
         onClick={onPlus}
         active={includeActive}
         activeClassName="bg-green-500/20 text-green-700 dark:text-green-400"
-        icon="lucide:zoom-in"
+        icon={LucideZoomInIcon}
       />
       <TagActionButton
         ariaLabel={`Exclude ${tag.display}`}
         onClick={onMinus}
         active={excludeActive}
         activeClassName="bg-red-500/20 text-red-700 dark:text-red-400"
-        icon="lucide:zoom-out"
+        icon={LucideZoomOutIcon}
       />
-      <TagActionButton ariaLabel={`Copy ${tag.display}`} onClick={onCopy} icon="lucide:copy" />
+      <TagActionButton ariaLabel={`Copy ${tag.display}`} onClick={onCopy} icon={LucideCopyIcon} />
     </span>
   );
 
@@ -297,7 +298,7 @@ function TagActionButton({
   onClick: (event: React.MouseEvent) => void;
   active?: boolean;
   activeClassName?: string;
-  icon: string;
+  icon: StaticIconComponent;
 }) {
   return (
     <button
@@ -311,7 +312,7 @@ function TagActionButton({
         active && activeClassName,
       )}
     >
-      <Icon name={icon} className="text-xs" />
+      <Icon icon={icon} className="text-xs" />
     </button>
   );
 }
@@ -396,19 +397,19 @@ function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
       suffixActions={[
         {
           id: "include",
-          icon: "lucide:zoom-in",
+          icon: LucideZoomInIcon,
           label: (_key, tag) => `Include ${tag.display}`,
           onClick: (_key, tag) => tagActions.toggleInclude(tag.token),
         },
         {
           id: "exclude",
-          icon: "lucide:zoom-out",
+          icon: LucideZoomOutIcon,
           label: (_key, tag) => `Exclude ${tag.display}`,
           onClick: (_key, tag) => tagActions.toggleExclude(tag.token),
         },
         {
           id: "copy",
-          icon: "lucide:copy",
+          icon: LucideCopyIcon,
           label: (_key, tag) => `Copy ${tag.display}`,
           onClick: (_key, tag) => copyToClipboard(tag.value),
         },

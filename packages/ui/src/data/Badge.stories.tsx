@@ -1,6 +1,25 @@
 import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge } from "./Badge";
+import {
+  CodiconCheckIcon,
+  LucideActivityIcon,
+  LucideBoxesIcon,
+  LucideCheckIcon,
+  LucideCircleXIcon,
+  LucideClock3Icon,
+  LucideCloudIcon,
+  LucideGitBranchIcon,
+  LucideInfoIcon,
+  LucideLockIcon,
+  LucideRocketIcon,
+  LucideRouteIcon,
+  LucideServerIcon,
+  LucideShieldCheckIcon,
+  LucideShipWheelIcon,
+  LucideTriangleAlertIcon,
+  LucideZapIcon,
+} from "./static-icons";
 
 const meta: Meta<typeof Badge> = {
   title: "Data/Badge",
@@ -17,15 +36,15 @@ const TONES = ["neutral", "success", "danger", "warning", "info"] as const;
 const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
-  { label: "Healthy", value: "ready", status: "success" as const, icon: "lucide:check" },
+  { label: "Healthy", value: "ready", status: "success" as const, icon: LucideCheckIcon },
   {
     label: "Degraded",
     value: "latency",
     status: "warning" as const,
-    icon: "lucide:triangle-alert",
+    icon: LucideTriangleAlertIcon,
   },
-  { label: "Failed", value: "blocked", status: "error" as const, icon: "lucide:circle-x" },
-  { label: "Pending", value: "queued", status: "info" as const, icon: "lucide:info" },
+  { label: "Failed", value: "blocked", status: "error" as const, icon: LucideCircleXIcon },
+  { label: "Pending", value: "queued", status: "info" as const, icon: LucideInfoIcon },
 ];
 
 const FIELD_VALUE_BADGES = [
@@ -120,19 +139,25 @@ function StoryGroup({
 export const Overview: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="status" status="success" label="Build" value="passing" icon="lucide:check" />
-      <Badge variant="metric" label="Latency" value="45ms" icon="lucide:activity" />
+      <Badge
+        variant="status"
+        status="success"
+        label="Build"
+        value="passing"
+        icon={LucideCheckIcon}
+      />
+      <Badge variant="metric" label="Latency" value="45ms" icon={LucideActivityIcon} />
       <Badge
         variant="custom"
         label="v2.4.1"
-        icon="lucide:git-branch"
+        icon={LucideGitBranchIcon}
         color="#eef2ff"
         textColor="#4338ca"
       />
       <Badge
         variant="outlined"
         label="Kubernetes"
-        icon="lucide:boxes"
+        icon={LucideBoxesIcon}
         borderColor="#326ce5"
         textColor="#326ce5"
       />
@@ -158,7 +183,7 @@ export const LegacyMatrix: Story = {
         <Badge tone="danger" variant="solid" count={12}>
           errors
         </Badge>
-        <Badge tone="success" icon="codicon:check">
+        <Badge tone="success" icon={CodiconCheckIcon}>
           passed
         </Badge>
         <Badge tone="warning" size="lg">
@@ -193,7 +218,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Kubernetes"
-        icon="lucide:boxes"
+        icon={LucideBoxesIcon}
         borderColor="#326ce5"
         textColor="#326ce5"
         size="xs"
@@ -201,7 +226,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Helm"
-        icon="lucide:ship-wheel"
+        icon={LucideShipWheelIcon}
         borderColor="#0f1689"
         textColor="#0f1689"
         size="xs"
@@ -209,7 +234,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Flux"
-        icon="lucide:zap"
+        icon={LucideZapIcon}
         borderColor="#5468ff"
         textColor="#5468ff"
         size="xs"
@@ -217,7 +242,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="ArgoCD"
-        icon="lucide:route"
+        icon={LucideRouteIcon}
         borderColor="#ef7b4d"
         textColor="#ef7b4d"
         size="xs"
@@ -271,11 +296,11 @@ export const LabelValueHooks: Story = {
 export const Sizes: Story = {
   render: () => (
     <div className="flex flex-wrap items-center gap-density-2">
-      <Badge variant="status" status="success" label="xxs" size="xxs" icon="lucide:check" />
-      <Badge variant="status" status="success" label="xs" size="xs" icon="lucide:check" />
-      <Badge variant="status" status="success" label="sm" size="sm" icon="lucide:check" />
-      <Badge variant="status" status="success" label="md" size="md" icon="lucide:check" />
-      <Badge variant="status" status="success" label="lg" size="lg" icon="lucide:check" />
+      <Badge variant="status" status="success" label="xxs" size="xxs" icon={LucideCheckIcon} />
+      <Badge variant="status" status="success" label="xs" size="xs" icon={LucideCheckIcon} />
+      <Badge variant="status" status="success" label="sm" size="sm" icon={LucideCheckIcon} />
+      <Badge variant="status" status="success" label="md" size="md" icon={LucideCheckIcon} />
+      <Badge variant="status" status="success" label="lg" size="lg" icon={LucideCheckIcon} />
     </div>
   ),
 };
@@ -289,7 +314,7 @@ export const Shapes: Story = {
         label="pill"
         shape="pill"
         size="xs"
-        icon="lucide:shield-check"
+        icon={LucideShieldCheckIcon}
       />
       <Badge
         variant="status"
@@ -297,7 +322,7 @@ export const Shapes: Story = {
         label="rounded"
         shape="rounded"
         size="xs"
-        icon="lucide:shield-check"
+        icon={LucideShieldCheckIcon}
       />
       <Badge
         variant="status"
@@ -305,7 +330,7 @@ export const Shapes: Story = {
         label="square"
         shape="square"
         size="xs"
-        icon="lucide:shield-check"
+        icon={LucideShieldCheckIcon}
       />
     </div>
   ),
@@ -453,7 +478,7 @@ export const BestPractices: Story = {
               label="Healthy"
               value="ready"
               size="xs"
-              icon="lucide:check"
+              icon={LucideCheckIcon}
             />
           </div>
           <div className="px-density-3 py-density-2">
@@ -476,7 +501,7 @@ export const BestPractices: Story = {
               label="Degraded"
               value="backpressure"
               size="xs"
-              icon="lucide:triangle-alert"
+              icon={LucideTriangleAlertIcon}
             />
           </div>
           <div className="px-density-3 py-density-2">
@@ -497,16 +522,16 @@ export const BestPractices: Story = {
 export const MixedUsage: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="metric" label="CPU" value="42%" icon="lucide:activity" size="xs" />
-      <Badge variant="metric" label="Memory" value="8.2 GB" icon="lucide:server" size="xs" />
-      <Badge variant="metric" label="Uptime" value="99.9%" icon="lucide:cloud" size="xs" />
-      <Badge variant="metric" label="Latency" value="12ms" icon="lucide:clock-3" size="xs" />
+      <Badge variant="metric" label="CPU" value="42%" icon={LucideActivityIcon} size="xs" />
+      <Badge variant="metric" label="Memory" value="8.2 GB" icon={LucideServerIcon} size="xs" />
+      <Badge variant="metric" label="Uptime" value="99.9%" icon={LucideCloudIcon} size="xs" />
+      <Badge variant="metric" label="Latency" value="12ms" icon={LucideClock3Icon} size="xs" />
       <Badge
         variant="custom"
         color="#fdf2f8"
         textColor="#be185d"
         label="Production"
-        icon="lucide:rocket"
+        icon={LucideRocketIcon}
         size="xs"
       />
       <Badge
@@ -514,7 +539,7 @@ export const MixedUsage: Story = {
         color="#ecfdf5"
         textColor="#065f46"
         label="Secured"
-        icon="lucide:lock"
+        icon={LucideLockIcon}
         size="xs"
       />
       <Badge
@@ -522,7 +547,7 @@ export const MixedUsage: Story = {
         color="#fffbeb"
         textColor="#92400e"
         label="Beta"
-        icon="lucide:zap"
+        icon={LucideZapIcon}
         size="xs"
       />
       <Badge
@@ -530,7 +555,7 @@ export const MixedUsage: Story = {
         color="#eef2ff"
         textColor="#4338ca"
         label="v2.4.1"
-        icon="lucide:git-branch"
+        icon={LucideGitBranchIcon}
         size="xs"
       />
     </div>

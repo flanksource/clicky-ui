@@ -4,6 +4,7 @@ import { AnsiHtml } from "./AnsiHtml";
 import { DataTable, type DataTableColumn, type DataTableProps } from "./DataTable";
 import { Properties, type PropertiesAction, type PropertiesItem } from "./Properties";
 import { formatPropertyLabel } from "./properties-utils";
+import { LucideCopyIcon, LucideZoomInIcon, LucideZoomOutIcon } from "./static-icons";
 
 export type LogsTableInput = string | Record<string, unknown>;
 
@@ -266,7 +267,7 @@ function LogDetails({ row }: { row: LogsTableRow }) {
   const prefixActions: PropertiesAction<unknown>[] = [
     {
       id: "expand",
-      icon: "lucide:zoom-in",
+      icon: LucideZoomInIcon,
       label: (key) => `Expand ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !!item.expanded,
@@ -274,7 +275,7 @@ function LogDetails({ row }: { row: LogsTableRow }) {
     },
     {
       id: "collapse",
-      icon: "lucide:zoom-out",
+      icon: LucideZoomOutIcon,
       label: (key) => `Collapse ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !item.expanded,
@@ -285,7 +286,7 @@ function LogDetails({ row }: { row: LogsTableRow }) {
   const suffixActions: PropertiesAction<unknown>[] = [
     {
       id: "copy",
-      icon: "lucide:copy",
+      icon: LucideCopyIcon,
       label: (key) => `Copy ${labelForPath(key)}`,
       onClick: (_k, value) => copyLogDetailsValue(value),
     },

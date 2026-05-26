@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Badge } from "./Badge";
+import { CodiconErrorIcon, LucideActivityIcon, LucideCheckIcon } from "./static-icons";
 
 describe("Badge", () => {
   it("defaults plain children-only badges to the legacy soft variant", () => {
@@ -12,7 +13,7 @@ describe("Badge", () => {
 
   it("keeps the legacy tone/count/children path working", () => {
     render(
-      <Badge tone="danger" variant="solid" count={12} icon="codicon:error">
+      <Badge tone="danger" variant="solid" count={12} icon={CodiconErrorIcon}>
         errors
       </Badge>,
     );
@@ -20,11 +21,11 @@ describe("Badge", () => {
     const badge = screen.getByText("errors").parentElement;
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(badge?.className).toMatch(/bg-red-500/);
-    expect(document.querySelector("iconify-icon")).toBeInTheDocument();
+    expect(document.querySelector("svg")).toBeInTheDocument();
   });
 
   it("defaults rich props to the metric layout", () => {
-    const { container } = render(<Badge label="Latency" value="45ms" icon="lucide:activity" />);
+    const { container } = render(<Badge label="Latency" value="45ms" icon={LucideActivityIcon} />);
 
     const badge = container.firstElementChild as HTMLElement | null;
     expect(screen.getByText("45ms")).toBeInTheDocument();
@@ -33,7 +34,13 @@ describe("Badge", () => {
 
   it("renders semantic status badges", () => {
     const { container } = render(
-      <Badge variant="status" status="success" label="Healthy" value="ready" icon="lucide:check" />,
+      <Badge
+        variant="status"
+        status="success"
+        label="Healthy"
+        value="ready"
+        icon={LucideCheckIcon}
+      />,
     );
 
     const badge = container.firstElementChild as HTMLElement | null;

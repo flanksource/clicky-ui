@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Properties, type PropertiesItem } from "./Properties";
+import { LucideCopyIcon, LucideZoomInIcon } from "./static-icons";
 
 type Row = PropertiesItem<string>;
 
@@ -60,7 +61,7 @@ describe("Properties", () => {
         suffixActions={[
           {
             id: "copy",
-            icon: "lucide:copy",
+            icon: LucideCopyIcon,
             label: (key) => `Copy ${key}`,
             onClick,
           },
@@ -87,7 +88,7 @@ describe("Properties", () => {
         prefixActions={[
           {
             id: "expand",
-            icon: "lucide:zoom-in",
+            icon: LucideZoomInIcon,
             label: (key) => `Expand ${key}`,
             visible: (_k, _v, item) => !!item.expandable,
             disabled: (_k, _v, item) => !!item.expanded,
@@ -137,6 +138,6 @@ describe("Properties", () => {
     const { container } = render(
       <Properties items={[{ key: "namespace", value: "demo" }]} labelIcon="k8s-namespace" />,
     );
-    expect(container.querySelector("iconify-icon")).toBeInTheDocument();
+    expect(container.querySelector('[title="k8s-namespace"]')).toBeInTheDocument();
   });
 });

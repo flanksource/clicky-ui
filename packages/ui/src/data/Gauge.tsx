@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
 
 export type GaugeTone = "neutral" | "success" | "warning" | "danger" | "info";
 
@@ -10,7 +10,7 @@ export type GaugeProps = {
   max?: number;
   tone?: GaugeTone;
   suffix?: string;
-  icon?: string | ReactNode;
+  icon?: string | StaticIconComponent | ReactNode;
   subtitle?: ReactNode;
   meta?: ReactNode;
   className?: string;
@@ -64,14 +64,24 @@ export function Gauge({
   );
 }
 
-function GaugeIcon({ icon }: { icon: string | ReactNode }) {
+function GaugeIcon({ icon }: { icon: string | StaticIconComponent | ReactNode }) {
   if (typeof icon === "string") {
     return <Icon name={icon} width={16} height={16} className="text-muted-foreground" />;
   }
+  if (isValidElement(icon)) {
+    return (
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">
+        {icon}
+      </span>
+    );
+  }
 
   return (
-    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">
-      {icon}
-    </span>
+    <Icon
+      icon={icon as StaticIconComponent}
+      width={16}
+      height={16}
+      className="text-muted-foreground"
+    />
   );
 }

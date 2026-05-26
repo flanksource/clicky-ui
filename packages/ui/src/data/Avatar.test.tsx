@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Avatar } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
+import { PhCheckThinIcon } from "./static-icons";
 
 describe("Avatar", () => {
   afterEach(() => {
@@ -85,7 +86,7 @@ describe("AvatarBadge", () => {
       <AvatarBadge
         alt="Tokollo Mphahlele"
         initials="T"
-        statusIcon="ph:check-thin"
+        statusIcon={PhCheckThinIcon}
         statusTone="emerald"
       />,
     );

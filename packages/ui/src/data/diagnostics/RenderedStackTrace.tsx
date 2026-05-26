@@ -6,6 +6,13 @@ import {
 } from "./stacktrace-parse";
 import { highlightCode, loadShikiTransformers } from "../code-highlight";
 import { Icon } from "../Icon";
+import {
+  CodiconChipIcon,
+  CodiconDebugStackframeDotIcon,
+  CodiconDebugStepOverIcon,
+  CodiconErrorIcon,
+  CodiconSymbolMethodIcon,
+} from "../static-icons";
 
 // SourceResolver matches the Go clicky.SourceResolver interface: given a
 // frame, return surrounding source lines so the renderer can display inline
@@ -100,7 +107,7 @@ export function StackTrace({
         <div className="border-b border-border bg-red-500/5 px-3 py-2">
           <div className="flex min-w-0 items-start gap-2">
             <Icon
-              name="codicon:error"
+              icon={CodiconErrorIcon}
               className="mt-0.5 shrink-0 text-sm text-red-600 dark:text-red-400"
             />
             <div className="min-w-0 flex-1">
@@ -125,7 +132,7 @@ export function StackTrace({
               key={i}
               className="flex min-w-0 items-start gap-2 font-mono text-[11px] text-orange-700 dark:text-orange-300"
             >
-              <Icon name="codicon:debug-stackframe-dot" className="mt-0.5 shrink-0 text-xs" />
+              <Icon icon={CodiconDebugStackframeDotIcon} className="mt-0.5 shrink-0 text-xs" />
               <span className="shrink-0 opacity-75">Caused by</span>
               <span className="min-w-0 break-all">{cause}</span>
             </div>
@@ -158,11 +165,11 @@ function FrameWithSource({ frame, index }: { frame: ParsedStackFrame; index: num
 }
 
 function StackFrameRow({ frame, index }: { frame: ParsedStackFrame; index: number }) {
-  const iconName = frame.nativeMethod
-    ? "codicon:chip"
+  const icon = frame.nativeMethod
+    ? CodiconChipIcon
     : frame.runtime
-      ? "codicon:debug-step-over"
-      : "codicon:symbol-method";
+      ? CodiconDebugStepOverIcon
+      : CodiconSymbolMethodIcon;
   const className = frame.class;
   const methodName = frame.displayName || frame.method || frame.functionName;
 
@@ -175,7 +182,7 @@ function StackFrameRow({ frame, index }: { frame: ParsedStackFrame; index: numbe
     >
       <div className="flex items-start justify-end gap-1 pt-0.5 font-mono text-[10px] text-muted-foreground">
         <span>{index + 1}</span>
-        <Icon name={iconName} className="mt-px shrink-0 text-[11px]" />
+        <Icon icon={icon} className="mt-px shrink-0 text-[11px]" />
       </div>
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">

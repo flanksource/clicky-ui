@@ -1,3 +1,12 @@
+import type { StaticIconComponent } from "../Icon";
+import {
+  CodiconCircleFilledIcon,
+  CodiconDebugPauseIcon,
+  CodiconDebugStepOverIcon,
+  CodiconErrorIcon,
+  CodiconPlayCircleIcon,
+  CodiconWatchIcon,
+} from "../static-icons";
 import type { ProcessNode } from "./types";
 
 export function countProcesses(node?: ProcessNode): number {
@@ -15,14 +24,14 @@ export function findProcessByPID(node: ProcessNode | undefined, pid: number): Pr
   return null;
 }
 
-export function processStateIcon(status?: string): string {
+export function processStateIcon(status?: string): StaticIconComponent {
   const value = (status || "").toLowerCase();
-  if (value.includes("run")) return "codicon:play-circle";
-  if (value.includes("sleep") || value.includes("idle")) return "codicon:clock";
-  if (value.includes("stop") || value.includes("halt")) return "codicon:debug-pause";
-  if (value.includes("zombie") || value.includes("dead")) return "codicon:error";
-  if (value.includes("wait") || value.includes("block")) return "codicon:debug-step-over";
-  return "codicon:circle-filled";
+  if (value.includes("run")) return CodiconPlayCircleIcon;
+  if (value.includes("sleep") || value.includes("idle")) return CodiconWatchIcon;
+  if (value.includes("stop") || value.includes("halt")) return CodiconDebugPauseIcon;
+  if (value.includes("zombie") || value.includes("dead")) return CodiconErrorIcon;
+  if (value.includes("wait") || value.includes("block")) return CodiconDebugStepOverIcon;
+  return CodiconCircleFilledIcon;
 }
 
 export function processStateColor(status?: string): string {

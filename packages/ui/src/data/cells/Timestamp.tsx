@@ -1,4 +1,5 @@
 import { cn } from "../../lib/utils";
+import type { TimeRangePresetGroup } from "../../components/TimeRange";
 
 export type TimestampMode = "auto" | "absolute" | "relative" | "time";
 
@@ -14,7 +15,13 @@ export type TimestampOptions = {
    */
   autoRangeFilter?: boolean;
   /** Override the trace-style preset list ("Last 15 minutes", etc.). */
-  rangePresets?: Array<{ label: string; from: string; to: string }>;
+  rangePresets?: Array<{ label: string; from: string; to: string } | TimeRangePresetGroup>;
+  /** Enable absolute date+time input and timezone selection for range filters. */
+  timeEnabled?: boolean;
+  /** Default timezone used when encoding absolute date+time range values. */
+  timeZone?: string;
+  /** Selectable timezones shown when `timeEnabled` is true. */
+  timeZones?: string[];
   /**
    * Default range applied on first render. Either side may use date-math
    * (`now-24h`, `now`) or any value parseable by `parseTimestamp`.
@@ -50,12 +57,14 @@ const UNIT_MS: Record<string, number> = {
   w: 604_800_000,
 };
 
-const RELATIVE_PATTERN = /^now\s*([+-])\s*(\d+)\s*([smhdw])$/i;
+const RELATIVE_PATTERN = /^now\s*([+-])\s*(\d+)\s*([smhdwMqy])$/;
+const ANCHORED_PATTERN = /^now\/([wMqy])(?:\s*([+-])\s*(\d+)\s*([wMqy]))?$/;
 
 /**
  * Resolves date-math strings to an absolute Date. Recognised forms:
  *   - "now"
- *   - "now-15m", "now-1h", "now+30s", "now-7d", "now-2w" (units: s/m/h/d/w)
+ *   - "now-15m", "now-1h", "now+30s", "now-7d", "now-2w" (units: s/m/h/d/w/M/q/y)
+ *   - "now/w", "now/M", "now/q", "now/y" with optional calendar offsets
  *   - any value parseable by `parseTimestamp` (ISO, epoch ms/s, Date)
  * Returns null for unparseable input.
  */
@@ -68,10 +77,24 @@ export function resolveDateMath(value: unknown, now: Date = new Date()): Date | 
 
     if (trimmed.toLowerCase() === "now") return new Date(now.getTime());
 
+    const anchoredMatch = trimmed.match(ANCHORED_PATTERN);
+    if (anchoredMatch) {
+      const [, anchor, sign, amount, unit] = anchoredMatch;
+      let anchored = startOfPeriod(now, anchor!);
+      if (sign && amount && unit) {
+        anchored = addPeriod(anchored, unit, Number(amount) * (sign === "-" ? -1 : 1));
+      }
+      return anchored;
+    }
+
     const match = trimmed.match(RELATIVE_PATTERN);
     if (match) {
       const [, sign, amount, unit] = match;
-      const unitMs = UNIT_MS[unit!.toLowerCase()];
+      const calendarUnit = unit!;
+      if (isCalendarUnit(calendarUnit)) {
+        return addPeriod(now, calendarUnit, Number(amount) * (sign === "-" ? -1 : 1));
+      }
+      const unitMs = UNIT_MS[calendarUnit.toLowerCase()];
       if (!unitMs) return null;
       const delta = Number(amount) * unitMs * (sign === "-" ? -1 : 1);
       return new Date(now.getTime() + delta);
@@ -79,6 +102,45 @@ export function resolveDateMath(value: unknown, now: Date = new Date()): Date | 
   }
 
   return parseTimestamp(value);
+}
+
+function isCalendarUnit(unit: string) {
+  return unit === "M" || unit === "q" || unit === "y";
+}
+
+function startOfPeriod(date: Date, unit: string) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+
+  if (unit === "w") {
+    const start = new Date(Date.UTC(year, month, day));
+    const dayOfWeek = start.getUTCDay();
+    const daysSinceMonday = (dayOfWeek + 6) % 7;
+    start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+    return start;
+  }
+  if (unit === "M") return new Date(Date.UTC(year, month, 1));
+  if (unit === "q") return new Date(Date.UTC(year, Math.floor(month / 3) * 3, 1));
+  if (unit === "y") return new Date(Date.UTC(year, 0, 1));
+  return new Date(date.getTime());
+}
+
+function addPeriod(date: Date, unit: string, amount: number) {
+  const next = new Date(date.getTime());
+  if (unit === "w") {
+    next.setUTCDate(next.getUTCDate() + amount * 7);
+  } else if (unit === "M") {
+    next.setUTCMonth(next.getUTCMonth() + amount);
+  } else if (unit === "q") {
+    next.setUTCMonth(next.getUTCMonth() + amount * 3);
+  } else if (unit === "y") {
+    next.setUTCFullYear(next.getUTCFullYear() + amount);
+  } else {
+    const unitMs = UNIT_MS[unit.toLowerCase()];
+    if (unitMs) next.setTime(next.getTime() + amount * unitMs);
+  }
+  return next;
 }
 
 const MS_PER_MINUTE = 60_000;

@@ -70,7 +70,10 @@
     "check": "vp check"
   },
   "dependencies": {
-    "@iconify/react": "^5.0.2",
+    "@iconify-react/codicon": "catalog:",
+    "@iconify-react/lucide": "catalog:",
+    "@iconify-react/ph": "catalog:",
+    "@iconify-react/svg-spinners": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
     "class-variance-authority": "^0.7.1",

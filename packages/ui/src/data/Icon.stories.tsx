@@ -1,5 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Icon } from "./Icon";
+import {
+  CodiconCheckIcon,
+  CodiconCircleOutlineIcon,
+  CodiconErrorIcon,
+  CodiconInfoIcon,
+  CodiconQuestionIcon,
+  CodiconStarFullIcon,
+  PhCheckThinIcon,
+  PhHourglassMediumThinIcon,
+  PhXThinIcon,
+  SvgSpinnerRingResizeIcon,
+} from "./static-icons";
 import { SIZE_TOKENS } from "../lib/size";
 
 const meta: Meta<typeof Icon> = {
@@ -9,7 +21,7 @@ const meta: Meta<typeof Icon> = {
     docs: {
       description: {
         component:
-          'Thin wrapper over the `iconify-icon` web component. Add `<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>` to your host HTML, or install `iconify-icon` as a runtime dep.',
+          "Renders statically imported icon components for built-in icons. Runtime string names are only for user-supplied data handled by a registered fallback provider.",
       },
     },
   },
@@ -19,15 +31,15 @@ export default meta;
 type Story = StoryObj<typeof Icon>;
 
 export const Check: Story = {
-  args: { name: "codicon:check", className: "text-green-600 text-xl" },
+  args: { icon: CodiconCheckIcon, className: "text-green-600 text-xl" },
 };
-export const Error: Story = { args: { name: "codicon:error", className: "text-red-600 text-xl" } };
+export const Error: Story = { args: { icon: CodiconErrorIcon, className: "text-red-600 text-xl" } };
 export const Spinner: Story = {
-  args: { name: "svg-spinners:ring-resize", className: "text-blue-500 text-2xl" },
+  args: { icon: SvgSpinnerRingResizeIcon, className: "text-blue-500 text-2xl" },
 };
 
 export const Badge: Story = {
-  args: { name: "ph:check-thin", style: "badge", tone: "emerald", size: "lg", title: "approved" },
+  args: { icon: PhCheckThinIcon, style: "badge", tone: "emerald", size: "lg", title: "approved" },
 };
 
 export const BadgeSizes: Story = {
@@ -35,7 +47,7 @@ export const BadgeSizes: Story = {
     <div className="flex items-end gap-4">
       {SIZE_TOKENS.map((size) => (
         <div key={size} className="flex flex-col items-center gap-2">
-          <Icon name="ph:check-thin" style="badge" tone="emerald" size={size} title="approved" />
+          <Icon icon={PhCheckThinIcon} style="badge" tone="emerald" size={size} title="approved" />
           <span className="font-mono text-[10px] text-muted-foreground">{size}</span>
         </div>
       ))}
@@ -46,13 +58,13 @@ export const BadgeSizes: Story = {
 export const BadgeTones: Story = {
   render: () => (
     <div className="flex items-center gap-3">
-      <Icon name="ph:check-thin" style="badge" tone="emerald" size="lg" title="approved" />
-      <Icon name="ph:hourglass-medium-thin" style="badge" tone="amber" size="lg" title="pending" />
-      <Icon name="ph:x-thin" style="badge" tone="rose" size="lg" title="rejected" />
-      <Icon name="codicon:info" style="badge" tone="sky" size="lg" title="info" />
-      <Icon name="codicon:star" style="badge" tone="violet" size="lg" title="starred" />
-      <Icon name="codicon:circle-outline" style="badge" tone="slate" size="lg" title="draft" />
-      <Icon name="codicon:question" style="badge" tone="neutral" size="lg" title="unknown" />
+      <Icon icon={PhCheckThinIcon} style="badge" tone="emerald" size="lg" title="approved" />
+      <Icon icon={PhHourglassMediumThinIcon} style="badge" tone="amber" size="lg" title="pending" />
+      <Icon icon={PhXThinIcon} style="badge" tone="rose" size="lg" title="rejected" />
+      <Icon icon={CodiconInfoIcon} style="badge" tone="sky" size="lg" title="info" />
+      <Icon icon={CodiconStarFullIcon} style="badge" tone="violet" size="lg" title="starred" />
+      <Icon icon={CodiconCircleOutlineIcon} style="badge" tone="slate" size="lg" title="draft" />
+      <Icon icon={CodiconQuestionIcon} style="badge" tone="neutral" size="lg" title="unknown" />
     </div>
   ),
 };

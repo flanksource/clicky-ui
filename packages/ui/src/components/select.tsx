@@ -1,6 +1,7 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
+import { CodiconChevronDownIcon } from "../data/static-icons";
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
 
@@ -37,7 +38,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             : children}
         </select>
         <Icon
-          name="codicon:chevron-down"
+          icon={CodiconChevronDownIcon}
           className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
         />
       </div>

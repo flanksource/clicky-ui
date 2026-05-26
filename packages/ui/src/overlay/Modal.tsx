@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
+import { CodiconCloseIcon } from "../data/static-icons";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -89,7 +90,7 @@ export function Modal({
                 aria-label="Close"
                 className="text-muted-foreground hover:text-foreground"
               >
-                <Icon name="codicon:close" />
+                <Icon icon={CodiconCloseIcon} />
               </button>
             )}
           </div>

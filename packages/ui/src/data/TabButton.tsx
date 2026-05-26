@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
 
 export type TabButtonProps = {
   active: boolean;
   onClick: () => void;
   label: ReactNode;
-  icon?: string;
+  icon?: string | StaticIconComponent;
   count?: number;
   countColor?: string;
   className?: string;
@@ -35,7 +35,7 @@ export function TabButton({
         className,
       )}
     >
-      {icon && <Icon name={icon} />}
+      {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
       <span>{label}</span>
       {count !== undefined && count > 0 && (
         <span

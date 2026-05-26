@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Avatar, type AvatarKind, type AvatarVariant } from "./Avatar";
-import { Icon, type IconTone } from "./Icon";
+import { Icon, type IconTone, type StaticIconComponent } from "./Icon";
 import { cn } from "../lib/utils";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -13,7 +13,7 @@ export type AvatarBadgeProps = {
   avatarVariant?: AvatarVariant;
   size?: SizeToken;
   title?: string;
-  statusIcon?: string;
+  statusIcon?: string | StaticIconComponent;
   statusTone?: IconTone;
   statusTitle?: string;
   comment?: ReactNode;
@@ -86,7 +86,7 @@ export function AvatarBadge({
         </span>
         {statusIcon && (
           <Icon
-            name={statusIcon}
+            {...(typeof statusIcon === "string" ? { name: statusIcon } : { icon: statusIcon })}
             style="badge"
             size={size}
             tone={statusTone}

@@ -2,6 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Gauge } from "./Gauge";
 import { TabButton } from "./TabButton";
+import {
+  CodiconBeakerIcon,
+  CodiconErrorIcon,
+  CodiconGraphIcon,
+  CodiconPassIcon,
+  CodiconWarningIcon,
+} from "./static-icons";
 
 const meta: Meta<typeof TabButton> = {
   title: "Data/TabButton",
@@ -20,7 +27,7 @@ export const TabsWithCounts: Story = {
           active={active === "tests"}
           onClick={() => setActive("tests")}
           label="Tests"
-          icon="codicon:beaker"
+          icon={CodiconBeakerIcon}
           count={120}
           countColor="bg-blue-500"
         />
@@ -28,7 +35,7 @@ export const TabsWithCounts: Story = {
           active={active === "lint"}
           onClick={() => setActive("lint")}
           label="Lint"
-          icon="codicon:warning"
+          icon={CodiconWarningIcon}
           count={4}
           countColor="bg-yellow-500"
         />
@@ -36,7 +43,7 @@ export const TabsWithCounts: Story = {
           active={active === "bench"}
           onClick={() => setActive("bench")}
           label="Benchmarks"
-          icon="codicon:graph"
+          icon={CodiconGraphIcon}
         />
       </div>
     );
@@ -47,7 +54,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
   render: () => (
     <div className="flex gap-density-3">
       <Gauge
-        icon="codicon:pass"
+        icon={CodiconPassIcon}
         label="Passed"
         value={92}
         tone="success"
@@ -55,7 +62,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
         meta="fresh"
       />
       <Gauge
-        icon="codicon:error"
+        icon={CodiconErrorIcon}
         label="Failed"
         value={3}
         tone="danger"
@@ -63,7 +70,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
         meta="3m"
       />
       <Gauge
-        icon="codicon:warning"
+        icon={CodiconWarningIcon}
         label="Skipped"
         value={5}
         tone="warning"

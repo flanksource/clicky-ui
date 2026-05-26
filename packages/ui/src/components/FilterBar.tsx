@@ -12,13 +12,21 @@ import {
 } from "react";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
+import {
+  CodiconChevronDownIcon,
+  CodiconChevronRightIcon,
+  CodiconChevronUpIcon,
+  CodiconCloseIcon,
+  CodiconFilterIcon,
+  CodiconSearchIcon,
+} from "../data/static-icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
-import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
 import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { Select } from "./select";
+import { TimeRange, type TimeRangePresetGroup } from "./TimeRange";
 
 const FILTER_INPUT_DEBOUNCE_MS = 500;
 const FILTER_BAR_GAP_PX = 8;
@@ -202,7 +210,10 @@ export type FilterBarRangeProps = {
   from?: string;
   to?: string;
   onApply: (from: string, to: string) => void;
-  presets?: FilterBarRangePreset[];
+  presets?: Array<FilterBarRangePreset | TimeRangePresetGroup>;
+  timeEnabled?: boolean;
+  timeZone?: string;
+  timeZones?: string[];
   fromPlaceholder?: string;
   toPlaceholder?: string;
   emptyLabel?: string;
@@ -590,7 +601,7 @@ function OverflowFiltersMenu({
           activeHidden > 0 && "border-primary/40 text-primary",
         )}
       >
-        <Icon name="codicon:filter" className="text-[14px]" />
+        <Icon icon={CodiconFilterIcon} className="text-[14px]" />
         <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
           {countLabel}
         </span>
@@ -623,7 +634,7 @@ function OverflowFiltersMenu({
                 className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
                 onClick={closeOverflowMenu}
               >
-                <Icon name="codicon:close" className="text-sm" />
+                <Icon icon={CodiconCloseIcon} className="text-sm" />
               </button>
             </div>
           </div>
@@ -657,7 +668,7 @@ function OverflowFiltersMenu({
                     onClick={() => clearFilterBarFilter(filter)}
                     disabled={!active}
                   >
-                    <Icon name="codicon:close" className="text-sm" />
+                    <Icon icon={CodiconCloseIcon} className="text-sm" />
                   </button>
                 </div>
               );
@@ -870,70 +881,32 @@ export function FilterBarRangePanel({
   from = "",
   to = "",
   onApply,
-  presets: _presets,
+  presets,
+  timeEnabled,
+  timeZone,
+  timeZones,
   fromPlaceholder,
   toPlaceholder,
-  emptyLabel: _emptyLabel,
+  emptyLabel,
 }: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
-  const fromInputRef = useRef<HTMLInputElement>(null);
-  const toInputRef = useRef<HTMLInputElement>(null);
-  const [draftFrom, setDraftFrom] = useState(from);
-  const [draftTo, setDraftTo] = useState(to);
-
-  useEffect(() => {
-    setDraftFrom(from);
-    setDraftTo(to);
-  }, [from, to]);
-
-  function applyRange(nextFrom: string, nextTo: string) {
-    onApply(
-      kind === "time" ? normalizeDateMath(nextFrom) : nextFrom.trim(),
-      kind === "time" ? normalizeDateMath(nextTo) : nextTo.trim(),
-    );
-  }
-
   return (
-    <div className="w-72 text-popover-foreground">
-      <div className="p-3">
-        <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-muted-foreground">From</label>
-            <RangeInput
-              inputRef={fromInputRef}
-              kind={kind}
-              ariaLabel={`${label} from`}
-              placeholder={fromPlaceholder ?? (kind === "date" ? "" : "now-24h")}
-              value={draftFrom}
-              onChange={setDraftFrom}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-muted-foreground">To</label>
-            <RangeInput
-              inputRef={toInputRef}
-              kind={kind}
-              ariaLabel={`${label} to`}
-              placeholder={toPlaceholder ?? (kind === "date" ? "" : "now")}
-              value={draftTo}
-              onChange={setDraftTo}
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="h-8 px-3 text-xs"
-            onClick={() => applyRange(draftFrom, draftTo)}
-          >
-            Apply
-          </Button>
-        </div>
-      </div>
+    <div className="w-72 p-3 text-popover-foreground">
+      <TimeRange
+        kind={kind}
+        label={label}
+        align="left"
+        from={from}
+        to={to}
+        onApply={onApply}
+        {...(presets ? { presets } : {})}
+        {...(timeEnabled !== undefined ? { timeEnabled } : {})}
+        {...(timeZone ? { timeZone } : {})}
+        {...(timeZones ? { timeZones } : {})}
+        {...(fromPlaceholder ? { fromPlaceholder } : {})}
+        {...(toPlaceholder ? { toPlaceholder } : {})}
+        {...(emptyLabel ? { emptyLabel } : {})}
+        panelClassName="left-0 right-auto"
+      />
     </div>
   );
 }
@@ -1009,7 +982,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
             {search.ariaLabel ?? "Search"}
           </span>
         ) : (
-          <Icon name="codicon:search" className="mr-2 shrink-0 text-muted-foreground" />
+          <Icon icon={CodiconSearchIcon} className="mr-2 shrink-0 text-muted-foreground" />
         )}
         <input
           type="search"
@@ -1201,7 +1174,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
       >
         <span className="truncate">{summary}</span>
         <Icon
-          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
           className="text-muted-foreground"
         />
       </Button>
@@ -1455,7 +1428,7 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
       >
         <span className="truncate">{summary}</span>
         <Icon
-          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
           className="text-muted-foreground"
         />
       </Button>
@@ -1478,7 +1451,7 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
 
           {showOptionFilter && (
             <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-              <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+              <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
               <input
                 type="search"
                 aria-label={`Filter ${filter.label} options`}
@@ -1582,7 +1555,7 @@ function MultiFilterPanel({
 
       {showOptionFilter && (
         <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+          <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
           <input
             type="search"
             aria-label={`Filter ${filter.label} options`}
@@ -1740,7 +1713,7 @@ function NestedMultiFilterPanel({
                     {selected}/{group.options.length}
                   </span>
                 )}
-                <Icon name="codicon:chevron-right" className="shrink-0 text-muted-foreground" />
+                <Icon icon={CodiconChevronRightIcon} className="shrink-0 text-muted-foreground" />
               </div>
             );
           })}
@@ -1914,7 +1887,7 @@ function NestedMultiFilterField({
       >
         <span className="truncate">{summary}</span>
         <Icon
-          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
           className="text-muted-foreground"
         />
       </Button>
@@ -1980,7 +1953,10 @@ function NestedMultiFilterField({
                         {selected}/{group.options.length}
                       </span>
                     )}
-                    <Icon name="codicon:chevron-right" className="shrink-0 text-muted-foreground" />
+                    <Icon
+                      icon={CodiconChevronRightIcon}
+                      className="shrink-0 text-muted-foreground"
+                    />
                   </div>
                 );
               })}
@@ -2112,118 +2088,31 @@ function RangeControlButton({
   from = "",
   to = "",
   onApply,
-  presets: _presets,
+  presets,
+  timeEnabled,
+  timeZone,
+  timeZones,
   fromPlaceholder,
   toPlaceholder,
   emptyLabel,
   className,
 }: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const fromInputRef = useRef<HTMLInputElement>(null);
-  const toInputRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
-  const [draftFrom, setDraftFrom] = useState(from);
-  const [draftTo, setDraftTo] = useState(to);
-
-  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
-
-  useEffect(() => {
-    if (open) {
-      setDraftFrom(from);
-      setDraftTo(to);
-    }
-  }, [from, open, to]);
-
-  const buttonLabel = formatRangeLabel(kind, from, to, emptyLabel);
-
-  function applyRange(nextFrom: string, nextTo: string) {
-    onApply(
-      kind === "time" ? normalizeDateMath(nextFrom) : nextFrom.trim(),
-      kind === "time" ? normalizeDateMath(nextTo) : nextTo.trim(),
-    );
-    setOpen(false);
-  }
-
-  function clearRange() {
-    setDraftFrom("");
-    setDraftTo("");
-    onApply("", "");
-    setOpen(false);
-  }
-
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="outline"
-        size="sm"
-        aria-label={`${label} filter`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={() => setOpen((current) => !current)}
-        className="h-7 w-fit max-w-[11rem] min-w-0 gap-2 px-2 text-xs font-normal"
-      >
-        <Icon name="codicon:calendar" className="text-muted-foreground text-[14px]" />
-        <span className="truncate font-normal tabular-nums">{buttonLabel}</span>
-      </Button>
-
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-md shadow-black/5 outline-none">
-          <div className="p-3">
-            <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {label}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-muted-foreground">From</label>
-                <RangeInput
-                  inputRef={fromInputRef}
-                  kind={kind}
-                  ariaLabel={`${label} from`}
-                  placeholder={fromPlaceholder ?? (kind === "date" ? "" : "now-24h")}
-                  value={draftFrom}
-                  onChange={setDraftFrom}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-muted-foreground">To</label>
-                <RangeInput
-                  inputRef={toInputRef}
-                  kind={kind}
-                  ariaLabel={`${label} to`}
-                  placeholder={toPlaceholder ?? (kind === "date" ? "" : "now")}
-                  value={draftTo}
-                  onChange={setDraftTo}
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex justify-between gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-3 text-xs"
-                disabled={!from && !to}
-                onClick={clearRange}
-              >
-                Clear
-              </Button>
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                className="h-8 px-3 text-xs"
-                onClick={() => applyRange(draftFrom, draftTo)}
-              >
-                Apply
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <TimeRange
+      kind={kind}
+      label={label}
+      from={from}
+      to={to}
+      onApply={onApply}
+      {...(presets ? { presets } : {})}
+      {...(timeEnabled !== undefined ? { timeEnabled } : {})}
+      {...(timeZone ? { timeZone } : {})}
+      {...(timeZones ? { timeZones } : {})}
+      {...(fromPlaceholder ? { fromPlaceholder } : {})}
+      {...(toPlaceholder ? { toPlaceholder } : {})}
+      {...(emptyLabel ? { emptyLabel } : {})}
+      {...(className ? { className } : {})}
+    />
   );
 }
 
@@ -2722,82 +2611,4 @@ function estimateFilterWidth(filter: FilterBarFilter) {
   if (filter.kind === "multi" || filter.kind === "nested-multi") return 136;
   if (filter.kind === "number") return 152;
   return Math.max(144, filter.label.length * 8 + 96);
-}
-
-function normalizeDateMath(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed === "now" || trimmed.startsWith("now")) return trimmed;
-  if (/^[+-]\d/.test(trimmed)) return `now${trimmed}`;
-  return trimmed;
-}
-
-function formatRangeLabel(
-  kind: "date" | "time",
-  from: string,
-  to: string,
-  emptyLabel?: string,
-): string {
-  const trimmedFrom = from.trim();
-  const trimmedTo = to.trim();
-
-  if (!trimmedFrom && !trimmedTo) {
-    return emptyLabel ?? (kind === "date" ? "Any date" : "now-24h");
-  }
-
-  if (kind === "time") {
-    const normalizedFrom = normalizeDateMath(trimmedFrom);
-    const normalizedTo = normalizeDateMath(trimmedTo || "now");
-    if (!normalizedFrom) return normalizedTo;
-    if (normalizedTo === "now") return normalizedFrom;
-    return `${normalizedFrom} → ${normalizedTo}`;
-  }
-
-  if (trimmedFrom && trimmedTo && trimmedFrom === trimmedTo) {
-    return trimmedFrom;
-  }
-
-  if (!trimmedFrom) return trimmedTo;
-  if (!trimmedTo) return trimmedFrom;
-  return `${trimmedFrom} → ${trimmedTo}`;
-}
-
-function RangeInput({
-  inputRef,
-  kind,
-  ariaLabel,
-  value,
-  onChange,
-  placeholder,
-}: {
-  inputRef: RefObject<HTMLInputElement | null>;
-  kind: "date" | "time";
-  ariaLabel: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  if (kind === "date") {
-    return (
-      <DatePicker
-        ref={inputRef as RefObject<HTMLInputElement>}
-        aria-label={ariaLabel}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        inputClassName="pr-8"
-      />
-    );
-  }
-
-  return (
-    <DateTimePicker
-      ref={inputRef as RefObject<HTMLInputElement>}
-      aria-label={ariaLabel}
-      inputClassName="pr-8"
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-    />
-  );
 }

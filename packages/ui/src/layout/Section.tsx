@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
+import { Icon, type StaticIconComponent } from "../data/Icon";
+import { CodiconChevronDownIcon, CodiconChevronRightIcon } from "../data/static-icons";
 
 export type SectionProps = {
   title: ReactNode;
@@ -8,7 +9,7 @@ export type SectionProps = {
   defaultOpen?: boolean;
   open?: boolean;
   onToggle?: (open: boolean) => void;
-  icon?: string;
+  icon?: string | StaticIconComponent;
   tone?: "default" | "danger" | "warning" | "success" | "info";
   className?: string;
   headerClassName?: string;
@@ -60,10 +61,12 @@ export function Section({
         )}
       >
         <Icon
-          name={open ? "codicon:chevron-down" : "codicon:chevron-right"}
+          icon={open ? CodiconChevronDownIcon : CodiconChevronRightIcon}
           className="text-muted-foreground text-xs"
         />
-        {icon && <Icon name={icon} className="text-base" />}
+        {icon && (
+          <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
+        )}
         <span className="font-medium text-sm flex-1 truncate">{title}</span>
         {summary && <span className="text-xs text-muted-foreground">{summary}</span>}
       </button>
@@ -77,7 +80,7 @@ export function Section({
 }
 
 export type DetailEmptyStateProps = {
-  icon?: string;
+  icon?: string | StaticIconComponent;
   label: ReactNode;
   description?: ReactNode;
   className?: string;
@@ -86,7 +89,12 @@ export type DetailEmptyStateProps = {
 export function DetailEmptyState({ icon, label, description, className }: DetailEmptyStateProps) {
   return (
     <div className={cn("p-density-6 text-center text-muted-foreground", className)}>
-      {icon && <Icon name={icon} className="text-3xl mb-density-2" />}
+      {icon && (
+        <Icon
+          {...(typeof icon === "string" ? { name: icon } : { icon })}
+          className="text-3xl mb-density-2"
+        />
+      )}
       <p className="text-sm">{label}</p>
       {description && <p className="text-xs mt-density-1 opacity-70">{description}</p>}
     </div>

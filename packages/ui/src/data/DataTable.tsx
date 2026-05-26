@@ -27,7 +27,22 @@ import {
   type FilterBarRangeProps,
 } from "../components/FilterBar";
 import type { MultiSelectOption } from "../components/MultiSelect";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
+import {
+  CodiconCloseIcon,
+  CodiconEllipsisIcon,
+  CodiconEyeClosedIcon,
+  CodiconFilterIcon,
+  CodiconScreenFullIcon,
+  PhArrowsInLineVerticalIcon,
+  PhCheckIcon,
+  PhDesktopIcon,
+  PhListDashesIcon,
+  PhListIcon,
+  PhMoonIcon,
+  PhRowsIcon,
+  PhSunIcon,
+} from "./static-icons";
 import { SortableHeader } from "./SortableHeader";
 import {
   Timestamp,
@@ -95,10 +110,10 @@ const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
 const COLUMN_VISIBILITY_STORAGE_PREFIX = "clicky-ui-data-table-column-visibility";
 const DENSITY_STORAGE_PREFIX = "clicky-ui-data-table-density";
 
-const DENSITY_OPTIONS: Array<{ value: Density; icon: string; label: string }> = [
-  { value: "compact", icon: "ph:rows", label: "Compact" },
-  { value: "comfortable", icon: "ph:list", label: "Comfortable" },
-  { value: "spacious", icon: "ph:list-dashes", label: "Spacious" },
+const DENSITY_OPTIONS: Array<{ value: Density; icon: StaticIconComponent; label: string }> = [
+  { value: "compact", icon: PhRowsIcon, label: "Compact" },
+  { value: "comfortable", icon: PhListIcon, label: "Comfortable" },
+  { value: "spacious", icon: PhListDashesIcon, label: "Spacious" },
 ];
 
 const DATA_TABLE_HEADER_DENSITY_CLASS =
@@ -630,7 +645,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
   const autoTimeRange = useMemo<FilterBarRangeProps | null>(() => {
     if (!autoFilter || !timeRangeColumn) return null;
-    return {
+    const next: FilterBarRangeProps = {
       from: timeRangeFilter.from,
       to: timeRangeFilter.to,
       onApply: (from, to) => setTimeRangeFilter({ from, to }),
@@ -639,6 +654,16 @@ function DataTableInner<T extends Record<string, unknown>>({
       toPlaceholder: "now",
       emptyLabel: "Any time",
     };
+    if (timeRangeColumn.timestamp?.timeEnabled !== undefined) {
+      next.timeEnabled = timeRangeColumn.timestamp.timeEnabled;
+    }
+    if (timeRangeColumn.timestamp?.timeZone) {
+      next.timeZone = timeRangeColumn.timestamp.timeZone;
+    }
+    if (timeRangeColumn.timestamp?.timeZones) {
+      next.timeZones = timeRangeColumn.timestamp.timeZones;
+    }
+    return next;
   }, [autoFilter, timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
   const showFilterBar =
     (autoFilter && (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
@@ -1166,7 +1191,7 @@ function HeaderFilterButton<T extends Record<string, unknown>>({
       )}
       onClick={onOpen}
     >
-      <Icon name="codicon:filter" className="text-xs" />
+      <Icon icon={CodiconFilterIcon} className="text-xs" />
     </button>
   );
 }
@@ -1228,7 +1253,7 @@ function HeaderFilterMenu({
             className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
             onClick={onClose}
           >
-            <Icon name="codicon:close" className="text-sm" />
+            <Icon icon={CodiconCloseIcon} className="text-sm" />
           </button>
         </div>
       </div>
@@ -1256,7 +1281,7 @@ function ColumnVisibilityTrigger({
         onOpen(event);
       }}
     >
-      <Icon name="codicon:ellipsis" className="text-sm" />
+      <Icon icon={CodiconEllipsisIcon} className="text-sm" />
     </button>
   );
 }
@@ -1336,7 +1361,7 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
                   onClose();
                 }}
               >
-                <Icon name="codicon:eye-closed" className="text-sm text-muted-foreground" />
+                <Icon icon={CodiconEyeClosedIcon} className="text-sm text-muted-foreground" />
                 <span>Hide {labelText(activeColumn)}</span>
               </button>
               <div className="my-1 h-px bg-border" />
@@ -1411,10 +1436,10 @@ function DensityMenuSection({
         className={densityMenuItemClassName(current === "inherit")}
         onClick={() => onDensityChange(undefined)}
       >
-        <Icon name="ph:arrows-in-line-vertical" className="text-sm text-muted-foreground" />
+        <Icon icon={PhArrowsInLineVerticalIcon} className="text-sm text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">Use page density</span>
         {current === "inherit" ? (
-          <Icon name="ph:check" className="text-sm text-foreground" />
+          <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
         ) : (
           <span className="inline-block h-4 w-4" aria-hidden />
         )}
@@ -1430,10 +1455,10 @@ function DensityMenuSection({
             className={densityMenuItemClassName(active)}
             onClick={() => onDensityChange(option.value)}
           >
-            <Icon name={option.icon} className="text-sm text-muted-foreground" />
+            <Icon icon={option.icon} className="text-sm text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">{option.label}</span>
             {active ? (
-              <Icon name="ph:check" className="text-sm text-foreground" />
+              <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
             ) : (
               <span className="inline-block h-4 w-4" aria-hidden />
             )}
@@ -1451,10 +1476,10 @@ function densityMenuItemClassName(active: boolean) {
   );
 }
 
-const THEME_MENU_OPTIONS: Array<{ value: Theme; icon: string; label: string }> = [
-  { value: "system", icon: "ph:desktop", label: "Use system theme" },
-  { value: "light", icon: "ph:sun", label: "Light" },
-  { value: "dark", icon: "ph:moon", label: "Dark" },
+const THEME_MENU_OPTIONS: Array<{ value: Theme; icon: StaticIconComponent; label: string }> = [
+  { value: "system", icon: PhDesktopIcon, label: "Use system theme" },
+  { value: "light", icon: PhSunIcon, label: "Light" },
+  { value: "dark", icon: PhMoonIcon, label: "Dark" },
 ];
 
 function ThemeMenuSection({
@@ -1480,10 +1505,10 @@ function ThemeMenuSection({
             className={densityMenuItemClassName(active)}
             onClick={() => onChange(option.value)}
           >
-            <Icon name={option.icon} className="text-sm text-muted-foreground" />
+            <Icon icon={option.icon} className="text-sm text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">{option.label}</span>
             {active ? (
-              <Icon name="ph:check" className="text-sm text-foreground" />
+              <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
             ) : (
               <span className="inline-block h-4 w-4" aria-hidden />
             )}
@@ -2235,7 +2260,7 @@ function FullscreenButton({ label, onClick }: { label: string; onClick: () => vo
       className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={onClick}
     >
-      <Icon name="codicon:screen-full" className="text-sm" />
+      <Icon icon={CodiconScreenFullIcon} className="text-sm" />
     </button>
   );
 }

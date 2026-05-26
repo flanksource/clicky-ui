@@ -1,5 +1,10 @@
 import { Tree } from "../Tree";
 import { Icon } from "../Icon";
+import {
+  CodiconDebugAltIcon,
+  CodiconServerProcessIcon,
+  SvgSpinnerRingResizeIcon,
+} from "../static-icons";
 import type { ProcessNode } from "./types";
 import {
   countProcesses,
@@ -25,7 +30,7 @@ export function DiagnosticsTree({
   if (!root) {
     return (
       <div className="p-density-6 text-center text-muted-foreground">
-        <Icon name="svg-spinners:ring-resize" className="text-3xl text-blue-500" />
+        <Icon icon={SvgSpinnerRingResizeIcon} className="text-3xl text-blue-500" />
         <p className="mt-density-2">Waiting for process diagnostics...</p>
       </div>
     );
@@ -53,7 +58,7 @@ export function DiagnosticsTree({
         return (
           <>
             <Icon
-              name={node.is_root ? "codicon:server-process" : "codicon:debug-alt"}
+              icon={node.is_root ? CodiconServerProcessIcon : CodiconDebugAltIcon}
               className={
                 node.is_root ? "text-base text-blue-600" : "text-base text-muted-foreground"
               }
@@ -73,7 +78,7 @@ export function DiagnosticsTree({
                   node.status,
                 )}`}
               >
-                <Icon name={processStateIcon(node.status)} />
+                <Icon icon={processStateIcon(node.status)} />
                 {node.status}
               </span>
             )}

@@ -390,10 +390,11 @@ describe("FilterBar", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
-    expect(screen.getAllByLabelText(/open time picker/i)).toHaveLength(2);
+    expect(screen.getAllByLabelText(/pick time range/i)).toHaveLength(2);
+    expect(screen.queryByLabelText(/time range from time/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
-    expect(screen.getAllByLabelText(/open date picker/i)).toHaveLength(2);
+    expect(screen.getAllByLabelText(/pick date range/i)).toHaveLength(2);
   });
 
   it("renders a nested-multi filter as a key→value submenu and round-trips selection", () => {
