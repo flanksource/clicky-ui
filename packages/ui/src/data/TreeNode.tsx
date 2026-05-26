@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
+import { CodiconChevronDownIcon, CodiconChevronRightIcon } from "./static-icons";
 
 export type TreeRowContext<T> = {
   node: T;
@@ -118,7 +119,7 @@ export function TreeNode<T>({
       >
         {hasChildren ? (
           <Icon
-            name={isOpen ? "codicon:chevron-down" : "codicon:chevron-right"}
+            icon={isOpen ? CodiconChevronDownIcon : CodiconChevronRightIcon}
             className="text-muted-foreground text-xs w-3"
           />
         ) : (

@@ -1,5 +1,6 @@
 import { forwardRef, useRef, type InputHTMLAttributes } from "react";
 import { Icon } from "../data/Icon";
+import { CodiconCalendarIcon } from "../data/static-icons";
 import { cn } from "../lib/utils";
 
 export type DateTimePickerProps = Omit<
@@ -74,7 +75,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
             pickerRef.current?.showPicker?.();
           }}
         >
-          <Icon name="codicon:calendar" className="text-sm" />
+          <Icon icon={CodiconCalendarIcon} className="text-sm" />
         </button>
       </div>
     );

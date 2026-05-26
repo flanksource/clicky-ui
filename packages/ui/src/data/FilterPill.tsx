@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
+import {
+  CodiconAddIcon,
+  CodiconCheckIcon,
+  CodiconCloseIcon,
+  CodiconRemoveIcon,
+} from "./static-icons";
 
 export type FilterMode = "active" | "neutral" | "include" | "exclude";
 
@@ -8,7 +14,7 @@ export type FilterPillProps = {
   mode?: FilterMode;
   label: ReactNode;
   count?: number;
-  icon?: string;
+  icon?: string | StaticIconComponent;
   badge?: string;
   /**
    * Tri-state handler. When provided the pill renders as a toggle with a left
@@ -84,7 +90,7 @@ function TristateSwitch({
       >
         {slot !== "neutral" && (
           <Icon
-            name={slot === "exclude" ? "codicon:close" : "codicon:check"}
+            icon={slot === "exclude" ? CodiconCloseIcon : CodiconCheckIcon}
             className={cn(
               "text-[10px]",
               slot === "exclude" && "text-red-600",
@@ -122,7 +128,9 @@ export function FilterPill({
           {count}
         </span>
       )}
-      {icon && <Icon name={icon} className="text-sm" />}
+      {icon && (
+        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-sm" />
+      )}
       <span className="truncate">{label}</span>
     </>
   );
@@ -176,8 +184,8 @@ export function FilterPill({
 }
 
 function LegacyMarker({ mode }: { mode: FilterMode }) {
-  if (mode === "include") return <Icon name="codicon:add" className="text-xs" />;
-  if (mode === "exclude") return <Icon name="codicon:remove" className="text-xs" />;
+  if (mode === "include") return <Icon icon={CodiconAddIcon} className="text-xs" />;
+  if (mode === "exclude") return <Icon icon={CodiconRemoveIcon} className="text-xs" />;
   if (mode === "active") return <span className="w-2 h-2 rounded-full bg-current" />;
   return <span className="w-2 h-2 rounded-full bg-current opacity-30" />;
 }

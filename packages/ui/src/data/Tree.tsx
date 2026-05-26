@@ -1,6 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
+import {
+  CodiconCloseIcon,
+  CodiconCollapseAllIcon,
+  CodiconExpandAllIcon,
+  CodiconSearchIcon,
+} from "./static-icons";
 import { TreeNode, type TreeNodeProps } from "./TreeNode";
 
 export type TreeProps<T> = Omit<
@@ -255,7 +261,10 @@ export function Tree<T>({
             style={{ paddingLeft: `${basePaddingPx}px` }}
           >
             {showFilter ? (
-              <Icon name="codicon:search" className="w-3 shrink-0 text-xs text-muted-foreground" />
+              <Icon
+                icon={CodiconSearchIcon}
+                className="w-3 shrink-0 text-xs text-muted-foreground"
+              />
             ) : (
               <span className="w-3 shrink-0" aria-hidden />
             )}
@@ -278,7 +287,7 @@ export function Tree<T>({
                     aria-label="Clear tree filter"
                     title="Clear tree filter"
                   >
-                    <Icon name="codicon:close" className="text-xs" />
+                    <Icon icon={CodiconCloseIcon} className="text-xs" />
                   </button>
                 )}
               </label>
@@ -300,7 +309,7 @@ export function Tree<T>({
                     effectiveExpandAll === true && "bg-accent text-accent-foreground",
                   )}
                 >
-                  <Icon name="codicon:expand-all" className="text-sm" />
+                  <Icon icon={CodiconExpandAllIcon} className="text-sm" />
                 </button>
                 <button
                   type="button"
@@ -314,7 +323,7 @@ export function Tree<T>({
                     effectiveExpandAll === false && "bg-accent text-accent-foreground",
                   )}
                 >
-                  <Icon name="codicon:collapse-all" className="text-sm" />
+                  <Icon icon={CodiconCollapseAllIcon} className="text-sm" />
                 </button>
               </div>
             )}

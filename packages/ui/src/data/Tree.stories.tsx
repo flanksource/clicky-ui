@@ -2,6 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
+import {
+  CodiconDebugAltIcon,
+  CodiconDebugPauseIcon,
+  CodiconErrorIcon,
+  CodiconPassIcon,
+  CodiconSymbolClassIcon,
+} from "./static-icons";
 import { Tree } from "./Tree";
 
 const meta: Meta<typeof Tree> = {
@@ -63,15 +70,15 @@ export const TestTree: Story = {
         renderRow={({ node }) => {
           const icon =
             node.status === "passed"
-              ? "codicon:pass"
+              ? CodiconPassIcon
               : node.status === "failed"
-                ? "codicon:error"
-                : "codicon:debug-pause";
+                ? CodiconErrorIcon
+                : CodiconDebugPauseIcon;
           const tone =
             node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
           return (
             <>
-              <Icon name={icon} />
+              <Icon icon={icon} />
               <span className="truncate flex-1">{node.name}</span>
               {node.duration && (
                 <span className="text-xs text-muted-foreground">{node.duration}ms</span>
@@ -115,7 +122,7 @@ export const ProcessTree: Story = {
       defaultOpen={() => true}
       renderRow={({ node }) => (
         <>
-          <Icon name="codicon:debug-alt" className="text-muted-foreground" />
+          <Icon icon={CodiconDebugAltIcon} className="text-muted-foreground" />
           <span className="font-medium">{node.name}</span>
           <span className="text-xs text-muted-foreground">pid {node.pid}</span>
           <span className="flex-1" />
@@ -158,7 +165,7 @@ export const GroupedConfigTree: Story = {
           <span className="font-medium text-sm">{node.name}</span>
         ) : (
           <>
-            <Icon name="codicon:symbol-class" className="text-blue-500" />
+            <Icon icon={CodiconSymbolClassIcon} className="text-blue-500" />
             <span>{node.name}</span>
           </>
         )

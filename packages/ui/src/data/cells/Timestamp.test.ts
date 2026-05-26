@@ -76,6 +76,20 @@ describe("resolveDateMath", () => {
     expect(resolveDateMath("now-24h", now)?.toISOString()).toBe("2026-04-14T12:00:00.000Z");
     expect(resolveDateMath("now-7d", now)?.toISOString()).toBe("2026-04-08T12:00:00.000Z");
     expect(resolveDateMath("now-2w", now)?.toISOString()).toBe("2026-04-01T12:00:00.000Z");
+    expect(resolveDateMath("now-1M", now)?.toISOString()).toBe("2026-03-15T12:00:00.000Z");
+    expect(resolveDateMath("now-1q", now)?.toISOString()).toBe("2026-01-15T12:00:00.000Z");
+    expect(resolveDateMath("now-1y", now)?.toISOString()).toBe("2025-04-15T12:00:00.000Z");
+  });
+
+  it("resolves anchored this and last period forms", () => {
+    expect(resolveDateMath("now/w", now)?.toISOString()).toBe("2026-04-13T00:00:00.000Z");
+    expect(resolveDateMath("now/w+1w", now)?.toISOString()).toBe("2026-04-20T00:00:00.000Z");
+    expect(resolveDateMath("now/M", now)?.toISOString()).toBe("2026-04-01T00:00:00.000Z");
+    expect(resolveDateMath("now/M-1M", now)?.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+    expect(resolveDateMath("now/q", now)?.toISOString()).toBe("2026-04-01T00:00:00.000Z");
+    expect(resolveDateMath("now/q+1q", now)?.toISOString()).toBe("2026-07-01T00:00:00.000Z");
+    expect(resolveDateMath("now/y", now)?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    expect(resolveDateMath("now/y-1y", now)?.toISOString()).toBe("2025-01-01T00:00:00.000Z");
   });
 
   it("resolves now+Xs forms", () => {

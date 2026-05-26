@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { TreeGroupHeader } from "./TreeGroupHeader";
+import { CodiconSymbolClassIcon } from "./static-icons";
 
 const meta: Meta<typeof TreeGroupHeader> = {
   title: "Data/TreeGroupHeader",
@@ -16,7 +17,7 @@ export const Default: Story = {
     return (
       <div className="border border-border rounded-md">
         <TreeGroupHeader
-          icon="codicon:symbol-class"
+          icon={CodiconSymbolClassIcon}
           title="Pod"
           count={12}
           open={open}

@@ -1,6 +1,13 @@
 import { type ReactNode } from "react";
 import { Icon } from "../Icon";
 import {
+  CodiconDebugStepOverIcon,
+  CodiconSymbolMethodIcon,
+  LucideChevronRightIcon,
+  LucideCopyIcon,
+  LucideTriangleAlertIcon,
+} from "../static-icons";
+import {
   compactStackPath,
   isApplicationStackFrame,
   parseDiagnosticsStackTrace,
@@ -29,7 +36,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
   return (
     <details className="group rounded-md border border-destructive/30 bg-destructive/5">
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
-        <Icon name="lucide:triangle-alert" className="mt-0.5 shrink-0 text-destructive" />
+        <Icon icon={LucideTriangleAlertIcon} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-destructive">Error</div>
           <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">
@@ -37,7 +44,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
           </div>
         </div>
         <Icon
-          name="lucide:chevron-right"
+          icon={LucideChevronRightIcon}
           className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
         />
       </summary>
@@ -99,7 +106,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
                 onClick={() => copyText(diagnostics.stacktrace ?? "")}
                 className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                <Icon name="lucide:copy" />
+                <Icon icon={LucideCopyIcon} />
                 copy
               </button>
             </div>
@@ -162,7 +169,7 @@ function StackFrameRow({ frame, index }: { frame: ErrorStackFrame; index: number
     >
       <div className="flex min-w-0 items-start gap-1.5">
         <Icon
-          name={appFrame ? "codicon:symbol-method" : "codicon:debug-step-over"}
+          icon={appFrame ? CodiconSymbolMethodIcon : CodiconDebugStepOverIcon}
           className="mt-0.5 shrink-0 text-[11px]"
         />
         <div className="min-w-0">
@@ -202,7 +209,7 @@ export function CopyBadge({
     >
       <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">{label}</span>
       <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">{value}</span>
-      <Icon name="lucide:copy" className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
+      <Icon icon={LucideCopyIcon} className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
     </button>
   );
 }

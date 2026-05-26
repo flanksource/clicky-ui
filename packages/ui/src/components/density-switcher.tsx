@@ -1,11 +1,12 @@
 import { forwardRef } from "react";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 import { useDensity, type Density } from "../hooks/use-density";
+import { PhListDashesIcon, PhListIcon, PhRowsIcon } from "../data/static-icons";
 
 const DENSITY_OPTIONS: IconMenuOption<Density>[] = [
-  { value: "compact", icon: "ph:rows", label: "compact" },
-  { value: "comfortable", icon: "ph:list", label: "comfortable" },
-  { value: "spacious", icon: "ph:list-dashes", label: "spacious" },
+  { value: "compact", icon: PhRowsIcon, label: "compact" },
+  { value: "comfortable", icon: PhListIcon, label: "comfortable" },
+  { value: "spacious", icon: PhListDashesIcon, label: "spacious" },
 ];
 
 export type DensitySwitcherProps = {

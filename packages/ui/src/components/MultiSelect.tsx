@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
+import { CodiconChevronDownIcon, CodiconChevronUpIcon } from "../data/static-icons";
 
 export type MultiSelectOption = {
   value: string;
@@ -99,7 +100,7 @@ export function MultiSelect({
       >
         <span className="truncate">{selected}</span>
         <Icon
-          name={open ? "codicon:chevron-up" : "codicon:chevron-down"}
+          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
           className="text-muted-foreground"
         />
       </Button>

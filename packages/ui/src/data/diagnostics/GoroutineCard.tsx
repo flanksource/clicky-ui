@@ -1,4 +1,9 @@
 import { Icon } from "../Icon";
+import {
+  CodiconDebugRestartIcon,
+  CodiconDebugStepOverIcon,
+  CodiconSymbolMethodIcon,
+} from "../static-icons";
 import type { ParsedGoroutine, ParsedGoroutineFrame } from "./stacktrace";
 
 export function goroutineStateBadge(state: string): string {
@@ -71,12 +76,12 @@ function FrameRow({ frame }: { frame: ParsedGoroutineFrame }) {
     <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
       <div className="flex items-start gap-1.5">
         <Icon
-          name={
+          icon={
             frame.kind === "created_by"
-              ? "codicon:debug-restart"
+              ? CodiconDebugRestartIcon
               : frame.runtime
-                ? "codicon:debug-step-over"
-                : "codicon:symbol-method"
+                ? CodiconDebugStepOverIcon
+                : CodiconSymbolMethodIcon
           }
           className="shrink-0 mt-0.5 text-[11px]"
         />

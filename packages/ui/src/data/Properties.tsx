@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
 import { formatPropertyLabel } from "./properties-utils";
 
 export type PropertiesAction<V = unknown> = {
   id: string;
-  icon: string;
+  icon: string | StaticIconComponent;
   label: (key: string, value: V, item: PropertiesItem<V>) => string;
   visible?: (key: string, value: V, item: PropertiesItem<V>) => boolean;
   disabled?: (key: string, value: V, item: PropertiesItem<V>) => boolean;
@@ -183,7 +183,10 @@ function PropertiesActionButton<V>({
         action.onClick(item.key, item.value, item);
       }}
     >
-      <Icon name={action.icon} className="text-xs" />
+      <Icon
+        {...(typeof action.icon === "string" ? { name: action.icon } : { icon: action.icon })}
+        className="text-xs"
+      />
     </button>
   );
 }

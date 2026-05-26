@@ -7,7 +7,7 @@ import {
 } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/utils";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
 
 export const badgeVariants = cva(
   "inline-flex items-center gap-1 rounded-full border border-transparent font-medium whitespace-nowrap align-middle",
@@ -188,7 +188,7 @@ export type BadgeProps = {
   tone?: BadgeTone;
   variant?: BadgeVariant;
   size?: BadgeSize;
-  icon?: string;
+  icon?: string | StaticIconComponent;
   count?: number;
   children?: ReactNode;
   className?: string;
@@ -714,7 +714,12 @@ export function Badge({
       style: legacyStyle,
       content: (
         <>
-          {icon && <Icon name={icon} className="text-[1em]" />}
+          {icon && (
+            <Icon
+              {...(typeof icon === "string" ? { name: icon } : { icon })}
+              className="text-[1em]"
+            />
+          )}
           {count !== undefined && <span>{count}</span>}
           {children != null && (
             <span className={textBehaviorClasses} title={legacyChildren.title}>
@@ -804,7 +809,12 @@ export function Badge({
     applyColorValue(borderColor, "borderColor", wrapperStyle, wrapperClasses);
   }
 
-  const iconEl = icon ? <Icon name={icon} className={cn("shrink-0", sizeClasses.icon)} /> : null;
+  const iconEl = icon ? (
+    <Icon
+      {...(typeof icon === "string" ? { name: icon } : { icon })}
+      className={cn("shrink-0", sizeClasses.icon)}
+    />
+  ) : null;
 
   if (resolvedVariant === "label") {
     const labelClasses = [

@@ -1,4 +1,12 @@
 import { Icon } from "../Icon";
+import {
+  CodiconChipIcon,
+  CodiconDebugStepOverIcon,
+  CodiconLockIcon,
+  CodiconSyncIcon,
+  CodiconSymbolMethodIcon,
+  CodiconWatchIcon,
+} from "../static-icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
 
 export type JvmStackTraceProps = {
@@ -25,22 +33,22 @@ export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: Jv
 
 export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
   const isAnno = frame.kind !== "frame";
-  const iconName = isAnno
+  const icon = isAnno
     ? frame.kind === "locked"
-      ? "codicon:lock"
+      ? CodiconLockIcon
       : frame.kind === "waiting_to_lock"
-        ? "codicon:sync"
-        : "codicon:watch"
+        ? CodiconSyncIcon
+        : CodiconWatchIcon
     : frame.nativeMethod
-      ? "codicon:chip"
+      ? CodiconChipIcon
       : frame.runtime
-        ? "codicon:debug-step-over"
-        : "codicon:symbol-method";
+        ? CodiconDebugStepOverIcon
+        : CodiconSymbolMethodIcon;
 
   return (
     <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
       <div className="flex items-start gap-1.5">
-        <Icon name={iconName} className="mt-0.5 shrink-0 text-[11px]" />
+        <Icon icon={icon} className="mt-0.5 shrink-0 text-[11px]" />
         <div className="min-w-0">
           <div className="break-all font-mono text-[11px] font-semibold leading-4">
             {isAnno ? (

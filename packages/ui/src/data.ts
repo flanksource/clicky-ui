@@ -68,6 +68,7 @@ export {
   type IconProps,
   type IconStyle,
   type IconTone,
+  type StaticIconComponent,
 } from "./data/Icon";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";

@@ -30,7 +30,18 @@ import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
 import { cn } from "../lib/utils";
 import { DataTable, type DataTableColumn, type DataTableRowDetailContext } from "./DataTable";
 import { Tree } from "./Tree";
-import { Icon } from "./Icon";
+import { Icon, type StaticIconComponent } from "./Icon";
+import {
+  CodiconCheckIcon,
+  CodiconChevronDownIcon,
+  CodiconChevronUpIcon,
+  CodiconCloudDownloadIcon,
+  CodiconCommentDiscussionIcon,
+  CodiconEllipsisIcon,
+  CodiconFileCodeIcon,
+  CodiconPreviewIcon,
+  CodiconTableIcon,
+} from "./static-icons";
 import { CodeBlock } from "./CodeBlock";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";
@@ -607,7 +618,7 @@ function ClickyViewMenu({
         )}
         onClick={() => setOpen((current) => !current)}
       >
-        <Icon name="codicon:ellipsis" className="text-sm" />
+        <Icon icon={CodiconEllipsisIcon} className="text-sm" />
       </button>
 
       {open && (
@@ -634,7 +645,7 @@ function ClickyViewMenu({
                 }}
               >
                 <Icon
-                  name={meta.icon}
+                  icon={meta.icon}
                   className={cn(
                     "mt-0.5 shrink-0 text-base text-muted-foreground",
                     active && "text-foreground",
@@ -644,7 +655,7 @@ function ClickyViewMenu({
                   <span className="flex items-center justify-between gap-3">
                     <span className="font-medium">{meta.label}</span>
                     {active && (
-                      <Icon name="codicon:check" className="text-xs text-muted-foreground" />
+                      <Icon icon={CodiconCheckIcon} className="text-xs text-muted-foreground" />
                     )}
                   </span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -688,7 +699,7 @@ function ClickyDownloadMenu({
           className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => submitDownloadRequest(buildFormatUrl(url, primaryFormat))}
         >
-          <Icon name="codicon:cloud-download" className="text-sm" />
+          <Icon icon={CodiconCloudDownloadIcon} className="text-sm" />
           <span>{`Download ${primaryMeta.label}`}</span>
         </button>
         <button
@@ -700,7 +711,7 @@ function ClickyDownloadMenu({
           className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => setOpen((current) => !current)}
         >
-          <Icon name={open ? "codicon:chevron-up" : "codicon:chevron-down"} className="text-sm" />
+          <Icon icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon} className="text-sm" />
         </button>
       </div>
 
@@ -725,7 +736,7 @@ function ClickyDownloadMenu({
                 }}
               >
                 <Icon
-                  name={meta.icon}
+                  icon={meta.icon}
                   className="mt-0.5 shrink-0 text-base text-muted-foreground"
                 />
                 <span className="min-w-0 flex-1">
@@ -1070,13 +1081,18 @@ function getDownloadFormats({
   return [...CLICKY_DOWNLOAD_FORMATS];
 }
 
-function getRemoteFormatMeta(format: ClickyRemoteFormat) {
+function getRemoteFormatMeta(format: ClickyRemoteFormat): {
+  label: string;
+  description: string;
+  icon: StaticIconComponent;
+  accept: string;
+} {
   switch (format) {
     case "clicky":
       return {
         label: "Clicky",
         description: "Rendered Clicky JSON with the rich Clicky viewer",
-        icon: "codicon:preview",
+        icon: CodiconPreviewIcon,
         accept:
           "application/json+clicky, application/clicky+json;q=0.9, application/json;q=0.8,*/*;q=0.7",
       };
@@ -1084,63 +1100,63 @@ function getRemoteFormatMeta(format: ClickyRemoteFormat) {
       return {
         label: "JSON",
         description: "Plain JSON for inspecting the raw response body",
-        icon: "vscode-icons:file-type-json",
+        icon: CodiconFileCodeIcon,
         accept: "application/json, text/plain;q=0.8,*/*;q=0.7",
       };
     case "pdf":
       return {
         label: "PDF",
         description: "Portable document for sharing and printing",
-        icon: "vscode-icons:file-type-pdf2",
+        icon: CodiconFileCodeIcon,
         accept: "application/pdf, */*;q=0.7",
       };
     case "html":
       return {
         label: "HTML",
         description: "Browser-ready HTML preview of the formatted output",
-        icon: "vscode-icons:file-type-html",
+        icon: CodiconFileCodeIcon,
         accept: "text/html, */*;q=0.7",
       };
     case "markdown":
       return {
         label: "Markdown",
         description: "Markdown formatted for docs, comments, and chat",
-        icon: "vscode-icons:file-type-markdown",
+        icon: CodiconFileCodeIcon,
         accept: "text/markdown, text/plain;q=0.8,*/*;q=0.7",
       };
     case "yaml":
       return {
         label: "YAML",
         description: "YAML for config-friendly inspection and export",
-        icon: "vscode-icons:file-type-yaml",
+        icon: CodiconFileCodeIcon,
         accept: "application/yaml, text/yaml;q=0.9, text/plain;q=0.8,*/*;q=0.7",
       };
     case "csv":
       return {
         label: "CSV",
         description: "Comma-separated values for spreadsheets and imports",
-        icon: "codicon:table",
+        icon: CodiconTableIcon,
         accept: "text/csv, text/plain;q=0.8,*/*;q=0.7",
       };
     case "pretty":
       return {
         label: "Pretty",
         description: "Human-readable plain text output from the formatter",
-        icon: "codicon:file-code",
+        icon: CodiconFileCodeIcon,
         accept: "text/plain, */*;q=0.7",
       };
     case "excel":
       return {
         label: "Excel",
         description: "Spreadsheet workbook for offline analysis",
-        icon: "codicon:table",
+        icon: CodiconTableIcon,
         accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*;q=0.7",
       };
     case "slack":
       return {
         label: "Slack",
         description: "Slack Block Kit JSON for chat-native output",
-        icon: "codicon:comment-discussion",
+        icon: CodiconCommentDiscussionIcon,
         accept: "application/vnd.slack.block-kit+json, application/json;q=0.8,*/*;q=0.7",
       };
   }

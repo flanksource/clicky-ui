@@ -6,6 +6,7 @@ export {
   TimeRange,
   type TimeRangeKind,
   type TimeRangePreset,
+  type TimeRangePresetGroup,
   type TimeRangeProps,
 } from "./components/TimeRange";
 export {

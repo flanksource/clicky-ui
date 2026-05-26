@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar, type AvatarKind, type AvatarVariant } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
+import type { StaticIconComponent } from "./Icon";
+import { PhCheckThinIcon, PhHourglassMediumThinIcon, PhXThinIcon } from "./static-icons";
 import { fnv1a32 } from "../lib/palette";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -74,15 +76,15 @@ const VARIANTS: Array<{
 type StageStatus = "approved" | "pending" | "rejected";
 
 type StageStatusSpec = {
-  icon: string;
+  icon: StaticIconComponent;
   cellBg: string;
   tone: "emerald" | "amber" | "rose";
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: "ph:check-thin", cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: "ph:hourglass-medium-thin", cellBg: "bg-amber-50/85", tone: "amber" },
-  rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
+  approved: { icon: PhCheckThinIcon, cellBg: "bg-emerald-50/80", tone: "emerald" },
+  pending: { icon: PhHourglassMediumThinIcon, cellBg: "bg-amber-50/85", tone: "amber" },
+  rejected: { icon: PhXThinIcon, cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
 const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [

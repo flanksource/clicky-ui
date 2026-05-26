@@ -10,12 +10,13 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
+import { Icon, type StaticIconComponent } from "../data/Icon";
+import { PhCheckIcon } from "../data/static-icons";
 import { Button } from "./button";
 
 export type IconMenuOption<T extends string> = {
   value: T;
-  icon: string;
+  icon: StaticIconComponent;
   label: string;
   description?: string;
 };
@@ -171,13 +172,7 @@ function IconMenuPickerInner<T extends string>(
           triggerClassName,
         )}
       >
-        <Icon name={selected.icon} className={showLabel ? "shrink-0 text-foreground" : undefined} />
-        {showLabel && (
-          <>
-            <span className="min-w-0 flex-1 truncate text-left capitalize">{selected.label}</span>
-            <Icon name="ph:caret-up-down" className="shrink-0 text-muted-foreground" />
-          </>
-        )}
+        <Icon icon={selected.icon} />
       </Button>
       {open && (
         <div
@@ -214,10 +209,10 @@ function IconMenuPickerInner<T extends string>(
                   active && "text-foreground",
                 )}
               >
-                <Icon name={option.icon} className="shrink-0 text-muted-foreground" />
+                <Icon icon={option.icon} className="shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate capitalize">{option.label}</span>
                 {active ? (
-                  <Icon name="ph:check" className="shrink-0 text-foreground" />
+                  <Icon icon={PhCheckIcon} className="shrink-0 text-foreground" />
                 ) : (
                   <span className="inline-block size-4 shrink-0" aria-hidden />
                 )}

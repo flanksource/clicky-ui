@@ -114,7 +114,7 @@ describe("TimeRange", () => {
     expect(picker.showPicker).toHaveBeenCalledTimes(1);
   });
 
-  it("renders date and time as separate inputs for the custom field when kind is time", () => {
+  it("keeps the custom time-of-day input opt-in when kind is time", () => {
     const onApply = vi.fn();
 
     const { container } = render(<TimeRange from="now-24h" to="now" onApply={onApply} />);
@@ -124,21 +124,34 @@ describe("TimeRange", () => {
     const datePicker = container.querySelector('input[type="date"]') as HTMLInputElement & {
       showPicker?: () => void;
     };
-    const timeInput = screen.getByLabelText("Time range from time") as HTMLInputElement;
     expect(datePicker).not.toBeNull();
-    expect(timeInput).toHaveAttribute("type", "time");
+    expect(screen.queryByLabelText("Time range from time")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Time range timezone")).not.toBeInTheDocument();
 
     datePicker.showPicker = vi.fn();
     fireEvent.click(screen.getByRole("button", { name: /pick time range from/i }));
     expect(datePicker.showPicker).toHaveBeenCalledTimes(1);
   });
 
-  it("composes a date and time selection into a datetime value on apply", () => {
+  it("composes a date and time selection into an offset datetime when time is enabled", () => {
     const onApply = vi.fn();
 
-    render(<TimeRange from="" to="now" onApply={onApply} />);
+    render(
+      <TimeRange
+        from=""
+        to="now"
+        onApply={onApply}
+        timeEnabled
+        timeZone="UTC"
+        timeZones={["UTC", "Asia/Jerusalem"]}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
+    expect(screen.getByLabelText("Time range timezone")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Time range timezone"), {
+      target: { value: "Asia/Jerusalem" },
+    });
     fireEvent.change(screen.getByLabelText("Time range from"), {
       target: { value: "2026-05-01" },
     });
@@ -147,7 +160,45 @@ describe("TimeRange", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
-    expect(onApply).toHaveBeenCalledWith("2026-05-01T09:30", "now");
+    expect(onApply).toHaveBeenCalledWith("2026-05-01T09:30:00+03:00", "now");
+  });
+
+  it("renders configurable preset groups alongside this and last ranges", () => {
+    const onApply = vi.fn();
+
+    render(
+      <TimeRange
+        from=""
+        to=""
+        presets={["min", "hr", "day", "wk+", "this", "last"]}
+        onApply={onApply}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
+    const filterList = screen.getAllByRole("list", { name: /time filters/i })[0]!;
+
+    expect(within(filterList).getByRole("button", { name: "now-15m" })).toBeInTheDocument();
+    expect(within(filterList).getByRole("button", { name: "now-1h" })).toBeInTheDocument();
+    expect(within(filterList).getByRole("button", { name: "now-1M" })).toBeInTheDocument();
+    expect(screen.getByText("This")).toBeInTheDocument();
+    expect(screen.getByText("Last")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "now/q" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /this year/i })).toHaveAttribute(
+      "title",
+      "this year",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /this quarter/i }));
+
+    expect(onApply).toHaveBeenCalledWith("now/q", "now/q+1q");
+  });
+
+  it("uses human labels for selected this/last ranges", () => {
+    render(<TimeRange from="now/y" to="now/y+1y" presets={["this", "last"]} onApply={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent(
+      "this year",
+    );
   });
 
   it("keeps the popover open when a date is picked from the native picker", () => {
