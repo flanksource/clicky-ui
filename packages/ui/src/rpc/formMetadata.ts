@@ -227,6 +227,9 @@ export function parametersToFormConfig(
 
   const config: ParameterFormConfig = { filters: emitFilters };
   if (hasTimeRange && rangeStart != null && rangeEnd != null) {
+    const rangeStartMeta = lookupFilters[rangeStart.name];
+    const rangeEndMeta = lookupFilters[rangeEnd.name];
+    const rangeMeta = rangeStartMeta ?? rangeEndMeta;
     config.timeRange = {
       from: values[rangeStart.name] ?? "",
       to: values[rangeEnd.name] ?? "",
@@ -236,6 +239,10 @@ export function parametersToFormConfig(
           [rangeStart.name]: from,
           [rangeEnd.name]: to,
         })),
+      ...(rangeMeta?.presets ? { presets: rangeMeta.presets } : {}),
+      ...(rangeMeta?.timeEnabled !== undefined ? { timeEnabled: rangeMeta.timeEnabled } : {}),
+      ...(rangeMeta?.timeZone ? { timeZone: rangeMeta.timeZone } : {}),
+      ...(rangeMeta?.timeZones ? { timeZones: rangeMeta.timeZones } : {}),
       ...(rangeStart.description ? { fromPlaceholder: rangeStart.description } : {}),
       ...(rangeEnd.description ? { toPlaceholder: rangeEnd.description } : {}),
     };

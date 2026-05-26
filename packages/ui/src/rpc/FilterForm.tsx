@@ -9,6 +9,7 @@ import type {
 import { TimeRange } from "../components/TimeRange";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
+import { CodiconSearchIcon } from "../data/static-icons";
 import { cn } from "../lib/utils";
 import {
   packParameterValues,
@@ -392,7 +393,7 @@ function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id:
     >
       {showOptionFilter && (
         <label className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon name="codicon:search" className="shrink-0 text-muted-foreground" />
+          <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
           <input
             type="search"
             aria-label={`Filter ${filter.label} options`}
@@ -442,12 +443,16 @@ function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
       <div className="text-sm font-medium text-muted-foreground">Time range</div>
       <div className="min-w-0">
         <TimeRange
-          kind="date"
+          kind={timeRange.timeEnabled ? "time" : "date"}
           label="Time range"
           align="left"
           from={timeRange.from ?? ""}
           to={timeRange.to ?? ""}
           onApply={timeRange.onApply}
+          {...(timeRange.presets ? { presets: timeRange.presets } : {})}
+          {...(timeRange.timeEnabled !== undefined ? { timeEnabled: timeRange.timeEnabled } : {})}
+          {...(timeRange.timeZone ? { timeZone: timeRange.timeZone } : {})}
+          {...(timeRange.timeZones ? { timeZones: timeRange.timeZones } : {})}
           {...(timeRange.fromPlaceholder ? { fromPlaceholder: timeRange.fromPlaceholder } : {})}
           {...(timeRange.toPlaceholder ? { toPlaceholder: timeRange.toPlaceholder } : {})}
         />

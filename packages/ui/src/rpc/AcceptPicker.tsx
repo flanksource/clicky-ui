@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
+import { CodiconEllipsisIcon, PhCheckIcon } from "../data/static-icons";
 import { cn } from "../lib/utils";
 
 export const ACCEPT_OPTIONS = [
@@ -101,7 +102,7 @@ export function AcceptPicker({
             className={cn("h-auto", pad)}
             onClick={() => setOpen((current) => !current)}
           >
-            <Icon name="codicon:ellipsis" />
+            <Icon icon={CodiconEllipsisIcon} />
           </Button>
           {open && (
             <div
@@ -127,7 +128,7 @@ export function AcceptPicker({
                     }}
                   >
                     <span className="min-w-0 flex-1">{option.label}</span>
-                    {active ? <Icon name="ph:check" className="shrink-0" /> : null}
+                    {active ? <Icon icon={PhCheckIcon} className="shrink-0" /> : null}
                   </button>
                 );
               })}

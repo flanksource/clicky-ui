@@ -1,6 +1,7 @@
 import { useReducer, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
+import { CodiconCloseIcon } from "../data/static-icons";
 import { isPositionalParam, type OpenAPIParameter } from "./types";
 
 export type CommandFormProps = {
@@ -189,7 +190,7 @@ function ParameterField({
               aria-label={`Clear ${param.name}`}
               onClick={() => onChange("")}
             >
-              <Icon name="codicon:close" />
+              <Icon icon={CodiconCloseIcon} />
             </Button>
           )}
         </div>
@@ -268,7 +269,7 @@ function TagInput({
             aria-label={`Remove ${tag}`}
             onClick={() => remove(index)}
           >
-            <Icon name="codicon:close" />
+            <Icon icon={CodiconCloseIcon} />
           </button>
         </span>
       ))}
