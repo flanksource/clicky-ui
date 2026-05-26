@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Properties, type PropertiesItem } from "@flanksource/clicky-ui";
+import CopyIcon from "@iconify-react/lucide/copy";
+import ZoomInIcon from "@iconify-react/lucide/zoom-in";
+import ZoomOutIcon from "@iconify-react/lucide/zoom-out";
 import { DemoSection } from "./Section";
 
 const baseItems: PropertiesItem<string>[] = [
@@ -149,7 +152,7 @@ export function PropertiesDemo() {
             prefixActions={[
               {
                 id: "expand",
-                icon: "lucide:zoom-in",
+                icon: ZoomInIcon,
                 label: (key) => `Expand ${key}`,
                 visible: (_k, _v, item) => !!item.expandable,
                 disabled: (_k, _v, item) => !!item.expanded,
@@ -157,7 +160,7 @@ export function PropertiesDemo() {
               },
               {
                 id: "collapse",
-                icon: "lucide:zoom-out",
+                icon: ZoomOutIcon,
                 label: (key) => `Collapse ${key}`,
                 visible: (_k, _v, item) => !!item.expandable,
                 disabled: (_k, _v, item) => !item.expanded,
@@ -167,7 +170,7 @@ export function PropertiesDemo() {
             suffixActions={[
               {
                 id: "copy",
-                icon: "lucide:copy",
+                icon: CopyIcon,
                 label: (key) => `Copy ${key}`,
                 onClick: (_k, value) => copy(value),
               },

@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { Gauge, TabButton } from "@flanksource/clicky-ui";
+import BeakerIcon from "@iconify-react/codicon/beaker";
+import ErrorIcon from "@iconify-react/codicon/error";
+import GraphIcon from "@iconify-react/codicon/graph";
+import PassIcon from "@iconify-react/codicon/pass";
+import WarningIcon from "@iconify-react/codicon/warning";
 import { DemoRow, DemoSection } from "./Section";
 
 export function TabButtonDemo() {
@@ -15,7 +20,7 @@ export function TabButtonDemo() {
           active={active === "tests"}
           onClick={() => setActive("tests")}
           label="Tests"
-          icon="codicon:beaker"
+          icon={BeakerIcon}
           count={120}
           countColor="bg-blue-500"
         />
@@ -23,7 +28,7 @@ export function TabButtonDemo() {
           active={active === "lint"}
           onClick={() => setActive("lint")}
           label="Lint"
-          icon="codicon:warning"
+          icon={WarningIcon}
           count={4}
           countColor="bg-yellow-500"
         />
@@ -31,12 +36,12 @@ export function TabButtonDemo() {
           active={active === "bench"}
           onClick={() => setActive("bench")}
           label="Benchmarks"
-          icon="codicon:graph"
+          icon={GraphIcon}
         />
       </DemoRow>
       <DemoRow label="Gauges">
         <Gauge
-          icon="codicon:pass"
+          icon={PassIcon}
           label="Passed"
           value={92}
           tone="success"
@@ -44,7 +49,7 @@ export function TabButtonDemo() {
           meta="fresh"
         />
         <Gauge
-          icon="codicon:error"
+          icon={ErrorIcon}
           label="Failed"
           value={3}
           tone="danger"
@@ -52,7 +57,7 @@ export function TabButtonDemo() {
           meta="3m"
         />
         <Gauge
-          icon="codicon:warning"
+          icon={WarningIcon}
           label="Skipped"
           value={5}
           tone="warning"
@@ -60,7 +65,7 @@ export function TabButtonDemo() {
           meta="cached"
         />
         <Gauge
-          icon="codicon:graph"
+          icon={GraphIcon}
           label="Coverage"
           value={78}
           tone="info"

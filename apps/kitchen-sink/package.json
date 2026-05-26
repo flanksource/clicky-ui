@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
+    "@iconify-react/codicon": "catalog:",
+    "@iconify-react/lucide": "catalog:",
+    "@iconify-react/ph": "catalog:",
     "@shikijs/langs": "catalog:",
     "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
