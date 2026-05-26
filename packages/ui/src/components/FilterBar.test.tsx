@@ -492,6 +492,7 @@ describe("FilterBar", () => {
     );
 
     await screen.findByRole("button", { name: /more filters/i });
+    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent(/\d/);
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
@@ -520,6 +521,68 @@ describe("FilterBar", () => {
     expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
+
+    measurement.mockRestore();
+  });
+
+  it("counts only active hidden filters in the overflow trigger badge", async () => {
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 220,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        service: 100,
+        status: 100,
+      },
+    });
+
+    const { rerender } = render(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "platform", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "data", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            onChange: vi.fn(),
+            options: [
+              { value: "healthy", label: "Healthy" },
+              { value: "degraded", label: "Degraded" },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /more filters/i })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent("1/3");
+    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent("3");
+
+    rerender(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "platform", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "data", onChange: vi.fn() },
+          { key: "service", kind: "text", label: "Service", value: "api", onChange: vi.fn() },
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: { degraded: "exclude" },
+            onChange: vi.fn(),
+            options: [
+              { value: "healthy", label: "Healthy" },
+              { value: "degraded", label: "Degraded" },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /more filters/i })).toHaveTextContent("3");
 
     measurement.mockRestore();
   });
