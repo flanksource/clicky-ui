@@ -1,20 +1,28 @@
 import type { ReactNode } from "react";
 import { Badge } from "@flanksource/clicky-ui";
+import CheckIcon from "@iconify-react/lucide/check";
+import ActivityIcon from "@iconify-react/lucide/activity";
+import BoxesIcon from "@iconify-react/lucide/boxes";
+import CircleXIcon from "@iconify-react/lucide/circle-x";
+import GitBranchIcon from "@iconify-react/lucide/git-branch";
+import InfoIcon from "@iconify-react/lucide/info";
+import TriangleAlertIcon from "@iconify-react/lucide/triangle-alert";
+import CodiconCheckIcon from "@iconify-react/codicon/check";
 import { DemoRow, DemoSection } from "./Section";
 
 const TONES = ["neutral", "success", "danger", "warning", "info"] as const;
 const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
-  { label: "Healthy", value: "ready", status: "success" as const, icon: "lucide:check" },
+  { label: "Healthy", value: "ready", status: "success" as const, icon: CheckIcon },
   {
     label: "Degraded",
     value: "latency",
     status: "warning" as const,
-    icon: "lucide:triangle-alert",
+    icon: TriangleAlertIcon,
   },
-  { label: "Failed", value: "blocked", status: "error" as const, icon: "lucide:circle-x" },
-  { label: "Pending", value: "queued", status: "info" as const, icon: "lucide:info" },
+  { label: "Failed", value: "blocked", status: "error" as const, icon: CircleXIcon },
+  { label: "Pending", value: "queued", status: "info" as const, icon: InfoIcon },
 ];
 
 const FIELD_VALUE_BADGES = [
@@ -107,7 +115,7 @@ export function BadgeDemo() {
           <Badge tone="danger" variant="solid" count={12}>
             errors
           </Badge>
-          <Badge tone="success" icon="codicon:check">
+          <Badge tone="success" icon={CodiconCheckIcon}>
             passed
           </Badge>
           <Badge tone="warning" size="lg">
@@ -129,11 +137,11 @@ export function BadgeDemo() {
               size="xs"
             />
           ))}
-          <Badge variant="metric" label="Latency" value="45ms" icon="lucide:activity" size="xs" />
+          <Badge variant="metric" label="Latency" value="45ms" icon={ActivityIcon} size="xs" />
           <Badge
             variant="custom"
             label="v2.4.1"
-            icon="lucide:git-branch"
+            icon={GitBranchIcon}
             color="#eef2ff"
             textColor="#4338ca"
             size="xs"
@@ -141,7 +149,7 @@ export function BadgeDemo() {
           <Badge
             variant="outlined"
             label="Kubernetes"
-            icon="lucide:boxes"
+            icon={BoxesIcon}
             borderColor="#326ce5"
             textColor="#326ce5"
             size="xs"

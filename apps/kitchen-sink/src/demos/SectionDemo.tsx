@@ -1,4 +1,6 @@
 import { DetailEmptyState, Section } from "@flanksource/clicky-ui";
+import ErrorIcon from "@iconify-react/codicon/error";
+import InboxIcon from "@iconify-react/codicon/inbox";
 import { DemoSection } from "./Section";
 
 export function SectionDemo() {
@@ -16,7 +18,7 @@ export function SectionDemo() {
           <li>mode = strict</li>
         </ul>
       </Section>
-      <Section title="Errors" tone="danger" summary="3 violations" icon="codicon:error">
+      <Section title="Errors" tone="danger" summary="3 violations" icon={ErrorIcon}>
         <div className="text-sm text-muted-foreground">Stack traces would go here.</div>
       </Section>
       <Section title="Nested example" defaultOpen>
@@ -29,7 +31,7 @@ export function SectionDemo() {
       </Section>
       <div className="border-t border-border pt-density-3">
         <DetailEmptyState
-          icon="codicon:inbox"
+          icon={InboxIcon}
           label="Nothing selected"
           description="Pick an item from the tree to see its details."
         />

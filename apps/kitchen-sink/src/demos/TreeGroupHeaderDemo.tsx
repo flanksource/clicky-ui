@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { TreeGroupHeader } from "@flanksource/clicky-ui";
+import { TreeGroupHeader, type StaticIconComponent } from "@flanksource/clicky-ui";
+import SymbolClassIcon from "@iconify-react/codicon/symbol-class";
+import SymbolInterfaceIcon from "@iconify-react/codicon/symbol-interface";
 import { DemoSection } from "./Section";
 
-const GROUPS = [
-  { kind: "Pod", icon: "codicon:symbol-class", items: ["api-server", "worker", "scheduler"] },
-  { kind: "Service", icon: "codicon:symbol-interface", items: ["api", "auth"] },
+const GROUPS: Array<{ kind: string; icon: StaticIconComponent; items: string[] }> = [
+  { kind: "Pod", icon: SymbolClassIcon, items: ["api-server", "worker", "scheduler"] },
+  { kind: "Service", icon: SymbolInterfaceIcon, items: ["api", "auth"] },
 ];
 
 export function TreeGroupHeaderDemo() {

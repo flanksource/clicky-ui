@@ -7,7 +7,10 @@ allowBuilds:
   vue-demi: true
 
 catalog:
-  "@iconify/react": ^5.0.2
+  '@iconify-react/codicon': ^1.0.12
+  '@iconify-react/lucide': ^1.0.15
+  '@iconify-react/ph': ^1.0.2
+  '@iconify-react/svg-spinners': ^1.0.2
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3
   "@radix-ui/react-accordion": ^1.2.2

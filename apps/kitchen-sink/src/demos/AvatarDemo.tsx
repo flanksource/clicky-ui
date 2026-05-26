@@ -3,7 +3,10 @@ import {
   type AvatarKind,
   type AvatarVariant,
 } from "../../../../packages/ui/src/data/Avatar";
-import { AvatarBadge, fnv1a32 } from "@flanksource/clicky-ui";
+import { AvatarBadge, fnv1a32, type StaticIconComponent } from "@flanksource/clicky-ui";
+import CheckThinIcon from "@iconify-react/ph/check-thin";
+import HourglassMediumThinIcon from "@iconify-react/ph/hourglass-medium-thin";
+import XThinIcon from "@iconify-react/ph/x-thin";
 import { resolveSize, type SizeToken } from "../../../../packages/ui/src/lib/size";
 import { useDensityValue } from "../../../../packages/ui/src/hooks/use-density";
 import { DemoRow, DemoSection } from "./Section";
@@ -54,15 +57,15 @@ const VARIANTS: Array<{ description: string; title: string; variant: AvatarVaria
 type StageStatus = "approved" | "pending" | "rejected";
 
 type StageStatusSpec = {
-  icon: string;
+  icon: StaticIconComponent;
   cellBg: string;
   tone: "emerald" | "amber" | "rose";
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: "ph:check-thin", cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: "ph:hourglass-medium-thin", cellBg: "bg-amber-50/85", tone: "amber" },
-  rejected: { icon: "ph:x-thin", cellBg: "bg-rose-50/85", tone: "rose" },
+  approved: { icon: CheckThinIcon, cellBg: "bg-emerald-50/80", tone: "emerald" },
+  pending: { icon: HourglassMediumThinIcon, cellBg: "bg-amber-50/85", tone: "amber" },
+  rejected: { icon: XThinIcon, cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
 const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [

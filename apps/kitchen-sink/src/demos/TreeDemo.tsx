@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Badge, Icon, Tree } from "@flanksource/clicky-ui";
+import DebugPauseIcon from "@iconify-react/codicon/debug-pause";
+import ErrorIcon from "@iconify-react/codicon/error";
+import PassIcon from "@iconify-react/codicon/pass";
 import { DemoRow, DemoSection } from "./Section";
 
 type Test = {
@@ -135,15 +138,15 @@ export function TreeDemo() {
         renderRow={({ node }) => {
           const icon =
             node.status === "passed"
-              ? "codicon:pass"
+              ? PassIcon
               : node.status === "failed"
-                ? "codicon:error"
-                : "codicon:debug-pause";
+                ? ErrorIcon
+                : DebugPauseIcon;
           const tone =
             node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
           return (
             <>
-              <Icon name={icon} />
+              <Icon icon={icon} />
               <span className="truncate flex-1">{node.name}</span>
               {node.duration !== undefined && (
                 <span className="text-xs text-muted-foreground tabular-nums">

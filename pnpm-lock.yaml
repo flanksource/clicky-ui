@@ -6,6 +6,18 @@ settings:
 
 catalogs:
   default:
+    '@iconify-react/codicon':
+      specifier: ^1.0.12
+      version: 1.0.12
+    '@iconify-react/lucide':
+      specifier: ^1.0.15
+      version: 1.0.15
+    '@iconify-react/ph':
+      specifier: ^1.0.2
+      version: 1.0.2
+    '@iconify-react/svg-spinners':
+      specifier: ^1.0.2
+      version: 1.0.2
     '@playwright/test':
       specifier: ^1.49.1
       version: 1.59.1
@@ -102,6 +114,15 @@ importers:
       '@flanksource/clicky-ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@iconify-react/codicon':
+        specifier: 'catalog:'
+        version: 1.0.12(react@18.3.1)
+      '@iconify-react/lucide':
+        specifier: 'catalog:'
+        version: 1.0.15(react@18.3.1)
+      '@iconify-react/ph':
+        specifier: 'catalog:'
+        version: 1.0.2(react@18.3.1)
       '@shikijs/langs':
         specifier: 'catalog:'
         version: 1.29.2
@@ -218,9 +239,18 @@ importers:
 
   packages/ui:
     dependencies:
-      '@iconify/react':
-        specifier: ^5.0.2
-        version: 5.2.1(react@18.3.1)
+      '@iconify-react/codicon':
+        specifier: 'catalog:'
+        version: 1.0.12(react@18.3.1)
+      '@iconify-react/lucide':
+        specifier: 'catalog:'
+        version: 1.0.15(react@18.3.1)
+      '@iconify-react/ph':
+        specifier: 'catalog:'
+        version: 1.0.2(react@18.3.1)
+      '@iconify-react/svg-spinners':
+        specifier: 'catalog:'
+        version: 1.0.2(react@18.3.1)
       '@radix-ui/react-compose-refs':
         specifier: ^1.1.2
         version: 1.1.2(@types/react@18.3.28)(react@18.3.1)
@@ -597,10 +627,22 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@iconify/react@5.2.1':
-    resolution: {integrity: sha512-37GDR3fYDZmnmUn9RagyaX+zca24jfVOMY8E1IXTqJuE8pxNtN51KWPQe3VODOWvuUurq7q9uUu3CFrpqj5Iqg==}
+  '@iconify-react/codicon@1.0.12':
+    resolution: {integrity: sha512-cfQf/H+CwUPoP4KBXoQrNfDcdUzK6w3ATkhc724bUSInk1K/tW/08++dhMO82SDA5TIqBtFafiGUyuut60WDog==}
+
+  '@iconify-react/lucide@1.0.15':
+    resolution: {integrity: sha512-19CGV+NQ4Uj3QTm9yov3yiFoXa/gXHbtzwLatDoA0gq5TNcFj+J5QlMYZZbILRs/LdN/j3GpZoQnNNEhm5Lpcw==}
+
+  '@iconify-react/ph@1.0.2':
+    resolution: {integrity: sha512-b4qD3p3XlFKx/Zzv2RZYJo8nFZbOgMXZ4eW+ic5rTRSa6TShvYxWBD10DWmU9k9TVdMOuqHfz/bOXrAm61qzWQ==}
+
+  '@iconify-react/svg-spinners@1.0.2':
+    resolution: {integrity: sha512-E5P3nak5GL8hITcMbwsiDVWzix+cw2d9hBO9YNHIeN4RiEZoCFR7dPkFVWugFnORMthZj/vQls+9N03ihGt5jA==}
+
+  '@iconify/css-react@1.0.2':
+    resolution: {integrity: sha512-k33FKG4jGgd8odos+1HdSwCKZOQ5F1heQxwl/zDrA53tLg5IseDPMqsmQbcCEZ6E0Zgcrmfo4ceFSBmbuEvGtw==}
     peerDependencies:
-      react: '>=16'
+      react: '>=18.0.0'
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -3484,7 +3526,31 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
-  '@iconify/react@5.2.1(react@18.3.1)':
+  '@iconify-react/codicon@1.0.12(react@18.3.1)':
+    dependencies:
+      '@iconify/css-react': 1.0.2(react@18.3.1)
+    transitivePeerDependencies:
+      - react
+
+  '@iconify-react/lucide@1.0.15(react@18.3.1)':
+    dependencies:
+      '@iconify/css-react': 1.0.2(react@18.3.1)
+    transitivePeerDependencies:
+      - react
+
+  '@iconify-react/ph@1.0.2(react@18.3.1)':
+    dependencies:
+      '@iconify/css-react': 1.0.2(react@18.3.1)
+    transitivePeerDependencies:
+      - react
+
+  '@iconify-react/svg-spinners@1.0.2(react@18.3.1)':
+    dependencies:
+      '@iconify/css-react': 1.0.2(react@18.3.1)
+    transitivePeerDependencies:
+      - react
+
+  '@iconify/css-react@1.0.2(react@18.3.1)':
     dependencies:
       '@iconify/types': 2.0.0
       react: 18.3.1
