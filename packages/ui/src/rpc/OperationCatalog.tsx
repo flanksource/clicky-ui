@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { FilterBar } from "../components/FilterBar";
 import { Icon } from "../data/Icon";
+import { CodiconAddIcon, CodiconListFlatIcon, CodiconTableIcon } from "../data/static-icons";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import { filterOperationsByDomain, findListEndpoint } from "./classify";
@@ -262,7 +263,7 @@ export function OperationCatalog({
               aria-pressed={view === "table"}
               onClick={() => setView("table")}
             >
-              <Icon name="codicon:table" />
+              <Icon icon={CodiconTableIcon} />
             </Button>
             <Button
               type="button"
@@ -273,7 +274,7 @@ export function OperationCatalog({
               aria-pressed={view === "endpoints"}
               onClick={() => setView("endpoints")}
             >
-              <Icon name="codicon:list-flat" />
+              <Icon icon={CodiconListFlatIcon} />
             </Button>
           </div>
         )}
@@ -300,7 +301,7 @@ export function OperationCatalog({
                     setActionError("");
                   }}
                 >
-                  <Icon name="codicon:add" className="text-xs" />
+                  <Icon icon={CodiconAddIcon} className="text-xs" />
                   {op.operation.summary || getOperationClickyMeta(op)?.actionName || commandName}
                 </Button>
               );
@@ -314,7 +315,7 @@ export function OperationCatalog({
                 "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
               children: (
                 <>
-                  <Icon name="codicon:add" className="text-xs" />
+                  <Icon icon={CodiconAddIcon} className="text-xs" />
                   {op.operation.summary || commandName}
                 </>
               ),

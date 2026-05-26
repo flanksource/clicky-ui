@@ -59,4 +59,35 @@ describe("parametersToFormConfig", () => {
 
     expect(updates).toEqual([{ status: "!ready,failed" }]);
   });
+
+  it("passes time range lookup options through to the range control", () => {
+    const values = { from: "", to: "" };
+    const config = parametersToFormConfig(
+      [
+        { name: "from", in: "query" },
+        { name: "to", in: "query" },
+      ],
+      values,
+      () => {},
+      {
+        lookup: {
+          filters: {
+            from: {
+              type: "from",
+              presets: ["this", "last"],
+              timeEnabled: true,
+              timeZone: "Asia/Jerusalem",
+              timeZones: ["Asia/Jerusalem", "UTC"],
+            },
+            to: { type: "to" },
+          },
+        },
+      },
+    );
+
+    expect(config.timeRange?.presets).toEqual(["this", "last"]);
+    expect(config.timeRange?.timeEnabled).toBe(true);
+    expect(config.timeRange?.timeZone).toBe("Asia/Jerusalem");
+    expect(config.timeRange?.timeZones).toEqual(["Asia/Jerusalem", "UTC"]);
+  });
 });

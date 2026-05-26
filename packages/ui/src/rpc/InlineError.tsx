@@ -1,4 +1,5 @@
 import { Icon } from "../data/Icon";
+import { CodiconChevronRightIcon } from "../data/static-icons";
 import { cn } from "../lib/utils";
 
 export type InlineErrorProps = {
@@ -29,7 +30,7 @@ export function InlineError({ title, error, className }: InlineErrorProps) {
         <details className="group mt-3">
           <summary className="flex cursor-pointer items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <Icon
-              name="codicon:chevron-right"
+              icon={CodiconChevronRightIcon}
               className="transition-transform group-open:rotate-90"
             />
             More details

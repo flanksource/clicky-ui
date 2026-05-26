@@ -1,4 +1,5 @@
 import type { ClickyNode } from "../data/Clicky";
+import type { TimeRangePresetGroup } from "../components/TimeRange";
 
 export interface ExecutionRequest {
   args?: string[];
@@ -105,6 +106,10 @@ export interface OperationLookupFilter {
   selected?: Record<string, ClickyNode>;
   multi?: boolean;
   type?: OperationLookupFilterType;
+  presets?: Array<{ label: string; from: string; to: string } | TimeRangePresetGroup>;
+  timeEnabled?: boolean;
+  timeZone?: string;
+  timeZones?: string[];
 }
 
 export interface OperationLookupResponse {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
+import { CodiconPlayIcon } from "../data/static-icons";
 import { Modal } from "../overlay/Modal";
 import { CommandForm } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
@@ -55,7 +56,7 @@ export function OperationActionDialog({
   return (
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <Icon name="codicon:play" />
+        <Icon icon={CodiconPlayIcon} />
         {label}
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title={label} size="lg">
