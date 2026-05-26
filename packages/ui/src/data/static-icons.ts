@@ -24,6 +24,7 @@ import CodiconErrorIcon from "@iconify-react/codicon/error";
 import CodiconExpandAllIcon from "@iconify-react/codicon/expand-all";
 import CodiconEyeClosedIcon from "@iconify-react/codicon/eye-closed";
 import CodiconFileCodeIcon from "@iconify-react/codicon/file-code";
+import CodiconFilterFilledIcon from "@iconify-react/codicon/filter-filled";
 import CodiconFilterIcon from "@iconify-react/codicon/filter";
 import CodiconGraphIcon from "@iconify-react/codicon/graph";
 import CodiconInboxIcon from "@iconify-react/codicon/inbox";
@@ -108,6 +109,7 @@ export {
   CodiconExpandAllIcon,
   CodiconEyeClosedIcon,
   CodiconFileCodeIcon,
+  CodiconFilterFilledIcon,
   CodiconFilterIcon,
   CodiconGraphIcon,
   CodiconInboxIcon,

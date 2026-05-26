@@ -32,6 +32,7 @@ import {
   CodiconCloseIcon,
   CodiconEllipsisIcon,
   CodiconEyeClosedIcon,
+  CodiconFilterFilledIcon,
   CodiconFilterIcon,
   CodiconScreenFullIcon,
   PhArrowsInLineVerticalIcon,
@@ -1191,7 +1192,9 @@ function HeaderFilterButton<T extends Record<string, unknown>>({
       )}
       onClick={onOpen}
     >
-      <Icon icon={CodiconFilterIcon} className="text-xs" />
+      <span data-filter-icon-state={active ? "filled" : "outline"} className="inline-flex">
+        <Icon icon={active ? CodiconFilterFilledIcon : CodiconFilterIcon} className="text-xs" />
+      </span>
     </button>
   );
 }

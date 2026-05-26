@@ -164,6 +164,8 @@ describe("DataTable", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
+    expect(document.querySelector("[data-filter-bar-list]")).not.toHaveClass("overflow-hidden");
+
     fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
     const healthyFilter = document.querySelector('[data-filter-option="healthy"]');
     if (!healthyFilter) {
@@ -224,7 +226,13 @@ describe("DataTable", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open status column filter/i }));
+    const statusFilterButton = screen.getByRole("button", {
+      name: /open status column filter/i,
+    });
+    expect(statusFilterButton).toHaveAttribute("aria-pressed", "false");
+    expect(statusFilterButton.querySelector('[data-filter-icon-state="outline"]')).not.toBeNull();
+
+    fireEvent.click(statusFilterButton);
     const healthyFilter = document.querySelector('[data-filter-option="healthy"]');
     if (!healthyFilter) {
       throw new Error("Expected healthy header filter option");
@@ -237,6 +245,13 @@ describe("DataTable", () => {
     expect(screen.getByText("api")).toBeInTheDocument();
     expect(screen.getByText("cron")).toBeInTheDocument();
     expect(screen.queryByText("worker")).not.toBeInTheDocument();
+
+    expect(statusFilterButton).toHaveAttribute("aria-pressed", "true");
+    expect(statusFilterButton.querySelector('[data-filter-icon-state="filled"]')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+    expect(statusFilterButton).toHaveAttribute("aria-pressed", "false");
+    expect(statusFilterButton.querySelector('[data-filter-icon-state="outline"]')).not.toBeNull();
     vi.useRealTimers();
   });
 

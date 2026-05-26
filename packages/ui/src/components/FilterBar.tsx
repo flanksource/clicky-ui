@@ -391,7 +391,7 @@ export function FilterBar({
             data-filter-bar-list
             className={cn(
               "flex min-w-0 items-center gap-2",
-              overflowMode === "wrap" ? "flex-wrap" : "flex-1 overflow-hidden",
+              overflowMode === "wrap" ? "flex-wrap" : "flex-1",
             )}
           >
             {inlineFilters.map((filter, index) => (
@@ -411,7 +411,6 @@ export function FilterBar({
           <OverflowFiltersMenu
             triggerRef={overflowTriggerRef}
             filters={overflowFilters}
-            totalHidden={overflowFilters.length}
             activeHidden={activeOverflowCount}
             {...(onApply ? { onApply } : {})}
           />
@@ -521,20 +520,18 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 function OverflowFiltersMenu({
   triggerRef,
   filters,
-  totalHidden,
   activeHidden,
   onApply,
 }: {
   triggerRef: RefObject<HTMLButtonElement>;
   filters: FilterBarFilter[];
-  totalHidden: number;
   activeHidden: number;
   onApply?: () => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [stagedValues, setStagedValues] = useState<Record<string, FilterBarValue>>({});
-  const hasHidden = totalHidden > 0;
+  const hasHidden = filters.length > 0;
   const hiddenFilterKeys = useMemo(
     () => filters.map((filter) => filter.key).join("\u0000"),
     [filters],
@@ -559,7 +556,6 @@ function OverflowFiltersMenu({
     setStagedValues(createFilterValueMap(filters));
   }, [hiddenFilterKeys, open]);
 
-  const countLabel = activeHidden > 0 ? `${activeHidden}/${totalHidden}` : String(totalHidden);
   const stagedFilters = filters.map((filter) =>
     filterWithStagedValue(
       filter,
@@ -602,9 +598,11 @@ function OverflowFiltersMenu({
         )}
       >
         <Icon icon={CodiconFilterIcon} className="text-[14px]" />
-        <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-          {countLabel}
-        </span>
+        {activeHidden > 0 && (
+          <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+            {activeHidden}
+          </span>
+        )}
       </Button>
 
       {hasHidden && open && (
