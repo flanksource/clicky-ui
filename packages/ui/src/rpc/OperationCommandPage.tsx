@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FilterBar } from "../components/FilterBar";
+import type { DataTablePagination } from "../data/DataTable";
 import type {
   ClickyCommandRuntime,
   ClickyNode,
@@ -28,7 +29,6 @@ import { OperationActionDialog } from "./OperationActionDialog";
 import {
   isPositionalParam,
   type ExecutionResponse,
-  type OpenAPIParameter,
   type ResolvedOperation,
 } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
@@ -71,8 +71,10 @@ export function OperationCommandPage({
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [submitError, setSubmitError] = useState("");
   const [hasAutoRun, setHasAutoRun] = useState(false);
   const parameters = operation?.operation.parameters ?? [];
+  const isGet = (operation?.method ?? "").toUpperCase() === "GET";
   const parameterSignature = JSON.stringify(
     parameters.map((param) => ({
       name: param.name,
@@ -114,6 +116,91 @@ export function OperationCommandPage({
     [lockedPathValues, operation, operations],
   );
 
+  // GET-mode parameter state: filter values + pagination cursor are driven
+  // by the page so they can flow natively into <CommandOutput>'s filter bar
+  // and pagination footer instead of through a separate OperationQueryFilterBar.
+  const [values, setValues] = useState<ParameterValues>(effectiveInitialValues);
+  useEffect(() => {
+    setValues(effectiveInitialValues);
+    setSubmitError("");
+  }, [effectiveInitialValues]);
+  const debouncedValues = useDebouncedRecord(values, 250);
+
+  const lookupQuery = useQuery({
+    queryKey: ["operation-query-lookup", operation?.method, operation?.path, debouncedValues],
+    queryFn: async () => {
+      if (!operation) return { filters: {} };
+      return (
+        (await client.lookupFilters?.(
+          operation.path,
+          operation.method,
+          packParameterValues(debouncedValues, parameters),
+          { Accept: "application/json+clicky" },
+        )) ?? { filters: {} }
+      );
+    },
+    enabled:
+      isGet &&
+      !!operation &&
+      !!client.lookupFilters &&
+      parameters.some((param) => param.in === "query"),
+    staleTime: 30_000,
+    retry: 0,
+  });
+
+  const formConfig = useMemo(() => {
+    if (!isGet) return { filters: [] };
+    return parametersToFormConfig(parameters, values, setValues, {
+      lookup: lookupQuery.data,
+      lockedValues: lockedPathValues,
+      hideLocked: hideLockedPathFilters,
+    });
+  }, [isGet, parameters, values, lookupQuery.data, lockedPathValues, hideLockedPathFilters]);
+
+  const dataTablePagination = useMemo<DataTablePagination | undefined>(() => {
+    const p = formConfig.pagination;
+    if (!p) return undefined;
+    const pageSize = Math.max(parseInt(p.limitValue, 10) || 25, 1);
+    const offset = Math.max(parseInt(p.offsetValue, 10) || 0, 0);
+    const page = Math.floor(offset / pageSize);
+    return {
+      page,
+      pageSize,
+      onPageChange: (next: number) => p.setOffset(String(Math.max(next, 0) * pageSize)),
+      onPageSizeChange: (next: number) => {
+        p.setLimit(String(next));
+        p.setOffset("0");
+      },
+    };
+  }, [formConfig.pagination]);
+
+  // Ref tracking the last submitted parameter signature so that the
+  // auto-submit-on-debounced-change effect and the manual submit button
+  // both coordinate against the same "have I already fired this set of
+  // values" check.
+  const lastSubmittedSignature = useRef("");
+
+  function handleManualSubmit() {
+    if (!operation) return;
+    const merged = { ...values, ...lockedPathValues };
+    const missingRequired = parameters.filter((param) => {
+      if (!param.required) return false;
+      return (merged[param.name] ?? "").trim() === "";
+    });
+    if (missingRequired.length > 0) {
+      setSubmitError(
+        `Missing required fields: ${missingRequired
+          .map((param) => titleCase(param.name))
+          .join(", ")}`,
+      );
+      return;
+    }
+    setSubmitError("");
+    setHasAutoRun(true);
+    lastSubmittedSignature.current = JSON.stringify(pruneParameterValues(merged));
+    void executeOperation(merged);
+  }
+
   async function executeOperation(values: ParameterValues) {
     if (!operation) return;
 
@@ -144,8 +231,10 @@ export function OperationCommandPage({
 
   useEffect(() => {
     if (!autoRun || !operation || hasAutoRun) return;
-    if (operation.method.toUpperCase() === "GET" && parameters.length > 0) return;
-
+    // Auto-run a GET as long as every required parameter has a value. Optional
+    // params (limit/offset, filter chips, etc.) get their defaults; the
+    // sidebar's "click → instant table" flow depends on this not bailing just
+    // because the operation declares any parameters at all.
     const missingRequired = parameters.filter((param) => {
       if (!param.required) return false;
       return (effectiveInitialValues[param.name] ?? "").trim() === "";
@@ -155,6 +244,26 @@ export function OperationCommandPage({
     setHasAutoRun(true);
     void executeOperation(effectiveInitialValues);
   }, [accept, autoRun, effectiveInitialValues, hasAutoRun, operationKey, parameterSignature]);
+
+  // GET re-runs on debounced filter/pagination changes once the initial
+  // auto-run has fired; non-GETs keep their explicit-submit behavior.
+  useEffect(() => {
+    if (!isGet || !operation || !hasAutoRun) return;
+    const merged = { ...debouncedValues, ...lockedPathValues };
+    const missingRequired = parameters.filter((param) => {
+      if (!param.required) return false;
+      return (merged[param.name] ?? "").trim() === "";
+    });
+    if (missingRequired.length > 0) return;
+    const signature = JSON.stringify(pruneParameterValues(merged));
+    if (lastSubmittedSignature.current === signature) return;
+    lastSubmittedSignature.current = signature;
+    void executeOperation(merged);
+  }, [isGet, hasAutoRun, debouncedValues, lockedPathValues, parameterSignature]);
+
+  useEffect(() => {
+    lastSubmittedSignature.current = "";
+  }, [operationKey]);
 
   const getRowDetailHref = useCallback<ClickyTableRowHref>(
     (row) => {
@@ -274,20 +383,32 @@ export function OperationCommandPage({
 
       <section className="space-y-3">
         {method.toUpperCase() === "GET" ? (
-          parameters.length > 0 && (
-            <OperationQueryFilterBar
-              client={client}
-              path={path}
-              method={method}
-              parameters={parameters}
-              initialValues={effectiveInitialValues}
-              lockedValues={lockedPathValues}
-              hideLocked={hideLockedPathFilters}
-              autoSubmit={autoRun}
-              isSubmitting={isExecuting}
-              onSubmit={executeOperation}
-            />
-          )
+          parameters.length > 0 ? (
+            // Before a result lands the FilterBar lives here so users can
+            // fill in path params / required inputs and submit. Once a
+            // result is showing AND autoRun is on (sidebar flow), the same
+            // filter chips relocate into the DataTable's filter bar via
+            // externalFilters, which is the unified placement the user asked
+            // for. The two branches share `formConfig.filters` so the values
+            // stay in sync.
+            !result || !autoRun ? (
+              <div className="space-y-2">
+                <FilterBar
+                  autoSubmit={autoRun}
+                  filters={formConfig.filters}
+                  {...(!autoRun ? { onApply: () => handleManualSubmit() } : {})}
+                  applyLabel="Execute request"
+                  isPending={isExecuting}
+                  {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}
+                />
+                {submitError && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                    {submitError}
+                  </div>
+                )}
+              </div>
+            ) : null
+          ) : null
         ) : (
           <div className="rounded-lg border p-4">
             <CommandForm
@@ -323,135 +444,15 @@ export function OperationCommandPage({
                   isTableRowClickable: (row: ClickyRow) => Boolean(getRowDetailHref(row)),
                 }
               : {})}
+            {...(isGet && autoRun && formConfig.filters.length > 0
+              ? { externalFilters: formConfig.filters }
+              : {})}
+            {...(isGet && autoRun && dataTablePagination
+              ? { pagination: dataTablePagination }
+              : {})}
           />
         </div>
       ) : null}
-    </div>
-  );
-}
-
-type OperationQueryFilterBarProps = {
-  client: OperationsApiClient;
-  path: string;
-  method: string;
-  parameters: OpenAPIParameter[];
-  initialValues: ParameterValues;
-  lockedValues?: ParameterValues;
-  hideLocked?: boolean;
-  autoSubmit: boolean;
-  isSubmitting: boolean;
-  onSubmit: (values: ParameterValues) => void | Promise<void>;
-};
-
-function OperationQueryFilterBar({
-  client,
-  path,
-  method,
-  parameters,
-  initialValues,
-  lockedValues = {},
-  hideLocked = false,
-  autoSubmit,
-  isSubmitting,
-  onSubmit,
-}: OperationQueryFilterBarProps) {
-  const [values, setValues] = useState<ParameterValues>(initialValues);
-  const [error, setError] = useState("");
-  const debouncedValues = useDebouncedRecord(values, 250);
-  const resetKey = useMemo(
-    () => `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
-    [initialValues, lockedValues, method, path],
-  );
-  const lastSubmitted = useRef("");
-
-  useEffect(() => {
-    setValues(initialValues);
-    setError("");
-    lastSubmitted.current = "";
-  }, [resetKey]);
-
-  const lookupQuery = useQuery({
-    queryKey: ["operation-query-lookup", method, path, debouncedValues],
-    queryFn: async () =>
-      (await client.lookupFilters?.(
-        path,
-        method,
-        packParameterValues(debouncedValues, parameters),
-        { Accept: "application/json+clicky" },
-      )) ?? { filters: {} },
-    enabled: !!client.lookupFilters && parameters.some((param) => param.in === "query"),
-    staleTime: 30_000,
-    retry: 0,
-  });
-
-  const formConfig = useMemo(
-    () =>
-      parametersToFormConfig(parameters, values, setValues, {
-        lookup: lookupQuery.data,
-        lockedValues,
-        hideLocked,
-      }),
-    [hideLocked, lockedValues, lookupQuery.data, parameters, values],
-  );
-
-  async function handleSubmit(nextValues: ParameterValues = values) {
-    const missingRequired = parameters.filter((param) => {
-      if (!param.required) return false;
-      const value = lockedValues[param.name] ?? nextValues[param.name] ?? "";
-      return value.trim() === "";
-    });
-
-    if (missingRequired.length > 0) {
-      setError(
-        `Missing required fields: ${missingRequired.map((param) => titleCase(param.name)).join(", ")}`,
-      );
-      return;
-    }
-
-    setError("");
-    await onSubmit(pruneParameterValues({ ...nextValues, ...lockedValues }));
-  }
-
-  useEffect(() => {
-    if (!autoSubmit) return;
-    const next = pruneParameterValues({ ...debouncedValues, ...lockedValues });
-    const signature = JSON.stringify(next);
-    if (lastSubmitted.current === signature) return;
-    lastSubmitted.current = signature;
-    void handleSubmit(debouncedValues);
-  }, [autoSubmit, debouncedValues, lockedValues]);
-
-  if (formConfig.filters.length === 0 && formConfig.timeRange == null) {
-    return (
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">This operation does not require input.</p>
-        <button
-          type="button"
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          disabled={isSubmitting}
-          onClick={() => handleSubmit()}
-        >
-          {isSubmitting ? "Executing..." : "Execute request"}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <FilterBar
-        autoSubmit={autoSubmit}
-        filters={formConfig.filters}
-        {...(!autoSubmit ? { onApply: () => handleSubmit() } : {})}
-        applyLabel="Execute request"
-        isPending={isSubmitting}
-        {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}
-      />
-      {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
     </div>
   );
 }

@@ -183,6 +183,20 @@ export type DataTableColumnInput<T extends Record<string, unknown> = Record<stri
   | DataTableColumn<T>
   | string;
 
+/**
+ * Server-side pagination control surfaced as a footer strip below the table.
+ * The DataTable never slices data itself; callers refetch when the page or
+ * pageSize changes.
+ */
+export type DataTablePagination = {
+  page: number; // 0-indexed
+  pageSize: number;
+  total?: number; // total row count if known; enables "Page X of Y"
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  pageSizeOptions?: number[]; // defaults to [25, 50, 100, 200]
+};
+
 type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unknown>> = {
   data: T[];
   /**
@@ -204,6 +218,20 @@ type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unkn
   globalFilterPlaceholder?: string;
   defaultSort?: { key: string; dir?: SortDir };
   filterBarProps?: Omit<FilterBarProps, "search" | "filters">;
+  /**
+   * Extra filter pills supplied by the caller (e.g., operation query
+   * parameters surfaced via parametersToFormConfig) that should appear in the
+   * FilterBar alongside the column-derived filters. Rendered before the
+   * column filters so the caller's natural ordering wins.
+   */
+  externalFilters?: FilterBarFilter[];
+  /**
+   * Server-side pagination footer. When provided, a small page-size / prev /
+   * next strip is rendered below the table; the DataTable does NOT slice
+   * `data` itself, callers are expected to refetch when `onPageChange` or
+   * `onPageSizeChange` fires.
+   */
+  pagination?: DataTablePagination;
   getRowId?: (row: T, index: number) => string;
   onRowClick?: (row: T) => void;
   isRowClickable?: (row: T) => boolean;
@@ -273,6 +301,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   globalFilterPlaceholder = "Search all columns…",
   defaultSort,
   filterBarProps,
+  externalFilters,
+  pagination,
   getRowId,
   onRowClick,
   isRowClickable,
@@ -668,6 +698,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   }, [autoFilter, timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
   const showFilterBar =
     (autoFilter && (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
+    (externalFilters && externalFilters.length > 0) ||
     hasCustomFilterBarContent ||
     showTablePreferencesControl;
   const setDensityOverride = (next: Density | undefined) => {
@@ -887,7 +918,11 @@ function DataTableInner<T extends Record<string, unknown>>({
               : {})}
             {...(autoTimeRange ? { timeRange: autoTimeRange } : {})}
             trailing={filterBarTrailing}
-            filters={nativeFilters}
+            filters={
+              externalFilters && externalFilters.length > 0
+                ? [...externalFilters, ...nativeFilters]
+                : nativeFilters
+            }
           />
         )}
 
@@ -1082,6 +1117,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             ? loadingMessage
             : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`}
         </div>
+        {pagination && <DataTablePaginationFooter pagination={pagination} />}
         {columnMenu && showTablePreferencesControl && (
           <ColumnVisibilityMenu
             columns={effectiveColumns}
@@ -1112,6 +1148,63 @@ function DataTableInner<T extends Record<string, unknown>>({
         )}
       </div>
     </DensityValueProvider>
+  );
+}
+
+const DEFAULT_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+
+// DataTablePaginationFooter renders a small page-size selector and prev/next
+// controls below the table. Pure presentation: every interaction routes
+// straight to the caller-supplied callbacks so the data layer (which lives in
+// CommandOutput / OperationCommandPage) stays the source of truth for which
+// rows are visible.
+function DataTablePaginationFooter({ pagination }: { pagination: DataTablePagination }) {
+  const { page, pageSize, total, onPageChange, onPageSizeChange } = pagination;
+  const options = pagination.pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS;
+  const safePage = Math.max(0, page);
+  const totalPages =
+    total != null && pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : undefined;
+  const atFirst = safePage === 0;
+  const atLast = totalPages != null ? safePage >= totalPages - 1 : false;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-muted-foreground">
+      <label className="flex items-center gap-1">
+        <span>Rows per page</span>
+        <select
+          className="rounded border border-border bg-background px-1 py-0.5 text-foreground"
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+          disabled={atFirst}
+          onClick={() => onPageChange(Math.max(0, safePage - 1))}
+        >
+          Prev
+        </button>
+        <span>
+          Page {safePage + 1}
+          {totalPages != null ? ` of ${totalPages}` : ""}
+        </span>
+        <button
+          type="button"
+          className="rounded border border-border px-2 py-0.5 disabled:opacity-50"
+          disabled={atLast}
+          onClick={() => onPageChange(safePage + 1)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
   );
 }
 

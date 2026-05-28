@@ -60,6 +60,45 @@ describe("parametersToFormConfig", () => {
     expect(updates).toEqual([{ status: "!ready,failed" }]);
   });
 
+  it("partitions limit/offset role parameters into pagination instead of filters", () => {
+    const values = { limit: "50", offset: "0", name: "" };
+    const config = parametersToFormConfig(
+      [
+        { name: "limit", in: "query", "x-clicky": { role: "limit" } },
+        { name: "offset", in: "query", "x-clicky": { role: "offset" } },
+        { name: "name", in: "query", "x-clicky": { role: "filter" } },
+      ],
+      values,
+      () => {},
+    );
+
+    expect(config.pagination).toEqual({
+      limitParam: "limit",
+      offsetParam: "offset",
+      limitValue: "50",
+      offsetValue: "0",
+      setLimit: expect.any(Function),
+      setOffset: expect.any(Function),
+    });
+    expect(config.filters.map((f) => f.key)).toEqual(["name"]);
+  });
+
+  it("partitions time-from/time-to role parameters into the time range", () => {
+    const values = { since: "2024-01-01", to: "2024-12-31" };
+    const config = parametersToFormConfig(
+      [
+        { name: "since", in: "query", "x-clicky": { role: "time-from" } },
+        { name: "to", in: "query", "x-clicky": { role: "time-to" } },
+      ],
+      values,
+      () => {},
+    );
+
+    expect(config.timeRange?.from).toBe("2024-01-01");
+    expect(config.timeRange?.to).toBe("2024-12-31");
+    expect(config.filters).toHaveLength(0);
+  });
+
   it("passes time range lookup options through to the range control", () => {
     const values = { from: "", to: "" };
     const config = parametersToFormConfig(
