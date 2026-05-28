@@ -28,7 +28,13 @@ import {
 } from "../rpc/types";
 import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
 import { cn } from "../lib/utils";
-import { DataTable, type DataTableColumn, type DataTableRowDetailContext } from "./DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTablePagination,
+  type DataTableRowDetailContext,
+} from "./DataTable";
+import type { FilterBarFilter } from "../components/FilterBar";
 import { Tree } from "./Tree";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -242,6 +248,11 @@ export type ClickyProps = {
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
   className?: string;
+  // externalFilters and pagination flow through to the embedded DataTable so
+  // operation pages can publish their query parameters as native filter pills
+  // and pagination footer without re-implementing them per page.
+  externalFilters?: FilterBarFilter[];
+  pagination?: DataTablePagination;
 };
 
 export type ClickyNodeViewProps = {
@@ -255,6 +266,8 @@ export type ClickyTableProps = {
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  externalFilters?: FilterBarFilter[] | undefined;
+  pagination?: DataTablePagination | undefined;
 };
 
 type ParsedClicky =
@@ -278,6 +291,12 @@ type ClickyRuntimeContextValue = {
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  // tableExternalFilters + tablePagination flow caller-owned widgets into the
+  // FIRST ClickyTable rendered inside this runtime. The wiring sits on the
+  // context rather than being threaded through every node so OperationCommand
+  // page-style callers don't need to know how deep the table is rendered.
+  tableExternalFilters?: FilterBarFilter[] | undefined;
+  tablePagination?: DataTablePagination | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
 };
@@ -308,6 +327,8 @@ export function Clicky(props: ClickyProps) {
       {...(props.onTableRowClick ? { onTableRowClick: props.onTableRowClick } : {})}
       {...(props.getTableRowHref ? { getTableRowHref: props.getTableRowHref } : {})}
       {...(props.isTableRowClickable ? { isTableRowClickable: props.isTableRowClickable } : {})}
+      {...(props.externalFilters ? { tableExternalFilters: props.externalFilters } : {})}
+      {...(props.pagination ? { tablePagination: props.pagination } : {})}
     >
       {props.url ? (
         <ClickyRemoteRenderer {...props} url={props.url} />
@@ -332,24 +353,36 @@ function ClickyRuntimeProvider({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  tableExternalFilters,
+  tablePagination,
   children,
 }: {
   commandRuntime?: ClickyCommandRuntime | undefined;
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  tableExternalFilters?: FilterBarFilter[] | undefined;
+  tablePagination?: DataTablePagination | undefined;
   children: ReactNode;
 }) {
   if (!commandRuntime) {
+    const hasOverrides =
+      onTableRowClick ||
+      getTableRowHref ||
+      isTableRowClickable ||
+      tableExternalFilters ||
+      tablePagination;
     return (
       <ClickyRuntimeContext.Provider
         value={
-          onTableRowClick || getTableRowHref || isTableRowClickable
+          hasOverrides
             ? {
                 ...clickyRuntimeContextDefault,
                 onTableRowClick,
                 getTableRowHref,
                 isTableRowClickable,
+                tableExternalFilters,
+                tablePagination,
               }
             : clickyRuntimeContextDefault
         }
@@ -365,6 +398,8 @@ function ClickyRuntimeProvider({
       {...(onTableRowClick ? { onTableRowClick } : {})}
       {...(getTableRowHref ? { getTableRowHref } : {})}
       {...(isTableRowClickable ? { isTableRowClickable } : {})}
+      {...(tableExternalFilters ? { tableExternalFilters } : {})}
+      {...(tablePagination ? { tablePagination } : {})}
     >
       {children}
     </ClickyCommandRuntimeProvider>
@@ -376,12 +411,16 @@ function ClickyCommandRuntimeProvider({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  tableExternalFilters,
+  tablePagination,
   children,
 }: {
   commandRuntime: ClickyCommandRuntime;
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  tableExternalFilters?: FilterBarFilter[] | undefined;
+  tablePagination?: DataTablePagination | undefined;
   children: ReactNode;
 }) {
   const { operations, isLoading } = useOperations(commandRuntime.client);
@@ -391,10 +430,21 @@ function ClickyCommandRuntimeProvider({
       onTableRowClick,
       getTableRowHref,
       isTableRowClickable,
+      tableExternalFilters,
+      tablePagination,
       operations,
       operationsLoading: isLoading,
     }),
-    [commandRuntime, getTableRowHref, isLoading, isTableRowClickable, onTableRowClick, operations],
+    [
+      commandRuntime,
+      getTableRowHref,
+      isLoading,
+      isTableRowClickable,
+      onTableRowClick,
+      operations,
+      tableExternalFilters,
+      tablePagination,
+    ],
   );
 
   return <ClickyRuntimeContext.Provider value={value}>{children}</ClickyRuntimeContext.Provider>;
@@ -2001,11 +2051,15 @@ export function ClickyTable({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  externalFilters,
+  pagination,
 }: ClickyTableProps) {
   const runtime = useContext(ClickyRuntimeContext);
   const rowClick = onTableRowClick ?? runtime.onTableRowClick;
   const rowHref = getTableRowHref ?? runtime.getTableRowHref;
   const rowClickable = isTableRowClickable ?? runtime.isTableRowClickable;
+  const effectiveExternalFilters = externalFilters ?? runtime.tableExternalFilters;
+  const effectivePagination = pagination ?? runtime.tablePagination;
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
@@ -2079,6 +2133,8 @@ export function ClickyTable({
             isRowClickable: rowClickable ?? ((row) => Boolean(rowHref?.(row))),
           }
         : {})}
+      {...(effectiveExternalFilters ? { externalFilters: effectiveExternalFilters } : {})}
+      {...(effectivePagination ? { pagination: effectivePagination } : {})}
     />
   );
 }

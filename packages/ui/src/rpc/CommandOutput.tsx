@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { FilterBarFilter } from "../components/FilterBar";
+import type { DataTablePagination } from "../data/DataTable";
 import {
   Clicky,
   type ClickyTableRowClick,
@@ -14,6 +16,8 @@ export type CommandOutputProps = {
   onTableRowClick?: ClickyTableRowClick;
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
+  externalFilters?: FilterBarFilter[];
+  pagination?: DataTablePagination;
 };
 
 export function CommandOutput({
@@ -22,6 +26,8 @@ export function CommandOutput({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  externalFilters,
+  pagination,
 }: CommandOutputProps) {
   const text = response.stdout || response.output || "";
   const ct = response.contentType || "application/json";
@@ -46,6 +52,8 @@ export function CommandOutput({
       {...(onTableRowClick ? { onTableRowClick } : {})}
       {...(getTableRowHref ? { getTableRowHref } : {})}
       {...(isTableRowClickable ? { isTableRowClickable } : {})}
+      {...(externalFilters ? { externalFilters } : {})}
+      {...(pagination ? { pagination } : {})}
     />
   );
 
@@ -94,6 +102,8 @@ function OutputBody({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  externalFilters,
+  pagination,
 }: {
   text: string;
   parsed: unknown;
@@ -103,6 +113,8 @@ function OutputBody({
   onTableRowClick?: ClickyTableRowClick;
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
+  externalFilters?: FilterBarFilter[];
+  pagination?: DataTablePagination;
 }) {
   const ct = (contentType.split(";")[0] ?? "").trim();
 
@@ -117,6 +129,8 @@ function OutputBody({
         {...(onTableRowClick ? { onTableRowClick } : {})}
         {...(getTableRowHref ? { getTableRowHref } : {})}
         {...(isTableRowClickable ? { isTableRowClickable } : {})}
+        {...(externalFilters ? { externalFilters } : {})}
+        {...(pagination ? { pagination } : {})}
       />
     );
 

@@ -9,9 +9,24 @@ import { isPositionalParam } from "./types";
 
 export type ParameterValues = Record<string, string>;
 export type ParameterValuesSetter = Dispatch<SetStateAction<ParameterValues>>;
+
+// ParameterPagination plumbs limit/offset query parameters into the
+// DataTable's pagination footer. The UI exposes both as the
+// {pageSize, pageIndex} tuple but here we keep raw string limit/offset
+// values so the executor sees exactly what the operation declared.
+export type ParameterPagination = {
+  limitParam: string; // parameter name on the operation, e.g. "limit"
+  offsetParam: string;
+  limitValue: string;
+  offsetValue: string;
+  setLimit: (next: string) => void;
+  setOffset: (next: string) => void;
+};
+
 export type ParameterFormConfig = {
   filters: FilterBarFilter[];
   timeRange?: FilterBarRangeProps;
+  pagination?: ParameterPagination;
 };
 export type ParameterFormOptions = {
   includeLocations?: OpenAPIParameter["in"][];
@@ -101,22 +116,43 @@ export function parametersToFormConfig(
   const includeLocations = new Set(options.includeLocations ?? ["path", "query", "header"]);
   const lockedValues = options.lockedValues ?? {};
   const hideLocked = options.hideLocked ?? false;
-  const rangeStart = parameters.find(
-    (param) =>
-      includeLocations.has(param.in) &&
-      param.in === "query" &&
-      lookupFilters[param.name]?.type === "from",
-  );
-  const rangeEnd = parameters.find(
-    (param) =>
-      includeLocations.has(param.in) &&
-      param.in === "query" &&
-      lookupFilters[param.name]?.type === "to",
-  );
+
+  // Pull limit/offset out of the filter loop entirely — they drive pagination,
+  // not filter pills. Roles come from server-side `paramRole` (see
+  // clicky/rpc/openapi.go); the older "named limit on a GET" heuristic is
+  // intentionally not duplicated here so the server stays the single source
+  // of truth for parameter classification.
+  const limitParam = parameters.find((p) => p["x-clicky"]?.role === "limit");
+  const offsetParam = parameters.find((p) => p["x-clicky"]?.role === "offset");
+  const paginationOmitNames = new Set<string>();
+  if (limitParam) paginationOmitNames.add(limitParam.name);
+  if (offsetParam) paginationOmitNames.add(offsetParam.name);
+
+  // Time-range first looks for server-stamped roles, then falls back to the
+  // existing lookup-driven "from"/"to" detection so older specs keep working.
+  const roleRangeStart = parameters.find((p) => p["x-clicky"]?.role === "time-from");
+  const roleRangeEnd = parameters.find((p) => p["x-clicky"]?.role === "time-to");
+  const rangeStart =
+    roleRangeStart ??
+    parameters.find(
+      (param) =>
+        includeLocations.has(param.in) &&
+        param.in === "query" &&
+        lookupFilters[param.name]?.type === "from",
+    );
+  const rangeEnd =
+    roleRangeEnd ??
+    parameters.find(
+      (param) =>
+        includeLocations.has(param.in) &&
+        param.in === "query" &&
+        lookupFilters[param.name]?.type === "to",
+    );
   const hasTimeRange = rangeStart != null && rangeEnd != null;
 
   for (const param of parameters) {
     if (!includeLocations.has(param.in)) continue;
+    if (paginationOmitNames.has(param.name)) continue;
     if (hasTimeRange && (param.name === rangeStart?.name || param.name === rangeEnd?.name)) {
       continue;
     }
@@ -226,6 +262,18 @@ export function parametersToFormConfig(
   }
 
   const config: ParameterFormConfig = { filters: emitFilters };
+  if (limitParam && offsetParam) {
+    config.pagination = {
+      limitParam: limitParam.name,
+      offsetParam: offsetParam.name,
+      limitValue: values[limitParam.name] ?? "",
+      offsetValue: values[offsetParam.name] ?? "",
+      setLimit: (next) =>
+        setValues((current) => ({ ...current, [limitParam.name]: next })),
+      setOffset: (next) =>
+        setValues((current) => ({ ...current, [offsetParam.name]: next })),
+    };
+  }
   if (hasTimeRange && rangeStart != null && rangeEnd != null) {
     const rangeStartMeta = lookupFilters[rangeStart.name];
     const rangeEndMeta = lookupFilters[rangeEnd.name];
