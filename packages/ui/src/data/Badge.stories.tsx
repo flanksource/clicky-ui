@@ -2,24 +2,23 @@ import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge } from "./Badge";
 import {
-  CodiconCheckIcon,
-  LucideActivityIcon,
-  LucideBoxesIcon,
-  LucideCheckIcon,
-  LucideCircleXIcon,
-  LucideClock3Icon,
-  LucideCloudIcon,
-  LucideGitBranchIcon,
-  LucideInfoIcon,
-  LucideLockIcon,
-  LucideRocketIcon,
-  LucideRouteIcon,
-  LucideServerIcon,
-  LucideShieldCheckIcon,
-  LucideShipWheelIcon,
-  LucideTriangleAlertIcon,
-  LucideZapIcon,
-} from "./static-icons";
+  UiCheck,
+  UiActivity,
+  UiBoxes,
+  UiCircleX,
+  UiClock,
+  UiCloud,
+  UiGitBranch,
+  UiInfo,
+  UiLock,
+  UiRocket,
+  UiRoute,
+  UiServer,
+  UiShieldCheck,
+  UiShipWheel,
+  UiWarningTriangle,
+  UiZap,
+} from "@flanksource/icons/ui";
 
 const meta: Meta<typeof Badge> = {
   title: "Data/Badge",
@@ -36,15 +35,25 @@ const TONES = ["neutral", "success", "danger", "warning", "info"] as const;
 const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
-  { label: "Healthy", value: "ready", status: "success" as const, icon: LucideCheckIcon },
+  {
+    label: "Healthy",
+    value: "ready",
+    status: "success" as const,
+    icon: UiCheck,
+  },
   {
     label: "Degraded",
     value: "latency",
     status: "warning" as const,
-    icon: LucideTriangleAlertIcon,
+    icon: UiWarningTriangle,
   },
-  { label: "Failed", value: "blocked", status: "error" as const, icon: LucideCircleXIcon },
-  { label: "Pending", value: "queued", status: "info" as const, icon: LucideInfoIcon },
+  {
+    label: "Failed",
+    value: "blocked",
+    status: "error" as const,
+    icon: UiCircleX,
+  },
+  { label: "Pending", value: "queued", status: "info" as const, icon: UiInfo },
 ];
 
 const FIELD_VALUE_BADGES = [
@@ -62,9 +71,18 @@ const FIELD_VALUE_BADGES = [
 
 const WRAPPING_BADGES = [
   ["container", "ghcr.io/flanksource/platform/incident-commander-controller"],
-  ["image", "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12"],
-  ["from", "sha256:42e5e2378f81f1b8d0355ab5b12a47f3b7ac91dbd5f3f65a174d4021c9d3eb18"],
-  ["to", "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412"],
+  [
+    "image",
+    "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12",
+  ],
+  [
+    "from",
+    "sha256:42e5e2378f81f1b8d0355ab5b12a47f3b7ac91dbd5f3f65a174d4021c9d3eb18",
+  ],
+  [
+    "to",
+    "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412",
+  ],
 ] as const;
 
 const TRUNCATION_BADGES = [
@@ -82,7 +100,8 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "arn",
-    value: "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
+    value:
+      "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
     truncate: "arn" as const,
     maxWidth: 20,
   },
@@ -100,13 +119,15 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "url",
-    value: "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
+    value:
+      "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
     truncate: "url" as const,
     maxWidth: 20,
   },
   {
     label: "auto",
-    value: "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
+    value:
+      "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
     truncate: "auto" as const,
     maxWidth: 20,
   },
@@ -129,7 +150,9 @@ function StoryGroup({
     <div className="space-y-density-2">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {description && (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        )}
       </div>
       {children}
     </div>
@@ -144,24 +167,30 @@ export const Overview: Story = {
         status="success"
         label="Build"
         value="passing"
-        icon={LucideCheckIcon}
+        icon={UiCheck}
       />
-      <Badge variant="metric" label="Latency" value="45ms" icon={LucideActivityIcon} />
+      <Badge variant="metric" label="Latency" value="45ms" icon={UiActivity} />
       <Badge
         variant="custom"
         label="v2.4.1"
-        icon={LucideGitBranchIcon}
+        icon={UiGitBranch}
         color="#eef2ff"
         textColor="#4338ca"
       />
       <Badge
         variant="outlined"
         label="Kubernetes"
-        icon={LucideBoxesIcon}
+        icon={UiBoxes}
         borderColor="#326ce5"
         textColor="#326ce5"
       />
-      <Badge variant="label" label="env" value="production" color="#dcfce7" textColor="#15803d" />
+      <Badge
+        variant="label"
+        label="env"
+        value="production"
+        color="#dcfce7"
+        textColor="#15803d"
+      />
     </div>
   ),
 };
@@ -170,7 +199,10 @@ export const LegacyMatrix: Story = {
   render: () => (
     <StoryStack>
       {LEGACY_VARIANTS.map((variant) => (
-        <div key={variant} className="flex flex-wrap items-center gap-density-2">
+        <div
+          key={variant}
+          className="flex flex-wrap items-center gap-density-2"
+        >
           <span className="w-20 text-xs text-muted-foreground">{variant}</span>
           {TONES.map((tone) => (
             <Badge key={tone} tone={tone} variant={variant}>
@@ -183,7 +215,7 @@ export const LegacyMatrix: Story = {
         <Badge tone="danger" variant="solid" count={12}>
           errors
         </Badge>
-        <Badge tone="success" icon={CodiconCheckIcon}>
+        <Badge tone="success" icon={UiCheck}>
           passed
         </Badge>
         <Badge tone="warning" size="lg">
@@ -218,7 +250,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Kubernetes"
-        icon={LucideBoxesIcon}
+        icon={UiBoxes}
         borderColor="#326ce5"
         textColor="#326ce5"
         size="xs"
@@ -226,7 +258,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Helm"
-        icon={LucideShipWheelIcon}
+        icon={UiShipWheel}
         borderColor="#0f1689"
         textColor="#0f1689"
         size="xs"
@@ -234,7 +266,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="Flux"
-        icon={LucideZapIcon}
+        icon={UiZap}
         borderColor="#5468ff"
         textColor="#5468ff"
         size="xs"
@@ -242,7 +274,7 @@ export const CustomOutlinedColors: Story = {
       <Badge
         variant="outlined"
         label="ArgoCD"
-        icon={LucideRouteIcon}
+        icon={UiRoute}
         borderColor="#ef7b4d"
         textColor="#ef7b4d"
         size="xs"
@@ -296,11 +328,41 @@ export const LabelValueHooks: Story = {
 export const Sizes: Story = {
   render: () => (
     <div className="flex flex-wrap items-center gap-density-2">
-      <Badge variant="status" status="success" label="xxs" size="xxs" icon={LucideCheckIcon} />
-      <Badge variant="status" status="success" label="xs" size="xs" icon={LucideCheckIcon} />
-      <Badge variant="status" status="success" label="sm" size="sm" icon={LucideCheckIcon} />
-      <Badge variant="status" status="success" label="md" size="md" icon={LucideCheckIcon} />
-      <Badge variant="status" status="success" label="lg" size="lg" icon={LucideCheckIcon} />
+      <Badge
+        variant="status"
+        status="success"
+        label="xxs"
+        size="xxs"
+        icon={UiCheck}
+      />
+      <Badge
+        variant="status"
+        status="success"
+        label="xs"
+        size="xs"
+        icon={UiCheck}
+      />
+      <Badge
+        variant="status"
+        status="success"
+        label="sm"
+        size="sm"
+        icon={UiCheck}
+      />
+      <Badge
+        variant="status"
+        status="success"
+        label="md"
+        size="md"
+        icon={UiCheck}
+      />
+      <Badge
+        variant="status"
+        status="success"
+        label="lg"
+        size="lg"
+        icon={UiCheck}
+      />
     </div>
   ),
 };
@@ -314,7 +376,7 @@ export const Shapes: Story = {
         label="pill"
         shape="pill"
         size="xs"
-        icon={LucideShieldCheckIcon}
+        icon={UiShieldCheck}
       />
       <Badge
         variant="status"
@@ -322,7 +384,7 @@ export const Shapes: Story = {
         label="rounded"
         shape="rounded"
         size="xs"
-        icon={LucideShieldCheckIcon}
+        icon={UiShieldCheck}
       />
       <Badge
         variant="status"
@@ -330,7 +392,7 @@ export const Shapes: Story = {
         label="square"
         shape="square"
         size="xs"
-        icon={LucideShieldCheckIcon}
+        icon={UiShieldCheck}
       />
     </div>
   ),
@@ -456,11 +518,25 @@ export const BestPractices: Story = {
     <StoryStack>
       <div className="rounded-lg border border-border bg-muted/40 p-density-3">
         <ul className="list-disc space-y-1 pl-4 text-sm text-foreground">
-          <li>Use badges for scan-friendly metadata and state, not for long explanations.</li>
-          <li>Reserve stronger color for semantics like risk, state, or workflow stage.</li>
-          <li>Prefer `size=&quot;xs&quot;` for rows that mix prose with many metadata tokens.</li>
-          <li>Use split `label | value` badges when field names repeat across rows.</li>
-          <li>Turn on `wrap` before adding one-off CSS for long metadata values.</li>
+          <li>
+            Use badges for scan-friendly metadata and state, not for long
+            explanations.
+          </li>
+          <li>
+            Reserve stronger color for semantics like risk, state, or workflow
+            stage.
+          </li>
+          <li>
+            Prefer `size=&quot;xs&quot;` for rows that mix prose with many
+            metadata tokens.
+          </li>
+          <li>
+            Use split `label | value` badges when field names repeat across
+            rows.
+          </li>
+          <li>
+            Turn on `wrap` before adding one-off CSS for long metadata values.
+          </li>
         </ul>
       </div>
       <div className="rounded-lg border border-border overflow-hidden">
@@ -478,7 +554,7 @@ export const BestPractices: Story = {
               label="Healthy"
               value="ready"
               size="xs"
-              icon={LucideCheckIcon}
+              icon={UiCheck}
             />
           </div>
           <div className="px-density-3 py-density-2">
@@ -501,7 +577,7 @@ export const BestPractices: Story = {
               label="Degraded"
               value="backpressure"
               size="xs"
-              icon={LucideTriangleAlertIcon}
+              icon={UiWarningTriangle}
             />
           </div>
           <div className="px-density-3 py-density-2">
@@ -522,16 +598,40 @@ export const BestPractices: Story = {
 export const MixedUsage: Story = {
   render: () => (
     <div className="flex flex-wrap gap-density-2">
-      <Badge variant="metric" label="CPU" value="42%" icon={LucideActivityIcon} size="xs" />
-      <Badge variant="metric" label="Memory" value="8.2 GB" icon={LucideServerIcon} size="xs" />
-      <Badge variant="metric" label="Uptime" value="99.9%" icon={LucideCloudIcon} size="xs" />
-      <Badge variant="metric" label="Latency" value="12ms" icon={LucideClock3Icon} size="xs" />
+      <Badge
+        variant="metric"
+        label="CPU"
+        value="42%"
+        icon={UiActivity}
+        size="xs"
+      />
+      <Badge
+        variant="metric"
+        label="Memory"
+        value="8.2 GB"
+        icon={UiServer}
+        size="xs"
+      />
+      <Badge
+        variant="metric"
+        label="Uptime"
+        value="99.9%"
+        icon={UiCloud}
+        size="xs"
+      />
+      <Badge
+        variant="metric"
+        label="Latency"
+        value="12ms"
+        icon={UiClock}
+        size="xs"
+      />
       <Badge
         variant="custom"
         color="#fdf2f8"
         textColor="#be185d"
         label="Production"
-        icon={LucideRocketIcon}
+        icon={UiRocket}
         size="xs"
       />
       <Badge
@@ -539,7 +639,7 @@ export const MixedUsage: Story = {
         color="#ecfdf5"
         textColor="#065f46"
         label="Secured"
-        icon={LucideLockIcon}
+        icon={UiLock}
         size="xs"
       />
       <Badge
@@ -547,7 +647,7 @@ export const MixedUsage: Story = {
         color="#fffbeb"
         textColor="#92400e"
         label="Beta"
-        icon={LucideZapIcon}
+        icon={UiZap}
         size="xs"
       />
       <Badge
@@ -555,7 +655,7 @@ export const MixedUsage: Story = {
         color="#eef2ff"
         textColor="#4338ca"
         label="v2.4.1"
-        icon={LucideGitBranchIcon}
+        icon={UiGitBranch}
         size="xs"
       />
     </div>

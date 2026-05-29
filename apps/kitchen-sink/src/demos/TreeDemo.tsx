@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { Badge, Icon, Tree } from "@flanksource/clicky-ui";
-import DebugPauseIcon from "@iconify-react/codicon/debug-pause";
-import ErrorIcon from "@iconify-react/codicon/error";
-import PassIcon from "@iconify-react/codicon/pass";
+import {
+  Badge,
+  UiPause as DebugPauseIcon,
+  UiError as ErrorIcon,
+  UiPass as PassIcon,
+  Icon,
+  Tree,
+} from "@flanksource/clicky-ui";
 import { DemoRow, DemoSection } from "./Section";
 
 type Test = {
@@ -20,8 +24,18 @@ const suiteGroups = [
     status: "passed" as const,
     tests: [
       { id: "login", name: "logs in", status: "passed" as const, duration: 42 },
-      { id: "logout", name: "logs out", status: "passed" as const, duration: 18 },
-      { id: "mfa", name: "requires mfa", status: "passed" as const, duration: 67 },
+      {
+        id: "logout",
+        name: "logs out",
+        status: "passed" as const,
+        duration: 18,
+      },
+      {
+        id: "mfa",
+        name: "requires mfa",
+        status: "passed" as const,
+        duration: 67,
+      },
       { id: "session", name: "expires session", status: "skipped" as const },
     ],
   },
@@ -30,10 +44,30 @@ const suiteGroups = [
     name: "group: billing",
     status: "failed" as const,
     tests: [
-      { id: "charge", name: "charges card", status: "failed" as const, duration: 210 },
-      { id: "refund", name: "refunds card", status: "passed" as const, duration: 64 },
-      { id: "invoice", name: "renders invoice", status: "passed" as const, duration: 31 },
-      { id: "ledger", name: "syncs ledger export", status: "failed" as const, duration: 155 },
+      {
+        id: "charge",
+        name: "charges card",
+        status: "failed" as const,
+        duration: 210,
+      },
+      {
+        id: "refund",
+        name: "refunds card",
+        status: "passed" as const,
+        duration: 64,
+      },
+      {
+        id: "invoice",
+        name: "renders invoice",
+        status: "passed" as const,
+        duration: 31,
+      },
+      {
+        id: "ledger",
+        name: "syncs ledger export",
+        status: "failed" as const,
+        duration: 155,
+      },
     ],
   },
   {
@@ -41,10 +75,30 @@ const suiteGroups = [
     name: "group: checkout",
     status: "passed" as const,
     tests: [
-      { id: "cart", name: "persists cart", status: "passed" as const, duration: 25 },
-      { id: "coupon", name: "applies coupon", status: "passed" as const, duration: 21 },
-      { id: "tax", name: "calculates tax", status: "passed" as const, duration: 29 },
-      { id: "address", name: "validates address", status: "passed" as const, duration: 36 },
+      {
+        id: "cart",
+        name: "persists cart",
+        status: "passed" as const,
+        duration: 25,
+      },
+      {
+        id: "coupon",
+        name: "applies coupon",
+        status: "passed" as const,
+        duration: 21,
+      },
+      {
+        id: "tax",
+        name: "calculates tax",
+        status: "passed" as const,
+        duration: 29,
+      },
+      {
+        id: "address",
+        name: "validates address",
+        status: "passed" as const,
+        duration: 36,
+      },
     ],
   },
   {
@@ -52,9 +106,23 @@ const suiteGroups = [
     name: "group: search",
     status: "passed" as const,
     tests: [
-      { id: "ranking", name: "ranks results", status: "passed" as const, duration: 47 },
-      { id: "facets", name: "updates facets", status: "passed" as const, duration: 39 },
-      { id: "spellcheck", name: "suggests spellcheck", status: "skipped" as const },
+      {
+        id: "ranking",
+        name: "ranks results",
+        status: "passed" as const,
+        duration: 47,
+      },
+      {
+        id: "facets",
+        name: "updates facets",
+        status: "passed" as const,
+        duration: 39,
+      },
+      {
+        id: "spellcheck",
+        name: "suggests spellcheck",
+        status: "skipped" as const,
+      },
       {
         id: "availability",
         name: "shows availability badges",
@@ -68,10 +136,30 @@ const suiteGroups = [
     name: "group: ops",
     status: "failed" as const,
     tests: [
-      { id: "alerts", name: "sends alert digest", status: "passed" as const, duration: 74 },
-      { id: "runbook", name: "links runbook", status: "passed" as const, duration: 33 },
-      { id: "drain", name: "drains node safely", status: "failed" as const, duration: 126 },
-      { id: "rollback", name: "rolls back deployment", status: "passed" as const, duration: 84 },
+      {
+        id: "alerts",
+        name: "sends alert digest",
+        status: "passed" as const,
+        duration: 74,
+      },
+      {
+        id: "runbook",
+        name: "links runbook",
+        status: "passed" as const,
+        duration: 33,
+      },
+      {
+        id: "drain",
+        name: "drains node safely",
+        status: "failed" as const,
+        duration: 126,
+      },
+      {
+        id: "rollback",
+        name: "rolls back deployment",
+        status: "passed" as const,
+        duration: 84,
+      },
     ],
   },
 ];
@@ -143,7 +231,11 @@ export function TreeDemo() {
                 ? ErrorIcon
                 : DebugPauseIcon;
           const tone =
-            node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
+            node.status === "passed"
+              ? "success"
+              : node.status === "failed"
+                ? "danger"
+                : "warning";
           return (
             <>
               <Icon icon={icon} />

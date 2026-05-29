@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Gauge, TabButton } from "@flanksource/clicky-ui";
-import BeakerIcon from "@iconify-react/codicon/beaker";
-import ErrorIcon from "@iconify-react/codicon/error";
-import GraphIcon from "@iconify-react/codicon/graph";
-import PassIcon from "@iconify-react/codicon/pass";
-import WarningIcon from "@iconify-react/codicon/warning";
+import {
+  UiBeaker as BeakerIcon,
+  UiError as ErrorIcon,
+  UiGraph as GraphIcon,
+  UiPass as PassIcon,
+  UiWarningCircle as WarningIcon,
+  Gauge,
+  TabButton,
+} from "@flanksource/clicky-ui";
 import { DemoRow, DemoSection } from "./Section";
 
 export function TabButtonDemo() {

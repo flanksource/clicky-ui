@@ -1,11 +1,11 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Icon } from "./Icon";
-import { CodiconSearchIcon } from "./static-icons";
+import { UiSearch } from "@flanksource/icons/ui";
 
 describe("Icon", () => {
   it("uses a stable 1em box for plain imported icons by default", () => {
-    const { container } = render(<Icon icon={CodiconSearchIcon} />);
+    const { container } = render(<Icon icon={UiSearch} />);
 
     const icon = container.querySelector("svg");
     expect(icon).toHaveAttribute("width", "1em");
@@ -15,7 +15,9 @@ describe("Icon", () => {
   });
 
   it("keeps explicit dimensions when they are provided", () => {
-    const { container } = render(<Icon icon={CodiconSearchIcon} width={12} height={14} />);
+    const { container } = render(
+      <Icon icon={UiSearch} width={12} height={14} />,
+    );
 
     const icon = container.querySelector("svg");
     expect(icon).toHaveAttribute("width", "12");

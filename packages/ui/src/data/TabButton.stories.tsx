@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Gauge } from "./Gauge";
 import { TabButton } from "./TabButton";
 import {
-  CodiconBeakerIcon,
-  CodiconErrorIcon,
-  CodiconGraphIcon,
-  CodiconPassIcon,
-  CodiconWarningIcon,
-} from "./static-icons";
+  UiBeaker,
+  UiError,
+  UiGraph,
+  UiPass,
+  UiWarningCircle,
+} from "@flanksource/icons/ui";
 
 const meta: Meta<typeof TabButton> = {
   title: "Data/TabButton",
@@ -27,7 +27,7 @@ export const TabsWithCounts: Story = {
           active={active === "tests"}
           onClick={() => setActive("tests")}
           label="Tests"
-          icon={CodiconBeakerIcon}
+          icon={UiBeaker}
           count={120}
           countColor="bg-blue-500"
         />
@@ -35,7 +35,7 @@ export const TabsWithCounts: Story = {
           active={active === "lint"}
           onClick={() => setActive("lint")}
           label="Lint"
-          icon={CodiconWarningIcon}
+          icon={UiWarningCircle}
           count={4}
           countColor="bg-yellow-500"
         />
@@ -43,7 +43,7 @@ export const TabsWithCounts: Story = {
           active={active === "bench"}
           onClick={() => setActive("bench")}
           label="Benchmarks"
-          icon={CodiconGraphIcon}
+          icon={UiGraph}
         />
       </div>
     );
@@ -54,7 +54,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
   render: () => (
     <div className="flex gap-density-3">
       <Gauge
-        icon={CodiconPassIcon}
+        icon={UiPass}
         label="Passed"
         value={92}
         tone="success"
@@ -62,7 +62,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
         meta="fresh"
       />
       <Gauge
-        icon={CodiconErrorIcon}
+        icon={UiError}
         label="Failed"
         value={3}
         tone="danger"
@@ -70,7 +70,7 @@ export const Gauges: StoryObj<typeof Gauge> = {
         meta="3m"
       />
       <Gauge
-        icon={CodiconWarningIcon}
+        icon={UiWarningCircle}
         label="Skipped"
         value={5}
         tone="warning"

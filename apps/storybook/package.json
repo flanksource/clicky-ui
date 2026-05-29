@@ -7,7 +7,7 @@
     "dev": "storybook dev -p 5270",
     "build": "storybook build",
     "test": "vitest run",
-    "check": "vp check"
+    "check": "tsc -b --noEmit && oxlint .storybook --deny-warnings"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
@@ -27,7 +27,6 @@
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
     "vitest": "catalog:"
   }
 }

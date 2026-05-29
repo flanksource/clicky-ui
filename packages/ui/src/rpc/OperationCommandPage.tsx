@@ -26,11 +26,7 @@ import {
 } from "./formMetadata";
 import { InlineError } from "./InlineError";
 import { OperationActionDialog } from "./OperationActionDialog";
-import {
-  isPositionalParam,
-  type ExecutionResponse,
-  type ResolvedOperation,
-} from "./types";
+import { isPositionalParam, type ExecutionResponse, type ResolvedOperation } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
 
 export type OperationCommandPageProps = {

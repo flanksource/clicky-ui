@@ -6,6 +6,9 @@ Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com
 
 ```bash
 pnpm add @flanksource/clicky-ui react react-dom tailwindcss
+npm install @flanksource/clicky-ui react react-dom tailwindcss
+yarn add @flanksource/clicky-ui react react-dom tailwindcss
+bun add @flanksource/clicky-ui react react-dom tailwindcss
 ```
 
 ## Usage
@@ -62,6 +65,12 @@ import { DataTable } from "@flanksource/clicky-ui/data";
 ```
 
 The root `@flanksource/clicky-ui` barrel remains supported for compatibility and convenience, but subpaths give bundlers a smaller entry surface. Import `@flanksource/clicky-ui/styles.css` once at the app root. Markdown parsing and code highlighting are loaded asynchronously by their components.
+
+The published package uses plain semver dependency ranges and does not require pnpm workspace or catalog protocols. The package ships ESM and CommonJS entrypoints for the public subpaths above.
+
+UI subpaths that render icons are intended for browser bundlers such as Vite, Rollup, Webpack, Rspack, and Bun's bundler. The Iconify React packages expose `.jsx` modules and CSS imports, so plain Node `import`/`require` of icon-heavy subpaths is not a supported verification target.
+
+Markdown and code highlighting use optional peer dependencies (`marked`, `shiki`, and `@shikijs/*`). Install them in applications that render those components.
 
 ## Tailwind preset
 

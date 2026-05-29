@@ -1,12 +1,12 @@
 import { type ReactNode } from "react";
 import { Icon } from "../Icon";
 import {
-  CodiconDebugStepOverIcon,
-  CodiconSymbolMethodIcon,
-  LucideChevronRightIcon,
-  LucideCopyIcon,
-  LucideTriangleAlertIcon,
-} from "../static-icons";
+  UiDebugStepOver,
+  UiMethod,
+  UiChevronRight,
+  UiCopy,
+  UiWarningTriangle,
+} from "@flanksource/icons/ui";
 import {
   compactStackPath,
   isApplicationStackFrame,
@@ -21,22 +21,37 @@ export type ErrorDetailsProps = {
   // Optional renderer for context values that parse as JSON. Defaults to a
   // CopyBadge with the raw string. MC's playbook view passes a richer JsonView
   // here; smaller consumers (plugin iframes) can leave it unset.
-  renderJsonContext?: (entry: { label: string; value: string; data: unknown }) => ReactNode;
+  renderJsonContext?: (entry: {
+    label: string;
+    value: string;
+    data: unknown;
+  }) => ReactNode;
 };
 
-export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsProps) {
+export function ErrorDetails({
+  diagnostics,
+  renderJsonContext,
+}: ErrorDetailsProps) {
   const scalarContext = diagnostics.context.filter(
     ([, value]) => !parseInlineJsonContextValue(value),
   );
   const jsonContext = diagnostics.context
-    .map(([label, value]) => ({ label, value, data: parseInlineJsonContextValue(value) }))
+    .map(([label, value]) => ({
+      label,
+      value,
+      data: parseInlineJsonContextValue(value),
+    }))
     .filter(
-      (entry): entry is { label: string; value: string; data: unknown } => entry.data !== null,
+      (entry): entry is { label: string; value: string; data: unknown } =>
+        entry.data !== null,
     );
   return (
     <details className="group rounded-md border border-destructive/30 bg-destructive/5">
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
-        <Icon icon={LucideTriangleAlertIcon} className="mt-0.5 shrink-0 text-destructive" />
+        <Icon
+          icon={UiWarningTriangle}
+          className="mt-0.5 shrink-0 text-destructive"
+        />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-destructive">Error</div>
           <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">
@@ -44,7 +59,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
           </div>
         </div>
         <Icon
-          icon={LucideChevronRightIcon}
+          icon={UiChevronRight}
           className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
         />
       </summary>
@@ -52,7 +67,11 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
         {(diagnostics.trace || diagnostics.time) && (
           <div className="flex min-w-0 flex-wrap gap-2">
             {diagnostics.trace && (
-              <CopyBadge label="Trace" value={diagnostics.trace} className="max-w-full" />
+              <CopyBadge
+                label="Trace"
+                value={diagnostics.trace}
+                className="max-w-full"
+              />
             )}
             {diagnostics.time && (
               <span className="inline-flex max-w-full items-center overflow-hidden rounded-md border border-border bg-background/80 text-xs">
@@ -74,7 +93,11 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
             {scalarContext.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {scalarContext.map(([label, value]) => (
-                  <CopyBadge key={`${label}:${value}`} label={label} value={value} />
+                  <CopyBadge
+                    key={`${label}:${value}`}
+                    label={label}
+                    value={value}
+                  />
                 ))}
               </div>
             )}
@@ -82,7 +105,9 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
               <div className="mt-2 grid gap-2">
                 {jsonContext.map((entry) =>
                   renderJsonContext ? (
-                    <span key={`${entry.label}:${entry.value}`}>{renderJsonContext(entry)}</span>
+                    <span key={`${entry.label}:${entry.value}`}>
+                      {renderJsonContext(entry)}
+                    </span>
                   ) : (
                     <CopyBadge
                       key={`${entry.label}:${entry.value}`}
@@ -106,7 +131,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
                 onClick={() => copyText(diagnostics.stacktrace ?? "")}
                 className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                <Icon icon={LucideCopyIcon} />
+                <Icon icon={UiCopy} />
                 copy
               </button>
             </div>
@@ -132,7 +157,9 @@ export function PrettyStackTrace({ stacktrace }: { stacktrace: string }) {
     <div className="max-h-96 min-h-40 overflow-auto rounded-md border border-border bg-background p-2">
       <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">error</span>
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">
+            error
+          </span>
           <span>{parsed.frames.length} frames</span>
         </div>
       </div>
@@ -143,7 +170,11 @@ export function PrettyStackTrace({ stacktrace }: { stacktrace: string }) {
       )}
       <div className="space-y-0.5">
         {parsed.frames.map((frame, index) => (
-          <StackFrameRow key={`${frame.file}:${frame.line}:${index}`} frame={frame} index={index} />
+          <StackFrameRow
+            key={`${frame.file}:${frame.line}:${index}`}
+            frame={frame}
+            index={index}
+          />
         ))}
       </div>
       {parsed.unparsed.length > 0 && (
@@ -155,7 +186,13 @@ export function PrettyStackTrace({ stacktrace }: { stacktrace: string }) {
   );
 }
 
-function StackFrameRow({ frame, index }: { frame: ErrorStackFrame; index: number }) {
+function StackFrameRow({
+  frame,
+  index,
+}: {
+  frame: ErrorStackFrame;
+  index: number;
+}) {
   const appFrame = isApplicationStackFrame(frame.file);
   return (
     <button
@@ -169,12 +206,14 @@ function StackFrameRow({ frame, index }: { frame: ErrorStackFrame; index: number
     >
       <div className="flex min-w-0 items-start gap-1.5">
         <Icon
-          icon={appFrame ? CodiconSymbolMethodIcon : CodiconDebugStepOverIcon}
+          icon={appFrame ? UiMethod : UiDebugStepOver}
           className="mt-0.5 shrink-0 text-[11px]"
         />
         <div className="min-w-0">
           <div className="break-all font-mono text-[11px] font-semibold leading-4">
-            <span className="mr-2 text-[10px] font-normal opacity-60">#{index + 1}</span>
+            <span className="mr-2 text-[10px] font-normal opacity-60">
+              #{index + 1}
+            </span>
             {frame.functionName || "unknown function"}
             <span className="ml-2 text-[10px] font-normal opacity-80">
               {compactStackPath(frame.file)}:{frame.line}
@@ -207,9 +246,16 @@ export function CopyBadge({
         .filter(Boolean)
         .join(" ")}
     >
-      <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">{value}</span>
-      <Icon icon={LucideCopyIcon} className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
+      <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">
+        {label}
+      </span>
+      <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">
+        {value}
+      </span>
+      <Icon
+        icon={UiCopy}
+        className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground"
+      />
     </button>
   );
 }

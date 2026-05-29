@@ -1,20 +1,26 @@
 import type { StaticIconComponent } from "../Icon";
 import {
-  CodiconCircleFilledIcon,
-  CodiconDebugPauseIcon,
-  CodiconDebugStepOverIcon,
-  CodiconErrorIcon,
-  CodiconPlayCircleIcon,
-  CodiconWatchIcon,
-} from "../static-icons";
+  UiCircleFilled,
+  UiPause,
+  UiDebugStepOver,
+  UiError,
+  UiPlayCircle,
+  UiWatch,
+} from "@flanksource/icons/ui";
 import type { ProcessNode } from "./types";
 
 export function countProcesses(node?: ProcessNode): number {
   if (!node) return 0;
-  return 1 + (node.children || []).reduce((sum, child) => sum + countProcesses(child), 0);
+  return (
+    1 +
+    (node.children || []).reduce((sum, child) => sum + countProcesses(child), 0)
+  );
 }
 
-export function findProcessByPID(node: ProcessNode | undefined, pid: number): ProcessNode | null {
+export function findProcessByPID(
+  node: ProcessNode | undefined,
+  pid: number,
+): ProcessNode | null {
   if (!node) return null;
   if (node.pid === pid) return node;
   for (const child of node.children || []) {
@@ -26,19 +32,21 @@ export function findProcessByPID(node: ProcessNode | undefined, pid: number): Pr
 
 export function processStateIcon(status?: string): StaticIconComponent {
   const value = (status || "").toLowerCase();
-  if (value.includes("run")) return CodiconPlayCircleIcon;
-  if (value.includes("sleep") || value.includes("idle")) return CodiconWatchIcon;
-  if (value.includes("stop") || value.includes("halt")) return CodiconDebugPauseIcon;
-  if (value.includes("zombie") || value.includes("dead")) return CodiconErrorIcon;
-  if (value.includes("wait") || value.includes("block")) return CodiconDebugStepOverIcon;
-  return CodiconCircleFilledIcon;
+  if (value.includes("run")) return UiPlayCircle;
+  if (value.includes("sleep") || value.includes("idle")) return UiWatch;
+  if (value.includes("stop") || value.includes("halt")) return UiPause;
+  if (value.includes("zombie") || value.includes("dead")) return UiError;
+  if (value.includes("wait") || value.includes("block")) return UiDebugStepOver;
+  return UiCircleFilled;
 }
 
 export function processStateColor(status?: string): string {
   const value = (status || "").toLowerCase();
   if (value.includes("run")) return "text-green-600";
-  if (value.includes("sleep") || value.includes("idle")) return "text-amber-500";
-  if (value.includes("stop") || value.includes("halt")) return "text-orange-600";
+  if (value.includes("sleep") || value.includes("idle"))
+    return "text-amber-500";
+  if (value.includes("stop") || value.includes("halt"))
+    return "text-orange-600";
   if (value.includes("zombie") || value.includes("dead")) return "text-red-600";
   if (value.includes("wait") || value.includes("block")) return "text-blue-600";
   return "text-muted-foreground";

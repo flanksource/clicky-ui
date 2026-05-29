@@ -103,7 +103,7 @@ function renderImportedGlyph(
   return (
     <ImportedIcon
       {...(glyphClassName ? { className: glyphClassName } : {})}
-      {...(glyphWidth != null ? { width: glyphWidth, size: glyphWidth } : {})}
+      {...(glyphWidth != null ? { width: glyphWidth } : {})}
       {...(glyphHeight != null ? { height: glyphHeight } : {})}
       {...(inline != null ? { "aria-hidden": !title } : {})}
       {...(title ? { title, role: "img" } : { "aria-hidden": true })}

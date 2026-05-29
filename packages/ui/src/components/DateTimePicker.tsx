@@ -1,6 +1,6 @@
 import { forwardRef, useRef, type InputHTMLAttributes } from "react";
 import { Icon } from "../data/Icon";
-import { CodiconCalendarIcon } from "../data/static-icons";
+import { UiCalendar } from "@flanksource/icons/ui";
 import { cn } from "../lib/utils";
 
 export type DateTimePickerProps = Omit<
@@ -75,7 +75,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
             pickerRef.current?.showPicker?.();
           }}
         >
-          <Icon icon={CodiconCalendarIcon} className="text-sm" />
+          <Icon icon={UiCalendar} className="text-sm" />
         </button>
       </div>
     );
@@ -89,7 +89,11 @@ function toDateTimeLocalValue(value: string) {
   if (!trimmed) return "";
   if (trimmed === "now" || trimmed.startsWith("now")) return "";
 
-  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? `${trimmed}T00:00` : trimmed;
+  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? `${trimmed}T00:00`
+    : trimmed;
 
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(withTime) ? withTime.slice(0, 16) : "";
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(withTime)
+    ? withTime.slice(0, 16)
+    : "";
 }

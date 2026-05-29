@@ -1,12 +1,20 @@
-import { useReducer, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useReducer,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { CodiconCloseIcon } from "../data/static-icons";
+import { UiClose } from "@flanksource/icons/ui";
 import { isPositionalParam, type OpenAPIParameter } from "./types";
 
 export type CommandFormProps = {
   parameters: OpenAPIParameter[];
-  onExecute: (params: Record<string, string>, headers: Record<string, string>) => void;
+  onExecute: (
+    params: Record<string, string>,
+    headers: Record<string, string>,
+  ) => void;
   isPending: boolean;
   method: string;
   path: string;
@@ -34,12 +42,20 @@ export function CommandForm({
     formReducer,
     { parameters, path, initialValues },
     ({ parameters: params, path: formPath, initialValues: overrides }) =>
-      buildInitialState(normalizeParameters(params, formPath), formPath, overrides),
+      buildInitialState(
+        normalizeParameters(params, formPath),
+        formPath,
+        overrides,
+      ),
   );
 
   const formParameters = normalizeParameters(parameters, path);
-  const visibleParams = formParameters.filter((p) => !(p.in === "path" && initialValues?.[p.name]));
-  const positionalNames = new Set(formParameters.filter(isPositionalParam).map((p) => p.name));
+  const visibleParams = formParameters.filter(
+    (p) => !(p.in === "path" && initialValues?.[p.name]),
+  );
+  const positionalNames = new Set(
+    formParameters.filter(isPositionalParam).map((p) => p.name),
+  );
   const inlineLayout = visibleParams.length >= INLINE_LAYOUT_THRESHOLD;
 
   function handleSubmit(event: FormEvent) {
@@ -164,7 +180,9 @@ function ParameterField({
           {param.required && <span className="text-destructive"> *</span>}
         </label>
         {param.description && (
-          <span className="text-xs text-muted-foreground">{param.description}</span>
+          <span className="text-xs text-muted-foreground">
+            {param.description}
+          </span>
         )}
       </div>
     );
@@ -180,7 +198,9 @@ function ParameterField({
             type={dateTime ? "datetime-local" : "date"}
             value={dateInputValue(value, dateTime)}
             className={inputClassName}
-            onChange={(event) => onChange(dateOutputValue(event.target.value, dateTime))}
+            onChange={(event) =>
+              onChange(dateOutputValue(event.target.value, dateTime))
+            }
           />
           {value && (
             <Button
@@ -190,7 +210,7 @@ function ParameterField({
               aria-label={`Clear ${param.name}`}
               onClick={() => onChange("")}
             >
-              <Icon icon={CodiconCloseIcon} />
+              <Icon icon={UiClose} />
             </Button>
           )}
         </div>
@@ -198,7 +218,8 @@ function ParameterField({
     );
   }
 
-  const inputType = schema?.type === "integer" || schema?.type === "number" ? "number" : "text";
+  const inputType =
+    schema?.type === "integer" || schema?.type === "number" ? "number" : "text";
 
   return (
     <FieldWrapper param={param} fieldId={fieldId} inline={inline}>
@@ -209,7 +230,9 @@ function ParameterField({
         className={inputClassName}
         onChange={(event) => onChange(event.target.value)}
         placeholder={
-          schema?.default != null ? String(schema.default) : param.description || param.name
+          schema?.default != null
+            ? String(schema.default)
+            : param.description || param.name
         }
       />
     </FieldWrapper>
@@ -269,7 +292,7 @@ function TagInput({
             aria-label={`Remove ${tag}`}
             onClick={() => remove(index)}
           >
-            <Icon icon={CodiconCloseIcon} />
+            <Icon icon={UiClose} />
           </button>
         </span>
       ))}
@@ -278,7 +301,9 @@ function TagInput({
         className="min-w-32 flex-1 bg-transparent px-1 py-1 text-sm outline-none"
         placeholder={tags.length === 0 ? placeholder : ""}
         onKeyDown={handleKeyDown}
-        onBlur={(event) => commit(event.currentTarget.value, event.currentTarget)}
+        onBlur={(event) =>
+          commit(event.currentTarget.value, event.currentTarget)
+        }
       />
     </div>
   );
@@ -308,7 +333,9 @@ function FieldWrapper({
         <div className="flex h-9 items-center">{label}</div>
         <div className="min-w-0">{children}</div>
         {param.description && (
-          <p className="col-start-2 text-xs text-muted-foreground">{param.description}</p>
+          <p className="col-start-2 text-xs text-muted-foreground">
+            {param.description}
+          </p>
         )}
       </div>
     );
@@ -318,7 +345,9 @@ function FieldWrapper({
     <div className="space-y-1.5">
       {label}
       {children}
-      {param.description && <p className="text-xs text-muted-foreground">{param.description}</p>}
+      {param.description && (
+        <p className="text-xs text-muted-foreground">{param.description}</p>
+      )}
     </div>
   );
 }
@@ -331,7 +360,12 @@ export function normalizeParameters(
   const firstPathParam = pathParams[0];
   const seen = new Set(parameters.map((param) => param.name));
   const normalized = parameters.filter(
-    (param) => !(param.name === "args" && firstPathParam != null && !seen.has(firstPathParam)),
+    (param) =>
+      !(
+        param.name === "args" &&
+        firstPathParam != null &&
+        !seen.has(firstPathParam)
+      ),
   );
   for (const name of pathParams) {
     if (seen.has(name)) continue;
@@ -369,7 +403,10 @@ function buildInitialState(
   return state;
 }
 
-function initialParamValue(param: OpenAPIParameter, override: string | undefined): string {
+function initialParamValue(
+  param: OpenAPIParameter,
+  override: string | undefined,
+): string {
   if (override != null) return sanitizeInitialValue(param, override);
   const value = param.schema?.default;
   if (value == null) return "";
@@ -383,7 +420,10 @@ function sanitizeInitialValue(param: OpenAPIParameter, value: string): string {
   return value;
 }
 
-export function submitValue(param: OpenAPIParameter, value: string | undefined): string | null {
+export function submitValue(
+  param: OpenAPIParameter,
+  value: string | undefined,
+): string | null {
   const trimmed = (value ?? "").trim();
   if (!trimmed || trimmed === "[]" || trimmed === "null") return null;
   if (isDateParam(param) && isZeroDate(trimmed)) return null;

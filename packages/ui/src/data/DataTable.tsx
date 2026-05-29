@@ -29,21 +29,21 @@ import {
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
-  CodiconCloseIcon,
-  CodiconEllipsisIcon,
-  CodiconEyeClosedIcon,
-  CodiconFilterFilledIcon,
-  CodiconFilterIcon,
-  CodiconScreenFullIcon,
-  PhArrowsInLineVerticalIcon,
-  PhCheckIcon,
-  PhDesktopIcon,
-  PhListDashesIcon,
-  PhListIcon,
-  PhMoonIcon,
-  PhRowsIcon,
-  PhSunIcon,
-} from "./static-icons";
+  UiClose,
+  UiEllipsis,
+  UiEyeClosed,
+  UiFilterFilled,
+  UiFilter,
+  UiFullscreen,
+  UiResizeVertical,
+  UiCheck,
+  UiDesktop,
+  UiListDashes,
+  UiListFlat,
+  UiMoon,
+  UiRows,
+  UiSun,
+} from "@flanksource/icons/ui";
 import { SortableHeader } from "./SortableHeader";
 import {
   Timestamp,
@@ -74,13 +74,21 @@ export type { TimestampOptions, TagsOptions };
 
 export type DataTableColumnKind = "timestamp" | "tags" | "status";
 
-export type StatusOptions<T extends Record<string, unknown> = Record<string, unknown>> = {
+export type StatusOptions<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
   map?: (raw: unknown, row: T) => BadgeStatus | null;
   showLabel?: boolean;
   title?: (raw: unknown, row: T) => string;
 };
 
-type FilterValue = string | number | boolean | null | undefined | Array<string | number | boolean>;
+type FilterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Array<string | number | boolean>;
 
 type InternalRow<T> = {
   id: string;
@@ -108,13 +116,18 @@ const DEFAULT_COLUMN_WIDTH = 160;
 const DEFAULT_GROW_COLUMN_WIDTH = 224;
 const DEFAULT_SHRINK_COLUMN_WIDTH = 96;
 const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
-const COLUMN_VISIBILITY_STORAGE_PREFIX = "clicky-ui-data-table-column-visibility";
+const COLUMN_VISIBILITY_STORAGE_PREFIX =
+  "clicky-ui-data-table-column-visibility";
 const DENSITY_STORAGE_PREFIX = "clicky-ui-data-table-density";
 
-const DENSITY_OPTIONS: Array<{ value: Density; icon: StaticIconComponent; label: string }> = [
-  { value: "compact", icon: PhRowsIcon, label: "Compact" },
-  { value: "comfortable", icon: PhListIcon, label: "Comfortable" },
-  { value: "spacious", icon: PhListDashesIcon, label: "Spacious" },
+const DENSITY_OPTIONS: Array<{
+  value: Density;
+  icon: StaticIconComponent;
+  label: string;
+}> = [
+  { value: "compact", icon: UiRows, label: "Compact" },
+  { value: "comfortable", icon: UiListFlat, label: "Comfortable" },
+  { value: "spacious", icon: UiListDashes, label: "Spacious" },
 ];
 
 const DATA_TABLE_HEADER_DENSITY_CLASS =
@@ -128,12 +141,13 @@ type ColumnMenuState = {
   columnKey?: string;
 };
 
-export type DataTableRowDetailContext<T extends Record<string, unknown> = Record<string, unknown>> =
-  {
-    columns: DataTableColumn<T>[];
-    visibleColumns: DataTableColumn<T>[];
-    tagActionsByColumn: Record<string, TagActionsContextValue>;
-  };
+export type DataTableRowDetailContext<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  columns: DataTableColumn<T>[];
+  visibleColumns: DataTableColumn<T>[];
+  tagActionsByColumn: Record<string, TagActionsContextValue>;
+};
 
 // Mirrors the preset list used by the trace UI's TraceFilters so log/trace
 // tables share the same vocabulary out of the box.
@@ -147,7 +161,9 @@ const TIMESTAMP_RANGE_PRESETS: FilterBarRangePreset[] = [
   { label: "Last 30 days", from: "now-30d", to: "now" },
 ];
 
-export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = {
+export type DataTableColumn<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
   key: string;
   label: ReactNode;
   sortable?: boolean;
@@ -179,9 +195,9 @@ export type DataTableColumn<T extends Record<string, unknown> = Record<string, u
   status?: StatusOptions<T>;
 };
 
-export type DataTableColumnInput<T extends Record<string, unknown> = Record<string, unknown>> =
-  | DataTableColumn<T>
-  | string;
+export type DataTableColumnInput<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = DataTableColumn<T> | string;
 
 /**
  * Server-side pagination control surfaced as a footer strip below the table.
@@ -197,7 +213,9 @@ export type DataTablePagination = {
   pageSizeOptions?: number[]; // defaults to [25, 50, 100, 200]
 };
 
-type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unknown>> = {
+type DataTableInnerProps<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
   data: T[];
   /**
    * Column descriptors. Pass a bare string for a default column —
@@ -236,7 +254,10 @@ type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unkn
   onRowClick?: (row: T) => void;
   isRowClickable?: (row: T) => boolean;
   getRowHref?: (row: T) => string | undefined;
-  renderExpandedRow?: (row: T, context: DataTableRowDetailContext<T>) => ReactNode;
+  renderExpandedRow?: (
+    row: T,
+    context: DataTableRowDetailContext<T>,
+  ) => ReactNode;
   resizableColumns?: boolean;
   persistColumnWidths?: boolean;
   columnResizeStorageKey?: string;
@@ -261,10 +282,9 @@ type DataTableInnerProps<T extends Record<string, unknown> = Record<string, unkn
   showHeaderFilters?: boolean;
 };
 
-export type DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> = Omit<
-  DataTableInnerProps<T>,
-  "themeMenuValue"
-> & {
+export type DataTableProps<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = Omit<DataTableInnerProps<T>, "themeMenuValue"> & {
   /**
    * Initial / controlled theme value for the column-menu Theme section.
    * When `onThemeChange` is omitted, the DataTable manages this internally
@@ -337,33 +357,46 @@ function DataTableInner<T extends Record<string, unknown>>({
     [columns],
   );
   const resolvedColumnResizeStorageKey =
-    columnResizeStorageKey ?? `${COLUMN_WIDTH_STORAGE_PREFIX}:${columnKeysSignature}`;
+    columnResizeStorageKey ??
+    `${COLUMN_WIDTH_STORAGE_PREFIX}:${columnKeysSignature}`;
   const resolvedColumnVisibilityStorageKey =
-    columnVisibilityStorageKey ?? `${COLUMN_VISIBILITY_STORAGE_PREFIX}:${columnKeysSignature}`;
+    columnVisibilityStorageKey ??
+    `${COLUMN_VISIBILITY_STORAGE_PREFIX}:${columnKeysSignature}`;
   const resolvedDensityStorageKey =
     densityStorageKey ?? `${DENSITY_STORAGE_PREFIX}:${columnKeysSignature}`;
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
-    persistColumnWidths ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns) : {},
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
+    () =>
+      persistColumnWidths
+        ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns)
+        : {},
   );
-  const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>(() =>
-    persistColumnVisibility
-      ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
-      : {},
+  const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>(
+    () =>
+      persistColumnVisibility
+        ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
+        : {},
   );
   const densityControlled = density !== undefined;
-  const [localDensityOverride, setLocalDensityOverride] = useState<Density | undefined>(() => {
+  const [localDensityOverride, setLocalDensityOverride] = useState<
+    Density | undefined
+  >(() => {
     if (densityControlled) return density;
     if (persistDensity)
-      return readStoredDensityOverride(resolvedDensityStorageKey) ?? defaultDensity;
+      return (
+        readStoredDensityOverride(resolvedDensityStorageKey) ?? defaultDensity
+      );
     return defaultDensity;
   });
   const [columnMenu, setColumnMenu] = useState<ColumnMenuState | null>(null);
-  const [headerFilterMenu, setHeaderFilterMenu] = useState<ColumnMenuState | null>(null);
+  const [headerFilterMenu, setHeaderFilterMenu] =
+    useState<ColumnMenuState | null>(null);
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
   >({});
-  const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarNumberValue>>({});
+  const [numberFilters, setNumberFilters] = useState<
+    Record<string, FilterBarNumberValue>
+  >({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
   const [timeRangeFilter, setTimeRangeFilter] = useState<{
@@ -387,7 +420,11 @@ function DataTableInner<T extends Record<string, unknown>>({
       const next = pruneColumnWidths({ ...stored, ...current }, columns);
       return sameColumnWidths(current, next) ? current : next;
     });
-  }, [columnKeysSignature, persistColumnWidths, resolvedColumnResizeStorageKey]);
+  }, [
+    columnKeysSignature,
+    persistColumnWidths,
+    resolvedColumnResizeStorageKey,
+  ]);
 
   useEffect(() => {
     if (!persistColumnWidths) return;
@@ -402,26 +439,45 @@ function DataTableInner<T extends Record<string, unknown>>({
       const next = pruneHiddenColumns({ ...stored, ...current }, columns);
       return sameHiddenColumns(current, next) ? current : next;
     });
-  }, [columnKeysSignature, persistColumnVisibility, resolvedColumnVisibilityStorageKey]);
+  }, [
+    columnKeysSignature,
+    persistColumnVisibility,
+    resolvedColumnVisibilityStorageKey,
+  ]);
 
   useEffect(() => {
     if (!persistColumnVisibility) return;
     writeStoredHiddenColumns(resolvedColumnVisibilityStorageKey, hiddenColumns);
-  }, [hiddenColumns, persistColumnVisibility, resolvedColumnVisibilityStorageKey]);
+  }, [
+    hiddenColumns,
+    persistColumnVisibility,
+    resolvedColumnVisibilityStorageKey,
+  ]);
 
   useEffect(() => {
     if (densityControlled) return;
     setLocalDensityOverride(
       persistDensity
-        ? (readStoredDensityOverride(resolvedDensityStorageKey) ?? defaultDensity)
+        ? (readStoredDensityOverride(resolvedDensityStorageKey) ??
+            defaultDensity)
         : defaultDensity,
     );
-  }, [defaultDensity, densityControlled, persistDensity, resolvedDensityStorageKey]);
+  }, [
+    defaultDensity,
+    densityControlled,
+    persistDensity,
+    resolvedDensityStorageKey,
+  ]);
 
   useEffect(() => {
     if (densityControlled || !persistDensity) return;
     writeStoredDensityOverride(resolvedDensityStorageKey, localDensityOverride);
-  }, [densityControlled, localDensityOverride, persistDensity, resolvedDensityStorageKey]);
+  }, [
+    densityControlled,
+    localDensityOverride,
+    persistDensity,
+    resolvedDensityStorageKey,
+  ]);
 
   useEffect(() => {
     if (!columnMenu && !headerFilterMenu) return;
@@ -462,19 +518,27 @@ function DataTableInner<T extends Record<string, unknown>>({
         if (parsed) dates.push(parsed);
       }
       const dataFormat = chooseTimestampFormat(dates);
-      out[column.key] = modeToFormat(column.timestamp?.mode ?? "auto", dataFormat);
+      out[column.key] = modeToFormat(
+        column.timestamp?.mode ?? "auto",
+        dataFormat,
+      );
     }
     return out;
   }, [columns, data]);
 
   const effectiveColumns = useMemo<DataTableColumn<T>[]>(
-    () => columns.map((column) => applyKindDefaults<T>(column, timestampFormats[column.key])),
+    () =>
+      columns.map((column) =>
+        applyKindDefaults<T>(column, timestampFormats[column.key]),
+      ),
     [columns, timestampFormats],
   );
 
   const visibleColumns = useMemo(() => {
     if (!hideableColumns) return effectiveColumns;
-    const next = effectiveColumns.filter((column) => !hiddenColumns[column.key]);
+    const next = effectiveColumns.filter(
+      (column) => !hiddenColumns[column.key],
+    );
     return next.length > 0 ? next : effectiveColumns;
   }, [effectiveColumns, hiddenColumns, hideableColumns]);
 
@@ -488,10 +552,14 @@ function DataTableInner<T extends Record<string, unknown>>({
     [visibleColumns],
   );
 
-  const showColumnVisibilityControl = hideableColumns && hideableColumnCount > 1;
-  const resolvedShowDensityControl = showDensityControl ?? showColumnVisibilityControl;
+  const showColumnVisibilityControl =
+    hideableColumns && hideableColumnCount > 1;
+  const resolvedShowDensityControl =
+    showDensityControl ?? showColumnVisibilityControl;
   const showTablePreferencesControl =
-    showColumnVisibilityControl || resolvedShowDensityControl || showThemeControl;
+    showColumnVisibilityControl ||
+    resolvedShowDensityControl ||
+    showThemeControl;
   const densityOverride = densityControlled ? density : localDensityOverride;
 
   // For each kind:"tags" column, expose a TagActions value backed by this
@@ -503,7 +571,10 @@ function DataTableInner<T extends Record<string, unknown>>({
     for (const column of visibleColumns) {
       if (column.kind !== "tags") continue;
       const columnKey = column.key;
-      const current = (multiFilters[columnKey] ?? {}) as Record<string, TagFilterMode>;
+      const current = (multiFilters[columnKey] ?? {}) as Record<
+        string,
+        TagFilterMode
+      >;
       const handler = (next: Record<string, TagFilterMode>) =>
         setMultiFilters((state) => updateFilterRecord(state, columnKey, next));
       out[columnKey] = tagActionsFromRecord(current, handler);
@@ -561,7 +632,9 @@ function DataTableInner<T extends Record<string, unknown>>({
       }
 
       const options = Array.from(values)
-        .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
+        .sort((left, right) =>
+          left.localeCompare(right, undefined, { numeric: true }),
+        )
         .map((value) => ({ value, label: value }));
 
       // Tag columns naturally have higher cardinality (e.g. infra labels);
@@ -596,13 +669,21 @@ function DataTableInner<T extends Record<string, unknown>>({
   }, [autoFilter, filterableColumns, loading, rows]);
 
   useEffect(() => {
-    setTextFilters((current) => pruneTextFilterState(current, generatedFilters));
-    setMultiFilters((current) => pruneMultiFilterState(current, generatedFilters));
-    setNumberFilters((current) => pruneNumberFilterState(current, generatedFilters));
+    setTextFilters((current) =>
+      pruneTextFilterState(current, generatedFilters),
+    );
+    setMultiFilters((current) =>
+      pruneMultiFilterState(current, generatedFilters),
+    );
+    setNumberFilters((current) =>
+      pruneNumberFilterState(current, generatedFilters),
+    );
   }, [generatedFilters]);
 
   const globalFilterControlled = globalFilter !== undefined;
-  const effectiveGlobalFilter = globalFilterControlled ? globalFilter : localGlobalFilter;
+  const effectiveGlobalFilter = globalFilterControlled
+    ? globalFilter
+    : localGlobalFilter;
   const setEffectiveGlobalFilter = globalFilterControlled
     ? (onGlobalFilterChange ?? (() => {}))
     : setLocalGlobalFilter;
@@ -617,7 +698,9 @@ function DataTableInner<T extends Record<string, unknown>>({
             label: labelText(filter.column),
             value: multiFilters[columnKey] ?? {},
             onChange: (next) =>
-              setMultiFilters((current) => updateFilterRecord(current, columnKey, next)),
+              setMultiFilters((current) =>
+                updateFilterRecord(current, columnKey, next),
+              ),
             options: filter.options,
           };
         }
@@ -628,7 +711,9 @@ function DataTableInner<T extends Record<string, unknown>>({
             label: labelText(filter.column),
             value: multiFilters[columnKey] ?? {},
             onChange: (next) =>
-              setMultiFilters((current) => updateFilterRecord(current, columnKey, next)),
+              setMultiFilters((current) =>
+                updateFilterRecord(current, columnKey, next),
+              ),
             groups: filter.groups ?? [],
           };
         }
@@ -639,7 +724,9 @@ function DataTableInner<T extends Record<string, unknown>>({
             label: labelText(filter.column),
             value: numberFilters[columnKey] ?? {},
             onChange: (next: FilterBarNumberValue) =>
-              setNumberFilters((current) => updateNumberFilterValue(current, columnKey, next)),
+              setNumberFilters((current) =>
+                updateNumberFilterValue(current, columnKey, next),
+              ),
           };
           if (filter.numberBounds?.min !== undefined) {
             numberFilter.domainMin = filter.numberBounds.min;
@@ -658,7 +745,9 @@ function DataTableInner<T extends Record<string, unknown>>({
           label: labelText(filter.column),
           value: textFilters[columnKey] ?? "",
           onChange: (next: string) =>
-            setTextFilters((current) => updateFilterValue(current, columnKey, next)),
+            setTextFilters((current) =>
+              updateFilterValue(current, columnKey, next),
+            ),
         };
       }),
     [generatedFilters, multiFilters, numberFilters, textFilters],
@@ -680,7 +769,8 @@ function DataTableInner<T extends Record<string, unknown>>({
       from: timeRangeFilter.from,
       to: timeRangeFilter.to,
       onApply: (from, to) => setTimeRangeFilter({ from, to }),
-      presets: timeRangeColumn.timestamp?.rangePresets ?? TIMESTAMP_RANGE_PRESETS,
+      presets:
+        timeRangeColumn.timestamp?.rangePresets ?? TIMESTAMP_RANGE_PRESETS,
       fromPlaceholder: "now-24h",
       toPlaceholder: "now",
       emptyLabel: "Any time",
@@ -697,7 +787,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     return next;
   }, [autoFilter, timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
   const showFilterBar =
-    (autoFilter && (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
+    (autoFilter &&
+      (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
     (externalFilters && externalFilters.length > 0) ||
     hasCustomFilterBarContent ||
     showTablePreferencesControl;
@@ -708,7 +799,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   const filterBarTrailing = showTablePreferencesControl ? (
     <>
       {filterBarProps?.trailing}
-      <ColumnVisibilityTrigger onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))} />
+      <ColumnVisibilityTrigger
+        onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))}
+      />
     </>
   ) : (
     filterBarProps?.trailing
@@ -718,8 +811,12 @@ function DataTableInner<T extends Record<string, unknown>>({
   const filteredRows = useMemo(() => {
     const globalNeedle = effectiveGlobalFilter.trim().toLowerCase();
     const now = new Date();
-    const rangeFromDate = timeRangeColumn ? resolveDateMath(timeRangeFilter.from, now) : null;
-    const rangeToDate = timeRangeColumn ? resolveDateMath(timeRangeFilter.to, now) : null;
+    const rangeFromDate = timeRangeColumn
+      ? resolveDateMath(timeRangeFilter.from, now)
+      : null;
+    const rangeToDate = timeRangeColumn
+      ? resolveDateMath(timeRangeFilter.to, now)
+      : null;
     const rangeColumnKey = timeRangeColumn?.key;
 
     return rows.filter(({ row }) => {
@@ -727,7 +824,8 @@ function DataTableInner<T extends Record<string, unknown>>({
         const raw = resolvePath(row, rangeColumnKey);
         const ts = parseTimestamp(raw);
         if (!ts) return false;
-        if (rangeFromDate && ts.getTime() < rangeFromDate.getTime()) return false;
+        if (rangeFromDate && ts.getTime() < rangeFromDate.getTime())
+          return false;
         if (rangeToDate && ts.getTime() > rangeToDate.getTime()) return false;
       }
 
@@ -746,8 +844,13 @@ function DataTableInner<T extends Record<string, unknown>>({
         const tokens = getFilterTokens(row, filter.column);
 
         if (filter.kind === "text") {
-          const needle = (textFilters[filter.column.key] ?? "").trim().toLowerCase();
-          if (needle && !tokens.some((token) => token.toLowerCase().includes(needle))) {
+          const needle = (textFilters[filter.column.key] ?? "")
+            .trim()
+            .toLowerCase();
+          if (
+            needle &&
+            !tokens.some((token) => token.toLowerCase().includes(needle))
+          ) {
             return false;
           }
         } else if (filter.kind === "number") {
@@ -760,7 +863,8 @@ function DataTableInner<T extends Record<string, unknown>>({
           if (hasMin || hasMax) {
             const values = getFilterNumbers(row, filter.column);
             const matches = values.some(
-              (value) => (min == null || value >= min) && (max == null || value <= max),
+              (value) =>
+                (min == null || value >= min) && (max == null || value <= max),
             );
 
             if (!matches) {
@@ -776,11 +880,17 @@ function DataTableInner<T extends Record<string, unknown>>({
             .filter(([, mode]) => mode === "exclude")
             .map(([value]) => value);
 
-          if (include.length > 0 && !tokens.some((token) => include.includes(token))) {
+          if (
+            include.length > 0 &&
+            !tokens.some((token) => include.includes(token))
+          ) {
             return false;
           }
 
-          if (exclude.length > 0 && tokens.some((token) => exclude.includes(token))) {
+          if (
+            exclude.length > 0 &&
+            tokens.some((token) => exclude.includes(token))
+          ) {
             return false;
           }
         }
@@ -818,17 +928,24 @@ function DataTableInner<T extends Record<string, unknown>>({
     ...(defaultSort?.key ? { defaultKey: defaultSort.key } : {}),
   });
 
-  const startColumnResize = (event: ReactMouseEvent<HTMLElement>, column: DataTableColumn<T>) => {
+  const startColumnResize = (
+    event: ReactMouseEvent<HTMLElement>,
+    column: DataTableColumn<T>,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
     const startX = event.clientX;
     const header = event.currentTarget.closest("th");
     const measuredWidth = header?.getBoundingClientRect().width ?? 0;
-    const startWidth = measuredWidth || columnWidths[column.key] || defaultColumnWidth(column);
+    const startWidth =
+      measuredWidth || columnWidths[column.key] || defaultColumnWidth(column);
 
     const onMove = (moveEvent: MouseEvent) => {
-      const nextWidth = clampColumnWidth(column, startWidth + moveEvent.clientX - startX);
+      const nextWidth = clampColumnWidth(
+        column,
+        startWidth + moveEvent.clientX - startX,
+      );
       setColumnWidths((current) => ({
         ...current,
         [column.key]: nextWidth,
@@ -848,7 +965,10 @@ function DataTableInner<T extends Record<string, unknown>>({
     document.body.style.userSelect = "none";
   };
 
-  const autoFitColumn = (event: ReactMouseEvent<HTMLElement>, column: DataTableColumn<T>) => {
+  const autoFitColumn = (
+    event: ReactMouseEvent<HTMLElement>,
+    column: DataTableColumn<T>,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -856,7 +976,9 @@ function DataTableInner<T extends Record<string, unknown>>({
     const table = event.currentTarget.closest("table");
     if (!header || !table) return;
 
-    const columnIndex = Array.from(header.parentElement?.children ?? []).indexOf(header);
+    const columnIndex = Array.from(
+      header.parentElement?.children ?? [],
+    ).indexOf(header);
     if (columnIndex < 0) return;
 
     const width = measureColumnContentWidth(table, columnIndex, column);
@@ -895,7 +1017,10 @@ function DataTableInner<T extends Record<string, unknown>>({
     setColumnMenu(menuStateFromPointer(event, column.key));
   };
 
-  const openHeaderFilterMenu = (event: ReactMouseEvent<HTMLElement>, columnKey: string) => {
+  const openHeaderFilterMenu = (
+    event: ReactMouseEvent<HTMLElement>,
+    columnKey: string,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
     setHeaderFilterMenu(menuStateFromTrigger(event, columnKey));
@@ -903,7 +1028,10 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   return (
     <DensityValueProvider density={densityOverride ?? "comfortable"}>
-      <div className={cn("flex min-h-0 flex-col gap-3", className)} data-density={densityOverride}>
+      <div
+        className={cn("flex min-h-0 flex-col gap-3", className)}
+        data-density={densityOverride}
+      >
         {showFilterBar && (
           <FilterBar
             {...filterBarProps}
@@ -949,16 +1077,22 @@ function DataTableInner<T extends Record<string, unknown>>({
                       "group/header relative whitespace-nowrap font-medium",
                       DATA_TABLE_HEADER_DENSITY_CLASS,
                       alignmentClass(column.align),
-                      resizableColumns && column.resizable !== false && "select-none",
+                      resizableColumns &&
+                        column.resizable !== false &&
+                        "select-none",
                       column.headerClassName,
                     )}
-                    onContextMenu={(event) => openHeaderColumnMenu(event, column)}
+                    onContextMenu={(event) =>
+                      openHeaderColumnMenu(event, column)
+                    }
                   >
                     <div
                       className={cn(
                         "flex min-w-0 items-center gap-1",
                         headerAlignmentClass(column.align),
-                        resizableColumns && column.resizable !== false && "pr-2",
+                        resizableColumns &&
+                          column.resizable !== false &&
+                          "pr-2",
                       )}
                     >
                       <span className="min-w-0">
@@ -967,7 +1101,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                         ) : (
                           <SortableHeader
                             active={sort?.key === column.key}
-                            {...(sort?.key === column.key ? { dir: sort.dir } : {})}
+                            {...(sort?.key === column.key
+                              ? { dir: sort.dir }
+                              : {})}
                             {...(column.align ? { align: column.align } : {})}
                             onClick={() => toggle(column.key)}
                           >
@@ -977,15 +1113,22 @@ function DataTableInner<T extends Record<string, unknown>>({
                       </span>
                       {showHeaderFilterControls &&
                         (nativeFilterByColumn.has(column.key) ||
-                          (autoTimeRange && timeRangeColumn?.key === column.key)) && (
+                          (autoTimeRange &&
+                            timeRangeColumn?.key === column.key)) && (
                           <HeaderFilterButton
                             column={column}
                             active={
                               nativeFilterByColumn.has(column.key)
-                                ? isFilterBarFilterActive(nativeFilterByColumn.get(column.key)!)
-                                : Boolean(timeRangeFilter.from || timeRangeFilter.to)
+                                ? isFilterBarFilterActive(
+                                    nativeFilterByColumn.get(column.key)!,
+                                  )
+                                : Boolean(
+                                    timeRangeFilter.from || timeRangeFilter.to,
+                                  )
                             }
-                            onOpen={(event) => openHeaderFilterMenu(event, column.key)}
+                            onOpen={(event) =>
+                              openHeaderFilterMenu(event, column.key)
+                            }
                           />
                         )}
                     </div>
@@ -1000,7 +1143,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                           event.stopPropagation();
                         }}
                         onDoubleClick={(event) => autoFitColumn(event, column)}
-                        onMouseDown={(event) => startColumnResize(event, column)}
+                        onMouseDown={(event) =>
+                          startColumnResize(event, column)
+                        }
                       >
                         <span
                           aria-hidden
@@ -1030,7 +1175,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                       tagActionsByColumn,
                     }) ?? null;
                   const expandable = expandedContent !== null;
-                  const rowClickEnabled = isRowClickable?.(record.row) ?? !!onRowClick;
+                  const rowClickEnabled =
+                    isRowClickable?.(record.row) ?? !!onRowClick;
                   const clickable = !!href || rowClickEnabled || expandable;
 
                   return (
@@ -1060,9 +1206,14 @@ function DataTableInner<T extends Record<string, unknown>>({
 
                           // Tag cells get the + / − filter affordance via
                           // context; copy-to-clipboard works without it too.
-                          if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                          if (
+                            column.kind === "tags" &&
+                            tagActionsByColumn[column.key]
+                          ) {
                             content = (
-                              <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                              <TagActionsProvider
+                                value={tagActionsByColumn[column.key]!}
+                              >
                                 {content}
                               </TagActionsProvider>
                             );
@@ -1097,7 +1248,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                       </tr>
                       {expanded && expandedContent && (
                         <tr>
-                          <td colSpan={visibleColumns.length} className="bg-muted/40 p-density-3">
+                          <td
+                            colSpan={visibleColumns.length}
+                            className="bg-muted/40 p-density-3"
+                          >
                             <div className="rounded-md border border-border bg-background p-density-3">
                               {expandedContent}
                             </div>
@@ -1139,7 +1293,8 @@ function DataTableInner<T extends Record<string, unknown>>({
         {headerFilterMenu && (
           <HeaderFilterMenu
             filter={nativeFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
-            {...(autoTimeRange && timeRangeColumn?.key === headerFilterMenu.columnKey
+            {...(autoTimeRange &&
+            timeRangeColumn?.key === headerFilterMenu.columnKey
               ? { timeRange: autoTimeRange }
               : {})}
             anchor={headerFilterMenu}
@@ -1158,12 +1313,18 @@ const DEFAULT_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 // straight to the caller-supplied callbacks so the data layer (which lives in
 // CommandOutput / OperationCommandPage) stays the source of truth for which
 // rows are visible.
-function DataTablePaginationFooter({ pagination }: { pagination: DataTablePagination }) {
+function DataTablePaginationFooter({
+  pagination,
+}: {
+  pagination: DataTablePagination;
+}) {
   const { page, pageSize, total, onPageChange, onPageSizeChange } = pagination;
   const options = pagination.pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS;
   const safePage = Math.max(0, page);
   const totalPages =
-    total != null && pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : undefined;
+    total != null && pageSize > 0
+      ? Math.max(1, Math.ceil(total / pageSize))
+      : undefined;
   const atFirst = safePage === 0;
   const atLast = totalPages != null ? safePage >= totalPages - 1 : false;
   return (
@@ -1223,7 +1384,10 @@ function DataTableLoadingRows<T extends Record<string, unknown>>({
   return (
     <>
       <tr className="border-b border-border/60 bg-muted/20">
-        <td colSpan={safeColumnCount} className={cn(DATA_TABLE_CELL_DENSITY_CLASS, "p-0")}>
+        <td
+          colSpan={safeColumnCount}
+          className={cn(DATA_TABLE_CELL_DENSITY_CLASS, "p-0")}
+        >
           <div className="h-0.5 w-full overflow-hidden bg-muted">
             <div className="h-full w-1/2 animate-pulse rounded-full bg-primary/70" />
           </div>
@@ -1285,8 +1449,11 @@ function HeaderFilterButton<T extends Record<string, unknown>>({
       )}
       onClick={onOpen}
     >
-      <span data-filter-icon-state={active ? "filled" : "outline"} className="inline-flex">
-        <Icon icon={active ? CodiconFilterFilledIcon : CodiconFilterIcon} className="text-xs" />
+      <span
+        data-filter-icon-state={active ? "filled" : "outline"}
+        className="inline-flex"
+      >
+        <Icon icon={active ? UiFilterFilled : UiFilter} className="text-xs" />
       </span>
     </button>
   );
@@ -1349,13 +1516,15 @@ function HeaderFilterMenu({
             className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
             onClick={onClose}
           >
-            <Icon icon={CodiconCloseIcon} className="text-sm" />
+            <Icon icon={UiClose} className="text-sm" />
           </button>
         </div>
       </div>
       <div className="flex flex-col gap-2">
         {filter && <FilterBarFilterPanel filter={filter} chrome="embedded" />}
-        {timeRange && <FilterBarRangePanel kind="time" label="Time range" {...timeRange} />}
+        {timeRange && (
+          <FilterBarRangePanel kind="time" label="Time range" {...timeRange} />
+        )}
       </div>
     </div>
   );
@@ -1377,7 +1546,7 @@ function ColumnVisibilityTrigger({
         onOpen(event);
       }}
     >
-      <Icon icon={CodiconEllipsisIcon} className="text-sm" />
+      <Icon icon={UiEllipsis} className="text-sm" />
     </button>
   );
 }
@@ -1417,7 +1586,9 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
     ? columns.find((column) => column.key === anchor.columnKey)
     : undefined;
   const canHideActiveColumn =
-    activeColumn && isColumnHideable(activeColumn) && visibleHideableColumnCount > 1;
+    activeColumn &&
+    isColumnHideable(activeColumn) &&
+    visibleHideableColumnCount > 1;
 
   return (
     <div
@@ -1457,7 +1628,10 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
                   onClose();
                 }}
               >
-                <Icon icon={CodiconEyeClosedIcon} className="text-sm text-muted-foreground" />
+                <Icon
+                  icon={UiEyeClosed}
+                  className="text-sm text-muted-foreground"
+                />
                 <span>Hide {labelText(activeColumn)}</span>
               </button>
               <div className="my-1 h-px bg-border" />
@@ -1468,7 +1642,8 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
             {columns.map((column) => {
               const hideable = isColumnHideable(column);
               const visible = hiddenColumns[column.key] !== true;
-              const disabled = !hideable || (visible && visibleHideableColumnCount <= 1);
+              const disabled =
+                !hideable || (visible && visibleHideableColumnCount <= 1);
               return (
                 <label
                   key={column.key}
@@ -1524,7 +1699,9 @@ function DensityMenuSection({
 
   return (
     <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
-      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Density</div>
+      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        Density
+      </div>
       <button
         type="button"
         role="menuitemradio"
@@ -1532,10 +1709,13 @@ function DensityMenuSection({
         className={densityMenuItemClassName(current === "inherit")}
         onClick={() => onDensityChange(undefined)}
       >
-        <Icon icon={PhArrowsInLineVerticalIcon} className="text-sm text-muted-foreground" />
+        <Icon
+          icon={UiResizeVertical}
+          className="text-sm text-muted-foreground"
+        />
         <span className="min-w-0 flex-1 truncate">Use page density</span>
         {current === "inherit" ? (
-          <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
+          <Icon icon={UiCheck} className="text-sm text-foreground" />
         ) : (
           <span className="inline-block h-4 w-4" aria-hidden />
         )}
@@ -1551,10 +1731,13 @@ function DensityMenuSection({
             className={densityMenuItemClassName(active)}
             onClick={() => onDensityChange(option.value)}
           >
-            <Icon icon={option.icon} className="text-sm text-muted-foreground" />
+            <Icon
+              icon={option.icon}
+              className="text-sm text-muted-foreground"
+            />
             <span className="min-w-0 flex-1 truncate">{option.label}</span>
             {active ? (
-              <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
+              <Icon icon={UiCheck} className="text-sm text-foreground" />
             ) : (
               <span className="inline-block h-4 w-4" aria-hidden />
             )}
@@ -1572,10 +1755,14 @@ function densityMenuItemClassName(active: boolean) {
   );
 }
 
-const THEME_MENU_OPTIONS: Array<{ value: Theme; icon: StaticIconComponent; label: string }> = [
-  { value: "system", icon: PhDesktopIcon, label: "Use system theme" },
-  { value: "light", icon: PhSunIcon, label: "Light" },
-  { value: "dark", icon: PhMoonIcon, label: "Dark" },
+const THEME_MENU_OPTIONS: Array<{
+  value: Theme;
+  icon: StaticIconComponent;
+  label: string;
+}> = [
+  { value: "system", icon: UiDesktop, label: "Use system theme" },
+  { value: "light", icon: UiSun, label: "Light" },
+  { value: "dark", icon: UiMoon, label: "Dark" },
 ];
 
 function ThemeMenuSection({
@@ -1589,7 +1776,9 @@ function ThemeMenuSection({
 }) {
   return (
     <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
-      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Theme</div>
+      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        Theme
+      </div>
       {THEME_MENU_OPTIONS.map((option) => {
         const active = value === option.value;
         return (
@@ -1601,10 +1790,13 @@ function ThemeMenuSection({
             className={densityMenuItemClassName(active)}
             onClick={() => onChange(option.value)}
           >
-            <Icon icon={option.icon} className="text-sm text-muted-foreground" />
+            <Icon
+              icon={option.icon}
+              className="text-sm text-muted-foreground"
+            />
             <span className="min-w-0 flex-1 truncate">{option.label}</span>
             {active ? (
-              <Icon icon={PhCheckIcon} className="text-sm text-foreground" />
+              <Icon icon={UiCheck} className="text-sm text-foreground" />
             ) : (
               <span className="inline-block h-4 w-4" aria-hidden />
             )}
@@ -1626,7 +1818,10 @@ function CellContent<T extends Record<string, unknown>>({
 }) {
   return (
     <div
-      className={cn(cellContentClassName(column, width), alignmentClass(column.align))}
+      className={cn(
+        cellContentClassName(column, width),
+        alignmentClass(column.align),
+      )}
       style={cellContentStyle(width)}
     >
       {children}
@@ -1634,21 +1829,33 @@ function CellContent<T extends Record<string, unknown>>({
   );
 }
 
-function getSortValue<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+function getSortValue<T extends Record<string, unknown>>(
+  row: T,
+  column: DataTableColumn<T>,
+) {
   const rawValue = resolvePath(row, column.key);
   return column.sortValue ? column.sortValue(rawValue, row) : rawValue;
 }
 
-function getFilterCandidate<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+function getFilterCandidate<T extends Record<string, unknown>>(
+  row: T,
+  column: DataTableColumn<T>,
+) {
   const rawValue = resolvePath(row, column.key);
   return column.filterValue ? column.filterValue(rawValue, row) : rawValue;
 }
 
-function getFilterTokens<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+function getFilterTokens<T extends Record<string, unknown>>(
+  row: T,
+  column: DataTableColumn<T>,
+) {
   return normalizeTokens(getFilterCandidate(row, column));
 }
 
-function getFilterNumbers<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+function getFilterNumbers<T extends Record<string, unknown>>(
+  row: T,
+  column: DataTableColumn<T>,
+) {
   return normalizeNumbers(getFilterCandidate(row, column));
 }
 
@@ -1673,7 +1880,11 @@ function normalizeNumbers(value: FilterValue | unknown): number[] {
   return parsed == null ? [] : [parsed];
 }
 
-function updateFilterValue(state: Record<string, string>, key: string, nextValue: string) {
+function updateFilterValue(
+  state: Record<string, string>,
+  key: string,
+  nextValue: string,
+) {
   const next = { ...state };
 
   if (nextValue.trim()) {
@@ -1719,8 +1930,16 @@ function updateNumberFilterValue(
   return next;
 }
 
-function pruneTextFilterState(state: Record<string, string>, filters: GeneratedFilter<any>[]) {
-  return pruneFilterState(state, filters, "text", (value) => !String(value ?? "").trim());
+function pruneTextFilterState(
+  state: Record<string, string>,
+  filters: GeneratedFilter<any>[],
+) {
+  return pruneFilterState(
+    state,
+    filters,
+    "text",
+    (value) => !String(value ?? "").trim(),
+  );
 }
 
 function pruneMultiFilterState(
@@ -1731,7 +1950,9 @@ function pruneMultiFilterState(
   // keep the entry alive.
   const allowed = new Set(
     filters
-      .filter((filter) => filter.kind === "multi" || filter.kind === "nested-multi")
+      .filter(
+        (filter) => filter.kind === "multi" || filter.kind === "nested-multi",
+      )
       .map((filter) => filter.column.key),
   );
   return Object.fromEntries(
@@ -1749,7 +1970,8 @@ function pruneNumberFilterState(
     state,
     filters,
     "number",
-    (value) => !String(value.min ?? "").trim() && !String(value.max ?? "").trim(),
+    (value) =>
+      !String(value.min ?? "").trim() && !String(value.max ?? "").trim(),
   );
 }
 
@@ -1760,10 +1982,14 @@ function pruneFilterState<T>(
   isEmpty: (value: T) => boolean,
 ) {
   const allowed = new Set(
-    filters.filter((filter) => filter.kind === kind).map((filter) => filter.column.key),
+    filters
+      .filter((filter) => filter.kind === kind)
+      .map((filter) => filter.column.key),
   );
   return Object.fromEntries(
-    Object.entries(state).filter(([key, value]) => allowed.has(key) && !isEmpty(value)),
+    Object.entries(state).filter(
+      ([key, value]) => allowed.has(key) && !isEmpty(value),
+    ),
   ) as Record<string, T>;
 }
 
@@ -1832,7 +2058,9 @@ function applyKindDefaults<T extends Record<string, unknown>>(
             showTitleOnHover={column.timestamp?.alwaysShowFullOnHover !== false}
           />
         )),
-      sortValue: column.sortValue ?? ((value) => parseTimestamp(value)?.getTime() ?? null),
+      sortValue:
+        column.sortValue ??
+        ((value) => parseTimestamp(value)?.getTime() ?? null),
       filterValue:
         column.filterValue ??
         ((value) => {
@@ -1856,9 +2084,11 @@ function applyKindDefaults<T extends Record<string, unknown>>(
           />
         )),
       filterValue:
-        column.filterValue ?? ((value) => tagFilterTokens(value as TagsValue, separator)),
+        column.filterValue ??
+        ((value) => tagFilterTokens(value as TagsValue, separator)),
       sortValue:
-        column.sortValue ?? ((value) => tagFilterTokens(value as TagsValue, separator).length),
+        column.sortValue ??
+        ((value) => tagFilterTokens(value as TagsValue, separator).length),
     };
   }
 
@@ -1872,9 +2102,14 @@ function applyKindDefaults<T extends Record<string, unknown>>(
         ((value, row) => {
           const status = map(value, row);
           if (!status) return <span className="text-muted-foreground">—</span>;
-          const label = opts?.showLabel ? (typeof value === "string" ? value : status) : undefined;
+          const label = opts?.showLabel
+            ? typeof value === "string"
+              ? value
+              : status
+            : undefined;
           const title =
-            opts?.title?.(value, row) ?? (typeof value === "string" ? value : undefined);
+            opts?.title?.(value, row) ??
+            (typeof value === "string" ? value : undefined);
           return (
             <StatusDot
               status={status}
@@ -1904,12 +2139,16 @@ function prettifyKey(key: string) {
     .trim();
 }
 
-function labelText<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
+function labelText<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+) {
   if (typeof column.label === "string") return column.label;
   return prettifyKey(column.key.split(".").at(-1) ?? column.key);
 }
 
-function isColumnHideable<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
+function isColumnHideable<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+) {
   return column.hideable !== false;
 }
 
@@ -1920,13 +2159,20 @@ function menuStateFromPointer(
   const padding = 8;
   const width = 256;
   const height = 320;
-  const viewportWidth = typeof window === "undefined" ? event.clientX + width : window.innerWidth;
+  const viewportWidth =
+    typeof window === "undefined" ? event.clientX + width : window.innerWidth;
   const viewportHeight =
     typeof window === "undefined" ? event.clientY + height : window.innerHeight;
 
   const position = {
-    x: Math.max(padding, Math.min(event.clientX, viewportWidth - width - padding)),
-    y: Math.max(padding, Math.min(event.clientY, viewportHeight - height - padding)),
+    x: Math.max(
+      padding,
+      Math.min(event.clientX, viewportWidth - width - padding),
+    ),
+    y: Math.max(
+      padding,
+      Math.min(event.clientY, viewportHeight - height - padding),
+    ),
   };
   return columnKey ? { ...position, columnKey } : position;
 }
@@ -1939,12 +2185,20 @@ function menuStateFromTrigger(
   const padding = 8;
   const width = 256;
   const height = 320;
-  const viewportWidth = typeof window === "undefined" ? rect.right + width : window.innerWidth;
-  const viewportHeight = typeof window === "undefined" ? rect.bottom + height : window.innerHeight;
+  const viewportWidth =
+    typeof window === "undefined" ? rect.right + width : window.innerWidth;
+  const viewportHeight =
+    typeof window === "undefined" ? rect.bottom + height : window.innerHeight;
 
   const position = {
-    x: Math.max(padding, Math.min(rect.right - width, viewportWidth - width - padding)),
-    y: Math.max(padding, Math.min(rect.bottom + 6, viewportHeight - height - padding)),
+    x: Math.max(
+      padding,
+      Math.min(rect.right - width, viewportWidth - width - padding),
+    ),
+    y: Math.max(
+      padding,
+      Math.min(rect.bottom + 6, viewportHeight - height - padding),
+    ),
   };
   return columnKey ? { ...position, columnKey } : position;
 }
@@ -1964,7 +2218,9 @@ function measureColumnContentWidth<T extends Record<string, unknown>>(
 ) {
   const cells = Array.from(table.querySelectorAll("th, td")).filter(
     (cell): cell is HTMLTableCellElement =>
-      cell instanceof HTMLTableCellElement && cell.cellIndex === columnIndex && cell.colSpan === 1,
+      cell instanceof HTMLTableCellElement &&
+      cell.cellIndex === columnIndex &&
+      cell.colSpan === 1,
   );
 
   const measured = cells.reduce((current, cell) => {
@@ -1981,7 +2237,10 @@ function measureColumnContentWidth<T extends Record<string, unknown>>(
 function getHorizontalPadding(element: HTMLElement) {
   if (typeof window === "undefined") return 0;
   const styles = window.getComputedStyle(element);
-  return parseCssPixelValue(styles.paddingLeft) + parseCssPixelValue(styles.paddingRight);
+  return (
+    parseCssPixelValue(styles.paddingLeft) +
+    parseCssPixelValue(styles.paddingRight)
+  );
 }
 
 function parseCssPixelValue(value: string) {
@@ -2000,7 +2259,8 @@ function readStoredColumnWidths<T extends Record<string, unknown>>(
     if (!raw) return {};
 
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
 
     return pruneColumnWidths(parsed as Record<string, unknown>, columns);
   } catch {
@@ -2008,7 +2268,10 @@ function readStoredColumnWidths<T extends Record<string, unknown>>(
   }
 }
 
-function writeStoredColumnWidths(storageKey: string, widths: Record<string, number>) {
+function writeStoredColumnWidths(
+  storageKey: string,
+  widths: Record<string, number>,
+) {
   if (typeof window === "undefined") return;
 
   try {
@@ -2031,7 +2294,8 @@ function readStoredHiddenColumns<T extends Record<string, unknown>>(
     if (!raw) return {};
 
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
 
     return pruneHiddenColumns(parsed as Record<string, unknown>, columns);
   } catch {
@@ -2039,7 +2303,10 @@ function readStoredHiddenColumns<T extends Record<string, unknown>>(
   }
 }
 
-function writeStoredHiddenColumns(storageKey: string, hiddenColumns: Record<string, boolean>) {
+function writeStoredHiddenColumns(
+  storageKey: string,
+  hiddenColumns: Record<string, boolean>,
+) {
   if (typeof window === "undefined") return;
 
   try {
@@ -2062,7 +2329,10 @@ function readStoredDensityOverride(storageKey: string): Density | undefined {
   }
 }
 
-function writeStoredDensityOverride(storageKey: string, density: Density | undefined) {
+function writeStoredDensityOverride(
+  storageKey: string,
+  density: Density | undefined,
+) {
   if (typeof window === "undefined") return;
 
   try {
@@ -2087,7 +2357,8 @@ function pruneColumnWidths<T extends Record<string, unknown>>(
 
   for (const [key, width] of Object.entries(widths)) {
     const column = byKey.get(key);
-    if (!column || typeof width !== "number" || !Number.isFinite(width)) continue;
+    if (!column || typeof width !== "number" || !Number.isFinite(width))
+      continue;
 
     next[key] = clampColumnWidth(column, width);
   }
@@ -2110,7 +2381,9 @@ function pruneHiddenColumns<T extends Record<string, unknown>>(
   }
 
   const hideable = columns.filter(isColumnHideable);
-  const visibleHideableCount = hideable.filter((column) => next[column.key] !== true).length;
+  const visibleHideableCount = hideable.filter(
+    (column) => next[column.key] !== true,
+  ).length;
   if (hideable.length > 0 && visibleHideableCount === 0) {
     delete next[hideable[0]!.key];
   }
@@ -2118,29 +2391,41 @@ function pruneHiddenColumns<T extends Record<string, unknown>>(
   return next;
 }
 
-function sameColumnWidths(left: Record<string, number>, right: Record<string, number>) {
+function sameColumnWidths(
+  left: Record<string, number>,
+  right: Record<string, number>,
+) {
   const leftKeys = Object.keys(left);
   const rightKeys = Object.keys(right);
   return (
     leftKeys.length === rightKeys.length &&
     leftKeys.every(
-      (key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key],
+      (key) =>
+        Object.prototype.hasOwnProperty.call(right, key) &&
+        left[key] === right[key],
     )
   );
 }
 
-function sameHiddenColumns(left: Record<string, boolean>, right: Record<string, boolean>) {
+function sameHiddenColumns(
+  left: Record<string, boolean>,
+  right: Record<string, boolean>,
+) {
   const leftKeys = Object.keys(left);
   const rightKeys = Object.keys(right);
   return (
     leftKeys.length === rightKeys.length &&
     leftKeys.every(
-      (key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key],
+      (key) =>
+        Object.prototype.hasOwnProperty.call(right, key) &&
+        left[key] === right[key],
     )
   );
 }
 
-function defaultColumnWidth<T extends Record<string, unknown>>(column: DataTableColumn<T>) {
+function defaultColumnWidth<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+) {
   if (column.grow) return DEFAULT_GROW_COLUMN_WIDTH;
   if (column.shrink) return DEFAULT_SHRINK_COLUMN_WIDTH;
   return DEFAULT_COLUMN_WIDTH;
@@ -2152,9 +2437,13 @@ function clampColumnWidth<T extends Record<string, unknown>>(
 ) {
   const minWidth = column.minWidth ?? DEFAULT_COLUMN_MIN_WIDTH;
   const maxWidth = column.maxWidth;
-  const minimum = Number.isFinite(minWidth) ? Math.max(1, minWidth) : DEFAULT_COLUMN_MIN_WIDTH;
+  const minimum = Number.isFinite(minWidth)
+    ? Math.max(1, minWidth)
+    : DEFAULT_COLUMN_MIN_WIDTH;
   const maximum =
-    maxWidth != null && Number.isFinite(maxWidth) ? Math.max(minimum, maxWidth) : Infinity;
+    maxWidth != null && Number.isFinite(maxWidth)
+      ? Math.max(minimum, maxWidth)
+      : Infinity;
 
   return Math.round(Math.max(minimum, Math.min(maximum, width)));
 }
@@ -2239,7 +2528,9 @@ function loadingSkeletonWidth(index: number) {
   return ["w-24", "w-40", "w-28", "w-56", "w-32", "w-48"][index % 6];
 }
 
-function cellContentStyle(width: number | undefined): CSSProperties | undefined {
+function cellContentStyle(
+  width: number | undefined,
+): CSSProperties | undefined {
   return width ? { maxWidth: `${width}px` } : undefined;
 }
 
@@ -2249,12 +2540,16 @@ function cellContentClassName<T extends Record<string, unknown>>(
 ): TdHTMLAttributes<HTMLTableCellElement>["className"] {
   const resized = width !== undefined;
   const base = "w-full truncate";
-  if (column.grow) return cn(base, resized ? "min-w-0" : "min-w-56 max-w-[36rem]");
-  if (column.shrink) return cn(base, "min-w-0 whitespace-nowrap", !resized && "max-w-[16rem]");
+  if (column.grow)
+    return cn(base, resized ? "min-w-0" : "min-w-56 max-w-[36rem]");
+  if (column.shrink)
+    return cn(base, "min-w-0 whitespace-nowrap", !resized && "max-w-[16rem]");
   return cn(base, "min-w-0", !resized && "max-w-[18rem]");
 }
 
-export function inferColumns<T extends Record<string, unknown>>(data: T[]): DataTableColumn<T>[] {
+export function inferColumns<T extends Record<string, unknown>>(
+  data: T[],
+): DataTableColumn<T>[] {
   if (data.length === 0) return [];
 
   const keys = new Set<string>();
@@ -2313,7 +2608,9 @@ export function DataTable<T extends Record<string, unknown>>({
     return (
       <DataTableInner
         {...(inner as DataTableInnerProps<T>)}
-        {...(mergedFilterBarProps ? { filterBarProps: mergedFilterBarProps } : {})}
+        {...(mergedFilterBarProps
+          ? { filterBarProps: mergedFilterBarProps }
+          : {})}
         themeMenuValue={themeValue}
         showThemeControl={showThemeControl}
         onThemeChange={handleThemeChange}
@@ -2347,7 +2644,13 @@ export function DataTable<T extends Record<string, unknown>>({
   );
 }
 
-function FullscreenButton({ label, onClick }: { label: string; onClick: () => void }) {
+function FullscreenButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -2356,7 +2659,7 @@ function FullscreenButton({ label, onClick }: { label: string; onClick: () => vo
       className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={onClick}
     >
-      <Icon icon={CodiconScreenFullIcon} className="text-sm" />
+      <Icon icon={UiFullscreen} className="text-sm" />
     </button>
   );
 }

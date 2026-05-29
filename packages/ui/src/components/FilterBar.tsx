@@ -13,13 +13,13 @@ import {
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
 import {
-  CodiconChevronDownIcon,
-  CodiconChevronRightIcon,
-  CodiconChevronUpIcon,
-  CodiconCloseIcon,
-  CodiconFilterIcon,
-  CodiconSearchIcon,
-} from "../data/static-icons";
+  UiChevronDown,
+  UiChevronRight,
+  UiChevronUp,
+  UiClose,
+  UiFilter,
+  UiSearch,
+} from "@flanksource/icons/ui";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { DateTimePicker } from "./DateTimePicker";
@@ -96,7 +96,10 @@ export type FilterBarLookupMultiFilter = {
   className?: string;
 };
 
-export type FilterBarMultiFilterMode = Extract<FilterMode, "include" | "exclude">;
+export type FilterBarMultiFilterMode = Extract<
+  FilterMode,
+  "include" | "exclude"
+>;
 
 export type FilterBarMultiFilter = {
   key: string;
@@ -259,7 +262,8 @@ export function FilterBar({
   const showApply = !autoSubmit && !!onApply;
   const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
   const allFilters = filters ?? [];
-  const responsiveOverflow = overflowMode === "responsive" && allFilters.length > 0;
+  const responsiveOverflow =
+    overflowMode === "responsive" && allFilters.length > 0;
   const filterListRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
@@ -268,7 +272,9 @@ export function FilterBar({
     () => allFilters.map((filter) => filter.key).join("\u0000"),
     [allFilters],
   );
-  const [visibleFilterCount, setVisibleFilterCount] = useState(allFilters.length);
+  const [visibleFilterCount, setVisibleFilterCount] = useState(
+    allFilters.length,
+  );
 
   // Latest-value refs so measureOverflow can be a stable useCallback. Reading
   // the current values through refs sidesteps the closure-staleness problem
@@ -306,7 +312,9 @@ export function FilterBar({
         filterWidthCache.current.set(filter.key, width);
         return width;
       }
-      return filterWidthCache.current.get(filter.key) ?? estimateFilterWidth(filter);
+      return (
+        filterWidthCache.current.get(filter.key) ?? estimateFilterWidth(filter)
+      );
     });
 
     const triggerWidth = Math.ceil(
@@ -322,7 +330,9 @@ export function FilterBar({
             widths,
             Math.max(0, availableWidth - triggerWidth - triggerGap),
           );
-    setVisibleFilterCount((prev) => (prev === nextVisible ? prev : nextVisible));
+    setVisibleFilterCount((prev) =>
+      prev === nextVisible ? prev : nextVisible,
+    );
   }, []);
 
   useLayoutEffect(() => {
@@ -334,7 +344,8 @@ export function FilterBar({
 
     const filterList = filterListRef.current;
     const trigger = overflowTriggerRef.current;
-    const ResizeObserverCtor = typeof ResizeObserver === "undefined" ? null : ResizeObserver;
+    const ResizeObserverCtor =
+      typeof ResizeObserver === "undefined" ? null : ResizeObserver;
 
     if (!ResizeObserverCtor) {
       window.addEventListener("resize", measureOverflow);
@@ -360,15 +371,20 @@ export function FilterBar({
   const overflowFilters = responsiveOverflow
     ? allFilters.slice(Math.min(visibleFilterCount, allFilters.length))
     : [];
-  const activeOverflowCount = overflowFilters.filter(isFilterBarFilterActive).length;
+  const activeOverflowCount = overflowFilters.filter(
+    isFilterBarFilterActive,
+  ).length;
 
-  const setFilterNode = useCallback((key: string, node: HTMLDivElement | null) => {
-    if (!node) {
-      filterNodeRefs.current.delete(key);
-      return;
-    }
-    filterNodeRefs.current.set(key, node);
-  }, []);
+  const setFilterNode = useCallback(
+    (key: string, node: HTMLDivElement | null) => {
+      if (!node) {
+        filterNodeRefs.current.delete(key);
+        return;
+      }
+      filterNodeRefs.current.set(key, node);
+    },
+    [],
+  );
 
   return (
     <FilterBarContext.Provider value={contextValue}>
@@ -379,7 +395,9 @@ export function FilterBar({
           className,
         )}
       >
-        {leading && <div className="flex shrink-0 items-center gap-2">{leading}</div>}
+        {leading && (
+          <div className="flex shrink-0 items-center gap-2">{leading}</div>
+        )}
 
         {search && <SearchField search={search} />}
 
@@ -418,8 +436,20 @@ export function FilterBar({
 
         {(hasRangeControls || trailing || showApply) && (
           <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
-            {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
-            {timeRange && <RangeControlButton kind="time" label="Time range" {...timeRange} />}
+            {dateRange && (
+              <RangeControlButton
+                kind="date"
+                label="Date range"
+                {...dateRange}
+              />
+            )}
+            {timeRange && (
+              <RangeControlButton
+                kind="time"
+                label="Time range"
+                {...timeRange}
+              />
+            )}
             {trailing}
             {showApply && (
               <Button
@@ -469,11 +499,21 @@ function FilterBarFilterPanelContent({
   return (
     <>
       {filter.kind === "lookup" && <LookupFilterField filter={filter} grow />}
-      {filter.kind === "lookup-multi" && <LookupMultiFilterField filter={filter} grow />}
-      {filter.kind === "multi" && <MultiFilterPanel filter={filter} chrome={chrome} />}
-      {filter.kind === "nested-multi" && <NestedMultiFilterPanel filter={filter} chrome={chrome} />}
-      {filter.kind === "select-multi" && <SelectMultiFilterField filter={filter} grow />}
-      {filter.kind === "number" && <NumberFilterPanel filter={filter} chrome={chrome} />}
+      {filter.kind === "lookup-multi" && (
+        <LookupMultiFilterField filter={filter} grow />
+      )}
+      {filter.kind === "multi" && (
+        <MultiFilterPanel filter={filter} chrome={chrome} />
+      )}
+      {filter.kind === "nested-multi" && (
+        <NestedMultiFilterPanel filter={filter} chrome={chrome} />
+      )}
+      {filter.kind === "select-multi" && (
+        <SelectMultiFilterField filter={filter} grow />
+      )}
+      {filter.kind === "number" && (
+        <NumberFilterPanel filter={filter} chrome={chrome} />
+      )}
       {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
       {filter.kind === "boolean" && <BooleanFilterField filter={filter} />}
       {filter.kind === "text" && <TextFilterField filter={filter} grow />}
@@ -530,7 +570,9 @@ function OverflowFiltersMenu({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [stagedValues, setStagedValues] = useState<Record<string, FilterBarValue>>({});
+  const [stagedValues, setStagedValues] = useState<
+    Record<string, FilterBarValue>
+  >({});
   const hasHidden = filters.length > 0;
   const hiddenFilterKeys = useMemo(
     () => filters.map((filter) => filter.key).join("\u0000"),
@@ -571,7 +613,10 @@ function OverflowFiltersMenu({
   return (
     <div
       ref={rootRef}
-      className={cn("relative shrink-0", !hasHidden && "invisible pointer-events-none")}
+      className={cn(
+        "relative shrink-0",
+        !hasHidden && "invisible pointer-events-none",
+      )}
       aria-hidden={!hasHidden || undefined}
     >
       <Button
@@ -597,7 +642,7 @@ function OverflowFiltersMenu({
           activeHidden > 0 && "border-primary/40 text-primary",
         )}
       >
-        <Icon icon={CodiconFilterIcon} className="text-[14px]" />
+        <Icon icon={UiFilter} className="text-[14px]" />
         {activeHidden > 0 && (
           <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
             {activeHidden}
@@ -621,7 +666,9 @@ function OverflowFiltersMenu({
                 type="button"
                 className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
                 onClick={() => stagedFilters.forEach(clearFilterBarFilter)}
-                disabled={stagedFilters.every((filter) => !isFilterBarFilterActive(filter))}
+                disabled={stagedFilters.every(
+                  (filter) => !isFilterBarFilterActive(filter),
+                )}
               >
                 Clear all
               </button>
@@ -632,7 +679,7 @@ function OverflowFiltersMenu({
                 className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
                 onClick={closeOverflowMenu}
               >
-                <Icon icon={CodiconCloseIcon} className="text-sm" />
+                <Icon icon={UiClose} className="text-sm" />
               </button>
             </div>
           </div>
@@ -666,7 +713,7 @@ function OverflowFiltersMenu({
                     onClick={() => clearFilterBarFilter(filter)}
                     disabled={!active}
                   >
-                    <Icon icon={CodiconCloseIcon} className="text-sm" />
+                    <Icon icon={UiClose} className="text-sm" />
                   </button>
                 </div>
               );
@@ -742,7 +789,10 @@ function valueInputClassName(disabled?: boolean) {
 }
 
 function TextFilterValueControl({ filter }: { filter: FilterBarTextFilter }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value,
+    filter.onChange,
+  );
 
   return (
     <input
@@ -758,8 +808,15 @@ function TextFilterValueControl({ filter }: { filter: FilterBarTextFilter }) {
   );
 }
 
-function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+function LookupFilterValueControl({
+  filter,
+}: {
+  filter: FilterBarLookupFilter;
+}) {
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value,
+    filter.onChange,
+  );
   const listId = `${filter.key}-overflow-lookup-options`;
 
   if (filter.inputType === "date") {
@@ -806,7 +863,11 @@ function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter })
   );
 }
 
-function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMultiFilter }) {
+function LookupMultiFilterValueControl({
+  filter,
+}: {
+  filter: FilterBarLookupMultiFilter;
+}) {
   return (
     <MultiSelect
       options={filter.options.map((option) => ({
@@ -843,7 +904,11 @@ function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
   );
 }
 
-function BooleanFilterValueControl({ filter }: { filter: FilterBarBooleanFilter }) {
+function BooleanFilterValueControl({
+  filter,
+}: {
+  filter: FilterBarBooleanFilter;
+}) {
   return (
     <div className="flex h-8 items-center">
       <input
@@ -859,7 +924,11 @@ function BooleanFilterValueControl({ filter }: { filter: FilterBarBooleanFilter 
   );
 }
 
-function SelectMultiFilterValueControl({ filter }: { filter: FilterBarSelectMultiFilter }) {
+function SelectMultiFilterValueControl({
+  filter,
+}: {
+  filter: FilterBarSelectMultiFilter;
+}) {
   return (
     <MultiSelect
       options={filter.options}
@@ -909,13 +978,21 @@ export function FilterBarRangePanel({
   );
 }
 
-function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
+function EnumFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarEnumFilter;
+  grow: boolean;
+}) {
   return (
     <label
       title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        grow
+          ? "min-w-[12rem] max-w-[18rem] flex-1"
+          : "min-w-[11rem] max-w-[15rem] shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
@@ -965,7 +1042,10 @@ function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
 }
 
 function SearchField({ search }: { search: FilterBarSearchProps }) {
-  const [draft, setDraft] = useDebouncedTextDraft(search.value, search.onChange);
+  const [draft, setDraft] = useDebouncedTextDraft(
+    search.value,
+    search.onChange,
+  );
 
   return (
     <div className="flex min-w-[14rem] max-w-[24rem] flex-1 items-center gap-2">
@@ -980,7 +1060,10 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
             {search.ariaLabel ?? "Search"}
           </span>
         ) : (
-          <Icon icon={CodiconSearchIcon} className="mr-2 shrink-0 text-muted-foreground" />
+          <Icon
+            icon={UiSearch}
+            className="mr-2 shrink-0 text-muted-foreground"
+          />
         )}
         <input
           type="search"
@@ -995,15 +1078,26 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
   );
 }
 
-function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: boolean }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+function TextFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarTextFilter;
+  grow: boolean;
+}) {
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value,
+    filter.onChange,
+  );
 
   return (
     <label
       title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        grow
+          ? "min-w-[12rem] max-w-[18rem] flex-1"
+          : "min-w-[11rem] max-w-[15rem] shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
@@ -1024,8 +1118,17 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
   );
 }
 
-function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; grow: boolean }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
+function LookupFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarLookupFilter;
+  grow: boolean;
+}) {
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value,
+    filter.onChange,
+  );
   const listId = `${filter.key}-lookup-options`;
 
   return (
@@ -1033,7 +1136,9 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
       title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        grow
+          ? "min-w-[12rem] max-w-[18rem] flex-1"
+          : "min-w-[11rem] max-w-[15rem] shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
@@ -1086,8 +1191,9 @@ function LookupMultiFilterField({
   filter: FilterBarLookupMultiFilter;
   grow: boolean;
 }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value.join(", "), (next) =>
-    filter.onChange(parseLookupMultiValue(next)),
+  const [draft, setDraft] = useDebouncedTextDraft(
+    filter.value.join(", "),
+    (next) => filter.onChange(parseLookupMultiValue(next)),
   );
   const listId = `${filter.key}-lookup-options`;
 
@@ -1096,7 +1202,9 @@ function LookupMultiFilterField({
       title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        grow
+          ? "min-w-[12rem] max-w-[18rem] flex-1"
+          : "min-w-[11rem] max-w-[15rem] shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
@@ -1128,7 +1236,13 @@ function LookupMultiFilterField({
   );
 }
 
-function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; grow: boolean }) {
+function NumberFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarNumberFilter;
+  grow: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -1136,9 +1250,20 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
   const bounds = resolveNumberFilterBounds(filter);
-  const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
-  const sliderMin = clampNumber(parseFilterNumber(draft.min) ?? bounds.min, bounds.min, bounds.max);
-  const sliderMax = clampNumber(parseFilterNumber(draft.max) ?? bounds.max, bounds.min, bounds.max);
+  const [draft, setDraft] = useDebouncedNumberDraft(
+    filter.value,
+    filter.onChange,
+  );
+  const sliderMin = clampNumber(
+    parseFilterNumber(draft.min) ?? bounds.min,
+    bounds.min,
+    bounds.max,
+  );
+  const sliderMax = clampNumber(
+    parseFilterNumber(draft.max) ?? bounds.max,
+    bounds.min,
+    bounds.max,
+  );
   const activeMin = Math.min(sliderMin, sliderMax);
   const activeMax = Math.max(sliderMin, sliderMax);
   const summary = summarizeNumberFilter(filter, bounds, draft);
@@ -1166,13 +1291,15 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
-          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[9.5rem] px-2.5",
+          grow
+            ? "w-full max-w-[12rem] justify-between"
+            : "w-auto max-w-[9.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
       >
         <span className="truncate">{summary}</span>
         <Icon
-          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
+          icon={open ? UiChevronUp : UiChevronDown}
           className="text-muted-foreground"
         />
       </Button>
@@ -1190,7 +1317,10 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                 setDraft({});
                 filter.onChange({});
               }}
-              disabled={!String(draft.min ?? "").trim() && !String(draft.max ?? "").trim()}
+              disabled={
+                !String(draft.min ?? "").trim() &&
+                !String(draft.max ?? "").trim()
+              }
             >
               Clear all
             </button>
@@ -1211,7 +1341,9 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                   ariaLabelMin={`${filter.label} minimum slider`}
                   ariaLabelMax={`${filter.label} maximum slider`}
                   onChange={([nextMin, nextMax]) =>
-                    setDraft(numberFilterValueFromSlider([nextMin, nextMax], bounds))
+                    setDraft(
+                      numberFilterValueFromSlider([nextMin, nextMax], bounds),
+                    )
                   }
                 />
               </div>
@@ -1226,7 +1358,10 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                   step={bounds.step}
                   aria-label={`${filter.label} minimum`}
                   className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+                  placeholder={
+                    filter.minPlaceholder ??
+                    formatNumberValue(bounds.min, filter)
+                  }
                   value={draft.min ?? ""}
                   onChange={(event) =>
                     setDraft(
@@ -1246,7 +1381,10 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                   step={bounds.step}
                   aria-label={`${filter.label} maximum`}
                   className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+                  placeholder={
+                    filter.maxPlaceholder ??
+                    formatNumberValue(bounds.max, filter)
+                  }
                   value={draft.max ?? ""}
                   onChange={(event) =>
                     setDraft(
@@ -1274,9 +1412,20 @@ function NumberFilterPanel({
   chrome?: FilterBarFilterPanelChrome;
 }) {
   const bounds = resolveNumberFilterBounds(filter);
-  const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
-  const sliderMin = clampNumber(parseFilterNumber(draft.min) ?? bounds.min, bounds.min, bounds.max);
-  const sliderMax = clampNumber(parseFilterNumber(draft.max) ?? bounds.max, bounds.min, bounds.max);
+  const [draft, setDraft] = useDebouncedNumberDraft(
+    filter.value,
+    filter.onChange,
+  );
+  const sliderMin = clampNumber(
+    parseFilterNumber(draft.min) ?? bounds.min,
+    bounds.min,
+    bounds.max,
+  );
+  const sliderMax = clampNumber(
+    parseFilterNumber(draft.max) ?? bounds.max,
+    bounds.min,
+    bounds.max,
+  );
   const activeMin = Math.min(sliderMin, sliderMax);
   const activeMax = Math.max(sliderMin, sliderMax);
   const embedded = chrome === "embedded";
@@ -1303,7 +1452,9 @@ function NumberFilterPanel({
               setDraft({});
               filter.onChange({});
             }}
-            disabled={!String(draft.min ?? "").trim() && !String(draft.max ?? "").trim()}
+            disabled={
+              !String(draft.min ?? "").trim() && !String(draft.max ?? "").trim()
+            }
           >
             Clear all
           </button>
@@ -1325,7 +1476,9 @@ function NumberFilterPanel({
               ariaLabelMin={`${filter.label} minimum slider`}
               ariaLabelMax={`${filter.label} maximum slider`}
               onChange={([nextMin, nextMax]) =>
-                setDraft(numberFilterValueFromSlider([nextMin, nextMax], bounds))
+                setDraft(
+                  numberFilterValueFromSlider([nextMin, nextMax], bounds),
+                )
               }
             />
           </div>
@@ -1340,7 +1493,9 @@ function NumberFilterPanel({
               step={bounds.step}
               aria-label={`${filter.label} minimum`}
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+              placeholder={
+                filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)
+              }
               value={draft.min ?? ""}
               onChange={(event) =>
                 setDraft(
@@ -1360,7 +1515,9 @@ function NumberFilterPanel({
               step={bounds.step}
               aria-label={`${filter.label} maximum`}
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+              placeholder={
+                filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)
+              }
               value={draft.max ?? ""}
               onChange={(event) =>
                 setDraft(
@@ -1378,12 +1535,21 @@ function NumberFilterPanel({
   );
 }
 
-function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow: boolean }) {
+function MultiFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarMultiFilter;
+  grow: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const [draft, setDraft] = useDebouncedMultiDraft(
+    filter.value,
+    filter.onChange,
+  );
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
@@ -1420,13 +1586,15 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
-          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
+          grow
+            ? "w-full max-w-[12rem] justify-between"
+            : "w-auto max-w-[8.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
       >
         <span className="truncate">{summary}</span>
         <Icon
-          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
+          icon={open ? UiChevronUp : UiChevronDown}
           className="text-muted-foreground"
         />
       </Button>
@@ -1449,7 +1617,10 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
 
           {showOptionFilter && (
             <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-              <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
+              <Icon
+                icon={UiSearch}
+                className="shrink-0 text-muted-foreground"
+              />
               <input
                 type="search"
                 aria-label={`Filter ${filter.label} options`}
@@ -1474,12 +1645,24 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                   data-filter-option={option.value}
                   className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                   onClick={() =>
-                    setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                    setDraft(
+                      updateMultiFilterValue(
+                        draft,
+                        option.value,
+                        nextFilterMode(mode),
+                      ),
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
+                      setDraft(
+                        updateMultiFilterValue(
+                          draft,
+                          option.value,
+                          nextFilterMode(mode),
+                        ),
+                      );
                     }
                   }}
                 >
@@ -1490,14 +1673,18 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                     title={title}
                     togglePosition="right"
                     onModeChange={(next) =>
-                      setDraft(updateMultiFilterValue(draft, option.value, next))
+                      setDraft(
+                        updateMultiFilterValue(draft, option.value, next),
+                      )
                     }
                   />
                 </div>
               );
             })}
             {visibleOptions.length === 0 && (
-              <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                No options found
+              </div>
             )}
           </div>
         </div>
@@ -1514,7 +1701,10 @@ function MultiFilterPanel({
   chrome?: FilterBarFilterPanelChrome;
 }) {
   const [optionQuery, setOptionQuery] = useState("");
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const [draft, setDraft] = useDebouncedMultiDraft(
+    filter.value,
+    filter.onChange,
+  );
   const showOptionFilter = filter.options.length > 7;
   const embedded = chrome === "embedded";
   const visibleOptions = useMemo(() => {
@@ -1553,7 +1743,7 @@ function MultiFilterPanel({
 
       {showOptionFilter && (
         <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
+          <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
           <input
             type="search"
             aria-label={`Filter ${filter.label} options`}
@@ -1578,12 +1768,24 @@ function MultiFilterPanel({
               data-filter-option={option.value}
               className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
               onClick={() =>
-                setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                setDraft(
+                  updateMultiFilterValue(
+                    draft,
+                    option.value,
+                    nextFilterMode(mode),
+                  ),
+                )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
+                  setDraft(
+                    updateMultiFilterValue(
+                      draft,
+                      option.value,
+                      nextFilterMode(mode),
+                    ),
+                  );
                 }
               }}
             >
@@ -1593,13 +1795,17 @@ function MultiFilterPanel({
                 mode={mode}
                 title={title}
                 togglePosition="right"
-                onModeChange={(next) => setDraft(updateMultiFilterValue(draft, option.value, next))}
+                onModeChange={(next) =>
+                  setDraft(updateMultiFilterValue(draft, option.value, next))
+                }
               />
             </div>
           );
         })}
         {visibleOptions.length === 0 && (
-          <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+          <div className="px-2 py-3 text-sm text-muted-foreground">
+            No options found
+          </div>
         )}
       </div>
     </div>
@@ -1613,12 +1819,20 @@ function NestedMultiFilterPanel({
   filter: FilterBarNestedMultiFilter;
   chrome?: FilterBarFilterPanelChrome;
 }) {
-  const [activeGroup, setActiveGroup] = useState<string | null>(filter.groups[0]?.groupKey ?? null);
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const [activeGroup, setActiveGroup] = useState<string | null>(
+    filter.groups[0]?.groupKey ?? null,
+  );
+  const [draft, setDraft] = useDebouncedMultiDraft(
+    filter.value,
+    filter.onChange,
+  );
   const groups = filter.groups;
   const embedded = chrome === "embedded";
   const activeGroupData = useMemo(
-    () => groups.find((group) => group.groupKey === activeGroup) ?? groups[0] ?? null,
+    () =>
+      groups.find((group) => group.groupKey === activeGroup) ??
+      groups[0] ??
+      null,
     [groups, activeGroup],
   );
 
@@ -1694,7 +1908,11 @@ function NestedMultiFilterPanel({
                 onFocus={() => setActiveGroup(group.groupKey)}
                 onClick={() => setActiveGroup(group.groupKey)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
+                  if (
+                    event.key === "Enter" ||
+                    event.key === " " ||
+                    event.key === "ArrowRight"
+                  ) {
                     event.preventDefault();
                     setActiveGroup(group.groupKey);
                   }
@@ -1705,18 +1923,25 @@ function NestedMultiFilterPanel({
                   isActive && "bg-accent/60",
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">{group.label ?? group.groupKey}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {group.label ?? group.groupKey}
+                </span>
                 {selected > 0 && (
                   <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
                     {selected}/{group.options.length}
                   </span>
                 )}
-                <Icon icon={CodiconChevronRightIcon} className="shrink-0 text-muted-foreground" />
+                <Icon
+                  icon={UiChevronRight}
+                  className="shrink-0 text-muted-foreground"
+                />
               </div>
             );
           })}
           {groups.length === 0 && (
-            <div className="px-2 py-3 text-sm text-muted-foreground">No groups</div>
+            <div className="px-2 py-3 text-sm text-muted-foreground">
+              No groups
+            </div>
           )}
         </div>
       </div>
@@ -1752,12 +1977,24 @@ function NestedMultiFilterPanel({
                   data-filter-option={option.value}
                   className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                   onClick={() =>
-                    setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                    setDraft(
+                      updateMultiFilterValue(
+                        draft,
+                        option.value,
+                        nextFilterMode(mode),
+                      ),
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
+                      setDraft(
+                        updateMultiFilterValue(
+                          draft,
+                          option.value,
+                          nextFilterMode(mode),
+                        ),
+                      );
                     } else if (event.key === "ArrowLeft") {
                       event.preventDefault();
                       setActiveGroup(null);
@@ -1766,19 +2003,26 @@ function NestedMultiFilterPanel({
                 >
                   <FilterPill
                     className="w-full justify-between"
-                    label={renderNestedOptionLabel(option, activeGroupData.groupKey)}
+                    label={renderNestedOptionLabel(
+                      option,
+                      activeGroupData.groupKey,
+                    )}
                     mode={mode}
                     title={title}
                     togglePosition="right"
                     onModeChange={(next) =>
-                      setDraft(updateMultiFilterValue(draft, option.value, next))
+                      setDraft(
+                        updateMultiFilterValue(draft, option.value, next),
+                      )
                     }
                   />
                 </div>
               );
             })}
             {activeGroupData.options.length === 0 && (
-              <div className="px-2 py-3 text-sm text-muted-foreground">No values</div>
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                No values
+              </div>
             )}
           </div>
         </div>
@@ -1803,7 +2047,10 @@ function NestedMultiFilterField({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
+  const [draft, setDraft] = useDebouncedMultiDraft(
+    filter.value,
+    filter.onChange,
+  );
 
   useDismissablePopup(open, rootRef, triggerRef, () => {
     setOpen(false);
@@ -1879,13 +2126,15 @@ function NestedMultiFilterField({
         }}
         className={cn(
           "min-w-0 gap-2 font-normal",
-          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
+          grow
+            ? "w-full max-w-[12rem] justify-between"
+            : "w-auto max-w-[8.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
       >
         <span className="truncate">{summary}</span>
         <Icon
-          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
+          icon={open ? UiChevronUp : UiChevronDown}
           className="text-muted-foreground"
         />
       </Button>
@@ -1945,21 +2194,25 @@ function NestedMultiFilterField({
                       isActive && "bg-accent/60",
                     )}
                   >
-                    <span className="min-w-0 flex-1 truncate">{group.label ?? group.groupKey}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {group.label ?? group.groupKey}
+                    </span>
                     {selected > 0 && (
                       <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
                         {selected}/{group.options.length}
                       </span>
                     )}
                     <Icon
-                      icon={CodiconChevronRightIcon}
+                      icon={UiChevronRight}
                       className="shrink-0 text-muted-foreground"
                     />
                   </div>
                 );
               })}
               {groups.length === 0 && (
-                <div className="px-2 py-3 text-sm text-muted-foreground">No groups</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground">
+                  No groups
+                </div>
               )}
             </div>
           </div>
@@ -1977,7 +2230,9 @@ function NestedMultiFilterField({
                   type="button"
                   className="text-[10px] text-primary disabled:text-muted-foreground"
                   onClick={() => clearGroup(activeGroupData.groupKey)}
-                  disabled={(selectedByGroup[activeGroupData.groupKey] ?? 0) === 0}
+                  disabled={
+                    (selectedByGroup[activeGroupData.groupKey] ?? 0) === 0
+                  }
                 >
                   Clear
                 </button>
@@ -1995,13 +2250,23 @@ function NestedMultiFilterField({
                       data-filter-option={option.value}
                       className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
                       onClick={() =>
-                        setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                        setDraft(
+                          updateMultiFilterValue(
+                            draft,
+                            option.value,
+                            nextFilterMode(mode),
+                          ),
+                        )
                       }
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           setDraft(
-                            updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
+                            updateMultiFilterValue(
+                              draft,
+                              option.value,
+                              nextFilterMode(mode),
+                            ),
                           );
                         } else if (event.key === "ArrowLeft") {
                           event.preventDefault();
@@ -2013,19 +2278,26 @@ function NestedMultiFilterField({
                         className="w-full justify-between"
                         // Show only the value side here — the key is already
                         // implied by the parent group panel.
-                        label={renderNestedOptionLabel(option, activeGroupData.groupKey)}
+                        label={renderNestedOptionLabel(
+                          option,
+                          activeGroupData.groupKey,
+                        )}
                         mode={mode}
                         title={title}
                         togglePosition="right"
                         onModeChange={(next) =>
-                          setDraft(updateMultiFilterValue(draft, option.value, next))
+                          setDraft(
+                            updateMultiFilterValue(draft, option.value, next),
+                          )
                         }
                       />
                     </div>
                   );
                 })}
                 {activeGroupData.options.length === 0 && (
-                  <div className="px-2 py-3 text-sm text-muted-foreground">No values</div>
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    No values
+                  </div>
                 )}
               </div>
             </div>
@@ -2036,12 +2308,16 @@ function NestedMultiFilterField({
   );
 }
 
-function renderNestedOptionLabel(option: MultiSelectOption, groupKey: string): ReactNode {
+function renderNestedOptionLabel(
+  option: MultiSelectOption,
+  groupKey: string,
+): ReactNode {
   // If the option label already strips the key prefix, use it. Otherwise
   // strip it here so the inner panel doesn't repeat the key on every row.
   if (typeof option.label === "string") {
     const prefix = `${groupKey}=`;
-    if (option.label.startsWith(prefix)) return option.label.slice(prefix.length);
+    if (option.label.startsWith(prefix))
+      return option.label.slice(prefix.length);
     return option.label;
   }
   return option.label ?? option.value;
@@ -2059,7 +2335,9 @@ function SelectMultiFilterField({
       title={filter.description}
       className={cn(
         "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
+        grow
+          ? "min-w-[12rem] max-w-[18rem] flex-1"
+          : "min-w-[11rem] max-w-[15rem] shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
@@ -2072,7 +2350,9 @@ function SelectMultiFilterField({
         value={filter.value}
         onChange={filter.onChange}
         placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
-        {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+        {...(filter.disabled !== undefined
+          ? { disabled: filter.disabled }
+          : {})}
         triggerClassName="h-6 min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         menuClassName="left-auto right-0"
       />
@@ -2149,8 +2429,12 @@ function summarizeMultiFilter(
   label: string,
   value: Record<string, FilterBarMultiFilterMode>,
 ): string {
-  const includeCount = Object.values(value).filter((mode) => mode === "include").length;
-  const excludeCount = Object.values(value).filter((mode) => mode === "exclude").length;
+  const includeCount = Object.values(value).filter(
+    (mode) => mode === "include",
+  ).length;
+  const excludeCount = Object.values(value).filter(
+    (mode) => mode === "exclude",
+  ).length;
 
   if (includeCount === 0 && excludeCount === 0) {
     return label;
@@ -2218,7 +2502,10 @@ function sameMultiFilterValue(
   return true;
 }
 
-function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {
+function useDebouncedTextDraft(
+  value: string,
+  onChange: (value: string) => void,
+) {
   const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
   const latestOnChange = useRef(onChange);
@@ -2283,8 +2570,14 @@ function useDebouncedNumberDraft(
   return [draft, setDraft] as const;
 }
 
-function sameNumberFilterValue(left: FilterBarNumberValue, right: FilterBarNumberValue) {
-  return (left.min ?? "") === (right.min ?? "") && (left.max ?? "") === (right.max ?? "");
+function sameNumberFilterValue(
+  left: FilterBarNumberValue,
+  right: FilterBarNumberValue,
+) {
+  return (
+    (left.min ?? "") === (right.min ?? "") &&
+    (left.max ?? "") === (right.max ?? "")
+  );
 }
 
 type NumberFilterBounds = {
@@ -2295,7 +2588,9 @@ type NumberFilterBounds = {
 
 type NumberFilterSource = "min-input" | "max-input";
 
-function resolveNumberFilterBounds(filter: FilterBarNumberFilter): NumberFilterBounds {
+function resolveNumberFilterBounds(
+  filter: FilterBarNumberFilter,
+): NumberFilterBounds {
   const parsedMin = parseFilterNumber(filter.value.min);
   const parsedMax = parseFilterNumber(filter.value.max);
   const fallbackMin = parsedMin ?? 0;
@@ -2375,8 +2670,14 @@ function numberFilterValueFromSlider(
 ): FilterBarNumberValue {
   const [min, max] = value;
   return {
-    min: min <= bounds.min ? "" : formatRawNumber(clampNumber(min, bounds.min, bounds.max)),
-    max: max >= bounds.max ? "" : formatRawNumber(clampNumber(max, bounds.min, bounds.max)),
+    min:
+      min <= bounds.min
+        ? ""
+        : formatRawNumber(clampNumber(min, bounds.min, bounds.max)),
+    max:
+      max >= bounds.max
+        ? ""
+        : formatRawNumber(clampNumber(max, bounds.min, bounds.max)),
   };
 }
 
@@ -2399,7 +2700,9 @@ function formatNumberValue(value: number, filter: FilterBarNumberFilter) {
 }
 
 function formatRawNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(6)));
 }
 
 function updateMultiFilterValue(
@@ -2428,7 +2731,11 @@ function nextFilterMode(mode: FilterMode): FilterMode {
 }
 
 export function clearFilterBarFilter(filter: FilterBarFilter) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "enum"
+  ) {
     filter.onChange("");
     return;
   }
@@ -2452,7 +2759,11 @@ export function clearFilterBarFilter(filter: FilterBarFilter) {
 }
 
 export function isFilterBarFilterActive(filter: FilterBarFilter) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "enum"
+  ) {
     return String(filter.value ?? "").trim() !== "";
   }
   if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
@@ -2460,7 +2771,8 @@ export function isFilterBarFilterActive(filter: FilterBarFilter) {
   }
   if (filter.kind === "number") {
     return (
-      String(filter.value.min ?? "").trim() !== "" || String(filter.value.max ?? "").trim() !== ""
+      String(filter.value.min ?? "").trim() !== "" ||
+      String(filter.value.max ?? "").trim() !== ""
     );
   }
   if (filter.kind === "boolean") return filter.value;
@@ -2475,7 +2787,9 @@ type FilterBarValue =
   | Record<string, FilterBarMultiFilterMode>;
 
 function createFilterValueMap(filters: FilterBarFilter[]) {
-  return Object.fromEntries(filters.map((filter) => [filter.key, filterBarFilterValue(filter)]));
+  return Object.fromEntries(
+    filters.map((filter) => [filter.key, filterBarFilterValue(filter)]),
+  );
 }
 
 function filterBarFilterValue(filter: FilterBarFilter): FilterBarValue {
@@ -2488,10 +2802,18 @@ function filterWithStagedValue(
   onChange: (value: FilterBarValue) => void,
 ): FilterBarFilter {
   if (filter.kind === "text") {
-    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+    return {
+      ...filter,
+      value: String(value ?? ""),
+      onChange: (next: string) => onChange(next),
+    };
   }
   if (filter.kind === "lookup") {
-    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+    return {
+      ...filter,
+      value: String(value ?? ""),
+      onChange: (next: string) => onChange(next),
+    };
   }
   if (filter.kind === "lookup-multi") {
     return {
@@ -2504,14 +2826,16 @@ function filterWithStagedValue(
     return {
       ...filter,
       value: isMultiFilterValue(value) ? value : {},
-      onChange: (next: Record<string, FilterBarMultiFilterMode>) => onChange(next),
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) =>
+        onChange(next),
     };
   }
   if (filter.kind === "nested-multi") {
     return {
       ...filter,
       value: isMultiFilterValue(value) ? value : {},
-      onChange: (next: Record<string, FilterBarMultiFilterMode>) => onChange(next),
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) =>
+        onChange(next),
     };
   }
   if (filter.kind === "select-multi") {
@@ -2529,7 +2853,11 @@ function filterWithStagedValue(
     };
   }
   if (filter.kind === "enum") {
-    return { ...filter, value: String(value ?? ""), onChange: (next: string) => onChange(next) };
+    return {
+      ...filter,
+      value: String(value ?? ""),
+      onChange: (next: string) => onChange(next),
+    };
   }
   return {
     ...filter,
@@ -2550,7 +2878,11 @@ function applyStagedFilterValues(
 }
 
 function applyFilterBarValue(filter: FilterBarFilter, value: FilterBarValue) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "enum"
+  ) {
     filter.onChange(String(value ?? ""));
     return;
   }
@@ -2573,7 +2905,9 @@ function sameFilterBarValue(left: FilterBarValue, right: FilterBarValue) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function isNumberFilterValue(value: FilterBarValue): value is FilterBarNumberValue {
+function isNumberFilterValue(
+  value: FilterBarValue,
+): value is FilterBarNumberValue {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -2600,12 +2934,14 @@ function calculateVisibleFilterCount(widths: number[], availableWidth: number) {
 function sumFilterWidths(widths: number[]) {
   if (widths.length === 0) return 0;
   return (
-    widths.reduce((total, width) => total + width, 0) + (widths.length - 1) * FILTER_BAR_GAP_PX
+    widths.reduce((total, width) => total + width, 0) +
+    (widths.length - 1) * FILTER_BAR_GAP_PX
   );
 }
 
 function estimateFilterWidth(filter: FilterBarFilter) {
-  if (filter.kind === "boolean") return Math.max(88, filter.label.length * 8 + 40);
+  if (filter.kind === "boolean")
+    return Math.max(88, filter.label.length * 8 + 40);
   if (filter.kind === "multi" || filter.kind === "nested-multi") return 136;
   if (filter.kind === "number") return 152;
   return Math.max(144, filter.label.length * 8 + 96);

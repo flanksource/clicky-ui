@@ -1,10 +1,6 @@
 import { Tree } from "../Tree";
 import { Icon } from "../Icon";
-import {
-  CodiconDebugAltIcon,
-  CodiconServerProcessIcon,
-  SvgSpinnerRingResizeIcon,
-} from "../static-icons";
+import { UiDebug, UiServerProcess, UiLoader } from "@flanksource/icons/ui";
 import type { ProcessNode } from "./types";
 import {
   countProcesses,
@@ -30,7 +26,7 @@ export function DiagnosticsTree({
   if (!root) {
     return (
       <div className="p-density-6 text-center text-muted-foreground">
-        <Icon icon={SvgSpinnerRingResizeIcon} className="text-3xl text-blue-500" />
+        <Icon icon={UiLoader} className="text-3xl text-blue-500" />
         <p className="mt-density-2">Waiting for process diagnostics...</p>
       </div>
     );
@@ -58,19 +54,25 @@ export function DiagnosticsTree({
         return (
           <>
             <Icon
-              icon={node.is_root ? CodiconServerProcessIcon : CodiconDebugAltIcon}
+              icon={node.is_root ? UiServerProcess : UiDebug}
               className={
-                node.is_root ? "text-base text-blue-600" : "text-base text-muted-foreground"
+                node.is_root
+                  ? "text-base text-blue-600"
+                  : "text-base text-muted-foreground"
               }
             />
             <span
               className={`truncate ${
-                selected ? "font-semibold text-primary" : "font-medium text-foreground"
+                selected
+                  ? "font-semibold text-primary"
+                  : "font-medium text-foreground"
               }`}
             >
               {processLabel(node)}
             </span>
-            <span className="text-xs text-muted-foreground shrink-0">pid {node.pid}</span>
+            <span className="text-xs text-muted-foreground shrink-0">
+              pid {node.pid}
+            </span>
             <span className="flex-1" />
             {node.status && (
               <span
@@ -92,7 +94,9 @@ export function DiagnosticsTree({
         );
       }}
       rowClass={(node) =>
-        node.pid === selectedPid ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent"
+        node.pid === selectedPid
+          ? "bg-primary/10 border-l-2 border-primary"
+          : "hover:bg-accent"
       }
     />
   );
