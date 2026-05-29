@@ -1,5 +1,5 @@
 import { Icon } from "../data/Icon";
-import { CodiconChevronRightIcon } from "../data/static-icons";
+import { UiChevronRight } from "@flanksource/icons/ui";
 import { cn } from "../lib/utils";
 
 export type InlineErrorProps = {
@@ -18,10 +18,17 @@ type ErrorDetails = {
 export function InlineError({ title, error, className }: InlineErrorProps) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const details = getErrorDetails(error);
-  const hasDetails = Boolean(details.responseBody || details.status || details.url);
+  const hasDetails = Boolean(
+    details.responseBody || details.status || details.url,
+  );
 
   return (
-    <div className={cn("rounded-xl border border-dashed border-red-300 p-6 text-sm", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-red-300 p-6 text-sm",
+        className,
+      )}
+    >
       <div className="text-center">
         <div className="font-medium text-red-600">{title}</div>
         {message && <div className="mt-1 text-muted-foreground">{message}</div>}
@@ -30,7 +37,7 @@ export function InlineError({ title, error, className }: InlineErrorProps) {
         <details className="group mt-3">
           <summary className="flex cursor-pointer items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <Icon
-              icon={CodiconChevronRightIcon}
+              icon={UiChevronRight}
               className="transition-transform group-open:rotate-90"
             />
             More details
@@ -62,6 +69,7 @@ function getErrorDetails(error: unknown): ErrorDetails {
   if (typeof record.method === "string") details.method = record.method;
   if (typeof record.url === "string") details.url = record.url;
   if (typeof record.status === "number") details.status = record.status;
-  if (typeof record.responseBody === "string") details.responseBody = record.responseBody;
+  if (typeof record.responseBody === "string")
+    details.responseBody = record.responseBody;
   return details;
 }

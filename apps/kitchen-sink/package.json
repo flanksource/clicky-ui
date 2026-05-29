@@ -4,16 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
-    "build": "tsc -b --noEmit && vp build",
-    "preview": "vp preview",
-    "check": "vp check"
+    "dev": "vite dev",
+    "build": "tsc -b --noEmit && vite build",
+    "preview": "vite preview",
+    "check": "tsc -b --noEmit && oxlint src vite.config.ts --deny-warnings"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
-    "@iconify-react/codicon": "catalog:",
-    "@iconify-react/lucide": "catalog:",
-    "@iconify-react/ph": "catalog:",
     "@shikijs/langs": "catalog:",
     "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
@@ -29,7 +26,6 @@
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite": "catalog:"
   }
 }

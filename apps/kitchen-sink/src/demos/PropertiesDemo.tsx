@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { Properties, type PropertiesItem } from "@flanksource/clicky-ui";
-import CopyIcon from "@iconify-react/lucide/copy";
-import ZoomInIcon from "@iconify-react/lucide/zoom-in";
-import ZoomOutIcon from "@iconify-react/lucide/zoom-out";
+import {
+  UiCopy as CopyIcon,
+  UiZoomIn as ZoomInIcon,
+  UiZoomOut as ZoomOutIcon,
+  Properties,
+  type PropertiesItem,
+} from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
 
 const baseItems: PropertiesItem<string>[] = [
@@ -38,7 +41,9 @@ const iconForKey = (key: string): string => {
 
 function copy(value: unknown) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    void navigator.clipboard.writeText(typeof value === "string" ? value : JSON.stringify(value));
+    void navigator.clipboard.writeText(
+      typeof value === "string" ? value : JSON.stringify(value),
+    );
   }
 }
 
@@ -47,8 +52,16 @@ export function PropertiesDemo() {
 
   const expandableItems: PropertiesItem<unknown>[] = [
     { key: "namespace", value: "claims-demo" },
-    { key: "pod", value: "policy-api-644b55c866-mg7tg", subtitle: "Source pod" },
-    { key: "timestamp", value: "2026-05-03T10:09:30.288Z", subtitle: "ECS @timestamp" },
+    {
+      key: "pod",
+      value: "policy-api-644b55c866-mg7tg",
+      subtitle: "Source pod",
+    },
+    {
+      key: "timestamp",
+      value: "2026-05-03T10:09:30.288Z",
+      subtitle: "ECS @timestamp",
+    },
     {
       key: "tags",
       value: ["env=prod", "team=platform", "tier=api", "region=eu-west-1"],
@@ -59,7 +72,12 @@ export function PropertiesDemo() {
         <Properties
           density="compact"
           className="mt-density-1"
-          items={["env=prod", "team=platform", "tier=api", "region=eu-west-1"].map((t, i) => ({
+          items={[
+            "env=prod",
+            "team=platform",
+            "tier=api",
+            "region=eu-west-1",
+          ].map((t, i) => ({
             key: `tags.${i}`,
             value: t,
           }))}
@@ -68,7 +86,10 @@ export function PropertiesDemo() {
     },
     {
       key: "attributes",
-      value: { "service.name": "policy-api", "process.thread.name": "http-nio-8080-exec-6" },
+      value: {
+        "service.name": "policy-api",
+        "process.thread.name": "http-nio-8080-exec-6",
+      },
       expandable: true,
       expanded: open.attributes ?? false,
       onToggle: (next) => setOpen((s) => ({ ...s, attributes: next })),
@@ -94,19 +115,42 @@ export function PropertiesDemo() {
     >
       <div className="space-y-density-4">
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">Default</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Default
+          </h3>
           <Properties items={baseItems} />
         </div>
 
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">Label icons + subtitles</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Label icons + subtitles
+          </h3>
           <Properties
             items={[
-              { key: "namespace", value: "claims-demo", subtitle: "Kubernetes namespace" },
-              { key: "pod", value: "policy-api-644b55c866-mg7tg", subtitle: "Source pod" },
-              { key: "container", value: "policy-api", subtitle: "Container in pod" },
-              { key: "timestamp", value: "2026-05-03T10:09:30.288Z", subtitle: "ECS @timestamp" },
-              { key: "logger", value: "com.example.policy.filter.ServiceRequestFilter" },
+              {
+                key: "namespace",
+                value: "claims-demo",
+                subtitle: "Kubernetes namespace",
+              },
+              {
+                key: "pod",
+                value: "policy-api-644b55c866-mg7tg",
+                subtitle: "Source pod",
+              },
+              {
+                key: "container",
+                value: "policy-api",
+                subtitle: "Container in pod",
+              },
+              {
+                key: "timestamp",
+                value: "2026-05-03T10:09:30.288Z",
+                subtitle: "ECS @timestamp",
+              },
+              {
+                key: "logger",
+                value: "com.example.policy.filter.ServiceRequestFilter",
+              },
             ]}
             labelIcon={iconForKey}
           />

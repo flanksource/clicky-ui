@@ -1,12 +1,12 @@
 import { Icon } from "../Icon";
 import {
-  CodiconChipIcon,
-  CodiconDebugStepOverIcon,
-  CodiconLockIcon,
-  CodiconSyncIcon,
-  CodiconSymbolMethodIcon,
-  CodiconWatchIcon,
-} from "../static-icons";
+  UiChip,
+  UiDebugStepOver,
+  UiLock,
+  UiSync,
+  UiMethod,
+  UiWatch,
+} from "@flanksource/icons/ui";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
 
 export type JvmStackTraceProps = {
@@ -15,7 +15,11 @@ export type JvmStackTraceProps = {
   className?: string;
 };
 
-export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: JvmStackTraceProps) {
+export function JvmStackTrace({
+  frames,
+  hideRuntimeOnly = false,
+  className,
+}: JvmStackTraceProps) {
   const visibleFrames = hideRuntimeOnly
     ? frames.filter((frame) => frame.kind !== "frame" || !frame.runtime)
     : frames;
@@ -25,7 +29,10 @@ export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: Jv
   return (
     <div className={className}>
       {visibleFrames.map((frame, index) => (
-        <JvmStackFrameRow key={`${frame.functionName}-${index}`} frame={frame} />
+        <JvmStackFrameRow
+          key={`${frame.functionName}-${index}`}
+          frame={frame}
+        />
       ))}
     </div>
   );
@@ -35,18 +42,20 @@ export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
   const isAnno = frame.kind !== "frame";
   const icon = isAnno
     ? frame.kind === "locked"
-      ? CodiconLockIcon
+      ? UiLock
       : frame.kind === "waiting_to_lock"
-        ? CodiconSyncIcon
-        : CodiconWatchIcon
+        ? UiSync
+        : UiWatch
     : frame.nativeMethod
-      ? CodiconChipIcon
+      ? UiChip
       : frame.runtime
-        ? CodiconDebugStepOverIcon
-        : CodiconSymbolMethodIcon;
+        ? UiDebugStepOver
+        : UiMethod;
 
   return (
-    <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
+    <div
+      className={frame.runtime ? "text-muted-foreground" : "text-foreground"}
+    >
       <div className="flex items-start gap-1.5">
         <Icon icon={icon} className="mt-0.5 shrink-0 text-[11px]" />
         <div className="min-w-0">
@@ -55,14 +64,18 @@ export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
               <>
                 <span className="opacity-70">{frame.functionName}</span>
                 {frame.annotationText && (
-                  <span className="ml-2 font-normal opacity-80">{frame.annotationText}</span>
+                  <span className="ml-2 font-normal opacity-80">
+                    {frame.annotationText}
+                  </span>
                 )}
               </>
             ) : (
               <>
                 {frame.displayName}
                 {frame.location && (
-                  <span className="ml-2 text-[10px] font-normal opacity-80">{frame.location}</span>
+                  <span className="ml-2 text-[10px] font-normal opacity-80">
+                    {frame.location}
+                  </span>
                 )}
               </>
             )}

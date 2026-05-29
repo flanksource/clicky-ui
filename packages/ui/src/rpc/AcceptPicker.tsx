@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { CodiconEllipsisIcon, PhCheckIcon } from "../data/static-icons";
+import { UiEllipsis, UiCheck } from "@flanksource/icons/ui";
 import { cn } from "../lib/utils";
 
 export const ACCEPT_OPTIONS = [
@@ -73,7 +73,10 @@ export function AcceptPicker({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={cn("relative flex flex-wrap gap-1", className)}>
+    <div
+      ref={rootRef}
+      className={cn("relative flex flex-wrap gap-1", className)}
+    >
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -102,7 +105,7 @@ export function AcceptPicker({
             className={cn("h-auto", pad)}
             onClick={() => setOpen((current) => !current)}
           >
-            <Icon icon={CodiconEllipsisIcon} />
+            <Icon icon={UiEllipsis} />
           </Button>
           {open && (
             <div
@@ -128,7 +131,9 @@ export function AcceptPicker({
                     }}
                   >
                     <span className="min-w-0 flex-1">{option.label}</span>
-                    {active ? <Icon icon={PhCheckIcon} className="shrink-0" /> : null}
+                    {active ? (
+                      <Icon icon={UiCheck} className="shrink-0" />
+                    ) : null}
                   </button>
                 );
               })}

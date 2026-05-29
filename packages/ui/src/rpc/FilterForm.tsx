@@ -9,7 +9,7 @@ import type {
 import { TimeRange } from "../components/TimeRange";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
-import { CodiconSearchIcon } from "../data/static-icons";
+import { UiSearch } from "@flanksource/icons/ui";
 import { cn } from "../lib/utils";
 import {
   packParameterValues,
@@ -59,11 +59,17 @@ export function FilterForm({
   onSubmit,
 }: FilterFormProps) {
   const resetKey = useMemo(
-    () => `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
+    () =>
+      `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
     [initialValues, lockedValues, method, path],
   );
   const [values, setValues] = useState<ParameterValues>(() =>
-    buildInitialParameterValues(parameters, method, lockedValues, initialValues),
+    buildInitialParameterValues(
+      parameters,
+      method,
+      lockedValues,
+      initialValues,
+    ),
   );
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
@@ -79,7 +85,9 @@ export function FilterForm({
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
     enabled:
-      enableLookup && !!client.lookupFilters && parameters.some((param) => param.in === "query"),
+      enableLookup &&
+      !!client.lookupFilters &&
+      parameters.some((param) => param.in === "query"),
     staleTime: 30_000,
     retry: 0,
   });
@@ -94,7 +102,8 @@ export function FilterForm({
     [hideLocked, lockedValues, lookupQuery.data, parameters, values],
   );
 
-  const hasFields = formConfig.filters.length > 0 || formConfig.timeRange != null;
+  const hasFields =
+    formConfig.filters.length > 0 || formConfig.timeRange != null;
 
   async function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
@@ -117,7 +126,14 @@ export function FilterForm({
   }
 
   useEffect(() => {
-    setValues(buildInitialParameterValues(parameters, method, lockedValues, initialValues));
+    setValues(
+      buildInitialParameterValues(
+        parameters,
+        method,
+        lockedValues,
+        initialValues,
+      ),
+    );
     setError("");
     lastAutoSubmitted.current = null;
   }, [resetKey]);
@@ -129,7 +145,8 @@ export function FilterForm({
 
     const missingRequired = parameters.filter((param) => {
       if (!param.required) return false;
-      const value = lockedValues[param.name] ?? debouncedValues[param.name] ?? "";
+      const value =
+        lockedValues[param.name] ?? debouncedValues[param.name] ?? "";
       return value.trim() === "";
     });
     if (missingRequired.length > 0) {
@@ -246,7 +263,9 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
         disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.value)}
       >
-        <option value="">{filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}</option>
+        <option value="">
+          {filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        </option>
         {filter.options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label ?? option.value}
@@ -314,7 +333,9 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
           value={filter.value.join(", ")}
           list={listId}
           disabled={filter.disabled}
-          onChange={(event) => filter.onChange(splitCommaValues(event.target.value))}
+          onChange={(event) =>
+            filter.onChange(splitCommaValues(event.target.value))
+          }
         />
         <datalist id={listId}>
           {filter.options.map((option) => (
@@ -362,7 +383,13 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
   );
 }
 
-function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id: string }) {
+function MultiParameterInput({
+  filter,
+  id,
+}: {
+  filter: FilterBarMultiFilter;
+  id: string;
+}) {
   const [query, setQuery] = useState("");
   const showOptionFilter = filter.options.length > 7;
   const visibleOptions = useMemo(() => {
@@ -393,7 +420,7 @@ function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id:
     >
       {showOptionFilter && (
         <label className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon icon={CodiconSearchIcon} className="shrink-0 text-muted-foreground" />
+          <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
           <input
             type="search"
             aria-label={`Filter ${filter.label} options`}
@@ -422,7 +449,9 @@ function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id:
           );
         })}
         {visibleOptions.length === 0 && (
-          <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
+          <div className="px-2 py-3 text-sm text-muted-foreground">
+            No options found
+          </div>
         )}
       </div>
     </div>
@@ -440,7 +469,9 @@ function multiOptionText(option: FilterBarMultiFilter["options"][number]) {
 function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
   return (
     <div className="grid grid-cols-1 gap-2 py-2 sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] sm:items-center">
-      <div className="text-sm font-medium text-muted-foreground">Time range</div>
+      <div className="text-sm font-medium text-muted-foreground">
+        Time range
+      </div>
       <div className="min-w-0">
         <TimeRange
           kind={timeRange.timeEnabled ? "time" : "date"}
@@ -450,11 +481,17 @@ function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
           to={timeRange.to ?? ""}
           onApply={timeRange.onApply}
           {...(timeRange.presets ? { presets: timeRange.presets } : {})}
-          {...(timeRange.timeEnabled !== undefined ? { timeEnabled: timeRange.timeEnabled } : {})}
+          {...(timeRange.timeEnabled !== undefined
+            ? { timeEnabled: timeRange.timeEnabled }
+            : {})}
           {...(timeRange.timeZone ? { timeZone: timeRange.timeZone } : {})}
           {...(timeRange.timeZones ? { timeZones: timeRange.timeZones } : {})}
-          {...(timeRange.fromPlaceholder ? { fromPlaceholder: timeRange.fromPlaceholder } : {})}
-          {...(timeRange.toPlaceholder ? { toPlaceholder: timeRange.toPlaceholder } : {})}
+          {...(timeRange.fromPlaceholder
+            ? { fromPlaceholder: timeRange.fromPlaceholder }
+            : {})}
+          {...(timeRange.toPlaceholder
+            ? { toPlaceholder: timeRange.toPlaceholder }
+            : {})}
         />
       </div>
     </div>

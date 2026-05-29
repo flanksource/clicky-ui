@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ThemeSwitcher } from "../components/theme-switcher";
 import type { ClickyCommandRuntime, ClickyResolvedCommand } from "../data/Clicky";
-import { findSurfaceListOperation, getClickySurfaces, makeSurfaceDefinition } from "./clickyMetadata";
+import {
+  findSurfaceListOperation,
+  getClickySurfaces,
+  makeSurfaceDefinition,
+} from "./clickyMetadata";
 import type { RenderLink } from "./EndpointList";
 import { OperationCatalog } from "./OperationCatalog";
 import { OperationCommandPage } from "./OperationCommandPage";

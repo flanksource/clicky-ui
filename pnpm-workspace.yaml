@@ -7,10 +7,7 @@ allowBuilds:
   vue-demi: true
 
 catalog:
-  '@iconify-react/codicon': ^1.0.12
-  '@iconify-react/lucide': ^1.0.15
-  '@iconify-react/ph': ^1.0.2
-  '@iconify-react/svg-spinners': ^1.0.2
+  "@flanksource/icons": ^1.0.60
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3
   "@radix-ui/react-accordion": ^1.2.2
@@ -39,16 +36,16 @@ catalog:
   "@types/node": ^24
   "@types/react": ^18.3.12
   "@types/react-dom": ^18.3.1
-  "@voidzero-dev/vite-plus-darwin-arm64": ^0.1.19
   autoprefixer: ^10.4.20
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   cmdk: ^1.0.4
   jsdom: ^26.0.0
-  lucide-react: ^0.469.0
   marked: ^15.0.0
+  oxlint: ^1.60.0
   postcss: ^8.4.49
   preact: ^10.25.3
+  prettier: ^3.8.3
   react: ^18.3.1
   react-dom: ^18.3.1
   shiki: ^1.24.0
@@ -59,7 +56,6 @@ catalog:
   typescript: ^5.7.2
   vite: ^6.0.3
   vite-plugin-dts: ^4.3.0
-  vite-plus: ^0.1.18
   vitest: ^3.0.5
 
 catalogMode: prefer

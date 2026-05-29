@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
 import {
-  CodiconDebugAltIcon,
-  CodiconDebugPauseIcon,
-  CodiconErrorIcon,
-  CodiconPassIcon,
-  CodiconSymbolClassIcon,
-} from "./static-icons";
+  UiDebug,
+  UiPause,
+  UiError,
+  UiPass,
+  UiClass,
+} from "@flanksource/icons/ui";
 import { Tree } from "./Tree";
 
 const meta: Meta<typeof Tree> = {
@@ -70,18 +70,24 @@ export const TestTree: Story = {
         renderRow={({ node }) => {
           const icon =
             node.status === "passed"
-              ? CodiconPassIcon
+              ? UiPass
               : node.status === "failed"
-                ? CodiconErrorIcon
-                : CodiconDebugPauseIcon;
+                ? UiError
+                : UiPause;
           const tone =
-            node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
+            node.status === "passed"
+              ? "success"
+              : node.status === "failed"
+                ? "danger"
+                : "warning";
           return (
             <>
               <Icon icon={icon} />
               <span className="truncate flex-1">{node.name}</span>
               {node.duration && (
-                <span className="text-xs text-muted-foreground">{node.duration}ms</span>
+                <span className="text-xs text-muted-foreground">
+                  {node.duration}ms
+                </span>
               )}
               <Badge tone={tone} size="sm">
                 {node.status}
@@ -122,11 +128,13 @@ export const ProcessTree: Story = {
       defaultOpen={() => true}
       renderRow={({ node }) => (
         <>
-          <Icon icon={CodiconDebugAltIcon} className="text-muted-foreground" />
+          <Icon icon={UiDebug} className="text-muted-foreground" />
           <span className="font-medium">{node.name}</span>
           <span className="text-xs text-muted-foreground">pid {node.pid}</span>
           <span className="flex-1" />
-          <span className="text-xs text-muted-foreground">{node.cpu.toFixed(1)}%</span>
+          <span className="text-xs text-muted-foreground">
+            {node.cpu.toFixed(1)}%
+          </span>
         </>
       )}
     />
@@ -165,7 +173,7 @@ export const GroupedConfigTree: Story = {
           <span className="font-medium text-sm">{node.name}</span>
         ) : (
           <>
-            <Icon icon={CodiconSymbolClassIcon} className="text-blue-500" />
+            <Icon icon={UiClass} className="text-blue-500" />
             <span>{node.name}</span>
           </>
         )
@@ -181,7 +189,11 @@ export const EmptyState: Story = {
       getChildren={(t) => t.children}
       getKey={(t) => t.id}
       renderRow={() => null}
-      empty={<div className="p-density-4 text-muted-foreground text-sm">No tests yet</div>}
+      empty={
+        <div className="p-density-4 text-muted-foreground text-sm">
+          No tests yet
+        </div>
+      }
     />
   ),
 };

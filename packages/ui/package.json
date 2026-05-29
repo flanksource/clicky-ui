@@ -20,37 +20,44 @@
     "**/*.css",
     "./src/styles/**"
   ],
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./utils": {
       "types": "./dist/utils.d.ts",
-      "import": "./dist/utils.js"
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.cjs"
     },
     "./hooks": {
       "types": "./dist/hooks.d.ts",
-      "import": "./dist/hooks.js"
+      "import": "./dist/hooks.js",
+      "require": "./dist/hooks.cjs"
     },
     "./components": {
       "types": "./dist/components.d.ts",
-      "import": "./dist/components.js"
+      "import": "./dist/components.js",
+      "require": "./dist/components.cjs"
     },
     "./data": {
       "types": "./dist/data.d.ts",
-      "import": "./dist/data.js"
+      "import": "./dist/data.js",
+      "require": "./dist/data.cjs"
     },
     "./clicky": {
       "types": "./dist/clicky.d.ts",
-      "import": "./dist/clicky.js"
+      "import": "./dist/clicky.js",
+      "require": "./dist/clicky.cjs"
     },
     "./rpc": {
       "types": "./dist/rpc.d.ts",
-      "import": "./dist/rpc.js"
+      "import": "./dist/rpc.js",
+      "require": "./dist/rpc.cjs"
     },
     "./styles.css": "./dist/styles.css",
     "./tailwind-preset": {
@@ -64,51 +71,45 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "vp dev",
-    "build": "vite build && node scripts/build-styles.mjs && vp pack src/tailwind-preset.ts -f cjs --no-clean --sourcemap --no-minify",
-    "test": "vp test",
-    "check": "vp check"
+    "dev": "vite dev",
+    "build": "vite build && vite build --mode cjs && node scripts/build-styles.mjs",
+    "test": "vitest run",
+    "check": "tsc -b --noEmit && oxlint src --deny-warnings"
   },
   "dependencies": {
-    "@iconify-react/codicon": "catalog:",
-    "@iconify-react/lucide": "catalog:",
-    "@iconify-react/ph": "catalog:",
-    "@iconify-react/svg-spinners": "catalog:",
+    "@flanksource/icons": "^1.0.60",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
+    "@tanstack/react-query": "^5.66.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.469.0",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@storybook/react-vite": "10.3.5",
     "@tailwindcss/cli": "^4.2.4",
-    "@tanstack/react-query": "catalog:",
-    "@testing-library/jest-dom": "catalog:",
-    "@testing-library/react": "catalog:",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "jsdom": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "jsdom": "^26.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tailwindcss": "^4.2.4",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vite-plugin-dts": "catalog:",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-dts": "^4.3.0",
+    "vitest": "^3.0.5"
   },
   "peerDependencies": {
     "@shikijs/langs": "^1.24.0",
     "@shikijs/themes": "^1.24.0",
     "@shikijs/transformers": "^1.24.0",
-    "@tanstack/react-query": "^5.0.0",
     "marked": "^15.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "shiki": "^1.24.0",
-    "tailwindcss": "^3.4.0"
+    "tailwindcss": "^3.4.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "@shikijs/langs": {
@@ -118,9 +119,6 @@
       "optional": true
     },
     "@shikijs/transformers": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
       "optional": true
     },
     "marked": {

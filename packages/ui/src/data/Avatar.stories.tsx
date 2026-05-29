@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar, type AvatarKind, type AvatarVariant } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
 import type { StaticIconComponent } from "./Icon";
-import { PhCheckThinIcon, PhHourglassMediumThinIcon, PhXThinIcon } from "./static-icons";
+import { UiCheck, UiHourglass, UiClose } from "@flanksource/icons/ui";
 import { fnv1a32 } from "../lib/palette";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -52,7 +52,8 @@ const VARIANTS: Array<{
   {
     title: "Duotone",
     variant: "duotone",
-    description: "Soft tint and colored type. Best general-purpose default for people and groups.",
+    description:
+      "Soft tint and colored type. Best general-purpose default for people and groups.",
   },
   {
     title: "Solid",
@@ -69,7 +70,8 @@ const VARIANTS: Array<{
   {
     title: "Mono",
     variant: "mono",
-    description: "Editorial box treatment for tables, printouts, and dense review surfaces.",
+    description:
+      "Editorial box treatment for tables, printouts, and dense review surfaces.",
   },
 ];
 
@@ -82,18 +84,26 @@ type StageStatusSpec = {
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: PhCheckThinIcon, cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: PhHourglassMediumThinIcon, cellBg: "bg-amber-50/85", tone: "amber" },
-  rejected: { icon: PhXThinIcon, cellBg: "bg-rose-50/85", tone: "rose" },
+  approved: { icon: UiCheck, cellBg: "bg-emerald-50/80", tone: "emerald" },
+  pending: { icon: UiHourglass, cellBg: "bg-amber-50/85", tone: "amber" },
+  rejected: { icon: UiClose, cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
-const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [
+const STAGE_STATES: Array<{
+  comment?: string;
+  state: StageStatus;
+  user: SampleUser;
+}> = [
   { state: "approved", user: USERS[0]! },
   { state: "pending", user: USERS[1]! },
   { state: "rejected", user: USERS[2]! },
 ];
 
-const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: SampleUser }> = [
+const STAGE_COMMENT_STATES: Array<{
+  comment: string;
+  state: StageStatus;
+  user: SampleUser;
+}> = [
   {
     state: "approved",
     user: USERS[0]!,
@@ -107,7 +117,10 @@ const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: S
   },
 ];
 
-function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string {
+function stageCellBorderColor(
+  user: SampleUser,
+  variant: AvatarVariant,
+): string {
   const kind = user.kind ?? "user";
   const hue = fnv1a32(user.full) % 360;
 
@@ -213,8 +226,12 @@ function SampleLine({
         variant={variant}
       />
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-foreground">{user.full}</div>
-        <div className="truncate font-mono text-[11px] text-muted-foreground">{user.email}</div>
+        <div className="truncate text-sm font-medium text-foreground">
+          {user.full}
+        </div>
+        <div className="truncate font-mono text-[11px] text-muted-foreground">
+          {user.email}
+        </div>
       </div>
     </div>
   );
@@ -233,12 +250,18 @@ function ExplorationCard({
     <div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
       <div className="space-y-1 border-b border-border pb-3">
         <div className="text-sm font-semibold text-foreground">{title}</div>
-        <div className="text-xs leading-5 text-muted-foreground">{description}</div>
+        <div className="text-xs leading-5 text-muted-foreground">
+          {description}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         {USERS.map((user) => (
-          <SampleLine key={`${variant}-${user.initials}`} user={user} variant={variant} />
+          <SampleLine
+            key={`${variant}-${user.initials}`}
+            user={user}
+            variant={variant}
+          />
         ))}
       </div>
 
@@ -250,7 +273,9 @@ function ExplorationCard({
           {STAGE_STATES.map((entry) => (
             <StageCellPreview
               key={`${variant}-${entry.state}`}
-              {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
+              {...(entry.comment !== undefined
+                ? { comment: entry.comment }
+                : {})}
               state={entry.state}
               user={entry.user}
               variant={variant}
@@ -275,8 +300,9 @@ export const Exploration: Story = {
           User representation
         </h2>
         <p className="text-sm text-muted-foreground">
-          Shared avatar variants derived from the pipeline-report exploration sheet. The component
-          keeps one API while letting Storybook show the distinct visual tones.
+          Shared avatar variants derived from the pipeline-report exploration
+          sheet. The component keeps one API while letting Storybook show the
+          distinct visual tones.
         </p>
       </div>
 
@@ -303,8 +329,8 @@ export const PipelineContext: Story = {
             Deployment report
           </div>
           <div className="text-sm text-muted-foreground">
-            The duotone fallback is the default. Stamp and mono variants support denser review
-            surfaces.
+            The duotone fallback is the default. Stamp and mono variants support
+            denser review surfaces.
           </div>
         </div>
 
@@ -341,8 +367,12 @@ export const PipelineContext: Story = {
                 variant="stamp"
               />
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-foreground">{user.full}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">approved · 14:32</div>
+                <div className="truncate text-sm font-medium text-foreground">
+                  {user.full}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  approved · 14:32
+                </div>
               </div>
             </div>
           ))}
@@ -354,7 +384,10 @@ export const PipelineContext: Story = {
           </div>
           <div className="space-y-2">
             {USERS.map((user) => (
-              <div key={`mono-${user.initials}`} className="flex items-center gap-2">
+              <div
+                key={`mono-${user.initials}`}
+                className="flex items-center gap-2"
+              >
                 <Avatar
                   alt={user.full}
                   initials={user.initials}
@@ -363,7 +396,9 @@ export const PipelineContext: Story = {
                   title={user.full}
                   variant="mono"
                 />
-                <span className="truncate text-sm text-foreground">{user.full}</span>
+                <span className="truncate text-sm text-foreground">
+                  {user.full}
+                </span>
               </div>
             ))}
           </div>
@@ -385,8 +420,9 @@ function StageSizesView() {
           Badge-style icons scale with the row
         </h2>
         <p className="text-sm text-muted-foreground">
-          The trailing status is rendered via <code>{'<Icon style="badge" />'}</code>. Pass the same
-          size token used by the neighbouring avatar and the chip, glyph, and row height stay in
+          The trailing status is rendered via{" "}
+          <code>{'<Icon style="badge" />'}</code>. Pass the same size token used
+          by the neighbouring avatar and the chip, glyph, and row height stay in
           proportion.
         </p>
       </div>
@@ -484,8 +520,9 @@ function SizesWithNamesView() {
           Avatar sizes with companion text
         </h2>
         <p className="text-sm text-muted-foreground">
-          Each row pairs the avatar with the identity label sized so the glyph is only a touch
-          taller than the cap height (font-size ≈ 85% of the avatar box).
+          Each row pairs the avatar with the identity label sized so the glyph
+          is only a touch taller than the cap height (font-size ≈ 85% of the
+          avatar box).
         </p>
       </div>
 
@@ -494,7 +531,12 @@ function SizesWithNamesView() {
           const px = resolveSize(size, density);
           return (
             <div key={size} className="flex items-center gap-3">
-              <Avatar alt="Chen, Nora" initials="CN" size={size} variant="duotone" />
+              <Avatar
+                alt="Chen, Nora"
+                initials="CN"
+                size={size}
+                variant="duotone"
+              />
               <span
                 className="font-medium leading-none text-foreground"
                 style={{ fontSize: Math.round(px * 0.85) }}
@@ -516,14 +558,26 @@ function SizesWithNamesView() {
             className="space-y-3 rounded-lg border border-border bg-card p-4"
           >
             <div className="space-y-1 border-b border-border pb-2">
-              <div className="text-sm font-semibold text-foreground">{entry.title}</div>
-              <div className="text-xs leading-5 text-muted-foreground">{entry.description}</div>
+              <div className="text-sm font-semibold text-foreground">
+                {entry.title}
+              </div>
+              <div className="text-xs leading-5 text-muted-foreground">
+                {entry.description}
+              </div>
             </div>
             {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
               const px = resolveSize(size, density);
               return (
-                <div key={`${entry.variant}-${size}`} className="flex items-center gap-2">
-                  <Avatar alt="Chen, Nora" initials="CN" size={size} variant={entry.variant} />
+                <div
+                  key={`${entry.variant}-${size}`}
+                  className="flex items-center gap-2"
+                >
+                  <Avatar
+                    alt="Chen, Nora"
+                    initials="CN"
+                    size={size}
+                    variant={entry.variant}
+                  />
                   <span
                     className="font-medium leading-none text-foreground"
                     style={{ fontSize: Math.round(px * 0.85) }}

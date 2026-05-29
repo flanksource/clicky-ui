@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Badge } from "./Badge";
-import { CodiconErrorIcon, LucideActivityIcon, LucideCheckIcon } from "./static-icons";
+import { UiError, UiActivity, UiCheck } from "@flanksource/icons/ui";
 
 describe("Badge", () => {
   it("defaults plain children-only badges to the legacy soft variant", () => {
@@ -13,7 +13,7 @@ describe("Badge", () => {
 
   it("keeps the legacy tone/count/children path working", () => {
     render(
-      <Badge tone="danger" variant="solid" count={12} icon={CodiconErrorIcon}>
+      <Badge tone="danger" variant="solid" count={12} icon={UiError}>
         errors
       </Badge>,
     );
@@ -25,7 +25,9 @@ describe("Badge", () => {
   });
 
   it("defaults rich props to the metric layout", () => {
-    const { container } = render(<Badge label="Latency" value="45ms" icon={LucideActivityIcon} />);
+    const { container } = render(
+      <Badge label="Latency" value="45ms" icon={UiActivity} />,
+    );
 
     const badge = container.firstElementChild as HTMLElement | null;
     expect(screen.getByText("45ms")).toBeInTheDocument();
@@ -39,7 +41,7 @@ describe("Badge", () => {
         status="success"
         label="Healthy"
         value="ready"
-        icon={LucideCheckIcon}
+        icon={UiCheck}
       />,
     );
 
@@ -59,8 +61,12 @@ describe("Badge", () => {
       />,
     );
 
-    expect(screen.getByText("env").parentElement?.className).toMatch(/uppercase/);
-    expect(screen.getByText("production").parentElement?.className).toMatch(/font-mono/);
+    expect(screen.getByText("env").parentElement?.className).toMatch(
+      /uppercase/,
+    );
+    expect(screen.getByText("production").parentElement?.className).toMatch(
+      /font-mono/,
+    );
   });
 
   it("renders links with a safe default rel for new tabs", () => {
@@ -175,18 +181,22 @@ describe("Badge", () => {
     );
 
     expect(
-      screen.getByTitle("arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control")
-        .textContent,
+      screen.getByTitle(
+        "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
+      ).textContent,
     ).toContain("mission-control");
     expect(
-      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-api:v2.4.1-build.17")
-        .textContent,
+      screen.getByTitle(
+        "ghcr.io/flanksource/platform/mission-control-api:v2.4.1-build.17",
+      ).textContent,
     ).toContain("mission-control-api");
     expect(
-      screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent,
+      screen.getByTitle("/configs/production/platform/mission-control.yaml")
+        .textContent,
     ).toContain("/configs/");
     expect(
-      screen.getByTitle("/configs/production/platform/mission-control.yaml").textContent,
+      screen.getByTitle("/configs/production/platform/mission-control.yaml")
+        .textContent,
     ).toContain("mission-control.yaml");
     expect(
       screen.getByTitle(
@@ -199,8 +209,9 @@ describe("Badge", () => {
       ).textContent,
     ).toContain("console.flanksource.com");
     expect(
-      screen.getByTitle("ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17")
-        .textContent,
+      screen.getByTitle(
+        "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
+      ).textContent,
     ).toContain("mission-control-worker");
   });
 
@@ -222,7 +233,9 @@ describe("Badge", () => {
     );
 
     fireEvent.click(screen.getByRole("button"));
-    expect(writeText).toHaveBeenCalledWith("/configs/production/platform/mission-control.yaml");
+    expect(writeText).toHaveBeenCalledWith(
+      "/configs/production/platform/mission-control.yaml",
+    );
   });
 
   it("does not auto-copy linked badges by default", () => {

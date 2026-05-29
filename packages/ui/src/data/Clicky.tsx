@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
 import {
   createContext,
   Fragment,
@@ -38,16 +42,16 @@ import type { FilterBarFilter } from "../components/FilterBar";
 import { Tree } from "./Tree";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
-  CodiconCheckIcon,
-  CodiconChevronDownIcon,
-  CodiconChevronUpIcon,
-  CodiconCloudDownloadIcon,
-  CodiconCommentDiscussionIcon,
-  CodiconEllipsisIcon,
-  CodiconFileCodeIcon,
-  CodiconPreviewIcon,
-  CodiconTableIcon,
-} from "./static-icons";
+  UiCheck,
+  UiChevronDown,
+  UiChevronUp,
+  UiCloudDownload,
+  UiComment,
+  UiEllipsis,
+  UiFileCode,
+  UiEye,
+  UiTable,
+} from "@flanksource/icons/ui";
 import { CodeBlock } from "./CodeBlock";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";
@@ -223,11 +227,19 @@ const CLICKY_OVERFLOW_VIEW_FORMATS = [
   "excel",
   "slack",
 ] as const;
-const CLICKY_DOWNLOAD_FORMATS = ["json", "clicky", ...CLICKY_OVERFLOW_VIEW_FORMATS] as const;
+const CLICKY_DOWNLOAD_FORMATS = [
+  "json",
+  "clicky",
+  ...CLICKY_OVERFLOW_VIEW_FORMATS,
+] as const;
 
-export type ClickyPrimaryViewFormat = (typeof CLICKY_PRIMARY_VIEW_FORMATS)[number];
-export type ClickyOverflowViewFormat = (typeof CLICKY_OVERFLOW_VIEW_FORMATS)[number];
-export type ClickyRemoteFormat = ClickyPrimaryViewFormat | ClickyOverflowViewFormat;
+export type ClickyPrimaryViewFormat =
+  (typeof CLICKY_PRIMARY_VIEW_FORMATS)[number];
+export type ClickyOverflowViewFormat =
+  (typeof CLICKY_OVERFLOW_VIEW_FORMATS)[number];
+export type ClickyRemoteFormat =
+  | ClickyPrimaryViewFormat
+  | ClickyOverflowViewFormat;
 
 export type ClickyViewOptions = Partial<Record<ClickyRemoteFormat, boolean>>;
 
@@ -306,7 +318,9 @@ const clickyRuntimeContextDefault: ClickyRuntimeContextValue = {
   operationsLoading: false,
 };
 
-const ClickyRuntimeContext = createContext<ClickyRuntimeContextValue>(clickyRuntimeContextDefault);
+const ClickyRuntimeContext = createContext<ClickyRuntimeContextValue>(
+  clickyRuntimeContextDefault,
+);
 
 export function Clicky(props: ClickyProps) {
   const [queryClient] = useState(
@@ -323,11 +337,21 @@ export function Clicky(props: ClickyProps) {
 
   const content = (
     <ClickyRuntimeProvider
-      {...(props.commandRuntime ? { commandRuntime: props.commandRuntime } : {})}
-      {...(props.onTableRowClick ? { onTableRowClick: props.onTableRowClick } : {})}
-      {...(props.getTableRowHref ? { getTableRowHref: props.getTableRowHref } : {})}
-      {...(props.isTableRowClickable ? { isTableRowClickable: props.isTableRowClickable } : {})}
-      {...(props.externalFilters ? { tableExternalFilters: props.externalFilters } : {})}
+      {...(props.commandRuntime
+        ? { commandRuntime: props.commandRuntime }
+        : {})}
+      {...(props.onTableRowClick
+        ? { onTableRowClick: props.onTableRowClick }
+        : {})}
+      {...(props.getTableRowHref
+        ? { getTableRowHref: props.getTableRowHref }
+        : {})}
+      {...(props.isTableRowClickable
+        ? { isTableRowClickable: props.isTableRowClickable }
+        : {})}
+      {...(props.externalFilters
+        ? { tableExternalFilters: props.externalFilters }
+        : {})}
       {...(props.pagination ? { tablePagination: props.pagination } : {})}
     >
       {props.url ? (
@@ -342,7 +366,9 @@ export function Clicky(props: ClickyProps) {
   );
 
   if (props.url || props.commandRuntime) {
-    return <QueryClientProvider client={queryClient}>{content}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{content}</QueryClientProvider>
+    );
   }
 
   return content;
@@ -447,7 +473,11 @@ function ClickyCommandRuntimeProvider({
     ],
   );
 
-  return <ClickyRuntimeContext.Provider value={value}>{children}</ClickyRuntimeContext.Provider>;
+  return (
+    <ClickyRuntimeContext.Provider value={value}>
+      {children}
+    </ClickyRuntimeContext.Provider>
+  );
 }
 
 function ClickyContent({
@@ -487,13 +517,22 @@ function ClickyRemoteRenderer({
   download,
   className,
 }: ClickyProps & { url: string }) {
-  const availableViews = useMemo(() => getAvailableViews({ data, url, view }), [data, url, view]);
-  const primaryViews = useMemo(() => availableViews.filter(isPrimaryViewFormat), [availableViews]);
+  const availableViews = useMemo(
+    () => getAvailableViews({ data, url, view }),
+    [data, url, view],
+  );
+  const primaryViews = useMemo(
+    () => availableViews.filter(isPrimaryViewFormat),
+    [availableViews],
+  );
   const overflowViews = useMemo(
     () => availableViews.filter(isOverflowViewFormat),
     [availableViews],
   );
-  const downloadFormats = useMemo(() => getDownloadFormats({ url, download }), [download, url]);
+  const downloadFormats = useMemo(
+    () => getDownloadFormats({ url, download }),
+    [download, url],
+  );
   const [activeView, setActiveView] = useState<ClickyRemoteFormat>(
     () => availableViews[0] ?? "clicky",
   );
@@ -511,13 +550,17 @@ function ClickyRemoteRenderer({
     queryFn: async () => fetchRemoteFormat(formattedUrl, activeView),
   });
   const effectiveClickyData =
-    activeView === "clicky" && activeQuery.data?.kind === "text" ? activeQuery.data.text : data;
+    activeView === "clicky" && activeQuery.data?.kind === "text"
+      ? activeQuery.data.text
+      : data;
   const fallbackJsonData = useMemo(() => parseJsonValue(data), [data]);
   const effectiveJsonData =
     activeView === "json" && activeQuery.data?.kind === "text"
       ? parseJsonValue(activeQuery.data.text)
       : fallbackJsonData;
-  const activeOverflowView = isOverflowViewFormat(activeView) ? activeView : null;
+  const activeOverflowView = isOverflowViewFormat(activeView)
+    ? activeView
+    : null;
   const canDownload = downloadFormats.length > 0;
   const loadingMessage = `Fetching ${formattedUrl}`;
 
@@ -525,7 +568,11 @@ function ClickyRemoteRenderer({
     <div className={cn("space-y-density-3", className)}>
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
         {primaryViews.length > 1 && (
-          <div role="radiogroup" aria-label="Clicky view mode" className="flex flex-wrap gap-1">
+          <div
+            role="radiogroup"
+            aria-label="Clicky view mode"
+            className="flex flex-wrap gap-1"
+          >
             {primaryViews.map((mode) => (
               <button
                 key={mode}
@@ -560,7 +607,11 @@ function ClickyRemoteRenderer({
           )}
 
           {canDownload && (
-            <ClickyDownloadMenu url={url} formats={downloadFormats} label={download?.label} />
+            <ClickyDownloadMenu
+              url={url}
+              formats={downloadFormats}
+              label={download?.label}
+            />
           )}
         </div>
       </div>
@@ -582,7 +633,9 @@ function ClickyRemoteRenderer({
           <ClickyNotice
             title="Clicky request failed"
             message={
-              activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+              activeQuery.error instanceof Error
+                ? activeQuery.error.message
+                : "Request failed"
             }
             tone="destructive"
           />
@@ -605,7 +658,9 @@ function ClickyRemoteRenderer({
           <ClickyNotice
             title="JSON request failed"
             message={
-              activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+              activeQuery.error instanceof Error
+                ? activeQuery.error.message
+                : "Request failed"
             }
             tone="destructive"
           />
@@ -622,12 +677,17 @@ function ClickyRemoteRenderer({
           </>
         )
       ) : activeQuery.isPending ? (
-        <ClickyNotice title={`Loading ${formatViewLabel(activeView)}`} message={loadingMessage} />
+        <ClickyNotice
+          title={`Loading ${formatViewLabel(activeView)}`}
+          message={loadingMessage}
+        />
       ) : activeQuery.isError ? (
         <ClickyNotice
           title={`${formatViewLabel(activeView)} request failed`}
           message={
-            activeQuery.error instanceof Error ? activeQuery.error.message : "Request failed"
+            activeQuery.error instanceof Error
+              ? activeQuery.error.message
+              : "Request failed"
           }
           tone="destructive"
         />
@@ -668,7 +728,7 @@ function ClickyViewMenu({
         )}
         onClick={() => setOpen((current) => !current)}
       >
-        <Icon icon={CodiconEllipsisIcon} className="text-sm" />
+        <Icon icon={UiEllipsis} className="text-sm" />
       </button>
 
       {open && (
@@ -705,7 +765,10 @@ function ClickyViewMenu({
                   <span className="flex items-center justify-between gap-3">
                     <span className="font-medium">{meta.label}</span>
                     {active && (
-                      <Icon icon={CodiconCheckIcon} className="text-xs text-muted-foreground" />
+                      <Icon
+                        icon={UiCheck}
+                        className="text-xs text-muted-foreground"
+                      />
                     )}
                   </span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -744,12 +807,16 @@ function ClickyDownloadMenu({
         <button
           type="button"
           aria-label={
-            label ? `Download ${primaryMeta.label} ${label}` : `Download ${primaryMeta.label}`
+            label
+              ? `Download ${primaryMeta.label} ${label}`
+              : `Download ${primaryMeta.label}`
           }
           className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          onClick={() => submitDownloadRequest(buildFormatUrl(url, primaryFormat))}
+          onClick={() =>
+            submitDownloadRequest(buildFormatUrl(url, primaryFormat))
+          }
         >
-          <Icon icon={CodiconCloudDownloadIcon} className="text-sm" />
+          <Icon icon={UiCloudDownload} className="text-sm" />
           <span>{`Download ${primaryMeta.label}`}</span>
         </button>
         <button
@@ -761,7 +828,7 @@ function ClickyDownloadMenu({
           className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => setOpen((current) => !current)}
         >
-          <Icon icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon} className="text-sm" />
+          <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-sm" />
         </button>
       </div>
 
@@ -842,7 +909,8 @@ export function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
     } catch (error) {
       return {
         ok: false,
-        message: error instanceof Error ? error.message : "Failed to parse JSON",
+        message:
+          error instanceof Error ? error.message : "Failed to parse JSON",
         raw: data,
       };
     }
@@ -851,14 +919,19 @@ export function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
   return normalizeClickyDocument(data);
 }
 
-function fetchRemoteFormat(url: string, format: ClickyRemoteFormat): Promise<ClickyRemoteResponse> {
+function fetchRemoteFormat(
+  url: string,
+  format: ClickyRemoteFormat,
+): Promise<ClickyRemoteResponse> {
   return fetch(url, {
     headers: {
       Accept: getRemoteFormatMeta(format).accept,
     },
   }).then(async (response) => {
     if (!response.ok) {
-      throw new Error(`Request failed with ${response.status} ${response.statusText}`.trim());
+      throw new Error(
+        `Request failed with ${response.status} ${response.statusText}`.trim(),
+      );
     }
 
     const contentType = response.headers.get("Content-Type") ?? "";
@@ -893,7 +966,9 @@ function ClickyInvalidPayload({
         className,
       )}
     >
-      <div className="text-sm font-medium text-destructive">Invalid Clicky payload</div>
+      <div className="text-sm font-medium text-destructive">
+        Invalid Clicky payload
+      </div>
       <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-muted-foreground">
         {parsed.message}
         {parsed.raw ? `\n\n${parsed.raw}` : ""}
@@ -942,11 +1017,20 @@ function ClickyPdfPreview({ src }: { src: string }) {
     <div className="overflow-hidden rounded-md border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
         <span>PDF preview</span>
-        <a href={src} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
           Open in new tab
         </a>
       </div>
-      <iframe title="Clicky PDF preview" src={src} className="h-[720px] w-full bg-white" />
+      <iframe
+        title="Clicky PDF preview"
+        src={src}
+        className="h-[720px] w-full bg-white"
+      />
     </div>
   );
 }
@@ -956,7 +1040,12 @@ function ClickyHtmlPreview({ src }: { src: string }) {
     <div className="overflow-hidden rounded-md border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
         <span>HTML preview</span>
-        <a href={src} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
           Open in new tab
         </a>
       </div>
@@ -985,7 +1074,12 @@ function ClickyUnsupportedPreview({
       message={
         <>
           <span>{message} </span>
-          <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline"
+          >
             Open format
           </a>
         </>
@@ -1004,7 +1098,8 @@ function ClickyRemotePreview({
   const meta = getRemoteFormatMeta(format);
 
   if (format === "slack") {
-    const parsed = response?.kind === "text" ? parseJsonValue(response.text) : undefined;
+    const parsed =
+      response?.kind === "text" ? parseJsonValue(response.text) : undefined;
     return <ClickyJsonTree value={parsed} emptyLabel={meta.label} />;
   }
 
@@ -1016,10 +1111,18 @@ function ClickyRemotePreview({
   );
 }
 
-function ClickyTextPreview({ title, content }: { title: string; content: string }) {
+function ClickyTextPreview({
+  title,
+  content,
+}: {
+  title: string;
+  content: string;
+}) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-background">
-      <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">{title}</div>
+      <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
+        {title}
+      </div>
       <pre
         aria-label="Clicky text preview"
         className="overflow-auto whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs text-foreground"
@@ -1030,7 +1133,13 @@ function ClickyTextPreview({ title, content }: { title: string; content: string 
   );
 }
 
-function ClickyJsonTree({ value, emptyLabel = "JSON" }: { value: unknown; emptyLabel?: string }) {
+function ClickyJsonTree({
+  value,
+  emptyLabel = "JSON",
+}: {
+  value: unknown;
+  emptyLabel?: string;
+}) {
   const roots = useMemo(() => buildJsonTree(value), [value]);
 
   if (value === undefined) {
@@ -1055,7 +1164,11 @@ function ClickyJsonTree({ value, emptyLabel = "JSON" }: { value: unknown; emptyL
         getChildren={(node) => node.children}
         renderRow={({ node }) => <ClickyJsonTreeRow node={node} />}
         rowClass={() => "hover:bg-accent"}
-        empty={<div className="px-3 py-4 text-sm text-muted-foreground">No JSON fields.</div>}
+        empty={
+          <div className="px-3 py-4 text-sm text-muted-foreground">
+            No JSON fields.
+          </div>
+        }
         toolbarClassName="pl-3"
       />
     </div>
@@ -1076,7 +1189,9 @@ function ClickyJsonTreeRow({ node }: { node: JsonTreeNode }) {
     <div className="flex min-w-0 items-start gap-2 font-mono text-xs">
       <span className="shrink-0 text-foreground">{node.key}</span>
       <span className="shrink-0 text-muted-foreground">:</span>
-      <span className={cn("min-w-0 break-words", primitiveClass)}>{node.preview}</span>
+      <span className={cn("min-w-0 break-words", primitiveClass)}>
+        {node.preview}
+      </span>
     </div>
   );
 }
@@ -1142,7 +1257,7 @@ function getRemoteFormatMeta(format: ClickyRemoteFormat): {
       return {
         label: "Clicky",
         description: "Rendered Clicky JSON with the rich Clicky viewer",
-        icon: CodiconPreviewIcon,
+        icon: UiEye,
         accept:
           "application/json+clicky, application/clicky+json;q=0.9, application/json;q=0.8,*/*;q=0.7",
       };
@@ -1150,64 +1265,66 @@ function getRemoteFormatMeta(format: ClickyRemoteFormat): {
       return {
         label: "JSON",
         description: "Plain JSON for inspecting the raw response body",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "application/json, text/plain;q=0.8,*/*;q=0.7",
       };
     case "pdf":
       return {
         label: "PDF",
         description: "Portable document for sharing and printing",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "application/pdf, */*;q=0.7",
       };
     case "html":
       return {
         label: "HTML",
         description: "Browser-ready HTML preview of the formatted output",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "text/html, */*;q=0.7",
       };
     case "markdown":
       return {
         label: "Markdown",
         description: "Markdown formatted for docs, comments, and chat",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "text/markdown, text/plain;q=0.8,*/*;q=0.7",
       };
     case "yaml":
       return {
         label: "YAML",
         description: "YAML for config-friendly inspection and export",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "application/yaml, text/yaml;q=0.9, text/plain;q=0.8,*/*;q=0.7",
       };
     case "csv":
       return {
         label: "CSV",
         description: "Comma-separated values for spreadsheets and imports",
-        icon: CodiconTableIcon,
+        icon: UiTable,
         accept: "text/csv, text/plain;q=0.8,*/*;q=0.7",
       };
     case "pretty":
       return {
         label: "Pretty",
         description: "Human-readable plain text output from the formatter",
-        icon: CodiconFileCodeIcon,
+        icon: UiFileCode,
         accept: "text/plain, */*;q=0.7",
       };
     case "excel":
       return {
         label: "Excel",
         description: "Spreadsheet workbook for offline analysis",
-        icon: CodiconTableIcon,
-        accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*;q=0.7",
+        icon: UiTable,
+        accept:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*;q=0.7",
       };
     case "slack":
       return {
         label: "Slack",
         description: "Slack Block Kit JSON for chat-native output",
-        icon: CodiconCommentDiscussionIcon,
-        accept: "application/vnd.slack.block-kit+json, application/json;q=0.8,*/*;q=0.7",
+        icon: UiComment,
+        accept:
+          "application/vnd.slack.block-kit+json, application/json;q=0.8,*/*;q=0.7",
       };
   }
 }
@@ -1217,9 +1334,13 @@ function formatViewLabel(mode: ClickyRemoteFormat) {
 }
 
 function buildFormatUrl(url: string, format: ClickyRemoteFormat) {
-  const base = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const base =
+    typeof window === "undefined" ? "http://localhost" : window.location.origin;
   const resolved = new URL(url, base);
-  resolved.searchParams.set("format", format === "clicky" ? "clicky-json" : format);
+  resolved.searchParams.set(
+    "format",
+    format === "clicky" ? "clicky-json" : format,
+  );
 
   if (isAbsoluteUrl(url)) {
     return resolved.toString();
@@ -1232,11 +1353,15 @@ function shouldFetchRemoteView(format: ClickyRemoteFormat) {
   return format !== "pdf" && format !== "html" && format !== "excel";
 }
 
-function isPrimaryViewFormat(format: ClickyRemoteFormat): format is ClickyPrimaryViewFormat {
+function isPrimaryViewFormat(
+  format: ClickyRemoteFormat,
+): format is ClickyPrimaryViewFormat {
   return (CLICKY_PRIMARY_VIEW_FORMATS as readonly string[]).includes(format);
 }
 
-function isOverflowViewFormat(format: ClickyRemoteFormat): format is ClickyOverflowViewFormat {
+function isOverflowViewFormat(
+  format: ClickyRemoteFormat,
+): format is ClickyOverflowViewFormat {
   return (CLICKY_OVERFLOW_VIEW_FORMATS as readonly string[]).includes(format);
 }
 
@@ -1247,7 +1372,9 @@ function resolveViewConfigFlag(
   url?: string,
 ) {
   const defaultEnabled =
-    format === "clicky" || format === "json" ? url != null || data !== undefined : !!url;
+    format === "clicky" || format === "json"
+      ? url != null || data !== undefined
+      : !!url;
 
   if (view === undefined) {
     return defaultEnabled;
@@ -1299,11 +1426,15 @@ function parseJsonValue(data: ClickyProps["data"]): unknown {
 
 function buildJsonTree(value: unknown): JsonTreeNode[] {
   if (Array.isArray(value)) {
-    return value.map((entry, index) => buildJsonTreeNode(String(index), entry, `$[${index}]`));
+    return value.map((entry, index) =>
+      buildJsonTreeNode(String(index), entry, `$[${index}]`),
+    );
   }
 
   if (isPlainObject(value)) {
-    return Object.entries(value).map(([key, entry]) => buildJsonTreeNode(key, entry, `$.${key}`));
+    return Object.entries(value).map(([key, entry]) =>
+      buildJsonTreeNode(key, entry, `$.${key}`),
+    );
   }
 
   if (value === undefined) {
@@ -1313,7 +1444,11 @@ function buildJsonTree(value: unknown): JsonTreeNode[] {
   return [buildJsonTreeNode("$", value, "$")];
 }
 
-function buildJsonTreeNode(key: string, value: unknown, id: string): JsonTreeNode {
+function buildJsonTreeNode(
+  key: string,
+  value: unknown,
+  id: string,
+): JsonTreeNode {
   const children = getJsonChildren(value, id);
   return {
     id,
@@ -1413,7 +1548,9 @@ function normalizeClickyDocument(data: unknown): ParsedClicky {
 
 function isClickyNode(value: unknown): value is ClickyNode {
   return (
-    !!value && typeof value === "object" && typeof (value as { kind?: unknown }).kind === "string"
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as { kind?: unknown }).kind === "string"
   );
 }
 
@@ -1474,9 +1611,13 @@ function ClickyComment({ node }: { node: ClickyNode }) {
   const text = node.text ?? node.plain;
   const content = <ClickyInlineContent node={node} />;
   const maxWidth =
-    node.style?.maxWidth && node.style.maxWidth > 0 ? Math.min(node.style.maxWidth, 50) : 50;
+    node.style?.maxWidth && node.style.maxWidth > 0
+      ? Math.min(node.style.maxWidth, 50)
+      : 50;
   const maxLines =
-    node.style?.maxLines && node.style.maxLines > 0 ? Math.min(node.style.maxLines, 3) : 3;
+    node.style?.maxLines && node.style.maxLines > 0
+      ? Math.min(node.style.maxLines, 3)
+      : 3;
   const inlineStyle = toInlineStyle(
     {
       ...node.style,
@@ -1490,7 +1631,10 @@ function ClickyComment({ node }: { node: ClickyNode }) {
 
   return (
     <div
-      className={cn("mt-1 text-xs leading-snug text-muted-foreground", node.style?.className)}
+      className={cn(
+        "mt-1 text-xs leading-snug text-muted-foreground",
+        node.style?.className,
+      )}
       style={inlineStyle}
       title={node.tooltip?.plain ?? text}
     >
@@ -1562,7 +1706,8 @@ function ClickyLinkCommandNode({ node }: { node: ClickyNode }) {
   const runtime = useContext(ClickyRuntimeContext);
   const request = useMemo(() => clickyNodeToCommandRequest(node), [node]);
   const resolved = useMemo(
-    () => resolveClickyCommand(request, runtime.commandRuntime, runtime.operations),
+    () =>
+      resolveClickyCommand(request, runtime.commandRuntime, runtime.operations),
     [request, runtime.commandRuntime, runtime.operations],
   );
   const target = request.target ?? "Dialog";
@@ -1580,7 +1725,8 @@ function ClickyLinkCommandNode({ node }: { node: ClickyNode }) {
 
   if (target === "_self" || target === "_window" || target === "_tab") {
     const href =
-      runtime.commandRuntime?.hrefForCommand?.(resolved) ?? buildCommandExecutionHref(resolved);
+      runtime.commandRuntime?.hrefForCommand?.(resolved) ??
+      buildCommandExecutionHref(resolved);
 
     if (!href) {
       return (
@@ -1736,11 +1882,17 @@ function ClickyCommandDialog({
     setError("");
 
     try {
-      const response = await executeClickyCommand(runtime.commandRuntime.client, operation, values);
+      const response = await executeClickyCommand(
+        runtime.commandRuntime.client,
+        operation,
+        values,
+      );
       setResult(response);
     } catch (err) {
       setResult(null);
-      setError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
+      setError(
+        err instanceof Error ? err.message : String(err ?? "Unknown error"),
+      );
     } finally {
       setIsExecuting(false);
     }
@@ -1771,7 +1923,10 @@ function ClickyCommandDialog({
             <code>{operation.path}</code>
           </div>
         ) : runtime.operationsLoading ? (
-          <ClickyNotice title="Loading commands" message="Resolving the command definition." />
+          <ClickyNotice
+            title="Loading commands"
+            message="Resolving the command definition."
+          />
         ) : (
           <ClickyNotice
             title="Unknown command"
@@ -1797,7 +1952,11 @@ function ClickyCommandDialog({
         )}
 
         {error ? (
-          <ClickyNotice title="Command failed" message={error} tone="destructive" />
+          <ClickyNotice
+            title="Command failed"
+            message={error}
+            tone="destructive"
+          />
         ) : (
           <ClickyCommandResponse
             response={result}
@@ -1810,7 +1969,11 @@ function ClickyCommandDialog({
   );
 }
 
-function ClickyAsyncCommandResult({ resolved }: { resolved: ClickyResolvedCommand }) {
+function ClickyAsyncCommandResult({
+  resolved,
+}: {
+  resolved: ClickyResolvedCommand;
+}) {
   const runtime = useContext(ClickyRuntimeContext);
   const operation = resolved.operation;
   const parameters = operation?.operation.parameters ?? [];
@@ -1831,10 +1994,17 @@ function ClickyAsyncCommandResult({ resolved }: { resolved: ClickyResolvedComman
       operation?.path,
       initialValues,
     ],
-    enabled: runtime.commandRuntime != null && operation != null && missing.length === 0,
+    enabled:
+      runtime.commandRuntime != null &&
+      operation != null &&
+      missing.length === 0,
     retry: 0,
     queryFn: async () =>
-      executeClickyCommand(runtime.commandRuntime!.client, operation!, initialValues),
+      executeClickyCommand(
+        runtime.commandRuntime!.client,
+        operation!,
+        initialValues,
+      ),
   });
 
   if (!runtime.commandRuntime) {
@@ -1849,7 +2019,12 @@ function ClickyAsyncCommandResult({ resolved }: { resolved: ClickyResolvedComman
 
   if (!operation) {
     if (runtime.operationsLoading) {
-      return <ClickyNotice title="Loading commands" message="Resolving the command definition." />;
+      return (
+        <ClickyNotice
+          title="Loading commands"
+          message="Resolving the command definition."
+        />
+      );
     }
     return (
       <ClickyNotice
@@ -1871,20 +2046,32 @@ function ClickyAsyncCommandResult({ resolved }: { resolved: ClickyResolvedComman
   }
 
   if (query.isPending) {
-    return <ClickyNotice title="Running command" message="Loading Clicky response…" />;
+    return (
+      <ClickyNotice
+        title="Running command"
+        message="Loading Clicky response…"
+      />
+    );
   }
 
   if (query.isError) {
     return (
       <ClickyNotice
         title="Command failed"
-        message={query.error instanceof Error ? query.error.message : "Request failed"}
+        message={
+          query.error instanceof Error ? query.error.message : "Request failed"
+        }
         tone="destructive"
       />
     );
   }
 
-  return <ClickyCommandResponse response={query.data} emptyMessage="No response body returned." />;
+  return (
+    <ClickyCommandResponse
+      response={query.data}
+      emptyMessage="No response body returned."
+    />
+  );
 }
 
 function ClickyCommandResponse({
@@ -1897,7 +2084,12 @@ function ClickyCommandResponse({
   emptyMessage: string;
 }) {
   if (pending) {
-    return <ClickyNotice title="Running command" message="Loading Clicky response…" />;
+    return (
+      <ClickyNotice
+        title="Running command"
+        message="Loading Clicky response…"
+      />
+    );
   }
 
   if (!response) {
@@ -1918,7 +2110,9 @@ function ClickyCommandResponse({
       ? parsedPayload
       : rawText;
   const parsedClicky =
-    clickyPayload === "" ? null : parseClickyData(clickyPayload as ClickyProps["data"]);
+    clickyPayload === ""
+      ? null
+      : parseClickyData(clickyPayload as ClickyProps["data"]);
 
   if (parsedClicky?.ok) {
     return (
@@ -1939,8 +2133,16 @@ function ClickyIconNode({ node }: { node: ClickyNode }) {
   const inlineStyle = toInlineStyle(node.style, node.plain ?? node.unicode);
 
   return (
-    <span style={inlineStyle} title={node.tooltip?.plain} className="inline-flex items-center">
-      {node.iconify ? <Icon name={node.iconify} /> : <span>{node.unicode ?? node.plain}</span>}
+    <span
+      style={inlineStyle}
+      title={node.tooltip?.plain}
+      className="inline-flex items-center"
+    >
+      {node.iconify ? (
+        <Icon name={node.iconify} />
+      ) : (
+        <span>{node.unicode ?? node.plain}</span>
+      )}
     </span>
   );
 }
@@ -1956,8 +2158,12 @@ function ClickyList({ node }: { node: ClickyNode }) {
           <Fragment key={index}>
             {index > 0 && <span className="text-muted-foreground">,</span>}
             <span className="inline-flex items-center gap-1">
-              {!node.ordered && node.bullet && <ClickyNodeRenderer node={node.bullet} />}
-              {node.ordered && <span className="text-muted-foreground">{index + 1}.</span>}
+              {!node.ordered && node.bullet && (
+                <ClickyNodeRenderer node={node.bullet} />
+              )}
+              {node.ordered && (
+                <span className="text-muted-foreground">{index + 1}.</span>
+              )}
               <ClickyNodeRenderer node={item} />
             </span>
           </Fragment>
@@ -1971,8 +2177,12 @@ function ClickyList({ node }: { node: ClickyNode }) {
       <div className="space-y-1">
         {items.map((item, index) => (
           <div key={index} className="flex items-start gap-2">
-            {!node.ordered && node.bullet && <ClickyNodeRenderer node={node.bullet} />}
-            {node.ordered && <span className="text-muted-foreground">{index + 1}.</span>}
+            {!node.ordered && node.bullet && (
+              <ClickyNodeRenderer node={node.bullet} />
+            )}
+            {node.ordered && (
+              <span className="text-muted-foreground">{index + 1}.</span>
+            )}
             <div className="min-w-0 flex-1">
               <ClickyNodeRenderer node={item} />
             </div>
@@ -2039,7 +2249,9 @@ function ClickyTableNode({ node }: { node: ClickyNode }) {
     <ClickyTable
       columns={node.columns ?? []}
       rows={node.rows ?? []}
-      {...(node.autoFilter !== undefined ? { autoFilter: node.autoFilter } : {})}
+      {...(node.autoFilter !== undefined
+        ? { autoFilter: node.autoFilter }
+        : {})}
     />
   );
 }
@@ -2058,7 +2270,8 @@ export function ClickyTable({
   const rowClick = onTableRowClick ?? runtime.onTableRowClick;
   const rowHref = getTableRowHref ?? runtime.getTableRowHref;
   const rowClickable = isTableRowClickable ?? runtime.isTableRowClickable;
-  const effectiveExternalFilters = externalFilters ?? runtime.tableExternalFilters;
+  const effectiveExternalFilters =
+    externalFilters ?? runtime.tableExternalFilters;
   const effectivePagination = pagination ?? runtime.tablePagination;
 
   if (columns.length === 0 || rows.length === 0) {
@@ -2080,7 +2293,9 @@ export function ClickyTable({
       ),
       ...(column.align ? { align: column.align } : {}),
       ...(column.sortable !== undefined ? { sortable: column.sortable } : {}),
-      ...(column.filterable !== undefined ? { filterable: column.filterable } : {}),
+      ...(column.filterable !== undefined
+        ? { filterable: column.filterable }
+        : {}),
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
       ...(column.shrink !== undefined ? { shrink: column.shrink } : {}),
     };
@@ -2093,8 +2308,10 @@ export function ClickyTable({
           const tags = clickyNodeTags(value as ClickyNode, column);
           return <TagList tags={tags} maxVisible={3} />;
         },
-        sortValue: (value) => clickyNodeTags(value as ClickyNode, column).length,
-        filterValue: (value) => clickyNodeTags(value as ClickyNode, column).map((tag) => tag.token),
+        sortValue: (value) =>
+          clickyNodeTags(value as ClickyNode, column).length,
+        filterValue: (value) =>
+          clickyNodeTags(value as ClickyNode, column).map((tag) => tag.token),
       };
     }
 
@@ -2107,7 +2324,8 @@ export function ClickyTable({
     };
   });
 
-  const defaultSortColumn = columns.find((column) => column.sortable !== false) ?? columns[0];
+  const defaultSortColumn =
+    columns.find((column) => column.sortable !== false) ?? columns[0];
 
   return (
     <DataTable<ClickyRow>
@@ -2115,7 +2333,12 @@ export function ClickyTable({
       columns={tableColumns}
       {...(autoFilter !== undefined ? { autoFilter } : {})}
       {...(defaultSortColumn
-        ? { defaultSort: { key: `cells.${defaultSortColumn.name}`, dir: "asc" as const } }
+        ? {
+            defaultSort: {
+              key: `cells.${defaultSortColumn.name}`,
+              dir: "asc" as const,
+            },
+          }
         : {})}
       getRowId={(row, index) =>
         `${index}-${columns
@@ -2133,7 +2356,9 @@ export function ClickyTable({
             isRowClickable: rowClickable ?? ((row) => Boolean(rowHref?.(row))),
           }
         : {})}
-      {...(effectiveExternalFilters ? { externalFilters: effectiveExternalFilters } : {})}
+      {...(effectiveExternalFilters
+        ? { externalFilters: effectiveExternalFilters }
+        : {})}
       {...(effectivePagination ? { pagination: effectivePagination } : {})}
     />
   );
@@ -2166,7 +2391,13 @@ function ClickyTableRowDetail({
           <div className="grid gap-2">
             {tagFields.map(({ column, tags, tableKey }) => {
               const tagActions = context.tagActionsByColumn[tableKey];
-              const content = <TagList tags={tags} maxVisible={tags.length} actions="inline" />;
+              const content = (
+                <TagList
+                  tags={tags}
+                  maxVisible={tags.length}
+                  actions="inline"
+                />
+              );
 
               return (
                 <div
@@ -2178,7 +2409,9 @@ function ClickyTableRowDetail({
                   </div>
                   <div className="min-w-0">
                     {tagActions ? (
-                      <TagActionsProvider value={tagActions}>{content}</TagActionsProvider>
+                      <TagActionsProvider value={tagActions}>
+                        {content}
+                      </TagActionsProvider>
                     ) : (
                       content
                     )}
@@ -2196,7 +2429,10 @@ function ClickyTableRowDetail({
         </div>
         <dl className="grid gap-2 md:grid-cols-2">
           {columns.map((column) => (
-            <div key={column.name} className="rounded-md border border-border bg-background p-2">
+            <div
+              key={column.name}
+              className="rounded-md border border-border bg-background p-2"
+            >
               <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {column.label || prettifyName(column.name)}
               </dt>
@@ -2253,11 +2489,16 @@ function ClickyCollapsedStructRows({
   );
 }
 
-function shouldRenderRowsAsCollapsedStructs(columns: ClickyColumn[], rows: ClickyRow[]) {
+function shouldRenderRowsAsCollapsedStructs(
+  columns: ClickyColumn[],
+  rows: ClickyRow[],
+) {
   if (rows.length === 0) return false;
 
   return rows.every((row) => {
-    const cells = columns.map((column) => row.cells[column.name]).filter(Boolean);
+    const cells = columns
+      .map((column) => row.cells[column.name])
+      .filter(Boolean);
     if (cells.length === 0) return false;
 
     const complexCells = cells.filter(isStructCellNode);
@@ -2272,7 +2513,10 @@ function isClickyTagColumn(column: ClickyColumn) {
   return /(^|[._-])(tags?|labels?|annotations?)$/.test(normalized);
 }
 
-function clickyNodeTags(node: ClickyNode | undefined, column: ClickyColumn): NormalizedTag[] {
+function clickyNodeTags(
+  node: ClickyNode | undefined,
+  column: ClickyColumn,
+): NormalizedTag[] {
   if (!isClickyTagColumn(column)) return [];
 
   const value = clickyNodeTagsValue(node);
@@ -2322,7 +2566,10 @@ function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
       return [
         {
           name: column.name,
-          label: clickyNodeText(column.header) || column.label || prettifyName(column.name),
+          label:
+            clickyNodeText(column.header) ||
+            column.label ||
+            prettifyName(column.name),
           value,
         },
       ];
@@ -2330,15 +2577,22 @@ function rowAsMap(row: ClickyRow, columns: ClickyColumn[]): ClickyNode {
   };
 }
 
-function rowStructLabel(row: ClickyRow, columns: ClickyColumn[], index: number) {
+function rowStructLabel(
+  row: ClickyRow,
+  columns: ClickyColumn[],
+  index: number,
+) {
   const entityLabel = singularizeLabel(
-    columns.find((column) => hasMeaningfulText(row.cells[column.name]))?.label ??
+    columns.find((column) => hasMeaningfulText(row.cells[column.name]))
+      ?.label ??
       columns[0]?.label ??
       columns[0]?.name ??
       "Item",
   );
   const title = rowTitle(row, columns);
-  return title ? `${entityLabel} ${index + 1}: ${title}` : `${entityLabel} ${index + 1}`;
+  return title
+    ? `${entityLabel} ${index + 1}: ${title}`
+    : `${entityLabel} ${index + 1}`;
 }
 
 function rowStructKey(row: ClickyRow, columns: ClickyColumn[], index: number) {
@@ -2372,7 +2626,10 @@ function rowTitle(row: ClickyRow, columns: ClickyColumn[]) {
   return "";
 }
 
-function findFieldText(node: ClickyNode | undefined, preferredName: string): string {
+function findFieldText(
+  node: ClickyNode | undefined,
+  preferredName: string,
+): string {
   if (!node) return "";
 
   if (node.kind === "map") {
@@ -2398,7 +2655,9 @@ function findFieldText(node: ClickyNode | undefined, preferredName: string): str
 }
 
 function hasMeaningfulText(node: ClickyNode | undefined) {
-  return Boolean(clickyNodeText(node).trim() || (node?.fields ?? []).length > 0);
+  return Boolean(
+    clickyNodeText(node).trim() || (node?.fields ?? []).length > 0,
+  );
 }
 
 function normalizeFieldName(name: string) {
@@ -2449,7 +2708,9 @@ function ClickyStackTraceNode({ node }: { node: ClickyNode }) {
     causedBy: node.causedBy ?? [],
     frames: node.frames ?? [],
     language: "java" as const,
-    ...(node.exceptionClass !== undefined ? { exceptionClass: node.exceptionClass } : {}),
+    ...(node.exceptionClass !== undefined
+      ? { exceptionClass: node.exceptionClass }
+      : {}),
     ...(node.message !== undefined ? { message: node.message } : {}),
   };
 
@@ -2473,7 +2734,11 @@ function ClickyCollapsed({ node }: { node: ClickyNode }) {
 
 function ClickyButtonNode({ node }: { node: ClickyNode }) {
   const title = [node.id, node.payload].filter(Boolean).join("\n") || undefined;
-  const content = node.label ? <ClickyNodeRenderer node={node.label} /> : node.text;
+  const content = node.label ? (
+    <ClickyNodeRenderer node={node.label} />
+  ) : (
+    node.text
+  );
 
   if (node.href) {
     return (
@@ -2521,13 +2786,18 @@ function ClickyHtmlNode({ node }: { node: ClickyNode }) {
   return <Tag dangerouslySetInnerHTML={{ __html: sanitized }} />;
 }
 
-function toInlineStyle(style?: ClickyStyle, text?: string): CSSProperties | undefined {
-  if (!style) return text?.includes("\n") ? { whiteSpace: "pre-wrap" } : undefined;
+function toInlineStyle(
+  style?: ClickyStyle,
+  text?: string,
+): CSSProperties | undefined {
+  if (!style)
+    return text?.includes("\n") ? { whiteSpace: "pre-wrap" } : undefined;
 
   const inlineStyle: CSSProperties = {};
 
   if (style.color) inlineStyle.color = style.color;
-  if (style.backgroundColor) inlineStyle.backgroundColor = style.backgroundColor;
+  if (style.backgroundColor)
+    inlineStyle.backgroundColor = style.backgroundColor;
   if (style.bold) inlineStyle.fontWeight = 700;
   if (style.faint) inlineStyle.opacity = 0.7;
   if (style.italic) inlineStyle.fontStyle = "italic";
@@ -2535,7 +2805,8 @@ function toInlineStyle(style?: ClickyStyle, text?: string): CSSProperties | unde
   const decorations: string[] = [];
   if (style.underline) decorations.push("underline");
   if (style.strikethrough) decorations.push("line-through");
-  if (decorations.length > 0) inlineStyle.textDecoration = decorations.join(" ");
+  if (decorations.length > 0)
+    inlineStyle.textDecoration = decorations.join(" ");
 
   if (
     style.textTransform === "uppercase" ||
@@ -2617,12 +2888,16 @@ function defaultResolveClickyCommand(
   if (!wanted) return undefined;
 
   return operations.find((operation) => {
-    const metaCommand = normalizeCommandPath(operation.operation["x-clicky"]?.command);
+    const metaCommand = normalizeCommandPath(
+      operation.operation["x-clicky"]?.command,
+    );
     if (metaCommand && metaCommand === wanted) {
       return true;
     }
 
-    const operationId = normalizeCommandPath(operation.operation.operationId?.replaceAll("_", "/"));
+    const operationId = normalizeCommandPath(
+      operation.operation.operationId?.replaceAll("_", "/"),
+    );
     return operationId === wanted;
   });
 }
@@ -2642,7 +2917,9 @@ function buildCommandParameterValues(
 ): ParameterValues {
   const values: ParameterValues = { ...request.flags };
   const args = [...(request.args ?? [])];
-  const positionalParams = parameters.filter((param) => isPositionalParam(param));
+  const positionalParams = parameters.filter((param) =>
+    isPositionalParam(param),
+  );
   let argIndex = 0;
 
   for (const param of positionalParams) {
@@ -2664,8 +2941,13 @@ function buildCommandParameterValues(
   return values;
 }
 
-function missingRequiredParameters(parameters: OpenAPIParameter[], values: ParameterValues) {
-  return parameters.filter((param) => param.required && (values[param.name] ?? "").trim() === "");
+function missingRequiredParameters(
+  parameters: OpenAPIParameter[],
+  values: ParameterValues,
+) {
+  return parameters.filter(
+    (param) => param.required && (values[param.name] ?? "").trim() === "",
+  );
 }
 
 async function executeClickyCommand(
@@ -2676,12 +2958,17 @@ async function executeClickyCommand(
   return client.executeCommand(
     operation.path,
     operation.method,
-    packParameterValues(pruneParameterValues(values), operation.operation.parameters ?? []),
+    packParameterValues(
+      pruneParameterValues(values),
+      operation.operation.parameters ?? [],
+    ),
     { Accept: "application/json+clicky" },
   );
 }
 
-function buildCommandExecutionHref(resolved: ClickyResolvedCommand): string | undefined {
+function buildCommandExecutionHref(
+  resolved: ClickyResolvedCommand,
+): string | undefined {
   const operation = resolved.operation;
   if (!operation) {
     return undefined;
@@ -2710,7 +2997,10 @@ function substituteOperationPath(path: string, params: Record<string, string>) {
 
   for (const [key, value] of Object.entries(params)) {
     if (url.pathname.includes(`{${key}}`)) {
-      url.pathname = url.pathname.replace(`{${key}}`, encodeURIComponent(value));
+      url.pathname = url.pathname.replace(
+        `{${key}}`,
+        encodeURIComponent(value),
+      );
       delete remaining[key];
     }
   }
@@ -2751,15 +3041,24 @@ function clickyNodeText(node: ClickyNode | null | undefined): string {
       .replace(/<[^>]+>/g, " ")
       .trim();
   if (node.kind === "code") return node.source ?? "";
-  if ((node.kind === "link" || node.kind === "link-command") && node.children?.length) {
-    return [node.text, ...node.children.map((child) => clickyNodeText(child))].join("");
+  if (
+    (node.kind === "link" || node.kind === "link-command") &&
+    node.children?.length
+  ) {
+    return [
+      node.text,
+      ...node.children.map((child) => clickyNodeText(child)),
+    ].join("");
   }
   if (node.kind === "button" && node.label) return clickyNodeText(node.label);
   if (node.kind === "button-group") {
     return (node.items ?? []).map((item) => clickyNodeText(item)).join(" ");
   }
   if (node.kind === "text" && node.children?.length) {
-    return [node.text, ...node.children.map((child) => clickyNodeText(child))].join("");
+    return [
+      node.text,
+      ...node.children.map((child) => clickyNodeText(child)),
+    ].join("");
   }
   return "";
 }

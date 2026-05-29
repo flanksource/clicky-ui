@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { FilterBar } from "../components/FilterBar";
 import { Icon } from "../data/Icon";
-import { CodiconAddIcon, CodiconListFlatIcon, CodiconTableIcon } from "../data/static-icons";
+import { UiAdd, UiListFlat, UiTable } from "@flanksource/icons/ui";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import { filterOperationsByDomain, findListEndpoint } from "./classify";
@@ -59,7 +59,11 @@ function defaultRenderError(err: unknown, title: string) {
   return (
     <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
       <div className="font-medium">{title}</div>
-      {message && <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">{message}</div>}
+      {message && (
+        <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">
+          {message}
+        </div>
+      )}
     </div>
   );
 }
@@ -80,8 +84,12 @@ export function OperationCatalog({
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
   const [view, setView] = useState<"table" | "endpoints">("table");
-  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
-  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
+  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(
+    null,
+  );
+  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(
+    null,
+  );
   const [actionError, setActionError] = useState("");
   const [isExecutingAction, setIsExecutingAction] = useState(false);
 
@@ -96,11 +104,23 @@ export function OperationCatalog({
       return surfaceOps;
     }
 
-    return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter(
-      (op) =>
-        operationIdPrefix ? (op.operation.operationId ?? "").startsWith(operationIdPrefix) : true,
+    return (
+      allOperations
+        ? operations
+        : filterOperationsByDomain(operations, entities)
+    ).filter((op) =>
+      operationIdPrefix
+        ? (op.operation.operationId ?? "").startsWith(operationIdPrefix)
+        : true,
     );
-  }, [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata]);
+  }, [
+    allOperations,
+    entities,
+    operationIdPrefix,
+    operations,
+    surfaceOps,
+    useSurfaceMetadata,
+  ]);
 
   const listEndpoint = useMemo(() => {
     if (useSurfaceMetadata) {
@@ -108,10 +128,15 @@ export function OperationCatalog({
     }
 
     return listOperationId
-      ? domainOps.find((op) => op.method === "get" && op.operation.operationId === listOperationId)
+      ? domainOps.find(
+          (op) =>
+            op.method === "get" && op.operation.operationId === listOperationId,
+        )
       : findListEndpoint(domainOps, entities);
   }, [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata]);
-  const [filters, setFilters] = useState<Record<string, string>>(() => readFiltersFromUrl());
+  const [filters, setFilters] = useState<Record<string, string>>(() =>
+    readFiltersFromUrl(),
+  );
   const listParameters = listEndpoint?.operation.parameters ?? [];
 
   useEffect(() => {
@@ -119,7 +144,12 @@ export function OperationCatalog({
   }, [filters]);
 
   const listQuery = useQuery<ExecutionResponse>({
-    queryKey: ["operation-list", listEndpoint?.method, listEndpoint?.path, filters],
+    queryKey: [
+      "operation-list",
+      listEndpoint?.method,
+      listEndpoint?.path,
+      filters,
+    ],
     queryFn: () =>
       client.executeCommand(
         listEndpoint!.path,
@@ -135,7 +165,12 @@ export function OperationCatalog({
   });
 
   const lookupQuery = useQuery<OperationLookupResponse>({
-    queryKey: ["operation-lookup", listEndpoint?.method, listEndpoint?.path, filters],
+    queryKey: [
+      "operation-lookup",
+      listEndpoint?.method,
+      listEndpoint?.path,
+      filters,
+    ],
     queryFn: async () =>
       (await client.lookupFilters?.(
         listEndpoint!.path,
@@ -157,7 +192,9 @@ export function OperationCatalog({
       (op) =>
         op.method !== "get" &&
         !op.path.includes("{") &&
-        !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
+        !op.operation.parameters?.some(
+          (p) => p.in === "path" || isPositionalParam(p),
+        ),
     );
   }, [domainOps, surfaceKey, useSurfaceMetadata]);
 
@@ -177,7 +214,9 @@ export function OperationCatalog({
     kind === "configuration" || definition.key.startsWith("config-")
       ? "Configuration"
       : "Operations";
-  const activeActionMeta = activeAction ? getOperationClickyMeta(activeAction) : undefined;
+  const activeActionMeta = activeAction
+    ? getOperationClickyMeta(activeAction)
+    : undefined;
 
   const actionLockedValues = useMemo(() => {
     const meta = activeActionMeta;
@@ -197,7 +236,11 @@ export function OperationCatalog({
       locked[meta.idParam] = "all";
     }
 
-    if ((activeAction.operation.parameters ?? []).some((param) => param.name === "filter")) {
+    if (
+      (activeAction.operation.parameters ?? []).some(
+        (param) => param.name === "filter",
+      )
+    ) {
       locked.filter =
         Object.entries(filters)
           .filter(([, value]) => value)
@@ -224,7 +267,9 @@ export function OperationCatalog({
       await listQuery.refetch();
     } catch (err) {
       setActionResult(null);
-      setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
+      setActionError(
+        err instanceof Error ? err.message : String(err ?? "Unknown error"),
+      );
     } finally {
       setIsExecutingAction(false);
     }
@@ -249,8 +294,12 @@ export function OperationCatalog({
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             {sectionLabel}
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{definition.title}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{definition.description}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {definition.title}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            {definition.description}
+          </p>
         </div>
         {hasTable && (
           <div className="flex gap-1 rounded-lg border p-1">
@@ -263,7 +312,7 @@ export function OperationCatalog({
               aria-pressed={view === "table"}
               onClick={() => setView("table")}
             >
-              <Icon icon={CodiconTableIcon} />
+              <Icon icon={UiTable} />
             </Button>
             <Button
               type="button"
@@ -274,7 +323,7 @@ export function OperationCatalog({
               aria-pressed={view === "endpoints"}
               onClick={() => setView("endpoints")}
             >
-              <Icon icon={CodiconListFlatIcon} />
+              <Icon icon={UiListFlat} />
             </Button>
           </div>
         )}
@@ -301,8 +350,10 @@ export function OperationCatalog({
                     setActionError("");
                   }}
                 >
-                  <Icon icon={CodiconAddIcon} className="text-xs" />
-                  {op.operation.summary || getOperationClickyMeta(op)?.actionName || commandName}
+                  <Icon icon={UiAdd} className="text-xs" />
+                  {op.operation.summary ||
+                    getOperationClickyMeta(op)?.actionName ||
+                    commandName}
                 </Button>
               );
             }
@@ -315,7 +366,7 @@ export function OperationCatalog({
                 "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
               children: (
                 <>
-                  <Icon icon={CodiconAddIcon} className="text-xs" />
+                  <Icon icon={UiAdd} className="text-xs" />
                   {op.operation.summary || commandName}
                 </>
               ),
@@ -326,12 +377,15 @@ export function OperationCatalog({
 
       {showTable ? (
         <>
-          {(filterBarConfig.filters.length > 0 || filterBarConfig.timeRange != null) && (
+          {(filterBarConfig.filters.length > 0 ||
+            filterBarConfig.timeRange != null) && (
             <FilterBar
               autoSubmit
               isPending={listQuery.isFetching}
               filters={filterBarConfig.filters}
-              {...(filterBarConfig.timeRange ? { timeRange: filterBarConfig.timeRange } : {})}
+              {...(filterBarConfig.timeRange
+                ? { timeRange: filterBarConfig.timeRange }
+                : {})}
             />
           )}
           {listQuery.isLoading ? (
@@ -343,7 +397,10 @@ export function OperationCatalog({
               className="mt-0"
             />
           ) : listQuery.isError ? (
-            renderError(listQuery.error, `Failed to load ${listEndpoint?.path ?? ""}`)
+            renderError(
+              listQuery.error,
+              `Failed to load ${listEndpoint?.path ?? ""}`,
+            )
           ) : listQuery.data ? (
             <ExecutionResult
               response={listQuery.data}
@@ -378,7 +435,9 @@ export function OperationCatalog({
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <MethodBadge method={activeAction.method} />
-              <code className="rounded-md bg-muted px-2 py-1 text-sm">{activeAction.path}</code>
+              <code className="rounded-md bg-muted px-2 py-1 text-sm">
+                {activeAction.path}
+              </code>
             </div>
             <FilterForm
               client={client}
@@ -422,7 +481,11 @@ function readFiltersFromUrl(): Record<string, string> {
 }
 
 function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()}
+    />
+  );
 }
 
 function writeFiltersToUrl(filters: Record<string, string>) {
@@ -433,7 +496,10 @@ function writeFiltersToUrl(filters: Record<string, string>) {
   }
   const query = search.toString();
   const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-  if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+  if (
+    next !==
+    `${window.location.pathname}${window.location.search}${window.location.hash}`
+  ) {
     window.history.replaceState(window.history.state, "", next);
   }
 }

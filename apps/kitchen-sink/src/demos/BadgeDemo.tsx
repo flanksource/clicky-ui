@@ -1,28 +1,45 @@
 import type { ReactNode } from "react";
-import { Badge } from "@flanksource/clicky-ui";
-import CheckIcon from "@iconify-react/lucide/check";
-import ActivityIcon from "@iconify-react/lucide/activity";
-import BoxesIcon from "@iconify-react/lucide/boxes";
-import CircleXIcon from "@iconify-react/lucide/circle-x";
-import GitBranchIcon from "@iconify-react/lucide/git-branch";
-import InfoIcon from "@iconify-react/lucide/info";
-import TriangleAlertIcon from "@iconify-react/lucide/triangle-alert";
-import CodiconCheckIcon from "@iconify-react/codicon/check";
+import {
+  Badge,
+  UiCheck,
+  UiActivity as ActivityIcon,
+  UiBoxes as BoxesIcon,
+  UiCheck as CheckIcon,
+  UiCircleX as CircleXIcon,
+  UiGitBranch as GitBranchIcon,
+  UiInfo as InfoIcon,
+  UiWarningTriangle as TriangleAlertIcon,
+} from "@flanksource/clicky-ui";
 import { DemoRow, DemoSection } from "./Section";
 
 const TONES = ["neutral", "success", "danger", "warning", "info"] as const;
 const LEGACY_VARIANTS = ["soft", "solid", "outline"] as const;
 
 const STATUS_BADGES = [
-  { label: "Healthy", value: "ready", status: "success" as const, icon: CheckIcon },
+  {
+    label: "Healthy",
+    value: "ready",
+    status: "success" as const,
+    icon: CheckIcon,
+  },
   {
     label: "Degraded",
     value: "latency",
     status: "warning" as const,
     icon: TriangleAlertIcon,
   },
-  { label: "Failed", value: "blocked", status: "error" as const, icon: CircleXIcon },
-  { label: "Pending", value: "queued", status: "info" as const, icon: InfoIcon },
+  {
+    label: "Failed",
+    value: "blocked",
+    status: "error" as const,
+    icon: CircleXIcon,
+  },
+  {
+    label: "Pending",
+    value: "queued",
+    status: "info" as const,
+    icon: InfoIcon,
+  },
 ];
 
 const FIELD_VALUE_BADGES = [
@@ -36,8 +53,14 @@ const FIELD_VALUE_BADGES = [
 
 const WRAPPING_BADGES = [
   ["container", "ghcr.io/flanksource/platform/incident-commander-controller"],
-  ["image", "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12"],
-  ["to", "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412"],
+  [
+    "image",
+    "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12",
+  ],
+  [
+    "to",
+    "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412",
+  ],
 ] as const;
 
 const TRUNCATION_BADGES = [
@@ -55,7 +78,8 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "arn",
-    value: "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
+    value:
+      "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
     truncate: "arn" as const,
     maxWidth: 20,
   },
@@ -73,19 +97,27 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "url",
-    value: "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
+    value:
+      "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
     truncate: "url" as const,
     maxWidth: 20,
   },
   {
     label: "auto",
-    value: "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
+    value:
+      "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
     truncate: "auto" as const,
     maxWidth: 20,
   },
 ] as const;
 
-function DemoGroup({ title, children }: { title: string; children: ReactNode }) {
+function DemoGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <div className="space-y-density-2">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -115,7 +147,7 @@ export function BadgeDemo() {
           <Badge tone="danger" variant="solid" count={12}>
             errors
           </Badge>
-          <Badge tone="success" icon={CodiconCheckIcon}>
+          <Badge tone="success" icon={UiCheck}>
             passed
           </Badge>
           <Badge tone="warning" size="lg">
@@ -137,7 +169,13 @@ export function BadgeDemo() {
               size="xs"
             />
           ))}
-          <Badge variant="metric" label="Latency" value="45ms" icon={ActivityIcon} size="xs" />
+          <Badge
+            variant="metric"
+            label="Latency"
+            value="45ms"
+            icon={ActivityIcon}
+            size="xs"
+          />
           <Badge
             variant="custom"
             label="v2.4.1"

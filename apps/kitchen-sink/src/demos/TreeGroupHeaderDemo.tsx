@@ -1,11 +1,22 @@
 import { useState } from "react";
-import { TreeGroupHeader, type StaticIconComponent } from "@flanksource/clicky-ui";
-import SymbolClassIcon from "@iconify-react/codicon/symbol-class";
-import SymbolInterfaceIcon from "@iconify-react/codicon/symbol-interface";
+import {
+  UiClass as SymbolClassIcon,
+  UiInterface as SymbolInterfaceIcon,
+  TreeGroupHeader,
+  type StaticIconComponent,
+} from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
 
-const GROUPS: Array<{ kind: string; icon: StaticIconComponent; items: string[] }> = [
-  { kind: "Pod", icon: SymbolClassIcon, items: ["api-server", "worker", "scheduler"] },
+const GROUPS: Array<{
+  kind: string;
+  icon: StaticIconComponent;
+  items: string[];
+}> = [
+  {
+    kind: "Pod",
+    icon: SymbolClassIcon,
+    items: ["api-server", "worker", "scheduler"],
+  },
   { kind: "Service", icon: SymbolInterfaceIcon, items: ["api", "auth"] },
 ];
 

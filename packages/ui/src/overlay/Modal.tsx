@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { CodiconCloseIcon } from "../data/static-icons";
+import { UiClose } from "@flanksource/icons/ui";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -90,13 +90,19 @@ export function Modal({
                 aria-label="Close"
                 className="text-muted-foreground hover:text-foreground"
               >
-                <Icon icon={CodiconCloseIcon} />
+                <Icon icon={UiClose} />
               </button>
             )}
           </div>
         )}
-        <div className="flex-1 overflow-auto px-density-4 py-density-3">{children}</div>
-        {footer && <div className="px-density-4 py-density-3 border-t border-border">{footer}</div>}
+        <div className="flex-1 overflow-auto px-density-4 py-density-3">
+          {children}
+        </div>
+        {footer && (
+          <div className="px-density-4 py-density-3 border-t border-border">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

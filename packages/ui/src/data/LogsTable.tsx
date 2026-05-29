@@ -1,10 +1,18 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { AnsiHtml } from "./AnsiHtml";
-import { DataTable, type DataTableColumn, type DataTableProps } from "./DataTable";
-import { Properties, type PropertiesAction, type PropertiesItem } from "./Properties";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableProps,
+} from "./DataTable";
+import {
+  Properties,
+  type PropertiesAction,
+  type PropertiesItem,
+} from "./Properties";
 import { formatPropertyLabel } from "./properties-utils";
-import { LucideCopyIcon, LucideZoomInIcon, LucideZoomOutIcon } from "./static-icons";
+import { UiCopy, UiZoomIn, UiZoomOut } from "@flanksource/icons/ui";
 
 export type LogsTableInput = string | Record<string, unknown>;
 
@@ -22,7 +30,10 @@ export type LogsTableRow = {
   raw: unknown;
 };
 
-export type LogsTableProps = Omit<DataTableProps<LogsTableRow>, "data" | "columns"> & {
+export type LogsTableProps = Omit<
+  DataTableProps<LogsTableRow>,
+  "data" | "columns"
+> & {
   logs: string | LogsTableInput[];
   columns?: DataTableColumn<LogsTableRow>[];
   showRawDetails?: boolean;
@@ -30,7 +41,9 @@ export type LogsTableProps = Omit<DataTableProps<LogsTableRow>, "data" | "column
 
 // Matches CSI / SGR escape sequences (e.g. "\x1b[31m"). Used to skip the
 // AnsiHtml render for plain messages so the cell stays a fast text node.
-const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`);
+const ANSI_PATTERN = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`,
+);
 
 const DEFAULT_LOG_COLUMNS: DataTableColumn<LogsTableRow>[] = [
   {
@@ -58,12 +71,25 @@ const DEFAULT_LOG_COLUMNS: DataTableColumn<LogsTableRow>[] = [
     minWidth: 360,
     cellClassName: "font-mono text-xs",
     render: (value) => {
-      const text = typeof value === "string" ? value : value == null ? "" : String(value);
+      const text =
+        typeof value === "string" ? value : value == null ? "" : String(value);
       if (!ANSI_PATTERN.test(text)) return text;
-      return <AnsiHtml as="span" text={text} className="whitespace-pre-wrap break-words" />;
+      return (
+        <AnsiHtml
+          as="span"
+          text={text}
+          className="whitespace-pre-wrap break-words"
+        />
+      );
     },
   },
-  { key: "tags", label: "Tags", kind: "tags", grow: true, tags: { maxVisible: 4 } },
+  {
+    key: "tags",
+    label: "Tags",
+    kind: "tags",
+    grow: true,
+    tags: { maxVisible: 4 },
+  },
 ];
 
 const DEFAULT_SORT = {
@@ -107,12 +133,16 @@ export function LogsTable({
       showFullscreenControl={showFullscreenControl}
       fullscreenTitle={fullscreenTitle}
       fullscreenButtonLabel={fullscreenButtonLabel}
-      {...(resolvedRenderExpandedRow ? { renderExpandedRow: resolvedRenderExpandedRow } : {})}
+      {...(resolvedRenderExpandedRow
+        ? { renderExpandedRow: resolvedRenderExpandedRow }
+        : {})}
     />
   );
 }
 
-export function normalizeLogsTableRows(logs: string | LogsTableInput[]): LogsTableRow[] {
+export function normalizeLogsTableRows(
+  logs: string | LogsTableInput[],
+): LogsTableRow[] {
   const entries = typeof logs === "string" ? splitLogLines(logs) : logs;
   return entries.map((entry, index) => normalizeLogEntry(entry, index));
 }
@@ -122,12 +152,17 @@ function splitLogLines(logs: string): string[] {
 }
 
 function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
-  const parsedOuterValue = typeof entry === "string" ? tryParseJson(entry) : entry;
-  const parsedOuter = parsedOuterValue === JSON_PARSE_FAILED ? entry : parsedOuterValue;
+  const parsedOuterValue =
+    typeof entry === "string" ? tryParseJson(entry) : entry;
+  const parsedOuter =
+    parsedOuterValue === JSON_PARSE_FAILED ? entry : parsedOuterValue;
   const outer = asRecord(parsedOuter);
   const outerLine = stringValue(outer?.line);
-  const parsedLineValue = outerLine ? tryParseJson(outerLine) : JSON_PARSE_FAILED;
-  const parsedLine = parsedLineValue === JSON_PARSE_FAILED ? undefined : parsedLineValue;
+  const parsedLineValue = outerLine
+    ? tryParseJson(outerLine)
+    : JSON_PARSE_FAILED;
+  const parsedLine =
+    parsedLineValue === JSON_PARSE_FAILED ? undefined : parsedLineValue;
   const inner = asRecord(parsedLine) ?? (outerLine ? undefined : outer);
   const labels = asRecord(outer?.labels);
 
@@ -167,7 +202,10 @@ function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
     pick(outer, "service"),
     pick(labels, "service"),
   );
-  const dataset = firstString(pick(inner, "event.dataset"), pick(inner, "dataset"));
+  const dataset = firstString(
+    pick(inner, "event.dataset"),
+    pick(inner, "dataset"),
+  );
   const logger = firstString(
     pick(inner, "log.logger"),
     pick(inner, "logger"),
@@ -204,7 +242,8 @@ function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
     thread,
     message,
     tags,
-    line: outerLine ?? (typeof entry === "string" ? entry : stableString(entry)),
+    line:
+      outerLine ?? (typeof entry === "string" ? entry : stableString(entry)),
     raw: parsedOuter,
     ...(parsedLine !== undefined ? { parsedLine } : {}),
   };
@@ -262,12 +301,13 @@ function LogDetails({ row }: { row: LogsTableRow }) {
   };
   const details = useMemo(() => buildProcessedLogDetails(row), [row]);
 
-  const labelForPath = (path: string) => formatPropertyLabel(path.split(".").pop() ?? path);
+  const labelForPath = (path: string) =>
+    formatPropertyLabel(path.split(".").pop() ?? path);
 
   const prefixActions: PropertiesAction<unknown>[] = [
     {
       id: "expand",
-      icon: LucideZoomInIcon,
+      icon: UiZoomIn,
       label: (key) => `Expand ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !!item.expanded,
@@ -275,7 +315,7 @@ function LogDetails({ row }: { row: LogsTableRow }) {
     },
     {
       id: "collapse",
-      icon: LucideZoomOutIcon,
+      icon: UiZoomOut,
       label: (key) => `Collapse ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !item.expanded,
@@ -286,17 +326,29 @@ function LogDetails({ row }: { row: LogsTableRow }) {
   const suffixActions: PropertiesAction<unknown>[] = [
     {
       id: "copy",
-      icon: LucideCopyIcon,
+      icon: UiCopy,
       label: (key) => `Copy ${labelForPath(key)}`,
       onClick: (_k, value) => copyLogDetailsValue(value),
     },
   ];
 
   const renderLabel = (key: string) => labelForPath(key);
-  const renderValue = (_key: string, value: unknown, item: PropertiesItem<unknown>) =>
-    item.expandable ? <LogValueSummary value={value} /> : <LogScalarValue value={value} />;
+  const renderValue = (
+    _key: string,
+    value: unknown,
+    item: PropertiesItem<unknown>,
+  ) =>
+    item.expandable ? (
+      <LogValueSummary value={value} />
+    ) : (
+      <LogScalarValue value={value} />
+    );
 
-  const toItems = (value: unknown, path: string, depth: number): PropertiesItem<unknown>[] =>
+  const toItems = (
+    value: unknown,
+    path: string,
+    depth: number,
+  ): PropertiesItem<unknown>[] =>
     getValueEntries(value).map(([key, entryValue]) => {
       const entryPath = `${path}.${String(key)}`;
       const expandable = isExpandableValue(entryValue);
@@ -337,7 +389,11 @@ function LogDetails({ row }: { row: LogsTableRow }) {
 
 function LogValueSummary({ value }: { value: unknown }) {
   if (Array.isArray(value)) {
-    return <span className="font-mono text-muted-foreground">[{value.length} items]</span>;
+    return (
+      <span className="font-mono text-muted-foreground">
+        [{value.length} items]
+      </span>
+    );
   }
   const record = asRecord(value);
   if (record) {
@@ -366,7 +422,11 @@ function LogScalarValue({ value }: { value: unknown }) {
   }
 
   if (typeof value === "number" || typeof value === "boolean") {
-    return <span className="font-mono text-blue-700 dark:text-blue-400">{String(value)}</span>;
+    return (
+      <span className="font-mono text-blue-700 dark:text-blue-400">
+        {String(value)}
+      </span>
+    );
   }
 
   return (
@@ -398,9 +458,9 @@ function stablePrettyString(value: unknown): string {
 
 function copyLogDetailsValue(value: unknown) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    Promise.resolve(navigator.clipboard.writeText(stablePrettyString(value))).catch(
-      () => undefined,
-    );
+    Promise.resolve(
+      navigator.clipboard.writeText(stablePrettyString(value)),
+    ).catch(() => undefined);
   }
 }
 
@@ -418,7 +478,9 @@ function buildProcessedLogDetails(row: LogsTableRow): Record<string, unknown> {
   });
 }
 
-function buildProcessedLogAttributes(row: LogsTableRow): Record<string, unknown> {
+function buildProcessedLogAttributes(
+  row: LogsTableRow,
+): Record<string, unknown> {
   const attributes = {
     ...asRecord(row.raw),
     ...asRecord(row.parsedLine),
@@ -446,11 +508,15 @@ function buildProcessedLogAttributes(row: LogsTableRow): Record<string, unknown>
   ]);
 
   return stripEmptyProperties(
-    Object.fromEntries(Object.entries(attributes).filter(([key]) => !hiddenKeys.has(key))),
+    Object.fromEntries(
+      Object.entries(attributes).filter(([key]) => !hiddenKeys.has(key)),
+    ),
   );
 }
 
-function stripEmptyProperties(record: Record<string, unknown>): Record<string, unknown> {
+function stripEmptyProperties(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(record).filter(([, value]) => {
       if (value == null) return false;
@@ -475,7 +541,10 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function pick(record: Record<string, unknown> | undefined, path: string): unknown {
+function pick(
+  record: Record<string, unknown> | undefined,
+  path: string,
+): unknown {
   if (!record) return undefined;
   if (Object.prototype.hasOwnProperty.call(record, path)) return record[path];
   return path.split(".").reduce<unknown>((current, key) => {
@@ -497,7 +566,8 @@ function firstString(...values: unknown[]): string {
 function stringValue(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   return "";
 }
 

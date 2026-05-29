@@ -3,11 +3,18 @@ import {
   type AvatarKind,
   type AvatarVariant,
 } from "../../../../packages/ui/src/data/Avatar";
-import { AvatarBadge, fnv1a32, type StaticIconComponent } from "@flanksource/clicky-ui";
-import CheckThinIcon from "@iconify-react/ph/check-thin";
-import HourglassMediumThinIcon from "@iconify-react/ph/hourglass-medium-thin";
-import XThinIcon from "@iconify-react/ph/x-thin";
-import { resolveSize, type SizeToken } from "../../../../packages/ui/src/lib/size";
+import {
+  AvatarBadge,
+  UiCheck as CheckThinIcon,
+  UiHourglass as HourglassMediumThinIcon,
+  UiClose as XThinIcon,
+  fnv1a32,
+  type StaticIconComponent,
+} from "@flanksource/clicky-ui";
+import {
+  resolveSize,
+  type SizeToken,
+} from "../../../../packages/ui/src/lib/size";
 import { useDensityValue } from "../../../../packages/ui/src/hooks/use-density";
 import { DemoRow, DemoSection } from "./Section";
 
@@ -21,7 +28,11 @@ type SampleUser = {
 const USERS: SampleUser[] = [
   { full: "Chen, Nora", email: "nora.chen@example.com", initials: "CN" },
   { full: "Singh, Tara", email: "tara.singh@example.com", initials: "ST" },
-  { full: "Martinez, Theo", email: "theo.martinez@example.com", initials: "MT" },
+  {
+    full: "Martinez, Theo",
+    email: "theo.martinez@example.com",
+    initials: "MT",
+  },
   {
     full: "Architecture Runway Team",
     email: "[CORP]\\Architecture Runway Team",
@@ -31,16 +42,22 @@ const USERS: SampleUser[] = [
   { full: "QA Group", email: "[CORP]\\QA", initials: "QA", kind: "group" },
 ];
 
-const VARIANTS: Array<{ description: string; title: string; variant: AvatarVariant }> = [
+const VARIANTS: Array<{
+  description: string;
+  title: string;
+  variant: AvatarVariant;
+}> = [
   {
     title: "Duotone",
     variant: "duotone",
-    description: "Soft tint with colored initials for the default user treatment.",
+    description:
+      "Soft tint with colored initials for the default user treatment.",
   },
   {
     title: "Solid",
     variant: "solid",
-    description: "Stronger monogram badge when the icon should carry more weight.",
+    description:
+      "Stronger monogram badge when the icon should carry more weight.",
   },
   {
     title: "Stamp",
@@ -63,18 +80,34 @@ type StageStatusSpec = {
 };
 
 const STAGE_STATUS: Record<StageStatus, StageStatusSpec> = {
-  approved: { icon: CheckThinIcon, cellBg: "bg-emerald-50/80", tone: "emerald" },
-  pending: { icon: HourglassMediumThinIcon, cellBg: "bg-amber-50/85", tone: "amber" },
+  approved: {
+    icon: CheckThinIcon,
+    cellBg: "bg-emerald-50/80",
+    tone: "emerald",
+  },
+  pending: {
+    icon: HourglassMediumThinIcon,
+    cellBg: "bg-amber-50/85",
+    tone: "amber",
+  },
   rejected: { icon: XThinIcon, cellBg: "bg-rose-50/85", tone: "rose" },
 };
 
-const STAGE_STATES: Array<{ comment?: string; state: StageStatus; user: SampleUser }> = [
+const STAGE_STATES: Array<{
+  comment?: string;
+  state: StageStatus;
+  user: SampleUser;
+}> = [
   { state: "approved", user: USERS[0]! },
   { state: "pending", user: USERS[1]! },
   { state: "rejected", user: USERS[2]! },
 ];
 
-const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: SampleUser }> = [
+const STAGE_COMMENT_STATES: Array<{
+  comment: string;
+  state: StageStatus;
+  user: SampleUser;
+}> = [
   {
     state: "approved",
     user: USERS[0]!,
@@ -88,7 +121,10 @@ const STAGE_COMMENT_STATES: Array<{ comment: string; state: StageStatus; user: S
   },
 ];
 
-function stageCellBorderColor(user: SampleUser, variant: AvatarVariant): string {
+function stageCellBorderColor(
+  user: SampleUser,
+  variant: AvatarVariant,
+): string {
   const kind = user.kind ?? "user";
   const hue = fnv1a32(user.full) % 360;
 
@@ -158,8 +194,12 @@ function IdentityLine({
         variant={variant}
       />
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-foreground">{user.full}</div>
-        <div className="truncate font-mono text-[11px] text-muted-foreground">{user.email}</div>
+        <div className="truncate text-sm font-medium text-foreground">
+          {user.full}
+        </div>
+        <div className="truncate font-mono text-[11px] text-muted-foreground">
+          {user.email}
+        </div>
       </div>
     </div>
   );
@@ -178,12 +218,18 @@ function VariantCard({
     <div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-background p-4">
       <div className="space-y-1 border-b border-border pb-3">
         <div className="text-sm font-semibold text-foreground">{title}</div>
-        <div className="text-xs leading-5 text-muted-foreground">{description}</div>
+        <div className="text-xs leading-5 text-muted-foreground">
+          {description}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         {USERS.map((user) => (
-          <IdentityLine key={`${variant}-${user.initials}`} user={user} variant={variant} />
+          <IdentityLine
+            key={`${variant}-${user.initials}`}
+            user={user}
+            variant={variant}
+          />
         ))}
       </div>
 
@@ -198,7 +244,9 @@ function VariantCard({
               state={entry.state}
               user={entry.user}
               variant={variant}
-              {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
+              {...(entry.comment !== undefined
+                ? { comment: entry.comment }
+                : {})}
             />
           ))}
         </div>
@@ -220,8 +268,8 @@ export function AvatarDemo() {
           Exploration · Option Set A
         </div>
         <div className="text-sm text-muted-foreground">
-          The shared avatar now supports duotone, solid, stamp, and mono treatments instead of a
-          single pastel fallback.
+          The shared avatar now supports duotone, solid, stamp, and mono
+          treatments instead of a single pastel fallback.
         </div>
       </div>
 
@@ -266,7 +314,12 @@ export function AvatarDemo() {
             const px = resolveSize(size, density);
             return (
               <div key={size} className="flex items-center gap-2">
-                <Avatar alt="Chen, Nora" initials="CN" size={size} variant="duotone" />
+                <Avatar
+                  alt="Chen, Nora"
+                  initials="CN"
+                  size={size}
+                  variant="duotone"
+                />
                 <span
                   className="font-medium leading-none text-foreground"
                   style={{ fontSize: Math.round(px * 0.85) }}
@@ -295,8 +348,16 @@ export function AvatarDemo() {
               {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => {
                 const px = resolveSize(size, density);
                 return (
-                  <div key={`${entry.variant}-${size}`} className="flex items-center gap-2">
-                    <Avatar alt="Chen, Nora" initials="CN" size={size} variant={entry.variant} />
+                  <div
+                    key={`${entry.variant}-${size}`}
+                    className="flex items-center gap-2"
+                  >
+                    <Avatar
+                      alt="Chen, Nora"
+                      initials="CN"
+                      size={size}
+                      variant={entry.variant}
+                    />
                     <span
                       className="font-medium leading-none text-foreground"
                       style={{ fontSize: Math.round(px * 0.85) }}
@@ -317,7 +378,9 @@ export function AvatarDemo() {
         </div>
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="font-mono text-[10px] text-muted-foreground">comments · sm</div>
+            <div className="font-mono text-[10px] text-muted-foreground">
+              comments · sm
+            </div>
             <div className="space-y-3">
               {STAGE_COMMENT_STATES.map((entry) => (
                 <StageCellPreview
@@ -343,7 +406,9 @@ export function AvatarDemo() {
                     user={entry.user}
                     variant="duotone"
                     size={size}
-                    {...(entry.comment !== undefined ? { comment: entry.comment } : {})}
+                    {...(entry.comment !== undefined
+                      ? { comment: entry.comment }
+                      : {})}
                   />
                 ))}
               </div>
@@ -387,8 +452,12 @@ export function AvatarDemo() {
                 variant="stamp"
               />
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-foreground">{user.full}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">approved · 14:32</div>
+                <div className="truncate text-sm font-medium text-foreground">
+                  {user.full}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  approved · 14:32
+                </div>
               </div>
             </div>
           ))}

@@ -268,10 +268,8 @@ export function parametersToFormConfig(
       offsetParam: offsetParam.name,
       limitValue: values[limitParam.name] ?? "",
       offsetValue: values[offsetParam.name] ?? "",
-      setLimit: (next) =>
-        setValues((current) => ({ ...current, [limitParam.name]: next })),
-      setOffset: (next) =>
-        setValues((current) => ({ ...current, [offsetParam.name]: next })),
+      setLimit: (next) => setValues((current) => ({ ...current, [limitParam.name]: next })),
+      setOffset: (next) => setValues((current) => ({ ...current, [offsetParam.name]: next })),
     };
   }
   if (hasTimeRange && rangeStart != null && rangeEnd != null) {

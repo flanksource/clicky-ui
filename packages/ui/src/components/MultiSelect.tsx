@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { CodiconChevronDownIcon, CodiconChevronUpIcon } from "../data/static-icons";
+import { UiChevronDown, UiChevronUp } from "@flanksource/icons/ui";
 
 export type MultiSelectOption = {
   value: string;
@@ -61,7 +61,9 @@ export function MultiSelect({
   }, [open]);
 
   const selected = useMemo(() => {
-    const selectedOptions = options.filter((option) => value.includes(option.value));
+    const selectedOptions = options.filter((option) =>
+      value.includes(option.value),
+    );
     const labels = selectedOptions
       .map((option) => option.label)
       .filter((label): label is string => typeof label === "string");
@@ -100,7 +102,7 @@ export function MultiSelect({
       >
         <span className="truncate">{selected}</span>
         <Icon
-          icon={open ? CodiconChevronUpIcon : CodiconChevronDownIcon}
+          icon={open ? UiChevronUp : UiChevronDown}
           className="text-muted-foreground"
         />
       </Button>

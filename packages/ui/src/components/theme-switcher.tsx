@@ -2,12 +2,12 @@ import { forwardRef } from "react";
 import { Icon } from "../data/Icon";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 import { useTheme, type Theme } from "../hooks/use-theme";
-import { PhDesktopIcon, PhMoonIcon, PhSunIcon } from "../data/static-icons";
+import { UiDesktop, UiMoon, UiSun } from "@flanksource/icons/ui";
 
 const THEME_OPTIONS: IconMenuOption<Theme>[] = [
-  { value: "light", icon: PhSunIcon, label: "light" },
-  { value: "dark", icon: PhMoonIcon, label: "dark" },
-  { value: "system", icon: PhDesktopIcon, label: "system" },
+  { value: "light", icon: UiSun, label: "light" },
+  { value: "dark", icon: UiMoon, label: "dark" },
+  { value: "system", icon: UiDesktop, label: "system" },
 ];
 
 export type ThemeSwitcherProps = {
@@ -22,10 +22,17 @@ export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
     const footer =
       theme === "system" ? (
         <span className="inline-flex items-center gap-1.5">
-          <Icon icon={resolvedTheme === "dark" ? PhMoonIcon : PhSunIcon} width={12} height={12} />
+          <Icon
+            icon={resolvedTheme === "dark" ? UiMoon : UiSun}
+            width={12}
+            height={12}
+          />
           <span>
             resolves to{" "}
-            <span data-testid="resolved-theme" className="font-medium text-foreground">
+            <span
+              data-testid="resolved-theme"
+              className="font-medium text-foreground"
+            >
               {resolvedTheme}
             </span>
           </span>

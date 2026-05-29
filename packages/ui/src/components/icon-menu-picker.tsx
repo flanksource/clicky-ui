@@ -11,7 +11,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { PhCheckIcon } from "../data/static-icons";
+import { UiCheck } from "@flanksource/icons/ui";
 import { Button } from "./button";
 
 export type IconMenuOption<T extends string> = {
@@ -115,7 +115,9 @@ function IconMenuPickerInner<T extends string>(
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const focusedIndex = itemRefs.current.findIndex((node) => node === document.activeElement);
+    const focusedIndex = itemRefs.current.findIndex(
+      (node) => node === document.activeElement,
+    );
     if (event.key === "ArrowDown") {
       event.preventDefault();
       focusItem((focusedIndex < 0 ? activeIndex : focusedIndex) + 1);
@@ -142,7 +144,11 @@ function IconMenuPickerInner<T extends string>(
   };
 
   const onTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "Enter" ||
+      event.key === " "
+    ) {
       event.preventDefault();
       setOpen(true);
     }
@@ -150,7 +156,9 @@ function IconMenuPickerInner<T extends string>(
 
   const selected = options[activeIndex];
   if (!selected) {
-    throw new Error(`IconMenuPicker: value "${value}" not found in options for ${ariaLabel}`);
+    throw new Error(
+      `IconMenuPicker: value "${value}" not found in options for ${ariaLabel}`,
+    );
   }
 
   return (
@@ -168,7 +176,6 @@ function IconMenuPickerInner<T extends string>(
         onKeyDown={onTriggerKeyDown}
         className={cn(
           "text-muted-foreground hover:text-foreground",
-          showLabel && "w-full justify-start",
           triggerClassName,
         )}
       >
@@ -209,10 +216,15 @@ function IconMenuPickerInner<T extends string>(
                   active && "text-foreground",
                 )}
               >
-                <Icon icon={option.icon} className="shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate capitalize">{option.label}</span>
+                <Icon
+                  icon={option.icon}
+                  className="shrink-0 text-muted-foreground"
+                />
+                <span className="min-w-0 flex-1 truncate capitalize">
+                  {option.label}
+                </span>
                 {active ? (
-                  <Icon icon={PhCheckIcon} className="shrink-0 text-foreground" />
+                  <Icon icon={UiCheck} className="shrink-0 text-foreground" />
                 ) : (
                   <span className="inline-block size-4 shrink-0" aria-hidden />
                 )}
@@ -230,6 +242,8 @@ function IconMenuPickerInner<T extends string>(
   );
 }
 
-export const IconMenuPicker = forwardRef(IconMenuPickerInner) as <T extends string>(
+export const IconMenuPicker = forwardRef(IconMenuPickerInner) as <
+  T extends string,
+>(
   props: IconMenuPickerProps<T> & { ref?: React.Ref<HTMLDivElement> },
 ) => JSX.Element;

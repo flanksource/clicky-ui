@@ -1,7 +1,7 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { CodiconChevronDownIcon } from "../data/static-icons";
+import { UiChevronDown } from "@flanksource/icons/ui";
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
 
@@ -31,14 +31,18 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           )}
           {options
             ? options.map((opt) => (
-                <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                <option
+                  key={opt.value}
+                  value={opt.value}
+                  disabled={opt.disabled}
+                >
                   {opt.label}
                 </option>
               ))
             : children}
         </select>
         <Icon
-          icon={CodiconChevronDownIcon}
+          icon={UiChevronDown}
           className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
         />
       </div>

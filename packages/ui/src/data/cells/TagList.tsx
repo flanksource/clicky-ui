@@ -3,12 +3,15 @@ import { Badge } from "../Badge";
 import { HoverCard } from "../../overlay/HoverCard";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { Properties, type PropertiesItem } from "../Properties";
-import { LucideCopyIcon, LucideZoomInIcon, LucideZoomOutIcon } from "../static-icons";
+import { UiCopy, UiZoomIn, UiZoomOut } from "@flanksource/icons/ui";
 import { useDensityValue } from "../../hooks/use-density";
 import { cn } from "../../lib/utils";
 import type { FilterMode } from "../FilterPill";
 
-export type TagInput = string | { key: string; value: string } | { name: string; value: string };
+export type TagInput =
+  | string
+  | { key: string; value: string }
+  | { name: string; value: string };
 
 export type NormalizedTag = {
   key?: string;
@@ -28,11 +31,16 @@ export type TagsOptions = {
   separator?: string;
 };
 
-export function normalizeTags(value: TagsValue, separator = "="): NormalizedTag[] {
+export function normalizeTags(
+  value: TagsValue,
+  separator = "=",
+): NormalizedTag[] {
   if (value == null) return [];
 
   if (Array.isArray(value)) {
-    return value.map((entry) => normalizeOne(entry, separator)).filter((tag) => tag.value !== "");
+    return value
+      .map((entry) => normalizeOne(entry, separator))
+      .filter((tag) => tag.value !== "");
   }
 
   if (typeof value === "object") {
@@ -108,10 +116,16 @@ export function tagFilterTokens(value: TagsValue, separator = "="): string[] {
  * back into its key and value parts using the same separator. Tokens
  * without a separator (bare tags) return `{ key: "", value: token }`.
  */
-export function splitTagToken(token: string, separator = "="): { key: string; value: string } {
+export function splitTagToken(
+  token: string,
+  separator = "=",
+): { key: string; value: string } {
   const idx = token.indexOf(separator);
   if (idx <= 0) return { key: "", value: token };
-  return { key: token.slice(0, idx), value: token.slice(idx + separator.length) };
+  return {
+    key: token.slice(0, idx),
+    value: token.slice(idx + separator.length),
+  };
 }
 
 // Filter mode mapping (re-using FilterPill's tri-state vocabulary so the wire
@@ -142,7 +156,11 @@ export function TagActionsProvider({
   value: TagActionsContextValue;
   children: React.ReactNode;
 }) {
-  return <TagActionsContext.Provider value={value}>{children}</TagActionsContext.Provider>;
+  return (
+    <TagActionsContext.Provider value={value}>
+      {children}
+    </TagActionsContext.Provider>
+  );
 }
 
 export function useTagActions(): TagActionsContextValue {
@@ -255,16 +273,20 @@ function TagBadge({
         onClick={onPlus}
         active={includeActive}
         activeClassName="bg-green-500/20 text-green-700 dark:text-green-400"
-        icon={LucideZoomInIcon}
+        icon={UiZoomIn}
       />
       <TagActionButton
         ariaLabel={`Exclude ${tag.display}`}
         onClick={onMinus}
         active={excludeActive}
         activeClassName="bg-red-500/20 text-red-700 dark:text-red-400"
-        icon={LucideZoomOutIcon}
+        icon={UiZoomOut}
       />
-      <TagActionButton ariaLabel={`Copy ${tag.display}`} onClick={onCopy} icon={LucideCopyIcon} />
+      <TagActionButton
+        ariaLabel={`Copy ${tag.display}`}
+        onClick={onCopy}
+        icon={UiCopy}
+      />
     </span>
   );
 
@@ -281,7 +303,13 @@ function TagBadge({
   // clean, and hovering reveals the magnifier-plus / magnifier-minus / copy
   // toolbar.
   return (
-    <HoverCard placement="top" delay={120} arrow={false} trigger={badge} cardClassName="!p-1">
+    <HoverCard
+      placement="top"
+      delay={120}
+      arrow={false}
+      trigger={badge}
+      cardClassName="!p-1"
+    >
       {toolbar}
     </HoverCard>
   );
@@ -372,7 +400,8 @@ export function TagList({
 function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
   const tagActions = useTagActions();
   const items = useMemo<PropertiesItem<NormalizedTag>[]>(
-    () => tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
+    () =>
+      tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
     [tags],
   );
 
@@ -397,19 +426,19 @@ function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
       suffixActions={[
         {
           id: "include",
-          icon: LucideZoomInIcon,
+          icon: UiZoomIn,
           label: (_key, tag) => `Include ${tag.display}`,
           onClick: (_key, tag) => tagActions.toggleInclude(tag.token),
         },
         {
           id: "exclude",
-          icon: LucideZoomOutIcon,
+          icon: UiZoomOut,
           label: (_key, tag) => `Exclude ${tag.display}`,
           onClick: (_key, tag) => tagActions.toggleExclude(tag.token),
         },
         {
           id: "copy",
-          icon: LucideCopyIcon,
+          icon: UiCopy,
           label: (_key, tag) => `Copy ${tag.display}`,
           onClick: (_key, tag) => copyToClipboard(tag.value),
         },
@@ -450,5 +479,8 @@ export function useTagActionsValue(
   value: Record<string, TagFilterMode>,
   onChange: (next: Record<string, TagFilterMode>) => void,
 ): TagActionsContextValue {
-  return useMemo(() => tagActionsFromRecord(value, onChange), [value, onChange]);
+  return useMemo(
+    () => tagActionsFromRecord(value, onChange),
+    [value, onChange],
+  );
 }

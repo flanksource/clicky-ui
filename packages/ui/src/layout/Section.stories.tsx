@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CodiconErrorIcon, CodiconInboxIcon } from "../data/static-icons";
+import { UiError, UiInbox } from "@flanksource/icons/ui";
 import { DetailEmptyState, Section } from "./Section";
 
 const meta: Meta<typeof Section> = {
@@ -47,7 +47,7 @@ export const DangerTone: Story = {
     tone: "danger",
     summary: "3 violations",
     defaultOpen: true,
-    icon: CodiconErrorIcon,
+    icon: UiError,
     children: <div className="text-sm">Stack traces here.</div>,
   },
 };
@@ -55,7 +55,7 @@ export const DangerTone: Story = {
 export const Empty: Story = {
   render: () => (
     <DetailEmptyState
-      icon={CodiconInboxIcon}
+      icon={UiInbox}
       label="Nothing selected"
       description="Pick an item from the tree to see its details."
     />

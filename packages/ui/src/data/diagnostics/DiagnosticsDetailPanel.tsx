@@ -2,16 +2,25 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import type { GaugeTone } from "../Gauge";
 import {
-  CodiconDebugAltIcon,
-  CodiconDebugAltSmallIcon,
-  CodiconRefreshIcon,
-  CodiconSearchIcon,
-  CodiconServerProcessIcon,
-  SvgSpinnerRingResizeIcon,
-} from "../static-icons";
+  UiDebug,
+  UiDebugSmall,
+  UiRefresh,
+  UiSearch,
+  UiServerProcess,
+  UiLoader,
+} from "@flanksource/icons/ui";
 import type { ProcessNode, RunMeta } from "./types";
-import { formatBytes, processLabel, processStateColor, processStateIcon } from "./utils";
-import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
+import {
+  formatBytes,
+  processLabel,
+  processStateColor,
+  processStateIcon,
+} from "./utils";
+import {
+  countStackByState,
+  parseStackDump,
+  type ParsedStack,
+} from "./stacktrace";
 import { GoroutineCard, goroutineStateDot } from "./GoroutineCard";
 import { ThreadCard, threadStateDot } from "./ThreadCard";
 
@@ -26,7 +35,10 @@ function cpuTone(pct: number): GaugeTone {
   return "neutral";
 }
 
-function memoryTone(rss: number | undefined, vms: number | undefined): GaugeTone {
+function memoryTone(
+  rss: number | undefined,
+  vms: number | undefined,
+): GaugeTone {
   if (!rss || !vms) return "neutral";
   const ratio = rss / vms;
   if (ratio >= 0.9) return "danger";
@@ -51,7 +63,10 @@ export function DiagnosticsDetailPanel({
   const [selectedStates, setSelectedStates] = useState<Set<string>>(new Set());
   const [hideRuntimeOnly, setHideRuntimeOnly] = useState(true);
   const stack = process?.stack_capture;
-  const parsed = useMemo<ParsedStack>(() => parseStackDump(stack?.text || ""), [stack?.text]);
+  const parsed = useMemo<ParsedStack>(
+    () => parseStackDump(stack?.text || ""),
+    [stack?.text],
+  );
   const stateCounts = useMemo(() => countStackByState(parsed), [parsed]);
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -59,9 +74,15 @@ export function DiagnosticsDetailPanel({
       state: string;
       userFrameCount: number;
       searchText: string;
-    }> = parsed.format === "jvm" ? parsed.threads : parsed.format === "go" ? parsed.goroutines : [];
+    }> =
+      parsed.format === "jvm"
+        ? parsed.threads
+        : parsed.format === "go"
+          ? parsed.goroutines
+          : [];
     return items.filter((item) => {
-      if (selectedStates.size > 0 && !selectedStates.has(item.state)) return false;
+      if (selectedStates.size > 0 && !selectedStates.has(item.state))
+        return false;
       if (hideRuntimeOnly && item.userFrameCount === 0) return false;
       if (needle && !item.searchText.includes(needle)) return false;
       return true;
@@ -78,7 +99,7 @@ export function DiagnosticsDetailPanel({
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         <div className="text-center">
-          <Icon icon={CodiconServerProcessIcon} className="text-4xl mb-density-2" />
+          <Icon icon={UiServerProcess} className="text-4xl mb-density-2" />
           <div>Select a process to view diagnostics</div>
         </div>
       </div>
@@ -127,14 +148,18 @@ function Header({ process }: { process: ProcessNode }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-density-2">
           <Icon
-            icon={process.is_root ? CodiconServerProcessIcon : CodiconDebugAltIcon}
+            icon={process.is_root ? UiServerProcess : UiDebug}
             className="text-2xl text-blue-600"
           />
-          <h2 className="text-lg font-bold text-foreground break-words">{processLabel(process)}</h2>
+          <h2 className="text-lg font-bold text-foreground break-words">
+            {processLabel(process)}
+          </h2>
         </div>
         <div className="mt-1 flex items-center gap-density-2 flex-wrap text-xs text-muted-foreground">
           <span className="font-mono">pid {process.pid}</span>
-          {process.ppid ? <span className="font-mono">ppid {process.ppid}</span> : null}
+          {process.ppid ? (
+            <span className="font-mono">ppid {process.ppid}</span>
+          ) : null}
           {process.status ? (
             <span
               className={`inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 ${processStateColor(
@@ -156,19 +181,35 @@ function RunSection({ runMeta }: { runMeta: RunMeta }) {
     <PanelSection title="Run">
       <div className="grid grid-cols-2 gap-density-2 text-sm">
         <InfoTile
-          label={runMeta.kind === "rerun" ? `Rerun #${runMeta.sequence}` : "Initial run"}
-          value={runMeta.started ? new Date(runMeta.started).toLocaleString() : "Unavailable"}
+          label={
+            runMeta.kind === "rerun"
+              ? `Rerun #${runMeta.sequence}`
+              : "Initial run"
+          }
+          value={
+            runMeta.started
+              ? new Date(runMeta.started).toLocaleString()
+              : "Unavailable"
+          }
         />
         <InfoTile
           label="Finished"
-          value={runMeta.ended ? new Date(runMeta.ended).toLocaleString() : "In progress"}
+          value={
+            runMeta.ended
+              ? new Date(runMeta.ended).toLocaleString()
+              : "In progress"
+          }
         />
       </div>
     </PanelSection>
   );
 }
 
-type StackFilterItem = { state: string; userFrameCount: number; searchText: string };
+type StackFilterItem = {
+  state: string;
+  userFrameCount: number;
+  searchText: string;
+};
 
 type StackBlockProps = {
   process: ProcessNode;
@@ -198,7 +239,9 @@ function stackItemLabel(parsed: ParsedStack): string {
 }
 
 function stackStateDot(parsed: ParsedStack, state: string): string {
-  return parsed.format === "jvm" ? threadStateDot(state) : goroutineStateDot(state);
+  return parsed.format === "jvm"
+    ? threadStateDot(state)
+    : goroutineStateDot(state);
 }
 
 function StackBlock(props: StackBlockProps) {
@@ -259,15 +302,22 @@ function StackBlock(props: StackBlockProps) {
         <div className="flex items-center justify-between gap-density-2 text-[11px] text-muted-foreground flex-wrap">
           <div className="flex items-center gap-density-2 flex-wrap">
             <StackStatusBadge status={stack.status} />
-            {stack.collected_at && <span>{new Date(stack.collected_at).toLocaleString()}</span>}
+            {stack.collected_at && (
+              <span>{new Date(stack.collected_at).toLocaleString()}</span>
+            )}
             {stackItemCount(parsed) > 0 && (
               <span>
-                {filtered.length} / {stackItemCount(parsed)} {stackItemLabel(parsed)}
+                {filtered.length} / {stackItemCount(parsed)}{" "}
+                {stackItemLabel(parsed)}
               </span>
             )}
           </div>
           {onCollectStack && (
-            <CollectButton pid={process.pid} busy={collectBusy ?? false} onClick={onCollectStack} />
+            <CollectButton
+              pid={process.pid}
+              busy={collectBusy ?? false}
+              onClick={onCollectStack}
+            />
           )}
         </div>
         {stackItemCount(parsed) > 0 && (
@@ -275,7 +325,7 @@ function StackBlock(props: StackBlockProps) {
             <div className="flex items-center gap-1.5 flex-wrap">
               <div className="relative min-w-[14rem] flex-1">
                 <Icon
-                  icon={CodiconSearchIcon}
+                  icon={UiSearch}
                   className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"
                 />
                 <input
@@ -332,7 +382,9 @@ function StackBlock(props: StackBlockProps) {
                         });
                       }}
                     >
-                      <span className={`h-2 w-2 rounded-full ${stackStateDot(parsed, state)}`} />
+                      <span
+                        className={`h-2 w-2 rounded-full ${stackStateDot(parsed, state)}`}
+                      />
                       {state}
                       <span className="text-[10px] opacity-70">{count}</span>
                     </button>
@@ -343,7 +395,9 @@ function StackBlock(props: StackBlockProps) {
         )}
       </div>
       {stack.error && (
-        <div className="mt-density-2 text-xs text-red-600 whitespace-pre-wrap">{stack.error}</div>
+        <div className="mt-density-2 text-xs text-red-600 whitespace-pre-wrap">
+          {stack.error}
+        </div>
       )}
       {stackItemCount(parsed) === 0 ? (
         <pre
@@ -423,11 +477,7 @@ function CollectButton({
       disabled={busy}
       title={primary ? "Collect the latest stack trace" : "Refresh stack trace"}
     >
-      <Icon
-        icon={
-          busy ? SvgSpinnerRingResizeIcon : primary ? CodiconDebugAltSmallIcon : CodiconRefreshIcon
-        }
-      />
+      <Icon icon={busy ? UiLoader : primary ? UiDebugSmall : UiRefresh} />
       {busy ? "Collecting..." : primary ? "Collect stack trace" : "Refresh"}
     </button>
   );
@@ -447,7 +497,11 @@ function PanelSection({
       <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
         {title}
       </div>
-      {grow ? <div className="flex-1 min-h-0 overflow-hidden">{children}</div> : children}
+      {grow ? (
+        <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+      ) : (
+        children
+      )}
     </section>
   );
 }
@@ -455,7 +509,9 @@ function PanelSection({
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="border border-border rounded-lg bg-muted/50 px-2.5 py-density-2">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
       <div className="text-xs font-medium text-foreground mt-0.5">{value}</div>
     </div>
   );
@@ -465,7 +521,8 @@ function ProcessMetrics({ process }: { process: ProcessNode }) {
   const cpu = process.cpu_percent || 0;
   const rss = process.rss;
   const vms = process.vms;
-  const memRatioPct = rss && vms && vms > 0 ? Math.min(100, Math.round((rss / vms) * 100)) : 0;
+  const memRatioPct =
+    rss && vms && vms > 0 ? Math.min(100, Math.round((rss / vms) * 100)) : 0;
   return (
     <div className="grid grid-cols-4 gap-density-1">
       <MetricTile
@@ -480,11 +537,21 @@ function ProcessMetrics({ process }: { process: ProcessNode }) {
         barPct={memRatioPct}
         tone={memoryTone(rss, vms)}
       />
-      <MetricTile label="VMS" value={vms !== undefined ? formatBytes(vms) : "n/a"} tone="neutral" />
+      <MetricTile
+        label="VMS"
+        value={vms !== undefined ? formatBytes(vms) : "n/a"}
+        tone="neutral"
+      />
       <MetricTile
         label="Files"
-        value={process.open_files !== undefined ? String(process.open_files) : "n/a"}
-        barPct={process.open_files ? Math.min(100, (process.open_files / 1024) * 100) : 0}
+        value={
+          process.open_files !== undefined ? String(process.open_files) : "n/a"
+        }
+        barPct={
+          process.open_files
+            ? Math.min(100, (process.open_files / 1024) * 100)
+            : 0
+        }
         tone="info"
       />
     </div>
@@ -521,7 +588,9 @@ function MetricTile({
       <span className="text-[9px] uppercase tracking-wide text-muted-foreground leading-none">
         {label}
       </span>
-      <span className={`text-xs font-semibold tabular-nums truncate ${toneText[tone]}`}>
+      <span
+        className={`text-xs font-semibold tabular-nums truncate ${toneText[tone]}`}
+      >
         {value}
       </span>
       {barPct !== undefined && (

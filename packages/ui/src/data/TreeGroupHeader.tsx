@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "./Icon";
-import { CodiconChevronDownIcon, CodiconChevronRightIcon } from "./static-icons";
+import { UiChevronDown, UiChevronRight } from "@flanksource/icons/ui";
 
 export type TreeGroupHeaderProps = {
   title: ReactNode;
@@ -32,14 +32,19 @@ export function TreeGroupHeader({
       )}
     >
       <Icon
-        icon={open ? CodiconChevronDownIcon : CodiconChevronRightIcon}
+        icon={open ? UiChevronDown : UiChevronRight}
         className="text-muted-foreground text-xs"
       />
       {icon && (
-        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
+        <Icon
+          {...(typeof icon === "string" ? { name: icon } : { icon })}
+          className="text-base"
+        />
       )}
       <span className="font-medium text-sm flex-1 truncate">{title}</span>
-      {count !== undefined && <span className="text-xs text-muted-foreground">{count}</span>}
+      {count !== undefined && (
+        <span className="text-xs text-muted-foreground">{count}</span>
+      )}
     </button>
   );
 }
