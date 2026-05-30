@@ -27,6 +27,7 @@ export type IconMenuPickerProps<T extends string> = {
   ariaLabel: string;
   triggerTitle?: string | undefined;
   footer?: ReactNode | undefined;
+  showLabel?: boolean | undefined;
   className?: string | undefined;
   triggerClassName?: string | undefined;
   menuClassName?: string | undefined;
@@ -40,6 +41,7 @@ function IconMenuPickerInner<T extends string>(
     ariaLabel,
     triggerTitle,
     footer,
+    showLabel,
     className,
     triggerClassName,
     menuClassName,
@@ -151,21 +153,31 @@ function IconMenuPickerInner<T extends string>(
   }
 
   return (
-    <div ref={rootRef} className={cn("relative inline-flex", className)}>
+    <div ref={rootRef} className={cn("relative inline-flex", showLabel && "w-full", className)}>
       <Button
         ref={triggerRef}
         type="button"
         variant="ghost"
-        size="icon"
+        size={showLabel ? "default" : "icon"}
         aria-label={ariaLabel}
         aria-haspopup="menu"
         aria-expanded={open}
         title={triggerTitle ?? `${ariaLabel}: ${selected.label}`}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onTriggerKeyDown}
-        className={cn("text-muted-foreground hover:text-foreground", triggerClassName)}
+        className={cn(
+          "text-muted-foreground hover:text-foreground",
+          showLabel && "w-full justify-start",
+          triggerClassName,
+        )}
       >
-        <Icon name={selected.icon} />
+        <Icon name={selected.icon} className={showLabel ? "shrink-0 text-foreground" : undefined} />
+        {showLabel && (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left capitalize">{selected.label}</span>
+            <Icon name="ph:caret-up-down" className="shrink-0 text-muted-foreground" />
+          </>
+        )}
       </Button>
       {open && (
         <div
