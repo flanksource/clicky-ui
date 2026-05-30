@@ -36,6 +36,11 @@ export {
 export { Select, type SelectProps, type SelectOption } from "./components/select";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
+export {
+  IconMenuPicker,
+  type IconMenuPickerProps,
+  type IconMenuOption,
+} from "./components/icon-menu-picker";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {
