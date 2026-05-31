@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import {
-  FilterPill,
-  FilterPillGroup,
-  FilterSeparator,
-  type FilterMode,
-} from "./FilterPill";
+import { FilterPill, FilterPillGroup, FilterSeparator, type FilterMode } from "./FilterPill";
 
 const meta: Meta<typeof FilterPill> = {
   title: "Data/FilterPill",
@@ -32,8 +27,7 @@ const meta: Meta<typeof FilterPill> = {
     },
     badge: {
       control: "text",
-      description:
-        "Tailwind class for the count badge background, e.g. `bg-red-500`.",
+      description: "Tailwind class for the count badge background, e.g. `bg-red-500`.",
       table: { category: "Content" },
     },
     togglePosition: {

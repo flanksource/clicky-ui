@@ -8,10 +8,7 @@ import { useDensityValue } from "../../hooks/use-density";
 import { cn } from "../../lib/utils";
 import type { FilterMode } from "../FilterPill";
 
-export type TagInput =
-  | string
-  | { key: string; value: string }
-  | { name: string; value: string };
+export type TagInput = string | { key: string; value: string } | { name: string; value: string };
 
 export type NormalizedTag = {
   key?: string;
@@ -33,16 +30,11 @@ export type TagsOptions = {
   separator?: string;
 };
 
-export function normalizeTags(
-  value: TagsValue,
-  separator = "=",
-): NormalizedTag[] {
+export function normalizeTags(value: TagsValue, separator = "="): NormalizedTag[] {
   if (value == null) return [];
 
   if (Array.isArray(value)) {
-    return value
-      .map((entry) => normalizeOne(entry, separator))
-      .filter((tag) => tag.value !== "");
+    return value.map((entry) => normalizeOne(entry, separator)).filter((tag) => tag.value !== "");
   }
 
   if (typeof value === "object") {
@@ -118,10 +110,7 @@ export function tagFilterTokens(value: TagsValue, separator = "="): string[] {
  * back into its key and value parts using the same separator. Tokens
  * without a separator (bare tags) return `{ key: "", value: token }`.
  */
-export function splitTagToken(
-  token: string,
-  separator = "=",
-): { key: string; value: string } {
+export function splitTagToken(token: string, separator = "="): { key: string; value: string } {
   const idx = token.indexOf(separator);
   if (idx <= 0) return { key: "", value: token };
   return {
@@ -158,11 +147,7 @@ export function TagActionsProvider({
   value: TagActionsContextValue;
   children: React.ReactNode;
 }) {
-  return (
-    <TagActionsContext.Provider value={value}>
-      {children}
-    </TagActionsContext.Provider>
-  );
+  return <TagActionsContext.Provider value={value}>{children}</TagActionsContext.Provider>;
 }
 
 export function useTagActions(): TagActionsContextValue {
@@ -288,11 +273,7 @@ function TagBadge({
         activeClassName="bg-red-500/20 text-red-700 dark:text-red-400"
         icon={UiZoomOut}
       />
-      <TagActionButton
-        ariaLabel={`Copy ${tag.display}`}
-        onClick={onCopy}
-        icon={UiCopy}
-      />
+      <TagActionButton ariaLabel={`Copy ${tag.display}`} onClick={onCopy} icon={UiCopy} />
     </span>
   );
 
@@ -309,13 +290,7 @@ function TagBadge({
   // clean, and hovering reveals the magnifier-plus / magnifier-minus / copy
   // toolbar.
   return (
-    <HoverCard
-      placement="top"
-      delay={120}
-      arrow={false}
-      trigger={badge}
-      cardClassName="!p-1"
-    >
+    <HoverCard placement="top" delay={120} arrow={false} trigger={badge} cardClassName="!p-1">
       {toolbar}
     </HoverCard>
   );
@@ -406,8 +381,7 @@ export function TagList({
 function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
   const tagActions = useTagActions();
   const items = useMemo<PropertiesItem<NormalizedTag>[]>(
-    () =>
-      tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
+    () => tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
     [tags],
   );
 
@@ -485,8 +459,5 @@ export function useTagActionsValue(
   value: Record<string, TagFilterMode>,
   onChange: (next: Record<string, TagFilterMode>) => void,
 ): TagActionsContextValue {
-  return useMemo(
-    () => tagActionsFromRecord(value, onChange),
-    [value, onChange],
-  );
+  return useMemo(() => tagActionsFromRecord(value, onChange), [value, onChange]);
 }

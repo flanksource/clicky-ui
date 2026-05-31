@@ -18,7 +18,9 @@ export function SignedDeltaBarDemo() {
     >
       <div className="space-y-density-3">
         <div className="w-96 space-y-density-2">
-          <p className="text-xs text-muted-foreground">Default semantics (positive = good / green)</p>
+          <p className="text-xs text-muted-foreground">
+            Default semantics (positive = good / green)
+          </p>
           <SignedDeltaBar value={12.4} />
           <SignedDeltaBar value={-8.1} />
           <SignedDeltaBar value={-3.2} significant={false} />

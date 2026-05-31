@@ -11,9 +11,7 @@ describe("Avatar", () => {
 
   it("derives a two-letter fallback from a full name", () => {
     render(<Avatar alt="Chen, Nora" size="md" />);
-    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(
-      "CN",
-    );
+    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent("CN");
   });
 
   it("uses the provided initials and neutral group styling", () => {
@@ -37,38 +35,23 @@ describe("Avatar", () => {
   });
 
   it("renders path-like identities from their final segment", () => {
-    render(
-      <Avatar
-        alt="flanksource/clicky-ui"
-        rounded="md"
-        size="md"
-        variant="mono"
-      />,
-    );
-    expect(
-      screen.getByRole("img", { name: "flanksource/clicky-ui" }),
-    ).toHaveTextContent("CU");
+    render(<Avatar alt="flanksource/clicky-ui" rounded="md" size="md" variant="mono" />);
+    expect(screen.getByRole("img", { name: "flanksource/clicky-ui" })).toHaveTextContent("CU");
   });
 
   it("renders a single initial at size=xs", () => {
     render(<Avatar alt="Chen, Nora" size="xs" />);
-    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(
-      /^C$/,
-    );
+    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(/^C$/);
   });
 
   it("caps explicit initials to one character at size=xs", () => {
     render(<Avatar alt="Chen, Nora" initials="CN" size="xs" />);
-    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(
-      /^C$/,
-    );
+    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(/^C$/);
   });
 
   it("renders a single initial at size=sm", () => {
     render(<Avatar alt="Chen, Nora" initials="CN" size="sm" />);
-    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(
-      /^C$/,
-    );
+    expect(screen.getByRole("img", { name: "Chen, Nora" })).toHaveTextContent(/^C$/);
   });
 
   it("uses a lighter font weight at size=sm", () => {
@@ -102,13 +85,8 @@ describe("Avatar", () => {
   });
 
   it("wraps the avatar in an external link when href is provided", () => {
-    render(
-      <Avatar alt="GitHub reviewers" href="https://github.com" initials="GH" />,
-    );
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "https://github.com",
-    );
+    render(<Avatar alt="GitHub reviewers" href="https://github.com" initials="GH" />);
+    expect(screen.getByRole("link")).toHaveAttribute("href", "https://github.com");
   });
 });
 

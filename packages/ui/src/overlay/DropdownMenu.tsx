@@ -126,7 +126,9 @@ export function DropdownMenu({
                 >
                   {item.icon && (
                     <Icon
-                      {...(typeof item.icon === "string" ? { name: item.icon } : { icon: item.icon })}
+                      {...(typeof item.icon === "string"
+                        ? { name: item.icon }
+                        : { icon: item.icon })}
                     />
                   )}
                   {item.label}

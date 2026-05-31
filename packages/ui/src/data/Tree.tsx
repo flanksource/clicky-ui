@@ -1,12 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
-import {
-  UiClose,
-  UiCollapseAll,
-  UiExpandAll,
-  UiSearch,
-} from "../icons";
+import { UiClose, UiCollapseAll, UiExpandAll, UiSearch } from "../icons";
 import { TreeNode, type TreeNodeProps } from "./TreeNode";
 
 export type TreeProps<T> = Omit<
@@ -49,10 +44,7 @@ export type TreeProps<T> = Omit<
   getSearchText?: (node: T) => string;
 };
 
-function countTreeEdges<T>(
-  roots: T[],
-  getChildren: TreeProps<T>["getChildren"],
-) {
+function countTreeEdges<T>(roots: T[], getChildren: TreeProps<T>["getChildren"]) {
   let total = 0;
   const stack = [...roots];
 
@@ -93,15 +85,7 @@ function collectTreeSearchText(
       .join(" ");
   }
 
-  const preferredKeys = [
-    "label",
-    "name",
-    "title",
-    "text",
-    "plain",
-    "id",
-    "content",
-  ];
+  const preferredKeys = ["label", "name", "title", "text", "plain", "id", "content"];
   const record = value as Record<string, unknown>;
   const chunks: string[] = [];
 
@@ -120,10 +104,7 @@ function collectTreeSearchText(
   return chunks.join(" ");
 }
 
-function nodeSearchText<T>(
-  node: T,
-  children: ReturnType<TreeProps<T>["getChildren"]>,
-) {
+function nodeSearchText<T>(node: T, children: ReturnType<TreeProps<T>["getChildren"]>) {
   const excluded = new Set<unknown>();
   if (children) excluded.add(children);
   return collectTreeSearchText(node, excluded).trim().toLowerCase();
@@ -216,15 +197,11 @@ export function Tree<T>({
   getSearchText,
   ...nodeProps
 }: TreeProps<T>) {
-  const [internalExpandAll, setInternalExpandAll] = useState<boolean | null>(
-    null,
-  );
+  const [internalExpandAll, setInternalExpandAll] = useState<boolean | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const basePaddingPx = nodeProps.basePaddingPx ?? 8;
   const isControlled = onExpandAllChange !== undefined;
-  const expandAll = isControlled
-    ? (controlledExpandAll ?? null)
-    : internalExpandAll;
+  const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
   const totalEdges = useMemo(
     () => countTreeEdges(roots, nodeProps.getChildren),
     [roots, nodeProps.getChildren],
@@ -258,9 +235,7 @@ export function Tree<T>({
     : nodeProps.getChildren;
   const effectiveExpandAll = expandAll;
   const effectiveEmpty = activeFilter.trim() ? (
-    <div className="px-3 py-4 text-sm text-muted-foreground">
-      No matching tree nodes.
-    </div>
+    <div className="px-3 py-4 text-sm text-muted-foreground">No matching tree nodes.</div>
   ) : (
     empty
   );
@@ -271,8 +246,7 @@ export function Tree<T>({
     else setInternalExpandAll(next);
   };
 
-  if (treeRoots.length === 0 && !showVirtualRow)
-    return <>{effectiveEmpty ?? null}</>;
+  if (treeRoots.length === 0 && !showVirtualRow) return <>{effectiveEmpty ?? null}</>;
 
   return (
     <div className={cn("flex flex-col min-h-0", className)}>
@@ -287,10 +261,7 @@ export function Tree<T>({
             style={{ paddingLeft: `${basePaddingPx}px` }}
           >
             {showFilter ? (
-              <Icon
-                icon={UiSearch}
-                className="w-3 shrink-0 text-xs text-muted-foreground"
-              />
+              <Icon icon={UiSearch} className="w-3 shrink-0 text-xs text-muted-foreground" />
             ) : (
               <span className="w-3 shrink-0" aria-hidden />
             )}
@@ -332,8 +303,7 @@ export function Tree<T>({
                   disabled={activeFilter.trim().length > 0}
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50",
-                    effectiveExpandAll === true &&
-                      "bg-accent text-accent-foreground",
+                    effectiveExpandAll === true && "bg-accent text-accent-foreground",
                   )}
                 >
                   <Icon icon={UiExpandAll} className="text-sm" />
@@ -347,8 +317,7 @@ export function Tree<T>({
                   disabled={activeFilter.trim().length > 0}
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50",
-                    effectiveExpandAll === false &&
-                      "bg-accent text-accent-foreground",
+                    effectiveExpandAll === false && "bg-accent text-accent-foreground",
                   )}
                 >
                   <Icon icon={UiCollapseAll} className="text-sm" />

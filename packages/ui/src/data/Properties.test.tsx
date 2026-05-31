@@ -22,23 +22,14 @@ describe("Properties", () => {
   });
 
   it("omits hidden items", () => {
-    render(
-      <Properties
-        items={[...items, { key: "secret", value: "shh", hidden: true }]}
-      />,
-    );
+    render(<Properties items={[...items, { key: "secret", value: "shh", hidden: true }]} />);
 
     expect(screen.queryByText("Secret")).not.toBeInTheDocument();
     expect(screen.queryByText("shh")).not.toBeInTheDocument();
   });
 
   it("shows the empty message when every item is hidden", () => {
-    render(
-      <Properties
-        items={[{ key: "x", value: "y", hidden: true }]}
-        emptyMessage="nothing"
-      />,
-    );
+    render(<Properties items={[{ key: "x", value: "y", hidden: true }]} emptyMessage="nothing" />);
     expect(screen.getByText("nothing")).toBeInTheDocument();
   });
 
@@ -113,9 +104,7 @@ describe("Properties", () => {
     );
 
     expect(screen.getByLabelText("Expand expandable-row")).not.toBeDisabled();
-    expect(
-      screen.queryByLabelText("Expand scalar-row"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Expand scalar-row")).not.toBeInTheDocument();
   });
 
   it("renders renderChildren only when expandable && expanded", () => {
@@ -152,13 +141,8 @@ describe("Properties", () => {
 
   it("renders a labelIcon when provided as a string", () => {
     const { container } = render(
-      <Properties
-        items={[{ key: "namespace", value: "demo" }]}
-        labelIcon="k8s-namespace"
-      />,
+      <Properties items={[{ key: "namespace", value: "demo" }]} labelIcon="k8s-namespace" />,
     );
-    expect(
-      container.querySelector('[title="k8s-namespace"]'),
-    ).toBeInTheDocument();
+    expect(container.querySelector('[title="k8s-namespace"]')).toBeInTheDocument();
   });
 });

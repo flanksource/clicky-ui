@@ -26,9 +26,7 @@ describe("generated icons", () => {
     expect(screen.getByRole("img", { name: "check" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "calendar" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "class" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "server process" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "server process" })).toBeInTheDocument();
   });
 
   it("exports change icon aliases", () => {

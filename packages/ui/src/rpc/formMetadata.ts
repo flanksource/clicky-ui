@@ -273,10 +273,7 @@ export function parametersToFormConfig(
 
   const config: ParameterFormConfig = { filters: emitFilters };
   if (searchParam) {
-    const searchDisabled = Object.prototype.hasOwnProperty.call(
-      lockedValues,
-      searchParam.name,
-    );
+    const searchDisabled = Object.prototype.hasOwnProperty.call(lockedValues, searchParam.name);
     const searchValue = searchDisabled
       ? (lockedValues[searchParam.name] ?? "")
       : (values[searchParam.name] ?? "");
@@ -286,11 +283,8 @@ export function parametersToFormConfig(
         if (searchDisabled) return;
         setValues((current) => ({ ...current, [searchParam.name]: next }));
       },
-      ...(searchParam.description
-        ? { placeholder: searchParam.description }
-        : {}),
-      ariaLabel:
-        lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
+      ...(searchParam.description ? { placeholder: searchParam.description } : {}),
+      ariaLabel: lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
     };
   }
   if (limitParam && offsetParam) {

@@ -12,14 +12,7 @@ function region(name: "exclude" | "neutral" | "include"): HTMLElement {
 
 function renderSwitch(mode: FilterMode) {
   const onModeChange = vi.fn<(next: FilterMode) => void>();
-  render(
-    <FilterPill
-      label="jest"
-      mode={mode}
-      title="Jest filter"
-      onModeChange={onModeChange}
-    />,
-  );
+  render(<FilterPill label="jest" mode={mode} title="Jest filter" onModeChange={onModeChange} />);
   return {
     onModeChange,
     // The toggle's regions are laid out left → middle → right as

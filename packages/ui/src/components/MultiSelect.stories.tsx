@@ -20,10 +20,7 @@ function MultiSelectShowcase() {
   );
 }
 
-function MultiSelectPlayground({
-  value: initialValue,
-  ...args
-}: MultiSelectProps) {
+function MultiSelectPlayground({ value: initialValue, ...args }: MultiSelectProps) {
   const [value, setValue] = useState<string[]>(initialValue);
 
   return (
@@ -54,8 +51,7 @@ const meta = {
   argTypes: {
     placeholder: {
       control: "text",
-      description:
-        "Trigger text when nothing is selected; also labels the menu.",
+      description: "Trigger text when nothing is selected; also labels the menu.",
       table: { category: "Appearance" },
     },
     disabled: {

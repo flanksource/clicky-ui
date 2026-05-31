@@ -108,9 +108,7 @@ export function GeneratedIconsDemo() {
         {GROUPS.map(([group, icons]) => (
           <section key={group} className="space-y-density-2">
             <header className="flex items-baseline justify-between gap-density-3">
-              <h3 className="text-sm font-semibold">
-                {GROUP_LABELS[group] ?? group}
-              </h3>
+              <h3 className="text-sm font-semibold">{GROUP_LABELS[group] ?? group}</h3>
               <span className="text-xs text-muted-foreground">{icons.length}</span>
             </header>
             <div className="grid gap-density-2 sm:grid-cols-2 xl:grid-cols-3">

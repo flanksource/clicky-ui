@@ -52,11 +52,7 @@ export const BenchmarkSemantics: Story = {
       ].map((row) => (
         <div key={row.label} className="flex items-center gap-3 text-xs">
           <span className="w-24 font-mono text-muted-foreground">{row.label}</span>
-          <SignedDeltaBar
-            value={row.value}
-            positiveIsBad
-            significant={row.significant ?? true}
-          />
+          <SignedDeltaBar value={row.value} positiveIsBad significant={row.significant ?? true} />
         </div>
       ))}
     </div>

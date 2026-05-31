@@ -11,16 +11,10 @@ import type { ProcessNode } from "./types";
 
 export function countProcesses(node?: ProcessNode): number {
   if (!node) return 0;
-  return (
-    1 +
-    (node.children || []).reduce((sum, child) => sum + countProcesses(child), 0)
-  );
+  return 1 + (node.children || []).reduce((sum, child) => sum + countProcesses(child), 0);
 }
 
-export function findProcessByPID(
-  node: ProcessNode | undefined,
-  pid: number,
-): ProcessNode | null {
+export function findProcessByPID(node: ProcessNode | undefined, pid: number): ProcessNode | null {
   if (!node) return null;
   if (node.pid === pid) return node;
   for (const child of node.children || []) {
@@ -43,10 +37,8 @@ export function processStateIcon(status?: string): StaticIconComponent {
 export function processStateColor(status?: string): string {
   const value = (status || "").toLowerCase();
   if (value.includes("run")) return "text-green-600";
-  if (value.includes("sleep") || value.includes("idle"))
-    return "text-amber-500";
-  if (value.includes("stop") || value.includes("halt"))
-    return "text-orange-600";
+  if (value.includes("sleep") || value.includes("idle")) return "text-amber-500";
+  if (value.includes("stop") || value.includes("halt")) return "text-orange-600";
   if (value.includes("zombie") || value.includes("dead")) return "text-red-600";
   if (value.includes("wait") || value.includes("block")) return "text-blue-600";
   return "text-muted-foreground";

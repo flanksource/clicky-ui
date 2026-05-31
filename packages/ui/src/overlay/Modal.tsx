@@ -128,14 +128,8 @@ export function Modal({
             )}
           </div>
         )}
-        <div className="flex-1 overflow-auto px-density-4 py-density-3">
-          {children}
-        </div>
-        {footer && (
-          <div className="px-density-4 py-density-3 border-t border-border">
-            {footer}
-          </div>
-        )}
+        <div className="flex-1 overflow-auto px-density-4 py-density-3">{children}</div>
+        {footer && <div className="px-density-4 py-density-3 border-t border-border">{footer}</div>}
       </div>
     </div>
   );

@@ -15,9 +15,7 @@ describe("Icon", () => {
   });
 
   it("keeps explicit dimensions when they are provided", () => {
-    const { container } = render(
-      <Icon icon={UiSearch} width={12} height={14} />,
-    );
+    const { container } = render(<Icon icon={UiSearch} width={12} height={14} />);
 
     const icon = container.querySelector("svg");
     expect(icon).toHaveAttribute("width", "12");

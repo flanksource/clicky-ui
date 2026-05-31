@@ -41,9 +41,7 @@ const iconForKey = (key: string): string => {
 
 function copy(value: unknown) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    void navigator.clipboard.writeText(
-      typeof value === "string" ? value : JSON.stringify(value),
-    );
+    void navigator.clipboard.writeText(typeof value === "string" ? value : JSON.stringify(value));
   }
 }
 
@@ -72,12 +70,7 @@ export function PropertiesDemo() {
         <Properties
           density="compact"
           className="mt-density-1"
-          items={[
-            "env=prod",
-            "team=platform",
-            "tier=api",
-            "region=eu-west-1",
-          ].map((t, i) => ({
+          items={["env=prod", "team=platform", "tier=api", "region=eu-west-1"].map((t, i) => ({
             key: `tags.${i}`,
             value: t,
           }))}
@@ -115,16 +108,12 @@ export function PropertiesDemo() {
     >
       <div className="space-y-density-4">
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">
-            Default
-          </h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">Default</h3>
           <Properties items={baseItems} />
         </div>
 
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">
-            Label icons + subtitles
-          </h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">Label icons + subtitles</h3>
           <Properties
             items={[
               {

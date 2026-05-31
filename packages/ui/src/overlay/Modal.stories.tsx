@@ -99,9 +99,7 @@ export const Playground: Story = {
   },
   render: (args) => (
     <Modal {...args}>
-      {args.children ?? (
-        <p className="text-sm">Are you sure you want to proceed?</p>
-      )}
+      {args.children ?? <p className="text-sm">Are you sure you want to proceed?</p>}
     </Modal>
   ),
 };
@@ -117,11 +115,7 @@ export const Default: Story = {
         >
           Open modal
         </button>
-        <Modal
-          open={open}
-          onClose={() => setOpen(false)}
-          title="Confirm action"
-        >
+        <Modal open={open} onClose={() => setOpen(false)} title="Confirm action">
           <p className="text-sm">Are you sure you want to proceed?</p>
         </Modal>
       </>
@@ -147,10 +141,7 @@ export const WithFooter: Story = {
           size="sm"
           footer={
             <div className="flex justify-end gap-density-2">
-              <button
-                className="px-3 py-1 text-sm"
-                onClick={() => setOpen(false)}
-              >
+              <button className="px-3 py-1 text-sm" onClick={() => setOpen(false)}>
                 Cancel
               </button>
               <button
@@ -180,15 +171,9 @@ export const Expandable: Story = {
         >
           Open expandable modal
         </button>
-        <Modal
-          open={open}
-          onClose={() => setOpen(false)}
-          title="Row detail"
-          size="lg"
-        >
+        <Modal open={open} onClose={() => setOpen(false)} title="Row detail" size="lg">
           <p className="text-sm">
-            Use the expand icon in the header to toggle between the configured
-            size and fullscreen.
+            Use the expand icon in the header to toggle between the configured size and fullscreen.
           </p>
         </Modal>
       </>

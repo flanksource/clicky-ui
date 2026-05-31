@@ -10,19 +10,11 @@ function DateFieldShowcase() {
     <div className="max-w-xl space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            Date
-          </span>
-          <DateField
-            aria-label="Business date"
-            value={date}
-            onChange={setDate}
-          />
+          <span className="text-xs font-medium text-muted-foreground">Date</span>
+          <DateField aria-label="Business date" value={date} onChange={setDate} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            Date and time
-          </span>
+          <span className="text-xs font-medium text-muted-foreground">Date and time</span>
           <DateField
             mode="datetime"
             aria-label="Started at"
@@ -67,8 +59,7 @@ const meta = {
     mode: {
       control: "inline-radio",
       options: ["date", "datetime"],
-      description:
-        "`date` renders a native date input; `datetime` adds a time-of-day field.",
+      description: "`date` renders a native date input; `datetime` adds a time-of-day field.",
       table: { category: "Behavior", defaultValue: { summary: "date" } },
     },
     value: {

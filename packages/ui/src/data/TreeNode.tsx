@@ -85,17 +85,11 @@ export function TreeNode<T>({
   // lose access — they just don't get auto-flooded.
   const secondaryNode = isSecondary?.(node) ?? false;
   const childrenAllSecondary =
-    hasChildren &&
-    isSecondary != null &&
-    children!.every((c) => isSecondary(c));
+    hasChildren && isSecondary != null && children!.every((c) => isSecondary(c));
   const skipExpandAll = secondaryNode || childrenAllSecondary;
 
   useEffect(() => {
-    if (
-      expandAll !== null &&
-      expandAll !== prevExpandAll.current &&
-      !skipExpandAll
-    ) {
+    if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
       setOpen(expandAll);
     }
     prevExpandAll.current = expandAll;
@@ -105,9 +99,7 @@ export function TreeNode<T>({
     if (hasChildren) setOpen((o) => !o);
   }
 
-  const defaultRowBg = isSelected
-    ? "bg-primary/10 border-l-2 border-primary"
-    : "hover:bg-accent";
+  const defaultRowBg = isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent";
   const rowClassName = rowClass ? rowClass(node, isSelected) : defaultRowBg;
 
   return (
@@ -117,10 +109,7 @@ export function TreeNode<T>({
       aria-selected={isSelected}
     >
       <div
-        className={cn(
-          "flex items-center gap-1.5 py-1 px-2 cursor-pointer text-sm",
-          rowClassName,
-        )}
+        className={cn("flex items-center gap-1.5 py-1 px-2 cursor-pointer text-sm", rowClassName)}
         style={{ paddingLeft: `${depth * indentPx + basePaddingPx}px` }}
         onClick={(e) => {
           e.stopPropagation();

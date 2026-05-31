@@ -42,6 +42,137 @@ type SelectionRow = {
 
 type Selections = { rows: SelectionRow[] };
 
+const SHAPE_TAGS = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline", "line"]);
+
+type StartTag = {
+  name: string;
+  rawName: string;
+  attrs: string;
+  end: number;
+  selfClosing: boolean;
+};
+
+function isWhitespace(code: number): boolean {
+  return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
+}
+
+function isTagNameChar(code: number): boolean {
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    code === 45 ||
+    code === 58
+  );
+}
+
+function readStartTag(source: string, start: number): StartTag | null {
+  if (source[start] !== "<") return null;
+  let i = start + 1;
+  const first = source[i];
+  if (!first || first === "/" || first === "!" || first === "?") return null;
+
+  const nameStart = i;
+  while (i < source.length && isTagNameChar(source.charCodeAt(i))) i++;
+  if (i === nameStart) return null;
+
+  const rawName = source.slice(nameStart, i);
+  const nameEnd = i;
+  let quote: string | null = null;
+  for (; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === ">") break;
+  }
+  if (i >= source.length) return null;
+
+  let attrEnd = i;
+  let j = attrEnd - 1;
+  while (j >= nameEnd && isWhitespace(source.charCodeAt(j))) j--;
+  const selfClosing = source[j] === "/";
+  if (selfClosing) attrEnd = j;
+
+  return {
+    name: rawName.toLowerCase(),
+    rawName,
+    attrs: source.slice(nameEnd, attrEnd),
+    end: i + 1,
+    selfClosing,
+  };
+}
+
+function hasAttribute(attrs: string, target: string): boolean {
+  const needle = target.toLowerCase();
+  let i = 0;
+  while (i < attrs.length) {
+    while (i < attrs.length && isWhitespace(attrs.charCodeAt(i))) i++;
+    if (attrs[i] === "/") {
+      i++;
+      continue;
+    }
+
+    const nameStart = i;
+    while (i < attrs.length && isTagNameChar(attrs.charCodeAt(i))) i++;
+    if (i === nameStart) {
+      i++;
+      continue;
+    }
+
+    const name = attrs.slice(nameStart, i).toLowerCase();
+    while (i < attrs.length && isWhitespace(attrs.charCodeAt(i))) i++;
+    if (attrs[i] === "=") {
+      i++;
+      while (i < attrs.length && isWhitespace(attrs.charCodeAt(i))) i++;
+      const quote = attrs[i] === '"' || attrs[i] === "'" ? attrs[i++] : null;
+      if (quote) {
+        while (i < attrs.length && attrs[i] !== quote) i++;
+        if (i < attrs.length) i++;
+      } else {
+        while (i < attrs.length && !isWhitespace(attrs.charCodeAt(i))) i++;
+      }
+    }
+
+    if (name === needle) return true;
+  }
+  return false;
+}
+
+function addCurrentColorToUnstyledShapes(source: string): string {
+  let result = "";
+  let last = 0;
+  let i = 0;
+  while (i < source.length) {
+    const tagStart = source.indexOf("<", i);
+    if (tagStart < 0) break;
+
+    const tag = readStartTag(source, tagStart);
+    if (!tag) {
+      i = tagStart + 1;
+      continue;
+    }
+
+    if (
+      SHAPE_TAGS.has(tag.name) &&
+      !hasAttribute(tag.attrs, "fill") &&
+      !hasAttribute(tag.attrs, "stroke")
+    ) {
+      result += source.slice(last, tagStart);
+      result += `<${tag.rawName} fill="currentColor"${tag.attrs}${tag.selfClosing ? "/" : ""}>`;
+      last = tag.end;
+    }
+    i = tag.end;
+  }
+
+  return result + source.slice(last);
+}
+
 function pascalCase(s: string): string {
   return s
     .replace(/[^a-zA-Z0-9]+/g, " ")
@@ -68,7 +199,10 @@ function resolveAliasTarget(consumerName: string): string | null {
   const arrow = consumerName.indexOf(" -> ");
   if (arrow < 0) return null;
   // Strip any trailing parenthetical: "stopwatch -> watch (timer)" → "watch"
-  return consumerName.slice(arrow + 4).replace(/\s*\(.*\)\s*$/, "").trim();
+  return consumerName
+    .slice(arrow + 4)
+    .replace(/\s*\(.*\)\s*$/, "")
+    .trim();
 }
 
 function cacheFileName(spec: string): string {
@@ -193,15 +327,17 @@ function normalizeSvg(raw: string, opts: { recolor: boolean }): { inner: string;
   // level (svgo's collapseGroups would have flattened it otherwise).
   if (rootHasInherit) {
     const trimmed = out.trim();
-    const startsWithG = /^<g[\s>]/i.test(trimmed);
+    const startsWithG = readStartTag(trimmed, 0)?.name === "g";
     if (!startsWithG) {
       const gAttrs: string[] = [];
       if (rootFill) {
-        const fill = opts.recolor && /^(#000|#000000|black)$/i.test(rootFill) ? "currentColor" : rootFill;
+        const fill =
+          opts.recolor && /^(#000|#000000|black)$/i.test(rootFill) ? "currentColor" : rootFill;
         gAttrs.push(`fill="${fill}"`);
       }
       if (rootStroke) {
-        const stroke = opts.recolor && /^(#000|#000000|black)$/i.test(rootStroke) ? "currentColor" : rootStroke;
+        const stroke =
+          opts.recolor && /^(#000|#000000|black)$/i.test(rootStroke) ? "currentColor" : rootStroke;
         gAttrs.push(`stroke="${stroke}"`);
       }
       if (rootStrokeWidth) gAttrs.push(`stroke-width="${rootStrokeWidth}"`);
@@ -220,16 +356,12 @@ function normalizeSvg(raw: string, opts: { recolor: boolean }): { inner: string;
     // we leave it alone — children inherit correctly. Only when there's no
     // such wrapper do we inject fill="currentColor" on orphan shapes.
     const trimmed = out.trim();
-    const wrapperGAttrs = (trimmed.match(/^<g([^>]*)>/i) || [])[1] || "";
-    const wrapperHasFillOrStroke = /\bfill=|\bstroke=/i.test(wrapperGAttrs);
+    const wrapperTag = readStartTag(trimmed, 0);
+    const wrapperHasFillOrStroke =
+      wrapperTag?.name === "g" &&
+      (hasAttribute(wrapperTag.attrs, "fill") || hasAttribute(wrapperTag.attrs, "stroke"));
     if (!wrapperHasFillOrStroke) {
-      const shapeRe = /<(path|rect|circle|ellipse|polygon|polyline|line)\b((?:[^>]|"[^"]*")*?)(\/?)>/gi;
-      out = out.replace(shapeRe, (_match, tag, attrs, slash) => {
-        const hasFill = /\bfill=/i.test(attrs);
-        const hasStroke = /\bstroke=/i.test(attrs);
-        if (hasFill || hasStroke) return `<${tag}${attrs}${slash}>`;
-        return `<${tag} fill="currentColor"${attrs}${slash}>`;
-      });
+      out = addCurrentColorToUnstyledShapes(out);
     }
   }
 
@@ -270,25 +402,25 @@ function shouldRecolor(spec: string): boolean {
 const DEFAULT_COLORS: Record<string, string> = {
   // Severity tiers — flanksource-ui ConfigChangeSeverity.
   UiSeverityCritical: "#dc2626", // red-600
-  UiSeverityHigh: "#ef4444",     // red-500
-  UiSeverityMedium: "#f59e0b",   // amber-500
-  UiSeverityLow: "#0ea5e9",      // sky-500
-  UiSeverityInfo: "#64748b",     // slate-500
-  UiSeverityWarning: "#d97706",  // amber-600
-  UiSeverityBlocker: "#b91c1c",  // red-700
+  UiSeverityHigh: "#ef4444", // red-500
+  UiSeverityMedium: "#f59e0b", // amber-500
+  UiSeverityLow: "#0ea5e9", // sky-500
+  UiSeverityInfo: "#64748b", // slate-500
+  UiSeverityWarning: "#d97706", // amber-600
+  UiSeverityBlocker: "#b91c1c", // red-700
 
   // General health/status set.
-  UiError: "#dc2626",            // red-600
-  UiCircleX: "#ef4444",          // red-500
-  UiWarningCircle: "#d97706",    // amber-600
-  UiWarningTriangle: "#d97706",  // amber-600
-  UiPass: "#059669",             // emerald-600
-  UiCheck: "#059669",            // emerald-600 (affirmative when standalone)
-  UiInfo: "#0ea5e9",             // sky-500
-  UiInfoCircle: "#0ea5e9",       // sky-500
-  UiSkull: "#b91c1c",            // red-700
-  UiSiren: "#dc2626",            // red-600
-  UiLoader: "#94a3b8",           // slate-400
+  UiError: "#dc2626", // red-600
+  UiCircleX: "#ef4444", // red-500
+  UiWarningCircle: "#d97706", // amber-600
+  UiWarningTriangle: "#d97706", // amber-600
+  UiPass: "#059669", // emerald-600
+  UiCheck: "#059669", // emerald-600 (affirmative when standalone)
+  UiInfo: "#0ea5e9", // sky-500
+  UiInfoCircle: "#0ea5e9", // sky-500
+  UiSkull: "#b91c1c", // red-700
+  UiSiren: "#dc2626", // red-600
+  UiLoader: "#94a3b8", // slate-400
 };
 
 // ============================================================================
@@ -301,7 +433,18 @@ const DEFAULT_COLORS: Record<string, string> = {
 // the base icon's height with a white stroke ring so they pop on both light
 // and dark backgrounds.
 
-type Marker = "plus" | "minus" | "tick" | "cross" | "hourglass" | "trash" | "info" | "warning" | "error" | "up" | "down";
+type Marker =
+  | "plus"
+  | "minus"
+  | "tick"
+  | "cross"
+  | "hourglass"
+  | "trash"
+  | "info"
+  | "warning"
+  | "error"
+  | "up"
+  | "down";
 type Position = "br" | "bl" | "tr" | "tl" | "center";
 
 type SubIconRecipe = {
@@ -324,11 +467,13 @@ const MARKER_GLYPHS: Record<Marker, string> = {
   // A bold plus — readable at small sizes, balanced cross.
   plus: '<path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
   // A bold minus — the horizontal half of plus.
-  minus: '<path d="M4 12h16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
+  minus:
+    '<path d="M4 12h16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
   // A check mark — angled at 45°, covers most of the 24×24.
   tick: '<path d="M5 13l4 4 10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>',
   // A cross — × symbol.
-  cross: '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
+  cross:
+    '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
   // A simple hourglass — top + bottom triangles meeting at a waist.
   hourglass:
     '<path d="M6 4h12v3l-5 5 5 5v3H6v-3l5-5-5-5V4z" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>',
@@ -338,10 +483,12 @@ const MARKER_GLYPHS: Record<Marker, string> = {
   // Info — letter "i" inside an implicit circle (the halo provides the disc).
   info: '<path d="M12 8.5v.01M11 12h1v5h1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>',
   // Warning — exclamation mark; the halo's white disc reads as the body.
-  warning: '<path d="M12 7v6M12 16v.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
+  warning:
+    '<path d="M12 7v6M12 16v.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none"/>',
   // Error — bold X (a "no-go" cross, slightly heavier than the regular cross
   // marker so it reads as a hard error rather than a generic close action).
-  error: '<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" fill="none"/>',
+  error:
+    '<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" fill="none"/>',
   // Up arrow — for backup/upload-style "data flowing up" markers.
   up: '<path d="M12 19V6M6 11l6-5l6 5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>',
   // Down arrow — for restore/download-style "data flowing down" markers.
@@ -430,9 +577,7 @@ function composeWithSubIcon(
   // inside, base icon owns the outside". "center" position (Shield) skips
   // the halo entirely so the shield outline isn't competing with a circle.
   const haloRadius = recipe.position === "center" ? 0 : 11;
-  const halo = haloRadius > 0
-    ? `<circle cx="12" cy="12" r="${haloRadius}" fill="white"/>`
-    : "";
+  const halo = haloRadius > 0 ? `<circle cx="12" cy="12" r="${haloRadius}" fill="white"/>` : "";
   return `${baseInner}<g transform="${transform}" color="${recipe.color}">${halo}${markerInner}</g>`;
 }
 
@@ -491,29 +636,6 @@ const SUB_ICONS_BY_BASE: Record<string, SubIconRecipe[]> = {
     { marker: "info", color: "#0ea5e9", position: "center", suffix: "Info", scale: 0.5 },
   ],
 };
-
-function componentSource(componentName: string, viewBox: string, inner: string): string {
-  return `import * as React from "react";
-import type { IconProps } from "../types";
-
-export const ${componentName}: React.FC<IconProps> = ({ size = "1em", className, title, ...props }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="${viewBox}"
-    role={title ? "img" : "presentation"}
-    aria-label={title}
-    aria-hidden={title ? undefined : true}
-    className={className}
-    {...props}
-  >
-    ${inner.replace(/\n/g, "\n    ")}
-  </svg>
-);
-${componentName}.displayName = "${componentName}";
-`;
-}
 
 async function main() {
   if (!force && generatedIconsPresent()) {
@@ -655,7 +777,9 @@ async function main() {
 
     // Collision dedupe: only the winner emits the component for this baseName.
     if (winnerForBase.get(baseName) !== row.consumerName) {
-      skippedCollisions.push(`${row.consumerName} → ${baseName} (winner: ${winnerForBase.get(baseName)})`);
+      skippedCollisions.push(
+        `${row.consumerName} → ${baseName} (winner: ${winnerForBase.get(baseName)})`,
+      );
       continue;
     }
 
@@ -674,12 +798,21 @@ async function main() {
     // Only re-export the variants that the *target* row also has.
     if (aliasTarget && rowByName.has(aliasTarget)) {
       const targetRow = rowByName.get(aliasTarget)!;
-      const targetHasOutline = !!(targetRow.outline && targetRow.outline !== "skip" && targetRow.outline !== "maintain");
-      const targetHasFilled = !!(targetRow.filled && targetRow.filled !== "skip" && targetRow.filled !== "maintain");
+      const targetHasOutline = !!(
+        targetRow.outline &&
+        targetRow.outline !== "skip" &&
+        targetRow.outline !== "maintain"
+      );
+      const targetHasFilled = !!(
+        targetRow.filled &&
+        targetRow.filled !== "skip" &&
+        targetRow.filled !== "maintain"
+      );
       const aliasHasOutline = variants.some((v) => v.slot === "outline");
       const aliasHasFilled = variants.some((v) => v.slot === "filled");
       // Outline export only if both target and alias chose the same outline.
-      const reExportOutline = aliasHasOutline && targetHasOutline && targetRow.outline === row.outline;
+      const reExportOutline =
+        aliasHasOutline && targetHasOutline && targetRow.outline === row.outline;
       // Filled export only if both target and alias chose the same filled.
       const reExportFilled = aliasHasFilled && targetHasFilled && targetRow.filled === row.filled;
       // Only emit a re-export module if at least one variant matches AND the
@@ -711,7 +844,10 @@ async function main() {
     ];
     const componentNames: string[] = [];
     // Capture each variant's normalised SVG so sub-icons can re-use the base.
-    const variantPayload: Record<"outline" | "filled", { inner: string; viewBox: string; spec: string }> = {} as any;
+    const variantPayload: Record<
+      "outline" | "filled",
+      { inner: string; viewBox: string; spec: string }
+    > = {} as any;
     for (const v of variants) {
       const compName = baseName + v.suffix;
       try {
@@ -773,12 +909,15 @@ async function main() {
       if (variantPayload.filled) subBases.push({ base: variantPayload.filled, suffix: "Filled" });
       // If only one base existed, fall back to that single base for the
       // un-suffixed composite.
-      if (subBases.length === 0 && variantPayload.filled) subBases.push({ base: variantPayload.filled, suffix: "" });
+      if (subBases.length === 0 && variantPayload.filled)
+        subBases.push({ base: variantPayload.filled, suffix: "" });
       for (const recipe of subRecipes) {
         for (const { base, suffix: variantSuffix } of subBases) {
           const subCompName = baseName + recipe.suffix + variantSuffix;
           if (winnerForBase.has(subCompName)) {
-            skippedCollisions.push(`${row.consumerName}:${recipe.suffix}${variantSuffix} → ${subCompName} (winner: row-derived)`);
+            skippedCollisions.push(
+              `${row.consumerName}:${recipe.suffix}${variantSuffix} → ${subCompName} (winner: row-derived)`,
+            );
             continue;
           }
           // Tint-base convention: filled-variant shield composites paint the
@@ -943,7 +1082,9 @@ export function getChangeIcon(
   }
   await writeFile(noticePath, noticeLines.join("\n") + "\n");
 
-  console.log(`Generated ${seen.size} components across ${new Set(generated.map((g) => g.file)).size} files.`);
+  console.log(
+    `Generated ${seen.size} components across ${new Set(generated.map((g) => g.file)).size} files.`,
+  );
   if (skippedCollisions.length) {
     console.log(`\nSkipped due to name collision (${skippedCollisions.length}):`);
     for (const s of skippedCollisions) console.log("  " + s);

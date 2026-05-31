@@ -14,9 +14,7 @@ describe("Modal", () => {
         <p>body</p>
       </Modal>,
     );
-    expect(
-      screen.getByRole("button", { name: "Expand to fullscreen" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand to fullscreen" })).toBeInTheDocument();
     expect(getDialog().className).toMatch(/max-w-2xl/);
   });
 
@@ -26,9 +24,7 @@ describe("Modal", () => {
         <p>body</p>
       </Modal>,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Expand to fullscreen" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Expand to fullscreen" }));
     expect(getDialog().className).toMatch(/max-w-\[95vw\]/);
     expect(getDialog().className).not.toMatch(/max-w-2xl/);
 
@@ -43,9 +39,7 @@ describe("Modal", () => {
         <p>body</p>
       </Modal>,
     );
-    expect(
-      screen.queryByRole("button", { name: "Expand to fullscreen" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand to fullscreen" })).not.toBeInTheDocument();
   });
 
   it("resets to the configured size after the modal is closed and reopened", () => {
@@ -62,17 +56,13 @@ describe("Modal", () => {
     }
     render(<Harness />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Expand to fullscreen" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Expand to fullscreen" }));
     expect(getDialog().className).toMatch(/max-w-\[95vw\]/);
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "reopen" }));
 
     expect(getDialog().className).toMatch(/max-w-2xl/);
-    expect(
-      screen.getByRole("button", { name: "Expand to fullscreen" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand to fullscreen" })).toBeInTheDocument();
   });
 });
