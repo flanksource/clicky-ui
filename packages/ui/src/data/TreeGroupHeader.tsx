@@ -4,11 +4,17 @@ import { Icon, type StaticIconComponent } from "./Icon";
 import { UiChevronDown, UiChevronRight } from "@flanksource/icons/ui";
 
 export type TreeGroupHeaderProps = {
+  /** Header title. */
   title: ReactNode;
+  /** Current expanded state. */
   open: boolean;
+  /** Called when the header is clicked. */
   onToggle: () => void;
+  /** Optional leading icon. */
   icon?: string | StaticIconComponent;
+  /** Optional trailing count. */
   count?: number;
+  /** Classes applied to the button. */
   className?: string;
 };
 

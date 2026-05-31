@@ -3,12 +3,19 @@ import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "./Icon";
 
 export type TabButtonProps = {
+  /** Current selected state. */
   active: boolean;
+  /** Called when the tab is clicked. */
   onClick: () => void;
+  /** Visible tab label. */
   label: ReactNode;
+  /** Optional leading icon. */
   icon?: string | StaticIconComponent;
+  /** Optional count badge. Hidden when zero. */
   count?: number;
+  /** Classes for the count badge background. */
   countColor?: string;
+  /** Classes applied to the button. */
   className?: string;
 };
 

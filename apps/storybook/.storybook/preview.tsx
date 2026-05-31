@@ -20,9 +20,13 @@ function GlobalSync({ theme, density }: { theme: Theme; density: Density }) {
 }
 
 const preview: Preview = {
+  tags: ["autodocs"],
   parameters: {
     controls: { expanded: true },
     backgrounds: { disabled: true },
+    docs: {
+      toc: true,
+    },
   },
   globalTypes: {
     theme: {

@@ -30,15 +30,24 @@ export type StackTraceSourceResolver = (
   | undefined;
 
 export interface StackTraceProps {
-  // Either a raw Java stack-trace string OR a pre-parsed ParsedStackTrace
-  // (e.g. one received from a Go backend that already ran the parser there).
+  /**
+   * Raw Java stack-trace string or a pre-parsed ParsedStackTrace
+   * from a backend/parser.
+   */
   input: string | ParsedStackTrace;
+  /** Parser language. Currently Java stack traces are supported. */
   language?: "java";
+  /** Optional source-line resolver for inline context under frames. */
   resolver?: StackTraceSourceResolver;
+  /** Number of source lines to request around each frame. */
   contextLines?: number;
+  /** Hide frames known to be runtime/library-only. */
   hideRuntimeOnly?: boolean;
+  /** Only show frames whose class starts with one of these prefixes. */
   include?: string[];
+  /** Hide frames whose class starts with one of these prefixes. */
   exclude?: string[];
+  /** Classes applied to the stack-trace shell. */
   className?: string;
 }
 

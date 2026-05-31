@@ -3,6 +3,7 @@ import type {
   FilterBarFilter,
   FilterBarMultiFilterMode,
   FilterBarRangeProps,
+  FilterBarSearchProps,
 } from "../components/FilterBar";
 import type { OpenAPIParameter, OperationLookupFilter, OperationLookupResponse } from "./types";
 import { isPositionalParam } from "./types";
@@ -25,6 +26,7 @@ export type ParameterPagination = {
 
 export type ParameterFormConfig = {
   filters: FilterBarFilter[];
+  search?: FilterBarSearchProps;
   timeRange?: FilterBarRangeProps;
   pagination?: ParameterPagination;
 };
@@ -128,6 +130,14 @@ export function parametersToFormConfig(
   if (limitParam) paginationOmitNames.add(limitParam.name);
   if (offsetParam) paginationOmitNames.add(offsetParam.name);
 
+  // The search-role param drives the FilterBar's dedicated search input rather
+  // than a filter chip; pull it out of the chip loop the same way pagination is.
+  const searchParam = parameters.find(
+    (p) => p["x-clicky"]?.role === "search" && includeLocations.has(p.in),
+  );
+  const omitNames = new Set(paginationOmitNames);
+  if (searchParam) omitNames.add(searchParam.name);
+
   // Time-range first looks for server-stamped roles, then falls back to the
   // existing lookup-driven "from"/"to" detection so older specs keep working.
   const roleRangeStart = parameters.find((p) => p["x-clicky"]?.role === "time-from");
@@ -152,7 +162,7 @@ export function parametersToFormConfig(
 
   for (const param of parameters) {
     if (!includeLocations.has(param.in)) continue;
-    if (paginationOmitNames.has(param.name)) continue;
+    if (omitNames.has(param.name)) continue;
     if (hasTimeRange && (param.name === rangeStart?.name || param.name === rangeEnd?.name)) {
       continue;
     }
@@ -262,6 +272,27 @@ export function parametersToFormConfig(
   }
 
   const config: ParameterFormConfig = { filters: emitFilters };
+  if (searchParam) {
+    const searchDisabled = Object.prototype.hasOwnProperty.call(
+      lockedValues,
+      searchParam.name,
+    );
+    const searchValue = searchDisabled
+      ? (lockedValues[searchParam.name] ?? "")
+      : (values[searchParam.name] ?? "");
+    config.search = {
+      value: searchValue,
+      onChange: (next) => {
+        if (searchDisabled) return;
+        setValues((current) => ({ ...current, [searchParam.name]: next }));
+      },
+      ...(searchParam.description
+        ? { placeholder: searchParam.description }
+        : {}),
+      ariaLabel:
+        lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
+    };
+  }
   if (limitParam && offsetParam) {
     config.pagination = {
       limitParam: limitParam.name,

@@ -5,10 +5,15 @@ import { highlightCode } from "./code-highlight";
 import { sanitizeHtml } from "./html-utils";
 
 export type CodeBlockProps = {
+  /** Language label and highlighter hint, e.g. `json`, `tsx`, or `bash`. */
   language?: string | undefined;
+  /** Raw source code to render or highlight. */
   source?: string | undefined;
+  /** Trusted server-rendered highlighted HTML, sanitized before rendering. */
   highlightedHtml?: string | undefined;
+  /** Classes applied to the code block shell. */
   className?: string | undefined;
+  /** Default expansion depth when rendering JSON as a tree. */
   jsonDefaultOpenDepth?: number | undefined;
 };
 

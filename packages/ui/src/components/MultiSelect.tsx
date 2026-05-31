@@ -5,20 +5,32 @@ import { Icon } from "../data/Icon";
 import { UiChevronDown, UiChevronUp } from "@flanksource/icons/ui";
 
 export type MultiSelectOption = {
+  /** Stable option value written into the selected value array. */
   value: string;
+  /** Visible option label in the menu and trigger summary. */
   label: ReactNode;
+  /** Prevents selecting this option while still showing it in the menu. */
   disabled?: boolean;
+  /** Optional browser tooltip for truncated or explanatory labels. */
   title?: string;
 };
 
 export type MultiSelectProps = {
+  /** Available options, rendered in the order provided. */
   options: MultiSelectOption[];
+  /** Controlled selected option values. */
   value: string[];
+  /** Called with the complete next value array after each toggle. */
   onChange: (next: string[]) => void;
+  /** Trigger text when nothing is selected. Also labels the menu. */
   placeholder?: string;
+  /** Disables opening and changing selections. */
   disabled?: boolean;
+  /** Classes applied to the root wrapper. */
   className?: string;
+  /** Classes applied to the trigger button. */
   triggerClassName?: string;
+  /** Classes applied to the popover menu. */
   menuClassName?: string;
 };
 

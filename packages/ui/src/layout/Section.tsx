@@ -4,16 +4,27 @@ import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown, UiChevronRight } from "@flanksource/icons/ui";
 
 export type SectionProps = {
+  /** Header title. */
   title: ReactNode;
+  /** Optional right-aligned header summary. */
   summary?: ReactNode;
+  /** Initial open state for uncontrolled usage. */
   defaultOpen?: boolean;
+  /** Controlled open state. */
   open?: boolean;
+  /** Called when the section is toggled. */
   onToggle?: (open: boolean) => void;
+  /** Optional leading icon. */
   icon?: string | StaticIconComponent;
+  /** Semantic border accent. */
   tone?: "default" | "danger" | "warning" | "success" | "info";
+  /** Classes applied to the section root. */
   className?: string;
+  /** Classes applied to the clickable header. */
   headerClassName?: string;
+  /** Classes applied to the content body. */
   bodyClassName?: string;
+  /** Collapsible content. */
   children: ReactNode;
 };
 
@@ -96,9 +107,13 @@ export function Section({
 }
 
 export type DetailEmptyStateProps = {
+  /** Optional icon shown above the label. */
   icon?: string | StaticIconComponent;
+  /** Primary empty-state text. */
   label: ReactNode;
+  /** Secondary empty-state text. */
   description?: ReactNode;
+  /** Classes applied to the empty-state root. */
   className?: string;
 };
 

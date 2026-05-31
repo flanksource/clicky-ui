@@ -21,41 +21,70 @@ export type TimeRangePresetGroup =
   | "last";
 
 export type TimeRangePreset = {
+  /** Visible label for the preset row. */
   label: string;
+  /** Start value applied when the preset is selected, e.g. `now-1h`. */
   from: string;
+  /** End value applied when the preset is selected, usually `now`. */
   to: string;
 };
 
 export type TimeRangeChipRow = {
+  /** Stable row id used as the React key. */
   id: string;
+  /** Group label shown beside the chips. */
   label: string;
+  /** Preset chips rendered in this row. */
   chips: {
+    /** Compact label shown in the chip. */
     label: string;
+    /** Start value applied when clicked, e.g. `now-15m`. */
     token: string;
+    /** Optional end value; defaults to `now`. */
     to?: string;
+    /** Accessible label for the chip button. */
     ariaLabel?: string;
+    /** Optional browser tooltip. */
     title?: string;
   }[];
 };
 
 export type TimeRangeProps = {
+  /** Controls whether the inputs accept date-only or date-time values. */
   kind?: TimeRangeKind;
+  /** Label shown in the trigger before the selected range summary. */
   label?: string;
+  /** Current start value. Relative values such as `now-1h` are supported. */
   from?: string;
+  /** Current end value. Relative values such as `now` are supported. */
   to?: string;
+  /** Called when the user applies a typed value or preset. */
   onApply: (from: string, to: string) => void;
+  /** Presets or preset groups to show in the popup. */
   presets?: Array<TimeRangePreset | TimeRangePresetGroup>;
+  /** Explicit chip rows; overrides the built-in preset group layout. */
   chipRows?: TimeRangeChipRow[];
+  /** Enables time fields for date-time ranges. */
   timeEnabled?: boolean;
+  /** Selected timezone shown in the popup. */
   timeZone?: string;
+  /** Available timezone options. */
   timeZones?: string[];
+  /** Placeholder for the start input. */
   fromPlaceholder?: string;
+  /** Placeholder for the end input. */
   toPlaceholder?: string;
+  /** Trigger text when neither boundary is set. */
   emptyLabel?: string;
+  /** Aligns the popup to the trigger's left or right edge. */
   align?: "left" | "right";
+  /** Disables opening and applying changes. */
   disabled?: boolean;
+  /** Classes applied to the root wrapper. */
   className?: string;
+  /** Classes applied to the trigger button. */
   triggerClassName?: string;
+  /** Classes applied to the popup panel. */
   panelClassName?: string;
 };
 

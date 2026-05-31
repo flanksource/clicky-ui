@@ -5,12 +5,19 @@ import { cn } from "../lib/utils";
 export type HoverCardPlacement = "top" | "bottom" | "left" | "right";
 
 export type HoverCardProps = {
+  /** Trigger content that opens the card on hover/focus. */
   trigger: ReactNode;
+  /** Floating card content. */
   children: ReactNode;
+  /** Preferred placement around the trigger. */
   placement?: HoverCardPlacement;
+  /** Open delay in milliseconds. */
   delay?: number;
+  /** Show the directional arrow. */
   arrow?: boolean;
+  /** Classes applied to the trigger wrapper. */
   className?: string;
+  /** Classes applied to the floating card. */
   cardClassName?: string;
 };
 

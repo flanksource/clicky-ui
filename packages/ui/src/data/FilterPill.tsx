@@ -11,10 +11,15 @@ import {
 export type FilterMode = "active" | "neutral" | "include" | "exclude";
 
 export type FilterPillProps = {
+  /** Visual and semantic state for the pill. */
   mode?: FilterMode;
+  /** Primary visible label. */
   label: ReactNode;
+  /** Optional count badge rendered before the label. */
   count?: number;
+  /** Iconify name or imported icon component. */
   icon?: string | StaticIconComponent;
+  /** Classes for the count badge background. */
   badge?: string;
   /**
    * Tri-state handler. When provided the pill renders as a toggle with a left
@@ -25,8 +30,11 @@ export type FilterPillProps = {
   onModeChange?: (next: FilterMode) => void;
   /** Legacy single-click handler, used when onModeChange is not provided. */
   onClick?: () => void;
+  /** Browser tooltip and accessible label for tri-state controls. */
   title?: string;
+  /** Places the tri-state toggle before or after the label. */
   togglePosition?: "left" | "right";
+  /** Classes applied to the pill root. */
   className?: string;
 };
 
@@ -70,12 +78,33 @@ function TristateSwitch({
         ? "bg-green-500/80"
         : "bg-muted";
 
+  // The three regions are aria-hidden click targets layered over the toggle
+  // track: clicking the left edge toggles exclude, the right edge toggles
+  // include, and the middle rotates. They are NOT focusable buttons — the
+  // whole switch is a single <button> so it exposes one accessible name and
+  // does not pollute the accessible name of any FilterBar wrapper that hosts
+  // it (e.g. the multi-filter option row, which is itself a role="button").
+  const region = (next: FilterMode, regionMode: SlotMode) => (
+    <span
+      aria-hidden
+      data-tristate-region={regionMode}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onChange(next);
+      }}
+      className="relative z-10 h-full flex-1 cursor-pointer"
+    />
+  );
+
   return (
     <button
       type="button"
       aria-label={ariaLabel}
       title={ariaLabel}
       onClick={(event) => {
+        // Keyboard activation (Enter/Space) lands here without a region —
+        // cycle, matching the middle-region rotation.
         event.preventDefault();
         event.stopPropagation();
         onChange(nextTriStateMode(mode));
@@ -85,6 +114,9 @@ function TristateSwitch({
         bg,
       )}
     >
+      {region(mode === "exclude" ? "neutral" : "exclude", "exclude")}
+      {region(nextTriStateMode(mode), "neutral")}
+      {region(mode === "include" ? "neutral" : "include", "include")}
       <span
         aria-hidden
         className={cn(
@@ -211,7 +243,9 @@ function nextTriStateMode(mode: FilterMode): FilterMode {
 }
 
 export type FilterPillGroupProps = {
+  /** Filter pills or separators to lay out. */
   children: ReactNode;
+  /** Classes applied to the wrapping row. */
   className?: string;
 };
 

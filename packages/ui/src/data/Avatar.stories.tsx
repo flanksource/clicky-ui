@@ -182,24 +182,34 @@ const meta: Meta<typeof Avatar> = {
   },
   argTypes: {
     size: {
+      description: "Density-aware size token.",
       control: "inline-radio",
       options: ["xs", "sm", "md", "lg", "xl"],
     },
     variant: {
+      description: "Fallback visual style used when no image is available.",
       control: "inline-radio",
       options: VARIANTS.map((entry) => entry.variant),
     },
     kind: {
+      description: "Identity type. Group avatars use a quieter neutral fallback palette.",
       control: "inline-radio",
       options: ["user", "group"],
     },
     rounded: {
+      description: "Avatar corner treatment.",
       control: "inline-radio",
       options: ["full", "md"],
     },
   },
   parameters: {
     layout: "padded",
+    docs: {
+      description: {
+        component:
+          "Density-aware avatar for users, groups, repositories, and stage-like identities. It renders an image when available and falls back to deterministic initials with selectable visual styles.",
+      },
+    },
   },
 };
 

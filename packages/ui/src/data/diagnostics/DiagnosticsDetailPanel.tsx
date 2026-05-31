@@ -47,9 +47,13 @@ function memoryTone(
 }
 
 export type DiagnosticsDetailPanelProps = {
+  /** Selected process; null renders the empty selection state. */
   process: ProcessNode | null;
+  /** Shows loading state while stack capture is being collected. */
   collectBusy?: boolean;
+  /** Called when the user requests a fresh stack capture. */
   onCollectStack?: (pid: number) => void | Promise<void>;
+  /** Optional run metadata rendered above diagnostics. */
   runMeta?: RunMeta;
 };
 

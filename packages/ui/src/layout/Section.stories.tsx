@@ -5,6 +5,14 @@ import { DetailEmptyState, Section } from "./Section";
 const meta: Meta<typeof Section> = {
   title: "Layout/Section",
   component: Section,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Collapsible layout section for dense detail screens. It supports controlled or uncontrolled open state, summaries, icons, semantic tone accents, and custom header/body classes.",
+      },
+    },
+  },
 };
 
 export default meta;

@@ -12,7 +12,7 @@ import { useSort, type SortDir } from "../hooks/use-sort";
 import { DensityValueProvider, type Density } from "../hooks/use-density";
 import { useResolvedTheme, type Theme } from "../hooks/use-theme";
 import { cn } from "../lib/utils";
-import { Modal } from "../overlay/Modal";
+import { Modal, type ModalSize } from "../overlay/Modal";
 import {
   FilterBar,
   FilterBarFilterPanel,
@@ -25,6 +25,7 @@ import {
   type FilterBarProps,
   type FilterBarRangePreset,
   type FilterBarRangeProps,
+  type FilterBarSearchProps,
 } from "../components/FilterBar";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
@@ -77,8 +78,11 @@ export type DataTableColumnKind = "timestamp" | "tags" | "status";
 export type StatusOptions<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
+  /** Maps the raw cell value to a badge status. Return null to fall back to text. */
   map?: (raw: unknown, row: T) => BadgeStatus | null;
+  /** Show the normalized status label next to the dot. */
   showLabel?: boolean;
+  /** Tooltip text for the status cell. */
   title?: (raw: unknown, row: T) => string;
 };
 
@@ -164,21 +168,37 @@ const TIMESTAMP_RANGE_PRESETS: FilterBarRangePreset[] = [
 export type DataTableColumn<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
+  /** Field path or stable column id. Dotted paths read nested row values. */
   key: string;
+  /** Header label. */
   label: ReactNode;
+  /** Enables header click sorting for this column. */
   sortable?: boolean;
+  /** Enables a generated column filter when `autoFilter` is true. */
   filterable?: boolean;
+  /** Prefer allocating extra width to this column. */
   grow?: boolean;
+  /** Prefer keeping this column compact. */
   shrink?: boolean;
+  /** Allows users to drag the column separator. */
   resizable?: boolean;
+  /** Allows the column to be toggled from the column menu. */
   hideable?: boolean;
+  /** Minimum column width in pixels. */
   minWidth?: number;
+  /** Maximum column width in pixels. */
   maxWidth?: number;
+  /** Cell and header text alignment. */
   align?: "left" | "center" | "right";
+  /** Custom cell renderer. */
   render?: (value: unknown, row: T) => ReactNode;
+  /** Sort key derived from the raw value and row. */
   sortValue?: (value: unknown, row: T) => unknown;
+  /** Filter token or tokens derived from the raw value and row. */
   filterValue?: (value: unknown, row: T) => FilterValue;
+  /** Classes applied to cells in this column. */
   cellClassName?: string;
+  /** Classes applied to the header cell. */
   headerClassName?: string;
   /**
    * Built-in cell kind. When set, DataTable supplies a default renderer,
@@ -205,17 +225,24 @@ export type DataTableColumnInput<
  * pageSize changes.
  */
 export type DataTablePagination = {
-  page: number; // 0-indexed
+  /** Current zero-indexed page. */
+  page: number;
+  /** Number of rows requested per page. */
   pageSize: number;
-  total?: number; // total row count if known; enables "Page X of Y"
+  /** Total row count if known; enables "Page X of Y". */
+  total?: number;
+  /** Called when the user moves to another page. */
   onPageChange: (page: number) => void;
+  /** Called when the page size select changes. */
   onPageSizeChange: (pageSize: number) => void;
-  pageSizeOptions?: number[]; // defaults to [25, 50, 100, 200]
+  /** Available page sizes. Defaults to [25, 50, 100, 200]. */
+  pageSizeOptions?: number[];
 };
 
 type DataTableInnerProps<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
+  /** Rows to render. The table does not fetch or mutate row data. */
   data: T[];
   /**
    * Column descriptors. Pass a bare string for a default column —
@@ -224,18 +251,45 @@ type DataTableInnerProps<
    * Mix and match strings with full descriptors as needed.
    */
   columns: Array<DataTableColumnInput<T>>;
+  /** Shows skeleton/loading rows instead of data rows. */
   loading?: boolean;
+  /** Message shown while `loading` is true. */
   loadingMessage?: ReactNode;
+  /** Number of skeleton rows to render while loading. */
   loadingRowCount?: number;
+  /** Message used when there are no rows after filtering. */
   emptyMessage?: string;
+  /** Classes applied to the table shell. */
   className?: string;
+  /** Generate filters from filterable columns. */
   autoFilter?: boolean;
+  /** Show the global search input. */
   showGlobalFilter?: boolean;
+  /** Controlled global search value. */
   globalFilter?: string;
+  /** Called when the global search changes. */
   onGlobalFilterChange?: (value: string) => void;
+  /** Placeholder for the global search input. */
   globalFilterPlaceholder?: string;
+  /** Initial sort state. */
   defaultSort?: { key: string; dir?: SortDir };
+  /** Extra props forwarded to the internal FilterBar. */
   filterBarProps?: Omit<FilterBarProps, "search" | "filters">;
+  /**
+   * Caller-owned search input rendered in the FilterBar's search slot. Unlike
+   * `globalFilter`, this does NOT filter rows client-side — it is a controlled
+   * input the caller wires to a server-side query (e.g., an operation's `q`
+   * parameter). Takes precedence over the built-in global filter input.
+   */
+  externalSearch?: FilterBarSearchProps;
+  /**
+   * Caller-owned time-range control rendered in the FilterBar. Like
+   * `externalSearch`/`externalFilters`, it does NOT filter rows client-side —
+   * the caller wires it to a server-side query (e.g. an operation's
+   * `time-from`/`time-to` parameters). Takes precedence over any
+   * column-derived time range.
+   */
+  externalTimeRange?: FilterBarRangeProps;
   /**
    * Extra filter pills supplied by the caller (e.g., operation query
    * parameters surfaced via parametersToFormConfig) that should appear in the
@@ -250,25 +304,57 @@ type DataTableInnerProps<
    * `onPageSizeChange` fires.
    */
   pagination?: DataTablePagination;
+  /** Stable row id extractor. Defaults to the row index. */
   getRowId?: (row: T, index: number) => string;
+  /** Called when a clickable row is selected. */
   onRowClick?: (row: T) => void;
+  /** Predicate controlling whether a row is clickable. */
   isRowClickable?: (row: T) => boolean;
+  /** Optional href for row link affordances. */
   getRowHref?: (row: T) => string | undefined;
+  /** Detail content rendered for expanded rows or dialog details. */
   renderExpandedRow?: (
     row: T,
     context: DataTableRowDetailContext<T>,
   ) => ReactNode;
+  /**
+   * How `renderExpandedRow` detail is surfaced when a row is clicked.
+   * - "row" (default): expands an inline detail row beneath the clicked row.
+   *   Multiple rows can be open at once.
+   * - "dialog": opens the detail content in a centered modal; one row at a
+   *   time. The same `renderExpandedRow` (and its context) drives both styles.
+   */
+  detailStyle?: "row" | "dialog";
+  /**
+   * Title for the detail dialog (detailStyle="dialog"). Pass a function to
+   * derive a per-row title, e.g. `(row) => \`Session ${row.sessionId}\``.
+   */
+  detailDialogTitle?: ReactNode | ((row: T) => ReactNode);
+  /** Modal size for the detail dialog. Defaults to "lg". */
+  detailDialogSize?: ModalSize;
+  /** Enables column drag resize handles. */
   resizableColumns?: boolean;
+  /** Persists column widths to localStorage. */
   persistColumnWidths?: boolean;
+  /** Storage key for persisted column widths. */
   columnResizeStorageKey?: string;
+  /** Enables column visibility controls. */
   hideableColumns?: boolean;
+  /** Persists column visibility to localStorage. */
   persistColumnVisibility?: boolean;
+  /** Storage key for persisted column visibility. */
   columnVisibilityStorageKey?: string;
+  /** Controlled row density. */
   density?: Density;
+  /** Initial row density for uncontrolled usage. */
   defaultDensity?: Density;
+  /** Called when density changes. */
   onDensityChange?: (density: Density | undefined) => void;
+  /** Persists density to localStorage. */
   persistDensity?: boolean;
+  /** Storage key for persisted density. */
   densityStorageKey?: string;
+  /** Shows density controls in the column menu. */
   showDensityControl?: boolean;
   /**
    * Current value of the theme menu shown in the column / preferences popover.
@@ -278,7 +364,9 @@ type DataTableInnerProps<
    */
   themeMenuValue?: Theme;
   onThemeChange?: (theme: Theme) => void;
+  /** Shows theme controls in the column menu. */
   showThemeControl?: boolean;
+  /** Shows per-column filter buttons in table headers. */
   showHeaderFilters?: boolean;
 };
 
@@ -298,6 +386,7 @@ export type DataTableProps<
    * inside a full-viewport `<Modal>`. Defaults to `false`.
    */
   showFullscreenControl?: boolean;
+  /** Title shown in the fullscreen modal. */
   fullscreenTitle?: ReactNode;
   /**
    * `aria-label` and `title` for the fullscreen toggle button. Defaults to
@@ -321,6 +410,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   globalFilterPlaceholder = "Search all columns…",
   defaultSort,
   filterBarProps,
+  externalSearch,
+  externalTimeRange,
   externalFilters,
   pagination,
   getRowId,
@@ -328,6 +419,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   isRowClickable,
   getRowHref,
   renderExpandedRow,
+  detailStyle = "row",
+  detailDialogTitle,
+  detailDialogSize = "lg",
   resizableColumns = true,
   persistColumnWidths = true,
   columnResizeStorageKey,
@@ -398,6 +492,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     Record<string, FilterBarNumberValue>
   >({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [detailRow, setDetailRow] = useState<InternalRow<T> | null>(null);
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
   const [timeRangeFilter, setTimeRangeFilter] = useState<{
     from: string;
@@ -789,6 +884,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   const showFilterBar =
     (autoFilter &&
       (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
+    !!externalSearch ||
+    !!externalTimeRange ||
     (externalFilters && externalFilters.length > 0) ||
     hasCustomFilterBarContent ||
     showTablePreferencesControl;
@@ -1035,16 +1132,22 @@ function DataTableInner<T extends Record<string, unknown>>({
         {showFilterBar && (
           <FilterBar
             {...filterBarProps}
-            {...(autoFilter && showGlobalFilter
-              ? {
-                  search: {
-                    value: effectiveGlobalFilter,
-                    onChange: setEffectiveGlobalFilter,
-                    placeholder: globalFilterPlaceholder,
-                  },
-                }
-              : {})}
-            {...(autoTimeRange ? { timeRange: autoTimeRange } : {})}
+            {...(externalSearch
+              ? { search: externalSearch }
+              : autoFilter && showGlobalFilter
+                ? {
+                    search: {
+                      value: effectiveGlobalFilter,
+                      onChange: setEffectiveGlobalFilter,
+                      placeholder: globalFilterPlaceholder,
+                    },
+                  }
+                : {})}
+            {...(externalTimeRange
+              ? { timeRange: externalTimeRange }
+              : autoTimeRange
+                ? { timeRange: autoTimeRange }
+                : {})}
             trailing={filterBarTrailing}
             filters={
               externalFilters && externalFilters.length > 0
@@ -1175,6 +1278,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                       tagActionsByColumn,
                     }) ?? null;
                   const expandable = expandedContent !== null;
+                  const expandsInline = expandable && detailStyle === "row";
+                  const opensDialog = expandable && detailStyle === "dialog";
                   const rowClickEnabled =
                     isRowClickable?.(record.row) ?? !!onRowClick;
                   const clickable = !!href || rowClickEnabled || expandable;
@@ -1187,11 +1292,14 @@ function DataTableInner<T extends Record<string, unknown>>({
                           clickable && "cursor-pointer hover:bg-accent/40",
                         )}
                         onClick={() => {
-                          if (expandable) {
+                          if (expandsInline) {
                             setExpandedRows((current) => ({
                               ...current,
                               [record.id]: !current[record.id],
                             }));
+                          }
+                          if (opensDialog) {
+                            setDetailRow(record);
                           }
                           if (rowClickEnabled) {
                             onRowClick?.(record.row);
@@ -1246,7 +1354,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                           );
                         })}
                       </tr>
-                      {expanded && expandedContent && (
+                      {expandsInline && expanded && expandedContent && (
                         <tr>
                           <td
                             colSpan={visibleColumns.length}
@@ -1272,6 +1380,29 @@ function DataTableInner<T extends Record<string, unknown>>({
             : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`}
         </div>
         {pagination && <DataTablePaginationFooter pagination={pagination} />}
+        {detailStyle === "dialog" && renderExpandedRow && (
+          <Modal
+            open={detailRow !== null}
+            onClose={() => setDetailRow(null)}
+            size={detailDialogSize}
+            {...(detailRow
+              ? {
+                  title:
+                    typeof detailDialogTitle === "function"
+                      ? detailDialogTitle(detailRow.row)
+                      : detailDialogTitle,
+                }
+              : {})}
+          >
+            {detailRow
+              ? renderExpandedRow(detailRow.row, {
+                  columns: effectiveColumns,
+                  visibleColumns,
+                  tagActionsByColumn,
+                })
+              : null}
+          </Modal>
+        )}
         {columnMenu && showTablePreferencesControl && (
           <ColumnVisibilityMenu
             columns={effectiveColumns}

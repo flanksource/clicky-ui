@@ -11,9 +11,26 @@ import {
 } from "@flanksource/icons/ui";
 import { Tree } from "./Tree";
 
+type DocsTreeNode = { id: string; label: string; children?: DocsTreeNode[] };
+
 const meta: Meta<typeof Tree> = {
   title: "Data/Tree",
   component: Tree,
+  args: {
+    roots: [{ id: "root", label: "Root", children: [{ id: "child", label: "Child" }] }],
+    getKey: (node: DocsTreeNode) => node.id,
+    getChildren: (node: DocsTreeNode) => node.children,
+    renderRow: ({ node }: { node: DocsTreeNode }) => node.label,
+    showControls: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Generic hierarchical list with built-in search, expand/collapse controls, custom row rendering, secondary child support, and controlled expand-all state.",
+      },
+    },
+  },
 };
 
 export default meta;

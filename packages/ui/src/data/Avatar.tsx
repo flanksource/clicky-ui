@@ -8,8 +8,11 @@ export type AvatarVariant = "duotone" | "solid" | "stamp" | "mono";
 export type AvatarKind = "user" | "group";
 
 export type AvatarProps = {
+  /** Image URL for the avatar. Falls back to initials when loading fails. */
   src?: string;
+  /** Accessible name and fallback text seed. */
   alt: string;
+  /** Explicit fallback initials. Defaults to initials derived from `alt`. */
   initials?: string;
   /**
    * Named size token (xs..xl). The rendered px is resolved through the active
@@ -18,10 +21,15 @@ export type AvatarProps = {
    * monogram stays quiet in dense list rows.
    */
   size?: SizeToken;
+  /** Border radius style. */
   rounded?: "full" | "md";
+  /** Identity type, used to choose fallback palette rules. */
   kind?: AvatarKind;
+  /** Fallback visual style. */
   variant?: AvatarVariant;
+  /** Browser tooltip. */
   title?: string;
+  /** Optional link URL. */
   href?: string;
   /**
    * Selects the palette color for the initial-fallback. Defaults to `alt` so
@@ -30,7 +38,9 @@ export type AvatarProps = {
    * orgs render with different colors.
    */
   colorKey?: string;
+  /** Called when the image fails to load. */
   onError?: (e: SyntheticEvent<HTMLImageElement>) => void;
+  /** Classes applied to the avatar root. */
   className?: string;
 };
 

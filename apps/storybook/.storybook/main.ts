@@ -7,8 +7,16 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
+  docs: {
+    defaultName: "Docs",
+  },
   typescript: {
     reactDocgen: "react-docgen-typescript",
+    reactDocgenTypescriptOptions: {
+      tsconfigPath: "../../packages/ui/tsconfig.json",
+      include: ["../../packages/ui/src/**/*.tsx"],
+      shouldExtractLiteralValuesFromEnum: true,
+    },
   },
   viteFinal: async (viteConfig) => {
     if (process.env.STORYBOOK_BASE_PATH) {

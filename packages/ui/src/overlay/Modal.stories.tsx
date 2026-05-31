@@ -5,6 +5,24 @@ import { Modal } from "./Modal";
 const meta: Meta<typeof Modal> = {
   title: "Overlay/Modal",
   component: Modal,
+  args: {
+    open: true,
+    title: "Confirm action",
+    size: "md",
+    closeOnBackdrop: true,
+    closeOnEsc: true,
+    expandable: true,
+    onClose: () => undefined,
+    children: <p className="text-sm">Are you sure you want to proceed?</p>,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Centered modal overlay with optional header, footer, backdrop/Escape closing, focus restoration, and built-in expand-to-fullscreen behavior.",
+      },
+    },
+  },
 };
 
 export default meta;
@@ -60,6 +78,33 @@ export const WithFooter: Story = {
           }
         >
           <p className="text-sm">This action cannot be undone.</p>
+        </Modal>
+      </>
+    );
+  },
+};
+
+export const Expandable: Story = {
+  render: () => {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button
+          className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground"
+          onClick={() => setOpen(true)}
+        >
+          Open expandable modal
+        </button>
+        <Modal
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Row detail"
+          size="lg"
+        >
+          <p className="text-sm">
+            Use the expand icon in the header to toggle between the configured
+            size and fullscreen.
+          </p>
         </Modal>
       </>
     );

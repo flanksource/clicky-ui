@@ -9,6 +9,14 @@ import type { ProcessNode } from "./types";
 const meta: Meta<typeof DiagnosticsDetailPanel> = {
   title: "Data/Diagnostics/DetailPanel",
   component: DiagnosticsDetailPanel,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Detail panel for a selected process diagnostics node. It shows process metadata, run metadata, collection actions, stack summaries, and searchable stack/thread detail.",
+      },
+    },
+  },
 };
 
 export default meta;

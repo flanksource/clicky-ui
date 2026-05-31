@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Icon-button picker that toggles between light, dark, and system themes. Writes `data-theme` on `<html>` and persists to `localStorage`. Pair with `ThemeProvider` at the app root.",
+          "Icon-button picker that toggles between light, dark, and system themes. It writes `data-theme` on `<html>`, persists to localStorage, and expects `ThemeProvider` at the app root.",
       },
     },
   },

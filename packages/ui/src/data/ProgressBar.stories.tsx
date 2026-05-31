@@ -4,6 +4,14 @@ import { ProgressBar } from "./ProgressBar";
 const meta: Meta<typeof ProgressBar> = {
   title: "Data/ProgressBar",
   component: ProgressBar,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Segmented progress bar for small summaries and table/detail metrics. Each segment contributes a count, color class, and tooltip label.",
+      },
+    },
+  },
 };
 
 export default meta;

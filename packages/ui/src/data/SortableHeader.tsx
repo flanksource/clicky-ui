@@ -3,11 +3,17 @@ import { cn } from "../lib/utils";
 import type { SortDir } from "../hooks/use-sort";
 
 export type SortableHeaderProps = {
+  /** Whether this header currently owns the sort state. */
   active: boolean;
+  /** Current sort direction when active. */
   dir?: SortDir | undefined;
+  /** Called when the header is clicked. */
   onClick: () => void;
+  /** Header content alignment. */
   align?: "left" | "right" | "center";
+  /** Classes applied to the button. */
   className?: string;
+  /** Header label/content. */
   children: ReactNode;
 };
 

@@ -5,6 +5,20 @@ import { FilterPill, FilterPillGroup, FilterSeparator, type FilterMode } from ".
 const meta: Meta<typeof FilterPill> = {
   title: "Data/FilterPill",
   component: FilterPill,
+  args: {
+    label: "env=prod",
+    mode: "include",
+    count: 3,
+    togglePosition: "left",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Compact filter state chip. It supports legacy active/neutral states and a tri-state include/exclude toggle used by DataTable and FilterBar filters.",
+      },
+    },
+  },
 };
 
 export default meta;

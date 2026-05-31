@@ -66,8 +66,11 @@ function spanToStyle(style: string): React.CSSProperties {
 }
 
 export type AnsiHtmlProps = {
+  /** Text containing ANSI SGR escape sequences. */
   text: string;
+  /** Classes applied to the rendered element. */
   className?: string;
+  /** Element to render: `pre` for blocks or `span` for inline log cells. */
   as?: "pre" | "span";
 };
 

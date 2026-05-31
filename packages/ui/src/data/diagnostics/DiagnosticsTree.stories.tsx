@@ -6,6 +6,14 @@ import { sampleProcessTree } from "./fixtures";
 const meta: Meta<typeof DiagnosticsTree> = {
   title: "Data/Diagnostics/Tree",
   component: DiagnosticsTree,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Process-tree browser for diagnostics captures. It highlights the selected process, shows pid/status/cpu/memory, and delegates hierarchy/search behavior to Tree.",
+      },
+    },
+  },
 };
 
 export default meta;

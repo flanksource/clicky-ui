@@ -23,8 +23,20 @@ import {
 const meta: Meta<typeof Badge> = {
   title: "Data/Badge",
   component: Badge,
+  args: {
+    children: "Badge",
+    tone: "neutral",
+    variant: "soft",
+    size: "md",
+  },
   parameters: {
     layout: "padded",
+    docs: {
+      description: {
+        component:
+          "Compact status, label/value, metric, and link badge. Use simple variants for inline labels and rich variants when keys, values, icons, truncation, wrapping, or copy behavior matter.",
+      },
+    },
   },
 };
 

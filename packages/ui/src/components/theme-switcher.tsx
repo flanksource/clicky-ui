@@ -11,8 +11,11 @@ const THEME_OPTIONS: IconMenuOption<Theme>[] = [
 ];
 
 export type ThemeSwitcherProps = {
+  /** Classes applied to the root wrapper. */
   className?: string;
+  /** Classes applied to the icon trigger button. */
   triggerClassName?: string;
+  /** Classes applied to the popup menu. */
   menuClassName?: string;
 };
 

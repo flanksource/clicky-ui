@@ -4,8 +4,21 @@ import { SplitPane } from "./SplitPane";
 const meta: Meta<typeof SplitPane> = {
   title: "Layout/SplitPane",
   component: SplitPane,
+  args: {
+    left: <div className="p-4">Left pane</div>,
+    right: <div className="p-4">Right pane</div>,
+    defaultSplit: 50,
+    minLeft: 20,
+    minRight: 20,
+  },
   parameters: {
     layout: "fullscreen",
+    docs: {
+      description: {
+        component:
+          "Resizable horizontal split layout for explorer/detail views. Drag the separator to change the left pane percentage while respecting minimum pane widths.",
+      },
+    },
   },
 };
 

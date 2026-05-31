@@ -2,11 +2,17 @@ import { useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 
 export type LogViewerProps = {
+  /** Raw log text separated by newlines. */
   logs: string;
+  /** Number of lines shown before the viewer is expanded. */
   collapsedLines?: number;
+  /** Maximum expanded height in viewport-height units. */
   maxExpandedVh?: number;
+  /** Background utility class for the log container. */
   bgClass?: string;
+  /** Border utility class for the log container. */
   borderClass?: string;
+  /** Classes applied to the root wrapper. */
   className?: string;
 };
 

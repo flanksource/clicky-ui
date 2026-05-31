@@ -6,6 +6,18 @@ import { sampleHarEntries } from "./fixtures";
 const meta: Meta<typeof HarPanel> = {
   title: "Data/HarPanel",
   component: HarPanel,
+  args: {
+    entries: sampleHarEntries,
+    emptyLabel: "No HTTP traffic captured",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "HAR entry table for HTTP diagnostics. It filters captured requests, summarizes method/url/status/timing/size, and expands rows into request and response details.",
+      },
+    },
+  },
 };
 
 export default meta;

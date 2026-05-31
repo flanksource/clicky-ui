@@ -3,7 +3,7 @@
 Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com/) with first-class light/dark and density theming.
 
 - **Library** (`packages/ui`) — React + TypeScript + Tailwind, published as `@flanksource/clicky-ui`.
-- **Storybook** (`apps/storybook`) — component catalog with interaction tests.
+- **Storybook** (`apps/storybook`) — Autodocs component catalog with interaction tests.
 - **Kitchen Sink** (`apps/kitchen-sink`) — Preact-hosted demo proving runtime compatibility.
 - **E2E** (`e2e`) — Playwright tests against the kitchen sink.
 

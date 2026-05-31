@@ -5,6 +5,21 @@ import { SortableHeader } from "./SortableHeader";
 const meta: Meta<typeof SortableHeader> = {
   title: "Data/SortableHeader",
   component: SortableHeader,
+  args: {
+    active: true,
+    dir: "asc",
+    align: "left",
+    children: "Name",
+    onClick: () => undefined,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Minimal sortable header control that shows active/inactive sort affordances and leaves sort state ownership to the caller.",
+      },
+    },
+  },
 };
 
 export default meta;

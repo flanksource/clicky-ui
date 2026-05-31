@@ -4,9 +4,13 @@ import { JsonView } from "../JsonView";
 import type { HAREntry } from "./types";
 
 export type HarPanelProps = {
+  /** HAR entries to render. */
   entries: HAREntry[];
+  /** Optional external search term. When omitted, the internal DataTable search is shown. */
   search?: string;
+  /** Empty-state label for no entries or no matches. */
   emptyLabel?: string;
+  /** Classes applied to the panel root. */
   className?: string;
 };
 

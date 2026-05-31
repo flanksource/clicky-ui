@@ -4,6 +4,18 @@ import { JsonView } from "./JsonView";
 const meta: Meta<typeof JsonView> = {
   title: "Data/JsonView",
   component: JsonView,
+  args: {
+    data: { service: "api", status: "healthy", replicas: 3 },
+    defaultOpenDepth: 2,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Recursive JSON/object viewer for compact diagnostics and raw payload inspection. Objects and arrays can be expanded by depth while primitive values stay inline.",
+      },
+    },
+  },
 };
 
 export default meta;

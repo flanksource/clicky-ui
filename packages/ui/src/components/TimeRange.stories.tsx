@@ -61,8 +61,25 @@ function TimeRangeShowcase() {
 
 const meta = {
   title: "Components/TimeRange",
-  component: TimeRangeShowcase,
-} satisfies Meta<typeof TimeRangeShowcase>;
+  component: TimeRange,
+  render: () => <TimeRangeShowcase />,
+  args: {
+    kind: "time",
+    label: "Time range",
+    from: "now-1d",
+    to: "now",
+    presets: ["min", "hr", "day", "wk+"],
+    onApply: () => undefined,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Controlled date/time range picker with relative `now-X` presets, optional absolute date-time fields, timezone selection, and compact preset groups for filter bars.",
+      },
+    },
+  },
+} satisfies Meta<typeof TimeRange>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

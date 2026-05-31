@@ -9,6 +9,11 @@ import {
   type ClickyTableRowPredicate,
 } from "../data/Clicky";
 import { DataTable, type DataTableColumn } from "../data/DataTable";
+import type {
+  FilterBarFilter,
+  FilterBarRangeProps,
+  FilterBarSearchProps,
+} from "../components/FilterBar";
 import { cn } from "../lib/utils";
 import { parseJsonBody } from "./classify";
 import type { ExecutionResponse } from "./types";
@@ -38,6 +43,12 @@ export type ExecutionResultProps = {
   onTableRowClick?: ClickyTableRowClick;
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
+  /** Caller-owned search input published into the embedded table's FilterBar. */
+  search?: FilterBarSearchProps;
+  /** Caller-owned time-range control published into the embedded table's FilterBar. */
+  timeRange?: FilterBarRangeProps;
+  /** Caller-owned filter pills published into the embedded table's FilterBar. */
+  externalFilters?: FilterBarFilter[];
 };
 
 export function ExecutionResult({
@@ -51,6 +62,9 @@ export function ExecutionResult({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  search,
+  timeRange,
+  externalFilters,
 }: ExecutionResultProps) {
   if (loading) {
     return (
@@ -96,6 +110,9 @@ export function ExecutionResult({
           {...(onTableRowClick ? { onTableRowClick } : {})}
           {...(getTableRowHref ? { getTableRowHref } : {})}
           {...(isTableRowClickable ? { isTableRowClickable } : {})}
+          {...(search ? { search } : {})}
+          {...(timeRange ? { timeRange } : {})}
+          {...(externalFilters ? { externalFilters } : {})}
         />
       </div>
     );
