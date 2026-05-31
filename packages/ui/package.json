@@ -90,6 +90,7 @@
     "@tanstack/react-query": "^5.66.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "catalog:",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
