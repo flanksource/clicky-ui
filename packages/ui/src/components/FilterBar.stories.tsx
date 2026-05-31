@@ -111,11 +111,7 @@ function FilterBarShowcase(overrides: FilterBarShowcaseProps = {}) {
         },
       }}
       onApply={() => undefined}
-      trailing={
-        <span className="text-xs text-muted-foreground">
-          {search || "Idle"}
-        </span>
-      }
+      trailing={<span className="text-xs text-muted-foreground">{search || "Idle"}</span>}
       {...overrides}
     />
   );
@@ -157,8 +153,7 @@ const meta = {
     },
     applyLabel: {
       control: "text",
-      description:
-        "Label for the Apply button (only shown when `autoSubmit` is false).",
+      description: "Label for the Apply button (only shown when `autoSubmit` is false).",
       table: { category: "Behavior", defaultValue: { summary: "Apply" } },
     },
     isPending: {

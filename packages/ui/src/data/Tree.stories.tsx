@@ -2,13 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
-import {
-  UiDebug,
-  UiPause,
-  UiError,
-  UiPass,
-  UiClass,
-} from "../icons";
+import { UiDebug, UiPause, UiError, UiPass, UiClass } from "../icons";
 import { Tree } from "./Tree";
 
 type DocsTreeNode = { id: string; label: string; children?: DocsTreeNode[] };
@@ -86,25 +80,15 @@ export const TestTree: Story = {
         defaultOpen={(t, d) => d < 1 || t.status === "failed"}
         renderRow={({ node }) => {
           const icon =
-            node.status === "passed"
-              ? UiPass
-              : node.status === "failed"
-                ? UiError
-                : UiPause;
+            node.status === "passed" ? UiPass : node.status === "failed" ? UiError : UiPause;
           const tone =
-            node.status === "passed"
-              ? "success"
-              : node.status === "failed"
-                ? "danger"
-                : "warning";
+            node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
           return (
             <>
               <Icon icon={icon} />
               <span className="truncate flex-1">{node.name}</span>
               {node.duration && (
-                <span className="text-xs text-muted-foreground">
-                  {node.duration}ms
-                </span>
+                <span className="text-xs text-muted-foreground">{node.duration}ms</span>
               )}
               <Badge tone={tone} size="sm">
                 {node.status}
@@ -149,9 +133,7 @@ export const ProcessTree: Story = {
           <span className="font-medium">{node.name}</span>
           <span className="text-xs text-muted-foreground">pid {node.pid}</span>
           <span className="flex-1" />
-          <span className="text-xs text-muted-foreground">
-            {node.cpu.toFixed(1)}%
-          </span>
+          <span className="text-xs text-muted-foreground">{node.cpu.toFixed(1)}%</span>
         </>
       )}
     />
@@ -206,11 +188,7 @@ export const EmptyState: Story = {
       getChildren={(t) => t.children}
       getKey={(t) => t.id}
       renderRow={() => null}
-      empty={
-        <div className="p-density-4 text-muted-foreground text-sm">
-          No tests yet
-        </div>
-      }
+      empty={<div className="p-density-4 text-muted-foreground text-sm">No tests yet</div>}
     />
   ),
 };

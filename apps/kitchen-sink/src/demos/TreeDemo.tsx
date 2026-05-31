@@ -231,11 +231,7 @@ export function TreeDemo() {
                 ? ErrorIcon
                 : DebugPauseIcon;
           const tone =
-            node.status === "passed"
-              ? "success"
-              : node.status === "failed"
-                ? "danger"
-                : "warning";
+            node.status === "passed" ? "success" : node.status === "failed" ? "danger" : "warning";
           return (
             <>
               <Icon icon={icon} />

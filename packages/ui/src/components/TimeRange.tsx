@@ -1,24 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "../data/Icon";
-import {
-  UiArrowRight,
-  UiCalendar,
-  UiClose,
-  UiWatch,
-} from "../icons";
+import { UiArrowRight, UiCalendar, UiClose, UiWatch } from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { Select } from "./select";
 
 export type TimeRangeKind = "time" | "date";
 
-export type TimeRangePresetGroup =
-  | "min"
-  | "hr"
-  | "day"
-  | "wk+"
-  | "this"
-  | "last";
+export type TimeRangePresetGroup = "min" | "hr" | "day" | "wk+" | "this" | "last";
 
 export type TimeRangePreset = {
   /** Visible label for the preset row. */
@@ -174,10 +163,7 @@ const defaultDateChipRows: TimeRangeChipRow[] = [
   },
 ];
 
-const thisLastChipRows: Record<
-  Extract<TimeRangePresetGroup, "this" | "last">,
-  TimeRangeChipRow
-> = {
+const thisLastChipRows: Record<Extract<TimeRangePresetGroup, "this" | "last">, TimeRangeChipRow> = {
   this: {
     id: "this",
     label: "This",
@@ -246,9 +232,7 @@ export function TimeRange({
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const resolvedDefaultTimeZone = timeZone ?? getDefaultTimeZone();
-  const [selectedTimeZone, setSelectedTimeZone] = useState(
-    resolvedDefaultTimeZone,
-  );
+  const [selectedTimeZone, setSelectedTimeZone] = useState(resolvedDefaultTimeZone);
 
   const activeTimeZones = resolveTimeZones(timeZones, selectedTimeZone);
   const { rows: activeChipRows, presets: activePresets } = resolvePresetConfig(
@@ -340,18 +324,10 @@ export function TimeRange({
           </div>
 
           {activeChipRows.length > 0 && (
-            <ChipRowList
-              rows={activeChipRows}
-              activeToken={activeToken}
-              onApply={applyRange}
-            />
+            <ChipRowList rows={activeChipRows} activeToken={activeToken} onApply={applyRange} />
           )}
           {activePresets.length > 0 && (
-            <div
-              className={
-                activeChipRows.length > 0 ? "px-3.5 pb-3" : "px-3.5 pt-3"
-              }
-            >
+            <div className={activeChipRows.length > 0 ? "px-3.5 pb-3" : "px-3.5 pt-3"}>
               <PresetList presets={activePresets} onApply={applyRange} />
             </div>
           )}
@@ -373,9 +349,7 @@ export function TimeRange({
                       value: zone,
                       label: zone,
                     }))}
-                    onChange={(event) =>
-                      setSelectedTimeZone(event.target.value)
-                    }
+                    onChange={(event) => setSelectedTimeZone(event.target.value)}
                     className="h-7 w-40 truncate px-2 pr-7 font-mono text-xs"
                   />
                 </div>
@@ -385,8 +359,7 @@ export function TimeRange({
               <DraftRangeInput
                 aria-label={`${label} from`}
                 placeholder={
-                  fromPlaceholder ??
-                  (kind === "date" ? "YYYY-MM-DD or now-1d" : "now-24h")
+                  fromPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now-1d" : "now-24h")
                 }
                 value={draftFrom}
                 onChange={setDraftFrom}
@@ -394,16 +367,10 @@ export function TimeRange({
                 pickerKind={kind}
                 timeEnabled={timeEnabled}
               />
-              <Icon
-                icon={UiArrowRight}
-                className="text-muted-foreground text-[12px]"
-              />
+              <Icon icon={UiArrowRight} className="text-muted-foreground text-[12px]" />
               <DraftRangeInput
                 aria-label={`${label} to`}
-                placeholder={
-                  toPlaceholder ??
-                  (kind === "date" ? "YYYY-MM-DD or now" : "now")
-                }
+                placeholder={toPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now" : "now")}
                 value={draftTo}
                 onChange={setDraftTo}
                 onClear={() => setDraftTo("")}
@@ -504,11 +471,7 @@ function DraftRangeInput({
         showCalendar={showCalendar}
       />
       {showTimeInput && (
-        <DraftTimeInput
-          ariaLabel={`${ariaLabel} time`}
-          value={timePart}
-          onChange={setTimePart}
-        />
+        <DraftTimeInput ariaLabel={`${ariaLabel} time`} value={timePart} onChange={setTimePart} />
       )}
     </div>
   );
@@ -521,9 +484,7 @@ function resolvePresetConfig(
 ) {
   if (presets === undefined) {
     return {
-      rows:
-        chipRows ??
-        (kind === "date" ? defaultDateChipRows : defaultTimeChipRows),
+      rows: chipRows ?? (kind === "date" ? defaultDateChipRows : defaultTimeChipRows),
       presets: [] as TimeRangePreset[],
     };
   }
@@ -739,18 +700,14 @@ function formatSelectedPresetLabel(
 
   for (const row of rows) {
     for (const chip of row.chips) {
-      if (
-        chip.token === normalizedFrom &&
-        (chip.to ?? "now") === normalizedTo
-      ) {
+      if (chip.token === normalizedFrom && (chip.to ?? "now") === normalizedTo) {
         return chip.ariaLabel ?? chip.title ?? chip.label;
       }
     }
   }
 
-  return presets.find(
-    (preset) => preset.from === normalizedFrom && preset.to === normalizedTo,
-  )?.label;
+  return presets.find((preset) => preset.from === normalizedFrom && preset.to === normalizedTo)
+    ?.label;
 }
 
 function formatPresetRange({ from, to }: TimeRangePreset) {
@@ -800,20 +757,12 @@ function normalizeRangeValue(
   if (trimmed === "now" || trimmed.startsWith("now")) return trimmed;
   if (kind === "time" && /^[+-]\d/.test(trimmed)) return `now${trimmed}`;
   if (kind === "time" && options.timeEnabled) {
-    return encodeDateTimeWithOffset(
-      trimmed,
-      options.timeZone ?? getDefaultTimeZone(),
-    );
+    return encodeDateTimeWithOffset(trimmed, options.timeZone ?? getDefaultTimeZone());
   }
   return trimmed;
 }
 
-function formatRangeLabel(
-  kind: TimeRangeKind,
-  from: string,
-  to: string,
-  emptyLabel?: string,
-) {
+function formatRangeLabel(kind: TimeRangeKind, from: string, to: string, emptyLabel?: string) {
   const trimmedFrom = from.trim();
   const trimmedTo = to.trim();
 
@@ -846,23 +795,15 @@ function getDefaultTimeZone() {
   }
 }
 
-function resolveTimeZones(
-  timeZones: string[] | undefined,
-  selectedTimeZone: string,
-) {
-  const zones =
-    timeZones && timeZones.length > 0 ? timeZones : [selectedTimeZone, "UTC"];
-  return Array.from(
-    new Set([selectedTimeZone, ...zones, "UTC"].filter(Boolean)),
-  );
+function resolveTimeZones(timeZones: string[] | undefined, selectedTimeZone: string) {
+  const zones = timeZones && timeZones.length > 0 ? timeZones : [selectedTimeZone, "UTC"];
+  return Array.from(new Set([selectedTimeZone, ...zones, "UTC"].filter(Boolean)));
 }
 
 function encodeDateTimeWithOffset(value: string, timeZone: string) {
   if (!isLocalDateTime(value) || hasExplicitOffset(value)) return value;
 
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/,
-  );
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
   if (!match) return value;
 
   const [, year, month, day, hour, minute, second = "00"] = match;
@@ -879,9 +820,7 @@ function encodeDateTimeWithOffset(value: string, timeZone: string) {
 }
 
 function isLocalDateTime(value: string) {
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?$/.test(
-    value.trim(),
-  );
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?$/.test(value.trim());
 }
 
 function hasExplicitOffset(value: string) {

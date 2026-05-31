@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import {
-  TimeRange,
-  type TimeRangePreset,
-  type TimeRangeProps,
-} from "./TimeRange";
+import { TimeRange, type TimeRangePreset, type TimeRangeProps } from "./TimeRange";
 
 const datePresets: TimeRangePreset[] = [
   { label: "Today", from: "2026-05-05", to: "2026-05-05" },

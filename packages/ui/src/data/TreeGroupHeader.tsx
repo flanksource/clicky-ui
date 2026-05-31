@@ -42,15 +42,10 @@ export function TreeGroupHeader({
         className="text-muted-foreground text-xs"
       />
       {icon && (
-        <Icon
-          {...(typeof icon === "string" ? { name: icon } : { icon })}
-          className="text-base"
-        />
+        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
       )}
       <span className="font-medium text-sm flex-1 truncate">{title}</span>
-      {count !== undefined && (
-        <span className="text-xs text-muted-foreground">{count}</span>
-      )}
+      {count !== undefined && <span className="text-xs text-muted-foreground">{count}</span>}
     </button>
   );
 }

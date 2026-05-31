@@ -53,14 +53,8 @@ const FIELD_VALUE_BADGES = [
 
 const WRAPPING_BADGES = [
   ["container", "ghcr.io/flanksource/platform/incident-commander-controller"],
-  [
-    "image",
-    "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12",
-  ],
-  [
-    "to",
-    "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412",
-  ],
+  ["image", "ghcr.io/flanksource/platform/incident-commander:v1.4.200-build.12"],
+  ["to", "sha256:8cd15af2d1364a5cb4f8df25e7c6291e67c9dbf6d137db4403228c4a37d00412"],
 ] as const;
 
 const TRUNCATION_BADGES = [
@@ -78,8 +72,7 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "arn",
-    value:
-      "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
+    value: "arn:aws:eks:eu-west-1:123456789012:cluster/production-mission-control",
     truncate: "arn" as const,
     maxWidth: 20,
   },
@@ -97,27 +90,19 @@ const TRUNCATION_BADGES = [
   },
   {
     label: "url",
-    value:
-      "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
+    value: "https://console.flanksource.com/configs/production/mission-control.yaml?env=prod",
     truncate: "url" as const,
     maxWidth: 20,
   },
   {
     label: "auto",
-    value:
-      "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
+    value: "ghcr.io/flanksource/platform/mission-control-worker:v2.4.1-build.17",
     truncate: "auto" as const,
     maxWidth: 20,
   },
 ] as const;
 
-function DemoGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function DemoGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-density-2">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -169,13 +154,7 @@ export function BadgeDemo() {
               size="xs"
             />
           ))}
-          <Badge
-            variant="metric"
-            label="Latency"
-            value="45ms"
-            icon={ActivityIcon}
-            size="xs"
-          />
+          <Badge variant="metric" label="Latency" value="45ms" icon={ActivityIcon} size="xs" />
           <Badge
             variant="custom"
             label="v2.4.1"

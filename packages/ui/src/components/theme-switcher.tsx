@@ -25,17 +25,10 @@ export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
     const footer =
       theme === "system" ? (
         <span className="inline-flex items-center gap-1.5">
-          <Icon
-            icon={resolvedTheme === "dark" ? UiMoon : UiSun}
-            width={12}
-            height={12}
-          />
+          <Icon icon={resolvedTheme === "dark" ? UiMoon : UiSun} width={12} height={12} />
           <span>
             resolves to{" "}
-            <span
-              data-testid="resolved-theme"
-              className="font-medium text-foreground"
-            >
+            <span data-testid="resolved-theme" className="font-medium text-foreground">
               {resolvedTheme}
             </span>
           </span>

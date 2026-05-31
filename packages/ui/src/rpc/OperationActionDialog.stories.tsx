@@ -40,7 +40,13 @@ const DELETE_OPERATION: ResolvedOperation = {
     description: "Permanently remove a widget. This is irreversible.",
     tags: ["widgets"],
     parameters: [
-      { name: "id", in: "path", required: true, description: "Widget id", schema: { type: "string" } },
+      {
+        name: "id",
+        in: "path",
+        required: true,
+        description: "Widget id",
+        schema: { type: "string" },
+      },
     ],
     responses: { "204": { description: "Deleted" } },
   },
@@ -63,7 +69,13 @@ const PROVISION_OPERATION: ResolvedOperation = {
         description: "Cluster id",
         schema: { type: "string" },
       },
-      { name: "name", in: "query", required: true, description: "Node name", schema: { type: "string" } },
+      {
+        name: "name",
+        in: "query",
+        required: true,
+        description: "Node name",
+        schema: { type: "string" },
+      },
       {
         name: "instanceType",
         in: "query",
@@ -91,7 +103,12 @@ const PROVISION_OPERATION: ResolvedOperation = {
         description: "Use spot instances",
         schema: { type: "boolean", default: false },
       },
-      { name: "labels", in: "query", description: "Repeatable key=value labels", schema: { type: "array" } },
+      {
+        name: "labels",
+        in: "query",
+        description: "Repeatable key=value labels",
+        schema: { type: "array" },
+      },
       { name: "taints", in: "query", description: "Repeatable taints", schema: { type: "array" } },
       { name: "ami", in: "query", description: "Custom AMI id", schema: { type: "string" } },
       { name: "subnet", in: "query", description: "Subnet id", schema: { type: "string" } },

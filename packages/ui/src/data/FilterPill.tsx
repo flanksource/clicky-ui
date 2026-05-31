@@ -1,12 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "./Icon";
-import {
-  UiAdd,
-  UiCheck,
-  UiClose,
-  UiRemove,
-} from "../icons";
+import { UiAdd, UiCheck, UiClose, UiRemove } from "../icons";
 
 export type FilterMode = "active" | "neutral" | "include" | "exclude";
 
@@ -72,11 +67,7 @@ function TristateSwitch({
   const slot: SlotMode =
     mode === "exclude" ? "exclude" : mode === "include" ? "include" : "neutral";
   const bg =
-    slot === "exclude"
-      ? "bg-red-500/80"
-      : slot === "include"
-        ? "bg-green-500/80"
-        : "bg-muted";
+    slot === "exclude" ? "bg-red-500/80" : slot === "include" ? "bg-green-500/80" : "bg-muted";
 
   // The three regions are aria-hidden click targets layered over the toggle
   // track: clicking the left edge toggles exclude, the right edge toggles
@@ -165,10 +156,7 @@ export function FilterPill({
         </span>
       )}
       {icon && (
-        <Icon
-          {...(typeof icon === "string" ? { name: icon } : { icon })}
-          className="text-sm"
-        />
+        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-sm" />
       )}
       <span className="truncate">{label}</span>
     </>
@@ -189,13 +177,7 @@ export function FilterPill({
     );
 
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 select-none",
-          className,
-        )}
-        title={title}
-      >
+      <span className={cn("inline-flex items-center gap-1.5 select-none", className)} title={title}>
         {togglePosition === "right" ? (
           <>
             {labelContent}
@@ -231,8 +213,7 @@ export function FilterPill({
 function LegacyMarker({ mode }: { mode: FilterMode }) {
   if (mode === "include") return <Icon icon={UiAdd} className="text-xs" />;
   if (mode === "exclude") return <Icon icon={UiRemove} className="text-xs" />;
-  if (mode === "active")
-    return <span className="w-2 h-2 rounded-full bg-current" />;
+  if (mode === "active") return <span className="w-2 h-2 rounded-full bg-current" />;
   return <span className="w-2 h-2 rounded-full bg-current opacity-30" />;
 }
 
@@ -250,11 +231,7 @@ export type FilterPillGroupProps = {
 };
 
 export function FilterPillGroup({ children, className }: FilterPillGroupProps) {
-  return (
-    <div className={cn("flex items-center gap-1.5 flex-wrap", className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn("flex items-center gap-1.5 flex-wrap", className)}>{children}</div>;
 }
 
 export function FilterSeparator() {

@@ -26,7 +26,10 @@ const meta = {
       options: ["default", "sm", "lg", "icon"],
     },
     disabled: { description: "Disable pointer and keyboard activation.", control: "boolean" },
-    loading: { description: "Show spinner and disable the button while pending.", control: "boolean" },
+    loading: {
+      description: "Show spinner and disable the button while pending.",
+      control: "boolean",
+    },
     loadingLabel: { description: "Content shown while loading; defaults to `children`." },
     asChild: { description: "Render styles onto the child element with Radix Slot." },
     onClick: { description: "Click handler.", action: "click" },

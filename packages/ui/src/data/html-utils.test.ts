@@ -17,7 +17,7 @@ describe("sanitizeHtml", () => {
   });
 
   it.each([
-    ['double-quoted handler', '<div onclick="steal()">x</div>'],
+    ["double-quoted handler", '<div onclick="steal()">x</div>'],
     ["single-quoted handler", "<div onclick='steal()'>x</div>"],
     ["onerror handler", '<img src="x" onerror="steal()">'],
   ])("removes event-handler attribute (%s)", (_name, input) => {

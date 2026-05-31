@@ -49,9 +49,7 @@ function isIconComponent(value: unknown): value is IconComponent {
 }
 
 const ICONS: IconEntry[] = Object.entries(GeneratedIcons)
-  .filter((entry): entry is [string, IconComponent] =>
-    isIconComponent(entry[1]),
-  )
+  .filter((entry): entry is [string, IconComponent] => isIconComponent(entry[1]))
   .map(([name, component]) => ({
     name,
     component,
@@ -59,9 +57,7 @@ const ICONS: IconEntry[] = Object.entries(GeneratedIcons)
     consumerName: component.__consumerName,
     source: component.__source,
   }))
-  .sort(
-    (a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name),
-  );
+  .sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
 
 const GROUPS = Object.entries(
   ICONS.reduce<Record<string, IconEntry[]>>((acc, icon) => {
@@ -131,21 +127,12 @@ function GeneratedIconsDemo({
       {filteredGroups.map(([groupName, icons]) => (
         <section key={groupName} className="space-y-2">
           <header className="flex items-baseline justify-between gap-3">
-            <h2 className="text-sm font-semibold">
-              {GROUP_LABELS[groupName] ?? groupName}
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {icons.length}
-            </span>
+            <h2 className="text-sm font-semibold">{GROUP_LABELS[groupName] ?? groupName}</h2>
+            <span className="text-xs text-muted-foreground">{icons.length}</span>
           </header>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {icons.map((icon) => (
-              <IconCard
-                key={icon.name}
-                icon={icon}
-                showSource={showSource}
-                size={size}
-              />
+              <IconCard key={icon.name} icon={icon} showSource={showSource} size={size} />
             ))}
           </div>
         </section>
@@ -196,8 +183,7 @@ const meta: Meta<typeof GeneratedIconsDemo> = {
     },
     showStats: {
       control: "boolean",
-      description:
-        "Show the summary counts (components, groups, filled variants).",
+      description: "Show the summary counts (components, groups, filled variants).",
       table: { category: "Display" },
     },
     showAliases: {
@@ -258,19 +244,11 @@ function IconCard({
 
   return (
     <div className="flex min-w-0 items-center gap-2 rounded border border-border bg-background px-2 py-1.5">
-      <Component
-        size={size}
-        className="shrink-0 text-foreground"
-        title={icon.name}
-      />
+      <Component size={size} className="shrink-0 text-foreground" title={icon.name} />
       <div className="min-w-0 leading-tight">
-        <div className="truncate font-mono text-[11px] text-foreground">
-          {icon.name}
-        </div>
+        <div className="truncate font-mono text-[11px] text-foreground">{icon.name}</div>
         {showSource && (
-          <div className="truncate text-[10px] text-muted-foreground">
-            {icon.source}
-          </div>
+          <div className="truncate text-[10px] text-muted-foreground">{icon.source}</div>
         )}
       </div>
     </div>
@@ -299,9 +277,7 @@ function ChangeAliasesDemo({ size }: { size: number }) {
               <Outline size={size} title={`${name} outline`} />
               {Filled && <Filled size={size} title={`${name} filled`} />}
             </div>
-            <code className="truncate text-xs text-muted-foreground">
-              {name}
-            </code>
+            <code className="truncate text-xs text-muted-foreground">{name}</code>
           </div>
         );
       })}

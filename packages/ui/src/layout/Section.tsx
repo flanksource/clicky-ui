@@ -60,13 +60,7 @@ export function Section({
   }
 
   return (
-    <div
-      className={cn(
-        "rounded-md border border-border bg-background",
-        toneRing[tone],
-        className,
-      )}
-    >
+    <div className={cn("rounded-md border border-border bg-background", toneRing[tone], className)}>
       <button
         type="button"
         onClick={toggle}
@@ -82,23 +76,13 @@ export function Section({
           className="text-muted-foreground text-xs"
         />
         {icon && (
-          <Icon
-            {...(typeof icon === "string" ? { name: icon } : { icon })}
-            className="text-base"
-          />
+          <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
         )}
         <span className="font-medium text-sm flex-1 truncate">{title}</span>
-        {summary && (
-          <span className="text-xs text-muted-foreground">{summary}</span>
-        )}
+        {summary && <span className="text-xs text-muted-foreground">{summary}</span>}
       </button>
       {open && (
-        <div
-          className={cn(
-            "px-density-3 py-density-2 border-t border-border",
-            bodyClassName,
-          )}
-        >
+        <div className={cn("px-density-3 py-density-2 border-t border-border", bodyClassName)}>
           {children}
         </div>
       )}
@@ -117,16 +101,9 @@ export type DetailEmptyStateProps = {
   className?: string;
 };
 
-export function DetailEmptyState({
-  icon,
-  label,
-  description,
-  className,
-}: DetailEmptyStateProps) {
+export function DetailEmptyState({ icon, label, description, className }: DetailEmptyStateProps) {
   return (
-    <div
-      className={cn("p-density-6 text-center text-muted-foreground", className)}
-    >
+    <div className={cn("p-density-6 text-center text-muted-foreground", className)}>
       {icon && (
         <Icon
           {...(typeof icon === "string" ? { name: icon } : { icon })}
@@ -134,9 +111,7 @@ export function DetailEmptyState({
         />
       )}
       <p className="text-sm">{label}</p>
-      {description && (
-        <p className="text-xs mt-density-1 opacity-70">{description}</p>
-      )}
+      {description && <p className="text-xs mt-density-1 opacity-70">{description}</p>}
     </div>
   );
 }

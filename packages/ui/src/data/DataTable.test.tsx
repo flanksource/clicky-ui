@@ -913,18 +913,10 @@ describe("DataTable", () => {
   });
 
   describe("row detail (renderExpandedRow)", () => {
-    const renderDetail = (row: ServiceRow) => (
-      <div>Detail for {row.service}</div>
-    );
+    const renderDetail = (row: ServiceRow) => <div>Detail for {row.service}</div>;
 
     it("expands an inline detail row by default (detailStyle omitted)", () => {
-      render(
-        <DataTable
-          data={rows}
-          columns={columns}
-          renderExpandedRow={renderDetail}
-        />,
-      );
+      render(<DataTable data={rows} columns={columns} renderExpandedRow={renderDetail} />);
 
       expect(screen.queryByText("Detail for api")).not.toBeInTheDocument();
 
@@ -1052,8 +1044,6 @@ describe("DataTable caller-owned FilterBar inputs", () => {
     );
 
     expect(screen.getByPlaceholderText("Search query")).toBeInTheDocument();
-    expect(
-      screen.queryByPlaceholderText("Search all columns…"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search all columns…")).not.toBeInTheDocument();
   });
 });

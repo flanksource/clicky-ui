@@ -16,7 +16,7 @@ const meta: Meta<typeof TabButton> = {
     docs: {
       description: {
         component:
-          "Compact tab button with optional icon and count badge. It renders `role=\"tab\"` and keeps selection state controlled by the parent.",
+          'Compact tab button with optional icon and count badge. It renders `role="tab"` and keeps selection state controlled by the parent.',
       },
     },
   },

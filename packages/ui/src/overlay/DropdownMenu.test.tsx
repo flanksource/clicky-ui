@@ -48,10 +48,7 @@ describe("DropdownMenu", () => {
   it("does not fire onSelect for a disabled item", () => {
     const onSelect = vi.fn();
     render(
-      <DropdownMenu
-        label="Actions"
-        items={[{ label: "Delete", onSelect, disabled: true }]}
-      />,
+      <DropdownMenu label="Actions" items={[{ label: "Delete", onSelect, disabled: true }]} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /actions/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));

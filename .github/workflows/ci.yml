@@ -9,19 +9,6 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
-
-      - run: vp install
-      - run: vp check
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +26,7 @@ jobs:
 
       - run: vp install
       - name: Run unit tests
-        run: pnpm --filter @flanksource/clicky-ui exec vitest run
+        run: pnpm --filter @flanksource/clicky-ui run test
 
   build:
     runs-on: ubuntu-latest

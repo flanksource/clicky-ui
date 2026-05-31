@@ -6,13 +6,7 @@ import {
 } from "./stacktrace-parse";
 import { highlightCode, loadShikiTransformers } from "../code-highlight";
 import { Icon } from "../Icon";
-import {
-  UiChip,
-  UiStackFrameDot,
-  UiDebugStepOver,
-  UiError,
-  UiMethod,
-} from "../../icons";
+import { UiChip, UiStackFrameDot, UiDebugStepOver, UiError, UiMethod } from "../../icons";
 
 // SourceResolver matches the Go clicky.SourceResolver interface: given a
 // frame, return surrounding source lines so the renderer can display inline
@@ -83,8 +77,7 @@ export function StackTrace({
         sourceLines: resolved.lines,
         sourceStartLine: resolved.startLine,
       };
-      if (resolved.language !== undefined)
-        next.sourceLanguage = resolved.language;
+      if (resolved.language !== undefined) next.sourceLanguage = resolved.language;
       return next;
     });
   }, [parsed.frames, resolver, contextLines]);
@@ -92,8 +85,7 @@ export function StackTrace({
   const visibleFrames = useMemo(() => {
     return enrichedFrames.filter((frame) => {
       if (hideRuntimeOnly && frame.runtime) return false;
-      if (exclude && exclude.some((p) => frame.class?.startsWith(p)))
-        return false;
+      if (exclude && exclude.some((p) => frame.class?.startsWith(p))) return false;
       if (include && include.length > 0) {
         return include.some((p) => frame.class?.startsWith(p));
       }
@@ -143,10 +135,7 @@ export function StackTrace({
               key={i}
               className="flex min-w-0 items-start gap-2 font-mono text-[11px] text-orange-700 dark:text-orange-300"
             >
-              <Icon
-                icon={UiStackFrameDot}
-                className="mt-0.5 shrink-0 text-xs"
-              />
+              <Icon icon={UiStackFrameDot} className="mt-0.5 shrink-0 text-xs" />
               <span className="shrink-0 opacity-75">Caused by</span>
               <span className="min-w-0 break-all">{cause}</span>
             </div>
@@ -155,11 +144,7 @@ export function StackTrace({
       )}
       <div className="divide-y divide-border/60">
         {visibleFrames.map((frame, idx) => (
-          <FrameWithSource
-            key={`${frame.functionName}-${idx}`}
-            frame={frame}
-            index={idx}
-          />
+          <FrameWithSource key={`${frame.functionName}-${idx}`} frame={frame} index={idx} />
         ))}
       </div>
       {hasFilteredFrames && (
@@ -171,13 +156,7 @@ export function StackTrace({
   );
 }
 
-function FrameWithSource({
-  frame,
-  index,
-}: {
-  frame: ParsedStackFrame;
-  index: number;
-}) {
+function FrameWithSource({ frame, index }: { frame: ParsedStackFrame; index: number }) {
   const hasSource = frame.sourceLines && frame.sourceLines.length > 0;
 
   return (
@@ -188,18 +167,8 @@ function FrameWithSource({
   );
 }
 
-function StackFrameRow({
-  frame,
-  index,
-}: {
-  frame: ParsedStackFrame;
-  index: number;
-}) {
-  const icon = frame.nativeMethod
-    ? UiChip
-    : frame.runtime
-      ? UiDebugStepOver
-      : UiMethod;
+function StackFrameRow({ frame, index }: { frame: ParsedStackFrame; index: number }) {
+  const icon = frame.nativeMethod ? UiChip : frame.runtime ? UiDebugStepOver : UiMethod;
   const className = frame.class;
   const methodName = frame.displayName || frame.method || frame.functionName;
 
@@ -216,9 +185,7 @@ function StackFrameRow({
       </div>
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="min-w-0 break-all font-mono font-semibold leading-4">
-            {methodName}
-          </span>
+          <span className="min-w-0 break-all font-mono font-semibold leading-4">{methodName}</span>
           {className && (
             <span className="min-w-0 break-all font-mono text-[11px] text-muted-foreground">
               {className}

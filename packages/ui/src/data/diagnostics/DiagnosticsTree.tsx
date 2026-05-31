@@ -60,23 +60,17 @@ export function DiagnosticsTree({
             <Icon
               icon={node.is_root ? UiServerProcess : UiDebug}
               className={
-                node.is_root
-                  ? "text-base text-blue-600"
-                  : "text-base text-muted-foreground"
+                node.is_root ? "text-base text-blue-600" : "text-base text-muted-foreground"
               }
             />
             <span
               className={`truncate ${
-                selected
-                  ? "font-semibold text-primary"
-                  : "font-medium text-foreground"
+                selected ? "font-semibold text-primary" : "font-medium text-foreground"
               }`}
             >
               {processLabel(node)}
             </span>
-            <span className="text-xs text-muted-foreground shrink-0">
-              pid {node.pid}
-            </span>
+            <span className="text-xs text-muted-foreground shrink-0">pid {node.pid}</span>
             <span className="flex-1" />
             {node.status && (
               <span
@@ -98,9 +92,7 @@ export function DiagnosticsTree({
         );
       }}
       rowClass={(node) =>
-        node.pid === selectedPid
-          ? "bg-primary/10 border-l-2 border-primary"
-          : "hover:bg-accent"
+        node.pid === selectedPid ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent"
       }
     />
   );

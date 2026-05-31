@@ -73,10 +73,7 @@ export function AcceptPicker({
   }, [open]);
 
   return (
-    <div
-      ref={rootRef}
-      className={cn("relative flex flex-wrap gap-1", className)}
-    >
+    <div ref={rootRef} className={cn("relative flex flex-wrap gap-1", className)}>
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -131,9 +128,7 @@ export function AcceptPicker({
                     }}
                   >
                     <span className="min-w-0 flex-1">{option.label}</span>
-                    {active ? (
-                      <Icon icon={UiCheck} className="shrink-0" />
-                    ) : null}
+                    {active ? <Icon icon={UiCheck} className="shrink-0" /> : null}
                   </button>
                 );
               })}

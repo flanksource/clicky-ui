@@ -29,7 +29,13 @@ export default defineConfig(({ mode }) => {
           dts({
             tsconfigPath: "./tsconfig.json",
             include: ["src"],
-            exclude: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.stories.tsx", "src/test/**", "src/test/**/*"],
+            exclude: [
+              "src/**/*.test.ts",
+              "src/**/*.test.tsx",
+              "src/**/*.stories.tsx",
+              "src/test/**",
+              "src/test/**/*",
+            ],
             rollupTypes: false,
             skipDiagnostics: true,
             logDiagnostics: false,

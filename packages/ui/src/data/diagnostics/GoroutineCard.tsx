@@ -28,15 +28,9 @@ export type GoroutineCardProps = {
   hideRuntimeOnly: boolean;
 };
 
-export function GoroutineCard({
-  goroutine,
-  search,
-  hideRuntimeOnly,
-}: GoroutineCardProps) {
+export function GoroutineCard({ goroutine, search, hideRuntimeOnly }: GoroutineCardProps) {
   const frames = hideRuntimeOnly
-    ? goroutine.frames.filter(
-        (frame) => !frame.runtime || frame.kind === "created_by",
-      )
+    ? goroutine.frames.filter((frame) => !frame.runtime || frame.kind === "created_by")
     : goroutine.frames;
   const defaultOpen = goroutine.state === "running" || !!search;
 
@@ -44,26 +38,18 @@ export function GoroutineCard({
     <details className="border-0 bg-transparent" open={defaultOpen}>
       <summary className="cursor-pointer list-none px-0 py-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-xs font-semibold text-foreground">
-            g{goroutine.id}
-          </span>
+          <span className="font-mono text-xs font-semibold text-foreground">g{goroutine.id}</span>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${goroutineStateBadge(
               goroutine.state,
             )}`}
           >
-            <span
-              className={`h-2 w-2 rounded-full ${goroutineStateDot(goroutine.state)}`}
-            />
+            <span className={`h-2 w-2 rounded-full ${goroutineStateDot(goroutine.state)}`} />
             {goroutine.rawState}
           </span>
-          <span className="text-[11px] text-muted-foreground">
-            {frames.length}f
-          </span>
+          <span className="text-[11px] text-muted-foreground">{frames.length}f</span>
           {goroutine.userFrameCount > 0 && (
-            <span className="text-[11px] text-muted-foreground">
-              {goroutine.userFrameCount}u
-            </span>
+            <span className="text-[11px] text-muted-foreground">{goroutine.userFrameCount}u</span>
           )}
           {goroutine.topFunction && (
             <span className="truncate text-[11px] text-muted-foreground">
@@ -83,17 +69,11 @@ export function GoroutineCard({
 
 function FrameRow({ frame }: { frame: ParsedGoroutineFrame }) {
   return (
-    <div
-      className={frame.runtime ? "text-muted-foreground" : "text-foreground"}
-    >
+    <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
       <div className="flex items-start gap-1.5">
         <Icon
           icon={
-            frame.kind === "created_by"
-              ? UiRestart
-              : frame.runtime
-                ? UiDebugStepOver
-                : UiMethod
+            frame.kind === "created_by" ? UiRestart : frame.runtime ? UiDebugStepOver : UiMethod
           }
           className="shrink-0 mt-0.5 text-[11px]"
         />
@@ -101,9 +81,7 @@ function FrameRow({ frame }: { frame: ParsedGoroutineFrame }) {
           <div className="break-all font-mono text-[11px] font-semibold leading-4">
             {frame.displayName}
             {frame.location && (
-              <span className="ml-2 text-[10px] font-normal opacity-80">
-                {frame.location}
-              </span>
+              <span className="ml-2 text-[10px] font-normal opacity-80">{frame.location}</span>
             )}
           </div>
         </div>

@@ -115,9 +115,7 @@ function IconMenuPickerInner<T extends string>(
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const focusedIndex = itemRefs.current.findIndex(
-      (node) => node === document.activeElement,
-    );
+    const focusedIndex = itemRefs.current.findIndex((node) => node === document.activeElement);
     if (event.key === "ArrowDown") {
       event.preventDefault();
       focusItem((focusedIndex < 0 ? activeIndex : focusedIndex) + 1);
@@ -144,11 +142,7 @@ function IconMenuPickerInner<T extends string>(
   };
 
   const onTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (
-      event.key === "ArrowDown" ||
-      event.key === "Enter" ||
-      event.key === " "
-    ) {
+    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       setOpen(true);
     }
@@ -156,9 +150,7 @@ function IconMenuPickerInner<T extends string>(
 
   const selected = options[activeIndex];
   if (!selected) {
-    throw new Error(
-      `IconMenuPicker: value "${value}" not found in options for ${ariaLabel}`,
-    );
+    throw new Error(`IconMenuPicker: value "${value}" not found in options for ${ariaLabel}`);
   }
 
   return (
@@ -174,10 +166,7 @@ function IconMenuPickerInner<T extends string>(
         title={triggerTitle ?? `${ariaLabel}: ${selected.label}`}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onTriggerKeyDown}
-        className={cn(
-          "text-muted-foreground hover:text-foreground",
-          triggerClassName,
-        )}
+        className={cn("text-muted-foreground hover:text-foreground", triggerClassName)}
       >
         <Icon icon={selected.icon} />
       </Button>
@@ -216,13 +205,8 @@ function IconMenuPickerInner<T extends string>(
                   active && "text-foreground",
                 )}
               >
-                <Icon
-                  icon={option.icon}
-                  className="shrink-0 text-muted-foreground"
-                />
-                <span className="min-w-0 flex-1 truncate capitalize">
-                  {option.label}
-                </span>
+                <Icon icon={option.icon} className="shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate capitalize">{option.label}</span>
                 {active ? (
                   <Icon icon={UiCheck} className="shrink-0 text-foreground" />
                 ) : (
@@ -242,8 +226,6 @@ function IconMenuPickerInner<T extends string>(
   );
 }
 
-export const IconMenuPicker = forwardRef(IconMenuPickerInner) as <
-  T extends string,
->(
+export const IconMenuPicker = forwardRef(IconMenuPickerInner) as <T extends string>(
   props: IconMenuPickerProps<T> & { ref?: React.Ref<HTMLDivElement> },
 ) => JSX.Element;

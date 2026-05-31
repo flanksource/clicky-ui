@@ -55,9 +55,7 @@ describe("SignedDeltaBar", () => {
   });
 
   it("uses a custom formatter when provided", () => {
-    const { getByText } = render(
-      <SignedDeltaBar value={12} format={(v) => `${v}ms`} />,
-    );
+    const { getByText } = render(<SignedDeltaBar value={12} format={(v) => `${v}ms`} />);
     expect(getByText("12ms")).toBeInTheDocument();
   });
 });

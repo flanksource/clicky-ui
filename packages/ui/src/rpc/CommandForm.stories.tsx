@@ -22,7 +22,13 @@ const MANY_PARAMETERS: OpenAPIParameter[] = [
     description: "Cluster id",
     schema: { type: "string" },
   },
-  { name: "name", in: "query", required: true, description: "Node name", schema: { type: "string" } },
+  {
+    name: "name",
+    in: "query",
+    required: true,
+    description: "Node name",
+    schema: { type: "string" },
+  },
   {
     name: "instanceType",
     in: "query",

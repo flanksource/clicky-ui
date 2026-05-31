@@ -21,15 +21,8 @@ export function SectionDemo() {
           <li>mode = strict</li>
         </ul>
       </Section>
-      <Section
-        title="Errors"
-        tone="danger"
-        summary="3 violations"
-        icon={ErrorIcon}
-      >
-        <div className="text-sm text-muted-foreground">
-          Stack traces would go here.
-        </div>
+      <Section title="Errors" tone="danger" summary="3 violations" icon={ErrorIcon}>
+        <div className="text-sm text-muted-foreground">Stack traces would go here.</div>
       </Section>
       <Section title="Nested example" defaultOpen>
         <Section title="Created" summary="2026-01-01" defaultOpen>

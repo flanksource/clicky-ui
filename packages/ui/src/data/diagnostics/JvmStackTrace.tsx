@@ -1,12 +1,5 @@
 import { Icon } from "../Icon";
-import {
-  UiChip,
-  UiDebugStepOver,
-  UiLock,
-  UiSync,
-  UiMethod,
-  UiWatch,
-} from "../../icons";
+import { UiChip, UiDebugStepOver, UiLock, UiSync, UiMethod, UiWatch } from "../../icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
 
 export type JvmStackTraceProps = {
@@ -15,11 +8,7 @@ export type JvmStackTraceProps = {
   className?: string;
 };
 
-export function JvmStackTrace({
-  frames,
-  hideRuntimeOnly = false,
-  className,
-}: JvmStackTraceProps) {
+export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: JvmStackTraceProps) {
   const visibleFrames = hideRuntimeOnly
     ? frames.filter((frame) => frame.kind !== "frame" || !frame.runtime)
     : frames;
@@ -29,10 +18,7 @@ export function JvmStackTrace({
   return (
     <div className={className}>
       {visibleFrames.map((frame, index) => (
-        <JvmStackFrameRow
-          key={`${frame.functionName}-${index}`}
-          frame={frame}
-        />
+        <JvmStackFrameRow key={`${frame.functionName}-${index}`} frame={frame} />
       ))}
     </div>
   );
@@ -53,9 +39,7 @@ export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
         : UiMethod;
 
   return (
-    <div
-      className={frame.runtime ? "text-muted-foreground" : "text-foreground"}
-    >
+    <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
       <div className="flex items-start gap-1.5">
         <Icon icon={icon} className="mt-0.5 shrink-0 text-[11px]" />
         <div className="min-w-0">
@@ -64,18 +48,14 @@ export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
               <>
                 <span className="opacity-70">{frame.functionName}</span>
                 {frame.annotationText && (
-                  <span className="ml-2 font-normal opacity-80">
-                    {frame.annotationText}
-                  </span>
+                  <span className="ml-2 font-normal opacity-80">{frame.annotationText}</span>
                 )}
               </>
             ) : (
               <>
                 {frame.displayName}
                 {frame.location && (
-                  <span className="ml-2 text-[10px] font-normal opacity-80">
-                    {frame.location}
-                  </span>
+                  <span className="ml-2 text-[10px] font-normal opacity-80">{frame.location}</span>
                 )}
               </>
             )}
