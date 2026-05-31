@@ -104,8 +104,28 @@ function FilterBarShowcase() {
 
 const meta = {
   title: "Components/FilterBar",
-  component: FilterBarShowcase,
-} satisfies Meta<typeof FilterBarShowcase>;
+  component: FilterBar,
+  render: () => <FilterBarShowcase />,
+  args: {
+    search: {
+      value: "",
+      onChange: () => undefined,
+      placeholder: "Search traces...",
+    },
+    filters: [],
+    autoSubmit: true,
+    applyLabel: "Apply",
+    overflowMode: "responsive",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Responsive filter toolbar for search, typed filters, include/exclude chips, lookup fields, and date/time ranges. It can submit live with debounced fields or stage edits behind an Apply button.",
+      },
+    },
+  },
+} satisfies Meta<typeof FilterBar>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

@@ -190,8 +190,11 @@ describe("OperationCatalog", () => {
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foo" } });
-    fireEvent.change(screen.getByLabelText("Q"), { target: { value: "foobar" } });
+    // The list filters now live inside the rendered table's FilterBar, so wait
+    // for the table response to mount before driving the Q field.
+    const search = await screen.findByLabelText("Q");
+    fireEvent.change(search, { target: { value: "foo" } });
+    fireEvent.change(search, { target: { value: "foobar" } });
 
     // No Apply button exists.
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
@@ -227,7 +230,8 @@ describe("OperationCatalog", () => {
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByLabelText(/kind/i)).toHaveRole("combobox");
+    // Filters render inside the table's FilterBar once the response mounts.
+    expect(await screen.findByLabelText(/kind/i)).toHaveRole("combobox");
     expect(screen.getByLabelText("Team")).toHaveAttribute("list", "team-lookup-options");
     expect(screen.getByLabelText("Tags")).toHaveAttribute("list", "tags-lookup-options");
     expect(screen.getByLabelText("Include archived")).toHaveAttribute("type", "checkbox");
@@ -244,7 +248,9 @@ describe("OperationCatalog", () => {
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "platform" } });
+    fireEvent.change(await screen.findByLabelText("Team"), {
+      target: { value: "platform" },
+    });
 
     await waitFor(
       () =>

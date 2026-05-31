@@ -11,9 +11,13 @@ import {
 } from "./utils";
 
 export type DiagnosticsTreeProps = {
+  /** Root process node. Missing root renders a waiting state. */
   root?: ProcessNode;
+  /** Currently selected process id. */
   selectedPid?: number | null;
+  /** Controlled expand-all state forwarded to Tree. */
   expandAll?: boolean | null;
+  /** Called with the selected process id. */
   onSelect: (pid: number) => void;
 };
 

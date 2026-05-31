@@ -4,39 +4,65 @@ import { Icon, type StaticIconComponent } from "./Icon";
 import { formatPropertyLabel } from "./properties-utils";
 
 export type PropertiesAction<V = unknown> = {
+  /** Stable action id. */
   id: string;
+  /** Iconify name or imported icon component. */
   icon: string | StaticIconComponent;
+  /** Accessible label and tooltip for this row action. */
   label: (key: string, value: V, item: PropertiesItem<V>) => string;
+  /** Return false to hide the action for a specific row. */
   visible?: (key: string, value: V, item: PropertiesItem<V>) => boolean;
+  /** Return true to disable the action for a specific row. */
   disabled?: (key: string, value: V, item: PropertiesItem<V>) => boolean;
+  /** Called when the row action is clicked. */
   onClick: (key: string, value: V, item: PropertiesItem<V>) => void;
 };
 
 export type PropertiesItem<V = unknown> = {
+  /** Stable property key. Also used as the default label. */
   key: string;
+  /** Property value passed to renderers and actions. */
   value: V;
+  /** Secondary text shown below the label. */
   subtitle?: ReactNode;
+  /** Hide this row without removing it from the item array. */
   hidden?: boolean;
+  /** Enables an expandable child area below the row value. */
   expandable?: boolean;
+  /** Controlled expanded state. */
   expanded?: boolean;
+  /** Called when an expandable row is toggled. */
   onToggle?: (next: boolean) => void;
+  /** Child content rendered when the row is expanded. */
   renderChildren?: () => ReactNode;
 };
 
 export type PropertiesDensity = "comfortable" | "compact";
 
 export type PropertiesProps<V = unknown> = {
+  /** Property rows to render. Hidden items are filtered out. */
   items: PropertiesItem<V>[];
+  /** Custom label renderer. */
   renderLabel?: (key: string, value: V, item: PropertiesItem<V>) => ReactNode;
+  /** Custom value renderer. */
   renderValue?: (key: string, value: V, item: PropertiesItem<V>) => ReactNode;
+  /** Static icon name or function that returns an icon name per row. */
   labelIcon?: string | ((key: string, value: V, item: PropertiesItem<V>) => string | undefined);
+  /** Actions rendered before the value. */
   prefixActions?: PropertiesAction<V>[];
+  /** Actions rendered after the value. */
   suffixActions?: PropertiesAction<V>[];
+  /** Classes applied to the list root. */
   className?: string;
+  /** Classes applied to each row. */
   rowClassName?: string;
+  /** Classes applied to each label cell. */
   labelClassName?: string;
+  /** Classes applied to each value cell. */
   valueClassName?: string;
+  /** Row density preset. */
   density?: PropertiesDensity;
+  /** Empty-state content when no rows are visible. */
   emptyMessage?: ReactNode;
 };
 

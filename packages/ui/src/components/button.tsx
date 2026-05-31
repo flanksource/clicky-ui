@@ -31,8 +31,11 @@ const buttonVariants = cva(
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonVariants> & {
+    /** Render the button styles onto the child element via Radix Slot. */
     asChild?: boolean;
+    /** Show a spinner and disable the button while an action is pending. */
     loading?: boolean;
+    /** Label to render while loading; defaults to the normal children. */
     loadingLabel?: ReactNode;
   };
 

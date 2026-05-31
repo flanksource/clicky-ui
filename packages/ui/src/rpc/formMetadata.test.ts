@@ -83,6 +83,33 @@ describe("parametersToFormConfig", () => {
     expect(config.filters.map((f) => f.key)).toEqual(["name"]);
   });
 
+  it("partitions the search role parameter into config.search instead of a filter", () => {
+    const updates: Array<Record<string, string>> = [];
+    const values = { q: "bolt", kind: "" };
+    const config = parametersToFormConfig(
+      [
+        {
+          name: "q",
+          in: "query",
+          description: "Search query",
+          "x-clicky": { role: "search" },
+        },
+        { name: "kind", in: "query", "x-clicky": { role: "filter" } },
+      ],
+      values,
+      (updater) => {
+        updates.push(typeof updater === "function" ? updater(values) : updater);
+      },
+    );
+
+    expect(config.search?.value).toBe("bolt");
+    expect(config.search?.placeholder).toBe("Search query");
+    expect(config.filters.map((f) => f.key)).toEqual(["kind"]);
+
+    config.search?.onChange("gasket");
+    expect(updates).toEqual([{ q: "gasket", kind: "" }]);
+  });
+
   it("partitions time-from/time-to role parameters into the time range", () => {
     const values = { since: "2024-01-01", to: "2024-12-31" };
     const config = parametersToFormConfig(

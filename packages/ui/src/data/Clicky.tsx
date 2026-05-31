@@ -38,7 +38,11 @@ import {
   type DataTablePagination,
   type DataTableRowDetailContext,
 } from "./DataTable";
-import type { FilterBarFilter } from "../components/FilterBar";
+import type {
+  FilterBarFilter,
+  FilterBarRangeProps,
+  FilterBarSearchProps,
+} from "../components/FilterBar";
 import { Tree } from "./Tree";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -246,39 +250,68 @@ export type ClickyViewOptions = Partial<Record<ClickyRemoteFormat, boolean>>;
 export type ClickyViewConfig = ClickyViewOptions | ClickyRemoteFormat[];
 
 export type ClickyDownloadOptions = {
+  /** Show all advertised download formats in the overflow menu. */
   all?: boolean;
+  /** Override the download menu label. */
   label?: string;
 };
 
 export type ClickyProps = {
+  /** Clicky document, node, or JSON string to render. */
   data?: ClickyDocument | ClickyNode | string;
+  /** Remote URL to fetch when `data` is not provided. */
   url?: string;
+  /** Enabled remote view/download formats. */
   view?: ClickyViewConfig;
+  /** Download menu configuration. */
   download?: ClickyDownloadOptions;
+  /** Runtime used by link-command nodes. */
   commandRuntime?: ClickyCommandRuntime;
+  /** Called when an embedded table row is clicked. */
   onTableRowClick?: ClickyTableRowClick;
+  /** Optional href factory for embedded table rows. */
   getTableRowHref?: ClickyTableRowHref;
+  /** Predicate controlling whether embedded table rows are clickable. */
   isTableRowClickable?: ClickyTableRowPredicate;
+  /** Classes applied to the renderer root. */
   className?: string;
-  // externalFilters and pagination flow through to the embedded DataTable so
-  // operation pages can publish their query parameters as native filter pills
-  // and pagination footer without re-implementing them per page.
+  // search, externalFilters and pagination flow through to the embedded
+  // DataTable so operation pages can publish their query parameters as the
+  // table's search box, native filter pills, and pagination footer without
+  // re-implementing them per page.
+  search?: FilterBarSearchProps;
   externalFilters?: FilterBarFilter[];
+  /** Time-range control published into the first embedded table's FilterBar. */
+  timeRange?: FilterBarRangeProps;
+  /** Pagination footer configuration for the first embedded table. */
   pagination?: DataTablePagination;
 };
 
 export type ClickyNodeViewProps = {
+  /** Node to render; null and undefined render nothing. */
   node: ClickyNode | null | undefined;
 };
 
 export type ClickyTableProps = {
+  /** Clicky table column definitions. */
   columns: ClickyColumn[];
+  /** Clicky table rows. */
   rows: ClickyRow[];
+  /** Enable generated filters for filterable columns. */
   autoFilter?: boolean | undefined;
+  /** Called when a row is clicked. */
   onTableRowClick?: ClickyTableRowClick | undefined;
+  /** Optional href factory for row links. */
   getTableRowHref?: ClickyTableRowHref | undefined;
+  /** Predicate controlling whether a row is clickable. */
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  /** Dedicated search input rendered in the table's FilterBar. */
+  search?: FilterBarSearchProps | undefined;
+  /** Time-range control rendered in the table's FilterBar. */
+  timeRange?: FilterBarRangeProps | undefined;
+  /** Extra FilterBar controls rendered before generated filters. */
   externalFilters?: FilterBarFilter[] | undefined;
+  /** Pagination footer configuration. */
   pagination?: DataTablePagination | undefined;
 };
 
@@ -303,10 +336,13 @@ type ClickyRuntimeContextValue = {
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
-  // tableExternalFilters + tablePagination flow caller-owned widgets into the
-  // FIRST ClickyTable rendered inside this runtime. The wiring sits on the
-  // context rather than being threaded through every node so OperationCommand
-  // page-style callers don't need to know how deep the table is rendered.
+  // tableSearch + tableExternalFilters + tablePagination flow caller-owned
+  // widgets into the FIRST ClickyTable rendered inside this runtime. The wiring
+  // sits on the context rather than being threaded through every node so
+  // OperationCommand page-style callers don't need to know how deep the table
+  // is rendered.
+  tableSearch?: FilterBarSearchProps | undefined;
+  tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
   operations: ResolvedOperation[];
@@ -349,6 +385,8 @@ export function Clicky(props: ClickyProps) {
       {...(props.isTableRowClickable
         ? { isTableRowClickable: props.isTableRowClickable }
         : {})}
+      {...(props.search ? { tableSearch: props.search } : {})}
+      {...(props.timeRange ? { tableTimeRange: props.timeRange } : {})}
       {...(props.externalFilters
         ? { tableExternalFilters: props.externalFilters }
         : {})}
@@ -379,6 +417,8 @@ function ClickyRuntimeProvider({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  tableSearch,
+  tableTimeRange,
   tableExternalFilters,
   tablePagination,
   children,
@@ -387,6 +427,8 @@ function ClickyRuntimeProvider({
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  tableSearch?: FilterBarSearchProps | undefined;
+  tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
   children: ReactNode;
@@ -396,6 +438,8 @@ function ClickyRuntimeProvider({
       onTableRowClick ||
       getTableRowHref ||
       isTableRowClickable ||
+      tableSearch ||
+      tableTimeRange ||
       tableExternalFilters ||
       tablePagination;
     return (
@@ -407,6 +451,8 @@ function ClickyRuntimeProvider({
                 onTableRowClick,
                 getTableRowHref,
                 isTableRowClickable,
+                tableSearch,
+                tableTimeRange,
                 tableExternalFilters,
                 tablePagination,
               }
@@ -424,6 +470,8 @@ function ClickyRuntimeProvider({
       {...(onTableRowClick ? { onTableRowClick } : {})}
       {...(getTableRowHref ? { getTableRowHref } : {})}
       {...(isTableRowClickable ? { isTableRowClickable } : {})}
+      {...(tableSearch ? { tableSearch } : {})}
+      {...(tableTimeRange ? { tableTimeRange } : {})}
       {...(tableExternalFilters ? { tableExternalFilters } : {})}
       {...(tablePagination ? { tablePagination } : {})}
     >
@@ -437,6 +485,8 @@ function ClickyCommandRuntimeProvider({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  tableSearch,
+  tableTimeRange,
   tableExternalFilters,
   tablePagination,
   children,
@@ -445,6 +495,8 @@ function ClickyCommandRuntimeProvider({
   onTableRowClick?: ClickyTableRowClick | undefined;
   getTableRowHref?: ClickyTableRowHref | undefined;
   isTableRowClickable?: ClickyTableRowPredicate | undefined;
+  tableSearch?: FilterBarSearchProps | undefined;
+  tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
   children: ReactNode;
@@ -456,6 +508,8 @@ function ClickyCommandRuntimeProvider({
       onTableRowClick,
       getTableRowHref,
       isTableRowClickable,
+      tableSearch,
+      tableTimeRange,
       tableExternalFilters,
       tablePagination,
       operations,
@@ -468,6 +522,8 @@ function ClickyCommandRuntimeProvider({
       isTableRowClickable,
       onTableRowClick,
       operations,
+      tableSearch,
+      tableTimeRange,
       tableExternalFilters,
       tablePagination,
     ],
@@ -2263,6 +2319,8 @@ export function ClickyTable({
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  search,
+  timeRange,
   externalFilters,
   pagination,
 }: ClickyTableProps) {
@@ -2270,6 +2328,8 @@ export function ClickyTable({
   const rowClick = onTableRowClick ?? runtime.onTableRowClick;
   const rowHref = getTableRowHref ?? runtime.getTableRowHref;
   const rowClickable = isTableRowClickable ?? runtime.isTableRowClickable;
+  const effectiveSearch = search ?? runtime.tableSearch;
+  const effectiveTimeRange = timeRange ?? runtime.tableTimeRange;
   const effectiveExternalFilters =
     externalFilters ?? runtime.tableExternalFilters;
   const effectivePagination = pagination ?? runtime.tablePagination;
@@ -2356,6 +2416,8 @@ export function ClickyTable({
             isRowClickable: rowClickable ?? ((row) => Boolean(rowHref?.(row))),
           }
         : {})}
+      {...(effectiveSearch ? { externalSearch: effectiveSearch } : {})}
+      {...(effectiveTimeRange ? { externalTimeRange: effectiveTimeRange } : {})}
       {...(effectiveExternalFilters
         ? { externalFilters: effectiveExternalFilters }
         : {})}

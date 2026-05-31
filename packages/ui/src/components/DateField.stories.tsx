@@ -33,8 +33,23 @@ function DateFieldShowcase() {
 
 const meta = {
   title: "Components/DateField",
-  component: DateFieldShowcase,
-} satisfies Meta<typeof DateFieldShowcase>;
+  component: DateField,
+  render: () => <DateFieldShowcase />,
+  args: {
+    mode: "date",
+    value: "2026-05-05",
+    placeholder: "Select date",
+    openButtonLabel: "Open calendar",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Single date or datetime input wrapper that keeps DatePicker and DateTimePicker behind one small API. Use it anywhere a form needs a controlled ISO-like date value.",
+      },
+    },
+  },
+} satisfies Meta<typeof DateField>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

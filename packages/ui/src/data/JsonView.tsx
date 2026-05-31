@@ -1,9 +1,13 @@
 import { useState } from "react";
 
 export type JsonViewProps = {
+  /** JSON-like value to render. */
   data: unknown;
+  /** Optional property name displayed before nested object/array values. */
   name?: string;
+  /** Current nesting depth; callers usually leave this unset. */
   depth?: number;
+  /** Depth that starts expanded by default. */
   defaultOpenDepth?: number;
 };
 

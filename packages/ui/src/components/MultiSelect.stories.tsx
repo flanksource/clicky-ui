@@ -22,8 +22,27 @@ function MultiSelectShowcase() {
 
 const meta = {
   title: "Components/MultiSelect",
-  component: MultiSelectShowcase,
-} satisfies Meta<typeof MultiSelectShowcase>;
+  component: MultiSelect,
+  render: () => <MultiSelectShowcase />,
+  args: {
+    options: [
+      { value: "healthy", label: "Healthy" },
+      { value: "degraded", label: "Degraded" },
+      { value: "pending", label: "Pending" },
+    ],
+    value: ["healthy"],
+    placeholder: "Status",
+    onChange: () => undefined,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Compact controlled multi-select menu used by filters and dense table chrome. Pass stable option values and a complete selected value array.",
+      },
+    },
+  },
+} satisfies Meta<typeof MultiSelect>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

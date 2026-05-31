@@ -4,6 +4,17 @@ import { MethodBadge } from "./MethodBadge";
 const meta: Meta<typeof MethodBadge> = {
   title: "Data/MethodBadge",
   component: MethodBadge,
+  args: {
+    method: "GET",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "HTTP method badge with method-specific tones. It normalizes method casing and renders through the shared Badge primitive.",
+      },
+    },
+  },
 };
 
 export default meta;

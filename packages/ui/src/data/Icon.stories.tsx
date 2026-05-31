@@ -20,7 +20,7 @@ const meta: Meta<typeof Icon> = {
     docs: {
       description: {
         component:
-          "Renders statically imported icon components for built-in icons. Runtime string names are only for user-supplied data handled by a registered fallback provider.",
+          "Renders statically imported icon components for built-in icons. Runtime string names are for user-supplied data handled by a registered fallback provider. Use `style=\"badge\"` when the icon needs its own circular chip.",
       },
     },
   },
@@ -64,6 +64,37 @@ export const BadgeSizes: Story = {
           <span className="font-mono text-[10px] text-muted-foreground">
             {size}
           </span>
+        </div>
+      ))}
+    </div>
+  ),
+};
+
+const RUNTIME_ICON_NAMES = [
+  "codicon:check",
+  "codicon:error",
+  "codicon:warning",
+  "codicon:info",
+  "codicon:beaker",
+  "codicon:rocket",
+  "svg-spinners:ring-resize",
+];
+
+export const RuntimeNames: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "User-supplied runtime icon names resolved by the registered fallback provider. With no provider registered (as in Storybook) each name renders the documented dashed placeholder.",
+      },
+    },
+  },
+  render: () => (
+    <div className="flex flex-col gap-density-2">
+      {RUNTIME_ICON_NAMES.map((name) => (
+        <div key={name} className="flex items-center gap-density-2 text-sm">
+          <Icon name={name} className="text-xl" title={name} />
+          <code className="text-xs text-muted-foreground">{name}</code>
         </div>
       ))}
     </div>

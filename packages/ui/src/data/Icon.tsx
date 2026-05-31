@@ -10,12 +10,19 @@ export type IconTone = "emerald" | "amber" | "rose" | "slate" | "sky" | "violet"
 export type StaticIconComponent = ElementType;
 
 type CommonIconProps = {
+  /** Classes applied to the glyph or badge wrapper. */
   className?: string;
+  /** Explicit glyph width. */
   width?: string | number;
+  /** Explicit glyph height. */
   height?: string | number;
+  /** CSS rotate value or degrees. */
   rotate?: string | number;
+  /** Flip direction for imported glyphs. */
   flip?: string;
+  /** Forward inline rendering semantics to imported glyphs. */
   inline?: boolean;
+  /** Accessible title for the glyph. */
   title?: string;
   /**
    * Presentation style. `plain` (default) renders the icon inline.
@@ -38,10 +45,12 @@ type CommonIconProps = {
 export type IconProps = CommonIconProps &
   (
     | {
+        /** Imported static icon component. */
         icon: StaticIconComponent;
         name?: never;
       }
     | {
+        /** Runtime icon name resolved by the fallback provider. */
         name: string;
         icon?: never;
       }
@@ -64,9 +73,13 @@ const DEFAULT_PLAIN_ICON_SIZE = "1em";
  * Built-in/default icons should pass an imported component via `icon`.
  */
 export type FallbackIconProps = {
+  /** Runtime icon name to resolve. */
   name?: string;
+  /** Classes applied by Icon. */
   className?: string;
+  /** Requested glyph size. */
   size?: string | number;
+  /** Accessible label. */
   alt?: string;
 };
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
-import { FilterBar } from "../components/FilterBar";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiListFlat, UiTable } from "@flanksource/icons/ui";
 import { MethodBadge } from "../data/MethodBadge";
@@ -377,17 +376,6 @@ export function OperationCatalog({
 
       {showTable ? (
         <>
-          {(filterBarConfig.filters.length > 0 ||
-            filterBarConfig.timeRange != null) && (
-            <FilterBar
-              autoSubmit
-              isPending={listQuery.isFetching}
-              filters={filterBarConfig.filters}
-              {...(filterBarConfig.timeRange
-                ? { timeRange: filterBarConfig.timeRange }
-                : {})}
-            />
-          )}
           {listQuery.isLoading ? (
             <ExecutionResult
               loading
@@ -408,6 +396,15 @@ export function OperationCatalog({
               ariaLabel={`${definition.title} results`}
               className="mt-0"
               {...(commandRuntime ? { commandRuntime } : {})}
+              {...(filterBarConfig.search
+                ? { search: filterBarConfig.search }
+                : {})}
+              {...(filterBarConfig.timeRange
+                ? { timeRange: filterBarConfig.timeRange }
+                : {})}
+              {...(filterBarConfig.filters.length > 0
+                ? { externalFilters: filterBarConfig.filters }
+                : {})}
             />
           ) : null}
         </>

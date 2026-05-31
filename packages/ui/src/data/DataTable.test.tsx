@@ -911,4 +911,149 @@ describe("DataTable", () => {
       expect(within(labelsCell).getByText("us-east-1")).toBeInTheDocument();
     });
   });
+
+  describe("row detail (renderExpandedRow)", () => {
+    const renderDetail = (row: ServiceRow) => (
+      <div>Detail for {row.service}</div>
+    );
+
+    it("expands an inline detail row by default (detailStyle omitted)", () => {
+      render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          renderExpandedRow={renderDetail}
+        />,
+      );
+
+      expect(screen.queryByText("Detail for api")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("api"));
+
+      const detail = screen.getByText("Detail for api");
+      expect(detail).toBeInTheDocument();
+      // Inline style renders the detail inside the table, not in a dialog.
+      expect(detail.closest('[role="dialog"]')).toBeNull();
+      expect(detail.closest("table")).not.toBeNull();
+    });
+
+    it("opens the detail in a dialog when detailStyle is 'dialog'", () => {
+      render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          detailStyle="dialog"
+          detailDialogTitle={(row) => `Service ${row.service}`}
+          renderExpandedRow={renderDetail}
+        />,
+      );
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("worker"));
+
+      const dialog = screen.getByRole("dialog", { name: /service worker/i });
+      expect(within(dialog).getByText("Detail for worker")).toBeInTheDocument();
+      // Dialog style does NOT also render an inline detail row in the table.
+      const detail = within(dialog).getByText("Detail for worker");
+      expect(detail.closest("table")).toBeNull();
+    });
+  });
+});
+
+describe("DataTable caller-owned FilterBar inputs", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("renders externalSearch and externalFilters in the same bar as the column menu", () => {
+    const onSearch = vi.fn<(value: string) => void>();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        externalSearch={{
+          value: "",
+          onChange: onSearch,
+          placeholder: "Search query",
+        }}
+        externalFilters={[
+          {
+            key: "kind",
+            kind: "enum",
+            label: "Kind",
+            value: "",
+            options: [
+              { value: "big", label: "big" },
+              { value: "small", label: "small" },
+            ],
+            onChange: () => {},
+          },
+        ]}
+      />,
+    );
+
+    const search = screen.getByPlaceholderText("Search query");
+    const kind = screen.getByRole("combobox", { name: "Kind" });
+    const columnMenu = screen.getByRole("button", { name: /open column menu/i });
+
+    // The FilterBar root is the parent of the [data-filter-bar-list] container;
+    // search, the Kind filter, and the column menu all live inside that one bar.
+    const filterList = document.querySelector("[data-filter-bar-list]");
+    const bar = filterList?.parentElement;
+    expect(bar).not.toBeNull();
+    expect(bar).toContainElement(search);
+    expect(bar).toContainElement(kind);
+    expect(bar).toContainElement(columnMenu);
+  });
+
+  it("does not filter rows client-side when externalSearch changes", () => {
+    vi.useFakeTimers();
+    const onSearch = vi.fn<(value: string) => void>();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        externalSearch={{
+          value: "",
+          onChange: onSearch,
+          placeholder: "Search query",
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Search query"), {
+      target: { value: "nothing-matches" },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // The caller owns the query (server-side); rows are untouched locally.
+    expect(onSearch).toHaveBeenCalledWith("nothing-matches");
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.getByText("cron")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("prefers externalSearch over the built-in global search input", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        autoFilter
+        externalSearch={{
+          value: "",
+          onChange: () => {},
+          placeholder: "Search query",
+        }}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Search query")).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Search all columns…"),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -1,15 +1,22 @@
 import { cn } from "../lib/utils";
 
 export type ProgressSegment = {
+  /** Numeric amount represented by this segment. */
   count: number;
+  /** Tailwind/background class applied to this segment. */
   color: string;
+  /** Label used in the tooltip. */
   label: string;
 };
 
 export type ProgressBarProps = {
+  /** Segments rendered in order from left to right. */
   segments: ProgressSegment[];
+  /** Total value used to calculate segment percentages. */
   total: number;
+  /** Height utility class, e.g. `h-2`. */
   height?: string;
+  /** Classes applied to the progressbar root. */
   className?: string;
 };
 

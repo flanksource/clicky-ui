@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { cn } from "../lib/utils";
 
 export type MarkdownProps = {
+  /** Markdown source text. */
   text: string;
+  /** Classes applied to the rendered markdown wrapper. */
   className?: string;
 };
 

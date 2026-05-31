@@ -4,6 +4,18 @@ import { AnsiHtml } from "./AnsiHtml";
 const meta: Meta<typeof AnsiHtml> = {
   title: "Data/AnsiHtml",
   component: AnsiHtml,
+  args: {
+    text: "\\u001b[32mPASS\\u001b[0m service ready",
+    as: "pre",
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Small ANSI SGR renderer for colored terminal output in logs, command results, and inline table cells.",
+      },
+    },
+  },
 };
 
 export default meta;

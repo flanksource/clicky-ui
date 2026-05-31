@@ -6,7 +6,9 @@ export type TimestampMode = "auto" | "absolute" | "relative" | "time";
 export type TimestampFormat = "relative" | "time" | "short" | "iso";
 
 export type TimestampOptions = {
+  /** Rendering mode for timestamp cells. */
   mode?: TimestampMode;
+  /** Show the full timestamp in a tooltip even for absolute/ISO formats. */
   alwaysShowFullOnHover?: boolean;
   /**
    * When the column is on a DataTable with `autoFilter`, DataTable mounts a

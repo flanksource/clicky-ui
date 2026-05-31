@@ -27,7 +27,9 @@ export type TagsValue =
   | undefined;
 
 export type TagsOptions = {
+  /** Number of tags to show inline before using the `+N` overflow popover. */
   maxVisible?: number;
+  /** Separator between tag keys and values. Defaults to `=`. */
   separator?: string;
 };
 
@@ -168,9 +170,13 @@ export function useTagActions(): TagActionsContextValue {
 }
 
 export type TagListProps = {
+  /** Normalized tags to render. */
   tags: NormalizedTag[];
+  /** Number of tags to show inline before the overflow popover. */
   maxVisible?: number;
+  /** Classes applied to the tag row. */
   className?: string;
+  /** Whether copy/zoom actions appear on hover or inline. */
   actions?: "hover" | "inline";
   /**
    * When `true`, visible tag badges render only their value — the key is

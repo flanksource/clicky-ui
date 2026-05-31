@@ -6,6 +6,20 @@ import { UiClass } from "@flanksource/icons/ui";
 const meta: Meta<typeof TreeGroupHeader> = {
   title: "Data/TreeGroupHeader",
   component: TreeGroupHeader,
+  args: {
+    title: "Services",
+    open: true,
+    count: 4,
+    onToggle: () => undefined,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Clickable grouped-tree header with chevron state, optional icon, and trailing count. Use it for collapsible buckets around Tree content.",
+      },
+    },
+  },
 };
 
 export default meta;

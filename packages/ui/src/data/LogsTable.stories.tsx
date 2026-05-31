@@ -4,6 +4,19 @@ import { LogsTable } from "./LogsTable";
 const meta: Meta<typeof LogsTable> = {
   title: "Data/LogsTable",
   component: LogsTable,
+  args: {
+    logs: "2026-05-05T09:30:00Z INFO api service ready\\n2026-05-05T09:31:00Z WARN worker retrying",
+    autoFilter: true,
+    showRawDetails: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Log-focused DataTable wrapper. It normalizes raw log lines or parsed records into timestamp, level, source, message, tags, and expandable raw-detail rows.",
+      },
+    },
+  },
 };
 
 export default meta;

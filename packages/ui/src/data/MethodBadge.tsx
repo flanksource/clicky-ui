@@ -12,7 +12,9 @@ const METHOD_TONES: Record<string, Tone> = {
 };
 
 export type MethodBadgeProps = {
+  /** HTTP method to display. Case-insensitive. */
   method: string;
+  /** Classes applied to the underlying badge. */
   className?: string;
 };
 

@@ -185,28 +185,51 @@ const STATUS_STYLES: Record<BadgeStatus, ToneStyle> = {
 };
 
 export type BadgeProps = {
+  /** Semantic color tone for legacy badge variants. */
   tone?: BadgeTone;
+  /** Visual variant. Legacy variants are `soft`, `solid`, and `outline`; rich variants add structured label/value layouts. */
   variant?: BadgeVariant;
+  /** Density-aware badge size. */
   size?: BadgeSize;
+  /** Iconify name or imported icon component rendered before the label. */
   icon?: string | StaticIconComponent;
+  /** Optional numeric count rendered as badge content. */
   count?: number;
+  /** Fallback content for simple badges. */
   children?: ReactNode;
+  /** Classes applied to the badge root. */
   className?: string;
+  /** Status palette used by `variant="status"`. */
   status?: BadgeStatus;
+  /** Label segment for structured label/value badges. */
   label?: ReactNode;
+  /** Value segment for structured label/value badges. */
   value?: ReactNode;
+  /** Custom background color or utility class. */
   color?: string;
+  /** Custom text color or utility class. */
   textColor?: string;
+  /** Custom border color or utility class. */
   borderColor?: string;
+  /** Corner treatment for the badge frame. */
   shape?: BadgeShape;
+  /** When set, renders the badge as a link. */
   href?: string;
+  /** Link target for linked badges. */
   target?: AnchorHTMLAttributes<HTMLAnchorElement>["target"];
+  /** Link rel attribute for linked badges. */
   rel?: string;
+  /** Allows long label/value content to wrap instead of truncating. */
   wrap?: boolean;
+  /** Maximum width before truncation; numbers are treated as character count. */
   maxWidth?: string | number;
+  /** Truncation strategy for long values. */
   truncate?: BadgeTruncate;
+  /** Copies the plain-text badge value when clicked. */
   clickToCopy?: boolean;
+  /** Classes applied to the label segment. */
   labelClassName?: string;
+  /** Classes applied to the value segment. */
   valueClassName?: string;
 };
 

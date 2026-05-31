@@ -34,8 +34,11 @@ export type LogsTableProps = Omit<
   DataTableProps<LogsTableRow>,
   "data" | "columns"
 > & {
+  /** Raw newline-delimited log text or pre-parsed log records. */
   logs: string | LogsTableInput[];
+  /** Optional custom columns; defaults to timestamp, level, pod, logger, thread, message, and tags. */
   columns?: DataTableColumn<LogsTableRow>[];
+  /** Render parsed/raw log details when a row is expanded. */
   showRawDetails?: boolean;
 };
 

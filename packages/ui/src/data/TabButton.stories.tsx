@@ -13,6 +13,20 @@ import {
 const meta: Meta<typeof TabButton> = {
   title: "Data/TabButton",
   component: TabButton,
+  args: {
+    active: true,
+    label: "Overview",
+    count: 3,
+    onClick: () => undefined,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Compact tab button with optional icon and count badge. It renders `role=\"tab\"` and keeps selection state controlled by the parent.",
+      },
+    },
+  },
 };
 
 export default meta;

@@ -447,10 +447,54 @@ function StatusDotShowcase() {
   );
 }
 
+function RowDetailDialogShowcase() {
+  return (
+    <DataTable
+      data={rows}
+      columns={columns}
+      defaultSort={{ key: "restarts", dir: "asc" }}
+      detailStyle="dialog"
+      detailDialogTitle={(row) => `${row.service} details`}
+      columnResizeStorageKey="clicky-ui-story-data-table-detail-dialog"
+      renderExpandedRow={(row) => (
+        <div className="space-y-2 text-sm">
+          <p className="text-muted-foreground">
+            {row.service} is owned by <strong>{row.owner}</strong>.
+          </p>
+          <pre className="overflow-auto rounded border border-border bg-muted p-2 text-xs">
+            {JSON.stringify(row, null, 2)}
+          </pre>
+        </div>
+      )}
+    />
+  );
+}
+
 const meta = {
   title: "Data/DataTable",
-  component: DataTableShowcase,
-} satisfies Meta<typeof DataTableShowcase>;
+  component: DataTable,
+  render: () => <DataTableShowcase />,
+  args: {
+    data: rows,
+    columns,
+    autoFilter: false,
+    showGlobalFilter: true,
+    resizableColumns: true,
+    hideableColumns: true,
+    persistColumnWidths: true,
+    persistColumnVisibility: true,
+    showHeaderFilters: true,
+    showFullscreenControl: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Feature-rich data grid for operational screens. It supports generated filters, sortable and resizable columns, density/theme controls, row details, fullscreen mode, pagination, and specialized timestamp/tag/status columns.",
+      },
+    },
+  },
+} satisfies Meta<typeof DataTable>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -483,4 +527,8 @@ export const Tags: Story = {
 
 export const StatusDots: Story = {
   render: () => <StatusDotShowcase />,
+};
+
+export const RowDetailDialog: Story = {
+  render: () => <RowDetailDialogShowcase />,
 };

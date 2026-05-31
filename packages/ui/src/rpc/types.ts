@@ -32,13 +32,20 @@ export interface OpenAPISchema {
 }
 
 // ClickyParameterRole tells the UI which widget owns a parameter:
+//   "search"    — render as the FilterBar's dedicated search input
 //   "filter"    — render as a FilterBar chip on the DataTable
 //   "limit"     — feed into DataTable pagination's pageSize
 //   "offset"    — feed into DataTable pagination's page (or skip)
 //   "time-from" — left edge of a time-range picker
 //   "time-to"   — right edge of a time-range picker
 // Set server-side by clicky's converter (see paramRole in clicky/rpc/openapi.go).
-export type ClickyParameterRole = "filter" | "limit" | "offset" | "time-from" | "time-to";
+export type ClickyParameterRole =
+  | "search"
+  | "filter"
+  | "limit"
+  | "offset"
+  | "time-from"
+  | "time-to";
 
 export interface ClickyParameterMeta {
   role?: ClickyParameterRole;

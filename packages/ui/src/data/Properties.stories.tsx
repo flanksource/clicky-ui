@@ -5,7 +5,22 @@ import { Properties, type PropertiesItem } from "./Properties";
 const meta: Meta<typeof Properties> = {
   title: "Data/Properties",
   component: Properties,
-  parameters: { layout: "padded" },
+  args: {
+    items: [
+      { key: "namespace", value: "production" },
+      { key: "owner", value: "platform" },
+    ],
+    density: "comfortable",
+  },
+  parameters: {
+    layout: "padded",
+    docs: {
+      description: {
+        component:
+          "Two-column property list for dense metadata, raw payload fields, and detail panels. Rows support custom renderers, label icons, prefix/suffix actions, and expandable child content.",
+      },
+    },
+  },
 };
 
 export default meta;

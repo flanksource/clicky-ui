@@ -9,6 +9,14 @@ import {
 
 const meta: Meta = {
   title: "Data/Clicky/Native Components",
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Lower-level Clicky renderers for embedding a single node or table without the full document wrapper. Use these when the host already owns the surrounding page chrome and runtime.",
+      },
+    },
+  },
 };
 
 export default meta;

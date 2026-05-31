@@ -6,18 +6,30 @@ const meta = {
   title: "Components/Button",
   component: Button,
   tags: ["autodocs"],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Primary command button with Clicky density tokens, shadcn-style variants, optional loading state, and Radix Slot support via `asChild`.",
+      },
+    },
+  },
   argTypes: {
     variant: {
+      description: "Visual treatment for the command.",
       control: "select",
       options: ["default", "destructive", "outline", "secondary", "ghost", "link"],
     },
     size: {
+      description: "Button size preset. `icon` creates a square icon-only button.",
       control: "select",
       options: ["default", "sm", "lg", "icon"],
     },
-    disabled: { control: "boolean" },
-    loading: { control: "boolean" },
-    onClick: { action: "click" },
+    disabled: { description: "Disable pointer and keyboard activation.", control: "boolean" },
+    loading: { description: "Show spinner and disable the button while pending.", control: "boolean" },
+    loadingLabel: { description: "Content shown while loading; defaults to `children`." },
+    asChild: { description: "Render styles onto the child element with Radix Slot." },
+    onClick: { description: "Click handler.", action: "click" },
   },
   args: { children: "Button", onClick: fn() },
 } satisfies Meta<typeof Button>;

@@ -1,13 +1,10 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { OperationCatalog } from "@flanksource/clicky-ui/rpc";
-import type {
-  ExecutionResponse,
-  OpenAPISpec,
-  OperationsApiClient,
-  RenderLink,
-} from "@flanksource/clicky-ui/rpc";
-import { DemoSection } from "./Section";
+import { OperationCatalog } from "./OperationCatalog";
+import type { RenderLink } from "./EndpointList";
+import type { ExecutionResponse, OpenAPISpec } from "./types";
+import type { OperationsApiClient } from "./useOperations";
 
 const SAMPLE_SPEC: OpenAPISpec = {
   openapi: "3.0.0",
@@ -24,13 +21,7 @@ const SAMPLE_SPEC: OpenAPISpec = {
         summary: "List widgets",
         tags: ["widget"],
         parameters: [
-          {
-            name: "q",
-            in: "query",
-            schema: { type: "string" },
-            description: "Search query",
-            "x-clicky": { role: "search" },
-          },
+          { name: "q", in: "query", schema: { type: "string" }, description: "Search query" },
           {
             name: "kind",
             in: "query",
@@ -132,41 +123,45 @@ const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => 
   </a>
 );
 
-export function OperationExplorerDemo() {
+function CatalogShowcase() {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
     [],
   );
-
   return (
-    <DemoSection
-      id="operation-explorer"
-      title="OperationCatalog"
-      description={
-        <>
-          Operations-mode explorer driven by an in-memory <code>OpenAPISpec</code> with{" "}
-          <code>x-clicky</code> surface metadata. The fake <code>OperationsApiClient</code> returns
-          a Clicky table for the list endpoint; navigation links are intercepted so the demo doesn't
-          hijack the kitchen-sink URL. Filter inputs still write to <code>?q=…</code> on the page —
-          a known side effect of <code>OperationCatalog</code>.
-        </>
-      }
-    >
-      <QueryClientProvider client={queryClient}>
-        <div className="h-[640px] overflow-auto rounded-md border border-border p-4">
-          <OperationCatalog
-            definition={{
-              key: "widgets",
-              title: "Widgets",
-              description: "Demo widget surface backed by a fake client.",
-            }}
-            entities={["widget"]}
-            client={FAKE_CLIENT}
-            renderLink={renderDemoLink}
-            surfaceKey="widgets"
-          />
-        </div>
-      </QueryClientProvider>
-    </DemoSection>
+    <QueryClientProvider client={queryClient}>
+      <div className="h-[640px] overflow-auto rounded-md border border-border p-density-4">
+        <OperationCatalog
+          definition={{
+            key: "widgets",
+            title: "Widgets",
+            description: "Demo widget surface backed by a fake client.",
+          }}
+          entities={["widget"]}
+          client={FAKE_CLIENT}
+          renderLink={renderDemoLink}
+          surfaceKey="widgets"
+        />
+      </div>
+    </QueryClientProvider>
   );
 }
+
+const meta: Meta<typeof OperationCatalog> = {
+  title: "Clicky-RPC/OperationCatalog",
+  component: OperationCatalog,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Operations-mode explorer driven by an in-memory OpenAPISpec with x-clicky surface metadata. The fake OperationsApiClient returns a Clicky table for the list endpoint and navigation links are intercepted. Note: filter inputs still write to ?q=… on the page — a known OperationCatalog side effect.",
+      },
+    },
+  },
+};
+
+export default meta;
+
+export const Default: StoryObj<typeof OperationCatalog> = {
+  render: () => <CatalogShowcase />,
+};

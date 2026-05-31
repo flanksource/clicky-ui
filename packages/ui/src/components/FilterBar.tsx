@@ -41,29 +41,47 @@ const FilterBarContext = createContext<{ autoSubmit: boolean }>({
 });
 
 export type FilterBarSearchProps = {
+  /** Controlled search text. */
   value: string;
+  /** Called with the next search text. Debounced when `autoSubmit` is true. */
   onChange: (value: string) => void;
+  /** Placeholder shown in the search input. */
   placeholder?: string;
+  /** Accessible label for the search input. */
   ariaLabel?: string;
+  /** Classes applied to the search input. */
   className?: string;
 };
 
 export type FilterBarTextFilter = {
+  /** Stable filter key used for rendering and overflow measurement. */
   key: string;
+  /** Renders a free-text input. */
   kind: "text";
+  /** Filter label shown on the control. */
   label: string;
+  /** Optional helper text shown in filter popovers. */
   description?: string;
+  /** Controlled input value. */
   value: string;
+  /** Called with the next input value. */
   onChange: (value: string) => void;
+  /** Placeholder shown in the input. */
   placeholder?: string;
+  /** Disables this filter. */
   disabled?: boolean;
+  /** Classes applied to this filter control. */
   className?: string;
 };
 
 export type FilterBarLookupOption = {
+  /** Option value written to filter state. */
   value: string;
+  /** Optional display label; falls back to `value`. */
   label?: string;
+  /** Prevents choosing the option. */
   disabled?: boolean;
+  /** Optional browser tooltip. */
   title?: string;
 };
 
@@ -71,13 +89,17 @@ export type FilterBarLookupInputType = "text" | "number" | "date";
 
 export type FilterBarLookupFilter = {
   key: string;
+  /** Renders an input backed by a datalist-style option set. */
   kind: "lookup";
   label: string;
   description?: string;
+  /** Controlled selected or typed value. */
   value: string;
+  /** Suggestions for the lookup input. */
   options: FilterBarLookupOption[];
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Native input type for the lookup field. */
   inputType?: FilterBarLookupInputType;
   disabled?: boolean;
   className?: string;
@@ -85,10 +107,13 @@ export type FilterBarLookupFilter = {
 
 export type FilterBarLookupMultiFilter = {
   key: string;
+  /** Renders a multi-value lookup filter. */
   kind: "lookup-multi";
   label: string;
   description?: string;
+  /** Controlled selected values. */
   value: string[];
+  /** Suggestions for the lookup input. */
   options: FilterBarLookupOption[];
   onChange: (value: string[]) => void;
   placeholder?: string;
@@ -103,10 +128,13 @@ export type FilterBarMultiFilterMode = Extract<
 
 export type FilterBarMultiFilter = {
   key: string;
+  /** Renders include/exclude chips for each option. */
   kind: "multi";
   label: string;
   description?: string;
+  /** Map of option value to include/exclude state. */
   value: Record<string, FilterBarMultiFilterMode>;
+  /** Available chip options. */
   options: MultiSelectOption[];
   onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
   disabled?: boolean;
@@ -114,13 +142,17 @@ export type FilterBarMultiFilter = {
 };
 
 export type FilterBarNestedMultiGroup = {
+  /** Stable group id. */
   groupKey: string;
+  /** Optional visible group label. */
   label?: string;
+  /** Options in this group. */
   options: MultiSelectOption[];
 };
 
 export type FilterBarNestedMultiFilter = {
   key: string;
+  /** Renders grouped include/exclude chips. */
   kind: "nested-multi";
   label: string;
   description?: string;
@@ -135,10 +167,13 @@ export type FilterBarNestedMultiFilter = {
 
 export type FilterBarSelectMultiFilter = {
   key: string;
+  /** Renders a compact multi-select dropdown. */
   kind: "select-multi";
   label: string;
   description?: string;
+  /** Controlled selected values. */
   value: string[];
+  /** Available dropdown options. */
   options: MultiSelectOption[];
   onChange: (value: string[]) => void;
   placeholder?: string;
@@ -147,20 +182,28 @@ export type FilterBarSelectMultiFilter = {
 };
 
 export type FilterBarNumberValue = {
+  /** Minimum bound as a string so callers can preserve draft input. */
   min?: string;
+  /** Maximum bound as a string so callers can preserve draft input. */
   max?: string;
 };
 
 export type FilterBarNumberFilter = {
   key: string;
+  /** Renders paired min/max numeric controls. */
   kind: "number";
   label: string;
   description?: string;
+  /** Controlled min/max value. */
   value: FilterBarNumberValue;
   onChange: (value: FilterBarNumberValue) => void;
+  /** Lower bound used by the optional range slider. */
   domainMin?: number;
+  /** Upper bound used by the optional range slider. */
   domainMax?: number;
+  /** Step size for number inputs and slider movement. */
   step?: number;
+  /** Formatter used for slider labels. */
   formatValue?: (value: number) => string;
   minPlaceholder?: string;
   maxPlaceholder?: string;
@@ -170,10 +213,13 @@ export type FilterBarNumberFilter = {
 
 export type FilterBarEnumFilter = {
   key: string;
+  /** Renders a single-select dropdown. */
   kind: "enum";
   label: string;
   description?: string;
+  /** Controlled selected value. */
   value: string;
+  /** Available enum options. */
   options: Array<{ value: string; label?: string }>;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -183,9 +229,11 @@ export type FilterBarEnumFilter = {
 
 export type FilterBarBooleanFilter = {
   key: string;
+  /** Renders a boolean toggle. */
   kind: "boolean";
   label: string;
   description?: string;
+  /** Controlled checked state. */
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -204,18 +252,28 @@ export type FilterBarFilter =
   | FilterBarBooleanFilter;
 
 export type FilterBarRangePreset = {
+  /** Visible preset label. */
   label: string;
+  /** Start value applied by the preset. */
   from: string;
+  /** End value applied by the preset. */
   to: string;
 };
 
 export type FilterBarRangeProps = {
+  /** Current start value. */
   from?: string;
+  /** Current end value. */
   to?: string;
+  /** Called when the user applies the range. */
   onApply: (from: string, to: string) => void;
+  /** Presets or preset groups shown in the range popup. */
   presets?: Array<FilterBarRangePreset | TimeRangePresetGroup>;
+  /** Enables time inputs when using date-time values. */
   timeEnabled?: boolean;
+  /** Selected timezone. */
   timeZone?: string;
+  /** Available timezone options. */
   timeZones?: string[];
   fromPlaceholder?: string;
   toPlaceholder?: string;
@@ -224,22 +282,34 @@ export type FilterBarRangeProps = {
 };
 
 export type FilterBarProps = {
+  /** Optional global search control shown first. */
   search?: FilterBarSearchProps;
+  /** Structured filters rendered after search. */
   filters?: FilterBarFilter[];
+  /** Date-time range control. */
   timeRange?: FilterBarRangeProps;
+  /** Date-only range control. */
   dateRange?: FilterBarRangeProps;
+  /** Additional content rendered in the filter row. */
   children?: ReactNode;
+  /** Content rendered before search and filters. */
   leading?: ReactNode;
+  /** Content rendered at the end of the bar. */
   trailing?: ReactNode;
+  /** Classes applied to the root bar. */
   className?: string;
-  // When false, debounced fields forward edits immediately (no timer) and
-  // an Apply button is rendered in the trailing slot. The caller is expected
-  // to accumulate field state and perform the side effect in `onApply`.
-  // Defaults to true.
+  /**
+   * When false, debounced fields forward edits immediately and an Apply button
+   * is rendered in the trailing slot. Defaults to true.
+   */
   autoSubmit?: boolean;
+  /** Called by the Apply button when `autoSubmit` is false. */
   onApply?: () => void;
+  /** Label for the Apply button. */
   applyLabel?: string;
+  /** Shows a pending state on the Apply button. */
   isPending?: boolean;
+  /** `responsive` moves hidden filters into an overflow popover; `wrap` lets them wrap. */
   overflowMode?: "responsive" | "wrap";
 };
 

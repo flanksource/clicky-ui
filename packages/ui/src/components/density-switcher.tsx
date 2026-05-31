@@ -10,8 +10,11 @@ const DENSITY_OPTIONS: IconMenuOption<Density>[] = [
 ];
 
 export type DensitySwitcherProps = {
+  /** Classes applied to the root wrapper. */
   className?: string;
+  /** Classes applied to the icon trigger button. */
   triggerClassName?: string;
+  /** Classes applied to the popup menu. */
   menuClassName?: string;
 };
 

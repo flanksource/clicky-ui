@@ -2,13 +2,21 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 
 export type SplitPaneProps = {
+  /** Content rendered in the left pane. */
   left: ReactNode;
+  /** Content rendered in the right pane. */
   right: ReactNode;
+  /** Initial left-pane width as a percentage. */
   defaultSplit?: number;
+  /** Minimum left-pane width as a percentage. */
   minLeft?: number;
+  /** Minimum right-pane width as a percentage. */
   minRight?: number;
+  /** Classes applied to the left pane. */
   leftClass?: string;
+  /** Classes applied to the right pane. */
   rightClass?: string;
+  /** Classes applied to the root split container. */
   className?: string;
 };
 

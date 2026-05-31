@@ -13,8 +13,11 @@ export type TreeProps<T> = Omit<
   TreeNodeProps<T>,
   "node" | "depth" | "expandAll" | "forcedOpenKeys"
 > & {
+  /** Root nodes to render. */
   roots: T[];
+  /** Empty-state content when no roots are provided. */
   empty?: ReactNode;
+  /** Classes applied to the tree root. */
   className?: string;
   /**
    * Render the Expand all / Collapse all toolbar above the tree. Enabled by
@@ -28,7 +31,9 @@ export type TreeProps<T> = Omit<
    * toolbar state internally.
    */
   expandAll?: boolean | null;
+  /** Called when the toolbar expand-all state changes. */
   onExpandAllChange?: (next: boolean | null) => void;
+  /** Classes applied to the search/control toolbar. */
   toolbarClassName?: string;
   /**
    * Override the text the filter matches against for a given node.
