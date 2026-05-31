@@ -32,6 +32,11 @@ pnpm-debug.log*
 # Storybook
 storybook-static/
 
+# Generated icon output/cache
+packages/ui/NOTICE.md
+packages/ui/src/icons/
+packages/ui/icons/svg/
+
 # Probe artefacts
 .playwright-mcp/
 

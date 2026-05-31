@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "storybook dev -p 5270",
-    "build": "storybook build",
-    "test": "vitest run",
+    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && storybook dev -p 5270",
+    "build": "pnpm --filter @flanksource/clicky-ui build:icons && storybook build",
+    "test": "pnpm --filter @flanksource/clicky-ui build:icons && vitest run",
     "check": "tsc -b --noEmit && oxlint .storybook --deny-warnings"
   },
   "dependencies": {

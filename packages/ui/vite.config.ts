@@ -11,6 +11,7 @@ const entry = {
   hooks: resolve(__dirname, "src/hooks.ts"),
   components: resolve(__dirname, "src/components.ts"),
   data: resolve(__dirname, "src/data.ts"),
+  icons: resolve(__dirname, "src/icons.ts"),
   clicky: resolve(__dirname, "src/clicky.ts"),
   rpc: resolve(__dirname, "src/rpc.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),

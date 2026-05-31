@@ -13,7 +13,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE.md"
   ],
   "type": "module",
   "sideEffects": [
@@ -49,6 +50,11 @@
       "import": "./dist/data.js",
       "require": "./dist/data.cjs"
     },
+    "./icons": {
+      "types": "./dist/icons.d.ts",
+      "import": "./dist/icons.js",
+      "require": "./dist/icons.cjs"
+    },
     "./clicky": {
       "types": "./dist/clicky.d.ts",
       "import": "./dist/clicky.js",
@@ -72,12 +78,13 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && vite build --mode cjs && node scripts/build-styles.mjs",
-    "test": "vitest run",
-    "check": "tsc -b --noEmit && oxlint src --deny-warnings"
+    "build": "pnpm run build:icons && vite build && vite build --mode cjs && node scripts/build-styles.mjs",
+    "build:icons": "tsx scripts/build-icons.ts",
+    "build:icons:force": "tsx scripts/build-icons.ts --force",
+    "test": "pnpm run build:icons && vitest run",
+    "check": "pnpm run build:icons && tsc -b --noEmit && oxlint src --deny-warnings"
   },
   "dependencies": {
-    "@flanksource/icons": "^1.0.60",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-query": "^5.66.8",
@@ -95,7 +102,9 @@
     "jsdom": "^26.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "svgo": "^3.2.0",
     "tailwindcss": "^4.2.4",
+    "tsx": "^4.7.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "vite-plugin-dts": "^4.3.0",

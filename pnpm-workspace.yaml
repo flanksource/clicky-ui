@@ -7,7 +7,6 @@ allowBuilds:
   vue-demi: true
 
 catalog:
-  "@flanksource/icons": ^1.0.60
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3
   "@radix-ui/react-accordion": ^1.2.2

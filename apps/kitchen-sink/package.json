@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "tsc -b --noEmit && vite build",
+    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev",
+    "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit && oxlint src vite.config.ts --deny-warnings"
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && oxlint src vite.config.ts --deny-warnings"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",

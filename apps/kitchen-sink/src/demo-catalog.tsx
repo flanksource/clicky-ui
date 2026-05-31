@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { SwitchersDemo } from "./demos/SwitchersDemo";
 import { ButtonDemo } from "./demos/ButtonDemo";
 import { IconDemo } from "./demos/IconDemo";
+import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
@@ -52,6 +53,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "switchers", label: "Switchers", component: SwitchersDemo },
       { id: "button", label: "Button", component: ButtonDemo },
       { id: "icon", label: "Icon", component: IconDemo },
+      { id: "generated-icons", label: "Generated Icons", component: GeneratedIconsDemo },
     ],
   },
   {
