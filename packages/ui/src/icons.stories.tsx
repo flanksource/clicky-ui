@@ -49,7 +49,9 @@ function isIconComponent(value: unknown): value is IconComponent {
 }
 
 const ICONS: IconEntry[] = Object.entries(GeneratedIcons)
-  .filter((entry): entry is [string, IconComponent] => isIconComponent(entry[1]))
+  .filter((entry): entry is [string, IconComponent] =>
+    isIconComponent(entry[1]),
+  )
   .map(([name, component]) => ({
     name,
     component,
@@ -57,7 +59,9 @@ const ICONS: IconEntry[] = Object.entries(GeneratedIcons)
     consumerName: component.__consumerName,
     source: component.__source,
   }))
-  .sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+  .sort(
+    (a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name),
+  );
 
 const GROUPS = Object.entries(
   ICONS.reduce<Record<string, IconEntry[]>>((acc, icon) => {
@@ -130,11 +134,18 @@ function GeneratedIconsDemo({
             <h2 className="text-sm font-semibold">
               {GROUP_LABELS[groupName] ?? groupName}
             </h2>
-            <span className="text-xs text-muted-foreground">{icons.length}</span>
+            <span className="text-xs text-muted-foreground">
+              {icons.length}
+            </span>
           </header>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {icons.map((icon) => (
-              <IconCard key={icon.name} icon={icon} showSource={showSource} size={size} />
+              <IconCard
+                key={icon.name}
+                icon={icon}
+                showSource={showSource}
+                size={size}
+              />
             ))}
           </div>
         </section>
@@ -159,14 +170,64 @@ const meta: Meta<typeof GeneratedIconsDemo> = {
     group: {
       control: "select",
       options: ["all", ...GROUPS.map(([groupName]) => groupName)],
+      description: "Filter the gallery to a single semantic group, or `all`.",
+      table: { category: "Filter" },
     },
-    size: { control: { type: "number", min: 12, max: 48, step: 1 } },
+    query: {
+      control: "text",
+      description:
+        "Case-insensitive substring matched against the component name, consumer name, and source.",
+      table: { category: "Filter" },
+    },
+    filledOnly: {
+      control: "boolean",
+      description: "Show only the `*Filled` solid variants.",
+      table: { category: "Filter" },
+    },
+    size: {
+      control: { type: "number", min: 12, max: 48, step: 1 },
+      description: "Pixel size passed to each rendered icon.",
+      table: { category: "Display" },
+    },
+    showSource: {
+      control: "boolean",
+      description: "Show the underlying Iconify source name under each icon.",
+      table: { category: "Display" },
+    },
+    showStats: {
+      control: "boolean",
+      description:
+        "Show the summary counts (components, groups, filled variants).",
+      table: { category: "Display" },
+    },
+    showAliases: {
+      control: "boolean",
+      description:
+        "Switch to the change-alias view pairing outline and filled icons by change type.",
+      table: { category: "Display" },
+    },
   },
   parameters: {
     docs: {
       description: {
-        component:
-          "Generated React icon components exported from @flanksource/clicky-ui/icons.",
+        component: [
+          "Generated React icon components exported from `@flanksource/clicky-ui/icons`.",
+          "",
+          "**What this is**",
+          "- Every icon is a tree-shakeable React component (`UiCheck`, `UiActivity`, …) generated from `icon-selections.json` and grouped by purpose (health, navigation, infra, …).",
+          "- Components carry metadata (`__group`, `__source`, `__consumerName`) used to build this searchable gallery.",
+          "",
+          "**Usage**",
+          "```tsx",
+          'import { UiCheck, UiActivity } from "@flanksource/clicky-ui/icons";',
+          "",
+          '<UiCheck size={18} className="text-emerald-600" title="healthy" />',
+          "```",
+          "- Prefer the imported component for built-in icons; pass runtime string names only for user-supplied data (handled by a registered fallback provider — see `Data/Icon`).",
+          "- `*Filled` variants are solid; use the **Filled only** control to browse them. **Change aliases** pairs outline/filled icons by change type.",
+          "",
+          "Use the controls panel to filter by **group**, full-text **query**, and adjust **size**.",
+        ].join("\n"),
       },
     },
   },
@@ -197,11 +258,19 @@ function IconCard({
 
   return (
     <div className="flex min-w-0 items-center gap-2 rounded border border-border bg-background px-2 py-1.5">
-      <Component size={size} className="shrink-0 text-foreground" title={icon.name} />
+      <Component
+        size={size}
+        className="shrink-0 text-foreground"
+        title={icon.name}
+      />
       <div className="min-w-0 leading-tight">
-        <div className="truncate font-mono text-[11px] text-foreground">{icon.name}</div>
+        <div className="truncate font-mono text-[11px] text-foreground">
+          {icon.name}
+        </div>
         {showSource && (
-          <div className="truncate text-[10px] text-muted-foreground">{icon.source}</div>
+          <div className="truncate text-[10px] text-muted-foreground">
+            {icon.source}
+          </div>
         )}
       </div>
     </div>
@@ -230,7 +299,9 @@ function ChangeAliasesDemo({ size }: { size: number }) {
               <Outline size={size} title={`${name} outline`} />
               {Filled && <Filled size={size} title={`${name} filled`} />}
             </div>
-            <code className="truncate text-xs text-muted-foreground">{name}</code>
+            <code className="truncate text-xs text-muted-foreground">
+              {name}
+            </code>
           </div>
         );
       })}

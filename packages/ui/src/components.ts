@@ -58,5 +58,10 @@ export {
   type DetailEmptyStateProps,
 } from "./layout/Section";
 
+export {
+  DropdownMenu,
+  type DropdownMenuProps,
+  type DropdownMenuItem,
+} from "./overlay/DropdownMenu";
 export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
