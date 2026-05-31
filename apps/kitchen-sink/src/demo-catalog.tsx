@@ -6,6 +6,7 @@ import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
+import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
 import { ClickyDemo } from "./demos/ClickyDemo";
@@ -28,6 +29,7 @@ import { TreeDemo } from "./demos/TreeDemo";
 import { TreeGroupHeaderDemo } from "./demos/TreeGroupHeaderDemo";
 import { HoverCardDemo } from "./demos/HoverCardDemo";
 import { ModalDemo } from "./demos/ModalDemo";
+import { DropdownMenuDemo } from "./demos/DropdownMenuDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
@@ -62,6 +64,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "badge", label: "Badge", component: BadgeDemo },
       { id: "avatar", label: "Avatar", component: AvatarDemo },
       { id: "progress", label: "ProgressBar", component: ProgressBarDemo },
+      { id: "signed-delta-bar", label: "SignedDeltaBar", component: SignedDeltaBarDemo },
       { id: "clicky", label: "Clicky", component: ClickyDemo },
       { id: "clicky-native", label: "Clicky Native", component: ClickyNativeDemo },
       { id: "code-blocks", label: "CodeBlocks", component: CodeBlocksDemo },
@@ -99,6 +102,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     items: [
       { id: "hover-card", label: "HoverCard", component: HoverCardDemo },
       { id: "modal", label: "Modal", component: ModalDemo },
+      { id: "dropdown-menu", label: "DropdownMenu", component: DropdownMenuDemo },
     ],
   },
   {

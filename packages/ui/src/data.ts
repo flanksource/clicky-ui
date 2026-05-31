@@ -118,6 +118,10 @@ export {
   type ProgressSegment,
 } from "./data/ProgressBar";
 export {
+  SignedDeltaBar,
+  type SignedDeltaBarProps,
+} from "./data/SignedDeltaBar";
+export {
   SortableHeader,
   type SortableHeaderProps,
 } from "./data/SortableHeader";

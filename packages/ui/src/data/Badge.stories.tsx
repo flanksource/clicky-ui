@@ -28,13 +28,106 @@ const meta: Meta<typeof Badge> = {
     tone: "neutral",
     variant: "soft",
     size: "md",
+    shape: "pill",
+  },
+  argTypes: {
+    variant: {
+      control: "select",
+      options: [
+        "soft",
+        "solid",
+        "outline",
+        "status",
+        "metric",
+        "custom",
+        "outlined",
+        "label",
+      ],
+      description:
+        "Visual variant. `soft`/`solid`/`outline` are the simple legacy styles; `status`/`metric`/`custom`/`outlined`/`label` are rich label/value layouts.",
+      table: { category: "Appearance", defaultValue: { summary: "soft" } },
+    },
+    tone: {
+      control: "inline-radio",
+      options: ["neutral", "success", "danger", "warning", "info"],
+      description: "Semantic color tone for the legacy variants.",
+      table: { category: "Appearance", defaultValue: { summary: "neutral" } },
+    },
+    status: {
+      control: "inline-radio",
+      options: ["success", "error", "warning", "info"],
+      description: 'Status palette used by `variant="status"`.',
+      table: { category: "Appearance" },
+    },
+    size: {
+      control: "inline-radio",
+      options: ["xxs", "xs", "sm", "md", "lg"],
+      description: "Density-aware badge size.",
+      table: { category: "Appearance", defaultValue: { summary: "md" } },
+    },
+    shape: {
+      control: "inline-radio",
+      options: ["pill", "rounded", "square"],
+      description: "Corner treatment for the badge frame.",
+      table: { category: "Appearance", defaultValue: { summary: "pill" } },
+    },
+    label: { control: "text", table: { category: "Content" } },
+    value: { control: "text", table: { category: "Content" } },
+    children: { control: "text", table: { category: "Content" } },
+    count: { control: "number", table: { category: "Content" } },
+    color: {
+      control: "color",
+      description: "Custom background color (CSS color) or utility class.",
+      table: { category: "Custom colors" },
+    },
+    textColor: { control: "color", table: { category: "Custom colors" } },
+    borderColor: { control: "color", table: { category: "Custom colors" } },
+    wrap: {
+      control: "boolean",
+      description:
+        "Allow long label/value content to wrap instead of truncating.",
+      table: { category: "Overflow" },
+    },
+    maxWidth: {
+      control: "number",
+      description:
+        "Max width before truncation; numbers are treated as a character budget.",
+      table: { category: "Overflow" },
+    },
+    truncate: {
+      control: "select",
+      options: ["prefix", "suffix", "arn", "image", "path", "url", "auto"],
+      description: "Semantic truncation strategy for long single-line values.",
+      table: { category: "Overflow" },
+    },
+    clickToCopy: { control: "boolean", table: { category: "Behavior" } },
+    href: { control: "text", table: { category: "Behavior" } },
+    icon: { control: false, table: { category: "Content" } },
   },
   parameters: {
     layout: "padded",
     docs: {
       description: {
-        component:
-          "Compact status, label/value, metric, and link badge. Use simple variants for inline labels and rich variants when keys, values, icons, truncation, wrapping, or copy behavior matter.",
+        component: [
+          "Compact status, label/value, metric, and link badge.",
+          "",
+          "**When to use**",
+          "- Simple variants (`soft`/`solid`/`outline`) for inline labels and counts.",
+          "- Rich variants when keys, values, icons, truncation, wrapping, or copy behavior matter:",
+          "  - `status` — health/state chip with a status palette and optional icon.",
+          "  - `metric` — `label | value` pair for numeric readouts (CPU, latency).",
+          "  - `label` — split `key | value` chip with its own colored key segment.",
+          "  - `custom` / `outlined` — bring-your-own `color`/`textColor`/`borderColor`.",
+          "",
+          "**Usage**",
+          "```tsx",
+          '<Badge variant="status" status="success" label="Build" value="passing" icon={UiCheck} />',
+          '<Badge variant="metric" label="Latency" value="45ms" icon={UiActivity} />',
+          '<Badge variant="label" label="env" value="production" color="#dcfce7" textColor="#15803d" />',
+          "```",
+          "",
+          "Use the **Playground** story to drive every prop from the controls panel.",
+        ].join("\n"),
       },
     },
   },
@@ -170,6 +263,29 @@ function StoryGroup({
     </div>
   );
 }
+
+export const Playground: Story = {
+  args: {
+    variant: "status",
+    status: "success",
+    label: "Build",
+    value: "passing",
+    size: "md",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Drive every prop from the controls panel. Switch `variant` to see how `label`, `value`, `tone`, `status`, and the custom color props apply.",
+      },
+    },
+  },
+  render: (args) => (
+    <div className="flex flex-wrap items-center gap-density-2">
+      <Badge {...args} icon={UiCheck} />
+    </div>
+  ),
+};
 
 export const Overview: Story = {
   render: () => (
