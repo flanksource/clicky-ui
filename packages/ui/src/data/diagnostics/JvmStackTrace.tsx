@@ -6,7 +6,7 @@ import {
   UiSync,
   UiMethod,
   UiWatch,
-} from "@flanksource/icons/ui";
+} from "../../icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
 
 export type JvmStackTraceProps = {

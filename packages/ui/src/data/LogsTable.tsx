@@ -12,7 +12,7 @@ import {
   type PropertiesItem,
 } from "./Properties";
 import { formatPropertyLabel } from "./properties-utils";
-import { UiCopy, UiZoomIn, UiZoomOut } from "@flanksource/icons/ui";
+import { UiCopy, UiZoomIn, UiZoomOut } from "../icons";
 
 export type LogsTableInput = string | Record<string, unknown>;
 

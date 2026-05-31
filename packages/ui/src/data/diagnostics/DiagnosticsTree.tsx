@@ -1,6 +1,6 @@
 import { Tree } from "../Tree";
 import { Icon } from "../Icon";
-import { UiDebug, UiServerProcess, UiLoader } from "@flanksource/icons/ui";
+import { UiDebug, UiServerProcess, UiLoader } from "../../icons";
 import type { ProcessNode } from "./types";
 import {
   countProcesses,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiClose, UiFullscreen, UiFullscreenFilled } from "@flanksource/icons/ui";
+import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 

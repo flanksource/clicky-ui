@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiPlay } from "@flanksource/icons/ui";
+import { UiPlay } from "../icons";
 import { Modal } from "../overlay/Modal";
 import { CommandForm } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";

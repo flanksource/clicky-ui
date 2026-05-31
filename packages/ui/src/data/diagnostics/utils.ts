@@ -6,7 +6,7 @@ import {
   UiError,
   UiPlayCircle,
   UiWatch,
-} from "@flanksource/icons/ui";
+} from "../../icons";
 import type { ProcessNode } from "./types";
 
 export function countProcesses(node?: ProcessNode): number {

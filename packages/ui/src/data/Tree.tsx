@@ -6,7 +6,7 @@ import {
   UiCollapseAll,
   UiExpandAll,
   UiSearch,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { TreeNode, type TreeNodeProps } from "./TreeNode";
 
 export type TreeProps<T> = Omit<

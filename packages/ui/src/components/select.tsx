@@ -1,7 +1,7 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiChevronDown } from "@flanksource/icons/ui";
+import { UiChevronDown } from "../icons";
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
 

@@ -6,7 +6,7 @@ import {
   UiCheck,
   UiClose,
   UiRemove,
-} from "@flanksource/icons/ui";
+} from "../icons";
 
 export type FilterMode = "active" | "neutral" | "include" | "exclude";
 

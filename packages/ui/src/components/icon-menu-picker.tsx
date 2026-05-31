@@ -11,7 +11,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { UiCheck } from "@flanksource/icons/ui";
+import { UiCheck } from "../icons";
 import { Button } from "./button";
 
 export type IconMenuOption<T extends string> = {

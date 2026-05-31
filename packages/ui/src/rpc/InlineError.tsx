@@ -1,5 +1,5 @@
 import { Icon } from "../data/Icon";
-import { UiChevronRight } from "@flanksource/icons/ui";
+import { UiChevronRight } from "../icons";
 import { cn } from "../lib/utils";
 
 export type InlineErrorProps = {

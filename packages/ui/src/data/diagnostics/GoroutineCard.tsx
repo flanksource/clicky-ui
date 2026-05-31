@@ -1,5 +1,5 @@
 import { Icon } from "../Icon";
-import { UiRestart, UiDebugStepOver, UiMethod } from "@flanksource/icons/ui";
+import { UiRestart, UiDebugStepOver, UiMethod } from "../../icons";
 import type { ParsedGoroutine, ParsedGoroutineFrame } from "./stacktrace";
 
 export function goroutineStateBadge(state: string): string {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiEllipsis, UiCheck } from "@flanksource/icons/ui";
+import { UiEllipsis, UiCheck } from "../icons";
 import { cn } from "../lib/utils";
 
 export const ACCEPT_OPTIONS = [

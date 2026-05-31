@@ -5,7 +5,7 @@ import {
   UiCalendar,
   UiClose,
   UiWatch,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { Select } from "./select";
