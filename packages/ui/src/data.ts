@@ -82,7 +82,7 @@ export {
   type IconTone,
   type StaticIconComponent,
 } from "./data/Icon";
-export * from "@flanksource/icons/ui";
+export * from "./icons";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export {
   KeyValueList,
