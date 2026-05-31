@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { TreeGroupHeader } from "./TreeGroupHeader";
-import { UiClass } from "@flanksource/icons/ui";
+import { UiClass } from "../icons";
 
 const meta: Meta<typeof TreeGroupHeader> = {
   title: "Data/TreeGroupHeader",

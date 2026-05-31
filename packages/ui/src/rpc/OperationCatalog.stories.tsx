@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useMemo } from "react";
+import { useMemo, type ComponentProps } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OperationCatalog } from "./OperationCatalog";
 import type { RenderLink } from "./EndpointList";
@@ -123,7 +123,7 @@ const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => 
   </a>
 );
 
-function CatalogShowcase() {
+function CatalogShowcase(args: ComponentProps<typeof OperationCatalog>) {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
     [],
@@ -131,17 +131,7 @@ function CatalogShowcase() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="h-[640px] overflow-auto rounded-md border border-border p-density-4">
-        <OperationCatalog
-          definition={{
-            key: "widgets",
-            title: "Widgets",
-            description: "Demo widget surface backed by a fake client.",
-          }}
-          entities={["widget"]}
-          client={FAKE_CLIENT}
-          renderLink={renderDemoLink}
-          surfaceKey="widgets"
-        />
+        <OperationCatalog {...args} />
       </div>
     </QueryClientProvider>
   );
@@ -150,6 +140,21 @@ function CatalogShowcase() {
 const meta: Meta<typeof OperationCatalog> = {
   title: "Clicky-RPC/OperationCatalog",
   component: OperationCatalog,
+  args: {
+    definition: {
+      key: "widgets",
+      title: "Widgets",
+      description: "Demo widget surface backed by a fake client.",
+    },
+    entities: ["widget"],
+    client: FAKE_CLIENT,
+    renderLink: renderDemoLink,
+    surfaceKey: "widgets",
+  },
+  argTypes: {
+    client: { table: { disable: true } },
+    renderLink: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -163,5 +168,5 @@ const meta: Meta<typeof OperationCatalog> = {
 export default meta;
 
 export const Default: StoryObj<typeof OperationCatalog> = {
-  render: () => <CatalogShowcase />,
+  render: (args) => <CatalogShowcase {...args} />,
 };

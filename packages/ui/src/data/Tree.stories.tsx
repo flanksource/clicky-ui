@@ -8,7 +8,7 @@ import {
   UiError,
   UiPass,
   UiClass,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { Tree } from "./Tree";
 
 type DocsTreeNode = { id: string; label: string; children?: DocsTreeNode[] };

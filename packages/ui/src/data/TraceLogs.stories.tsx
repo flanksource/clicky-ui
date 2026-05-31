@@ -75,7 +75,15 @@ const logColumns: DataTableColumn<LogRow>[] = [
   { key: "tags", label: "Tags", kind: "tags", grow: true, tags: { maxVisible: 3 } },
 ];
 
-function TraceLogsShowcase() {
+function TraceLogsShowcase({
+  autoFilter = true,
+  showGlobalFilter = true,
+  showHeaderFilters = true,
+}: {
+  autoFilter?: boolean;
+  showGlobalFilter?: boolean;
+  showHeaderFilters?: boolean;
+}) {
   const [spread, setSpread] = useState<Spread>("sameDay");
   const data = buildLogs(spread);
   return (
@@ -100,8 +108,10 @@ function TraceLogsShowcase() {
       <DataTable
         data={data}
         columns={logColumns}
-        autoFilter
+        autoFilter={autoFilter}
         defaultSort={{ key: "ts", dir: "desc" }}
+        showGlobalFilter={showGlobalFilter}
+        showHeaderFilters={showHeaderFilters}
         columnResizeStorageKey={`clicky-ui-story-trace-logs-${spread}`}
       />
     </div>
@@ -111,6 +121,14 @@ function TraceLogsShowcase() {
 const meta: Meta<typeof DataTable> = {
   title: "Data/DataTable/TraceLogs",
   component: DataTable,
+  args: {
+    data: buildLogs("sameDay"),
+    columns: logColumns,
+    autoFilter: true,
+    showGlobalFilter: true,
+    showHeaderFilters: true,
+    defaultSort: { key: "ts", dir: "desc" },
+  },
   parameters: {
     docs: {
       description: {
@@ -123,6 +141,12 @@ const meta: Meta<typeof DataTable> = {
 
 export default meta;
 
-export const TraceLogs: StoryObj<typeof DataTable> = {
-  render: () => <TraceLogsShowcase />,
+export const TraceLogs: StoryObj<typeof DataTable<LogRow>> = {
+  render: (args) => (
+    <TraceLogsShowcase
+      autoFilter={args.autoFilter}
+      showGlobalFilter={args.showGlobalFilter}
+      showHeaderFilters={args.showHeaderFilters}
+    />
+  ),
 };

@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Clicky, type ClickyDocument, type ClickyNode } from "./Clicky";
 import { CodeBlock } from "./CodeBlock";
 
 const meta: Meta<typeof CodeBlock> = {
@@ -129,27 +128,4 @@ export const Python: Story = {
 if __name__ == "__main__":
     print(greet())`,
   },
-};
-
-const codeNode = (language: string, source: string): ClickyNode => ({
-  kind: "code",
-  language,
-  source,
-});
-
-const combinedDoc: ClickyDocument = {
-  version: 1,
-  node: {
-    kind: "text",
-    children: [
-      { kind: "text", text: "Go", style: { className: "font-semibold text-sm mt-density-3" } },
-      codeNode("go", `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, world!")\n}`),
-      { kind: "text", text: "Python", style: { className: "font-semibold text-sm mt-density-3" } },
-      codeNode("python", `def greet(name: str = "world") -> str:\n    return f"Hello, {name}!"`),
-    ],
-  },
-};
-
-export const ClickyCodeNodes: StoryObj<typeof Clicky> = {
-  render: () => <Clicky data={combinedDoc} />,
 };

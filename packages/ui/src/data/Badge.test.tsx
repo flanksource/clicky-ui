@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Badge } from "./Badge";
-import { UiError, UiActivity, UiCheck } from "@flanksource/icons/ui";
+import { UiError, UiActivity, UiCheck } from "../icons";
 
 describe("Badge", () => {
   it("defaults plain children-only badges to the legacy soft variant", () => {

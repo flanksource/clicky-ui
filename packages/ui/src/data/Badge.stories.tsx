@@ -18,7 +18,7 @@ import {
   UiShipWheel,
   UiWarningTriangle,
   UiZap,
-} from "@flanksource/icons/ui";
+} from "../icons";
 
 const meta: Meta<typeof Badge> = {
   title: "Data/Badge",

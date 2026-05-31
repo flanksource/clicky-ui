@@ -10,12 +10,34 @@ import {
   UiHourglass,
   UiClose,
   UiLoader,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { SIZE_TOKENS } from "../lib/size";
 
 const meta: Meta<typeof Icon> = {
   title: "Data/Icon",
   component: Icon,
+  args: {
+    icon: UiCheck,
+    className: "text-green-600 text-xl",
+    title: "approved",
+    style: "plain",
+    tone: "neutral",
+  },
+  argTypes: {
+    icon: { table: { disable: true } },
+    style: {
+      control: "inline-radio",
+      options: ["plain", "badge"],
+    },
+    tone: {
+      control: "inline-radio",
+      options: ["emerald", "amber", "rose", "slate", "sky", "violet", "neutral"],
+    },
+    size: {
+      control: "inline-radio",
+      options: SIZE_TOKENS,
+    },
+  },
   parameters: {
     docs: {
       description: {

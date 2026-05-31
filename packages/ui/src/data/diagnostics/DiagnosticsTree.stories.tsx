@@ -6,6 +6,14 @@ import { sampleProcessTree } from "./fixtures";
 const meta: Meta<typeof DiagnosticsTree> = {
   title: "Data/Diagnostics/Tree",
   component: DiagnosticsTree,
+  args: {
+    root: sampleProcessTree,
+    selectedPid: 1,
+    onSelect: () => undefined,
+  },
+  argTypes: {
+    onSelect: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -20,11 +28,11 @@ export default meta;
 type Story = StoryObj<typeof DiagnosticsTree>;
 
 export const Default: Story = {
-  render: () => {
-    const [pid, setPid] = useState<number | null>(null);
+  render: (args) => {
+    const [pid, setPid] = useState<number | null>(args.selectedPid ?? null);
     return (
       <div className="w-[640px]">
-        <DiagnosticsTree root={sampleProcessTree} selectedPid={pid} onSelect={setPid} />
+        <DiagnosticsTree {...args} selectedPid={pid} onSelect={setPid} />
       </div>
     );
   },

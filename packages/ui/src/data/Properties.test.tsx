@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Properties, type PropertiesItem } from "./Properties";
-import { UiCopy, UiZoomIn } from "@flanksource/icons/ui";
+import { UiCopy, UiZoomIn } from "../icons";
 
 type Row = PropertiesItem<string>;
 

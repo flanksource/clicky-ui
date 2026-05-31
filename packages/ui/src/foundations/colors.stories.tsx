@@ -1,8 +1,80 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ThemeSwitcher } from "../components/theme-switcher";
 
-const meta: Meta = {
+type ColorsDemoProps = {
+  showThemeSwitcher: boolean;
+  showPalette: boolean;
+  showStrokes: boolean;
+  columns: "two" | "three" | "four";
+  swatchHeight: "sm" | "md" | "lg";
+};
+
+function ColorsDemo({
+  showThemeSwitcher,
+  showPalette,
+  showStrokes,
+  columns,
+  swatchHeight,
+}: ColorsDemoProps) {
+  const columnClass =
+    columns === "four"
+      ? "sm:grid-cols-2 lg:grid-cols-4"
+      : columns === "three"
+        ? "sm:grid-cols-2 lg:grid-cols-3"
+        : "sm:grid-cols-2";
+  const heightClass =
+    swatchHeight === "lg" ? "min-h-36" : swatchHeight === "md" ? "min-h-28" : "min-h-20";
+
+  return (
+    <div className="flex flex-col gap-density-4">
+      {showThemeSwitcher && <ThemeSwitcher />}
+      {showPalette && (
+        <div className={`grid grid-cols-1 gap-density-3 ${columnClass}`}>
+          {PAIRS.map(({ name, bg, fg, token }) => (
+            <div
+              key={name}
+              className={`flex ${heightClass} flex-col justify-between rounded-lg border border-border p-density-4 ${bg} ${fg}`}
+            >
+              <div className="text-sm font-semibold">{name}</div>
+              <code className="mt-density-3 text-xs opacity-80">{token}</code>
+            </div>
+          ))}
+        </div>
+      )}
+      {showStrokes && (
+        <div className="grid grid-cols-1 gap-density-3 sm:grid-cols-3">
+          {STROKES.map(({ name, cls }) => (
+            <div key={name} className="flex flex-col gap-density-2">
+              <div className={`h-16 rounded-md border bg-background ${cls}`} />
+              <code className="text-xs text-muted-foreground">{name}</code>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const meta: Meta<typeof ColorsDemo> = {
   title: "Foundations/Colors",
+  component: ColorsDemo,
+  args: {
+    showThemeSwitcher: true,
+    showPalette: true,
+    showStrokes: false,
+    columns: "three",
+    swatchHeight: "md",
+  },
+  argTypes: {
+    columns: {
+      control: "inline-radio",
+      options: ["two", "three", "four"],
+    },
+    swatchHeight: {
+      control: "inline-radio",
+      options: ["sm", "md", "lg"],
+    },
+  },
   parameters: {
     docs: {
       description: {
@@ -14,7 +86,7 @@ const meta: Meta = {
 };
 
 export default meta;
-type Story = StoryObj;
+type Story = StoryObj<typeof ColorsDemo>;
 
 type Pair = { name: string; bg: string; fg: string; token: string };
 
@@ -40,22 +112,10 @@ const PAIRS: Pair[] = [
 ];
 
 export const Palette: Story = {
-  render: () => (
-    <div className="flex flex-col gap-density-4">
-      <ThemeSwitcher />
-      <div className="grid grid-cols-1 gap-density-3 sm:grid-cols-2 lg:grid-cols-3">
-        {PAIRS.map(({ name, bg, fg, token }) => (
-          <div
-            key={name}
-            className={`flex flex-col justify-between rounded-lg border border-border p-density-4 ${bg} ${fg}`}
-          >
-            <div className="text-sm font-semibold">{name}</div>
-            <code className="mt-density-3 text-xs opacity-80">{token}</code>
-          </div>
-        ))}
-      </div>
-    </div>
-  ),
+  args: {
+    showPalette: true,
+    showStrokes: false,
+  },
 };
 
 type Stroke = { name: string; cls: string };
@@ -66,17 +126,8 @@ const STROKES: Stroke[] = [
 ];
 
 export const Strokes: Story = {
-  render: () => (
-    <div className="flex flex-col gap-density-4">
-      <ThemeSwitcher />
-      <div className="grid grid-cols-1 gap-density-3 sm:grid-cols-3">
-        {STROKES.map(({ name, cls }) => (
-          <div key={name} className="flex flex-col gap-density-2">
-            <div className={`h-16 rounded-md border bg-background ${cls}`} />
-            <code className="text-xs text-muted-foreground">{name}</code>
-          </div>
-        ))}
-      </div>
-    </div>
-  ),
+  args: {
+    showPalette: false,
+    showStrokes: true,
+  },
 };
