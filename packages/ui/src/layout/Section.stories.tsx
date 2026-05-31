@@ -1,10 +1,33 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { UiError, UiInbox } from "@flanksource/icons/ui";
-import { DetailEmptyState, Section } from "./Section";
+import { UiError } from "../icons";
+import { Section } from "./Section";
 
 const meta: Meta<typeof Section> = {
   title: "Layout/Section",
   component: Section,
+  args: {
+    title: "Configuration",
+    summary: "4 items",
+    defaultOpen: true,
+    tone: "default",
+    children: (
+      <ul className="text-sm space-y-density-1">
+        <li>key = value</li>
+        <li>timeout = 30s</li>
+        <li>retries = 3</li>
+        <li>mode = strict</li>
+      </ul>
+    ),
+  },
+  argTypes: {
+    tone: {
+      control: "inline-radio",
+      options: ["default", "danger", "warning", "success", "info"],
+    },
+    icon: { table: { disable: true } },
+    children: { table: { disable: true } },
+    onToggle: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -18,21 +41,7 @@ const meta: Meta<typeof Section> = {
 export default meta;
 type Story = StoryObj<typeof Section>;
 
-export const Default: Story = {
-  args: {
-    title: "Configuration",
-    summary: "4 items",
-    defaultOpen: true,
-    children: (
-      <ul className="text-sm space-y-density-1">
-        <li>key = value</li>
-        <li>timeout = 30s</li>
-        <li>retries = 3</li>
-        <li>mode = strict</li>
-      </ul>
-    ),
-  },
-};
+export const Default: Story = {};
 
 export const Nested: Story = {
   render: () => (
@@ -58,14 +67,4 @@ export const DangerTone: Story = {
     icon: UiError,
     children: <div className="text-sm">Stack traces here.</div>,
   },
-};
-
-export const Empty: Story = {
-  render: () => (
-    <DetailEmptyState
-      icon={UiInbox}
-      label="Nothing selected"
-      description="Pick an item from the tree to see its details."
-    />
-  ),
 };

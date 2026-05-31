@@ -7,6 +7,11 @@ const meta = {
   title: "Theming/DensitySwitcher",
   component: DensitySwitcher,
   tags: ["autodocs"],
+  args: {
+    className: "",
+    triggerClassName: "",
+    menuClassName: "",
+  },
   parameters: {
     docs: {
       description: {

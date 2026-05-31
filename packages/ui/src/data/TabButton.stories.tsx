@@ -1,14 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { Gauge } from "./Gauge";
 import { TabButton } from "./TabButton";
-import {
-  UiBeaker,
-  UiError,
-  UiGraph,
-  UiPass,
-  UiWarningCircle,
-} from "@flanksource/icons/ui";
+import { UiBeaker, UiGraph, UiWarningCircle } from "../icons";
 
 const meta: Meta<typeof TabButton> = {
   title: "Data/TabButton",
@@ -62,35 +55,4 @@ export const TabsWithCounts: Story = {
       </div>
     );
   },
-};
-
-export const Gauges: StoryObj<typeof Gauge> = {
-  render: () => (
-    <div className="flex gap-density-3">
-      <Gauge
-        icon={UiPass}
-        label="Passed"
-        value={92}
-        tone="success"
-        subtitle="110 / 120 tests"
-        meta="fresh"
-      />
-      <Gauge
-        icon={UiError}
-        label="Failed"
-        value={3}
-        tone="danger"
-        subtitle="requires attention"
-        meta="3m"
-      />
-      <Gauge
-        icon={UiWarningCircle}
-        label="Skipped"
-        value={5}
-        tone="warning"
-        subtitle="intentionally skipped"
-        meta="cached"
-      />
-    </div>
-  ),
 };

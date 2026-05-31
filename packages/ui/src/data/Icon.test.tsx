@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Icon } from "./Icon";
-import { UiSearch } from "@flanksource/icons/ui";
+import { UiSearch } from "../icons";
 
 describe("Icon", () => {
   it("uses a stable 1em box for plain imported icons by default", () => {

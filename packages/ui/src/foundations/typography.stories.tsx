@@ -2,8 +2,53 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ThemeSwitcher } from "../components/theme-switcher";
 import { DensitySwitcher } from "../components/density-switcher";
 
-const meta: Meta = {
+type TypographyDemoProps = {
+  sampleText: string;
+  showThemeSwitcher: boolean;
+  showDensitySwitcher: boolean;
+  section: "scale" | "weights" | "content" | "all";
+};
+
+function TypographyDemo({
+  sampleText,
+  showThemeSwitcher,
+  showDensitySwitcher,
+  section,
+}: TypographyDemoProps) {
+  const showScale = section === "scale" || section === "all";
+  const showWeights = section === "weights" || section === "all";
+  const showContent = section === "content" || section === "all";
+
+  return (
+    <div className="flex flex-col gap-density-5">
+      {(showThemeSwitcher || showDensitySwitcher) && (
+        <div className="flex flex-wrap gap-density-2">
+          {showThemeSwitcher && <ThemeSwitcher />}
+          {showDensitySwitcher && <DensitySwitcher />}
+        </div>
+      )}
+      {showScale && <ScaleTable sampleText={sampleText} />}
+      {showWeights && <WeightsList sampleText={sampleText} />}
+      {showContent && <ContentBlock sampleText={sampleText} />}
+    </div>
+  );
+}
+
+const meta: Meta<typeof TypographyDemo> = {
   title: "Foundations/Typography",
+  component: TypographyDemo,
+  args: {
+    sampleText: "The quick brown fox jumps over the lazy dog",
+    showThemeSwitcher: true,
+    showDensitySwitcher: true,
+    section: "scale",
+  },
+  argTypes: {
+    section: {
+      control: "inline-radio",
+      options: ["scale", "weights", "content", "all"],
+    },
+  },
   parameters: {
     docs: {
       description: {
@@ -15,7 +60,7 @@ const meta: Meta = {
 };
 
 export default meta;
-type Story = StoryObj;
+type Story = StoryObj<typeof TypographyDemo>;
 
 type Sample = { label: string; className: string; pt: string };
 
@@ -38,57 +83,51 @@ const WEIGHTS: Sample[] = [
   { label: "font-bold", className: "font-bold", pt: "700" },
 ];
 
-export const Scale: Story = {
-  render: () => (
-    <div className="flex flex-col gap-density-4">
-      <div className="flex flex-wrap gap-density-2">
-        <ThemeSwitcher />
-        <DensitySwitcher />
-      </div>
-      <table className="w-full border-separate border-spacing-y-density-2">
-        <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <th className="w-48">Token</th>
-            <th className="w-24">Size</th>
-            <th>Sample</th>
+function ScaleTable({ sampleText }: { sampleText: string }) {
+  return (
+    <table className="w-full border-separate border-spacing-y-density-2">
+      <thead>
+        <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <th className="w-48">Token</th>
+          <th className="w-24">Size</th>
+          <th>Sample</th>
+        </tr>
+      </thead>
+      <tbody>
+        {SCALE.map(({ label, className, pt }) => (
+          <tr key={label} className="align-baseline">
+            <td className="font-mono text-xs text-muted-foreground">{label}</td>
+            <td className="font-mono text-xs text-muted-foreground">{pt}</td>
+            <td className={className}>{sampleText}</td>
           </tr>
-        </thead>
-        <tbody>
-          {SCALE.map(({ label, className, pt }) => (
-            <tr key={label} className="align-baseline">
-              <td className="font-mono text-xs text-muted-foreground">{label}</td>
-              <td className="font-mono text-xs text-muted-foreground">{pt}</td>
-              <td className={className}>The quick brown fox jumps over the lazy dog</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  ),
-};
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-export const Weights: Story = {
-  render: () => (
+function WeightsList({ sampleText }: { sampleText: string }) {
+  return (
     <div className="flex flex-col gap-density-3">
       {WEIGHTS.map(({ label, className, pt }) => (
         <div key={label} className="flex items-baseline gap-density-3">
           <code className="w-36 text-xs text-muted-foreground">{label}</code>
           <code className="w-12 text-xs text-muted-foreground">{pt}</code>
-          <span className={`text-xl ${className}`}>Clicky UI typography</span>
+          <span className={`text-xl ${className}`}>{sampleText}</span>
         </div>
       ))}
     </div>
-  ),
-};
+  );
+}
 
-export const Content: Story = {
-  render: () => (
+function ContentBlock({ sampleText }: { sampleText: string }) {
+  return (
     <article className="max-w-2xl space-y-density-3">
       <h1 className="text-3xl font-bold tracking-tight">Heading 1</h1>
       <h2 className="text-2xl font-semibold tracking-tight">Heading 2</h2>
       <h3 className="text-xl font-semibold">Heading 3</h3>
       <p className="text-density-base leading-7">
-        Body copy uses{" "}
+        {sampleText}. Body copy uses{" "}
         <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">text-density-base</code>,
         which scales with the density switcher above. Inline{" "}
         <a className="text-primary underline-offset-4 hover:underline" href="#">
@@ -103,5 +142,25 @@ export const Content: Story = {
         Muted supporting text sits on <code className="font-mono">--muted-foreground</code>.
       </p>
     </article>
-  ),
+  );
+}
+
+export const Scale: Story = {
+  args: {
+    section: "scale",
+  },
+};
+
+export const Weights: Story = {
+  args: {
+    section: "weights",
+    showDensitySwitcher: false,
+  },
+};
+
+export const Content: Story = {
+  args: {
+    section: "content",
+    showDensitySwitcher: false,
+  },
 };

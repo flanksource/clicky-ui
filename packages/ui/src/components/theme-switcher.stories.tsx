@@ -7,6 +7,11 @@ const meta = {
   title: "Theming/ThemeSwitcher",
   component: ThemeSwitcher,
   tags: ["autodocs"],
+  args: {
+    className: "",
+    triggerClassName: "",
+    menuClassName: "",
+  },
   parameters: {
     docs: {
       description: {

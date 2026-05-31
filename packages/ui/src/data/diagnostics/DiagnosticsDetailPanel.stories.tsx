@@ -9,6 +9,14 @@ import type { ProcessNode } from "./types";
 const meta: Meta<typeof DiagnosticsDetailPanel> = {
   title: "Data/Diagnostics/DetailPanel",
   component: DiagnosticsDetailPanel,
+  args: {
+    process: sampleProcessTree,
+    collectBusy: false,
+    onCollectStack: async () => {},
+  },
+  argTypes: {
+    onCollectStack: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -40,21 +48,25 @@ export const WithTree: Story = {
 };
 
 export const NoProcessSelected: Story = {
-  render: () => (
+  args: {
+    process: null,
+  },
+  render: (args) => (
     <div className="h-[320px] border border-border rounded-md">
-      <DiagnosticsDetailPanel process={null} />
+      <DiagnosticsDetailPanel {...args} />
     </div>
   ),
 };
 
 export const AwaitingStack: Story = {
-  render: () => (
+  args: {
+    process: { ...sampleProcessTree, stack_capture: undefined },
+    collectBusy: false,
+    onCollectStack: async () => {},
+  },
+  render: (args) => (
     <div className="h-[480px] border border-border rounded-md">
-      <DiagnosticsDetailPanel
-        process={{ ...sampleProcessTree, stack_capture: undefined }}
-        collectBusy={false}
-        onCollectStack={async () => {}}
-      />
+      <DiagnosticsDetailPanel {...args} />
     </div>
   ),
 };

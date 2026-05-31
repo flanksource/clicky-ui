@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar, type AvatarKind, type AvatarVariant } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
 import type { StaticIconComponent } from "./Icon";
-import { UiCheck, UiHourglass, UiClose } from "@flanksource/icons/ui";
+import { UiCheck, UiHourglass, UiClose } from "../icons";
 import { fnv1a32 } from "../lib/palette";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";

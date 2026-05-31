@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Clicky } from "./Clicky";
+import { Clicky, type ClickyDocument, type ClickyNode } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
 
 const meta: Meta<typeof Clicky> = {
@@ -44,5 +44,51 @@ export const RemoteUrl: Story = {
     data: clickyFixture,
     view: [],
     download: { all: true, label: "artifact" },
+  },
+};
+
+const codeNode = (language: string, source: string): ClickyNode => ({
+  kind: "code",
+  language,
+  source,
+});
+
+const combinedCodeDoc: ClickyDocument = {
+  version: 1,
+  node: {
+    kind: "text",
+    children: [
+      {
+        kind: "text",
+        text: "Go",
+        style: { className: "font-semibold text-sm mt-density-3" },
+      },
+      codeNode(
+        "go",
+        `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, world!")
+}`,
+      ),
+      {
+        kind: "text",
+        text: "Python",
+        style: { className: "font-semibold text-sm mt-density-3" },
+      },
+      codeNode(
+        "python",
+        `def greet(name: str = "world") -> str:
+    return f"Hello, {name}!"`,
+      ),
+    ],
+  },
+};
+
+export const CodeNodes: Story = {
+  args: {
+    data: combinedCodeDoc,
   },
 };

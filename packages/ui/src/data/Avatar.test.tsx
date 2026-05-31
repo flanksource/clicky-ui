@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Avatar } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
-import { UiCheck } from "@flanksource/icons/ui";
+import { UiCheck } from "../icons";
 
 describe("Avatar", () => {
   afterEach(() => {
