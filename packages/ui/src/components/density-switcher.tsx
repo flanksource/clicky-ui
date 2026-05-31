@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 import { useDensity, type Density } from "../hooks/use-density";
-import { UiListDashes, UiListFlat, UiRows } from "@flanksource/icons/ui";
+import { UiListDashes, UiListFlat, UiRows } from "../icons";
 
 const DENSITY_OPTIONS: IconMenuOption<Density>[] = [
   { value: "compact", icon: UiRows, label: "compact" },

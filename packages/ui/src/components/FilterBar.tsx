@@ -19,7 +19,7 @@ import {
   UiClose,
   UiFilter,
   UiSearch,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { DateTimePicker } from "./DateTimePicker";

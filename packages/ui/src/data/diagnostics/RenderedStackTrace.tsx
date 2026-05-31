@@ -12,7 +12,7 @@ import {
   UiDebugStepOver,
   UiError,
   UiMethod,
-} from "@flanksource/icons/ui";
+} from "../../icons";
 
 // SourceResolver matches the Go clicky.SourceResolver interface: given a
 // frame, return surrounding source lines so the renderer can display inline

@@ -44,7 +44,7 @@ import {
   UiMoon,
   UiRows,
   UiSun,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { SortableHeader } from "./SortableHeader";
 import {
   Timestamp,

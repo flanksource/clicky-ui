@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiAdd, UiListFlat, UiTable } from "@flanksource/icons/ui";
+import { UiAdd, UiListFlat, UiTable } from "../icons";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import { filterOperationsByDomain, findListEndpoint } from "./classify";

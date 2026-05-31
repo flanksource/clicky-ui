@@ -1,6 +1,6 @@
 import { forwardRef, useRef, type InputHTMLAttributes } from "react";
 import { Icon } from "../data/Icon";
-import { UiCalendar } from "@flanksource/icons/ui";
+import { UiCalendar } from "../icons";
 import { cn } from "../lib/utils";
 
 export type DatePickerProps = Omit<

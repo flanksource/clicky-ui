@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import { Icon } from "../data/Icon";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 import { useTheme, type Theme } from "../hooks/use-theme";
-import { UiDesktop, UiMoon, UiSun } from "@flanksource/icons/ui";
+import { UiDesktop, UiMoon, UiSun } from "../icons";
 
 const THEME_OPTIONS: IconMenuOption<Theme>[] = [
   { value: "light", icon: UiSun, label: "light" },

@@ -3,7 +3,7 @@ import { Badge } from "../Badge";
 import { HoverCard } from "../../overlay/HoverCard";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { Properties, type PropertiesItem } from "../Properties";
-import { UiCopy, UiZoomIn, UiZoomOut } from "@flanksource/icons/ui";
+import { UiCopy, UiZoomIn, UiZoomOut } from "../../icons";
 import { useDensityValue } from "../../hooks/use-density";
 import { cn } from "../../lib/utils";
 import type { FilterMode } from "../FilterPill";

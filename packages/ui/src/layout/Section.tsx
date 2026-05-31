@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { UiChevronDown, UiChevronRight } from "@flanksource/icons/ui";
+import { UiChevronDown, UiChevronRight } from "../icons";
 
 export type SectionProps = {
   /** Header title. */

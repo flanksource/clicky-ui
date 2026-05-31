@@ -9,7 +9,7 @@ import type {
 import { TimeRange } from "../components/TimeRange";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { Icon } from "../data/Icon";
-import { UiSearch } from "@flanksource/icons/ui";
+import { UiSearch } from "../icons";
 import { cn } from "../lib/utils";
 import {
   packParameterValues,

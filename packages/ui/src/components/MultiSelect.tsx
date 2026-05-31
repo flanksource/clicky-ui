@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiChevronDown, UiChevronUp } from "@flanksource/icons/ui";
+import { UiChevronDown, UiChevronUp } from "../icons";
 
 export type MultiSelectOption = {
   /** Stable option value written into the selected value array. */

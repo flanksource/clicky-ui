@@ -55,7 +55,7 @@ import {
   UiFileCode,
   UiEye,
   UiTable,
-} from "@flanksource/icons/ui";
+} from "../icons";
 import { CodeBlock } from "./CodeBlock";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";

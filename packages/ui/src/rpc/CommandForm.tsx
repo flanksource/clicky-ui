@@ -6,7 +6,7 @@ import {
 } from "react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiClose } from "@flanksource/icons/ui";
+import { UiClose } from "../icons";
 import { isPositionalParam, type OpenAPIParameter } from "./types";
 
 export type CommandFormProps = {

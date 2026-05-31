@@ -8,7 +8,7 @@ import {
   UiSearch,
   UiServerProcess,
   UiLoader,
-} from "@flanksource/icons/ui";
+} from "../../icons";
 import type { ProcessNode, RunMeta } from "./types";
 import {
   formatBytes,

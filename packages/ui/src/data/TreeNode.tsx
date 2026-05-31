@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
-import { UiChevronDown, UiChevronRight } from "@flanksource/icons/ui";
+import { UiChevronDown, UiChevronRight } from "../icons";
 
 export type TreeRowContext<T> = {
   node: T;

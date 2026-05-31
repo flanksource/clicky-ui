@@ -6,7 +6,7 @@ import {
   UiChevronRight,
   UiCopy,
   UiWarningTriangle,
-} from "@flanksource/icons/ui";
+} from "../../icons";
 import {
   compactStackPath,
   isApplicationStackFrame,
