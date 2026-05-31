@@ -15,7 +15,7 @@
     "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/storybook/package.json e2e/package.json",
     "lint": "oxlint . --deny-warnings",
     "typecheck": "tsc -b",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck"
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm run format:check && pnpm run lint && pnpm run typecheck"
   },
   "devDependencies": {
     "oxlint": "catalog:",

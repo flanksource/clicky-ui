@@ -13,6 +13,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@flanksource\/clicky-ui\/styles\.css$/, replacement: resolve(uiSrc, "styles.ts") },
+      { find: /^@flanksource\/clicky-ui\/icons$/, replacement: resolve(uiSrc, "icons.ts") },
       { find: /^@flanksource\/clicky-ui\/rpc$/, replacement: resolve(uiSrc, "rpc.ts") },
       { find: /^@flanksource\/clicky-ui$/, replacement: resolve(uiSrc, "index.ts") },
       { find: /^preact$/, replacement: preactPath("dist/preact.module.js") },
