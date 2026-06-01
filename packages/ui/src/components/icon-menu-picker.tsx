@@ -11,7 +11,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { UiCheck } from "../icons";
+import { UiCheck, UiChevronDown } from "../icons";
 import { Button } from "./button";
 
 export type IconMenuOption<T extends string> = {
@@ -166,9 +166,21 @@ function IconMenuPickerInner<T extends string>(
         title={triggerTitle ?? `${ariaLabel}: ${selected.label}`}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onTriggerKeyDown}
-        className={cn("text-muted-foreground hover:text-foreground", triggerClassName)}
+        className={cn(
+          "text-muted-foreground hover:text-foreground",
+          showLabel && "w-full justify-start",
+          triggerClassName,
+        )}
       >
-        <Icon icon={selected.icon} />
+        <Icon icon={selected.icon} className={showLabel ? "shrink-0 text-foreground" : undefined} />
+        {showLabel && (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left capitalize">
+              {`${ariaLabel}: ${selected.label}`}
+            </span>
+            <Icon icon={UiChevronDown} className="shrink-0 text-muted-foreground" />
+          </>
+        )}
       </Button>
       {open && (
         <div
