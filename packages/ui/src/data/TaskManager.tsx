@@ -19,9 +19,27 @@ export interface TaskManagerProps {
   kind?: string;
   pollMs?: number;
   className?: string;
+  /**
+   * Currently-selected (expanded) run id, e.g. driven from the URL. When set,
+   * the matching run renders expanded and selection is controlled — otherwise
+   * each row manages its own expand/collapse state.
+   */
+  selectedId?: string;
+  /**
+   * Called when a run row is toggled: the new selection id, or null when the
+   * open row is collapsed. Pair with selectedId for URL-driven deep links.
+   */
+  onSelectRun?: (id: string | null) => void;
 }
 
-export function TaskManager({ basePath, kind, pollMs, className }: TaskManagerProps) {
+export function TaskManager({
+  basePath,
+  kind,
+  pollMs,
+  className,
+  selectedId,
+  onSelectRun,
+}: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const { runs, status } = useTaskRuns({
@@ -76,7 +94,14 @@ export function TaskManager({ basePath, kind, pollMs, className }: TaskManagerPr
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card">
           {runs.map((run) => (
-            <RunRow key={run.id} run={run} basePath={basePath} pollMs={pollMs} />
+            <RunRow
+              key={run.id}
+              run={run}
+              basePath={basePath}
+              pollMs={pollMs}
+              selectedId={selectedId}
+              onSelectRun={onSelectRun}
+            />
           ))}
         </div>
       )}
@@ -88,12 +113,24 @@ function RunRow({
   run,
   basePath,
   pollMs,
+  selectedId,
+  onSelectRun,
 }: {
   run: TaskRunMeta;
   basePath: string | undefined;
   pollMs: number | undefined;
+  selectedId: string | undefined;
+  onSelectRun: ((id: string | null) => void) | undefined;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  // Controlled by selectedId when a selection handler is wired; otherwise the
+  // row owns its expand state (backward compatible for router-less consumers).
+  const controlled = onSelectRun !== undefined;
+  const open = controlled ? selectedId === run.id : localOpen;
+  const toggle = () => {
+    if (controlled) onSelectRun(open ? null : run.id);
+    else setLocalOpen((v) => !v);
+  };
   const isTerminal = run.status !== "running" && run.status !== "pending";
 
   return (
@@ -101,7 +138,7 @@ function RunRow({
       <button
         type="button"
         className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

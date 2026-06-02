@@ -42,6 +42,7 @@ export {
   type MultiSelectProps,
 } from "./components/MultiSelect";
 export { Select, type SelectProps, type SelectOption } from "./components/select";
+export { Combobox, type ComboboxProps, type ComboboxOption } from "./components/Combobox";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
 export {
