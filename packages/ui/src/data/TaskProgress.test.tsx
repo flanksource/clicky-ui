@@ -71,4 +71,24 @@ describe("TaskProgress", () => {
     render(<TaskProgress snapshots={[]} title="Fixes" />);
     expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument();
   });
+
+  it("surfaces the latest warning message inline without expanding the row", () => {
+    const snapshots: TaskSnapshot[] = [
+      { id: "g", name: "warn-run", type: "group", status: "warning", groupId: "g", total: 1 },
+      {
+        id: "w1",
+        name: "reorg idx_c",
+        type: "task",
+        groupId: "g",
+        status: "warning",
+        logs: [
+          { level: "info", message: "starting" },
+          { level: "warn", message: "skipped: index already optimal" },
+        ],
+      },
+    ];
+    render(<TaskProgress snapshots={snapshots} />);
+    // Visible without any click — the warning text is promoted onto the row.
+    expect(screen.getByText("skipped: index already optimal")).toBeInTheDocument();
+  });
 });

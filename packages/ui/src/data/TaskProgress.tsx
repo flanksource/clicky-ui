@@ -155,6 +155,9 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
   const [expanded, setExpanded] = useState(false);
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
+  // Promote the latest warning message inline so a `warning` row shows its
+  // reason without expanding. Suppressed when an error is already shown.
+  const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
 
   return (
     <div
@@ -170,6 +173,11 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
           <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
             <span className="truncate">{t.name}</span>
             {t.error && <span className="truncate text-xs font-normal text-red-500">{t.error}</span>}
+            {latestWarn && (
+              <span className={cn("truncate text-xs font-normal", logLevelColor("warn"))}>
+                {latestWarn.message}
+              </span>
+            )}
             {hasLogs && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
                 {logs.length}

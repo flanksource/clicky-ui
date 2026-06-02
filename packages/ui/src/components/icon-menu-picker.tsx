@@ -172,7 +172,7 @@ function IconMenuPickerInner<T extends string>(
           triggerClassName,
         )}
       >
-        <Icon icon={selected.icon} className={showLabel ? "shrink-0 text-foreground" : undefined} />
+        <Icon icon={selected.icon} {...(showLabel ? { className: "shrink-0 text-foreground" } : {})} />
         {showLabel && (
           <>
             <span className="min-w-0 flex-1 truncate text-left capitalize">

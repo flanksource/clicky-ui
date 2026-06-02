@@ -44,3 +44,5 @@ packages/ui/icons/svg/
 .claude/
 hack/
 *.png
+.antigravitycli/
+.playwright-cli/
