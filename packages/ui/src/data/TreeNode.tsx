@@ -10,6 +10,10 @@ export type TreeRowContext<T> = {
   selected: boolean;
   hasChildren: boolean;
   toggle: () => void;
+  /** True while this node's lazy children are being fetched via loadChildren. */
+  loading: boolean;
+  /** The rejection value from loadChildren, or null when there was no error. */
+  error: unknown;
 };
 
 export type TreeNodeProps<T> = {
@@ -26,6 +30,20 @@ export type TreeNodeProps<T> = {
   rowClass?: (node: T, selected: boolean) => string;
   indentPx?: number;
   basePaddingPx?: number;
+  /**
+   * Reports that a node has children that are not yet loaded — it renders an
+   * expand chevron even when `getChildren` returns nothing. On the first open
+   * the node fetches them via `loadChildren`. Without this (the default), a
+   * node is expandable only when `getChildren` already returns children.
+   */
+  hasMoreChildren?: (node: T) => boolean;
+  /**
+   * Lazily fetch a node's children the first time it is opened. Resolves to the
+   * child nodes (which may themselves be lazy). A rejection is surfaced to
+   * `renderRow` via `ctx.error` and is not retried until the node is collapsed
+   * and reopened. Required for any node `hasMoreChildren` returns true for.
+   */
+  loadChildren?: (node: T) => Promise<T[]>;
   /**
    * Marks a node as a **secondary child** of its parent. Secondary
    * children keep the full tree structure (they render, they can be
@@ -60,9 +78,22 @@ export function TreeNode<T>({
   indentPx = 16,
   basePaddingPx = 8,
   isSecondary,
+  hasMoreChildren,
+  loadChildren,
 }: TreeNodeProps<T>) {
-  const children = getChildren(node);
+  // Lazily-fetched children take precedence over the synchronous ones once a
+  // load has resolved; until then `loadedChildren` is null and we fall back to
+  // getChildren. A node can be "lazy" (hasMoreChildren) with no sync children.
+  const [loadedChildren, setLoadedChildren] = useState<T[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const syncChildren = getChildren(node);
+  const children = loadedChildren ?? syncChildren;
   const hasChildren = (children?.length ?? 0) > 0;
+  const lazyUnloaded = (hasMoreChildren?.(node) ?? false) && loadedChildren === null;
+  // The chevron shows when there is something to reveal: either real children
+  // are present, or the node is lazy and has not been loaded yet.
+  const expandable = hasChildren || lazyUnloaded;
   const initialOpen = defaultOpen ? defaultOpen(node, depth) : depth < 1;
   const [open, setOpen] = useState(initialOpen);
   const prevExpandAll = useRef(expandAll);
@@ -95,8 +126,42 @@ export function TreeNode<T>({
     prevExpandAll.current = expandAll;
   }, [expandAll, skipExpandAll]);
 
+  // Guards a lazy fetch so a node loads its children at most once per mount and
+  // a resolution arriving after the node was reused (key changed) is ignored.
+  const loadRequested = useRef(false);
+  const nodeKey = getKey(node);
+  const loadKeyRef = useRef(nodeKey);
+
+  function loadLazyChildren() {
+    if (!loadChildren || loadRequested.current) return;
+    loadRequested.current = true;
+    loadKeyRef.current = nodeKey;
+    setLoading(true);
+    setError(null);
+    loadChildren(node)
+      .then((kids) => {
+        if (loadKeyRef.current !== nodeKey) return;
+        setLoadedChildren(kids);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (loadKeyRef.current !== nodeKey) return;
+        // Surfaced to renderRow via ctx.error; allow a retry on re-toggle.
+        loadRequested.current = false;
+        setError(err);
+        setLoading(false);
+      });
+  }
+
   function toggle() {
-    if (hasChildren) setOpen((o) => !o);
+    if (!expandable) return;
+    setOpen((o) => {
+      const next = !o;
+      // Only fetch when transitioning into the open state, so collapsing a
+      // not-yet-loaded (e.g. previously-failed) lazy node never triggers a load.
+      if (next && lazyUnloaded) loadLazyChildren();
+      return next;
+    });
   }
 
   const defaultRowBg = isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent";
@@ -105,7 +170,7 @@ export function TreeNode<T>({
   return (
     <div
       role="treeitem"
-      aria-expanded={hasChildren ? isOpen : undefined}
+      aria-expanded={expandable ? isOpen : undefined}
       aria-selected={isSelected}
     >
       <div
@@ -117,7 +182,7 @@ export function TreeNode<T>({
           toggle();
         }}
       >
-        {hasChildren ? (
+        {expandable ? (
           <Icon
             icon={isOpen ? UiChevronDown : UiChevronRight}
             className="text-muted-foreground text-xs w-3"
@@ -132,6 +197,8 @@ export function TreeNode<T>({
           selected: isSelected,
           hasChildren,
           toggle,
+          loading,
+          error,
         })}
       </div>
       {isOpen && hasChildren && (
@@ -153,6 +220,8 @@ export function TreeNode<T>({
               {...(onSelect ? { onSelect } : {})}
               {...(rowClass ? { rowClass } : {})}
               {...(isSecondary ? { isSecondary } : {})}
+              {...(hasMoreChildren ? { hasMoreChildren } : {})}
+              {...(loadChildren ? { loadChildren } : {})}
             />
           ))}
         </div>
