@@ -44,6 +44,12 @@ export type TreeProps<T> = Omit<
   getSearchText?: (node: T) => string;
 };
 
+// Edge counting, search-text collection and filtering all walk the tree through
+// the synchronous `getChildren` only. A lazy node (one declared via
+// `hasMoreChildren` whose children have not been fetched yet) therefore
+// contributes no edges and no search text until the operator expands it — so it
+// is invisible to "expand all" and to the filter while still collapsed. This is
+// intentional: we never trigger network loads from bulk/search operations.
 function countTreeEdges<T>(roots: T[], getChildren: TreeProps<T>["getChildren"]) {
   let total = 0;
   const stack = [...roots];

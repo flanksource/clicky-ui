@@ -15,3 +15,12 @@ export {
   type UseSortReturn,
 } from "./hooks/use-sort";
 export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-history-route";
+export {
+  useTaskRun,
+  useTaskRuns,
+  type UseTaskRunOptions,
+  type UseTaskRunResult,
+  type UseTaskRunsOptions,
+  type UseTaskRunsResult,
+  type TaskTransportOptions,
+} from "./hooks/use-task-run";

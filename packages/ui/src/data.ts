@@ -99,6 +99,23 @@ export { TabButton, type TabButtonProps } from "./data/TabButton";
 export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
+export {
+  type LogEntry,
+  type TaskSnapshot,
+  type TaskRunMeta,
+  isTerminalStatus,
+  allGroupsTerminal,
+} from "./data/TaskSnapshot";
+export {
+  taskStatusColor,
+  taskStatusIcon,
+  taskStatusBg,
+  logLevelColor,
+  taskSegments,
+  bucketTasks,
+} from "./data/task-status";
+export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
+export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
 
 export { DiagnosticsTree, type DiagnosticsTreeProps } from "./data/diagnostics/DiagnosticsTree";
 export {

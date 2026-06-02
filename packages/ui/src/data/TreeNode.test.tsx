@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TreeNode } from "./TreeNode";
 
-type Node = { id: string; label: string; children?: Node[] };
+type Node = { id: string; label: string; children?: Node[]; lazy?: boolean };
 
 const tree: Node = {
   id: "root",
@@ -108,5 +108,104 @@ describe("TreeNode", () => {
     expect(rootRow.style.paddingLeft).toBe("8px");
     expect(aRow.style.paddingLeft).toBe("24px");
     expect(a1Row.style.paddingLeft).toBe("40px");
+  });
+});
+
+describe("TreeNode lazy children", () => {
+  // A single lazy root that carries no synchronous children; loadChildren
+  // supplies them the first time it is opened.
+  const lazyRoot: Node = { id: "root", label: "root", lazy: true };
+
+  function renderLazy(
+    loadChildren: (n: Node) => Promise<Node[]>,
+    renderRow?: Parameters<typeof TreeNode<Node>>[0]["renderRow"],
+  ) {
+    return render(
+      <TreeNode<Node>
+        node={lazyRoot}
+        getChildren={(n) => n.children}
+        getKey={(n) => n.id}
+        defaultOpen={() => false}
+        hasMoreChildren={(n) => n.lazy === true && !n.children}
+        loadChildren={loadChildren}
+        renderRow={renderRow ?? (({ node }) => <span>{node.label}</span>)}
+      />,
+    );
+  }
+
+  it("shows an expand chevron for a lazy node with no synchronous children", () => {
+    renderLazy(() => Promise.resolve([]));
+    const row = screen.getByText("root").closest("[role='treeitem']")!;
+    // aria-expanded is only present when the node is expandable; a lazy node is.
+    expect(row).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("fetches children once on open, showing loading then the resolved nodes", async () => {
+    const loadChildren = vi.fn(() =>
+      Promise.resolve([{ id: "c1", label: "child-1" }] as Node[]),
+    );
+    renderLazy(loadChildren, ({ node, loading }) => (
+      <span>
+        {node.label}
+        {loading ? " (loading)" : ""}
+      </span>
+    ));
+
+    fireEvent.click(screen.getByText("root"));
+    expect(screen.getByText("root (loading)")).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByText("child-1")).toBeInTheDocument());
+    expect(loadChildren).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-fetch when collapsed and reopened after a successful load", async () => {
+    const loadChildren = vi.fn(() =>
+      Promise.resolve([{ id: "c1", label: "child-1" }] as Node[]),
+    );
+    renderLazy(loadChildren);
+
+    fireEvent.click(screen.getByText("root"));
+    await waitFor(() => expect(screen.getByText("child-1")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("root")); // collapse
+    expect(screen.queryByText("child-1")).toBeNull();
+    fireEvent.click(screen.getByText("root")); // reopen
+    expect(screen.getByText("child-1")).toBeInTheDocument();
+    expect(loadChildren).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a load failure via renderRow ctx.error and stays usable", async () => {
+    const loadChildren = vi.fn(() => Promise.reject(new Error("boom")));
+    renderLazy(loadChildren, ({ node, error }) => (
+      <span>
+        {node.label}
+        {error ? ` (error: ${(error as Error).message})` : ""}
+      </span>
+    ));
+
+    fireEvent.click(screen.getByText("root"));
+    await waitFor(() =>
+      expect(screen.getByText("root (error: boom)")).toBeInTheDocument(),
+    );
+  });
+
+  it("retries the fetch after a failure when reopened", async () => {
+    const loadChildren = vi
+      .fn<(n: Node) => Promise<Node[]>>()
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce([{ id: "c1", label: "child-1" }]);
+    renderLazy(loadChildren, ({ node, error }) => (
+      <span data-testid="row">
+        {node.label}
+        {error ? " (error)" : ""}
+      </span>
+    ));
+
+    const row = () => screen.getByTestId("row");
+    fireEvent.click(row());
+    await waitFor(() => expect(row()).toHaveTextContent("root (error)"));
+    fireEvent.click(row()); // collapse
+    fireEvent.click(row()); // reopen → retry
+    await waitFor(() => expect(screen.getByText("child-1")).toBeInTheDocument());
+    expect(loadChildren).toHaveBeenCalledTimes(2);
   });
 });
