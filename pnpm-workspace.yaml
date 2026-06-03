@@ -57,6 +57,6 @@ catalog:
   typescript: ^5.7.2
   vite: ^6.0.3
   vite-plugin-dts: ^4.3.0
-  vitest: ^3.0.5
+  vitest: ^4.1.0
 
 catalogMode: prefer
