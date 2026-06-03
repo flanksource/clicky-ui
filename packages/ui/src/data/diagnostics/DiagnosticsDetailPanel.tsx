@@ -43,6 +43,18 @@ export type DiagnosticsDetailPanelProps = {
    * source). A missing class must resolve to undefined, never throw.
    */
   resolveSource?: JvmFrameSourceResolver;
+  /**
+   * Caller-supplied action buttons rendered right-aligned in the header row,
+   * next to the title and Refresh. Use for download/decompile-style actions.
+   */
+  headerActions?: ReactNode;
+  /**
+   * The capture holds a single, already-selected item (e.g. one thread the
+   * caller picked from its own list). Suppresses the redundant per-item filter
+   * UI (search box, state chips, hide-runtime, count) and lifts Refresh into
+   * the header row so the detail view shows just that item's frames.
+   */
+  singleItem?: boolean;
 };
 
 export function DiagnosticsDetailPanel({
@@ -51,6 +63,8 @@ export function DiagnosticsDetailPanel({
   onCollectStack,
   runMeta,
   resolveSource,
+  headerActions,
+  singleItem,
 }: DiagnosticsDetailPanelProps) {
   const [search, setSearch] = useState("");
   const [selectedStates, setSelectedStates] = useState<Set<string>>(new Set());
@@ -65,13 +79,14 @@ export function DiagnosticsDetailPanel({
       userFrameCount: number;
       searchText: string;
     }> = parsed.format === "jvm" ? parsed.threads : parsed.format === "go" ? parsed.goroutines : [];
+    if (singleItem) return items;
     return items.filter((item) => {
       if (selectedStates.size > 0 && !selectedStates.has(item.state)) return false;
       if (hideRuntimeOnly && item.userFrameCount === 0) return false;
       if (needle && !item.searchText.includes(needle)) return false;
       return true;
     });
-  }, [parsed, search, selectedStates, hideRuntimeOnly]);
+  }, [parsed, search, selectedStates, hideRuntimeOnly, singleItem]);
 
   useEffect(() => {
     setSearch("");
@@ -92,7 +107,17 @@ export function DiagnosticsDetailPanel({
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-density-3 p-density-4">
-      <Header process={process} />
+      <Header
+        process={process}
+        actions={
+          <div className="flex items-center gap-density-2">
+            {singleItem && onCollectStack && (
+              <CollectButton pid={process.pid} busy={collectBusy ?? false} onClick={onCollectStack} />
+            )}
+            {headerActions}
+          </div>
+        }
+      />
       {runMeta && <RunSection runMeta={runMeta} />}
       {process.command && (
         <PanelSection title="Command">
@@ -119,6 +144,7 @@ export function DiagnosticsDetailPanel({
           hideRuntimeOnly={hideRuntimeOnly}
           setHideRuntimeOnly={setHideRuntimeOnly}
           collectBusy={collectBusy ?? false}
+          singleItem={singleItem ?? false}
           {...(onCollectStack ? { onCollectStack } : {})}
           {...(resolveSource ? { resolveSource } : {})}
         />
@@ -127,23 +153,19 @@ export function DiagnosticsDetailPanel({
   );
 }
 
-function Header({ process }: { process: ProcessNode }) {
+function Header({ process, actions }: { process: ProcessNode; actions?: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-density-3">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-density-2">
+        <div className="flex items-center gap-density-2 flex-wrap">
           <Icon
             icon={process.is_root ? UiServerProcess : UiDebug}
             className="text-2xl text-blue-600"
           />
           <h2 className="text-lg font-bold text-foreground break-words">{processLabel(process)}</h2>
-        </div>
-        <div className="mt-1 flex items-center gap-density-2 flex-wrap text-xs text-muted-foreground">
-          <span className="font-mono">pid {process.pid}</span>
-          {process.ppid ? <span className="font-mono">ppid {process.ppid}</span> : null}
           {process.status ? (
             <span
-              className={`inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 ${processStateColor(
+              className={`inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs ${processStateColor(
                 process.status,
               )}`}
             >
@@ -152,7 +174,12 @@ function Header({ process }: { process: ProcessNode }) {
             </span>
           ) : null}
         </div>
+        <div className="mt-1 flex items-center gap-density-2 flex-wrap text-xs text-muted-foreground">
+          <span className="font-mono">pid {process.pid}</span>
+          {process.ppid ? <span className="font-mono">ppid {process.ppid}</span> : null}
+        </div>
       </div>
+      {actions ? <div className="shrink-0">{actions}</div> : null}
     </div>
   );
 }
@@ -194,6 +221,7 @@ type StackBlockProps = {
   collectBusy?: boolean;
   onCollectStack?: (pid: number) => void | Promise<void>;
   resolveSource?: JvmFrameSourceResolver;
+  singleItem?: boolean;
 };
 
 function stackItemCount(parsed: ParsedStack): number {
@@ -227,6 +255,7 @@ function StackBlock(props: StackBlockProps) {
     collectBusy,
     onCollectStack,
     resolveSource,
+    singleItem,
   } = props;
   const stack = process.stack_capture;
 
@@ -267,6 +296,7 @@ function StackBlock(props: StackBlockProps) {
 
   return (
     <div className="h-full min-h-0 flex flex-col">
+      {!singleItem && (
       <div className="px-1 py-1.5 space-y-density-2">
         <div className="flex items-center justify-between gap-density-2 text-[11px] text-muted-foreground flex-wrap">
           <div className="flex items-center gap-density-2 flex-wrap">
@@ -354,6 +384,7 @@ function StackBlock(props: StackBlockProps) {
           </>
         )}
       </div>
+      )}
       {stack.error && (
         <div className="mt-density-2 text-xs text-red-600 whitespace-pre-wrap">{stack.error}</div>
       )}

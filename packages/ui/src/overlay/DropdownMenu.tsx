@@ -90,9 +90,14 @@ export function DropdownMenu({
   const toggle = () => setOpen((v) => !v);
 
   return (
-    <div className={cn("relative inline-block", className)} ref={wrapperRef}>
+    <div className={cn("relative inline-flex", className)} ref={wrapperRef}>
       {trigger ? (
-        <span onClick={toggle} aria-haspopup="menu" aria-expanded={open}>
+        <span
+          className="contents"
+          onClick={toggle}
+          aria-haspopup="menu"
+          aria-expanded={open}
+        >
           {trigger}
         </span>
       ) : (

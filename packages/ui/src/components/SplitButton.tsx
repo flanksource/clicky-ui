@@ -48,6 +48,22 @@ export function SplitButton({
 }: SplitButtonProps) {
   const [open, setOpen] = useState(false);
 
+  if (items.length === 0) {
+    return (
+      <Button
+        variant={variant}
+        size={size}
+        loading={loading}
+        disabled={disabled}
+        onClick={onClick}
+        className={className}
+      >
+        {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
+        {label}
+      </Button>
+    );
+  }
+
   return (
     <div className={cn("inline-flex items-stretch", className)}>
       <Button
@@ -56,7 +72,7 @@ export function SplitButton({
         loading={loading}
         disabled={disabled}
         onClick={onClick}
-        className="rounded-r-none border-r-0"
+        className="rounded-r-none"
       >
         {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
         {label}
@@ -64,6 +80,7 @@ export function SplitButton({
       <DropdownMenu
         items={items}
         align={align}
+        className="items-stretch"
         {...(menuClassName ? { menuClassName } : {})}
         onOpenChange={setOpen}
         trigger={
@@ -73,7 +90,10 @@ export function SplitButton({
             disabled={disabled}
             title={title}
             aria-label={title ?? "Open menu"}
-            className={cn("rounded-l-none border-l border-l-black/10 px-2", size !== "icon" && "w-8")}
+            className={cn(
+              "h-auto self-stretch rounded-l-none border-l border-l-current/25 px-2",
+              size !== "icon" && "w-8",
+            )}
           >
             <Icon icon={open ? UiChevronUp : UiChevronDown} />
           </Button>

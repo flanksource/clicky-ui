@@ -32,6 +32,15 @@ type ComboboxBaseProps = {
   className?: string;
   /** Shows a loading indicator when options are being fetched. */
   loading?: boolean;
+  /**
+   * Optional async search invoked (debounced ~250ms) as the user types. The
+   * consumer fetches and feeds matching options back via the `options` prop
+   * (setting `loading` while in flight). When set, the component renders the
+   * provided `options` as-is instead of filtering them client-side — the
+   * server has already filtered. When absent, typing filters `options`
+   * client-side as before.
+   */
+  onSearch?: (query: string) => void;
   /** Called when a key is pressed in the input. */
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
@@ -65,6 +74,7 @@ export function Combobox(props: ComboboxProps) {
     id,
     className,
     loading,
+    onSearch,
     onKeyDown: onKeyDownProp,
   } = props;
   const multiple = props.multiple === true;
@@ -105,12 +115,27 @@ export function Combobox(props: ComboboxProps) {
   const displayValue = open ? query : closedLabel;
 
   const filtered = useMemo(() => {
+    // With onSearch the server already filtered. The matches replace the list,
+    // but any already-selected value not in the matches is pinned so the user's
+    // selection stays visible and toggleable. Selected values carry no label
+    // object here, so synthesize {value, label: value} (the typeahead's value is
+    // its own human label).
+    if (onSearch) return withSelectedOptions(options, selectedValues);
     const q = query.toLowerCase().trim();
     if (!q) return options;
     return options.filter(
       (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
     );
-  }, [options, query]);
+  }, [onSearch, options, query, selectedValues]);
+
+  // Debounced server-side search: fires onSearch ~250ms after the query settles
+  // while the menu is open. The empty-query call lets the consumer reset its
+  // result set. Only active when onSearch is provided.
+  useEffect(() => {
+    if (!onSearch || !open) return;
+    const handle = setTimeout(() => onSearch(query.trim()), 250);
+    return () => clearTimeout(handle);
+  }, [onSearch, open, query]);
 
   useEffect(() => {
     setHighlighted(-1);
@@ -353,4 +378,20 @@ export function Combobox(props: ComboboxProps) {
 function labelPadding(label: ReactNode) {
   const length = typeof label === "string" ? label.length : 6;
   return { paddingLeft: `${Math.min(length * 0.62 + 0.75, 9)}rem` };
+}
+
+// withSelectedOptions returns the option list plus any selected value that isn't
+// already present, synthesized as {value, label: value}. Used by the server
+// (onSearch) typeahead so an already-selected value missing from the current
+// matches still renders as a checked row. Selected-but-absent values come first
+// so they don't get scrolled past by a long match list.
+function withSelectedOptions(
+  options: ComboboxOption[],
+  selectedValues: string[],
+): ComboboxOption[] {
+  const present = new Set(options.map((o) => o.value));
+  const pinned = selectedValues
+    .filter((v) => !present.has(v))
+    .map((v) => ({ value: v, label: v }));
+  return pinned.length === 0 ? options : [...pinned, ...options];
 }

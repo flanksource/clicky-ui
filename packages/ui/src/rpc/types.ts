@@ -127,6 +127,10 @@ export interface OperationLookupFilter {
   selected?: Record<string, ClickyNode>;
   multi?: boolean;
   type?: OperationLookupFilterType;
+  /** True when `options` is only the head of a larger set (server-side capped). */
+  truncated?: boolean;
+  /** True distinct count behind a truncated option set; drives "… and N more". */
+  total?: number;
   presets?: Array<{ label: string; from: string; to: string } | TimeRangePresetGroup>;
   timeEnabled?: boolean;
   timeZone?: string;
