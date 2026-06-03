@@ -37,6 +37,36 @@ describe("ProgressBar", () => {
     expect(screen.queryByTitle("0 failed")).toBeNull();
   });
 
+  it("applies a Tailwind color as a class, leaving inline backgroundColor unset", () => {
+    render(
+      <ProgressBar
+        total={100}
+        segments={[
+          { count: 60, color: "bg-emerald-500", label: "used" },
+          { count: 40, color: "bg-gray-200", label: "free" },
+        ]}
+      />,
+    );
+    const seg = screen.getByTitle("60 used") as HTMLElement;
+    expect(seg.className).toContain("bg-emerald-500");
+    expect(seg.style.backgroundColor).toBe("");
+  });
+
+  it("applies a CSS color value as inline backgroundColor, not a class", () => {
+    render(
+      <ProgressBar
+        total={100}
+        segments={[
+          { count: 60, color: "#10b981", label: "used" },
+          { count: 40, color: "var(--chart-2)", label: "free" },
+        ]}
+      />,
+    );
+    const seg = screen.getByTitle("60 used") as HTMLElement;
+    expect(seg.style.backgroundColor).toBe("rgb(16, 185, 129)");
+    expect(seg.className).not.toContain("#10b981");
+  });
+
   it("exposes aria progressbar with aggregated value", () => {
     render(
       <ProgressBar

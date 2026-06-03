@@ -44,17 +44,9 @@ export function processStateColor(status?: string): string {
   return "text-muted-foreground";
 }
 
-export function formatBytes(value?: number): string {
-  if (!value || value <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = value;
-  let unit = 0;
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024;
-    unit++;
-  }
-  return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
-}
+// formatBytes lives in the shared lib/format module; re-exported here so the
+// diagnostics barrel (data.ts) and existing importers keep working unchanged.
+export { formatBytes } from "../../lib/format";
 
 export function processLabel(node: ProcessNode): string {
   if (node.name) return node.name;

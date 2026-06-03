@@ -51,6 +51,12 @@ describe("parseJvmThreadDump", () => {
     expect(main.frames[1].runtime).toBe(false);
   });
 
+  it("splits functionName into class and method", () => {
+    const [main] = parseJvmThreadDump(dump);
+    expect(main.frames[1].class).toBe("com.example.App");
+    expect(main.frames[1].method).toBe("main");
+  });
+
   it("flags native methods and runtime frames", () => {
     const [main, worker] = parseJvmThreadDump(dump);
     expect(main.frames[0].nativeMethod).toBe(true);

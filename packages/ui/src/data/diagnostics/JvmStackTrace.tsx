@@ -1,14 +1,29 @@
 import { Icon } from "../Icon";
 import { UiChip, UiDebugStepOver, UiLock, UiSync, UiMethod, UiWatch } from "../../icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
+import { FrameSourceWindow, frameHasSource } from "./FrameSourceWindow";
+
+// JvmFrameSourceResolver returns a source window for a frame, or undefined when
+// no source is available (a missing class must never blank out the frame). Used
+// to augment the rendered thread dump with decompiled source in place.
+export type JvmFrameSourceResolver = (frame: ParsedThreadFrame) =>
+  | { sourceLines: string[]; sourceLineNumbers?: number[]; sourceStartLine?: number }
+  | undefined;
 
 export type JvmStackTraceProps = {
   frames: ParsedThreadFrame[];
   hideRuntimeOnly?: boolean;
   className?: string;
+  /** Optional resolver that supplies inline source under each frame. */
+  resolveSource?: JvmFrameSourceResolver;
 };
 
-export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: JvmStackTraceProps) {
+export function JvmStackTrace({
+  frames,
+  hideRuntimeOnly = false,
+  className,
+  resolveSource,
+}: JvmStackTraceProps) {
   const visibleFrames = hideRuntimeOnly
     ? frames.filter((frame) => frame.kind !== "frame" || !frame.runtime)
     : frames;
@@ -17,9 +32,13 @@ export function JvmStackTrace({ frames, hideRuntimeOnly = false, className }: Jv
 
   return (
     <div className={className}>
-      {visibleFrames.map((frame, index) => (
-        <JvmStackFrameRow key={`${frame.functionName}-${index}`} frame={frame} />
-      ))}
+      {visibleFrames.map((frame, index) => {
+        const resolved = resolveSource?.(frame);
+        const withSource = resolved ? { ...frame, ...resolved } : frame;
+        return (
+          <JvmStackFrameRow key={`${frame.functionName}-${index}`} frame={withSource} />
+        );
+      })}
     </div>
   );
 }
@@ -62,6 +81,7 @@ export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
           </div>
         </div>
       </div>
+      {!isAnno && frameHasSource(frame) && <FrameSourceWindow frame={frame} />}
     </div>
   );
 }

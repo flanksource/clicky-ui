@@ -45,6 +45,7 @@ const meta = {
   argTypes: {
     placeholder: { control: "text", table: { category: "Appearance" } },
     disabled: { control: "boolean", table: { category: "Behavior" } },
+    required: { control: "boolean", table: { category: "Behavior" } },
     loading: { control: "boolean", table: { category: "Behavior" } },
     value: { control: false, table: { category: "Value" } },
     options: { control: false, table: { category: "Value" } },
@@ -78,4 +79,80 @@ export const Disabled: Story = {
       <Combobox placeholder="Select database" value="PrimaryDB" onChange={() => {}} options={DATABASE_OPTIONS} disabled />
     </div>
   ),
+};
+
+export const Clearable: Story = {
+  render: () => {
+    const [value, setValue] = useState("PrimaryDB");
+    return (
+      <div className="w-64">
+        <Combobox placeholder="Select database" value={value} onChange={setValue} options={DATABASE_OPTIONS} />
+      </div>
+    );
+  },
+};
+
+export const Required: Story = {
+  render: () => {
+    const [value, setValue] = useState("PrimaryDB");
+    return (
+      <div className="w-64">
+        <Combobox placeholder="Select database" value={value} onChange={setValue} options={DATABASE_OPTIONS} required />
+      </div>
+    );
+  },
+};
+
+export const WithInlineLabel: Story = {
+  render: () => {
+    const [value, setValue] = useState("");
+    return (
+      <div className="w-64">
+        <Combobox label="Database" value={value} onChange={setValue} options={DATABASE_OPTIONS} />
+      </div>
+    );
+  },
+};
+
+export const Strict: Story = {
+  render: () => {
+    const [value, setValue] = useState("");
+    return (
+      <div className="w-64 space-y-3">
+        <Combobox
+          label="Database"
+          placeholder="Pick one"
+          value={value}
+          onChange={setValue}
+          options={DATABASE_OPTIONS}
+          allowCustomValue={false}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};
+
+export const Multiple: Story = {
+  render: () => {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <div className="w-64 space-y-3">
+        <Combobox
+          multiple
+          label="Databases"
+          placeholder="Pick databases"
+          value={value}
+          onChange={setValue}
+          options={DATABASE_OPTIONS}
+          allowCustomValue={false}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
 };

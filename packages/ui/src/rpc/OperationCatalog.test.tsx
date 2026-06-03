@@ -232,15 +232,15 @@ describe("OperationCatalog", () => {
 
     // Filters render inside the table's FilterBar once the response mounts.
     expect(await screen.findByLabelText(/kind/i)).toHaveRole("combobox");
-    expect(screen.getByLabelText("Team")).toHaveAttribute("list", "team-lookup-options");
-    expect(screen.getByLabelText("Tags")).toHaveAttribute("list", "tags-lookup-options");
+    expect(screen.getByLabelText("Team")).toHaveRole("combobox");
+    expect(screen.getByLabelText("Tags")).toHaveRole("combobox");
     expect(screen.getByLabelText("Include archived")).toHaveAttribute("type", "checkbox");
     expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
   });
 
-  it("live-filters: a debounced lookup field refires the list", async () => {
+  it("live-filters: selecting a lookup option refires the list", async () => {
     const client = makeClient();
     client.lookupMock.mockResolvedValue(makeLookupResponse());
     renderCatalog(client);
@@ -248,16 +248,16 @@ describe("OperationCatalog", () => {
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(await screen.findByLabelText("Team"), {
-      target: { value: "platform" },
-    });
+    const team = await screen.findByLabelText("Team");
+    fireEvent.focus(team);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Platform" }));
 
     await waitFor(
       () =>
         expect(client.executeMock).toHaveBeenLastCalledWith(
           "/api/v1/widgets",
           "get",
-          { team: "platform" },
+          { team: "team/platform" },
           { Accept: "application/json+clicky" },
         ),
       { timeout: 2_000 },

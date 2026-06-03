@@ -15,6 +15,7 @@ import { Icon } from "../data/Icon";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
+import { Combobox, type ComboboxOption } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
 import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
@@ -797,6 +798,14 @@ function filterInputId(filter: FilterBarFilter) {
   return `filterbar-overflow-${filter.key}`;
 }
 
+function lookupOptionsToCombobox(options: FilterBarLookupOption[]): ComboboxOption[] {
+  return options.map((option) => ({
+    value: option.value,
+    label: option.label ?? option.value,
+    ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+  }));
+}
+
 function valueInputClassName(disabled?: boolean) {
   return cn(
     "h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring",
@@ -823,7 +832,6 @@ function TextFilterValueControl({ filter }: { filter: FilterBarTextFilter }) {
 
 function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter }) {
   const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
-  const listId = `${filter.key}-overflow-lookup-options`;
 
   if (filter.inputType === "date") {
     return (
@@ -833,57 +841,57 @@ function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter })
         className="w-full"
         inputClassName={valueInputClassName(filter.disabled)}
         buttonClassName="right-1"
-        placeholder={filter.placeholder ?? "Filter..."}
+        placeholder={filter.placeholder}
         value={draft}
-        list={listId}
         disabled={filter.disabled}
         onChange={setDraft}
       />
     );
   }
 
-  return (
-    <>
+  if (filter.inputType === "number") {
+    return (
       <input
         id={filterInputId(filter)}
-        type={filter.inputType === "number" ? "number" : "text"}
+        type="number"
         aria-label={filter.label}
         className={valueInputClassName(filter.disabled)}
-        placeholder={filter.placeholder ?? "Filter..."}
+        placeholder={filter.placeholder}
         value={draft}
-        list={listId}
         disabled={filter.disabled}
         onChange={(event) => setDraft(event.target.value)}
       />
-      <datalist id={listId}>
-        {filter.options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            label={option.label ?? option.value}
-            disabled={option.disabled}
-          />
-        ))}
-      </datalist>
-    </>
+    );
+  }
+
+  // The overflow panel renders the filter label as a separate row header, so
+  // the Combobox here omits its own inline label to avoid duplication.
+  return (
+    <Combobox
+      id={filterInputId(filter)}
+      options={lookupOptionsToCombobox(filter.options)}
+      value={filter.value}
+      onChange={filter.onChange}
+      allowCustomValue={false}
+      className="w-full"
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+    />
   );
 }
 
 function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMultiFilter }) {
   return (
-    <MultiSelect
-      options={filter.options.map((option) => ({
-        value: option.value,
-        label: option.label ?? option.value,
-        ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
-        ...(option.title !== undefined ? { title: option.title } : {}),
-      }))}
+    <Combobox
+      multiple
+      id={filterInputId(filter)}
+      options={lookupOptionsToCombobox(filter.options)}
       value={filter.value}
       onChange={filter.onChange}
-      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      allowCustomValue={false}
+      className="w-full"
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
-      triggerClassName="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
-      menuClassName="left-auto right-0"
     />
   );
 }
@@ -1087,58 +1095,66 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
   );
 }
 
+function lookupFieldWidthClass(grow: boolean) {
+  return grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0";
+}
+
 function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; grow: boolean }) {
   const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
-  const listId = `${filter.key}-lookup-options`;
+
+  // Date and number lookups keep their specialized inputs in the label shell;
+  // text lookups use the Combobox with its own inline label.
+  if (filter.inputType === "date" || filter.inputType === "number") {
+    return (
+      <label
+        title={filter.description}
+        className={cn(
+          "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
+          lookupFieldWidthClass(grow),
+          filter.disabled && "opacity-60",
+          filter.className,
+        )}
+      >
+        <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+          {filter.label}
+        </span>
+        {filter.inputType === "date" ? (
+          <DateTimePicker
+            aria-label={filter.label}
+            className="w-full"
+            inputClassName="w-full min-w-0 border-0 bg-transparent px-0 pr-6 text-sm text-foreground shadow-none focus-visible:ring-0"
+            buttonClassName="right-0"
+            placeholder={filter.placeholder}
+            value={draft}
+            disabled={filter.disabled}
+            onChange={setDraft}
+          />
+        ) : (
+          <input
+            type="number"
+            aria-label={filter.label}
+            className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            placeholder={filter.placeholder}
+            value={draft}
+            disabled={filter.disabled}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        )}
+      </label>
+    );
+  }
 
   return (
-    <label
-      title={filter.description}
-      className={cn(
-        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
-        filter.disabled && "opacity-60",
-        filter.className,
-      )}
-    >
-      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-        {filter.label}
-      </span>
-      {filter.inputType === "date" ? (
-        <DateTimePicker
-          aria-label={filter.label}
-          className="w-full"
-          inputClassName="w-full min-w-0 border-0 bg-transparent px-0 pr-6 text-sm text-foreground shadow-none focus-visible:ring-0"
-          buttonClassName="right-0"
-          placeholder={filter.placeholder ?? "Filter…"}
-          value={draft}
-          list={listId}
-          disabled={filter.disabled}
-          onChange={setDraft}
-        />
-      ) : (
-        <input
-          type={filter.inputType === "number" ? "number" : "text"}
-          aria-label={filter.label}
-          className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-          placeholder={filter.placeholder ?? "Filter…"}
-          value={draft}
-          list={listId}
-          disabled={filter.disabled}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-      )}
-      <datalist id={listId}>
-        {filter.options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            label={option.label ?? option.value}
-            disabled={option.disabled}
-          />
-        ))}
-      </datalist>
-    </label>
+    <Combobox
+      label={filter.label}
+      options={lookupOptionsToCombobox(filter.options)}
+      value={filter.value}
+      onChange={filter.onChange}
+      allowCustomValue={false}
+      className={cn(lookupFieldWidthClass(grow), filter.className)}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+    />
   );
 }
 
@@ -1149,45 +1165,18 @@ function LookupMultiFilterField({
   filter: FilterBarLookupMultiFilter;
   grow: boolean;
 }) {
-  const [draft, setDraft] = useDebouncedTextDraft(filter.value.join(", "), (next) =>
-    filter.onChange(parseLookupMultiValue(next)),
-  );
-  const listId = `${filter.key}-lookup-options`;
-
   return (
-    <label
-      title={filter.description}
-      className={cn(
-        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
-        filter.disabled && "opacity-60",
-        filter.className,
-      )}
-    >
-      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-        {filter.label}
-      </span>
-      <input
-        type="text"
-        aria-label={filter.label}
-        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-        placeholder={filter.placeholder ?? "value-1, value-2"}
-        value={draft}
-        list={listId}
-        disabled={filter.disabled}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <datalist id={listId}>
-        {filter.options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            label={option.label ?? option.value}
-            disabled={option.disabled}
-          />
-        ))}
-      </datalist>
-    </label>
+    <Combobox
+      multiple
+      label={filter.label}
+      options={lookupOptionsToCombobox(filter.options)}
+      value={filter.value}
+      onChange={filter.onChange}
+      allowCustomValue={false}
+      className={cn(lookupFieldWidthClass(grow), filter.className)}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+    />
   );
 }
 
@@ -2213,13 +2202,6 @@ function summarizeMultiFilter(
   ].filter(Boolean);
 
   return `${label} ${counts.join(" ")}`;
-}
-
-function parseLookupMultiValue(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function useDebouncedMultiDraft(

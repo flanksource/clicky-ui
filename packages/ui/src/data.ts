@@ -96,6 +96,17 @@ export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
 export { TabButton, type TabButtonProps } from "./data/TabButton";
+export {
+  TimeseriesPanel,
+  resolveSeries,
+  resolveBreakdown,
+  type BreakdownItem,
+  type ResolvedSeries,
+  type TimeseriesPanelProps,
+  type TimeseriesPoint,
+  type TimeseriesResponse,
+  type TimeseriesSeries,
+} from "./data/TimeseriesPanel";
 export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
@@ -151,7 +162,13 @@ export {
   JvmStackTrace,
   JvmStackFrameRow,
   type JvmStackTraceProps,
+  type JvmFrameSourceResolver,
 } from "./data/diagnostics/JvmStackTrace";
+export {
+  FrameSourceWindow,
+  frameHasSource,
+  type FrameSource,
+} from "./data/diagnostics/FrameSourceWindow";
 export {
   StackTrace,
   type StackTraceProps,
