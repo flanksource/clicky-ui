@@ -36,6 +36,8 @@ export type DropdownMenuProps = {
   children?: (closeMenu: () => void) => ReactNode;
   /** Horizontal alignment of the menu relative to the trigger. */
   align?: "left" | "right";
+  /** Notified whenever the menu opens or closes. */
+  onOpenChange?: (open: boolean) => void;
   /** Browser tooltip / accessible label for the default trigger. */
   title?: string;
   /** Classes applied to the wrapper. */
@@ -54,12 +56,19 @@ export function DropdownMenu({
   items,
   children,
   align = "right",
+  onOpenChange,
   title,
   className,
   menuClassName,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  useEffect(() => {
+    onOpenChangeRef.current?.(open);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

@@ -1,9 +1,10 @@
 import { cn } from "../lib/utils";
+import { isTailwindColorClass } from "../lib/color";
 
 export type ProgressSegment = {
   /** Numeric amount represented by this segment. */
   count: number;
-  /** Tailwind/background class applied to this segment. */
+  /** Segment fill: a Tailwind bg class (e.g. "bg-green-500") or a CSS color value. */
   color: string;
   /** Label used in the tooltip. */
   label: string;
@@ -40,11 +41,12 @@ export function ProgressBar({ segments, total, height = "h-2", className }: Prog
       {segments.map((seg, i) => {
         if (seg.count === 0) return null;
         const pct = (seg.count / total) * 100;
+        const asClass = isTailwindColorClass(seg.color);
         return (
           <div
             key={i}
-            className={cn(seg.color, height, "transition-all duration-300")}
-            style={{ width: `${pct}%` }}
+            className={cn(asClass ? seg.color : undefined, height, "transition-all duration-300")}
+            style={{ width: `${pct}%`, ...(asClass ? {} : { backgroundColor: seg.color }) }}
             title={`${seg.count} ${seg.label}`}
           />
         );

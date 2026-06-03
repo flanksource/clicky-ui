@@ -122,6 +122,7 @@ function parseThreadBlock(block: string): ParsedThread | null {
         kind: "frame",
         runtime: isJvmRuntimeFrame(functionName),
         nativeMethod: src === "Native Method",
+        ...splitClassMethod(functionName),
       };
       const srcMatch = srcLineRe.exec(src);
       if (srcMatch?.groups?.file && srcMatch.groups.line) {
@@ -241,6 +242,19 @@ function normalizeJvmState(value: string): string {
 const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];
 function isJvmRuntimeFrame(functionName: string): boolean {
   return runtimePrefixes.some((p) => functionName.startsWith(p));
+}
+
+// splitClassMethod separates a JVM frame's `fully.qualified.Class.method` into
+// its class and method. The method is the last dot segment; everything before
+// is the (possibly inner) class. Returns no fields when the name has no dot, so
+// frames like a bare `<init>` are left without a class rather than guessed.
+function splitClassMethod(functionName: string): { class?: string; method?: string } {
+  const lastDot = functionName.lastIndexOf(".");
+  if (lastDot <= 0) return {};
+  return {
+    class: functionName.slice(0, lastDot),
+    method: functionName.slice(lastDot + 1),
+  };
 }
 
 function sanitizeJvmFunctionName(functionName: string): string {

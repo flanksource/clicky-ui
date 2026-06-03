@@ -1,4 +1,4 @@
-import { JvmStackTrace } from "./JvmStackTrace";
+import { JvmStackTrace, type JvmFrameSourceResolver } from "./JvmStackTrace";
 import type { ParsedThread } from "./jvm-stacktrace";
 
 export function threadStateBadge(state: string): string {
@@ -41,9 +41,10 @@ export type ThreadCardProps = {
   thread: ParsedThread;
   search: string;
   hideRuntimeOnly: boolean;
+  resolveSource?: JvmFrameSourceResolver;
 };
 
-export function ThreadCard({ thread, search, hideRuntimeOnly }: ThreadCardProps) {
+export function ThreadCard({ thread, search, hideRuntimeOnly, resolveSource }: ThreadCardProps) {
   const frames = hideRuntimeOnly
     ? thread.frames.filter((f) => f.kind !== "frame" || !f.runtime)
     : thread.frames;
@@ -77,7 +78,11 @@ export function ThreadCard({ thread, search, hideRuntimeOnly }: ThreadCardProps)
           )}
         </div>
       </summary>
-      <JvmStackTrace frames={frames} className="space-y-0.5 py-1 pl-3" />
+      <JvmStackTrace
+        frames={frames}
+        className="space-y-0.5 py-1 pl-3"
+        {...(resolveSource ? { resolveSource } : {})}
+      />
     </details>
   );
 }

@@ -1,4 +1,11 @@
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
+export {
+  FormatOptionsDropdown,
+  CLICKY_FORMAT_OPTIONS,
+  type FormatOptionsDropdownProps,
+  type FormatOption,
+} from "./components/FormatOptionsDropdown";
 export { DateField, type DateFieldMode, type DateFieldProps } from "./components/DateField";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
@@ -42,7 +49,13 @@ export {
   type MultiSelectProps,
 } from "./components/MultiSelect";
 export { Select, type SelectProps, type SelectOption } from "./components/select";
-export { Combobox, type ComboboxProps, type ComboboxOption } from "./components/Combobox";
+export {
+  Combobox,
+  type ComboboxProps,
+  type ComboboxOption,
+  type ComboboxSingleProps,
+  type ComboboxMultiProps,
+} from "./components/Combobox";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
 export {

@@ -332,7 +332,7 @@ describe("FilterBar", () => {
     expect(screen.queryByText("Status 1")).not.toBeInTheDocument();
   });
 
-  it("renders lookup-backed single and multi filters as freeform fields", () => {
+  it("renders lookup-backed single and multi filters as option-restricted comboboxes", () => {
     const onTeam = vi.fn();
     const onTags = vi.fn();
 
@@ -366,10 +366,17 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "platform" } });
-    expect(onTeam).toHaveBeenCalledWith("platform");
+    // Single lookup: selecting an option commits its value; freeform text is not committed.
+    const team = screen.getByLabelText("Team");
+    fireEvent.focus(team);
+    fireEvent.change(team, { target: { value: "plat" } });
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Platform" }));
+    expect(onTeam).toHaveBeenCalledWith("team/platform");
 
-    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "api, worker" } });
+    // Multi lookup: toggling an option appends it to the existing selection.
+    const tags = screen.getByLabelText("Tags");
+    fireEvent.focus(tags);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Worker" }));
     expect(onTags).toHaveBeenCalledWith(["api", "worker"]);
   });
 

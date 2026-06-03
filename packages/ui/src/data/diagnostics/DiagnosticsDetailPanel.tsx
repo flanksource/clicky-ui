@@ -7,6 +7,7 @@ import { formatBytes, processLabel, processStateColor, processStateIcon } from "
 import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
 import { GoroutineCard, goroutineStateDot } from "./GoroutineCard";
 import { ThreadCard, threadStateDot } from "./ThreadCard";
+import type { JvmFrameSourceResolver } from "./JvmStackTrace";
 
 const STACK_MIN_LINES = 10;
 const STACK_LINE_HEIGHT_REM = 1;
@@ -36,6 +37,12 @@ export type DiagnosticsDetailPanelProps = {
   onCollectStack?: (pid: number) => void | Promise<void>;
   /** Optional run metadata rendered above diagnostics. */
   runMeta?: RunMeta;
+  /**
+   * Optional resolver that supplies inline source under each JVM stack frame,
+   * so the rendered thread dump can be augmented in place (e.g. with decompiled
+   * source). A missing class must resolve to undefined, never throw.
+   */
+  resolveSource?: JvmFrameSourceResolver;
 };
 
 export function DiagnosticsDetailPanel({
@@ -43,6 +50,7 @@ export function DiagnosticsDetailPanel({
   collectBusy,
   onCollectStack,
   runMeta,
+  resolveSource,
 }: DiagnosticsDetailPanelProps) {
   const [search, setSearch] = useState("");
   const [selectedStates, setSelectedStates] = useState<Set<string>>(new Set());
@@ -112,6 +120,7 @@ export function DiagnosticsDetailPanel({
           setHideRuntimeOnly={setHideRuntimeOnly}
           collectBusy={collectBusy ?? false}
           {...(onCollectStack ? { onCollectStack } : {})}
+          {...(resolveSource ? { resolveSource } : {})}
         />
       </PanelSection>
     </div>
@@ -184,6 +193,7 @@ type StackBlockProps = {
   setHideRuntimeOnly: (v: boolean) => void;
   collectBusy?: boolean;
   onCollectStack?: (pid: number) => void | Promise<void>;
+  resolveSource?: JvmFrameSourceResolver;
 };
 
 function stackItemCount(parsed: ParsedStack): number {
@@ -216,6 +226,7 @@ function StackBlock(props: StackBlockProps) {
     setHideRuntimeOnly,
     collectBusy,
     onCollectStack,
+    resolveSource,
   } = props;
   const stack = process.stack_capture;
 
@@ -372,6 +383,7 @@ function StackBlock(props: StackBlockProps) {
                   thread={t}
                   search={search}
                   hideRuntimeOnly={hideRuntimeOnly}
+                  {...(resolveSource ? { resolveSource } : {})}
                 />
               ))}
           {parsed.format === "go" &&
