@@ -55,4 +55,24 @@ describe("SplitButton", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Open menu" })).toBeDisabled();
   });
+
+  it("fuses the two halves into a seamless control", () => {
+    renderSplitButton();
+    const primary = screen.getByRole("button", { name: "Save" });
+    const chevron = screen.getByRole("button", { name: "Open menu" });
+
+    // Primary keeps only its left rounding; chevron keeps only its right rounding.
+    expect(primary.className).toMatch(/rounded-r-none/);
+    expect(chevron.className).toMatch(/rounded-l-none/);
+
+    // The chevron half stretches to the primary half's height instead of
+    // locking to its own fixed icon-button height, so the seam is flush.
+    expect(chevron.className).toMatch(/self-stretch/);
+    expect(chevron.className).toMatch(/h-auto/);
+
+    // A single foreground-tinted divider sits between the halves, so the seam
+    // reads correctly on every variant (light on dark fills, dark on light fills).
+    expect(chevron.className).toMatch(/border-l-current/);
+    expect(primary.className).not.toMatch(/border-r/);
+  });
 });

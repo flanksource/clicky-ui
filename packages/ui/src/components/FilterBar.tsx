@@ -111,6 +111,15 @@ export type FilterBarLookupMultiFilter = {
   options: FilterBarLookupOption[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  /**
+   * Optional async search invoked (debounced) as the user types; the consumer
+   * fetches matching options and feeds them back via `options`. When set, the
+   * typeahead is server-driven (results replace the list); when absent it
+   * filters the static `options` client-side.
+   */
+  onSearch?: (query: string) => void;
+  /** Shows a loading indicator while a search is in flight. */
+  loading?: boolean;
   disabled?: boolean;
   className?: string;
 };
@@ -125,9 +134,24 @@ export type FilterBarMultiFilter = {
   description?: string;
   /** Map of option value to include/exclude state. */
   value: Record<string, FilterBarMultiFilterMode>;
-  /** Available chip options. */
+  /** Available chip options. When `truncated`, this is only the head set. */
   options: MultiSelectOption[];
   onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
+  /**
+   * True when more options exist than are in `options` (the option set was
+   * capped server-side). Renders an "… and N more" hint and, with `onSearch`,
+   * lets the user search the full set.
+   */
+  truncated?: boolean;
+  /** True distinct count behind a truncated option set; drives the "N more" label. */
+  total?: number;
+  /**
+   * Optional async fetch invoked (debounced) as the user types in the option
+   * search box. Returns the options matching the query, which are merged into
+   * the displayed list so values beyond the head become selectable. When
+   * absent, the search box filters the static `options` client-side only.
+   */
+  onSearch?: (query: string) => Promise<MultiSelectOption[]> | void;
   disabled?: boolean;
   className?: string;
 };
@@ -1175,6 +1199,8 @@ function LookupMultiFilterField({
       allowCustomValue={false}
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.onSearch !== undefined ? { onSearch: filter.onSearch } : {})}
+      {...(filter.loading !== undefined ? { loading: filter.loading } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
   );
@@ -1432,19 +1458,62 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
+  // Options fetched via onSearch for the current query. While a query is active
+  // these replace the head (plus already-toggled head items); empty otherwise.
+  const [searchOptions, setSearchOptions] = useState<MultiSelectOption[]>([]);
   const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
+  // Debounced server-side search. Runs only when onSearch is provided; clears
+  // results for an empty query so the view reverts to the head set.
+  const onSearch = filter.onSearch;
+  useEffect(() => {
+    if (!onSearch) return;
+    const query = optionQuery.trim();
+    if (!query) {
+      setSearchOptions([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      Promise.resolve(onSearch(query))
+        .then((opts) => {
+          if (!cancelled && Array.isArray(opts)) setSearchOptions(opts);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchOptions([]);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [onSearch, optionQuery]);
+
   const summary = summarizeMultiFilter(filter.label, draft);
-  const showOptionFilter = filter.options.length > 7;
+  // Truncated or async-searchable filters always expose the search box; small
+  // static lists only get it past a threshold (matching the original behaviour).
+  const showOptionFilter = filter.truncated || Boolean(onSearch) || filter.options.length > 7;
   const visibleOptions = useMemo(() => {
-    const query = optionQuery.trim().toLowerCase();
+    const query = optionQuery.trim();
+    // No query → the head set, as supplied.
     if (!query) return filter.options;
+    // Server search active → the matches REPLACE the head, but any head option
+    // the user has already toggled (include/exclude) stays pinned so their
+    // selection remains visible and changeable. Selected first, then matches.
+    if (onSearch) {
+      const selectedHead = filter.options.filter((o) => draft[o.value] !== undefined);
+      return mergeMultiSelectOptions(selectedHead, searchOptions);
+    }
+    // No server search (static/AsCode list) → client-side substring filter.
+    const lowered = query.toLowerCase();
     return filter.options.filter((option) =>
-      multiSelectOptionText(option).toLowerCase().includes(query),
+      multiSelectOptionText(option).toLowerCase().includes(lowered),
     );
-  }, [filter.options, optionQuery]);
+  }, [filter.options, searchOptions, optionQuery, onSearch, draft]);
+  const moreCount =
+    filter.truncated && filter.total ? Math.max(filter.total - filter.options.length, 0) : 0;
 
   return (
     <div
@@ -1546,10 +1615,35 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
               <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
             )}
           </div>
+
+          {moreCount > 0 && !optionQuery.trim() && (
+            <div className="mt-2 px-1.5 text-[11px] text-muted-foreground">
+              … and {moreCount.toLocaleString()} more
+              {onSearch ? " — type to search all" : ""}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+// mergeMultiSelectOptions concatenates two option lists, deduping by value with
+// the first list (the head) taking precedence on ordering and label.
+function mergeMultiSelectOptions(
+  head: MultiSelectOption[],
+  extra: MultiSelectOption[],
+): MultiSelectOption[] {
+  if (extra.length === 0) return head;
+  const seen = new Set(head.map((o) => o.value));
+  const merged = [...head];
+  for (const option of extra) {
+    if (!seen.has(option.value)) {
+      seen.add(option.value);
+      merged.push(option);
+    }
+  }
+  return merged;
 }
 
 function MultiFilterPanel({

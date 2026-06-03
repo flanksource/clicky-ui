@@ -216,3 +216,62 @@ describe("Combobox inline label", () => {
     expect(screen.getByRole("combobox", { name: "Database" })).toBeInTheDocument();
   });
 });
+
+describe("Combobox onSearch (server-side)", () => {
+  it("debounces onSearch and fires once with the typed query", () => {
+    vi.useFakeTimers();
+    const onSearch = vi.fn();
+    render(<Combobox value="" onChange={vi.fn()} options={[]} onSearch={onSearch} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "smi" } });
+    fireEvent.change(input, { target: { value: "smith" } });
+
+    // Before the debounce window elapses, no call.
+    vi.advanceTimersByTime(200);
+    expect(onSearch).not.toHaveBeenCalledWith("smith");
+
+    vi.advanceTimersByTime(100);
+    expect(onSearch).toHaveBeenLastCalledWith("smith");
+    vi.useRealTimers();
+  });
+
+  it("renders provided options as-is without client-side filtering when onSearch is set", () => {
+    // The server already filtered; even a typed query must not narrow the list.
+    render(
+      <Combobox
+        value=""
+        onChange={vi.fn()}
+        options={[{ value: "Smithson", label: "Smithson" }]}
+        onSearch={vi.fn()}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "zzz" } });
+    // "zzz" matches nothing client-side, but the server-provided option stays.
+    expect(screen.getByRole("option")).toHaveTextContent("Smithson");
+  });
+
+  it("keeps an already-selected value visible when it is absent from the search results", () => {
+    // "Jones" was selected earlier; the current results (Smithson) don't include
+    // it, but it must still render so the user can unselect it.
+    render(
+      <Combobox
+        multiple
+        value={["Jones"]}
+        onChange={vi.fn()}
+        options={[{ value: "Smithson", label: "Smithson" }]}
+        onSearch={vi.fn()}
+        allowCustomValue={false}
+      />,
+    );
+    fireEvent.focus(screen.getByRole("combobox"));
+    const options = screen.getAllByRole("option");
+    const labels = options.map((o) => o.textContent);
+    expect(labels).toContain("Jones");
+    expect(labels).toContain("Smithson");
+    // The pinned selection is marked selected.
+    expect(screen.getByRole("option", { name: /Jones/ })).toHaveAttribute("aria-selected", "true");
+  });
+});

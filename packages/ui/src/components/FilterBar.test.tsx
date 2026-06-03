@@ -713,4 +713,144 @@ describe("FilterBar", () => {
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
   });
+
+  it("renders an 'and N more' hint for a truncated multi filter", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "plan",
+            kind: "multi",
+            label: "Plan",
+            value: {},
+            options: Array.from({ length: 3 }, (_, i) => ({
+              value: `plan-${i}`,
+              label: `Plan ${i}`,
+            })),
+            truncated: true,
+            total: 250,
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    // 250 total - 3 head = 247 more.
+    expect(screen.getByText(/and 247 more/i)).toBeInTheDocument();
+    // The search box is forced visible for a truncated filter even with <8 options.
+    expect(screen.getByLabelText("Filter Plan options")).toBeInTheDocument();
+  });
+
+  it("replaces the head with onSearch matches and hides non-selected head items", async () => {
+    vi.useFakeTimers();
+    // onSearch returns a value (plan-0225) that is NOT in the head set.
+    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "plan",
+            kind: "multi",
+            label: "Plan",
+            value: {},
+            options: [{ value: "plan-0000", label: "Plan 0000" }],
+            truncated: true,
+            total: 250,
+            onSearch,
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
+      target: { value: "plan-0225" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(onSearch).toHaveBeenCalledWith("plan-0225");
+    expect(screen.getByText("Plan 0225")).toBeInTheDocument();
+    // The unselected head item is replaced by the matches while searching.
+    expect(screen.queryByText("Plan 0000")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("keeps an already-toggled head item visible during an onSearch query", async () => {
+    vi.useFakeTimers();
+    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "plan",
+            kind: "multi",
+            label: "Plan",
+            // plan-0000 is already included; plan-0001 is untouched.
+            value: { "plan-0000": "include" },
+            options: [
+              { value: "plan-0000", label: "Plan 0000" },
+              { value: "plan-0001", label: "Plan 0001" },
+            ],
+            truncated: true,
+            total: 250,
+            onSearch,
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
+      target: { value: "plan-0225" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    // The match shows; the already-included head item stays; the untouched head
+    // item is hidden.
+    expect(screen.getByText("Plan 0225")).toBeInTheDocument();
+    expect(screen.getByText("Plan 0000")).toBeInTheDocument();
+    expect(screen.queryByText("Plan 0001")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("does not call onSearch for an empty query and filters the head client-side", () => {
+    const onSearch = vi.fn();
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "plan",
+            kind: "multi",
+            label: "Plan",
+            value: {},
+            options: Array.from({ length: 8 }, (_, i) => ({
+              value: `plan-${i}`,
+              label: `Plan ${i}`,
+            })),
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
+      target: { value: "Plan 7" },
+    });
+
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.getByText("Plan 7")).toBeInTheDocument();
+    expect(screen.queryByText("Plan 1")).not.toBeInTheDocument();
+  });
 });
