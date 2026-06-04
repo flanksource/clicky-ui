@@ -113,6 +113,13 @@ export {
   type TimeseriesGaugeProps,
 } from "./data/TimeseriesGauge";
 export {
+  TimeseriesCoreBars,
+  deriveCoreBars,
+  type TimeseriesCoreBarsProps,
+  type CoreBar,
+  type CoreBarsModel,
+} from "./data/TimeseriesCoreBars";
+export {
   StatusRows,
   StackedStatusBar,
   segment,

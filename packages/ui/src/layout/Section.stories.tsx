@@ -24,6 +24,7 @@ const meta: Meta<typeof Section> = {
       control: "inline-radio",
       options: ["default", "danger", "warning", "success", "info"],
     },
+    collapsible: { control: "boolean" },
     icon: { table: { disable: true } },
     children: { table: { disable: true } },
     onToggle: { table: { disable: true } },
@@ -32,7 +33,7 @@ const meta: Meta<typeof Section> = {
     docs: {
       description: {
         component:
-          "Collapsible layout section for dense detail screens. It supports controlled or uncontrolled open state, summaries, icons, semantic tone accents, and custom header/body classes.",
+          "Collapsible layout section for dense detail screens. It supports controlled or uncontrolled open state, summaries, icons, semantic tone accents, and custom header/body classes. Only the chevron + title toggle — the summary is a sibling of the toggle, so a summary containing its own interactive content (filters, links) is valid DOM and its clicks do not collapse the section. Pass `collapsible={false}` for a fixed panel that always shows its body.",
       },
     },
   },
@@ -66,5 +67,36 @@ export const DangerTone: Story = {
     defaultOpen: true,
     icon: UiError,
     children: <div className="text-sm">Stack traces here.</div>,
+  },
+};
+
+// The summary can hold its own interactive controls — they are a sibling of the
+// toggle, so clicking them does not collapse the section (and is valid DOM).
+export const InteractiveSummary: Story = {
+  args: {
+    title: "Activities",
+    defaultOpen: true,
+    summary: (
+      <span className="inline-flex gap-density-1">
+        {["All", "OK", "Failed"].map((label) => (
+          <button
+            key={label}
+            type="button"
+            className="rounded border border-border px-density-2 py-px text-xs hover:bg-accent/50"
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+    ),
+  },
+};
+
+// A non-collapsible section: no chevron, no toggle, the body is always shown.
+export const NonCollapsible: Story = {
+  args: {
+    title: "Fixed Panel",
+    collapsible: false,
+    summary: "always open",
   },
 };

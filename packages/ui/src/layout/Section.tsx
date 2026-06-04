@@ -6,8 +6,20 @@ import { UiChevronDown, UiChevronRight } from "../icons";
 export type SectionProps = {
   /** Header title. */
   title: ReactNode;
-  /** Optional right-aligned header summary. */
+  /**
+   * Optional right-aligned header summary. The summary is a sibling of the
+   * collapse toggle, never a descendant of it — so a summary containing
+   * interactive content (filter tabs, links) is valid DOM and its clicks do
+   * not toggle the section. When a summary is present, only the chevron + the
+   * title toggle; the summary region does not.
+   */
   summary?: ReactNode;
+  /**
+   * Whether the section can collapse. Defaults to true. When false the body is
+   * always rendered, the header has no chevron and is not clickable — use for a
+   * fixed panel that should never hide its content.
+   */
+  collapsible?: boolean;
   /** Initial open state for uncontrolled usage. */
   defaultOpen?: boolean;
   /** Controlled open state. */
@@ -39,6 +51,7 @@ const toneRing: Record<NonNullable<SectionProps["tone"]>, string> = {
 export function Section({
   title,
   summary,
+  collapsible = true,
   defaultOpen = false,
   open: openProp,
   onToggle,
@@ -51,7 +64,8 @@ export function Section({
 }: SectionProps) {
   const isControlled = openProp !== undefined;
   const [innerOpen, setInnerOpen] = useState(defaultOpen);
-  const open = isControlled ? openProp : innerOpen;
+  // A non-collapsible section is permanently open — there is no toggle to track.
+  const open = !collapsible || (isControlled ? openProp : innerOpen);
 
   function toggle() {
     const next = !open;
@@ -59,28 +73,46 @@ export function Section({
     onToggle?.(next);
   }
 
-  return (
-    <div className={cn("rounded-md border border-border bg-background", toneRing[tone], className)}>
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        className={cn(
-          "w-full flex items-center gap-2 px-density-3 py-density-2 text-left",
-          "hover:bg-accent/50 transition-colors",
-          headerClassName,
-        )}
-      >
+  const leading = (
+    <>
+      {collapsible && (
         <Icon
           icon={open ? UiChevronDown : UiChevronRight}
           className="text-muted-foreground text-xs"
         />
-        {icon && (
-          <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
+      )}
+      {icon && (
+        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
+      )}
+      <span className="font-medium text-sm flex-1 truncate">{title}</span>
+    </>
+  );
+
+  return (
+    <div className={cn("rounded-md border border-border bg-background", toneRing[tone], className)}>
+      {/* The header is always a plain row so the summary (which may hold its own
+          interactive content) is never nested inside the toggle button. Only the
+          chevron + title region toggles; the summary is a sibling of it. */}
+      <div
+        className={cn(
+          "w-full flex items-center gap-2 px-density-3 py-density-2 text-left",
+          headerClassName,
         )}
-        <span className="font-medium text-sm flex-1 truncate">{title}</span>
-        {summary && <span className="text-xs text-muted-foreground">{summary}</span>}
-      </button>
+      >
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={open}
+            className="flex flex-1 min-w-0 items-center gap-2 text-left rounded-sm hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {leading}
+          </button>
+        ) : (
+          <div className="flex flex-1 min-w-0 items-center gap-2">{leading}</div>
+        )}
+        {summary && <span className="text-xs text-muted-foreground shrink-0">{summary}</span>}
+      </div>
       {open && (
         <div className={cn("px-density-3 py-density-2 border-t border-border", bodyClassName)}>
           {children}
