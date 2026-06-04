@@ -107,6 +107,18 @@ export {
   type TimeseriesResponse,
   type TimeseriesSeries,
 } from "./data/TimeseriesPanel";
+export {
+  TimeseriesGauge,
+  type GaugeSeries,
+  type TimeseriesGaugeProps,
+} from "./data/TimeseriesGauge";
+export {
+  StatusRows,
+  StackedStatusBar,
+  segment,
+  type StatusSegment,
+  type StatusRenderLink,
+} from "./data/StatusBreakdown";
 export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
