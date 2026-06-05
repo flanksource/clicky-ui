@@ -16,10 +16,17 @@ export type MatrixTableProps = {
   density?: "default" | "compact";
   columnWidth?: number;
   headerHeight?: number;
+  // maxHeight caps the scroll viewport so the body scrolls under frozen
+  // headers (Excel-style freeze panes). Accepts any CSS length; number => px.
+  maxHeight?: number | string;
   className?: string;
   columnClassName?: string;
   rowLabelClassName?: string;
   cellClassName?: string;
+  // headerClassName is appended to the header row and every header cell (corner
+  // + columns). Use it to override the default gray header background, e.g.
+  // "bg-transparent", since tailwind-merge lets the later class win.
+  headerClassName?: string;
 };
 
 export function MatrixTable({
@@ -31,10 +38,12 @@ export function MatrixTable({
   density = "default",
   columnWidth = 48,
   headerHeight = 120,
+  maxHeight,
   className,
   columnClassName,
   rowLabelClassName,
   cellClassName,
+  headerClassName,
 }: MatrixTableProps) {
   if (rows.length === 0 || columns.length === 0) {
     return <div className="text-sm text-muted-foreground">{emptyMessage}</div>;
@@ -50,7 +59,10 @@ export function MatrixTable({
   return (
     <div
       className={cn("overflow-auto rounded-md border border-border", className)}
-      style={angledHeaders ? { paddingRight: diagonalOverhang } : undefined}
+      style={{
+        ...(angledHeaders ? { paddingRight: diagonalOverhang } : undefined),
+        ...(maxHeight !== undefined ? { maxHeight } : undefined),
+      }}
     >
       <table className={cn("w-max border-collapse", compact ? "text-xs" : "text-sm")}>
         {angledHeaders && (
@@ -62,13 +74,14 @@ export function MatrixTable({
           </colgroup>
         )}
         <thead>
-          <tr className={cn("bg-muted/40", !angledHeaders && "border-b border-border")}>
+          <tr className={cn("bg-muted/40", !angledHeaders && "border-b border-border", headerClassName)}>
             <th
               scope="col"
               className={cn(
-                "sticky left-0 z-10 min-w-44 border-r border-border bg-muted/40 text-left font-medium",
+                "sticky left-0 top-0 z-30 min-w-44 border-r border-border bg-muted text-left font-medium",
                 headerCellPadding,
-                angledHeaders ? "align-bottom" : columnClassName,
+                angledHeaders ? "align-bottom" : cn("border-b border-border", columnClassName),
+                headerClassName,
               )}
             >
               {corner}
@@ -80,8 +93,9 @@ export function MatrixTable({
                   scope="col"
                   title={columnTitle(column)}
                   className={cn(
-                    "relative overflow-visible border-b border-border p-0 align-bottom",
+                    "sticky top-0 z-20 overflow-visible border-b border-border bg-muted p-0 align-bottom",
                     columnClassName,
+                    headerClassName,
                   )}
                   style={{
                     width: columnWidth,
@@ -127,9 +141,10 @@ export function MatrixTable({
                   key={index}
                   scope="col"
                   className={cn(
-                    "min-w-24 whitespace-nowrap text-center text-xs font-medium text-muted-foreground",
+                    "sticky top-0 z-20 min-w-24 whitespace-nowrap border-b border-border bg-muted text-center text-xs font-medium text-muted-foreground",
                     headerCellPadding,
                     columnClassName,
+                    headerClassName,
                   )}
                 >
                   {column}
