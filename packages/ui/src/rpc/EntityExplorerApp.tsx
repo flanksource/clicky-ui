@@ -330,7 +330,8 @@ function UnknownSurface({ surfaceKey }: { surfaceKey: string }) {
   );
 }
 
-const AUTORUN_QUERY_PARAM = "__autoRun";
+const AUTORUN_QUERY_PARAM = "autoRun";
+const LEGACY_AUTORUN_QUERY_PARAM = "__autoRun";
 const ARG_QUERY_PREFIX = "__arg";
 
 function buildCommandHref(basePath: string, resolved: ClickyResolvedCommand): string | undefined {
@@ -441,7 +442,7 @@ function readCommandQueryParams(): { initialValues: Record<string, string>; auto
   const positional: string[] = [];
 
   for (const [key, value] of search.entries()) {
-    if (key === AUTORUN_QUERY_PARAM) {
+    if (key === AUTORUN_QUERY_PARAM || key === LEGACY_AUTORUN_QUERY_PARAM) {
       autoRun = value === "1" || value === "true";
       continue;
     }
