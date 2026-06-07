@@ -187,7 +187,7 @@ export function formatTimestamp(
 ): string {
   switch (format) {
     case "relative":
-      return formatRelative(date, now);
+      return formatRelativeTime(date, now);
     case "time":
       return date.toLocaleTimeString(undefined, {
         hour: "2-digit",
@@ -216,7 +216,8 @@ function formatIso(date: Date): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-function formatRelative(date: Date, now: Date): string {
+// formatRelativeTime renders a compact "30s ago" / "in 5m" / "just now" string.
+export function formatRelativeTime(date: Date, now: Date = new Date()): string {
   const diffMs = now.getTime() - date.getTime();
   const future = diffMs < 0;
   const abs = Math.abs(diffMs);
@@ -231,6 +232,26 @@ function formatRelative(date: Date, now: Date): string {
 
   if (value === "just now") return value;
   return future ? `in ${value}` : `${value} ago`;
+}
+
+// formatDateTimeRelative renders a value as an absolute locale date+time plus a
+// parenthesised relative hint, e.g. "Apr 15, 2026, 12:00 PM (2h ago)". It is the
+// shared "locale + relative" presentation used for date-typed values across the
+// form, filter, and combobox surfaces. Unparseable strings pass through
+// unchanged (so a template token or freeform value is preserved); nullish input
+// yields an empty string. The hint is dropped when the value reads "just now".
+export function formatDateTimeRelative(value: unknown, now: Date = new Date()): string {
+  const parsed = parseTimestamp(value);
+  if (!parsed) return typeof value === "string" ? value : "";
+  const absolute = parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const relative = formatRelativeTime(parsed, now);
+  return relative === "just now" ? absolute : `${absolute} (${relative})`;
 }
 
 export function modeToFormat(mode: TimestampMode, dataFormat: TimestampFormat): TimestampFormat {

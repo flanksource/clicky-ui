@@ -26,12 +26,16 @@ export function ArrayControl({
   fieldId: string;
   ctx: RenderContext;
 }) {
+  // A read-only array marks its whole subtree non-editable: no add/remove/reorder
+  // and item inputs disabled (a child the schema marks readOnly still renders as
+  // a value span).
+  const readOnly = ctx.readOnly || field.readOnly === true;
   if (isScalarStringItems(field.itemSchema)) {
-    return <TagArray field={field} fieldId={fieldId} readOnly={ctx.readOnly} />;
+    return <TagArray field={field} fieldId={fieldId} readOnly={readOnly} />;
   }
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "string" };
-  const childCtx: RenderContext = { ...ctx, depth: ctx.depth + 1 };
+  const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 
   return (
     <div className="space-y-2 rounded-md border border-input p-2">
@@ -50,7 +54,7 @@ export function ArrayControl({
               { labelOverride: `Item ${i + 1}` },
             )}
           </div>
-          {!ctx.readOnly && (
+          {!readOnly && (
             <ItemControls
               onUp={i > 0 ? () => field.onChange(moveItem(items, i, i - 1)) : undefined}
               onDown={i < items.length - 1 ? () => field.onChange(moveItem(items, i, i + 1)) : undefined}
@@ -60,7 +64,7 @@ export function ArrayControl({
           )}
         </div>
       ))}
-      {!ctx.readOnly && (
+      {!readOnly && (
         <Button
           type="button"
           variant="outline"

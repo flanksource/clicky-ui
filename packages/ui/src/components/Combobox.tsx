@@ -1,12 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
+import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiClose, UiCheck } from "../icons";
 
 export type ComboboxOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /** Leading glyph for the option: a runtime icon name or a rendered node. */
+  icon?: LabelIconSpec;
 };
 
 type ComboboxBaseProps = {
@@ -84,9 +95,13 @@ export function Combobox(props: ComboboxProps) {
   );
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // Fixed-position coordinates for the portaled listbox, measured from the
+  // input row. Null until first measured so we never render at (0,0).
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
   // `query` is the type-ahead filter text, kept separate from the committed
   // value. It is empty unless the user is actively typing, so opening the
   // dropdown shows every option rather than only the selected one.
@@ -144,13 +159,39 @@ export function Combobox(props: ComboboxProps) {
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // The listbox is portaled out of rootRef, so a click inside it would
+      // otherwise read as "outside" and close the menu before selection.
+      if (!rootRef.current?.contains(target) && !listRef.current?.contains(target)) {
         commitAndClose();
       }
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   });
+
+  // Position the portaled listbox with fixed coordinates measured from the
+  // input row, so it escapes any overflow-hidden / scroll ancestor (e.g. a
+  // Modal body) that would otherwise clip it. Mirrors HoverCard's approach.
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const update = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
 
   function emit(next: string[]) {
     if (multiple) {
@@ -253,7 +294,7 @@ export function Combobox(props: ComboboxProps) {
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      <div className="relative flex items-center">
+      <div ref={anchorRef} className="relative flex items-center">
         {label != null && (
           <span className="pointer-events-none absolute left-2 z-10 whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground text-[10px]">
             {label}
@@ -324,13 +365,15 @@ export function Combobox(props: ComboboxProps) {
           </button>
         )}
       </div>
-      {open && (
+      {open && menuPos && typeof document !== "undefined" &&
+        createPortal(
         <div
           id={listId}
           ref={listRef}
           role="listbox"
           aria-multiselectable={multiple || undefined}
-          className="absolute left-0 top-[calc(100%+0.25rem)] z-50 w-full min-w-[10rem] max-h-64 overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+          className="z-[9999] min-w-[10rem] max-h-64 overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
         >
           {loading && filtered.length === 0 && (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">Loading…</div>
@@ -363,12 +406,14 @@ export function Combobox(props: ComboboxProps) {
                   icon={UiCheck}
                   className={cn("text-xs shrink-0", selected ? "opacity-100" : "opacity-0")}
                 />
+                <LabelIcon icon={opt.icon} className="text-sm text-muted-foreground" />
                 <span className="min-w-0 truncate">{opt.label}</span>
               </div>
             );
           })}
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -11,7 +11,8 @@ import {
   type RefObject,
 } from "react";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
-import { Icon } from "../data/Icon";
+import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
+import { formatDateTimeRelative } from "../data/cells/Timestamp";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
@@ -19,7 +20,6 @@ import { Combobox, type ComboboxOption } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
 import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
-import { Select } from "./select";
 import { TimeRange, type TimeRangePresetGroup } from "./TimeRange";
 
 const FILTER_INPUT_DEBOUNCE_MS = 500;
@@ -54,6 +54,8 @@ export type FilterBarTextFilter = {
   kind: "text";
   /** Filter label shown on the control. */
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   /** Optional helper text shown in filter popovers. */
   description?: string;
   /** Controlled input value. */
@@ -86,6 +88,8 @@ export type FilterBarLookupFilter = {
   /** Renders an input backed by a datalist-style option set. */
   kind: "lookup";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled selected or typed value. */
   value: string;
@@ -104,6 +108,8 @@ export type FilterBarLookupMultiFilter = {
   /** Renders a multi-value lookup filter. */
   kind: "lookup-multi";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled selected values. */
   value: string[];
@@ -131,6 +137,8 @@ export type FilterBarMultiFilter = {
   /** Renders include/exclude chips for each option. */
   kind: "multi";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Map of option value to include/exclude state. */
   value: Record<string, FilterBarMultiFilterMode>;
@@ -170,6 +178,8 @@ export type FilterBarNestedMultiFilter = {
   /** Renders grouped include/exclude chips. */
   kind: "nested-multi";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   // Same wire shape as FilterBarMultiFilter so consumers can swap kinds
   // without changing their state slot.
@@ -185,6 +195,8 @@ export type FilterBarSelectMultiFilter = {
   /** Renders a compact multi-select dropdown. */
   kind: "select-multi";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled selected values. */
   value: string[];
@@ -208,6 +220,8 @@ export type FilterBarNumberFilter = {
   /** Renders paired min/max numeric controls. */
   kind: "number";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled min/max value. */
   value: FilterBarNumberValue;
@@ -231,6 +245,8 @@ export type FilterBarEnumFilter = {
   /** Renders a single-select dropdown. */
   kind: "enum";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled selected value. */
   value: string;
@@ -247,6 +263,8 @@ export type FilterBarBooleanFilter = {
   /** Renders a boolean toggle. */
   kind: "boolean";
   label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
   description?: string;
   /** Controlled checked state. */
   value: boolean;
@@ -735,10 +753,11 @@ function OverflowFiltersMenu({
                 >
                   <label
                     htmlFor={filterInputId(filter)}
-                    className="min-w-0 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                    className="flex min-w-0 items-center gap-1 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
                     title={filter.description ?? filter.label}
                   >
-                    {filter.label}
+                    <LabelIcon icon={filter.icon} className="text-[12px] normal-case" />
+                    <span className="truncate">{filter.label}</span>
                   </label>
                   <span className="text-sm text-muted-foreground">=</span>
                   <div className="min-w-0 overflow-visible">
@@ -920,20 +939,26 @@ function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMult
   );
 }
 
+function enumOptionsToCombobox(
+  options: FilterBarEnumFilter["options"],
+): ComboboxOption[] {
+  return options.map((option) => ({
+    value: option.value,
+    label: option.label ?? option.value,
+  }));
+}
+
 function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
   return (
-    <Select
+    <Combobox
       id={filterInputId(filter)}
-      aria-label={filter.label}
-      className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
+      options={enumOptionsToCombobox(filter.options)}
       value={filter.value}
+      onChange={filter.onChange}
+      allowCustomValue={false}
       placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
-      disabled={filter.disabled}
-      onChange={(event) => filter.onChange(event.target.value)}
-      options={filter.options.map((option) => ({
-        value: option.value,
-        label: option.label ?? option.value,
-      }))}
+      className="w-full"
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
   );
 }
@@ -1006,31 +1031,16 @@ export function FilterBarRangePanel({
 
 function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
   return (
-    <label
-      title={filter.description}
-      className={cn(
-        "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-1 text-xs",
-        grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0",
-        filter.disabled && "opacity-60",
-        filter.className,
-      )}
-    >
-      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-        {filter.label}
-      </span>
-      <Select
-        aria-label={filter.label}
-        className="h-6 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
-        value={filter.value}
-        placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
-        disabled={filter.disabled}
-        onChange={(event) => filter.onChange(event.target.value)}
-        options={filter.options.map((option) => ({
-          value: option.value,
-          label: option.label ?? option.value,
-        }))}
-      />
-    </label>
+    <Combobox
+      label={filter.label}
+      options={enumOptionsToCombobox(filter.options)}
+      value={filter.value}
+      onChange={filter.onChange}
+      allowCustomValue={false}
+      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      className={cn(lookupFieldWidthClass(grow), filter.className)}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+    />
   );
 }
 
@@ -1052,9 +1062,7 @@ function BooleanFilterField({ filter }: { filter: FilterBarBooleanFilter }) {
         disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.checked)}
       />
-      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-        {filter.label}
-      </span>
+      <FilterFieldLabel icon={filter.icon} label={filter.label} />
     </label>
   );
 }
@@ -1103,9 +1111,7 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
         filter.className,
       )}
     >
-      <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-        {filter.label}
-      </span>
+      <FilterFieldLabel icon={filter.icon} label={filter.label} />
       <input
         type="text"
         aria-label={filter.label}
@@ -1119,6 +1125,17 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
   );
 }
 
+// FilterFieldLabel is the uppercase label shown inside inline filter shells,
+// with an optional leading glyph from the filter's `icon`.
+function FilterFieldLabel({ icon, label }: { icon?: LabelIconSpec; label: string }) {
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
+      <LabelIcon icon={icon} className="text-[13px] normal-case" />
+      {label}
+    </span>
+  );
+}
+
 function lookupFieldWidthClass(grow: boolean) {
   return grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0";
 }
@@ -1129,9 +1146,13 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
   // Date and number lookups keep their specialized inputs in the label shell;
   // text lookups use the Combobox with its own inline label.
   if (filter.inputType === "date" || filter.inputType === "number") {
+    // For a date lookup with a value, surface the human-readable absolute +
+    // relative form (e.g. "Apr 15, 2026, 12:00 PM (2h ago)") as the hover title.
+    const dateTitle =
+      filter.inputType === "date" && draft ? formatDateTimeRelative(draft) : undefined;
     return (
       <label
-        title={filter.description}
+        title={dateTitle ?? filter.description}
         className={cn(
           "flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 pl-2 pr-2 text-xs",
           lookupFieldWidthClass(grow),
@@ -1139,9 +1160,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
           filter.className,
         )}
       >
-        <span className="whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground">
-          {filter.label}
-        </span>
+        <FilterFieldLabel icon={filter.icon} label={filter.label} />
         {filter.inputType === "date" ? (
           <DateTimePicker
             aria-label={filter.label}
@@ -1248,6 +1267,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
           summary === filter.label && "text-muted-foreground",
         )}
       >
+        <LabelIcon icon={filter.icon} className="text-[14px] text-muted-foreground" />
         <span className="truncate">{summary}</span>
         <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
       </Button>
@@ -1542,6 +1562,7 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
           summary === filter.label && "text-muted-foreground",
         )}
       >
+        <LabelIcon icon={filter.icon} className="text-[14px] text-muted-foreground" />
         <span className="truncate">{summary}</span>
         <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
       </Button>

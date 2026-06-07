@@ -13,14 +13,18 @@ export function JsonSchemaForm({
   onChange,
   readOnly = false,
   inline = false,
+  hideReadOnlyFields = false,
   hiddenKeys,
+  requiredFirst = false,
   title,
   pre,
   post,
 }: JsonSchemaFormProps) {
   const ctx: RenderContext = {
     readOnly,
+    hideReadOnlyFields,
     inline,
+    requiredFirst,
     pre: pre ?? [],
     post: post ?? [],
     depth: 0,

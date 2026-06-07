@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chooseTimestampFormat,
+  formatDateTimeRelative,
   formatTimestamp,
   parseTimestamp,
   resolveDateMath,
@@ -124,5 +125,36 @@ describe("formatTimestamp", () => {
 
   it("renders iso as YYYY-MM-DD HH:mm in local time", () => {
     expect(formatTimestamp(t, "iso")).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+});
+
+describe("formatDateTimeRelative", () => {
+  const t = new Date("2026-04-15T12:00:00Z");
+
+  it("appends a relative hint after the absolute date for parseable input", () => {
+    const now = new Date(t.getTime() + 2 * HOUR);
+    const result = formatDateTimeRelative(t, now);
+    expect(result).toMatch(/\(2h ago\)$/);
+    expect(result).toMatch(/2026/);
+  });
+
+  it("parses ISO strings and epoch numbers like parseTimestamp", () => {
+    const now = new Date(t.getTime() + 30 * SECOND);
+    expect(formatDateTimeRelative("2026-04-15T12:00:00Z", now)).toMatch(/\(30s ago\)$/);
+    expect(formatDateTimeRelative(t.getTime(), now)).toMatch(/\(30s ago\)$/);
+  });
+
+  it("omits the relative hint when the value is 'just now'", () => {
+    const result = formatDateTimeRelative(t, t);
+    expect(result).not.toContain("(");
+  });
+
+  it("returns the raw string unchanged when it is not a date", () => {
+    expect(formatDateTimeRelative("not-a-date")).toBe("not-a-date");
+  });
+
+  it("returns an empty string for nullish input", () => {
+    expect(formatDateTimeRelative(null)).toBe("");
+    expect(formatDateTimeRelative(undefined)).toBe("");
   });
 });

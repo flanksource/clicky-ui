@@ -1,9 +1,11 @@
 import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
+import { Icon, LabelIcon } from "../data/Icon";
+import { formatDateTimeRelative } from "../data/cells/Timestamp";
 import { UiAdd, UiTrash } from "../icons";
 import { Button } from "./button";
 import { Combobox } from "./Combobox";
+import { DateTimePicker } from "./DateTimePicker";
 import { ArrayControl } from "./json-schema-form-array";
 import { renderFieldNodes, renderObjectFields, type RenderContext } from "./json-schema-form-render";
 import type {
@@ -53,6 +55,7 @@ export function FieldWrapper({
 export function FieldLabel({ field, fieldId }: { field: FieldControl; fieldId: string }) {
   return (
     <label htmlFor={fieldId} className="flex items-center gap-2 text-sm font-medium">
+      <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
       <span>{field.label}</span>
       {field.required && <span className="text-destructive">*</span>}
       {field.badge && (
@@ -73,6 +76,14 @@ export function fieldInputId(key: string): string {
 // container controls (array/object/map) can recurse with full context.
 export function renderValueControl(field: FieldControl, ctx: RenderContext): ReactNode {
   const fieldId = fieldInputId(field.key);
+  // A field the schema marks `readOnly` is never editable: it shows its current
+  // value as plain text, not a disabled input. (The form-level ctx.readOnly,
+  // below, instead disables the real controls so the structure stays visible.)
+  // Containers (array/object/map) still render structurally so nested read-only
+  // values surface; their own children resolve their own readOnly.
+  if (field.readOnly && field.kind !== "array" && field.kind !== "object" && field.kind !== "string-map") {
+    return <ReadOnlyValue field={field} fieldId={fieldId} />;
+  }
   const readOnly = ctx.readOnly;
   switch (field.kind) {
     case "enum":
@@ -81,6 +92,8 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
       return <BooleanControl field={field} fieldId={fieldId} readOnly={readOnly} />;
     case "number":
       return <NumberControl field={field} fieldId={fieldId} readOnly={readOnly} />;
+    case "date":
+      return <DateControl field={field} fieldId={fieldId} readOnly={readOnly} />;
     case "array":
       return <ArrayControl field={field} fieldId={fieldId} ctx={ctx} />;
     case "object":
@@ -90,6 +103,26 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
     default:
       return <StringControl field={field} fieldId={fieldId} readOnly={readOnly} />;
   }
+}
+
+// ReadOnlyValue renders a `readOnly` field's current value as static text — no
+// input, no border, just the value (date/date-time formatted human-readably).
+// An empty value shows an em-dash. Carries the same id + data-jsf-input as the
+// editable controls so layout and queries stay uniform.
+function ReadOnlyValue({ field, fieldId }: { field: FieldControl; fieldId: string }) {
+  const text = toText(field.value);
+  const display = field.kind === "date" && text ? formatDateTimeRelative(text) : text;
+  return (
+    <span
+      id={fieldId}
+      data-jsf-input
+      data-jsf-readonly
+      className="flex h-9 items-center text-sm text-foreground"
+      title={text || undefined}
+    >
+      {display || <span className="text-muted-foreground">—</span>}
+    </span>
+  );
 }
 
 function StringControl({
@@ -145,6 +178,45 @@ function NumberControl({
           field.onChange(raw);
         }
       }}
+    />
+  );
+}
+
+// DateControl edits a `format: date`/`date-time` string. Read-only, it shows the
+// human-readable absolute + relative form (e.g. "Apr 15, 2026, 12:00 PM (2h
+// ago)"); editable, a DateTimePicker. The raw string is committed unchanged so a
+// consumer-permitted template token in the field is preserved.
+function DateControl({
+  field,
+  fieldId,
+  readOnly,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+}) {
+  const text = toText(field.value);
+  if (readOnly) {
+    return (
+      <div
+        id={fieldId}
+        data-jsf-input
+        className="flex h-9 items-center text-sm text-foreground"
+        title={text || undefined}
+      >
+        {text ? formatDateTimeRelative(text) : <span className="text-muted-foreground">—</span>}
+      </div>
+    );
+  }
+  return (
+    <DateTimePicker
+      id={fieldId}
+      aria-label={field.label}
+      data-jsf-input
+      inputClassName={cn(inputClassName, "pr-8")}
+      value={text}
+      onChange={(next) => field.onChange(next)}
+      placeholder={defaultPlaceholder(field.schema)}
     />
   );
 }
@@ -213,10 +285,17 @@ function ObjectControl({ field, ctx }: { field: FieldControl; ctx: RenderContext
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
   };
+  // No border/box: nested objects render as flat headed sections (see
+  // ObjectSection in renderFieldRow) rather than progressively indented
+  // sub-forms, so deep schemas stay readable as a single column.
+  // A read-only object marks its whole subtree non-editable: recurse with
+  // form-level readOnly on so child inputs are disabled (and any child the
+  // schema marks readOnly still renders as a value span).
   return (
-    <div className="space-y-2 rounded-md border border-input p-2">
+    <div className="space-y-2">
       {renderObjectFields(subSchema, obj, (next) => field.onChange(next), {
         ...ctx,
+        readOnly: ctx.readOnly || field.readOnly === true,
         depth: ctx.depth + 1,
       })}
     </div>
@@ -229,12 +308,14 @@ function ObjectControl({ field, ctx }: { field: FieldControl; ctx: RenderContext
 // Values recurse through the shared pipeline, so a value that is itself an object
 // or array renders structurally and pre/post extensions apply to it.
 function StringMapControl({ field, ctx }: { field: FieldControl; ctx: RenderContext }) {
-  const readOnly = ctx.readOnly;
+  // A read-only map marks its whole subtree non-editable: no rename/remove/add
+  // and value inputs disabled.
+  const readOnly = ctx.readOnly || field.readOnly === true;
   const map = isPlainObject(field.value) ? (field.value as Record<string, unknown>) : {};
   const known = field.knownProperties ?? {};
   const knownKeys = Object.keys(known);
   const extraKeys = Object.keys(map).filter((k) => !(k in known));
-  const childCtx: RenderContext = { ...ctx, depth: ctx.depth + 1 };
+  const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 
   function setEntry(key: string, next: unknown) {
     field.onChange({ ...map, [key]: next });

@@ -52,6 +52,11 @@ const meta = {
     schema: { control: "object", table: { category: "Schema" } },
     value: { control: "object", table: { category: "Value" } },
     readOnly: { control: "boolean", table: { category: "Behavior" } },
+    hideReadOnlyFields: {
+      control: "boolean",
+      description: "Omit schema `readOnly: true` fields entirely instead of showing them as value displays.",
+      table: { category: "Behavior", defaultValue: { summary: "false" } },
+    },
     inline: {
       control: "boolean",
       description: "Two-column label/field layout instead of stacked.",
@@ -212,6 +217,58 @@ export const ReadOnly: Story = {
       description: {
         story:
           "`readOnly` disables every control at every depth — including add/remove/reorder on arrays and Add-field on maps — while still rendering the current values for inspection.",
+      },
+    },
+  },
+};
+
+const readOnlyFieldSchema: JsonSchemaObject = {
+  type: "object",
+  required: ["FirstName"],
+  properties: {
+    ClientGUID: { type: "string", title: "Client GUID", readOnly: true },
+    SystemDate: { type: "string", format: "date-time", title: "System date", readOnly: true },
+    FirstName: { type: "string", title: "First name" },
+    Role: { type: "string", title: "Role", enum: ["admin", "editor", "viewer"] },
+  },
+};
+
+export const PerFieldReadOnly: Story = {
+  args: {
+    schema: readOnlyFieldSchema,
+    value: {
+      ClientGUID: "8f3c-7a21-44de",
+      SystemDate: "2026-04-15T12:00:00Z",
+      FirstName: "Ada",
+      Role: "editor",
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Fields whose schema declares `readOnly: true` render as static value displays (no input), while the rest stay editable. Dates are formatted human-readably; an empty read-only value shows an em-dash.",
+      },
+    },
+  },
+};
+
+export const HideReadOnlyFields: Story = {
+  args: {
+    schema: readOnlyFieldSchema,
+    value: {
+      ClientGUID: "8f3c-7a21-44de",
+      SystemDate: "2026-04-15T12:00:00Z",
+      FirstName: "Ada",
+      Role: "editor",
+    },
+    hideReadOnlyFields: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`hideReadOnlyFields` drops every `readOnly: true` field at every depth, leaving only the editable surface.",
       },
     },
   },

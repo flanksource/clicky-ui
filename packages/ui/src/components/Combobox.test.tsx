@@ -210,10 +210,49 @@ describe("Combobox multiple", () => {
   });
 });
 
+describe("Combobox dropdown portal", () => {
+  it("renders the open listbox outside the component root so a dialog's overflow cannot clip it", () => {
+    render(
+      <div data-testid="container">
+        <Combobox value="" onChange={vi.fn()} options={OPTIONS} />
+      </div>,
+    );
+    fireEvent.focus(screen.getByRole("combobox"));
+    const listbox = screen.getByRole("listbox");
+    const container = screen.getByTestId("container");
+    expect(container.contains(listbox)).toBe(false);
+    expect(document.body.contains(listbox)).toBe(true);
+  });
+
+  it("keeps the menu open and selects when an option in the portal is clicked", () => {
+    const onChange = vi.fn();
+    render(<Combobox value="" onChange={onChange} options={OPTIONS} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    const option = screen.getByRole("option", { name: "ArchiveDB" });
+    fireEvent.mouseDown(option);
+    expect(onChange).toHaveBeenCalledWith("ArchiveDB");
+  });
+});
+
 describe("Combobox inline label", () => {
   it("renders the label and uses it as the input's accessible name", () => {
     render(<Combobox label="Database" value="" onChange={vi.fn()} options={OPTIONS} />);
     expect(screen.getByRole("combobox", { name: "Database" })).toBeInTheDocument();
+  });
+});
+
+describe("Combobox option icons", () => {
+  it("renders an option's ReactNode icon before its label in the list", () => {
+    const options = [
+      { value: "aws", label: "AWS", icon: <span data-testid="aws-icon">★</span> },
+      { value: "gcp", label: "GCP" },
+    ];
+    render(<Combobox value="" onChange={vi.fn()} options={options} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    const awsOption = screen.getByRole("option", { name: /AWS/ });
+    expect(awsOption.querySelector('[data-testid="aws-icon"]')).not.toBeNull();
+    const gcpOption = screen.getByRole("option", { name: /GCP/ });
+    expect(gcpOption.querySelector('[data-testid="aws-icon"]')).toBeNull();
   });
 });
 

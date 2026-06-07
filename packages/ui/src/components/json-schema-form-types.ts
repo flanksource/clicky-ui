@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { LabelIconSpec } from "../data/Icon";
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -10,6 +11,11 @@ export interface JsonSchemaProperty {
   enum?: unknown[];
   const?: unknown;
   default?: unknown;
+  // Standard JSON Schema string format. `date`/`date-time` drive a date control.
+  format?: string;
+  // Standard JSON Schema 2020-12 keyword. When true the form renders the field
+  // as a read-only value display (no input), or omits it under hideReadOnlyFields.
+  readOnly?: boolean;
   minimum?: number;
   maximum?: number;
   items?: JsonSchemaProperty;
@@ -18,6 +24,12 @@ export interface JsonSchemaProperty {
   // false = closed object; true = open; sub-schema = open string/typed map.
   additionalProperties?: boolean | JsonSchemaProperty;
   allOf?: JsonSchemaConditional[];
+  // Union branches. The form does not validate against them, but it does mine
+  // them for an `enum` branch so a value-or-template union (a string whose
+  // anyOf carries one enum branch plus free-form branches) still renders as a
+  // dropdown rather than a bare text input.
+  anyOf?: JsonSchemaProperty[];
+  oneOf?: JsonSchemaProperty[];
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
   else?: JsonSchemaProperty;
@@ -34,9 +46,14 @@ export type JsonSchemaType =
   | "boolean"
   | "null";
 
+// An `allOf` member is either a conditional (if/then) or an unconditional
+// composition member that contributes its own `properties`/`required` — the
+// latter is what an inlined `$ref` (a flattened component schema) collapses to.
 export interface JsonSchemaConditional {
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
 }
 
 // JsonSchemaObject is the flat object subschema the form renders — one control
@@ -55,6 +72,7 @@ export type FieldControlKind =
   | "number"
   | "boolean"
   | "enum"
+  | "date"
   | "string-map"
   | "array"
   | "object";
@@ -73,6 +91,15 @@ export interface FieldControl {
   value: unknown;
   onChange: (next: unknown) => void;
 
+  // Resolved from the schema's standard `readOnly` keyword. A read-only field
+  // renders as a value display (no input) regardless of the form-level readOnly
+  // prop, and is dropped entirely when the form sets hideReadOnlyFields. A
+  // pre-extension may set or clear it.
+  readOnly?: boolean;
+
+  // Leading glyph for the label, lifted from the schema's `x-icon` extension.
+  labelIcon?: LabelIconSpec;
+
   // enum
   options?: FieldOption[];
   // Generic free-text-allowed flag (the consumer's escape hatch for tokens /
@@ -89,6 +116,10 @@ export interface FieldControl {
   // Number; otherwise the raw string is preserved. Consumers set false to keep
   // non-numeric values (e.g. template tokens) intact.
   coerceNumber?: boolean;
+
+  // date — which JSON Schema format produced this control: "date" (date only)
+  // or "date-time" (date + time).
+  dateFormat?: "date" | "date-time";
 
   // string-map
   valueSchema?: JsonSchemaProperty;
@@ -129,8 +160,19 @@ export interface JsonSchemaFormProps {
   readOnly?: boolean;
   /** Inline 2-column label/field layout; stacked when false (default). */
   inline?: boolean;
+  /**
+   * Omit fields whose schema declares `readOnly: true` entirely, instead of
+   * rendering them as read-only value displays. Applies at every depth.
+   */
+  hideReadOnlyFields?: boolean;
   /** Property keys to omit from rendering. */
   hiddenKeys?: string[];
+  /**
+   * Render required fields before optional ones at every object level. The sort
+   * is stable: required keys keep their relative order, then optional keys keep
+   * theirs. Defaults to false (schema property order is preserved).
+   */
+  requiredFirst?: boolean;
   title?: string;
   pre?: PreExtension[];
   post?: PostExtension[];

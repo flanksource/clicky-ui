@@ -1,7 +1,11 @@
-import type { CSSProperties, ComponentType, ElementType } from "react";
+import type { CSSProperties, ComponentType, ElementType, ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
+
+// LabelIconSpec is the icon a label may carry: an iconify/runtime name (resolved
+// via the fallback provider) or a fully-rendered node the caller supplies.
+export type LabelIconSpec = string | ReactNode;
 
 export type IconStyle = "plain" | "badge";
 
@@ -227,4 +231,24 @@ export function Icon({
       {renderedIcon}
     </span>
   );
+}
+
+/**
+ * LabelIcon renders a label's leading glyph from a {@link LabelIconSpec}: a
+ * string is treated as a runtime icon name (resolved by the registered fallback
+ * provider), any other ReactNode is rendered as-is. Returns null for an absent
+ * or empty spec so callers can spread it unconditionally before a label.
+ */
+export function LabelIcon({
+  icon,
+  className,
+}: {
+  icon?: LabelIconSpec;
+  className?: string;
+}): JSX.Element | null {
+  if (icon == null || icon === "" || icon === false) return null;
+  if (typeof icon === "string") {
+    return <Icon name={icon} className={cn("shrink-0", className)} />;
+  }
+  return <>{icon}</>;
 }
