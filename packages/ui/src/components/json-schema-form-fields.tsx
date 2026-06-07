@@ -10,6 +10,7 @@ import { ArrayControl } from "./json-schema-form-array";
 import { renderFieldNodes, renderObjectFields, type RenderContext } from "./json-schema-form-render";
 import type {
   FieldControl,
+  FieldOption,
   JsonSchemaObject,
   JsonSchemaProperty,
 } from "./json-schema-form-types";
@@ -261,6 +262,9 @@ function EnumControl({
 }) {
   const value = toText(field.value);
   const options = withSyntheticValue(field.options ?? [], value);
+  if (field.display === "radio") {
+    return <RadioGroupControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} />;
+  }
   return (
     <Combobox
       id={fieldId}
@@ -271,6 +275,61 @@ function EnumControl({
       onChange={(v) => field.onChange(v)}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
+  );
+}
+
+// RadioGroupControl renders a small fixed enum as a segmented radio-button group
+// instead of a dropdown. It shares EnumControl's option list (any out-of-enum
+// value is already prepended, so a token still shows). One `radiogroup` role +
+// native radios keep it keyboard-navigable; the visible chip is a styled label.
+function RadioGroupControl({
+  field,
+  fieldId,
+  readOnly,
+  options,
+  value,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  options: FieldOption[];
+  value: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={field.label}
+      id={fieldId}
+      data-jsf-input
+      className="inline-flex flex-wrap items-center gap-1 rounded-md border border-input bg-background p-0.5"
+    >
+      {options.map((opt) => {
+        const checked = opt.value === value;
+        return (
+          <label
+            key={opt.value}
+            className={cn(
+              "inline-flex cursor-pointer select-none items-center rounded px-2.5 py-1 text-sm",
+              checked
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              readOnly && "cursor-not-allowed opacity-60",
+            )}
+          >
+            <input
+              type="radio"
+              name={fieldId}
+              className="sr-only"
+              value={opt.value}
+              checked={checked}
+              disabled={readOnly}
+              onChange={() => field.onChange(opt.value)}
+            />
+            {opt.label}
+          </label>
+        );
+      })}
+    </div>
   );
 }
 
