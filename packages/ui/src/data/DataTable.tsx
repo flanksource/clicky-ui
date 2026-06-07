@@ -140,7 +140,7 @@ export type DataTableRowDetailContext<T extends Record<string, unknown> = Record
   {
     columns: DataTableColumn<T>[];
     visibleColumns: DataTableColumn<T>[];
-    tagActionsByColumn: Record<string, TagActionsContextValue>;
+    filterActionsByColumn: Record<string, TagActionsContextValue>;
   };
 
 // Mirrors the preset list used by the trace UI's TraceFilters so log/trace
@@ -593,23 +593,6 @@ function DataTableInner<T extends Record<string, unknown>>({
     showColumnVisibilityControl || resolvedShowDensityControl || showThemeControl;
   const densityOverride = densityControlled ? density : localDensityOverride;
 
-  // For each kind:"tags" column, expose a TagActions value backed by this
-  // table's multiFilters slot. The + / − icons inside each tag mutate the
-  // same Record<token, mode> shape that the filter-bar dropdown uses, so
-  // the existing filter pipeline picks up the change without changes.
-  const tagActionsByColumn = useMemo(() => {
-    const out: Record<string, TagActionsContextValue> = {};
-    for (const column of visibleColumns) {
-      if (column.kind !== "tags") continue;
-      const columnKey = column.key;
-      const current = (multiFilters[columnKey] ?? {}) as Record<string, TagFilterMode>;
-      const handler = (next: Record<string, TagFilterMode>) =>
-        setMultiFilters((state) => updateFilterRecord(state, columnKey, next));
-      out[columnKey] = tagActionsFromRecord(current, handler);
-    }
-    return out;
-  }, [multiFilters, visibleColumns]);
-
   // The first kind:"timestamp" column (with autoRangeFilter not disabled) gets
   // the auto-mounted FilterBar time-range picker. The user can override by
   // supplying their own filterBarProps.timeRange.
@@ -693,6 +676,25 @@ function DataTableInner<T extends Record<string, unknown>>({
       };
     });
   }, [autoFilter, filterableColumns, loading, rows]);
+
+  // For every multi / nested-multi column (which includes kind:"tags"), expose a
+  // TagActions value backed by this table's multiFilters slot. The + / − icons in
+  // tag cells and in expanded-row details mutate the same Record<token, mode>
+  // shape the filter-bar dropdown uses, so the existing filter pipeline picks up
+  // the change. Built from generatedFilters so it stays in lockstep with
+  // pruneMultiFilterState (only multi/nested-multi columns honor multiFilters).
+  const filterActionsByColumn = useMemo(() => {
+    const out: Record<string, TagActionsContextValue> = {};
+    for (const filter of generatedFilters) {
+      if (filter.kind !== "multi" && filter.kind !== "nested-multi") continue;
+      const columnKey = filter.column.key;
+      const current = (multiFilters[columnKey] ?? {}) as Record<string, TagFilterMode>;
+      const handler = (next: Record<string, TagFilterMode>) =>
+        setMultiFilters((state) => updateFilterRecord(state, columnKey, next));
+      out[columnKey] = tagActionsFromRecord(current, handler);
+    }
+    return out;
+  }, [generatedFilters, multiFilters]);
 
   useEffect(() => {
     setTextFilters((current) => pruneTextFilterState(current, generatedFilters));
@@ -1134,7 +1136,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                     renderExpandedRow?.(record.row, {
                       columns: effectiveColumns,
                       visibleColumns,
-                      tagActionsByColumn,
+                      filterActionsByColumn,
                     }) ?? null;
                   const expandable = expandedContent !== null;
                   const expandsInline = expandable && detailStyle === "row";
@@ -1172,9 +1174,9 @@ function DataTableInner<T extends Record<string, unknown>>({
 
                           // Tag cells get the + / − filter affordance via
                           // context; copy-to-clipboard works without it too.
-                          if (column.kind === "tags" && tagActionsByColumn[column.key]) {
+                          if (column.kind === "tags" && filterActionsByColumn[column.key]) {
                             content = (
-                              <TagActionsProvider value={tagActionsByColumn[column.key]!}>
+                              <TagActionsProvider value={filterActionsByColumn[column.key]!}>
                                 {content}
                               </TagActionsProvider>
                             );
@@ -1248,7 +1250,7 @@ function DataTableInner<T extends Record<string, unknown>>({
               ? renderExpandedRow(detailRow.row, {
                   columns: effectiveColumns,
                   visibleColumns,
-                  tagActionsByColumn,
+                  filterActionsByColumn,
                 })
               : null}
           </Modal>
@@ -1783,7 +1785,10 @@ function getFilterCandidate<T extends Record<string, unknown>>(row: T, column: D
   return column.filterValue ? column.filterValue(rawValue, row) : rawValue;
 }
 
-function getFilterTokens<T extends Record<string, unknown>>(row: T, column: DataTableColumn<T>) {
+export function getFilterTokens<T extends Record<string, unknown>>(
+  row: T,
+  column: DataTableColumn<T>,
+) {
   return normalizeTokens(getFilterCandidate(row, column));
 }
 

@@ -24,6 +24,22 @@ const envelopeLine = JSON.stringify({
   },
 });
 
+const otherEnvelopeLine = JSON.stringify({
+  pod: "billing-api-7f9c5d4b8-xk2pq",
+  container: "billing-api",
+  line: JSON.stringify({
+    "@timestamp": "2026-05-03T10:10:00.000Z",
+    "log.level": "ERROR",
+    message: "Processing invoice batch",
+    "service.name": "billing-api",
+  }),
+  timestamp: "2026-05-03T10:10:00.000000000Z",
+  labels: {
+    namespace: "billing-demo",
+    pod: "billing-api-7f9c5d4b8-xk2pq",
+  },
+});
+
 describe("LogsTable", () => {
   it("normalizes Kubernetes envelope JSON lines with nested ECS JSON", () => {
     const row = normalizeLogsTableRows(envelopeLine)[0]!;
@@ -109,12 +125,15 @@ describe("LogsTable", () => {
     expect(screen.queryByRole("term", { name: "Labels" })).not.toBeInTheDocument();
     expect(screen.queryByRole("term", { name: "Line" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("definition").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /expand tags/i })).toBeInTheDocument();
+    // Tags render as a nested key/value Properties list (expanded by default)
+    // with per-tag include/exclude/copy actions.
+    expect(
+      screen.getByRole("button", { name: /include namespace=claims-demo/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /collapse tags/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy tags/i })).toBeInTheDocument();
   });
 
-  it("expands, collapses, and copies expanded nested values", () => {
+  it("expands, collapses, and copies expanded nested object values", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -124,30 +143,75 @@ describe("LogsTable", () => {
     render(<LogsTable logs={envelopeLine} />);
 
     fireEvent.click(screen.getByText("Filtering request path: appBanner/bannerInfo"));
-    fireEvent.click(screen.getByRole("button", { name: /collapse tags/i }));
+    fireEvent.click(screen.getByRole("button", { name: /collapse attributes/i }));
 
     expect(
-      screen.getAllByText((_, element) => element?.textContent === "[6 items]").length,
+      screen.getAllByText((_, element) => element?.textContent === "{ 1 properties }").length,
     ).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /expand tags/i }));
-    fireEvent.click(screen.getByRole("button", { name: /copy tags/i }));
+    fireEvent.click(screen.getByRole("button", { name: /expand attributes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy attributes/i }));
 
-    expect(screen.getAllByText("namespace=claims-demo").length).toBeGreaterThanOrEqual(1);
     expect(writeText).toHaveBeenCalledWith(
-      JSON.stringify(
-        [
-          "namespace=claims-demo",
-          "container=policy-api",
-          "service=policy-api",
-          "dataset=policy-api",
-          "ecs.version=1.2.0",
-          "pod=policy-api-644b55c866-mg7tg",
-        ],
-        null,
-        2,
-      ),
+      JSON.stringify({ "ecs.version": "1.2.0" }, null, 2),
     );
+  });
+
+  it("renders tags as nested key/value properties with include/exclude/copy actions", () => {
+    render(<LogsTable logs={envelopeLine} />);
+
+    fireEvent.click(screen.getByText("Filtering request path: appBanner/bannerInfo"));
+
+    expect(
+      screen.getByRole("button", { name: /include namespace=claims-demo/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /exclude namespace=claims-demo/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy namespace=claims-demo/i })).toBeInTheDocument();
+    // Each tag is a key=value row; the key segment is rendered as the label.
+    expect(screen.getByText("namespace")).toBeInTheDocument();
+  });
+
+  it("filters rows when a tag include action is clicked in the row detail", () => {
+    render(<LogsTable logs={[envelopeLine, otherEnvelopeLine]} />);
+
+    expect(screen.getByText("Processing invoice batch")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Filtering request path: appBanner/bannerInfo"));
+    fireEvent.click(screen.getByRole("button", { name: /include namespace=claims-demo/i }));
+
+    expect(screen.queryByText("Processing invoice batch")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText("Filtering request path: appBanner/bannerInfo").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("filters rows when a non-tag multi-select field include action is clicked", () => {
+    render(<LogsTable logs={[envelopeLine, otherEnvelopeLine]} />);
+
+    // Two distinct levels (INFO, ERROR) make "level" a tristate multi filter.
+    expect(screen.getByText("Processing invoice batch")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Filtering request path: appBanner/bannerInfo"));
+    fireEvent.click(screen.getByRole("button", { name: /^include level$/i }));
+
+    // Including INFO hides the ERROR row.
+    expect(screen.queryByText("Processing invoice batch")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText("Filtering request path: appBanner/bannerInfo").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("does not show include/exclude actions for non-multi fields (timestamp)", () => {
+    render(<LogsTable logs={[envelopeLine, otherEnvelopeLine]} />);
+
+    fireEvent.click(screen.getByText("Filtering request path: appBanner/bannerInfo"));
+
+    // Timestamp is range-filtered, not a tristate multi filter, so it gets no
+    // include/exclude affordance in the detail.
+    expect(screen.queryByRole("button", { name: /include timestamp/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /exclude timestamp/i })).not.toBeInTheDocument();
   });
 
   it("opens logs in a full screen dialog", () => {
