@@ -80,6 +80,7 @@ export type {
   FieldControl,
   FieldControlKind,
   FieldOption,
+  EnumDisplay,
   PreExtension,
   PostExtension,
 } from "./components/json-schema-form-types";
