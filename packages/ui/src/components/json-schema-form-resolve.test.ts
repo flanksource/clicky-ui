@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   effectiveProperties,
+  enumBranch,
   isOpenStringMap,
   isScalarStringItems,
   matchesIf,
@@ -84,9 +85,17 @@ describe("resolveControl", () => {
     expect(control("sample", { type: "object" }).kind).toBe("string-map");
   });
 
-  it("does NOT infer date/ascode/token behavior (domain-agnostic)", () => {
-    // A property named "EffectiveDate" stays a plain string control — date
-    // handling is a consumer extension, not built in.
+  it("infers a date control from a schema-declared format", () => {
+    expect(control("when", { type: "string", format: "date" }).kind).toBe("date");
+    expect(control("when", { type: "string", format: "date-time" }).kind).toBe("date");
+    // The control carries which format so the renderer can pick date vs datetime.
+    expect(control("when", { type: "string", format: "date" }).dateFormat).toBe("date");
+    expect(control("when", { type: "string", format: "date-time" }).dateFormat).toBe("date-time");
+  });
+
+  it("does NOT infer a date control from the field name (domain-agnostic)", () => {
+    // A property named "EffectiveDate" with no `format` stays a plain string —
+    // date handling keys off the schema keyword, never the name.
     expect(control("EffectiveDate", { type: "string" }).kind).toBe("string");
     const asCode = control("AddressRole", {
       type: "string",
@@ -102,6 +111,73 @@ describe("resolveControl", () => {
     const c = control("Name", { type: "string" }, true);
     expect(c.required).toBe(true);
     expect(c.label).toBe("Name");
+  });
+
+  it("lifts an x-icon extension key onto the control's labelIcon", () => {
+    const c = control("region", { type: "string", "x-icon": "mdi:earth" });
+    expect(c.labelIcon).toBe("mdi:earth");
+  });
+
+  it("leaves labelIcon unset when no x-icon is present", () => {
+    expect(control("region", { type: "string" }).labelIcon).toBeUndefined();
+  });
+
+  it("lifts an enum out of an anyOf value-or-template union into a dropdown", () => {
+    const c = control("Status", {
+      type: "string",
+      anyOf: [
+        { type: "string", enum: ["01", "02"] },
+        { type: "string", pattern: "^\\{\\{.+\\}\\}$" },
+        { type: "string", const: "" },
+      ],
+    });
+    expect(c.kind).toBe("enum");
+    expect(c.options).toEqual([
+      { value: "01", label: "01" },
+      { value: "02", label: "02" },
+    ]);
+    // The union's free-form branches are honoured by a consumer allowCustomValue
+    // pre-extension, not inferred here.
+    expect(c.allowCustomValue).toBeUndefined();
+  });
+
+  it("lifts an enum out of a oneOf union as well", () => {
+    const c = control("Kind", {
+      type: "string",
+      oneOf: [{ type: "string", enum: ["X"] }, { type: "string" }],
+    });
+    expect(c.kind).toBe("enum");
+    expect(c.options).toEqual([{ value: "X", label: "X" }]);
+  });
+
+  it("prefers a top-level enum over an anyOf branch", () => {
+    const c = control("Status", {
+      type: "string",
+      enum: ["TOP"],
+      anyOf: [{ type: "string", enum: ["BRANCH"] }],
+    });
+    expect(c.kind).toBe("enum");
+    expect(c.options).toEqual([{ value: "TOP", label: "TOP" }]);
+  });
+
+  it("stays a string when an anyOf union has no enum branch", () => {
+    const c = control("Note", {
+      type: "string",
+      anyOf: [{ type: "string", pattern: "a" }, { type: "string", const: "" }],
+    });
+    expect(c.kind).toBe("string");
+  });
+});
+
+describe("enumBranch", () => {
+  it("returns the first anyOf/oneOf branch carrying a non-empty enum", () => {
+    expect(enumBranch({ anyOf: [{ type: "string" }, { enum: ["a", "b"] }] })?.enum).toEqual(["a", "b"]);
+    expect(enumBranch({ oneOf: [{ enum: ["x"] }] })?.enum).toEqual(["x"]);
+  });
+
+  it("returns undefined when no branch enumerates values", () => {
+    expect(enumBranch({ type: "string" })).toBeUndefined();
+    expect(enumBranch({ anyOf: [{ type: "string" }, { enum: [] }] })).toBeUndefined();
   });
 });
 
@@ -188,6 +264,49 @@ describe("effectiveProperties", () => {
       activity: "SchemeMoneyIn",
     });
     expect(twice.properties.input.properties).toHaveProperty("Amount");
+  });
+
+  // An inlined `$ref` (flattened component) becomes an unconditional `allOf`
+  // member carrying its own `properties` — no `if`/`then`. These must merge
+  // regardless of value, the way a `$ref` composition always applies.
+  it("merges unconditional allOf composition members (inlined $ref)", () => {
+    const composed: JsonSchemaObject = {
+      type: "object",
+      allOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            FirstName: { type: "string" },
+            LastName: { type: "string" },
+          },
+          required: ["FirstName"],
+        },
+      ],
+      unevaluatedProperties: false,
+    } as JsonSchemaObject;
+    const { properties, required } = effectiveProperties(composed, {});
+    expect(properties).toHaveProperty("FirstName");
+    expect(properties).toHaveProperty("LastName");
+    expect(required).toContain("FirstName");
+  });
+
+  it("merges base properties, composition members, and matching conditionals together", () => {
+    const mixed: JsonSchemaObject = {
+      type: "object",
+      properties: { activity: { type: "string" } },
+      allOf: [
+        { type: "object", properties: { SchemeNumber: { type: "string" } } },
+        {
+          if: { properties: { activity: { const: "X" } }, required: ["activity"] },
+          then: { properties: { extra: { type: "string" } } },
+        },
+      ],
+    };
+    const { properties } = effectiveProperties(mixed, { activity: "X" });
+    expect(properties).toHaveProperty("activity");
+    expect(properties).toHaveProperty("SchemeNumber");
+    expect(properties).toHaveProperty("extra");
   });
 });
 

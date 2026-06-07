@@ -24,6 +24,17 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
   return (prop.enum ?? []).map((v) => ({ value: String(v), label: String(v) }));
 }
 
+// enumBranch returns the first anyOf/oneOf member carrying a non-empty `enum`,
+// for a union of "an enum value OR a free-form string" (e.g. a value-or-token
+// field). It lets such a union render as a dropdown. Returns undefined when no
+// branch enumerates values.
+export function enumBranch(prop: JsonSchemaProperty): JsonSchemaProperty | undefined {
+  for (const branch of [...(prop.anyOf ?? []), ...(prop.oneOf ?? [])]) {
+    if (Array.isArray(branch.enum) && branch.enum.length > 0) return branch;
+  }
+  return undefined;
+}
+
 export interface ResolveControlArgs {
   key: string;
   prop: JsonSchemaProperty;
@@ -33,10 +44,13 @@ export interface ResolveControlArgs {
 }
 
 // resolveControl infers a base, render-ready FieldControl from a property
-// schema. It is deliberately domain-agnostic: no date/ascode/token heuristics —
-// those are layered on by consumer pre-extensions. First match wins.
+// schema. It keys off schema keywords only — never the field name: ascode/token
+// heuristics are layered on by consumer pre-extensions. The one exception is the
+// standard `format: date`/`date-time` keyword, which is a schema-declared signal
+// (not a name guess) and so drives a date control directly. First match wins.
 export function resolveControl(args: ResolveControlArgs): FieldControl {
   const { key, prop, required, value, onChange } = args;
+  const labelIcon = prop["x-icon"];
   const base: FieldControl = {
     key,
     kind: "string",
@@ -45,11 +59,24 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     schema: prop,
     value,
     onChange,
+    ...(prop.readOnly === true ? { readOnly: true } : {}),
     ...(typeof prop.description === "string" ? { description: prop.description } : {}),
+    ...(labelIcon != null && labelIcon !== "" ? { labelIcon: labelIcon as FieldControl["labelIcon"] } : {}),
   };
 
   if (Array.isArray(prop.enum) && prop.enum.length > 0) {
     return { ...base, kind: "enum", options: enumOptions(prop) };
+  }
+  // A value-or-template union: the enum lives in an anyOf/oneOf branch alongside
+  // free-form branches. Render it as a dropdown using that branch's enum; the
+  // free-form branches are honoured via a consumer's allowCustomValue pre-ext.
+  const branch = enumBranch(prop);
+  if (branch) {
+    return { ...base, kind: "enum", options: enumOptions(branch) };
+  }
+  // A schema-declared date/date-time string renders as a date control.
+  if (prop.format === "date" || prop.format === "date-time") {
+    return { ...base, kind: "date", dateFormat: prop.format };
   }
   if (schemaHasType(prop, "boolean")) {
     return { ...base, kind: "boolean" };
@@ -133,9 +160,12 @@ export interface EffectiveProperties {
   required: string[];
 }
 
-// effectiveProperties merges the schema's base `properties` with every
-// `allOf[i].then.properties` whose `allOf[i].if` matches the current value.
-// `then` wins on key collision; required is the union. Pure and idempotent.
+// effectiveProperties merges the schema's base `properties` with each `allOf`
+// member's contribution. An `if`/`then` member contributes `then.properties`
+// only when its `if` matches the current value; an unconditional member (e.g.
+// an inlined `$ref` composition, which carries its own `properties` and no
+// `if`) always contributes. Later members win on key collision; required is the
+// union. Pure and idempotent.
 export function effectiveProperties(
   schema: JsonSchemaObject,
   value: Record<string, unknown>,
@@ -143,6 +173,14 @@ export function effectiveProperties(
   const properties: Record<string, JsonSchemaProperty> = { ...(schema.properties ?? {}) };
   const required = new Set(schema.required ?? []);
   for (const clause of schema.allOf ?? []) {
+    // Unconditional composition member: merge its own properties/required.
+    if (clause.if === undefined && clause.then === undefined) {
+      for (const [k, sub] of Object.entries(clause.properties ?? {})) {
+        properties[k] = sub;
+      }
+      for (const k of clause.required ?? []) required.add(k);
+      continue;
+    }
     if (!matchesIf(clause.if, value)) continue;
     const then = clause.then ?? {};
     for (const [k, sub] of Object.entries(then.properties ?? {})) {

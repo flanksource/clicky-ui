@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Combobox, type ComboboxProps } from "./Combobox";
+import { Modal } from "../overlay/Modal";
 
 const DATABASE_OPTIONS = [
   { value: "PrimaryDB", label: "PrimaryDB" },
@@ -135,6 +136,46 @@ export const Strict: Story = {
   },
 };
 
+export const InsideDialog: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The dropdown portals to `document.body` and is positioned with fixed coordinates, so it floats above the dialog and is not clipped by the modal body's `overflow-auto`. Open the dialog, then open the Combobox — the option list extends past the dialog's edge.",
+      },
+    },
+  },
+  render: () => {
+    const [open, setOpen] = useState(true);
+    const [value, setValue] = useState("");
+    return (
+      <div>
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-1.5 text-sm"
+          onClick={() => setOpen(true)}
+        >
+          Open dialog
+        </button>
+        <Modal open={open} onClose={() => setOpen(false)} title="Edit connection" size="sm">
+          <div className="space-y-3">
+            <label className="block text-sm font-medium">Database</label>
+            <Combobox
+              placeholder="Select database"
+              value={value}
+              onChange={setValue}
+              options={DATABASE_OPTIONS}
+            />
+            <p className="text-xs text-muted-foreground">
+              The dropdown should overflow the dialog without being clipped.
+            </p>
+          </div>
+        </Modal>
+      </div>
+    );
+  },
+};
+
 export const Multiple: Story = {
   render: () => {
     const [value, setValue] = useState<string[]>([]);
@@ -152,6 +193,37 @@ export const Multiple: Story = {
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
           value={JSON.stringify(value)}
         </div>
+      </div>
+    );
+  },
+};
+
+const CLOUD_OPTIONS = [
+  { value: "aws", label: "AWS", icon: <span aria-hidden>🟧</span> },
+  { value: "gcp", label: "Google Cloud", icon: <span aria-hidden>🔵</span> },
+  { value: "azure", label: "Azure", icon: <span aria-hidden>🟦</span> },
+];
+
+export const OptionIcons: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Each `ComboboxOption` may carry an `icon` — a runtime icon name (resolved by the registered fallback provider) or a rendered node — shown before the option label in the list.",
+      },
+    },
+  },
+  render: () => {
+    const [value, setValue] = useState("");
+    return (
+      <div className="w-64">
+        <Combobox
+          label="Provider"
+          placeholder="Select a cloud"
+          value={value}
+          onChange={setValue}
+          options={CLOUD_OPTIONS}
+        />
       </div>
     );
   },

@@ -292,6 +292,22 @@ describe("JsonSchemaForm nested object", () => {
     render(<JsonSchemaForm schema={schema} value={{ db: { host: "" } }} onChange={vi.fn()} />);
     expect(screen.getByText("Required")).toBeInTheDocument();
   });
+
+  it("renders the object as a headed section, not an inline bordered sub-form", () => {
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{ db: { host: "x", port: 5432 } }} onChange={vi.fn()} />,
+    );
+    // The object's key ("db") renders as a section header (font-semibold), and
+    // its fields surface at the top level — host + port labels are both present.
+    const header = [...container.querySelectorAll("div")].find(
+      (el) => el.textContent === "db" && el.className.includes("font-semibold"),
+    );
+    expect(header).toBeTruthy();
+    expect(screen.getByText("host")).toBeInTheDocument();
+    expect(screen.getByText("port")).toBeInTheDocument();
+    // No bordered sub-form box (the previous nesting affordance).
+    expect(container.querySelector(".rounded-md.border.border-input.p-2")).toBeNull();
+  });
 });
 
 describe("JsonSchemaForm deep recursion", () => {
@@ -394,5 +410,149 @@ describe("JsonSchemaForm array item kinds", () => {
     );
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm date fields", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: { when: { type: "string", format: "date-time" } },
+  };
+
+  it("renders a date control and commits the typed value", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{}} onChange={onChange} />);
+    const input = screen.getByLabelText("when");
+    fireEvent.change(input, { target: { value: "2026-04-15T12:00" } });
+    expect(lastCall(onChange)).toEqual({ when: "2026-04-15T12:00" });
+  });
+
+  it("renders the human-readable absolute+relative value when read-only", () => {
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ when: "2026-04-15T12:00:00Z" }}
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/\(.+\)$/)).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm readOnly schema fields", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      ClientGUID: { type: "string", readOnly: true },
+      FirstName: { type: "string" },
+    },
+  };
+
+  it("renders a readOnly field as a value span, not an input", () => {
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ ClientGUID: "abc-123", FirstName: "Ada" }}
+        onChange={vi.fn()}
+      />,
+    );
+    // The editable field still has an input; the read-only one shows its value
+    // as static text with no input control.
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("Ada");
+    expect(screen.getByText("abc-123")).toBeInTheDocument();
+    const readOnlyNode = container.querySelector("[data-jsf-readonly]");
+    expect(readOnlyNode).not.toBeNull();
+    expect(readOnlyNode?.tagName).toBe("SPAN");
+    expect(readOnlyNode?.querySelector("input")).toBeNull();
+  });
+
+  it("shows an em-dash for an empty readOnly value", () => {
+    render(<JsonSchemaForm schema={schema} value={{ FirstName: "Ada" }} onChange={vi.fn()} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("does not commit changes for a readOnly field (it has no editable control)", () => {
+    render(<JsonSchemaForm schema={schema} value={{ ClientGUID: "abc-123" }} onChange={vi.fn()} />);
+    // Exactly one editable control exists (FirstName); ClientGUID contributes none.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  });
+
+  it("omits readOnly fields entirely under hideReadOnlyFields", () => {
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ ClientGUID: "abc-123", FirstName: "Ada" }}
+        onChange={vi.fn()}
+        hideReadOnlyFields
+      />,
+    );
+    expect(screen.getByText("FirstName")).toBeInTheDocument();
+    expect(screen.queryByText("ClientGUID")).not.toBeInTheDocument();
+    expect(screen.queryByText("abc-123")).not.toBeInTheDocument();
+  });
+
+  it("lets a pre-extension clear readOnly so the field becomes editable again", () => {
+    const makeEditable: PreExtension = (field) =>
+      field.key === "ClientGUID" ? { ...field, readOnly: false } : field;
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ ClientGUID: "abc-123", FirstName: "Ada" }}
+        onChange={vi.fn()}
+        pre={[makeEditable]}
+      />,
+    );
+    // Both fields now editable: two text inputs, no read-only span.
+    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(document.querySelector("[data-jsf-readonly]")).toBeNull();
+  });
+
+  it("formats a readOnly date value human-readably", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: { created: { type: "string", format: "date-time", readOnly: true } },
+        }}
+        value={{ created: "2026-04-15T12:00:00Z" }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/\(.+\)$/)).toBeInTheDocument();
+  });
+
+  it("renders a readOnly enum as a value span, not a combobox", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: { status: { type: "string", enum: ["Active", "Closed"], readOnly: true } },
+        }}
+        value={{ status: "Active" }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm label icons", () => {
+  it("renders an x-icon node before a field's label", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { region: { type: "string", "x-icon": "mdi:earth" } },
+    };
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} />,
+    );
+    // The runtime icon name resolves to the dashed-border placeholder glyph when
+    // no fallback provider is registered; its presence inside the label confirms
+    // the icon slot rendered.
+    const label = container.querySelector("label");
+    expect(label?.querySelector('[title="mdi:earth"]')).not.toBeNull();
   });
 });

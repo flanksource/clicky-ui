@@ -27,6 +27,8 @@ export {
 export {
   Timestamp,
   chooseTimestampFormat,
+  formatDateTimeRelative,
+  formatRelativeTime,
   formatTimestamp,
   parseTimestamp,
   modeToFormat,
@@ -63,11 +65,13 @@ export {
 export { Gauge, type GaugeProps, type GaugeTone } from "./data/Gauge";
 export {
   Icon,
+  LabelIcon,
   setFallbackIconProvider,
   type FallbackIconProps,
   type IconProps,
   type IconStyle,
   type IconTone,
+  type LabelIconSpec,
   type StaticIconComponent,
 } from "./data/Icon";
 export * from "./icons";

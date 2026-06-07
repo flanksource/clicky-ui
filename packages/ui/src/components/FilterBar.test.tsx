@@ -266,7 +266,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "closed" } });
+    const status = screen.getByLabelText("Status");
+    fireEvent.focus(status);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Closed" }));
     expect(onStatus).toHaveBeenCalledWith("closed");
 
     fireEvent.click(screen.getByLabelText("Active"));
@@ -852,5 +854,69 @@ describe("FilterBar", () => {
     expect(onSearch).not.toHaveBeenCalled();
     expect(screen.getByText("Plan 7")).toBeInTheDocument();
     expect(screen.queryByText("Plan 1")).not.toBeInTheDocument();
+  });
+});
+
+describe("FilterBar label icons", () => {
+  it("renders a text filter's icon node before its label", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            icon: <span data-testid="owner-icon">@</span>,
+            value: "",
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("owner-icon")).toBeInTheDocument();
+  });
+
+  it("renders a number filter's icon in the trigger button", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "restarts",
+            kind: "number",
+            label: "Restarts",
+            icon: <span data-testid="restarts-icon">#</span>,
+            value: { min: "", max: "" },
+            domainMin: 0,
+            domainMax: 6,
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: /restarts filter/i });
+    expect(within(trigger).getByTestId("restarts-icon")).toBeInTheDocument();
+  });
+});
+
+describe("FilterBar date lookup rendering", () => {
+  it("shows the human-readable absolute+relative date as the field title", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "since",
+            kind: "lookup",
+            label: "Since",
+            inputType: "date",
+            value: "2026-04-15T12:00:00Z",
+            options: [],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    const title = screen.getByLabelText("Since").closest("label")?.getAttribute("title");
+    expect(title).toMatch(/2026/);
+    expect(title).toMatch(/\(.+\)$/);
   });
 });

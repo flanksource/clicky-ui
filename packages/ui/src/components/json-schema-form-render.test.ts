@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   moveItem,
+  orderRequiredFirst,
   removeIndex,
   seedFromSchema,
   setIndex,
@@ -41,6 +42,27 @@ describe("immutable array helpers", () => {
     expect(moveItem([1, 2, 3], 2, 1)).toEqual([1, 3, 2]);
     expect(moveItem([1, 2, 3], 0, -1)).toEqual([1, 2, 3]);
     expect(moveItem([1, 2, 3], 2, 3)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("orderRequiredFirst", () => {
+  const entries: [string, number][] = [
+    ["a", 1],
+    ["b", 2],
+    ["c", 3],
+    ["d", 4],
+  ];
+
+  it("moves required keys to the front, preserving order within each group", () => {
+    expect(orderRequiredFirst(entries, ["c", "a"]).map(([k]) => k)).toEqual(["a", "c", "b", "d"]);
+  });
+
+  it("is a no-op when no entries are required", () => {
+    expect(orderRequiredFirst(entries, []).map(([k]) => k)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("ignores required keys that are not present", () => {
+    expect(orderRequiredFirst(entries, ["x", "b"]).map(([k]) => k)).toEqual(["b", "a", "c", "d"]);
   });
 });
 
