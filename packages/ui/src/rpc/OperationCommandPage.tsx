@@ -51,7 +51,7 @@ export function OperationCommandPage({
   operation: providedOperation,
   operations = providedOperation ? [providedOperation] : [],
   initialValues = {},
-  autoRun = false,
+  autoRun,
   backHref,
   backLabel = "Back",
   renderLink,
@@ -71,6 +71,7 @@ export function OperationCommandPage({
   const [hasAutoRun, setHasAutoRun] = useState(false);
   const parameters = operation?.operation.parameters ?? [];
   const isGet = (operation?.method ?? "").toUpperCase() === "GET";
+  const effectiveAutoRun = operation ? (autoRun ?? isGet) : false;
   const parameterSignature = JSON.stringify(
     parameters.map((param) => ({
       name: param.name,
@@ -223,10 +224,11 @@ export function OperationCommandPage({
     setHasAutoRun(false);
     setResult(null);
     setError(null);
-  }, [autoRun, operationKey]);
+    lastSubmittedSignature.current = "";
+  }, [effectiveAutoRun, operationKey]);
 
   useEffect(() => {
-    if (!autoRun || !operation || hasAutoRun) return;
+    if (!effectiveAutoRun || !operation || hasAutoRun) return;
     // Auto-run a GET as long as every required parameter has a value. Optional
     // params (limit/offset, filter chips, etc.) get their defaults; the
     // sidebar's "click → instant table" flow depends on this not bailing just
@@ -238,8 +240,16 @@ export function OperationCommandPage({
     if (missingRequired.length > 0) return;
 
     setHasAutoRun(true);
+    lastSubmittedSignature.current = JSON.stringify(pruneParameterValues(effectiveInitialValues));
     void executeOperation(effectiveInitialValues);
-  }, [accept, autoRun, effectiveInitialValues, hasAutoRun, operationKey, parameterSignature]);
+  }, [
+    accept,
+    effectiveAutoRun,
+    effectiveInitialValues,
+    hasAutoRun,
+    operationKey,
+    parameterSignature,
+  ]);
 
   // GET re-runs on debounced filter/pagination changes once the initial
   // auto-run has fired; non-GETs keep their explicit-submit behavior.
@@ -256,10 +266,6 @@ export function OperationCommandPage({
     lastSubmittedSignature.current = signature;
     void executeOperation(merged);
   }, [isGet, hasAutoRun, debouncedValues, lockedPathValues, parameterSignature]);
-
-  useEffect(() => {
-    lastSubmittedSignature.current = "";
-  }, [operationKey]);
 
   const getRowDetailHref = useCallback<ClickyTableRowHref>(
     (row) => {
@@ -382,17 +388,17 @@ export function OperationCommandPage({
           parameters.length > 0 ? (
             // Before a result lands the FilterBar lives here so users can
             // fill in path params / required inputs and submit. Once a
-            // result is showing AND autoRun is on (sidebar flow), the same
+            // result is showing AND auto-run is on (sidebar flow), the same
             // filter chips relocate into the DataTable's filter bar via
             // externalFilters, which is the unified placement the user asked
             // for. The two branches share `formConfig.filters` so the values
             // stay in sync.
-            !result || !autoRun ? (
+            !result || !effectiveAutoRun ? (
               <div className="space-y-2">
                 <FilterBar
-                  autoSubmit={autoRun}
+                  autoSubmit={effectiveAutoRun}
                   filters={formConfig.filters}
-                  {...(!autoRun ? { onApply: () => handleManualSubmit() } : {})}
+                  {...(!effectiveAutoRun ? { onApply: () => handleManualSubmit() } : {})}
                   applyLabel="Execute request"
                   isPending={isExecuting}
                   {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}
@@ -440,10 +446,10 @@ export function OperationCommandPage({
                   isTableRowClickable: (row: ClickyRow) => Boolean(getRowDetailHref(row)),
                 }
               : {})}
-            {...(isGet && autoRun && formConfig.filters.length > 0
+            {...(isGet && effectiveAutoRun && formConfig.filters.length > 0
               ? { externalFilters: formConfig.filters }
               : {})}
-            {...(isGet && autoRun && dataTablePagination
+            {...(isGet && effectiveAutoRun && dataTablePagination
               ? { pagination: dataTablePagination }
               : {})}
           />
@@ -606,7 +612,7 @@ function shellQuote(value: string) {
 function stripRunnerParams(values: ParameterValues): ParameterValues {
   const next: ParameterValues = {};
   for (const [key, value] of Object.entries(values)) {
-    if (key === "autoRun") continue;
+    if (key === "autoRun" || key === "__autoRun") continue;
     next[key] = value;
   }
   return next;

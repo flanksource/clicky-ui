@@ -171,6 +171,12 @@ export type TagListProps = {
    * (via {@link useDensityValue}) is `"compact"`.
    */
   compact?: boolean;
+  /**
+   * When `true`, tag badges wrap onto multiple lines instead of staying on a
+   * single row with a `+N` overflow popover. Used by detail/expanded views
+   * (e.g. LogsTable row details) where vertical space is available.
+   */
+  wrap?: boolean;
 };
 
 function copyToClipboard(text: string) {
@@ -332,12 +338,28 @@ export function TagList({
   className,
   actions = "hover",
   compact,
+  wrap = false,
 }: TagListProps) {
   const density = useDensityValue();
   const isCompact = compact ?? density === "compact";
 
   if (tags.length === 0) {
     return <span className="text-muted-foreground">—</span>;
+  }
+
+  if (wrap) {
+    return (
+      <span className={cn("flex min-w-0 flex-wrap items-center gap-1", className)}>
+        {tags.map((tag, index) => (
+          <TagBadge
+            key={`${tag.display}-${index}`}
+            tag={tag}
+            actions={actions}
+            compact={isCompact}
+          />
+        ))}
+      </span>
+    );
   }
 
   const visible = tags.slice(0, maxVisible);
@@ -378,7 +400,13 @@ export function TagList({
   );
 }
 
-function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
+export function TagPropertiesList({
+  tags,
+  rowClassName = "grid-cols-[minmax(4rem,8rem)_minmax(0,1fr)]",
+}: {
+  tags: NormalizedTag[];
+  rowClassName?: string;
+}) {
   const tagActions = useTagActions();
   const items = useMemo<PropertiesItem<NormalizedTag>[]>(
     () => tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
@@ -390,7 +418,7 @@ function TagPropertiesList({ tags }: { tags: NormalizedTag[] }) {
       items={items}
       density="compact"
       className="border-0 bg-transparent"
-      rowClassName="grid-cols-[minmax(4rem,8rem)_minmax(0,1fr)]"
+      rowClassName={rowClassName}
       renderLabel={(_key, tag) =>
         tag.key ? (
           <span className="font-mono">{tag.key}</span>

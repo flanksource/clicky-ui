@@ -64,6 +64,26 @@ export {
   type IconMenuOption,
 } from "./components/icon-menu-picker";
 
+export { JsonSchemaForm } from "./components/JsonSchemaForm";
+export {
+  resolveControl,
+  effectiveProperties,
+  matchesIf,
+  isOpenStringMap,
+} from "./components/json-schema-form-resolve";
+export type {
+  JsonSchemaFormProps,
+  JsonSchemaObject,
+  JsonSchemaProperty,
+  JsonSchemaConditional,
+  JsonSchemaType,
+  FieldControl,
+  FieldControlKind,
+  FieldOption,
+  PreExtension,
+  PostExtension,
+} from "./components/json-schema-form-types";
+
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {
   Section,

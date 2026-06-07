@@ -2230,7 +2230,7 @@ function ClickyTableRowDetail({
           </div>
           <div className="grid gap-2">
             {tagFields.map(({ column, tags, tableKey }) => {
-              const tagActions = context.tagActionsByColumn[tableKey];
+              const tagActions = context.filterActionsByColumn[tableKey];
               const content = <TagList tags={tags} maxVisible={tags.length} actions="inline" />;
 
               return (

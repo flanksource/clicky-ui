@@ -32,6 +32,15 @@ export {
   type OperationsApiClient,
 } from "./rpc/useOperations";
 export {
+  createOperationsApiClient,
+  OperationsApiClientError,
+  type CreateOperationsApiClientOptions,
+  type OperationApiClientContext,
+  type OperationDefaultParams,
+  type OperationHeadersProvider,
+  type SharedOperationsApiClient,
+} from "./rpc/apiClient";
+export {
   filterOperationsByDomain,
   findDetailEndpoint,
   findListEndpoint,

@@ -143,7 +143,7 @@ export function Properties<V = unknown>({
             <dd className={cn("min-w-0 space-y-density-1", valueClassName)}>
               <div className="flex min-w-0 items-start gap-density-1">
                 <ActionList actions={prefixActions} item={item} className="shrink-0 pt-0.5" />
-                <div className={cn("min-w-0 max-w-full flex-1", styles.value)}>
+                <div className={cn("min-w-0 max-w-full", styles.value)}>
                   {renderValue
                     ? renderValue(item.key, item.value, item)
                     : defaultRenderValue(item.value)}
@@ -176,7 +176,7 @@ function ActionList<V>({
   );
   if (rendered.length === 0) return null;
   return (
-    <span className={cn("inline-flex items-center gap-0.5", className)}>
+    <span className={cn("inline-flex items-center", className)}>
       {rendered.map((action) => (
         <PropertiesActionButton key={action.id} action={action} item={item} />
       ))}

@@ -99,7 +99,7 @@ function hrefForOperationAction(path: string, params: Record<string, string>): s
 
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(nextParams)) {
-    if (value && key !== "autoRun") search.set(key, value);
+    if (value && key !== "autoRun" && key !== "__autoRun") search.set(key, value);
   }
   const query = search.toString();
   return query ? `${route}?${query}` : route;
