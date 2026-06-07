@@ -232,6 +232,42 @@ describe("Combobox dropdown portal", () => {
     fireEvent.mouseDown(option);
     expect(onChange).toHaveBeenCalledWith("ArchiveDB");
   });
+
+  it("sizes the menu to the input width as a minimum and caps growth at 400px", () => {
+    const INPUT_WIDTH = 220;
+    const anchorRect = {
+      width: INPUT_WIDTH,
+      height: 32,
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: INPUT_WIDTH,
+      bottom: 32,
+      toJSON: () => ({}),
+    } as DOMRect;
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue(anchorRect);
+    // Wide viewport so the 400px cap is the binding constraint, not the edge.
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { value: 1600, configurable: true });
+
+    render(<Combobox value="" onChange={vi.fn()} options={OPTIONS} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    const listbox = screen.getByRole("listbox");
+
+    expect(listbox.style.minWidth).toBe(`${INPUT_WIDTH}px`);
+    expect(listbox.style.maxWidth).toBe("400px");
+    // No fixed width — the menu grows to fit content between the two bounds.
+    expect(listbox.style.width).toBe("");
+
+    rectSpy.mockRestore();
+    Object.defineProperty(window, "innerWidth", {
+      value: originalInnerWidth,
+      configurable: true,
+    });
+  });
 });
 
 describe("Combobox inline label", () => {

@@ -12,6 +12,10 @@ import { cn } from "../lib/utils";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiClose, UiCheck } from "../icons";
 
+// Upper bound the open dropdown grows to in order to show full option labels
+// before they truncate. The menu's minimum is always the input's width.
+const MENU_MAX_WIDTH_PX = 400;
+
 export type ComboboxOption = {
   value: string;
   label: string;
@@ -100,8 +104,15 @@ export function Combobox(props: ComboboxProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   // Fixed-position coordinates for the portaled listbox, measured from the
-  // input row. Null until first measured so we never render at (0,0).
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  // input row. `width` is the input width (the menu's minimum); `maxWidth` caps
+  // content growth at 400px, further bounded by the viewport. Null until first
+  // measured so we never render at (0,0).
+  const [menuPos, setMenuPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxWidth: number;
+  } | null>(null);
   // `query` is the type-ahead filter text, kept separate from the committed
   // value. It is empty unless the user is actively typing, so opening the
   // dropdown shows every option rather than only the selected one.
@@ -182,7 +193,11 @@ export function Combobox(props: ComboboxProps) {
       const anchor = anchorRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      // The menu may grow rightward up to 400px, but not past the viewport edge
+      // (leaving an 8px gutter). Never let the cap fall below the input width.
+      const viewportCap = window.innerWidth - rect.left - 8;
+      const maxWidth = Math.max(rect.width, Math.min(MENU_MAX_WIDTH_PX, viewportCap));
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width, maxWidth });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -372,8 +387,17 @@ export function Combobox(props: ComboboxProps) {
           ref={listRef}
           role="listbox"
           aria-multiselectable={multiple || undefined}
-          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }}
-          className="z-[9999] min-w-[10rem] max-h-64 overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+          style={{
+            position: "fixed",
+            top: menuPos.top,
+            left: menuPos.left,
+            // Grow to fit the widest option, but never narrower than the input
+            // nor wider than 400px (beyond which option labels truncate). The
+            // cap is also bounded by the viewport so the menu can't overflow.
+            minWidth: menuPos.width,
+            maxWidth: menuPos.maxWidth,
+          }}
+          className="z-[9999] max-h-64 w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
         >
           {loading && filtered.length === 0 && (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">Loading…</div>

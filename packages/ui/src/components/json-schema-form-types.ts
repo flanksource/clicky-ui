@@ -77,6 +77,10 @@ export type FieldControlKind =
   | "array"
   | "object";
 
+// How an enum control renders. "combobox" (default) is the searchable dropdown;
+// "radio" is a segmented radio-button group for small, fixed option sets.
+export type EnumDisplay = "combobox" | "radio";
+
 // FieldControl is the resolved, render-ready descriptor for one property. The
 // orchestrator infers a base control from the schema, then lets pre-extensions
 // transform it. `value`/`onChange` are carried here so post-extension adornments
@@ -105,6 +109,9 @@ export interface FieldControl {
   // Generic free-text-allowed flag (the consumer's escape hatch for tokens /
   // values outside the enum). Never inferred from value syntax.
   allowCustomValue?: boolean;
+  // Enum presentation. Defaults to "combobox" when unset. A pre-extension sets
+  // "radio" to render a small fixed option set as segmented radio buttons.
+  display?: EnumDisplay;
 
   // adornment hints (set by pre-extensions)
   badge?: string;

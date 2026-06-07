@@ -31,6 +31,24 @@ describe("JsonSchemaForm extension pipeline", () => {
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
   });
 
+  it("renders the schema title as the label and exposes the property key as a hover tooltip", () => {
+    const titled: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        AutoCancelIndicator: { type: "string", title: "Auto Cancel Indicator" },
+      },
+    };
+    render(<JsonSchemaForm schema={titled} value={{ AutoCancelIndicator: "" }} onChange={vi.fn()} />);
+    const label = screen.getByText("Auto Cancel Indicator");
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveAttribute("title", "AutoCancelIndicator");
+  });
+
+  it("omits the tooltip when the label falls back to the property key", () => {
+    render(<JsonSchemaForm schema={schema} value={{ Name: "x", secret: "y" }} onChange={vi.fn()} />);
+    expect(screen.getByText("Name")).not.toHaveAttribute("title");
+  });
+
   it("reflects a pre-extension that sets a badge", () => {
     const badge: PreExtension = (field) => ({ ...field, badge: "AsCode" });
     render(<JsonSchemaForm schema={schema} value={{ Name: "x", secret: "y" }} onChange={vi.fn()} pre={[badge]} />);

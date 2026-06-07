@@ -56,7 +56,7 @@ export function FieldLabel({ field, fieldId }: { field: FieldControl; fieldId: s
   return (
     <label htmlFor={fieldId} className="flex items-center gap-2 text-sm font-medium">
       <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
-      <span>{field.label}</span>
+      <span title={field.label !== field.key ? field.key : undefined}>{field.label}</span>
       {field.required && <span className="text-destructive">*</span>}
       {field.badge && (
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
