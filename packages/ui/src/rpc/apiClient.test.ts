@@ -65,6 +65,41 @@ describe("createOperationsApiClient", () => {
     expect(response.stdout).toContain("tenant not found");
   });
 
+  it("exposes pagination metadata from execution response headers", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(
+        {
+          version: 1,
+          node: { kind: "table", columns: [], rows: [] },
+        },
+        {
+          headers: {
+            "Content-Type": "application/json+clicky",
+            "X-Total-Count": "14",
+            "X-Page-Limit": "5",
+            "X-Page-Offset": "10",
+          },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createOperationsApiClient();
+    const response = await client.executeCommand(
+      "/api/v1/transactions",
+      "GET",
+      { limit: "5", offset: "10" },
+      { Accept: "application/json+clicky" },
+    );
+
+    expect(response.pagination).toEqual({ total: 14, limit: 5, offset: 10 });
+    expect(response.responseHeaders).toMatchObject({
+      "x-total-count": "14",
+      "x-page-limit": "5",
+      "x-page-offset": "10",
+    });
+  });
+
   it("throws non-Clicky non-2xx responses", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ error: "plain failure" }, { status: 500 }),

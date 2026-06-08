@@ -65,6 +65,8 @@ export {
 } from "./components/icon-menu-picker";
 
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
+export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
+export type { FormSize } from "./components/json-schema-form-size";
 export {
   resolveControl,
   effectiveProperties,
@@ -73,6 +75,7 @@ export {
 } from "./components/json-schema-form-resolve";
 export type {
   JsonSchemaFormProps,
+  FormLayout,
   JsonSchemaObject,
   JsonSchemaProperty,
   JsonSchemaConditional,

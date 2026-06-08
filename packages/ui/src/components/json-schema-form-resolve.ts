@@ -6,13 +6,23 @@ import type {
 } from "./json-schema-form-types";
 
 // isOpenStringMap reports whether a property is an object whose entries are
-// described by a sub-schema in `additionalProperties` (a typed key/value map).
+// described by a sub-schema in `additionalProperties` (a typed key/value map) or
+// by `patternProperties` (a per-key-pattern value map). Either makes it an
+// editable key/value control rather than a fixed-property sub-form.
 export function isOpenStringMap(prop: JsonSchemaProperty): boolean {
-  return (
-    schemaHasType(prop, "object") &&
-    typeof prop.additionalProperties === "object" &&
-    prop.additionalProperties !== null
-  );
+  if (!schemaHasType(prop, "object")) return false;
+  if (typeof prop.additionalProperties === "object" && prop.additionalProperties !== null) {
+    return true;
+  }
+  return !!prop.patternProperties && Object.keys(prop.patternProperties).length > 0;
+}
+
+// patternSchemasOf compiles a schema's `patternProperties` into the ordered
+// {pattern, schema} list the string-map control matches keys against.
+function patternSchemasOf(prop: JsonSchemaProperty): { pattern: string; schema: JsonSchemaProperty }[] | undefined {
+  const pp = prop.patternProperties;
+  if (!pp || Object.keys(pp).length === 0) return undefined;
+  return Object.entries(pp).map(([pattern, schema]) => ({ pattern, schema }));
 }
 
 function schemaHasType(prop: JsonSchemaProperty, type: string): boolean {
@@ -51,6 +61,10 @@ export interface ResolveControlArgs {
 export function resolveControl(args: ResolveControlArgs): FieldControl {
   const { key, prop, required, value, onChange } = args;
   const labelIcon = prop["x-icon"];
+  const xLayout = prop["x-layout"];
+  const layout =
+    xLayout === "inline" || xLayout === "stack" || xLayout === "table" ? xLayout : undefined;
+  const keyOptions = keyOptionsFor(prop);
   const base: FieldControl = {
     key,
     kind: "string",
@@ -90,17 +104,36 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     };
   }
   if (schemaHasType(prop, "array")) {
-    return { ...base, kind: "array", ...(prop.items ? { itemSchema: prop.items } : {}) };
+    return {
+      ...base,
+      kind: "array",
+      ...(prop.items ? { itemSchema: prop.items } : {}),
+      ...(layout ? { layout } : {}),
+    };
   }
   // An open map: object whose entries are described by an additionalProperties
-  // sub-schema. Renders as editable key/value rows (+ any known properties).
+  // sub-schema and/or per-key patternProperties. Renders as editable key/value
+  // rows (+ any known properties), with the value form resolved per key.
   if (isOpenStringMap(prop)) {
+    const addl =
+      typeof prop.additionalProperties === "object" && prop.additionalProperties !== null
+        ? (prop.additionalProperties as JsonSchemaProperty)
+        : undefined;
+    const patterns = patternSchemasOf(prop);
+    // A constrained picker (propertyNames enum) or patternProperties still lets
+    // the author ADD keys — the additions are limited to the allowed set, not
+    // free-form — so `additionalProperties: false` doesn't disable "Add field"
+    // in that case. It only closes a plain open map with no key constraints.
+    const allowExtraKeys = keyOptions || patterns ? true : prop.additionalProperties !== false;
     return {
       ...base,
       kind: "string-map",
-      valueSchema: prop.additionalProperties as JsonSchemaProperty,
+      ...(addl ? { valueSchema: addl } : {}),
+      ...(patterns ? { valuePatternSchemas: patterns } : {}),
       ...(prop.properties ? { knownProperties: prop.properties } : {}),
-      allowExtraKeys: true,
+      allowExtraKeys,
+      ...(keyOptions ? { keyOptions } : {}),
+      ...(layout ? { layout } : {}),
     };
   }
   // A structured object: fixed `properties`, not an open map. Renders as a
@@ -111,14 +144,30 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       kind: "object",
       objectProperties: prop.properties,
       ...(prop.required ? { objectRequired: prop.required } : {}),
+      ...(layout ? { layout } : {}),
     };
   }
   // A bare object with neither properties nor an additionalProperties schema:
   // treat as an open string map unless explicitly closed.
   if (schemaHasType(prop, "object")) {
-    return { ...base, kind: "string-map", allowExtraKeys: prop.additionalProperties !== false };
+    return {
+      ...base,
+      kind: "string-map",
+      allowExtraKeys: prop.additionalProperties !== false,
+      ...(keyOptions ? { keyOptions } : {}),
+      ...(layout ? { layout } : {}),
+    };
   }
   return base;
+}
+
+// keyOptionsFor resolves the strict map-key picker options from a map schema's
+// `propertyNames.enum` (e.g. an AsCode-constrained key set). Returns undefined
+// when the keys are unconstrained, so the key stays free-text.
+function keyOptionsFor(prop: JsonSchemaProperty): FieldOption[] | undefined {
+  const pn = prop.propertyNames as JsonSchemaProperty | undefined;
+  if (!pn || !Array.isArray(pn.enum) || pn.enum.length === 0) return undefined;
+  return enumOptions(pn);
 }
 
 // isScalarStringItems reports whether an array's item schema is a plain string

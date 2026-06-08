@@ -1,5 +1,12 @@
 import { cn } from "../lib/utils";
 import { renderObjectFields, type RenderContext } from "./json-schema-form-render";
+import {
+  DEFAULT_FORM_SIZE,
+  fieldInnerGapClass,
+  inlineRowGapClass,
+  labelSizeClass,
+  stackedRowGapClass,
+} from "./json-schema-form-size";
 import type { FormLayout, JsonSchemaFormProps } from "./json-schema-form-types";
 
 const DEFAULT_LABEL_MAX_WIDTH = "40ch";
@@ -30,6 +37,8 @@ export function JsonSchemaForm({
   readOnly = false,
   inline = false,
   layout,
+  size = DEFAULT_FORM_SIZE,
+  idPrefix,
   hideReadOnlyFields = false,
   hiddenKeys,
   requiredFirst = false,
@@ -42,17 +51,20 @@ export function JsonSchemaForm({
     readOnly,
     hideReadOnlyFields,
     layout: resolvedLayout,
+    size,
     requiredFirst,
     pre: pre ?? [],
     post: post ?? [],
     depth: 0,
+    ...(idPrefix ? { idPrefix } : {}),
   };
   const rows = renderObjectFields(schema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
 
+  const rowGap = resolvedLayout.mode === "inline" ? inlineRowGapClass[size] : stackedRowGapClass[size];
   return (
-    <div className="space-y-3">
-      {title && <h3 className="text-sm font-semibold">{title}</h3>}
-      <div className={cn(resolvedLayout.mode === "inline" ? "grid gap-2" : "grid gap-4")}>{rows}</div>
+    <div className={cn("flex flex-col", fieldInnerGapClass[size])}>
+      {title && <h3 className={cn("font-semibold", labelSizeClass[size])}>{title}</h3>}
+      <div className={cn("grid", rowGap)}>{rows}</div>
     </div>
   );
 }

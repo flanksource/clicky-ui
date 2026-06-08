@@ -19,6 +19,7 @@ export {
   type DataTableColumn,
   type DataTableColumnInput,
   type DataTableColumnKind,
+  type DataTableMenuAction,
   type DataTableProps,
   type StatusOptions,
   type TagsOptions,

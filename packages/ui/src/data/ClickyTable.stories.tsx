@@ -1,10 +1,30 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import {
+  UiFileCode,
+  UiFileSpreadsheet,
+  UiFileText,
+  UiJson,
+  UiMarkdown,
+} from "../icons";
 import { ClickyTable, type ClickyColumn, type ClickyRow } from "./Clicky";
+import type { DataTableMenuAction } from "./DataTable";
 
 const columns: ClickyColumn[] = [
   { name: "service", label: "Service", sortable: true, grow: true },
-  { name: "status", label: "Status", kind: "status", sortable: true, shrink: true },
-  { name: "labels", label: "Labels", kind: "tags", filterable: true, grow: true },
+  {
+    name: "status",
+    label: "Status",
+    kind: "status",
+    sortable: true,
+    shrink: true,
+  },
+  {
+    name: "labels",
+    label: "Labels",
+    kind: "tags",
+    filterable: true,
+    grow: true,
+  },
 ];
 
 const rows: ClickyRow[] = [
@@ -38,7 +58,56 @@ const rows: ClickyRow[] = [
         ],
       },
     },
-    detail: { kind: "text", text: "Retry queue is above the warning threshold." },
+    detail: {
+      kind: "text",
+      text: "Retry queue is above the warning threshold.",
+    },
+  },
+];
+
+const menuActions: DataTableMenuAction[] = [
+  {
+    id: "download-yaml",
+    label: "YAML",
+    icon: UiFileCode,
+    iconClassName: "text-violet-600 dark:text-violet-400",
+    onSelect: () => {
+      console.info("Download YAML");
+    },
+  },
+  {
+    id: "download-json",
+    label: "JSON",
+    icon: UiJson,
+    onSelect: () => {
+      console.info("Download JSON");
+    },
+  },
+  {
+    id: "download-csv",
+    label: "CSV",
+    icon: UiFileSpreadsheet,
+    iconClassName: "text-emerald-600 dark:text-emerald-400",
+    onSelect: () => {
+      console.info("Download CSV");
+    },
+  },
+  {
+    id: "download-pdf",
+    label: "PDF",
+    icon: UiFileText,
+    iconClassName: "text-rose-600 dark:text-rose-400",
+    onSelect: () => {
+      console.info("Download PDF");
+    },
+  },
+  {
+    id: "download-markdown",
+    label: "Markdown",
+    icon: UiMarkdown,
+    onSelect: () => {
+      console.info("Download Markdown");
+    },
   },
 ];
 
@@ -58,6 +127,7 @@ const meta: Meta<typeof ClickyTable> = {
     timeRange: { table: { disable: true } },
     externalFilters: { table: { disable: true } },
     pagination: { table: { disable: true } },
+    menuActions: { table: { disable: true } },
   },
   parameters: {
     docs: {
@@ -77,5 +147,11 @@ export const Default: Story = {};
 export const Empty: Story = {
   args: {
     rows: [],
+  },
+};
+
+export const WithMenuActions: Story = {
+  args: {
+    menuActions,
   },
 };

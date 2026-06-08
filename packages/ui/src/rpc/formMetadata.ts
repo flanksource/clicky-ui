@@ -5,7 +5,13 @@ import type {
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
-import type { OpenAPIParameter, OperationLookupFilter, OperationLookupResponse } from "./types";
+import type { DataTablePagination } from "../data/DataTable";
+import type {
+  ExecutionResponse,
+  OpenAPIParameter,
+  OperationLookupFilter,
+  OperationLookupResponse,
+} from "./types";
 import { isPositionalParam } from "./types";
 
 export type ParameterValues = Record<string, string>;
@@ -73,6 +79,33 @@ export function buildInitialParameterValues(
     parameters.map((param) => [param.name, defaultValueForParameter(param, method)]),
   );
   return { ...values, ...initialValues, ...lockedValues };
+}
+
+export function dataTablePaginationFromForm(
+  pagination: ParameterPagination | undefined,
+  response: Pick<ExecutionResponse, "pagination"> | null | undefined,
+): DataTablePagination | undefined {
+  if (!pagination) return undefined;
+
+  const pageSize = positiveInt(pagination.limitValue) ?? response?.pagination?.limit ?? 25;
+  const offset = nonNegativeInt(pagination.offsetValue) ?? response?.pagination?.offset ?? 0;
+  const page = Math.floor(offset / pageSize);
+
+  return {
+    page,
+    pageSize,
+    ...(response?.pagination?.total !== undefined ? { total: response.pagination.total } : {}),
+    onPageChange: (next: number) => {
+      if (positiveInt(pagination.limitValue) == null) {
+        pagination.setLimit(String(pageSize));
+      }
+      pagination.setOffset(String(Math.max(next, 0) * pageSize));
+    },
+    onPageSizeChange: (next: number) => {
+      pagination.setLimit(String(next));
+      pagination.setOffset("0");
+    },
+  };
 }
 
 export function pruneParameterValues(values: ParameterValues) {
@@ -360,6 +393,16 @@ function splitCommaValues(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function positiveInt(value: string | undefined): number | undefined {
+  const parsed = parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nonNegativeInt(value: string | undefined): number | undefined {
+  const parsed = parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {

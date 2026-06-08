@@ -1,4 +1,5 @@
 import type {
+  ExecutionPagination,
   ExecutionResponse,
   OpenAPISpec,
   OperationLookupFilter,
@@ -283,6 +284,7 @@ function parseExecutionResponse(
   const exitCode = parseInt(headers["x-exit-code"] ?? (success ? "0" : "1"), 10);
   const cli = headers["x-cli-command"];
   const error = headers["x-error"] || clickyError;
+  const pagination = paginationFromHeaders(headers);
 
   return {
     success,
@@ -291,6 +293,8 @@ function parseExecutionResponse(
     exit_code: Number.isFinite(exitCode) ? exitCode : success ? 0 : 1,
     contentType: parsed.contentType || headers["content-type"] || "application/json",
     requestUrl: context.requestUrl,
+    responseHeaders: headers,
+    ...(pagination ? { pagination } : {}),
     ...(cli ? { cli } : {}),
     ...(error ? { error } : {}),
     ...(parsed.blob ? { blob: parsed.blob } : {}),
@@ -409,6 +413,25 @@ function responseHeaders(headers: Headers): Record<string, string> {
     out[key.toLowerCase()] = value;
   });
   return out;
+}
+
+function paginationFromHeaders(headers: Record<string, string>): ExecutionPagination | undefined {
+  const pagination: ExecutionPagination = {};
+  const total = integerHeader(headers["x-total-count"]);
+  const limit = integerHeader(headers["x-page-limit"]);
+  const offset = integerHeader(headers["x-page-offset"]);
+
+  if (total !== undefined) pagination.total = total;
+  if (limit !== undefined) pagination.limit = limit;
+  if (offset !== undefined) pagination.offset = offset;
+
+  return Object.keys(pagination).length > 0 ? pagination : undefined;
+}
+
+function integerHeader(value: string | undefined): number | undefined {
+  if (value == null || value.trim() === "") return undefined;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function shouldParseJson(text: string, contentType: string) {

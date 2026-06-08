@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { cn } from "../lib/utils";
 import { LabelIcon, type LabelIconSpec } from "../data/Icon";
 import {
   FieldLabel,
@@ -15,6 +16,7 @@ import type {
   PostExtension,
   PreExtension,
 } from "./json-schema-form-types";
+import { fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
 
 // RenderContext carries everything the recursive renderer needs to descend into
 // array items and object/map values: readOnly/inline layout, the consumer's
@@ -27,6 +29,11 @@ export interface RenderContext {
   hideReadOnlyFields: boolean;
   // Resolved form layout (mode + inline width caps); see FormLayout.
   layout: FormLayout;
+  // Form-wide size token scaling inputs and labels; see FormSize.
+  size: FormSize;
+  // Optional namespace for generated input ids, so multiple forms on one page
+  // don't collide on duplicate ids (which would break label/input focus).
+  idPrefix?: string;
   // requiredFirst stably reorders each object level so required fields render
   // before optional ones (see JsonSchemaFormProps.requiredFirst).
   requiredFirst: boolean;
@@ -53,9 +60,17 @@ function buildField(
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
   if (ctx.hideReadOnlyFields && field.readOnly) return null;
 
-  const fieldId = fieldInputId(field.key);
-  let label: ReactNode = <FieldLabel field={field} fieldId={fieldId} />;
-  let value: ReactNode = renderValueControl(field, ctx);
+  const fieldId = fieldInputId(field.key, ctx.idPrefix);
+  let label: ReactNode = <FieldLabel field={field} fieldId={fieldId} size={ctx.size} />;
+  // A field's `x-layout: inline|stack` overrides the form-level layout for its
+  // own value subtree (the field's own row keeps the parent layout). "table" is
+  // handled structurally inside the array/string-map controls, not here.
+  const overrideMode =
+    field.layout === "inline" ? "inline" : field.layout === "stack" ? "stacked" : undefined;
+  const valueCtx: RenderContext = overrideMode
+    ? { ...ctx, layout: { ...ctx.layout, mode: overrideMode } }
+    : ctx;
+  let value: ReactNode = renderValueControl(field, valueCtx);
   for (const ext of ctx.post) {
     const next = ext(field, { label, value });
     label = next.label;
@@ -87,15 +102,18 @@ export function renderFieldRow(
   const built = buildField(args, ctx);
   if (!built) return null;
   const { field } = built;
-  // Object fields render as a flat section — a header followed by the nested
-  // fields at full width — rather than an inline label + bordered sub-form box.
-  // This keeps deep schemas (e.g. policy → shape, asfile → params) readable as a
-  // single column of labelled sections instead of progressively indented boxes.
-  if (field.kind === "object") {
+  // Object fields — and table-laid-out arrays/string-maps — render as a flat
+  // section: a header followed by their body at full width, rather than an
+  // inline label + narrow value column. This keeps deep schemas (e.g. policy →
+  // shape, asfile → params) readable as a single column of labelled sections,
+  // and gives a `x-layout: "table"` array the full width its columns need
+  // instead of cramming it into the inline value column.
+  if (field.kind === "object" || field.layout === "table") {
     return (
       <ObjectSection
         label={opts?.labelOverride ?? field.label}
         required={field.required}
+        size={ctx.size}
         {...(field.badge ? { badge: field.badge } : {})}
         {...(field.helper ? { helper: field.helper } : {})}
         {...(field.labelIcon != null ? { labelIcon: field.labelIcon } : {})}
@@ -105,7 +123,7 @@ export function renderFieldRow(
     );
   }
   const label = opts?.labelOverride ? (
-    <span className="flex items-center gap-2 text-sm font-medium">
+    <span className={cn("flex items-center gap-2 font-medium", labelSizeClass[ctx.size])}>
       <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
       <span>{opts.labelOverride}</span>
       {field.required && <span className="text-destructive">*</span>}
@@ -122,6 +140,7 @@ export function renderFieldRow(
   return (
     <FieldWrapper
       layout={ctx.layout}
+      size={ctx.size}
       label={label}
       value={built.value}
       {...(field.helper ? { helper: field.helper } : {})}
@@ -137,6 +156,7 @@ export function renderFieldRow(
 function ObjectSection({
   label,
   required,
+  size,
   badge,
   helper,
   labelIcon,
@@ -144,14 +164,15 @@ function ObjectSection({
 }: {
   label: string;
   required: boolean;
+  size: FormSize;
   badge?: string;
   helper?: string;
   labelIcon?: LabelIconSpec;
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2 border-b border-border pb-1 text-sm font-semibold">
+    <div className={cn("flex flex-col", fieldInnerGapClass[size])}>
+      <div className={cn("flex items-center gap-2 border-b border-border pb-1 font-semibold", labelSizeClass[size])}>
         <LabelIcon icon={labelIcon} className="text-[15px] text-muted-foreground" />
         <span>{label}</span>
         {required && <span className="text-destructive">*</span>}

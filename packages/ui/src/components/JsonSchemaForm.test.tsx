@@ -618,3 +618,178 @@ describe("JsonSchemaForm layout", () => {
     expect(inlineGrid(container)).toBeNull();
   });
 });
+
+describe("JsonSchemaForm map key picker (propertyNames)", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      addresses: {
+        type: "object",
+        propertyNames: { enum: ["Home", "Business"] },
+        additionalProperties: { type: "object", properties: { city: { type: "string" } } },
+      },
+    },
+  };
+
+  it("renders the map key as a picker constrained to propertyNames.enum", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ addresses: { "": {} } }} onChange={onChange} />);
+    const keyBox = screen.getByRole("combobox");
+    fireEvent.focus(keyBox);
+    fireEvent.click(keyBox);
+    const home = screen.getByRole("option", { name: "Home" });
+    fireEvent.mouseDown(home);
+    expect(lastCall(onChange)).toEqual({ addresses: { Home: {} } });
+  });
+
+  it("rejects a key outside the enum (strict, no custom values)", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ addresses: { "": {} } }} onChange={onChange} />);
+    const keyBox = screen.getByRole("combobox");
+    fireEvent.change(keyBox, { target: { value: "Garage" } });
+    fireEvent.keyDown(keyBox, { key: "Enter" });
+    // allowCustomValue={false}: the typed non-option is discarded, so the empty
+    // key is never renamed to "Garage".
+    const renamed = onChange.mock.calls.some(
+      (c) => JSON.stringify(c[0]) === JSON.stringify({ addresses: { Garage: {} } }),
+    );
+    expect(renamed).toBe(false);
+  });
+
+  it("stacks the key above the value when the entry value is x-layout: stack", () => {
+    const stackSchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        addresses: {
+          type: "object",
+          propertyNames: { enum: ["Home", "Business"] },
+          additionalProperties: {
+            type: "object",
+            "x-layout": "stack",
+            properties: { line1: { type: "string" }, city: { type: "string" } },
+          },
+        },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={stackSchema}
+        value={{ addresses: { Home: { line1: "1 Maple St", city: "Mbabane" } } }}
+        onChange={vi.fn()}
+      />,
+    );
+    // No fixed key-column grid: the key picker is not in a `10rem _ auto` row.
+    const keyColumnGrid = [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+      el.className.includes("grid-cols-[10rem"),
+    );
+    expect(keyColumnGrid).toBeUndefined();
+    // Both the key picker and the stacked value fields are present in one unit.
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("1 Maple St")).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm map value form varies by key (patternProperties)", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      dwellings: {
+        type: "object",
+        propertyNames: { enum: ["House", "Apartment"] },
+        additionalProperties: false,
+        patternProperties: {
+          "^House$": { type: "object", properties: { lotSize: { type: "string", title: "Lot size" } } },
+          "^Apartment$": { type: "object", properties: { unit: { type: "string", title: "Unit" } } },
+        },
+      },
+    },
+  };
+
+  it("renders the House value form for a House key", () => {
+    render(<JsonSchemaForm schema={schema} value={{ dwellings: { House: { lotSize: "600" } } }} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue("600")).toBeInTheDocument();
+    expect(screen.getByText("Lot size")).toBeInTheDocument();
+    expect(screen.queryByText("Unit")).not.toBeInTheDocument();
+  });
+
+  it("renders the Apartment value form for an Apartment key", () => {
+    render(<JsonSchemaForm schema={schema} value={{ dwellings: { Apartment: { unit: "4B" } } }} onChange={vi.fn()} />);
+    expect(screen.getByDisplayValue("4B")).toBeInTheDocument();
+    expect(screen.getByText("Unit")).toBeInTheDocument();
+    expect(screen.queryByText("Lot size")).not.toBeInTheDocument();
+  });
+
+  it("still offers Add field even though additionalProperties is false (keys are picker-constrained)", () => {
+    render(<JsonSchemaForm schema={schema} value={{ dwellings: {} }} onChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /add field/i })).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm x-layout: table", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      rows: {
+        type: "array",
+        "x-layout": "table",
+        items: {
+          type: "object",
+          properties: { name: { type: "string" }, port: { type: "integer" } },
+        },
+      },
+    },
+  };
+
+  it("renders column headers and one editable row per item", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm schema={schema} value={{ rows: [{ name: "a", port: 80 }] }} onChange={onChange} />,
+    );
+    expect(screen.getByRole("columnheader", { name: "name" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "port" })).toBeInTheDocument();
+    const nameInput = screen.getByDisplayValue("a");
+    fireEvent.change(nameInput, { target: { value: "b" } });
+    expect(lastCall(onChange)).toEqual({ rows: [{ name: "b", port: 80 }] });
+  });
+
+  it("renders full-width (no inline label/value grid) even when the form is inline", () => {
+    const inlineGrid = (container: HTMLElement): HTMLElement | null =>
+      [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+        el.style.gridTemplateColumns.includes("minmax"),
+      ) ?? null;
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{ rows: [{ name: "a", port: 80 }] }} onChange={vi.fn()} inline />,
+    );
+    // The table is laid out as a headed full-width section, not crammed into the
+    // narrow inline value column — so no minmax label/value grid wraps it.
+    expect(inlineGrid(container)).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "name" })).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm x-layout: stack", () => {
+  function inlineGrid(container: HTMLElement): HTMLElement | null {
+    return [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+      el.style.gridTemplateColumns.includes("minmax"),
+    ) ?? null;
+  }
+
+  it("forces a stacked subtree even when the form is inline", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        addr: {
+          type: "object",
+          "x-layout": "stack",
+          properties: { city: { type: "string" }, state: { type: "string" } },
+        },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{ addr: { city: "", state: "" } }} onChange={vi.fn()} inline />,
+    );
+    // The address object's children render stacked (no inline grid), despite the
+    // form-level inline mode.
+    expect(inlineGrid(container)).toBeNull();
+  });
+});

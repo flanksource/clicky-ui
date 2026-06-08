@@ -335,7 +335,12 @@ describe("OperationCommandPage", () => {
     );
 
     renderPage(client, {
-      initialValues: { id: "flagged-widget", autoRun: "1", __autoRun: "1" },
+      initialValues: {
+        id: "flagged-widget",
+        autoRun: "1",
+        __autoRun: "1",
+        __entity: "entity-1",
+      },
     });
 
     await screen.findByRole("heading", { name: "Get widget" });
