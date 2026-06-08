@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { vi } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, vi } from "vitest";
 import { Clicky, type ClickyDocument } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
 
@@ -69,6 +75,10 @@ function createCommandClient() {
 }
 
 describe("Clicky", () => {
+  beforeEach(() => {
+    document.getElementById("clicky-download-frame")?.remove();
+  });
+
   it("renders a JSON string payload", () => {
     render(<Clicky data={JSON.stringify(clickyFixture)} />);
 
@@ -126,7 +136,9 @@ describe("Clicky", () => {
       />,
     );
 
-    expect(screen.getByText("java.lang.NullPointerException")).toBeInTheDocument();
+    expect(
+      screen.getByText("java.lang.NullPointerException"),
+    ).toBeInTheDocument();
     expect(screen.getByText("name must not be null")).toBeInTheDocument();
     expect(screen.getByText("Caused by")).toBeInTheDocument();
     expect(screen.getByText("Greeter.greet")).toBeInTheDocument();
@@ -150,7 +162,8 @@ describe("Clicky", () => {
     expect(screen.getByText("platform")).toBeInTheDocument();
     expect(
       screen.getAllByText(
-        (_, element) => element?.textContent?.includes("apiVersion: v1") ?? false,
+        (_, element) =>
+          element?.textContent?.includes("apiVersion: v1") ?? false,
       )[0],
     ).toBeInTheDocument();
   });
@@ -166,7 +179,11 @@ describe("Clicky", () => {
           {
             cells: {
               _id: { kind: "text", text: "widget-1", plain: "widget-1" },
-              name: { kind: "text", text: "First widget", plain: "First widget" },
+              name: {
+                kind: "text",
+                text: "First widget",
+                plain: "First widget",
+              },
             },
           },
         ],
@@ -216,15 +233,20 @@ describe("Clicky", () => {
     render(<Clicky data={clickyDocument} />);
 
     fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
-    const healthyFilter = document.querySelector('[data-filter-option="healthy"]');
+    const healthyFilter = document.querySelector(
+      '[data-filter-option="healthy"]',
+    );
     if (!healthyFilter) {
       throw new Error("Expected healthy filter option");
     }
     fireEvent.click(healthyFilter);
 
-    await waitFor(() => expect(screen.queryByText("worker")).not.toBeInTheDocument(), {
-      timeout: 1_500,
-    });
+    await waitFor(
+      () => expect(screen.queryByText("worker")).not.toBeInTheDocument(),
+      {
+        timeout: 1_500,
+      },
+    );
     expect(screen.getByText("api")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("api"));
@@ -250,7 +272,11 @@ describe("Clicky", () => {
                 kind: "list",
                 items: [
                   { kind: "text", text: "env=prod", plain: "env=prod" },
-                  { kind: "text", text: "team=platform", plain: "team=platform" },
+                  {
+                    kind: "text",
+                    text: "team=platform",
+                    plain: "team=platform",
+                  },
                 ],
               },
             },
@@ -260,7 +286,9 @@ describe("Clicky", () => {
               service: { kind: "text", text: "worker", plain: "worker" },
               tags: {
                 kind: "list",
-                items: [{ kind: "text", text: "env=staging", plain: "env=staging" }],
+                items: [
+                  { kind: "text", text: "env=staging", plain: "env=staging" },
+                ],
               },
             },
           },
@@ -273,15 +301,24 @@ describe("Clicky", () => {
     fireEvent.click(screen.getByText("api"));
 
     expect(screen.getByText("Fields")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Include env=prod$/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Exclude env=prod$/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Copy env=prod$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Include env=prod$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Exclude env=prod$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Copy env=prod$/ }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Include env=prod$/ }));
 
-    await waitFor(() => expect(screen.queryByText("worker")).not.toBeInTheDocument(), {
-      timeout: 1_500,
-    });
+    await waitFor(
+      () => expect(screen.queryByText("worker")).not.toBeInTheDocument(),
+      {
+        timeout: 1_500,
+      },
+    );
     expect(screen.getAllByText("api").length).toBeGreaterThan(0);
   });
 
@@ -311,7 +348,11 @@ describe("Clicky", () => {
                   },
                   {
                     name: "agreementGUID",
-                    value: { kind: "text", text: "agreement-1", plain: "agreement-1" },
+                    value: {
+                      kind: "text",
+                      text: "agreement-1",
+                      plain: "agreement-1",
+                    },
                   },
                 ],
               },
@@ -333,7 +374,11 @@ describe("Clicky", () => {
                 fields: [
                   {
                     name: "typeCode",
-                    value: { kind: "text", text: "MSTR-INS", plain: "MSTR-INS" },
+                    value: {
+                      kind: "text",
+                      text: "MSTR-INS",
+                      plain: "MSTR-INS",
+                    },
                   },
                 ],
               },
@@ -346,7 +391,9 @@ describe("Clicky", () => {
     render(<Clicky data={clickyDocument} />);
 
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByText("Agreement 1: Group Scheme Contract")).toBeInTheDocument();
+    expect(
+      screen.getByText("Agreement 1: Group Scheme Contract"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Acme Africa Holdings")).not.toBeVisible();
 
     fireEvent.click(screen.getByText("Agreement 1: Group Scheme Contract"));
@@ -355,50 +402,45 @@ describe("Clicky", () => {
     expect(screen.getByText("MSTR-INS")).toBeVisible();
   });
 
-  it("exposes Clicky and JSON primary views with overflow formats and JSON-first downloads", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
+  it("exposes Clicky and JSON primary views with overflow formats and whitelisted table downloads", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        const url = String(input);
 
-      if (url.includes("format=clicky-json")) {
-        return new Response(JSON.stringify(clickyFixture), {
-          status: 200,
-          headers: { "Content-Type": "application/json+clicky" },
-        });
-      }
-
-      if (url.includes("format=json")) {
-        return new Response(
-          JSON.stringify({
-            service: "api",
-            healthy: true,
-            replicas: 3,
-          }),
-          {
+        if (url.includes("format=clicky-json")) {
+          return new Response(JSON.stringify(clickyFixture), {
             status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
+            headers: { "Content-Type": "application/json+clicky" },
+          });
+        }
 
-      if (url.includes("format=markdown")) {
-        return new Response("# Report\n\nAll systems nominal.", {
+        if (url.includes("format=json")) {
+          return new Response(
+            JSON.stringify({
+              service: "api",
+              healthy: true,
+              replicas: 3,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        if (url.includes("format=markdown")) {
+          return new Response("# Report\n\nAll systems nominal.", {
+            status: 200,
+            headers: { "Content-Type": "text/markdown" },
+          });
+        }
+
+        return new Response("", {
           status: 200,
-          headers: { "Content-Type": "text/markdown" },
+          headers: { "Content-Type": "text/plain" },
         });
-      }
-
-      return new Response("", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
       });
-    });
-    const submittedActions: string[] = [];
-    const submitSpy = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(function (this: HTMLFormElement) {
-        submittedActions.push(this.action);
-      });
-
     render(<Clicky url="/api/clicky/report" />);
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -410,11 +452,63 @@ describe("Clicky", () => {
       }),
     );
     expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
-    expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Clicky" })).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("radiogroup", { name: /clicky view mode/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Clicky" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(screen.getByRole("radio", { name: "JSON" })).toBeInTheDocument();
-    expect(screen.queryByRole("radio", { name: "PDF" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^download json/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("radio", { name: "PDF" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^download json/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    let tableMenu = screen.getByRole("menu", { name: /column menu/i });
+    expect(within(tableMenu).getByText("Download")).toBeInTheDocument();
+    for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
+      expect(
+        within(tableMenu).getByRole("menuitem", {
+          name: new RegExp(`^${label}$`, "i"),
+        }),
+      ).toBeInTheDocument();
+    }
+    for (const label of ["Clicky", "HTML", "Pretty", "Excel", "Slack"]) {
+      expect(
+        within(tableMenu).queryByRole("menuitem", {
+          name: new RegExp(`^${label}$`, "i"),
+        }),
+      ).not.toBeInTheDocument();
+    }
+    expect(
+      within(tableMenu).queryByText(
+        "Portable document for sharing and printing",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      within(tableMenu).getByRole("menuitem", { name: /^JSON\b/i }),
+    );
+
+    const downloadFrame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    expect(downloadFrame).toBeInstanceOf(HTMLIFrameElement);
+    expect(downloadFrame.src).toContain("/api/clicky/report?format=json");
+    expect(downloadFrame.src).toContain("filename=report.json");
+    expect(downloadFrame.src).toContain("_download=");
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    tableMenu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(
+      within(tableMenu).getByRole("menuitem", { name: /^YAML\b/i }),
+    );
+
+    expect(downloadFrame.src).toContain("/api/clicky/report?format=yaml");
+    expect(downloadFrame.src).toContain("filename=report.yaml");
 
     fireEvent.click(screen.getByRole("radio", { name: "JSON" }));
 
@@ -430,24 +524,43 @@ describe("Clicky", () => {
     expect(screen.getByText("service")).toBeInTheDocument();
     expect(screen.getByText('"api"')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /open additional view menu/i }));
-    expect(screen.getByRole("menuitemradio", { name: /pdf/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /html/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /markdown/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /yaml/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /csv/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /pretty/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /excel/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemradio", { name: /slack/i })).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /open additional view menu/i }),
+    );
+    expect(
+      screen.getByRole("menuitemradio", { name: /pdf/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /html/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /markdown/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /yaml/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /csv/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /pretty/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /excel/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitemradio", { name: /slack/i }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("menuitemradio", { name: /pdf/i }));
 
     expect(screen.getByTitle("Clicky PDF preview")).toHaveAttribute(
       "src",
       "/api/clicky/report?format=pdf",
     );
-    expect(screen.getByRole("button", { name: /open download menu/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /open additional view menu/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /open additional view menu/i }),
+    );
     fireEvent.click(screen.getByRole("menuitemradio", { name: /markdown/i }));
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -458,50 +571,31 @@ describe("Clicky", () => {
         }),
       }),
     );
-    expect(await screen.findByLabelText("Clicky text preview")).toHaveTextContent("# Report");
-
-    fireEvent.click(screen.getByRole("button", { name: /^download json/i }));
-
-    expect(submitSpy).toHaveBeenCalledTimes(1);
-    expect(submittedActions[0]).toContain("/api/clicky/report?format=json");
-
-    fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));
     expect(
-      screen.getByText("Rendered Clicky JSON with the rich Clicky viewer"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Portable document for sharing and printing")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: /clicky/i }));
-
-    expect(submitSpy).toHaveBeenCalledTimes(2);
-    expect(submittedActions[1]).toContain("/api/clicky/report?format=clicky-json");
+      await screen.findByLabelText("Clicky text preview"),
+    ).toHaveTextContent("# Report");
 
     fetchSpy.mockRestore();
-    submitSpy.mockRestore();
   });
 
   it("supports an empty remote view config without rendering the mode switcher", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        const url = String(input);
 
-      if (url.includes("format=clicky-json")) {
-        return new Response(JSON.stringify(clickyFixture), {
+        if (url.includes("format=clicky-json")) {
+          return new Response(JSON.stringify(clickyFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/json+clicky" },
+          });
+        }
+
+        return new Response("", {
           status: 200,
-          headers: { "Content-Type": "application/json+clicky" },
+          headers: { "Content-Type": "text/plain" },
         });
-      }
-
-      return new Response("", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
       });
-    });
-    const submittedActions: string[] = [];
-    const submitSpy = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(function (this: HTMLFormElement) {
-        submittedActions.push(this.action);
-      });
-
     render(
       <Clicky
         url="/api/clicky/report"
@@ -520,21 +614,130 @@ describe("Clicky", () => {
       }),
     );
     expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
-    expect(screen.queryByRole("radiogroup", { name: /clicky view mode/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("radiogroup", { name: /clicky view mode/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /open additional view menu/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /download json/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /download json/i }),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /open download menu/i }));
-    expect(screen.getByText("Portable document for sharing and printing")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: /pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const tableMenu = screen.getByRole("menu", { name: /column menu/i });
+    expect(within(tableMenu).getByText("Download")).toBeInTheDocument();
+    expect(
+      within(tableMenu).queryByText(
+        "Portable document for sharing and printing",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(tableMenu).getByRole("menuitem", { name: /pdf/i }));
 
-    expect(submitSpy).toHaveBeenCalledTimes(1);
-    expect(submittedActions[0]).toContain("/api/clicky/report?format=pdf");
+    const downloadFrame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    expect(downloadFrame).toBeInstanceOf(HTMLIFrameElement);
+    expect(downloadFrame.src).toContain("/api/clicky/report?format=pdf");
+    expect(downloadFrame.src).toContain("filename=report.pdf");
+    expect(downloadFrame.src).toContain("_download=");
 
     fetchSpy.mockRestore();
-    submitSpy.mockRestore();
+  });
+
+  it("moves format downloads into the table menu for table outputs", async () => {
+    const tableDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [
+          { name: "code", label: "Code" },
+          { name: "name", label: "Name" },
+        ],
+        rows: [
+          {
+            cells: {
+              code: { kind: "text", text: "200", plain: "200" },
+              name: { kind: "text", text: "Sales", plain: "Sales" },
+            },
+          },
+        ],
+      },
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(tableDocument), {
+        status: 200,
+        headers: { "Content-Type": "application/json+clicky" },
+      }),
+    );
+
+    render(
+      <Clicky
+        url="/api/v1/accounts?limit=5"
+        data={tableDocument}
+        download={{ all: true, label: "accounts" }}
+      />,
+    );
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^download json/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /open download menu/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+
+    const densityItem = within(menu).getByRole("menuitemradio", {
+      name: /use page density/i,
+    });
+    const downloadHeader = within(menu).getByText("Download");
+    const pdfItem = within(menu).getByRole("menuitem", { name: /pdf/i });
+
+    expect(
+      Boolean(
+        densityItem.compareDocumentPosition(downloadHeader) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(
+      Boolean(
+        downloadHeader.compareDocumentPosition(pdfItem) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+
+    for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
+      expect(
+        within(menu).getByRole("menuitem", {
+          name: new RegExp(`^${label}$`, "i"),
+        }),
+      ).toBeInTheDocument();
+    }
+    for (const label of ["Clicky", "HTML", "Pretty", "Excel", "Slack"]) {
+      expect(
+        within(menu).queryByRole("menuitem", {
+          name: new RegExp(`^${label}$`, "i"),
+        }),
+      ).not.toBeInTheDocument();
+    }
+    expect(
+      within(menu).queryByText("Portable document for sharing and printing"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(pdfItem);
+
+    const downloadFrame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    expect(downloadFrame).toBeInstanceOf(HTMLIFrameElement);
+    expect(downloadFrame.src).toContain("/api/v1/accounts?limit=5&format=pdf");
+    expect(downloadFrame.src).toContain("filename=accounts.pdf");
+    expect(downloadFrame.src).toContain("_download=");
+
+    fetchSpy.mockRestore();
   });
 
   it("renders tree nodes through the native tree component", () => {
@@ -543,7 +746,9 @@ describe("Clicky", () => {
     const tree = screen.getByRole("tree");
     expect(tree).toBeInTheDocument();
     expect(
-      within(tree).getAllByText((_, element) => element?.textContent === "cluster / prod-eu")[0],
+      within(tree).getAllByText(
+        (_, element) => element?.textContent === "cluster / prod-eu",
+      )[0],
     ).toBeInTheDocument();
     expect(within(tree).getByText("worker")).toBeInTheDocument();
   });
@@ -596,7 +801,9 @@ describe("Clicky", () => {
     fireEvent.click(screen.getByRole("button", { name: "stack-42" }));
 
     await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
-    expect(onNavigate.mock.calls[0][0].request.command).toBe("stack/get-descendants");
+    expect(onNavigate.mock.calls[0][0].request.command).toBe(
+      "stack/get-descendants",
+    );
     expect(onNavigate.mock.calls[0][0].request.flags).toEqual({ events: "1" });
   });
 
@@ -663,7 +870,9 @@ describe("Clicky", () => {
     fireEvent.click(screen.getByRole("button", { name: "show descendants" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /run command/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /run command/i }),
+    ).toBeInTheDocument();
     await waitFor(() => expect(client.executeCommand).not.toHaveBeenCalled());
   });
 
@@ -746,7 +955,8 @@ describe("Clicky", () => {
         kind: "code",
         language: "xml",
         source: "<Activity><Math/></Activity>",
-        highlightedHtml: '<pre class="chroma"><span class="nt">Activity</span> tag</pre>',
+        highlightedHtml:
+          '<pre class="chroma"><span class="nt">Activity</span> tag</pre>',
       },
     };
 
@@ -778,9 +988,12 @@ describe("Clicky", () => {
     await waitFor(() => {
       expect(container.querySelector("pre.shiki")).not.toBeNull();
     });
-    expect(mockHighlightCode).toHaveBeenCalledWith("type SourceResolver interface {}", {
-      lang: "go",
-    });
+    expect(mockHighlightCode).toHaveBeenCalledWith(
+      "type SourceResolver interface {}",
+      {
+        lang: "go",
+      },
+    );
     expect(within(container).getByText("SourceResolver")).toBeInTheDocument();
   });
 

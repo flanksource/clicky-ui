@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiListFlat, UiTable } from "../icons";
@@ -25,6 +25,7 @@ import {
 } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
 import {
+  dataTablePaginationFromForm,
   packParameterValues,
   parametersToFormConfig,
   type ParameterFormOptions,
@@ -129,6 +130,7 @@ export function OperationCatalog({
         },
       ),
     enabled: !!listEndpoint && view === "table",
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
@@ -169,6 +171,10 @@ export function OperationCatalog({
     }
     return parametersToFormConfig(listParameters, filters, setFilters, options);
   }, [filters, listParameters, lookupQuery.data]);
+  const dataTablePagination = useMemo(
+    () => dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),
+    [filterBarConfig.pagination, listQuery.data],
+  );
 
   const hasTable = !!listEndpoint;
   const showTable = hasTable && view === "table";
@@ -325,19 +331,13 @@ export function OperationCatalog({
 
       {showTable ? (
         <>
-          {listQuery.isLoading ? (
-            <ExecutionResult
-              loading
-              loadingMessage={`Loading ${definition.title} results…`}
-              emptyMessage="No records returned"
-              ariaLabel={`${definition.title} results`}
-              className="mt-0"
-            />
-          ) : listQuery.isError ? (
+          {listQuery.isError && !listQuery.data ? (
             renderError(listQuery.error, `Failed to load ${listEndpoint?.path ?? ""}`)
-          ) : listQuery.data ? (
+          ) : (
             <ExecutionResult
-              response={listQuery.data}
+              response={listQuery.data ?? null}
+              loading={listQuery.isFetching}
+              loadingMessage={`Loading ${definition.title} results…`}
               emptyMessage="No records returned"
               ariaLabel={`${definition.title} results`}
               className="mt-0"
@@ -347,8 +347,9 @@ export function OperationCatalog({
               {...(filterBarConfig.filters.length > 0
                 ? { externalFilters: filterBarConfig.filters }
                 : {})}
+              {...(dataTablePagination ? { pagination: dataTablePagination } : {})}
             />
-          ) : null}
+          )}
         </>
       ) : (
         <EndpointList
@@ -423,7 +424,7 @@ function SkeletonBlock({ className }: { className?: string }) {
 
 function writeFiltersToUrl(filters: Record<string, string>) {
   if (typeof window === "undefined") return;
-  const search = new URLSearchParams();
+  const search = reservedSearchParamsFromUrl();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== "") search.set(key, value);
   }
@@ -432,4 +433,15 @@ function writeFiltersToUrl(filters: Record<string, string>) {
   if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
     window.history.replaceState(window.history.state, "", next);
   }
+}
+
+function reservedSearchParamsFromUrl() {
+  const current = new URLSearchParams(window.location.search);
+  const next = new URLSearchParams();
+  for (const [key, value] of current.entries()) {
+    if (!key.startsWith("__")) continue;
+    if (key === "__autoRun" || key.startsWith("__arg")) continue;
+    next.append(key, value);
+  }
+  return next;
 }

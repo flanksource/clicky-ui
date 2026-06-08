@@ -1,12 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { JsonSchemaForm } from "./JsonSchemaForm";
+import type { FormSize } from "./json-schema-form-size";
 import type {
   JsonSchemaFormProps,
   JsonSchemaObject,
   PostExtension,
   PreExtension,
 } from "./json-schema-form-types";
+
+const ALL_SIZES: FormSize[] = ["xs", "sm", "md", "lg", "xl"];
 
 // Renders the form as a controlled component and echoes the live value as JSON
 // so every story doubles as a working demo of what onChange emits.
@@ -68,6 +71,17 @@ const meta = {
       description:
         "Form-level layout, overrides `inline`. Inline mode caps the label column (`labelMaxWidth`, default `40ch`) and value column (`valueMaxWidth`, default `400px`).",
       table: { category: "Appearance" },
+    },
+    size: {
+      control: "inline-radio",
+      options: ["xs", "sm", "md", "lg", "xl"],
+      description: "Scales every input and label form-wide. Defaults to `md`.",
+      table: { category: "Appearance", defaultValue: { summary: "md" } },
+    },
+    idPrefix: {
+      control: "text",
+      description: "Namespaces generated input ids so multiple forms on one page don't collide.",
+      table: { category: "Behavior" },
     },
     title: { control: "text", table: { category: "Appearance" } },
     hiddenKeys: { control: "object", table: { category: "Behavior" } },
@@ -227,6 +241,43 @@ export const InlineCustomWidths: Story = {
       description: {
         story:
           "Pass an explicit `layout` to override the inline width caps — here a narrower `8rem` label column and a `240px` value column. `layout` takes precedence over the `inline` shorthand.",
+      },
+    },
+  },
+};
+
+// Each column owns its own controlled value so the five forms are independent —
+// editing one doesn't bleed into the others (and their field ids stay unique
+// per column, so label/input focus association works).
+function SizeColumn({ size }: { size: FormSize }) {
+  const [value, setValue] = useState<Record<string, unknown>>({
+    name: "Ada Lovelace",
+    age: 36,
+    active: true,
+    role: "editor",
+    tags: ["math"],
+  });
+  return (
+    <div className="min-w-64 space-y-2">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{size}</div>
+      <JsonSchemaForm schema={scalarSchema} value={value} onChange={setValue} size={size} idPrefix={size} />
+    </div>
+  );
+}
+
+export const Sizes: Story = {
+  render: () => (
+    <div className="flex flex-wrap gap-8">
+      {ALL_SIZES.map((size) => (
+        <SizeColumn key={size} size={size} />
+      ))}
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The `size` prop scales every input and label form-wide across `xs`–`xl` (default `md`). Each column is an independent controlled form, so you can compare the full scale side by side — smaller sizes also tighten the vertical gaps between fields, larger sizes cap their spacing at `lg`.",
       },
     },
   },
@@ -648,6 +699,147 @@ export const EnumArray: Story = {
       description: {
         story:
           "An array whose items carry an `enum` is NOT a tag list — each item gets its own Combobox so values stay constrained to (and discoverable from) the option set, with the usual add / remove / reorder controls.",
+      },
+    },
+  },
+};
+
+// A keyed map whose KEYS are constrained by `propertyNames.enum` (a strict
+// picker, no free-text keys) AND whose VALUE form varies per key via
+// `patternProperties` — the standard JSON-Schema way to tie a map value's schema
+// to its key. Picking `House` types the entry against the `^House$` schema;
+// `Apartment` against `^Apartment$`. Each value carries `x-layout: "stack"` so
+// the key joins the stacked unit above its fields.
+const mapKeyPickerSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    dwellings: {
+      type: "object",
+      title: "Dwellings",
+      propertyNames: { enum: ["House", "Apartment"] },
+      additionalProperties: false,
+      patternProperties: {
+        "^House$": {
+          type: "object",
+          "x-layout": "stack",
+          properties: {
+            line1: { type: "string", title: "Line 1" },
+            city: { type: "string", title: "City" },
+            lotSize: { type: "string", title: "Lot size" },
+            floors: { type: "integer", title: "Floors", minimum: 1 },
+            hasGarden: { type: "boolean", title: "Has garden" },
+          },
+        },
+        "^Apartment$": {
+          type: "object",
+          "x-layout": "stack",
+          properties: {
+            line1: { type: "string", title: "Line 1" },
+            city: { type: "string", title: "City" },
+            buildingName: { type: "string", title: "Building name" },
+            unit: { type: "string", title: "Unit" },
+            floor: { type: "integer", title: "Floor" },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const MapKeyPicker: Story = {
+  args: {
+    schema: mapKeyPickerSchema,
+    value: {
+      dwellings: {
+        House: { line1: "1 Maple St", city: "Mbabane", lotSize: "600m²", floors: 2, hasGarden: true },
+      },
+    },
+    title: "Dwellings",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Two features combined. **(1) Strict key picker:** the map declares `propertyNames.enum`, so the key field is a dropdown limited to those options (no free-text keys) — click **Add field** and pick `House` or `Apartment`; already-used keys are filtered out. **(2) Per-key value form:** `patternProperties` maps each key to its own value schema (`^House$` → lot-size / floors / garden, `^Apartment$` → building / unit / floor), so the form rendered under each entry depends on which key you picked — the standard JSON-Schema way to vary a map value by its key, with no duplicate discriminator field. `x-layout: \"stack\"` keeps the key and its fields together as one full-width unit.",
+      },
+    },
+  },
+};
+
+// `x-layout: "table"` renders an array of small objects as a compact table —
+// one column per item property, one row per item — instead of the default
+// per-item stacked sub-form. Ideal for short, wide collections like roles.
+const tableLayoutSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    roles: {
+      type: "array",
+      title: "Roles",
+      "x-layout": "table",
+      items: {
+        type: "object",
+        properties: {
+          clientGuid: { type: "string", title: "Client" },
+          primary: { type: "string", title: "Primary", enum: ["Group Scheme", "Owner", "Insured"] },
+          secondary: { type: "string", title: "Secondary", enum: ["Scheme", "Member"] },
+        },
+      },
+    },
+  },
+};
+
+export const TableLayout: Story = {
+  args: {
+    schema: tableLayoutSchema,
+    value: {
+      roles: [
+        { clientGuid: "{{scheme.guid}}", primary: "Group Scheme", secondary: "Scheme" },
+        { clientGuid: "{{clients.Director.guid}}", primary: "Owner", secondary: "Member" },
+      ],
+    },
+    title: "Relationships",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`x-layout: \"table\"` on an array of objects renders it as a table — a header row of the item's property names and one compact row per item, with a per-row remove and an **Add item** button. Compare with **ArrayOfObjects**, which renders the same data as taller per-item sub-forms. Absent the hint, the stacked form is still the default.",
+      },
+    },
+  },
+};
+
+// `x-layout` also forces a per-subtree layout mode that overrides the form-level
+// `inline` setting: here the form is inline (two-column), but the `address`
+// object opts into a stacked layout for its own fields.
+const stackOverrideSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    name: { type: "string", title: "Name" },
+    address: {
+      type: "object",
+      title: "Address",
+      "x-layout": "stack",
+      properties: {
+        line1: { type: "string", title: "Line 1" },
+        city: { type: "string", title: "City" },
+      },
+    },
+  },
+};
+
+export const LayoutOverride: Story = {
+  args: {
+    schema: stackOverrideSchema,
+    value: { name: "Ada Lovelace", address: { line1: "1 Maple St", city: "Mbabane" } },
+    title: "Profile",
+    inline: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A per-field `x-layout` overrides the form-level layout for that field's subtree. The form is `inline` (two-column), but the `address` object declares `x-layout: \"stack\"`, so its `line1`/`city` fields render stacked (label above value) while the top-level `name` stays inline. Precedence is: explicit `x-layout` > form-level `layout`/`inline`.",
       },
     },
   },

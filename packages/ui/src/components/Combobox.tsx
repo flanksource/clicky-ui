@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiClose, UiCheck } from "../icons";
+import { inputSizeClass, type FormSize } from "./json-schema-form-size";
 
 // Upper bound the open dropdown grows to in order to show full option labels
 // before they truncate. The menu's minimum is always the input's width.
@@ -43,6 +44,11 @@ type ComboboxBaseProps = {
   allowCustomValue?: boolean;
   /** HTML id for the input element. */
   id?: string;
+  /**
+   * Overrides the input's height/padding/text size with an explicit size token
+   * (xs–xl). When unset, the input uses the global density tokens.
+   */
+  size?: FormSize;
   /** Classes applied to the root wrapper. */
   className?: string;
   /** Shows a loading indicator when options are being fetched. */
@@ -87,6 +93,7 @@ export function Combobox(props: ComboboxProps) {
     required,
     allowCustomValue = true,
     id,
+    size,
     className,
     loading,
     onSearch,
@@ -335,7 +342,8 @@ export function Combobox(props: ComboboxProps) {
           onFocus={openMenu}
           onKeyDown={onKeyDown}
           className={cn(
-            "h-control-h w-full rounded-md border border-input bg-background px-control-px text-sm text-foreground",
+            "w-full rounded-md border border-input bg-background text-foreground",
+            size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
             showClear ? "pr-14" : "pr-8",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",

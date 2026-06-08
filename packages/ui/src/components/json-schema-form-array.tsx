@@ -1,18 +1,21 @@
-import { type KeyboardEvent } from "react";
+import { type KeyboardEvent, type ReactNode } from "react";
+import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiChevronDown, UiChevronUp, UiClose, UiTrash } from "../icons";
 import { Button } from "./button";
 import { defaultPlaceholder } from "./json-schema-form-fields";
+import { controlMinHeightClass, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
 import { isScalarStringItems } from "./json-schema-form-resolve";
 import {
   moveItem,
   removeIndex,
+  renderFieldNodes,
   renderFieldRow,
   seedFromSchema,
   setIndex,
   type RenderContext,
 } from "./json-schema-form-render";
-import type { FieldControl } from "./json-schema-form-types";
+import type { FieldControl, JsonSchemaProperty } from "./json-schema-form-types";
 
 // ArrayControl is a hybrid: plain string-item arrays keep the compact tag UI;
 // anything richer (objects, numbers, enums, nested arrays) renders one recursive
@@ -31,14 +34,19 @@ export function ArrayControl({
   // a value span).
   const readOnly = ctx.readOnly || field.readOnly === true;
   if (isScalarStringItems(field.itemSchema)) {
-    return <TagArray field={field} fieldId={fieldId} readOnly={readOnly} />;
+    return <TagArray field={field} fieldId={fieldId} readOnly={readOnly} size={ctx.size} />;
+  }
+  // `x-layout: table` renders object-item arrays as compact rows with one column
+  // per item property — a denser alternative to the per-item stacked sub-form.
+  if (field.layout === "table" && hasObjectItemProperties(field.itemSchema)) {
+    return <TableArray field={field} ctx={ctx} readOnly={readOnly} />;
   }
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "string" };
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 
   return (
-    <div className="space-y-2 rounded-md border border-input p-2">
+    <div className={cn("flex flex-col rounded-md border border-input p-2", fieldInnerGapClass[ctx.size])}>
       {items.map((item, i) => (
         <div key={i} className="grid grid-cols-[1fr_auto] items-start gap-2">
           <div className="min-w-0">
@@ -78,6 +86,103 @@ export function ArrayControl({
       )}
     </div>
   );
+}
+
+// hasObjectItemProperties reports whether the array's items are objects with a
+// fixed `properties` set — the precondition for a column-per-property table.
+function hasObjectItemProperties(items: JsonSchemaProperty | undefined): boolean {
+  return !!items && !!items.properties && Object.keys(items.properties).length > 0;
+}
+
+// TableArray renders an object-item array as a table: a header row of the item's
+// property names and one row per item with value-only controls, plus per-row
+// remove and an add button. Driven by `x-layout: table`.
+function TableArray({
+  field,
+  ctx,
+  readOnly,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+  readOnly: boolean;
+}) {
+  const items = Array.isArray(field.value) ? field.value : [];
+  const itemSchema = field.itemSchema ?? { type: "object" };
+  const columns = Object.entries(itemSchema.properties ?? {});
+  const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
+
+  function cell(item: unknown, rowIndex: number, col: string, prop: JsonSchemaProperty): ReactNode {
+    const obj = isPlainObject(item) ? item : {};
+    const nodes = renderFieldNodes(
+      {
+        key: `${field.key}[${rowIndex}].${col}`,
+        prop,
+        required: false,
+        value: obj[col],
+        onChange: (next) => field.onChange(setIndex(items, rowIndex, { ...obj, [col]: next })),
+      },
+      childCtx,
+    );
+    return nodes?.value ?? null;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-input">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-input bg-muted/40 text-left">
+            {columns.map(([col, prop]) => (
+              <th key={col} className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                {typeof prop.title === "string" && prop.title ? prop.title : col}
+              </th>
+            ))}
+            {!readOnly && <th className="w-10 px-2 py-1" />}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => (
+            <tr key={i} className="border-b border-input last:border-b-0 align-top">
+              {columns.map(([col, prop]) => (
+                <td key={col} className="px-2 py-1">
+                  {cell(item, i, col, prop)}
+                </td>
+              ))}
+              {!readOnly && (
+                <td className="px-2 py-1">
+                  <button
+                    type="button"
+                    aria-label={`Remove item ${i + 1}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                    onClick={() => field.onChange(removeIndex(items, i))}
+                  >
+                    <Icon icon={UiTrash} className="text-sm" />
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!readOnly && (
+        <div className="p-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => field.onChange([...items, seedFromSchema(itemSchema)])}
+          >
+            <Icon icon={UiAdd} className="text-sm" />
+            Add item
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function ItemControls({
@@ -128,10 +233,12 @@ function TagArray({
   field,
   fieldId,
   readOnly,
+  size,
 }: {
   field: FieldControl;
   fieldId: string;
   readOnly: boolean;
+  size: FormSize;
 }) {
   const tags = toStringArray(field.value);
 
@@ -158,7 +265,12 @@ function TagArray({
   }
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1 shadow-sm">
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1 shadow-sm",
+        controlMinHeightClass[size],
+      )}
+    >
       {tags.map((tag, i) => (
         <span
           key={`${tag}-${i}`}
@@ -181,7 +293,7 @@ function TagArray({
         <input
           id={fieldId}
           data-jsf-input
-          className="min-w-32 flex-1 bg-transparent px-1 py-1 text-sm outline-none"
+          className={cn("min-w-32 flex-1 bg-transparent px-1 py-1 outline-none", labelSizeClass[size])}
           placeholder={tags.length === 0 ? defaultPlaceholder(field.schema) : ""}
           onKeyDown={handleKeyDown}
           onBlur={(e) => commit(e.currentTarget.value, e.currentTarget)}

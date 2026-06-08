@@ -6,6 +6,12 @@ export interface ExecutionRequest {
   flags?: Record<string, string>;
 }
 
+export interface ExecutionPagination {
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
 export interface ExecutionResponse {
   success: boolean;
   message?: string;
@@ -18,6 +24,8 @@ export interface ExecutionResponse {
   input?: ExecutionRequest;
   contentType?: string;
   requestUrl?: string;
+  responseHeaders?: Record<string, string>;
+  pagination?: ExecutionPagination;
   blob?: Blob;
   parsed?: unknown;
 }

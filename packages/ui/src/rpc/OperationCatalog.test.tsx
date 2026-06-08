@@ -18,6 +18,18 @@ function makeSpec(): OpenAPISpec {
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
             {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer" },
+              "x-clicky": { role: "limit" },
+            },
+            {
+              name: "offset",
+              in: "query",
+              schema: { type: "integer" },
+              "x-clicky": { role: "offset" },
+            },
+            {
               name: "kind",
               in: "query",
               schema: { type: "string", enum: ["big", "small"] },
@@ -77,6 +89,59 @@ const clickyTableResponse: ExecutionResponse = {
     },
   }),
 };
+
+function clickyTablePageResponse(
+  rowCount: number,
+  pagination: NonNullable<ExecutionResponse["pagination"]>,
+): ExecutionResponse {
+  return {
+    ...clickyTableResponse,
+    stdout: JSON.stringify({
+      version: 1,
+      node: {
+        kind: "map",
+        fields: [
+          {
+            name: "Data",
+            value: {
+              kind: "table",
+              columns: [
+                { name: "ID", label: "ID" },
+                { name: "Name", label: "Name" },
+              ],
+              rows: Array.from({ length: rowCount }, (_, index) => ({
+                cells: {
+                  ID: {
+                    kind: "text",
+                    text: `widget-${index + 1}`,
+                    plain: `widget-${index + 1}`,
+                  },
+                  Name: {
+                    kind: "text",
+                    text: `Widget ${index + 1}`,
+                    plain: `Widget ${index + 1}`,
+                  },
+                },
+              })),
+            },
+          },
+          {
+            name: "Page",
+            value: {
+              kind: "map",
+              fields: [
+                { name: "Limit", value: { kind: "text", text: String(pagination.limit) } },
+                { name: "Offset", value: { kind: "text", text: String(pagination.offset) } },
+                { name: "Total", value: { kind: "text", text: String(pagination.total) } },
+              ],
+            },
+          },
+        ],
+      },
+    }),
+    pagination,
+  };
+}
 
 function makeClient(
   executeResponse: ExecutionResponse = clickyTableResponse,
@@ -184,6 +249,41 @@ describe("OperationCatalog", () => {
     expect(screen.getByText("one")).toBeInTheDocument();
   });
 
+  it("paginates list tables through native table controls", async () => {
+    const client = makeClient(
+      clickyTablePageResponse(5, {
+        total: 14,
+        limit: 5,
+        offset: 0,
+      }),
+    );
+    renderCatalog(client);
+
+    expect(await screen.findByText("1-5 of 14")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+    expect(screen.queryByText("Total")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2));
+    expect(client.executeMock).toHaveBeenLastCalledWith(
+      "/api/v1/widgets",
+      "get",
+      { limit: "5", offset: "5" },
+      { Accept: "application/json+clicky" },
+    );
+
+    fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "10" } });
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(3));
+    expect(client.executeMock).toHaveBeenLastCalledWith(
+      "/api/v1/widgets",
+      "get",
+      { limit: "10", offset: "0" },
+      { Accept: "application/json+clicky" },
+    );
+  });
+
   it("live-filters: typing debounces then refires with the final value", async () => {
     const client = makeClient();
     renderCatalog(client);
@@ -206,6 +306,22 @@ describe("OperationCatalog", () => {
       { q: "foobar" },
       { Accept: "application/json+clicky" },
     );
+  });
+
+  it("preserves reserved URL params when writing live filters", async () => {
+    window.history.replaceState(null, "", "/widgets?__entity=entity-1");
+    const client = makeClient();
+    renderCatalog(client);
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+
+    const search = await screen.findByLabelText("Q");
+    fireEvent.change(search, { target: { value: "scoped" } });
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), { timeout: 2_000 });
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("__entity")).toBe("entity-1");
+    expect(params.get("q")).toBe("scoped");
   });
 
   it("switches to the endpoint list view", async () => {

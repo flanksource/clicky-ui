@@ -1,6 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { DataTable, type DataTableColumn } from "./DataTable";
+import {
+  UiFileCode,
+  UiFileSpreadsheet,
+  UiFileText,
+  UiJson,
+  UiMarkdown,
+} from "../icons";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableMenuAction,
+} from "./DataTable";
 
 type Row = {
   service: string;
@@ -16,7 +27,8 @@ const rows: Row[] = [
     status: "healthy",
     restarts: 0,
     owner: "platform",
-    notes: "Primary public API with long-form notes that should keep its width.",
+    notes:
+      "Primary public API with long-form notes that should keep its width.",
   },
   {
     service: "worker",
@@ -302,6 +314,65 @@ function LoadingShowcase() {
   );
 }
 
+const downloadMenuActions: DataTableMenuAction[] = [
+  {
+    id: "download-yaml",
+    label: "YAML",
+    icon: UiFileCode,
+    iconClassName: "text-violet-600 dark:text-violet-400",
+    onSelect: () => {
+      console.info("Download YAML");
+    },
+  },
+  {
+    id: "download-json",
+    label: "JSON",
+    icon: UiJson,
+    onSelect: () => {
+      console.info("Download JSON");
+    },
+  },
+  {
+    id: "download-csv",
+    label: "CSV",
+    icon: UiFileSpreadsheet,
+    iconClassName: "text-emerald-600 dark:text-emerald-400",
+    onSelect: () => {
+      console.info("Download CSV");
+    },
+  },
+  {
+    id: "download-pdf",
+    label: "PDF",
+    icon: UiFileText,
+    iconClassName: "text-rose-600 dark:text-rose-400",
+    onSelect: () => {
+      console.info("Download PDF");
+    },
+  },
+  {
+    id: "download-markdown",
+    label: "Markdown",
+    icon: UiMarkdown,
+    onSelect: () => {
+      console.info("Download Markdown");
+    },
+  },
+];
+
+function MenuActionsShowcase() {
+  return (
+    <DataTable
+      data={wideRows}
+      columns={wideColumns}
+      autoFilter
+      defaultSort={{ key: "latency", dir: "asc" }}
+      menuActions={downloadMenuActions}
+      columnResizeStorageKey="clicky-ui-story-data-table-menu-actions"
+    />
+  );
+}
+
 type LogRow = {
   ts: string;
   level: string;
@@ -324,7 +395,11 @@ function makeLogRows(spread: "subMinute" | "sameDay" | "multiYear"): LogRow[] {
   ];
 
   const stepMs =
-    spread === "subMinute" ? 8_000 : spread === "sameDay" ? 1_800_000 : 86_400_000 * 90;
+    spread === "subMinute"
+      ? 8_000
+      : spread === "sameDay"
+        ? 1_800_000
+        : 86_400_000 * 90;
 
   return Array.from({ length: 6 }, (_, i) => ({
     ts: new Date(base + stepMs * i).toISOString(),
@@ -337,14 +412,28 @@ function makeLogRows(spread: "subMinute" | "sameDay" | "multiYear"): LogRow[] {
 
 const logColumns: DataTableColumn<LogRow>[] = [
   { key: "ts", label: "Timestamp", kind: "timestamp", shrink: true },
-  { key: "level", label: "Status", kind: "status", shrink: true, status: { showLabel: true } },
+  {
+    key: "level",
+    label: "Status",
+    kind: "status",
+    shrink: true,
+    status: { showLabel: true },
+  },
   { key: "service", label: "Service", shrink: true },
   { key: "message", label: "Message", grow: true },
-  { key: "tags", label: "Tags", kind: "tags", grow: true, tags: { maxVisible: 2 } },
+  {
+    key: "tags",
+    label: "Tags",
+    kind: "tags",
+    grow: true,
+    tags: { maxVisible: 2 },
+  },
 ];
 
 function TimestampsShowcase() {
-  const [spread, setSpread] = useState<"subMinute" | "sameDay" | "multiYear">("sameDay");
+  const [spread, setSpread] = useState<"subMinute" | "sameDay" | "multiYear">(
+    "sameDay",
+  );
   const data = makeLogRows(spread);
   return (
     <div className="space-y-3">
@@ -356,7 +445,9 @@ function TimestampsShowcase() {
             type="button"
             onClick={() => setSpread(option)}
             className={`rounded-md border px-2 py-1 text-xs ${
-              spread === option ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              spread === option
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground"
             }`}
           >
             {option}
@@ -384,10 +475,24 @@ const tagRows: TagRow[] = [
   {
     id: "1",
     name: "auth-service",
-    tags: ["env=prod", "team=identity", "tier=edge", "region=us-east", "v=2026.04.1"],
+    tags: [
+      "env=prod",
+      "team=identity",
+      "tier=edge",
+      "region=us-east",
+      "v=2026.04.1",
+    ],
   },
-  { id: "2", name: "billing-svc", tags: ["env=prod", "team=finance", "tier=core"] },
-  { id: "3", name: "ingest-pipeline", tags: ["env=staging", "team=data", "tier=core"] },
+  {
+    id: "2",
+    name: "billing-svc",
+    tags: ["env=prod", "team=finance", "tier=core"],
+  },
+  {
+    id: "3",
+    name: "ingest-pipeline",
+    tags: ["env=staging", "team=data", "tier=core"],
+  },
   { id: "4", name: "marketing-site", tags: ["env=prod", "team=growth"] },
   {
     id: "5",
@@ -399,7 +504,13 @@ const tagRows: TagRow[] = [
 const tagColumns: DataTableColumn<TagRow>[] = [
   { key: "id", label: "ID", shrink: true },
   { key: "name", label: "Name", grow: true },
-  { key: "tags", label: "Tags", kind: "tags", grow: true, tags: { maxVisible: 3 } },
+  {
+    key: "tags",
+    label: "Tags",
+    kind: "tags",
+    grow: true,
+    tags: { maxVisible: 3 },
+  },
 ];
 
 function TagsShowcase() {
@@ -427,11 +538,21 @@ const statusRows: StatusRow[] = [
   { service: "search", state: "failed", notes: "circuit broken" },
   { service: "cron", state: "degraded", notes: "1/3 retries" },
   { service: "router", state: "info", notes: "info-only event" },
-  { service: "unknown", state: "mystery", notes: "unmapped value falls through" },
+  {
+    service: "unknown",
+    state: "mystery",
+    notes: "unmapped value falls through",
+  },
 ];
 
 const statusColumns: DataTableColumn<StatusRow>[] = [
-  { key: "state", label: "Status", kind: "status", shrink: true, status: { showLabel: true } },
+  {
+    key: "state",
+    label: "Status",
+    kind: "status",
+    shrink: true,
+    status: { showLabel: true },
+  },
   { key: "service", label: "Service", shrink: true },
   { key: "notes", label: "Notes", grow: true },
 ];
@@ -515,6 +636,10 @@ export const EverythingFits: Story = {
 
 export const LotsOfColumns: Story = {
   render: () => <LotsOfColumnsShowcase />,
+};
+
+export const MenuActions: Story = {
+  render: () => <MenuActionsShowcase />,
 };
 
 export const Timestamps: Story = {

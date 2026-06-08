@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LabelIconSpec } from "../data/Icon";
+import type { FormSize } from "./json-schema-form-size";
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -23,6 +24,11 @@ export interface JsonSchemaProperty {
   required?: string[];
   // false = closed object; true = open; sub-schema = open string/typed map.
   additionalProperties?: boolean | JsonSchemaProperty;
+  // Per-key-pattern value schemas: each entry whose key matches the regex is
+  // typed by its sub-schema. Lets a keyed map render a different value form per
+  // key (e.g. House vs Apartment), the standard JSON-Schema way to vary a map
+  // value by its key.
+  patternProperties?: Record<string, JsonSchemaProperty>;
   allOf?: JsonSchemaConditional[];
   // Union branches. The form does not validate against them, but it does mine
   // them for an `enum` branch so a value-or-template union (a string whose
@@ -130,8 +136,22 @@ export interface FieldControl {
 
   // string-map
   valueSchema?: JsonSchemaProperty;
+  // Per-key-pattern value schemas (from the schema's `patternProperties`): the
+  // first whose regex matches an entry key types that entry's value, falling
+  // back to `valueSchema`. Lets the value form vary by key.
+  valuePatternSchemas?: { pattern: string; schema: JsonSchemaProperty }[];
   knownProperties?: Record<string, JsonSchemaProperty>;
   allowExtraKeys?: boolean;
+  // Strict enum options for the map key, resolved from the schema's
+  // `propertyNames.enum`. When set, extra keys render as a picker limited to
+  // these options (no free-text); unset keeps the free-text key input.
+  keyOptions?: FieldOption[];
+
+  // Per-field layout override, resolved from the schema's `x-layout` extension.
+  // "inline"/"stack" force the field's subtree into that FormLayout mode;
+  // "table" renders an array (or string-map) as compact rows with column
+  // headers. Takes precedence over the form-level layout.
+  layout?: "inline" | "stack" | "table";
 
   // array — the schema each item is rendered against (recursively).
   itemSchema?: JsonSchemaProperty;
@@ -187,6 +207,17 @@ export interface JsonSchemaFormProps {
    * label column (default 40ch) and value column (default 400px).
    */
   layout?: FormLayout;
+  /**
+   * Scales every input and label form-wide. One of "xs" | "sm" | "md" | "lg" |
+   * "xl"; defaults to "md" (the original fixed sizing). Applies at every depth.
+   */
+  size?: FormSize;
+  /**
+   * Namespaces generated input/label ids (`jsf-<idPrefix>-<key>`). Set this when
+   * more than one form renders on the same page so their ids don't collide,
+   * which would otherwise break label/input focus association.
+   */
+  idPrefix?: string;
   /**
    * Omit fields whose schema declares `readOnly: true` entirely, instead of
    * rendering them as read-only value displays. Applies at every depth.

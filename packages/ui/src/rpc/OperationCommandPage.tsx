@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FilterBar } from "../components/FilterBar";
-import type { DataTablePagination } from "../data/DataTable";
 import type {
   ClickyCommandRuntime,
   ClickyNode,
@@ -14,9 +13,9 @@ import { AcceptPicker, type OperationPreviewMode } from "./AcceptPicker";
 import { CommandForm, pathParamNames, submitValue } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
 import type { RenderLink } from "./EndpointList";
-import { ExecutionResult } from "./ExecutionResult";
 import {
   buildInitialParameterValues,
+  dataTablePaginationFromForm,
   packParameterValues,
   parametersToFormConfig,
   pruneParameterValues,
@@ -45,12 +44,14 @@ export type OperationCommandPageProps = {
   className?: string;
 };
 
+const EMPTY_PARAMETER_VALUES: ParameterValues = {};
+
 export function OperationCommandPage({
   client,
   operationId,
   operation: providedOperation,
   operations = providedOperation ? [providedOperation] : [],
-  initialValues = {},
+  initialValues = EMPTY_PARAMETER_VALUES,
   autoRun,
   backHref,
   backLabel = "Back",
@@ -154,22 +155,10 @@ export function OperationCommandPage({
     });
   }, [isGet, parameters, values, lookupQuery.data, lockedPathValues, hideLockedPathFilters]);
 
-  const dataTablePagination = useMemo<DataTablePagination | undefined>(() => {
-    const p = formConfig.pagination;
-    if (!p) return undefined;
-    const pageSize = Math.max(parseInt(p.limitValue, 10) || 25, 1);
-    const offset = Math.max(parseInt(p.offsetValue, 10) || 0, 0);
-    const page = Math.floor(offset / pageSize);
-    return {
-      page,
-      pageSize,
-      onPageChange: (next: number) => p.setOffset(String(Math.max(next, 0) * pageSize)),
-      onPageSizeChange: (next: number) => {
-        p.setLimit(String(next));
-        p.setOffset("0");
-      },
-    };
-  }, [formConfig.pagination]);
+  const dataTablePagination = useMemo(
+    () => dataTablePaginationFromForm(formConfig.pagination, result),
+    [formConfig.pagination, result],
+  );
 
   // Ref tracking the last submitted parameter signature so that the
   // auto-submit-on-debounced-change effect and the manual submit button
@@ -432,12 +421,12 @@ export function OperationCommandPage({
 
       {error ? (
         <InlineError title={`Failed to load ${path} as ${accept}`} error={error} />
-      ) : isExecuting && !result ? (
-        <ExecutionResult loading loadingMessage="Loading execution results…" className="mt-0" />
-      ) : result ? (
+      ) : isExecuting || result ? (
         <div role="region" aria-label="Response body">
           <CommandOutput
             response={result}
+            loading={isExecuting}
+            loadingMessage="Loading execution results…"
             bare
             {...(detailOperation
               ? {
@@ -612,7 +601,7 @@ function shellQuote(value: string) {
 function stripRunnerParams(values: ParameterValues): ParameterValues {
   const next: ParameterValues = {};
   for (const [key, value] of Object.entries(values)) {
-    if (key === "autoRun" || key === "__autoRun") continue;
+    if (key === "autoRun" || key.startsWith("__")) continue;
     next[key] = value;
   }
   return next;

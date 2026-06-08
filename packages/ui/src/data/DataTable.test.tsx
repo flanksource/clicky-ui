@@ -49,7 +49,8 @@ const columns: DataTableColumn<ServiceRow>[] = [
     key: "tags",
     label: "Tags",
     grow: true,
-    render: (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? "")),
+    render: (value) =>
+      Array.isArray(value) ? value.join(", ") : String(value ?? ""),
     filterValue: (value) => (Array.isArray(value) ? value : []),
   },
 ];
@@ -70,14 +71,16 @@ function rect(width: number): DOMRect {
 
 function mockFilterBarWidths(listWidth: number, itemWidth = 112) {
   const original = HTMLElement.prototype.getBoundingClientRect;
-  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-    if (this instanceof HTMLElement) {
-      if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth);
-      if (this.hasAttribute("data-filter-bar-item")) return rect(itemWidth);
-      if (this.getAttribute("aria-label") === "More filters") return rect(44);
-    }
-    return original.call(this);
-  });
+  return vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function () {
+      if (this instanceof HTMLElement) {
+        if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth);
+        if (this.hasAttribute("data-filter-bar-item")) return rect(itemWidth);
+        if (this.getAttribute("aria-label") === "More filters") return rect(44);
+      }
+      return original.call(this);
+    });
 }
 
 describe("DataTable", () => {
@@ -86,7 +89,13 @@ describe("DataTable", () => {
   });
 
   it("sorts columns by default and toggles the sort order", () => {
-    render(<DataTable data={rows} columns={columns} defaultSort={{ key: "restarts" }} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        defaultSort={{ key: "restarts" }}
+      />,
+    );
 
     const table = within(screen.getByRole("table"));
     expect(table.getAllByRole("row")[1]).toHaveTextContent("api");
@@ -136,10 +145,102 @@ describe("DataTable", () => {
     render(<DataTable data={[]} columns={columns} />);
 
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /service/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /service/i }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(1);
     expect(screen.queryByText("No data")).not.toBeInTheDocument();
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
+  });
+
+  it("renders native server pagination controls", () => {
+    const onPageChange = vi.fn();
+    const onPageSizeChange = vi.fn();
+    const pageRows: ServiceRow[] = Array.from({ length: 5 }, (_, index) => ({
+      service: `service-${index + 6}`,
+      status: "healthy",
+      restarts: index,
+      notes: "Paged result",
+      tags: [],
+    }));
+
+    render(
+      <DataTable
+        data={pageRows}
+        columns={columns}
+        pagination={{
+          page: 1,
+          pageSize: 5,
+          total: 14,
+          onPageChange,
+          onPageSizeChange,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("6-10 of 14")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    expect(onPageChange).toHaveBeenCalledWith(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+
+    fireEvent.change(screen.getByLabelText("Rows per page"), {
+      target: { value: "10" },
+    });
+    expect(onPageSizeChange).toHaveBeenCalledWith(10);
+  });
+
+  it("renders caller menu actions in the table menu", () => {
+    const exportPdf = vi.fn();
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        hideableColumns={false}
+        showDensityControl
+        menuActions={[
+          {
+            id: "pdf",
+            label: "PDF",
+            onSelect: exportPdf,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+
+    const densityItem = within(menu).getByRole("menuitemradio", {
+      name: /use page density/i,
+    });
+    const downloadHeader = within(menu).getByText("Download");
+    const actionItem = within(menu).getByRole("menuitem", { name: /pdf/i });
+
+    expect(downloadHeader).toBeInTheDocument();
+    expect(actionItem).toBeInTheDocument();
+    expect(
+      Boolean(
+        densityItem.compareDocumentPosition(downloadHeader) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(
+      Boolean(
+        densityItem.compareDocumentPosition(actionItem) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(
+      within(menu).queryByText("Portable document"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(actionItem);
+    expect(exportPdf).toHaveBeenCalledTimes(1);
   });
 
   it("renders an initial loading state inside the table shell", () => {
@@ -154,9 +255,14 @@ describe("DataTable", () => {
     );
 
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /service/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /service/i }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Loading execution results...")).toHaveLength(2);
-    expect(screen.getByRole("table").parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("table").parentElement).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
     expect(screen.getAllByRole("row")).toHaveLength(5);
   });
 
@@ -164,10 +270,14 @@ describe("DataTable", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
-    expect(document.querySelector("[data-filter-bar-list]")).not.toHaveClass("overflow-hidden");
+    expect(document.querySelector("[data-filter-bar-list]")).not.toHaveClass(
+      "overflow-hidden",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
-    const healthyFilter = document.querySelector('[data-filter-option="healthy"]');
+    const healthyFilter = document.querySelector(
+      '[data-filter-option="healthy"]',
+    );
     if (!healthyFilter) {
       throw new Error("Expected healthy filter option");
     }
@@ -214,10 +324,14 @@ describe("DataTable", () => {
     const measurement = mockFilterBarWidths(260);
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
-    expect(await screen.findByRole("button", { name: /more filters/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /more filters/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
-    expect(screen.getByRole("dialog", { name: /overflow filters/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /overflow filters/i }),
+    ).toBeInTheDocument();
 
     measurement.mockRestore();
   });
@@ -230,10 +344,14 @@ describe("DataTable", () => {
       name: /open status column filter/i,
     });
     expect(statusFilterButton).toHaveAttribute("aria-pressed", "false");
-    expect(statusFilterButton.querySelector('[data-filter-icon-state="outline"]')).not.toBeNull();
+    expect(
+      statusFilterButton.querySelector('[data-filter-icon-state="outline"]'),
+    ).not.toBeNull();
 
     fireEvent.click(statusFilterButton);
-    const healthyFilter = document.querySelector('[data-filter-option="healthy"]');
+    const healthyFilter = document.querySelector(
+      '[data-filter-option="healthy"]',
+    );
     if (!healthyFilter) {
       throw new Error("Expected healthy header filter option");
     }
@@ -247,18 +365,24 @@ describe("DataTable", () => {
     expect(screen.queryByText("worker")).not.toBeInTheDocument();
 
     expect(statusFilterButton).toHaveAttribute("aria-pressed", "true");
-    expect(statusFilterButton.querySelector('[data-filter-icon-state="filled"]')).not.toBeNull();
+    expect(
+      statusFilterButton.querySelector('[data-filter-icon-state="filled"]'),
+    ).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     expect(statusFilterButton).toHaveAttribute("aria-pressed", "false");
-    expect(statusFilterButton.querySelector('[data-filter-icon-state="outline"]')).not.toBeNull();
+    expect(
+      statusFilterButton.querySelector('[data-filter-icon-state="outline"]'),
+    ).not.toBeNull();
     vi.useRealTimers();
   });
 
   it("embeds header filter controls without duplicate panel chrome", () => {
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open status column filter/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /open status column filter/i }),
+    );
 
     const dialog = screen.getByRole("dialog", {
       name: /status column filter/i,
@@ -268,16 +392,24 @@ describe("DataTable", () => {
     expect(
       within(dialog).getByRole("button", { name: /close column filter/i }),
     ).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
-    expect(dialog.querySelector('[data-filter-panel-chrome="embedded"]')).toBeInTheDocument();
-    expect(dialog.querySelector('[data-filter-panel-chrome="full"]')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: /^close$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      dialog.querySelector('[data-filter-panel-chrome="embedded"]'),
+    ).toBeInTheDocument();
+    expect(
+      dialog.querySelector('[data-filter-panel-chrome="full"]'),
+    ).not.toBeInTheDocument();
   });
 
   it("exposes number filters from column headers", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
 
-    fireEvent.click(screen.getByRole("button", { name: /open restarts column filter/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /open restarts column filter/i }),
+    );
     fireEvent.change(screen.getByLabelText("Restarts minimum"), {
       target: { value: "2" },
     });
@@ -308,14 +440,20 @@ describe("DataTable", () => {
 
     expect(screen.getByRole("table")).toHaveClass("w-max", "table-auto");
     expect(screen.getByRole("table")).not.toHaveClass("w-full");
-    expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass("whitespace-nowrap");
-    expect(screen.getByRole("columnheader", { name: /service/i })).not.toHaveClass("pr-5");
+    expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass(
+      "whitespace-nowrap",
+    );
+    expect(
+      screen.getByRole("columnheader", { name: /service/i }),
+    ).not.toHaveClass("pr-5");
   });
 
   it("uses distinct table row padding for compact and spacious density", () => {
     render(<DataTable data={rows} columns={columns} density="compact" />);
 
-    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+    expect(
+      screen.getByRole("table").closest('[data-density="compact"]'),
+    ).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass(
       "density-compact:py-1",
       "density-spacious:py-3",
@@ -329,9 +467,9 @@ describe("DataTable", () => {
   it("renders column resize handles by default", () => {
     render(<DataTable data={rows} columns={columns} />);
 
-    expect(screen.getAllByRole("separator", { name: /resize .* column/i })).toHaveLength(
-      columns.length,
-    );
+    expect(
+      screen.getAllByRole("separator", { name: /resize .* column/i }),
+    ).toHaveLength(columns.length);
   });
 
   it("updates column width when dragging a resize handle", () => {
@@ -343,13 +481,18 @@ describe("DataTable", () => {
       />,
     );
 
-    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
-      clientX: 100,
-    });
+    fireEvent.mouseDown(
+      screen.getByRole("separator", { name: /resize service column/i }),
+      {
+        clientX: 100,
+      },
+    );
     fireEvent.mouseMove(document, { clientX: 180 });
     fireEvent.mouseUp(document);
 
-    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 304px");
+    expect(document.querySelector("col")?.getAttribute("style")).toContain(
+      "width: 304px",
+    );
   });
 
   it("adapts cell truncation width when a column is resized", () => {
@@ -361,9 +504,12 @@ describe("DataTable", () => {
       />,
     );
 
-    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize notes column/i }), {
-      clientX: 100,
-    });
+    fireEvent.mouseDown(
+      screen.getByRole("separator", { name: /resize notes column/i }),
+      {
+        clientX: 100,
+      },
+    );
     fireEvent.mouseMove(document, { clientX: 400 });
     fireEvent.mouseUp(document);
 
@@ -374,7 +520,13 @@ describe("DataTable", () => {
 
   it("auto-fits a column when double-clicking a resize handle", () => {
     const storageKey = "clicky-ui-test-widths-autofit";
-    render(<DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnResizeStorageKey={storageKey}
+      />,
+    );
 
     const notesHeader = screen.getByRole("columnheader", { name: /notes/i });
     const notesCell = screen.getByText("Production API service").closest("td");
@@ -396,18 +548,25 @@ describe("DataTable", () => {
       value: 360,
     });
 
-    fireEvent.doubleClick(screen.getByRole("separator", { name: /resize notes column/i }));
+    fireEvent.doubleClick(
+      screen.getByRole("separator", { name: /resize notes column/i }),
+    );
 
     const notesCol = document.querySelectorAll("col")[3];
     expect(notesCol?.getAttribute("style")).toContain("width: 360px");
-    expect(window.localStorage.getItem(storageKey)).toBe(JSON.stringify({ notes: 360 }));
+    expect(window.localStorage.getItem(storageKey)).toBe(
+      JSON.stringify({ notes: 360 }),
+    );
   });
 
   it("clamps resized widths to column minWidth and maxWidth", () => {
     render(
       <DataTable
         data={rows}
-        columns={[{ ...columns[0], minWidth: 120, maxWidth: 240 }, ...columns.slice(1)]}
+        columns={[
+          { ...columns[0], minWidth: 120, maxWidth: 240 },
+          ...columns.slice(1),
+        ]}
         columnResizeStorageKey="clicky-ui-test-widths-clamp"
       />,
     );
@@ -419,48 +578,84 @@ describe("DataTable", () => {
     fireEvent.mouseMove(document, { clientX: 1000 });
     fireEvent.mouseUp(document);
 
-    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 240px");
+    expect(document.querySelector("col")?.getAttribute("style")).toContain(
+      "width: 240px",
+    );
 
     fireEvent.mouseDown(handle, { clientX: 100 });
     fireEvent.mouseMove(document, { clientX: -1000 });
     fireEvent.mouseUp(document);
 
-    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 120px");
+    expect(document.querySelector("col")?.getAttribute("style")).toContain(
+      "width: 120px",
+    );
   });
 
   it("persists resized widths to localStorage and restores them on remount", () => {
     const storageKey = "clicky-ui-test-widths-persist";
     const { unmount } = render(
-      <DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />,
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnResizeStorageKey={storageKey}
+      />,
     );
 
-    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
-      clientX: 100,
-    });
+    fireEvent.mouseDown(
+      screen.getByRole("separator", { name: /resize service column/i }),
+      {
+        clientX: 100,
+      },
+    );
     fireEvent.mouseMove(document, { clientX: 140 });
     fireEvent.mouseUp(document);
 
-    expect(window.localStorage.getItem(storageKey)).toBe(JSON.stringify({ service: 264 }));
+    expect(window.localStorage.getItem(storageKey)).toBe(
+      JSON.stringify({ service: 264 }),
+    );
 
     unmount();
-    render(<DataTable data={rows} columns={columns} columnResizeStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnResizeStorageKey={storageKey}
+      />,
+    );
 
-    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 264px");
+    expect(document.querySelector("col")?.getAttribute("style")).toContain(
+      "width: 264px",
+    );
   });
 
   it("hides a column from the header context menu and persists the choice", () => {
     const storageKey = "clicky-ui-test-column-visibility-context";
-    render(<DataTable data={rows} columns={columns} columnVisibilityStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnVisibilityStorageKey={storageKey}
+      />,
+    );
 
-    fireEvent.contextMenu(screen.getByRole("columnheader", { name: /notes/i }), {
-      clientX: 120,
-      clientY: 80,
-    });
+    fireEvent.contextMenu(
+      screen.getByRole("columnheader", { name: /notes/i }),
+      {
+        clientX: 120,
+        clientY: 80,
+      },
+    );
     fireEvent.click(screen.getByRole("menuitem", { name: /hide notes/i }));
 
-    expect(screen.queryByRole("columnheader", { name: /notes/i })).not.toBeInTheDocument();
-    expect(screen.queryByText("Production API service")).not.toBeInTheDocument();
-    expect(window.localStorage.getItem(storageKey)).toBe(JSON.stringify({ notes: true }));
+    expect(
+      screen.queryByRole("columnheader", { name: /notes/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Production API service"),
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(storageKey)).toBe(
+      JSON.stringify({ notes: true }),
+    );
   });
 
   it("restores hidden columns from localStorage and can show them from the column menu", () => {
@@ -468,26 +663,45 @@ describe("DataTable", () => {
     window.localStorage.setItem(storageKey, JSON.stringify({ notes: true }));
 
     const { unmount } = render(
-      <DataTable data={rows} columns={columns} columnVisibilityStorageKey={storageKey} />,
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnVisibilityStorageKey={storageKey}
+      />,
     );
 
-    expect(screen.queryByRole("columnheader", { name: /notes/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: /notes/i }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     fireEvent.click(screen.getByRole("checkbox", { name: /notes/i }));
 
-    expect(screen.getByRole("columnheader", { name: /notes/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /notes/i }),
+    ).toBeInTheDocument();
     expect(window.localStorage.getItem(storageKey)).toBeNull();
 
     unmount();
-    render(<DataTable data={rows} columns={columns} columnVisibilityStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        columnVisibilityStorageKey={storageKey}
+      />,
+    );
 
-    expect(screen.getByRole("columnheader", { name: /notes/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /notes/i }),
+    ).toBeInTheDocument();
   });
 
   it("does not expose non-hideable columns as removable", () => {
     render(
-      <DataTable data={rows} columns={[{ ...columns[0], hideable: false }, ...columns.slice(1)]} />,
+      <DataTable
+        data={rows}
+        columns={[{ ...columns[0], hideable: false }, ...columns.slice(1)]}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
@@ -509,38 +723,66 @@ describe("DataTable", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: /notes/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /open column menu/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /notes/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /open column menu/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("overrides table density from the column menu and persists the choice", () => {
     const storageKey = "clicky-ui-test-density-override";
     const { unmount } = render(
-      <DataTable data={rows} columns={columns} densityStorageKey={storageKey} />,
+      <DataTable
+        data={rows}
+        columns={columns}
+        densityStorageKey={storageKey}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: /compact/i }));
 
-    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+    expect(
+      screen.getByRole("table").closest('[data-density="compact"]'),
+    ).not.toBeNull();
     expect(window.localStorage.getItem(storageKey)).toBe("compact");
 
     unmount();
-    render(<DataTable data={rows} columns={columns} densityStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        densityStorageKey={storageKey}
+      />,
+    );
 
-    expect(screen.getByRole("table").closest('[data-density="compact"]')).not.toBeNull();
+    expect(
+      screen.getByRole("table").closest('[data-density="compact"]'),
+    ).not.toBeNull();
   });
 
   it("can clear table density back to the page density", () => {
     const storageKey = "clicky-ui-test-density-clear";
     window.localStorage.setItem(storageKey, "spacious");
 
-    render(<DataTable data={rows} columns={columns} densityStorageKey={storageKey} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        densityStorageKey={storageKey}
+      />,
+    );
 
-    expect(screen.getByRole("table").closest('[data-density="spacious"]')).not.toBeNull();
+    expect(
+      screen.getByRole("table").closest('[data-density="spacious"]'),
+    ).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: /use page density/i }));
+    fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /use page density/i }),
+    );
 
     expect(screen.getByRole("table").closest("[data-density]")).toBeNull();
     expect(window.localStorage.getItem(storageKey)).toBeNull();
@@ -557,20 +799,29 @@ describe("DataTable", () => {
       />,
     );
 
-    fireEvent.mouseDown(screen.getByRole("separator", { name: /resize service column/i }), {
-      clientX: 100,
-    });
+    fireEvent.mouseDown(
+      screen.getByRole("separator", { name: /resize service column/i }),
+      {
+        clientX: 100,
+      },
+    );
     fireEvent.mouseMove(document, { clientX: 140 });
     fireEvent.mouseUp(document);
 
-    expect(document.querySelector("col")?.getAttribute("style")).toContain("width: 264px");
+    expect(document.querySelector("col")?.getAttribute("style")).toContain(
+      "width: 264px",
+    );
     expect(window.localStorage.getItem(storageKey)).toBeNull();
   });
 
   it("can disable all resize handles", () => {
-    render(<DataTable data={rows} columns={columns} resizableColumns={false} />);
+    render(
+      <DataTable data={rows} columns={columns} resizableColumns={false} />,
+    );
 
-    expect(screen.queryByRole("separator", { name: /resize .* column/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("separator", { name: /resize .* column/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("can disable resizing for a single column", () => {
@@ -584,14 +835,24 @@ describe("DataTable", () => {
     expect(
       screen.queryByRole("separator", { name: /resize service column/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("separator", { name: /resize status column/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("separator", { name: /resize status column/i }),
+    ).toBeInTheDocument();
   });
 
   it("keeps sorting independent from resize handles", () => {
-    render(<DataTable data={rows} columns={columns} defaultSort={{ key: "restarts" }} />);
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        defaultSort={{ key: "restarts" }}
+      />,
+    );
 
     const table = within(screen.getByRole("table"));
-    fireEvent.click(screen.getByRole("separator", { name: /resize restarts column/i }));
+    fireEvent.click(
+      screen.getByRole("separator", { name: /resize restarts column/i }),
+    );
 
     expect(table.getAllByRole("row")[1]).toHaveTextContent("api");
 
@@ -621,8 +882,12 @@ describe("DataTable", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
     expect(screen.queryByText("Quick ranges")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Time range from"), { target: { value: "now-1h" } });
-    fireEvent.change(screen.getByLabelText("Time range to"), { target: { value: "now" } });
+    fireEvent.change(screen.getByLabelText("Time range from"), {
+      target: { value: "now-1h" },
+    });
+    fireEvent.change(screen.getByLabelText("Time range to"), {
+      target: { value: "now" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
     expect(onApply).toHaveBeenCalledWith("now-1h", "now");
@@ -649,9 +914,15 @@ describe("DataTable", () => {
 
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
-    expect(within(rows[0]!).getByRole("img", { name: "ERROR" })).toBeInTheDocument();
-    expect(within(rows[1]!).getByRole("img", { name: "ok" })).toBeInTheDocument();
-    expect(within(rows[2]!).getByRole("img", { name: "warning" })).toBeInTheDocument();
+    expect(
+      within(rows[0]!).getByRole("img", { name: "ERROR" }),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[1]!).getByRole("img", { name: "ok" }),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[2]!).getByRole("img", { name: "warning" }),
+    ).toBeInTheDocument();
   });
 
   it("emits tag tokens for a kind:'tags' column so auto-filter can pick them up", () => {
@@ -699,7 +970,9 @@ describe("DataTable", () => {
 
     render(<DataTable data={data} columns={cols} autoFilter />);
 
-    expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /time range filter/i }),
+    ).toBeInTheDocument();
 
     const rows = screen.getAllByRole("row").slice(1);
     // cron (Apr 8) is below the 'from' bound; api + worker remain.
@@ -709,8 +982,12 @@ describe("DataTable", () => {
       expect.stringContaining("worker"),
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: /open timestamp column filter/i }));
-    const dialog = screen.getByRole("dialog", { name: /time range column filter/i });
+    fireEvent.click(
+      screen.getByRole("button", { name: /open timestamp column filter/i }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: /time range column filter/i,
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: /clear all/i }));
 
     const clearedRows = screen.getAllByRole("row").slice(1);
@@ -808,7 +1085,9 @@ describe("DataTable", () => {
     render(<DataTable data={data} columns={cols} autoFilter />);
 
     // The action icons live inside a hover card — not visible at rest.
-    expect(screen.queryByRole("button", { name: /^Include env=prod$/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /^Include env=prod$/ }),
+    ).toBeNull();
 
     // Hover the prod tag's wrapper to open its action card.
     const prodTag = screen.getByText("prod").closest("span.relative");
@@ -866,7 +1145,9 @@ describe("DataTable", () => {
   describe("compact-mode tag rendering and body-only theme", () => {
     type TagRow = { name: string; labels: Record<string, string> };
 
-    const tagRows: TagRow[] = [{ name: "api", labels: { env: "prod", region: "us-east-1" } }];
+    const tagRows: TagRow[] = [
+      { name: "api", labels: { env: "prod", region: "us-east-1" } },
+    ];
 
     const tagColumns: DataTableColumn<TagRow>[] = [
       { key: "name", label: "Name" },
@@ -875,7 +1156,12 @@ describe("DataTable", () => {
 
     it("hides tag keys inline when density is compact (keys still in tooltip)", () => {
       render(
-        <DataTable data={tagRows} columns={tagColumns} defaultDensity="compact" theme="light" />,
+        <DataTable
+          data={tagRows}
+          columns={tagColumns}
+          defaultDensity="compact"
+          theme="light"
+        />,
       );
 
       const labelsCell = screen.getByText("prod").closest("td") as HTMLElement;
@@ -913,10 +1199,18 @@ describe("DataTable", () => {
   });
 
   describe("row detail (renderExpandedRow)", () => {
-    const renderDetail = (row: ServiceRow) => <div>Detail for {row.service}</div>;
+    const renderDetail = (row: ServiceRow) => (
+      <div>Detail for {row.service}</div>
+    );
 
     it("expands an inline detail row by default (detailStyle omitted)", () => {
-      render(<DataTable data={rows} columns={columns} renderExpandedRow={renderDetail} />);
+      render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          renderExpandedRow={renderDetail}
+        />,
+      );
 
       expect(screen.queryByText("Detail for api")).not.toBeInTheDocument();
 
@@ -987,7 +1281,9 @@ describe("DataTable caller-owned FilterBar inputs", () => {
 
     const search = screen.getByPlaceholderText("Search query");
     const kind = screen.getByRole("combobox", { name: "Kind" });
-    const columnMenu = screen.getByRole("button", { name: /open column menu/i });
+    const columnMenu = screen.getByRole("button", {
+      name: /open column menu/i,
+    });
 
     // The FilterBar root is the parent of the [data-filter-bar-list] container;
     // search, the Kind filter, and the column menu all live inside that one bar.
@@ -1044,6 +1340,8 @@ describe("DataTable caller-owned FilterBar inputs", () => {
     );
 
     expect(screen.getByPlaceholderText("Search query")).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Search all columns…")).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Search all columns…"),
+    ).not.toBeInTheDocument();
   });
 });

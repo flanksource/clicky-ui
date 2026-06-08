@@ -1,38 +1,78 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { FilterBarFilter } from "../components/FilterBar";
-import type { DataTablePagination } from "../data/DataTable";
+import type {
+  FilterBarFilter,
+  FilterBarRangeProps,
+  FilterBarSearchProps,
+} from "../components/FilterBar";
+import { DataTable, type DataTableColumn, type DataTablePagination } from "../data/DataTable";
 import {
   Clicky,
+  parseClickyData,
+  type ClickyCommandRuntime,
+  type ClickyDocument,
+  type ClickyNode,
   type ClickyTableRowClick,
   type ClickyTableRowHref,
   type ClickyTableRowPredicate,
 } from "../data/Clicky";
 import { JsonView } from "../data/JsonView";
+import { cn } from "../lib/utils";
 import type { ExecutionResponse } from "./types";
 
 export type CommandOutputProps = {
-  response: ExecutionResponse;
+  response?: ExecutionResponse | null;
+  loading?: boolean;
+  loadingMessage?: string;
+  emptyMessage?: string;
+  ariaLabel?: string;
+  className?: string;
   bare?: boolean;
+  commandRuntime?: ClickyCommandRuntime;
   onTableRowClick?: ClickyTableRowClick;
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
+  search?: FilterBarSearchProps;
+  timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
   pagination?: DataTablePagination;
 };
 
+type LoadingResultRow = {
+  result: string;
+  status: string;
+  updated: string;
+  details: string;
+};
+
+const LOADING_RESULT_COLUMNS: DataTableColumn<LoadingResultRow>[] = [
+  { key: "result", label: "Result", grow: true },
+  { key: "status", label: "Status", shrink: true },
+  { key: "updated", label: "Updated", shrink: true },
+  { key: "details", label: "Details", grow: true },
+];
+
 export function CommandOutput({
   response,
+  loading = false,
+  loadingMessage = "Loading execution results…",
+  emptyMessage = "No response yet.",
+  ariaLabel,
+  className,
   bare = false,
+  commandRuntime,
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  search,
+  timeRange,
   externalFilters,
   pagination,
 }: CommandOutputProps) {
-  const text = response.stdout || response.output || "";
-  const ct = response.contentType || "application/json";
+  const text = response?.stdout || response?.output || "";
+  const ct = response?.contentType || "application/json";
 
   const parsed = useMemo(() => {
+    if (!response) return null;
     if (response.parsed !== undefined) return response.parsed;
     if (!text.trim()) return null;
     try {
@@ -40,27 +80,51 @@ export function CommandOutput({
     } catch {
       return null;
     }
-  }, [response.parsed, text]);
+  }, [response, text]);
 
-  const output = (
-    <OutputBody
-      text={text}
-      parsed={parsed}
-      contentType={ct}
-      bare={bare}
-      {...(response.blob ? { blob: response.blob } : {})}
-      {...(onTableRowClick ? { onTableRowClick } : {})}
-      {...(getTableRowHref ? { getTableRowHref } : {})}
-      {...(isTableRowClickable ? { isTableRowClickable } : {})}
-      {...(externalFilters ? { externalFilters } : {})}
-      {...(pagination ? { pagination } : {})}
-    />
-  );
+  let output: ReactNode;
+  if (response) {
+    output = (
+      <OutputBody
+        text={text}
+        parsed={parsed}
+        contentType={ct}
+        bare={bare}
+        {...(response.requestUrl ? { url: response.requestUrl } : {})}
+        {...(response.blob ? { blob: response.blob } : {})}
+        {...(commandRuntime ? { commandRuntime } : {})}
+        {...(onTableRowClick ? { onTableRowClick } : {})}
+        {...(getTableRowHref ? { getTableRowHref } : {})}
+        {...(isTableRowClickable ? { isTableRowClickable } : {})}
+        {...(search ? { search } : {})}
+        {...(timeRange ? { timeRange } : {})}
+        {...(externalFilters ? { externalFilters } : {})}
+        {...(pagination ? { pagination } : {})}
+      />
+    );
+  } else if (loading) {
+    output = <LoadingOutput loadingMessage={loadingMessage} />;
+  } else {
+    output = <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+  }
 
-  if (bare) return output;
+  const pending = loading && response ? (
+    <div
+      role="status"
+      className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground"
+    >
+      {loadingMessage}
+    </div>
+  ) : null;
 
-  return (
+  const content = bare || !response ? (
+    <div className="space-y-2">
+      {pending}
+      {output}
+    </div>
+  ) : (
     <div className="space-y-3">
+      {pending}
       <div className="flex items-center gap-2">
         <span
           className={
@@ -91,28 +155,51 @@ export function CommandOutput({
       {output}
     </div>
   );
+
+  if (ariaLabel || className) {
+    return (
+      <div
+        role={ariaLabel ? "region" : undefined}
+        aria-label={ariaLabel}
+        aria-busy={loading || undefined}
+        className={cn("mt-3", className)}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
 
 function OutputBody({
   text,
   parsed,
   contentType,
+  url,
   blob,
   bare,
+  commandRuntime,
   onTableRowClick,
   getTableRowHref,
   isTableRowClickable,
+  search,
+  timeRange,
   externalFilters,
   pagination,
 }: {
   text: string;
   parsed: unknown;
   contentType: string;
+  url?: string;
   blob?: Blob;
   bare?: boolean;
+  commandRuntime?: ClickyCommandRuntime;
   onTableRowClick?: ClickyTableRowClick;
   getTableRowHref?: ClickyTableRowHref;
   isTableRowClickable?: ClickyTableRowPredicate;
+  search?: FilterBarSearchProps;
+  timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
   pagination?: DataTablePagination;
 }) {
@@ -122,13 +209,31 @@ function OutputBody({
     return <PdfOutput blob={blob} />;
   }
 
-  if (ct === "application/clicky+json" || ct === "application/json+clicky") {
+  const clickyPayload: string | ClickyNode | ClickyDocument | undefined =
+    typeof parsed === "string" || (parsed != null && typeof parsed === "object")
+      ? (parsed as ClickyNode | ClickyDocument)
+      : text;
+  const parsedClicky = clickyPayload === "" ? null : parseClickyData(clickyPayload);
+
+  if (
+    parsedClicky?.ok ||
+    ct === "application/clicky+json" ||
+    ct === "application/json+clicky"
+  ) {
     const clicky = (
       <Clicky
-        data={(parsed as Parameters<typeof Clicky>[0]["data"]) ?? text}
+        data={
+          parsedClicky?.ok
+            ? parsedClicky.document
+            : ((parsed as Parameters<typeof Clicky>[0]["data"]) ?? text)
+        }
+        {...(url ? { url } : {})}
+        {...(commandRuntime ? { commandRuntime } : {})}
         {...(onTableRowClick ? { onTableRowClick } : {})}
         {...(getTableRowHref ? { getTableRowHref } : {})}
         {...(isTableRowClickable ? { isTableRowClickable } : {})}
+        {...(search ? { search } : {})}
+        {...(timeRange ? { timeRange } : {})}
         {...(externalFilters ? { externalFilters } : {})}
         {...(pagination ? { pagination } : {})}
       />
@@ -185,6 +290,25 @@ function OutputBody({
   if (text) return <TextOutput text={text} />;
 
   return <p className="py-4 text-sm text-muted-foreground">No output</p>;
+}
+
+function LoadingOutput({ loadingMessage }: { loadingMessage: string }) {
+  return (
+    <DataTable<LoadingResultRow>
+      data={[]}
+      columns={LOADING_RESULT_COLUMNS}
+      loading
+      loadingMessage={loadingMessage}
+      loadingRowCount={8}
+      showGlobalFilter={false}
+      showDensityControl={false}
+      hideableColumns={false}
+      resizableColumns={false}
+      persistColumnWidths={false}
+      persistColumnVisibility={false}
+      persistDensity={false}
+    />
+  );
 }
 
 function PdfOutput({ blob }: { blob: Blob }) {
