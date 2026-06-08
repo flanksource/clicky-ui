@@ -574,3 +574,47 @@ describe("JsonSchemaForm label icons", () => {
     expect(label?.querySelector('[title="mdi:earth"]')).not.toBeNull();
   });
 });
+
+describe("JsonSchemaForm layout", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: { Name: { type: "string" } },
+  };
+
+  function inlineGrid(container: HTMLElement): HTMLElement | null {
+    return [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+      el.style.gridTemplateColumns.includes("minmax"),
+    ) ?? null;
+  }
+
+  it("caps inline label and value columns at the 40ch / 400px defaults", () => {
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} inline />,
+    );
+    expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
+      "minmax(0, 40ch) minmax(0, 400px)",
+    );
+  });
+
+  it("honors an explicit layout override and prefers it over the inline alias", () => {
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        inline
+        layout={{ mode: "inline", labelMaxWidth: "12rem", valueMaxWidth: "600px" }}
+      />,
+    );
+    expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
+      "minmax(0, 12rem) minmax(0, 600px)",
+    );
+  });
+
+  it("applies no width caps in the default stacked layout", () => {
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} />,
+    );
+    expect(inlineGrid(container)).toBeNull();
+  });
+});

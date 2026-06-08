@@ -160,13 +160,33 @@ export type PostExtension = (
   nodes: { label: ReactNode; value: ReactNode },
 ) => { label: ReactNode; value: ReactNode };
 
+// FormLayout describes how a form arranges each field's label and value. It is
+// resolved once at the top level and threaded through every depth via
+// RenderContext, so width caps apply uniformly to nested objects and array items.
+export interface FormLayout {
+  /** "inline" = 2-column label/value; "stacked" = label above value. */
+  mode: "inline" | "stacked";
+  /** Inline only: max width of the label column (CSS length). Default "40ch". */
+  labelMaxWidth?: string;
+  /** Inline only: max width of the value column (CSS length). Default "400px". */
+  valueMaxWidth?: string;
+}
+
 export interface JsonSchemaFormProps {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   readOnly?: boolean;
-  /** Inline 2-column label/field layout; stacked when false (default). */
+  /**
+   * Shorthand for `layout: { mode: "inline" }` (2-column label/value); stacked
+   * when false (default). Ignored when `layout` is provided.
+   */
   inline?: boolean;
+  /**
+   * Form-level layout. Takes precedence over `inline`. Inline mode caps the
+   * label column (default 40ch) and value column (default 400px).
+   */
+  layout?: FormLayout;
   /**
    * Omit fields whose schema declares `readOnly: true` entirely, instead of
    * rendering them as read-only value displays. Applies at every depth.

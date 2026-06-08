@@ -59,8 +59,15 @@ const meta = {
     },
     inline: {
       control: "boolean",
-      description: "Two-column label/field layout instead of stacked.",
+      description:
+        "Shorthand for `layout: { mode: 'inline' }` — a two-column label/field layout instead of stacked. Ignored when `layout` is set.",
       table: { category: "Appearance", defaultValue: { summary: "false" } },
+    },
+    layout: {
+      control: "object",
+      description:
+        "Form-level layout, overrides `inline`. Inline mode caps the label column (`labelMaxWidth`, default `40ch`) and value column (`valueMaxWidth`, default `400px`).",
+      table: { category: "Appearance" },
     },
     title: { control: "text", table: { category: "Appearance" } },
     hiddenKeys: { control: "object", table: { category: "Behavior" } },
@@ -204,7 +211,22 @@ export const Inline: Story = {
     docs: {
       description: {
         story:
-          "`inline` switches each field to a compact two-column label/control layout, and `title` renders a heading above the form. Use this for dense property panels.",
+          "`inline` switches each field to a compact two-column label/control layout, and `title` renders a heading above the form. Use this for dense property panels. The label column caps at `40ch` and the value column at `400px` by default.",
+      },
+    },
+  },
+};
+
+export const InlineCustomWidths: Story = {
+  args: {
+    title: "Profile",
+    layout: { mode: "inline", labelMaxWidth: "8rem", valueMaxWidth: "240px" },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Pass an explicit `layout` to override the inline width caps — here a narrower `8rem` label column and a `240px` value column. `layout` takes precedence over the `inline` shorthand.",
       },
     },
   },

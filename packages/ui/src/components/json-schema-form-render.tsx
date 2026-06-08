@@ -9,6 +9,7 @@ import {
 import { effectiveProperties, resolveControl } from "./json-schema-form-resolve";
 import type {
   FieldControl,
+  FormLayout,
   JsonSchemaObject,
   JsonSchemaProperty,
   PostExtension,
@@ -24,7 +25,8 @@ export interface RenderContext {
   // Drop fields whose resolved control is read-only (schema `readOnly: true`)
   // instead of rendering them as value displays. Applies at every depth.
   hideReadOnlyFields: boolean;
-  inline: boolean;
+  // Resolved form layout (mode + inline width caps); see FormLayout.
+  layout: FormLayout;
   // requiredFirst stably reorders each object level so required fields render
   // before optional ones (see JsonSchemaFormProps.requiredFirst).
   requiredFirst: boolean;
@@ -119,7 +121,7 @@ export function renderFieldRow(
   const err = softError(field);
   return (
     <FieldWrapper
-      inline={ctx.inline}
+      layout={ctx.layout}
       label={label}
       value={built.value}
       {...(field.helper ? { helper: field.helper } : {})}

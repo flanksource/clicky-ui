@@ -1,6 +1,22 @@
 import { cn } from "../lib/utils";
 import { renderObjectFields, type RenderContext } from "./json-schema-form-render";
-import type { JsonSchemaFormProps } from "./json-schema-form-types";
+import type { FormLayout, JsonSchemaFormProps } from "./json-schema-form-types";
+
+const DEFAULT_LABEL_MAX_WIDTH = "40ch";
+const DEFAULT_VALUE_MAX_WIDTH = "400px";
+
+// resolveFormLayout maps the `layout`/`inline` props to a single resolved
+// FormLayout. An explicit `layout` wins; otherwise `inline` selects the inline
+// preset. Width caps are only filled for inline mode.
+function resolveFormLayout(layout: FormLayout | undefined, inline: boolean): FormLayout {
+  const base = layout ?? { mode: inline ? "inline" : "stacked" };
+  if (base.mode !== "inline") return { mode: "stacked" };
+  return {
+    mode: "inline",
+    labelMaxWidth: base.labelMaxWidth ?? DEFAULT_LABEL_MAX_WIDTH,
+    valueMaxWidth: base.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH,
+  };
+}
 
 // JsonSchemaForm renders an object subschema as a form: one control per
 // (effective) property. It resolves if/then conditionals internally and recurses
@@ -13,6 +29,7 @@ export function JsonSchemaForm({
   onChange,
   readOnly = false,
   inline = false,
+  layout,
   hideReadOnlyFields = false,
   hiddenKeys,
   requiredFirst = false,
@@ -20,10 +37,11 @@ export function JsonSchemaForm({
   pre,
   post,
 }: JsonSchemaFormProps) {
+  const resolvedLayout = resolveFormLayout(layout, inline);
   const ctx: RenderContext = {
     readOnly,
     hideReadOnlyFields,
-    inline,
+    layout: resolvedLayout,
     requiredFirst,
     pre: pre ?? [],
     post: post ?? [],
@@ -34,7 +52,7 @@ export function JsonSchemaForm({
   return (
     <div className="space-y-3">
       {title && <h3 className="text-sm font-semibold">{title}</h3>}
-      <div className={cn(inline ? "grid gap-2" : "grid gap-4")}>{rows}</div>
+      <div className={cn(resolvedLayout.mode === "inline" ? "grid gap-2" : "grid gap-4")}>{rows}</div>
     </div>
   );
 }

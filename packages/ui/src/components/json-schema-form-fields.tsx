@@ -11,6 +11,7 @@ import { renderFieldNodes, renderObjectFields, type RenderContext } from "./json
 import type {
   FieldControl,
   FieldOption,
+  FormLayout,
   JsonSchemaObject,
   JsonSchemaProperty,
 } from "./json-schema-form-types";
@@ -19,24 +20,31 @@ export const inputClassName =
   "h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring";
 
 // FieldWrapper lays out a label + value (+ helper/error) either inline (2-col)
-// or stacked, mirroring the convention used elsewhere in the library.
+// or stacked, mirroring the convention used elsewhere in the library. In inline
+// mode the label and value columns are capped (see FormLayout); the grid
+// template is set inline because Tailwind can't interpolate runtime widths.
 export function FieldWrapper({
   label,
   value,
   helper,
   error,
-  inline,
+  layout,
 }: {
   label: ReactNode;
   value: ReactNode;
   helper?: ReactNode;
   error?: ReactNode;
-  inline?: boolean;
+  layout: FormLayout;
 }) {
-  if (inline) {
+  if (layout.mode === "inline") {
+    const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
+    const valueMaxWidth = layout.valueMaxWidth ?? "400px";
     return (
-      <div className="grid grid-cols-[10rem_1fr] items-start gap-x-3 gap-y-0.5">
-        <div className="flex min-h-9 items-center">{label}</div>
+      <div
+        className="grid items-start gap-x-3 gap-y-0.5"
+        style={{ gridTemplateColumns: `minmax(0, ${labelMaxWidth}) minmax(0, ${valueMaxWidth})` }}
+      >
+        <div className="flex min-h-9 min-w-0 items-center">{label}</div>
         <div className="min-w-0">{value}</div>
         {helper && <p className="col-start-2 text-xs text-muted-foreground">{helper}</p>}
         {error && <p className="col-start-2 text-xs text-destructive">{error}</p>}
