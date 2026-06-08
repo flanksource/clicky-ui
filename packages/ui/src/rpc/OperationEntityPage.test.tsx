@@ -254,7 +254,7 @@ describe("OperationEntityPage", () => {
     renderPage(client);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Response body")).toHaveTextContent('"name": "Fallback widget"'),
+      expect(screen.getByLabelText("Response body")).toHaveTextContent('name: "Fallback widget"'),
     );
   });
 });
