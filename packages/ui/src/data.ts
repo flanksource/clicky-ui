@@ -131,6 +131,12 @@ export {
   type StatusSegment,
   type StatusRenderLink,
 } from "./data/StatusBreakdown";
+export { Version, type VersionProps } from "./data/Version";
+export {
+  getVersionInfo,
+  type RuntimeMode,
+  type VersionInfo,
+} from "./data/version-info";
 export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";

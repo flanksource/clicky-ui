@@ -2,8 +2,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+import { gitInfo } from "./scripts/git-info.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const build = gitInfo();
 
 const entry = {
   index: resolve(__dirname, "src/index.ts"),
@@ -23,6 +26,12 @@ export default defineConfig(({ mode }) => {
   const jsExt = isCjs ? "cjs" : "js";
 
   return {
+    define: {
+      __CLICKY_COMMIT__: JSON.stringify(build.commit),
+      __CLICKY_TAG__: JSON.stringify(build.tag),
+      __CLICKY_DATE__: JSON.stringify(build.date),
+      __CLICKY_DIRTY__: JSON.stringify(build.dirty),
+    },
     plugins: isCjs
       ? []
       : [
