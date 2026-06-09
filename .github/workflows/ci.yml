@@ -9,15 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  gavel:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          fetch-depth: 0
+
       - run: corepack enable
 
       - name: Install Vite+
@@ -26,8 +28,12 @@ jobs:
         run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
 
       - run: vp install
-      - name: Run unit tests
-        run: pnpm --filter @flanksource/clicky-ui run test
+      - name: Gavel test + lint
+        uses: flanksource/gavel@1632f718fbd850658c4a04818b800991039f1b74 # v0.0.46
+        with:
+          args: test --lint
+          comment-header: gavel
+          artifact-name: gavel-results
 
   build:
     runs-on: ubuntu-latest
@@ -35,9 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
       - run: corepack enable
 
       - name: Install Vite+
@@ -69,9 +72,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
       - run: corepack enable
 
       - name: Install Vite+
@@ -80,12 +80,6 @@ jobs:
         run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
 
       - run: vp install
-      - name: Install Playwright system dependencies
-        timeout-minutes: 5
-        run: pnpm --filter e2e exec playwright install-deps chromium
-      - name: Install Playwright browsers
-        timeout-minutes: 5
-        run: pnpm --filter e2e exec playwright install chromium
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
       - name: Run Playwright tests
