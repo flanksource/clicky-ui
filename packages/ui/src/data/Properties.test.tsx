@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Properties, type PropertiesItem } from "./Properties";
-import { UiCopy, UiZoomIn } from "../icons";
+import { UiChevronRight, UiCopy } from "../icons";
 
 type Row = PropertiesItem<string>;
 
@@ -93,7 +93,7 @@ describe("Properties", () => {
         prefixActions={[
           {
             id: "expand",
-            icon: UiZoomIn,
+            icon: UiChevronRight,
             label: (key) => `Expand ${key}`,
             visible: (_k, _v, item) => !!item.expandable,
             disabled: (_k, _v, item) => !!item.expanded,

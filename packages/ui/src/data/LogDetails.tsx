@@ -14,7 +14,7 @@ import {
 import { formatPropertyLabel } from "./properties-utils";
 import type { LogsTableRow } from "./LogsTable";
 import { asRecord } from "./log-utils";
-import { UiCopy, UiZoomIn, UiZoomOut } from "../icons";
+import { UiChevronDown, UiChevronRight, UiCopy, UiZoomIn, UiZoomOut } from "../icons";
 
 const TAGS_PATH = "details.tags";
 
@@ -88,7 +88,7 @@ function LogDetails({
   const prefixActions: PropertiesAction<unknown>[] = [
     {
       id: "expand",
-      icon: UiZoomIn,
+      icon: UiChevronRight,
       label: (key) => `Expand ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !!item.expanded,
@@ -96,7 +96,7 @@ function LogDetails({
     },
     {
       id: "collapse",
-      icon: UiZoomOut,
+      icon: UiChevronDown,
       label: (key) => `Collapse ${labelForPath(key)}`,
       visible: (_k, _v, item) => !!item.expandable,
       disabled: (_k, _v, item) => !item.expanded,

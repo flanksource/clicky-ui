@@ -36,8 +36,10 @@ export function inputClass(size: FormSize): string {
 
 // FieldWrapper lays out a label + value (+ helper/error) either inline (2-col)
 // or stacked, mirroring the convention used elsewhere in the library. In inline
-// mode the label and value columns are capped (see FormLayout); the grid
-// template is set inline because Tailwind can't interpolate runtime widths.
+// mode the label column shrinks to fit its content but is capped/truncated at
+// labelMaxWidth, and the value column is capped at valueMaxWidth (see
+// FormLayout); the grid template is set inline because Tailwind can't
+// interpolate runtime widths.
 export function FieldWrapper({
   label,
   value,
@@ -55,11 +57,13 @@ export function FieldWrapper({
 }) {
   if (layout.mode === "inline") {
     const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
-    const valueMaxWidth = layout.valueMaxWidth ?? "400px";
+    const valueMaxWidth = layout.valueMaxWidth ?? "600px";
     return (
       <div
         className="grid items-start gap-x-3 gap-y-0.5"
-        style={{ gridTemplateColumns: `minmax(0, ${labelMaxWidth}) minmax(0, ${valueMaxWidth})` }}
+        style={{
+          gridTemplateColumns: `minmax(0, min(${labelMaxWidth}, max-content)) minmax(0, ${valueMaxWidth})`,
+        }}
       >
         <div className={cn("flex min-w-0 items-center", controlMinHeightClass[size])}>{label}</div>
         <div className="min-w-0">{value}</div>
@@ -80,12 +84,14 @@ export function FieldWrapper({
 
 export function FieldLabel({ field, fieldId, size }: { field: FieldControl; fieldId: string; size: FormSize }) {
   return (
-    <label htmlFor={fieldId} className={cn("flex items-center gap-2 font-medium", labelSizeClass[size])}>
-      <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
-      <span title={field.label !== field.key ? field.key : undefined}>{field.label}</span>
-      {field.required && <span className="text-destructive">*</span>}
+    <label htmlFor={fieldId} className={cn("flex min-w-0 items-center gap-2 font-medium", labelSizeClass[size])}>
+      <LabelIcon icon={field.labelIcon} className="shrink-0 text-[15px] text-muted-foreground" />
+      <span className="truncate" title={field.label !== field.key ? field.key : undefined}>
+        {field.label}
+      </span>
+      {field.required && <span className="shrink-0 text-destructive">*</span>}
       {field.badge && (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {field.badge}
         </span>
       )}

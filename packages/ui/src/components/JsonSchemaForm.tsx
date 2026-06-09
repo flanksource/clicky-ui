@@ -10,7 +10,7 @@ import {
 import type { FormLayout, JsonSchemaFormProps } from "./json-schema-form-types";
 
 const DEFAULT_LABEL_MAX_WIDTH = "40ch";
-const DEFAULT_VALUE_MAX_WIDTH = "400px";
+const DEFAULT_VALUE_MAX_WIDTH = "600px";
 
 // resolveFormLayout maps the `layout`/`inline` props to a single resolved
 // FormLayout. An explicit `layout` wins; otherwise `inline` selects the inline

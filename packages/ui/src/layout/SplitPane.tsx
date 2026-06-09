@@ -63,7 +63,10 @@ export function SplitPane({
   );
 
   return (
-    <div ref={container} className={cn("flex flex-1 overflow-hidden min-h-0", className)}>
+    <div
+      ref={container}
+      className={cn("flex flex-1 overflow-hidden h-full", className)}
+    >
       <div
         style={{ width: `${split}%` }}
         className={cn("overflow-y-auto bg-background min-h-0", leftClass)}
