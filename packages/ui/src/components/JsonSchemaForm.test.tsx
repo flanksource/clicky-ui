@@ -587,12 +587,12 @@ describe("JsonSchemaForm layout", () => {
     ) ?? null;
   }
 
-  it("caps inline label and value columns at the 40ch / 400px defaults", () => {
+  it("shrinks the label column to fit (capped at 40ch) and caps the value column at 600px by default", () => {
     const { container } = render(
       <JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} inline />,
     );
     expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
-      "minmax(0, 40ch) minmax(0, 400px)",
+      "minmax(0, min(40ch, max-content)) minmax(0, 600px)",
     );
   });
 
@@ -607,7 +607,7 @@ describe("JsonSchemaForm layout", () => {
       />,
     );
     expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
-      "minmax(0, 12rem) minmax(0, 600px)",
+      "minmax(0, min(12rem, max-content)) minmax(0, 600px)",
     );
   });
 

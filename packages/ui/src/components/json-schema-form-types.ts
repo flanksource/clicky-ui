@@ -186,9 +186,12 @@ export type PostExtension = (
 export interface FormLayout {
   /** "inline" = 2-column label/value; "stacked" = label above value. */
   mode: "inline" | "stacked";
-  /** Inline only: max width of the label column (CSS length). Default "40ch". */
+  /**
+   * Inline only: the label column shrinks to fit its widest label and is capped
+   * at this width, truncating longer labels with an ellipsis. Default "40ch".
+   */
   labelMaxWidth?: string;
-  /** Inline only: max width of the value column (CSS length). Default "400px". */
+  /** Inline only: max width of the value column (CSS length). Default "600px". */
   valueMaxWidth?: string;
 }
 
@@ -203,8 +206,9 @@ export interface JsonSchemaFormProps {
    */
   inline?: boolean;
   /**
-   * Form-level layout. Takes precedence over `inline`. Inline mode caps the
-   * label column (default 40ch) and value column (default 400px).
+   * Form-level layout. Takes precedence over `inline`. Inline mode shrinks the
+   * label column to fit (capped/truncated at 40ch) and caps the value column at
+   * 600px.
    */
   layout?: FormLayout;
   /**
