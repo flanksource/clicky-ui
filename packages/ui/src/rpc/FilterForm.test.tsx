@@ -81,3 +81,15 @@ describe("FilterForm time range", () => {
     );
   });
 });
+
+describe("FilterForm placeholders", () => {
+  it("does not use a param's description as the input placeholder", async () => {
+    renderFilterForm();
+
+    const policyInput = (await screen.findByLabelText("Policy")) as HTMLInputElement;
+    // `policy` declares description "Policy number" but no placeholder, so the
+    // input falls back to its label and never echoes the help text.
+    expect(policyInput.placeholder).toBe("Policy");
+    expect(policyInput.placeholder).not.toBe("Policy number");
+  });
+});

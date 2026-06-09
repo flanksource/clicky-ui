@@ -2,7 +2,11 @@ import { useReducer, type FormEvent, type KeyboardEvent, type ReactNode } from "
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
 import { UiClose } from "../icons";
-import { isPositionalParam, type OpenAPIParameter } from "./types";
+import {
+  isPositionalParam,
+  parameterPlaceholder,
+  type OpenAPIParameter,
+} from "./types";
 
 export type CommandFormProps = {
   parameters: OpenAPIParameter[];
@@ -112,7 +116,7 @@ function ParameterField({
         <TagInput
           id={fieldId}
           value={value}
-          placeholder={param.description || param.name}
+          placeholder={parameterPlaceholder(param) || param.name}
           onChange={onChange}
         />
       </FieldWrapper>
@@ -209,7 +213,9 @@ function ParameterField({
         className={inputClassName}
         onChange={(event) => onChange(event.target.value)}
         placeholder={
-          schema?.default != null ? String(schema.default) : param.description || param.name
+          schema?.default != null
+            ? String(schema.default)
+            : parameterPlaceholder(param) || param.name
         }
       />
     </FieldWrapper>

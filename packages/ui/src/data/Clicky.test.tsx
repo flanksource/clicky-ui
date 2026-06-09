@@ -254,6 +254,51 @@ describe("Clicky", () => {
     expect(screen.getByText(/kind: Deployment/)).toBeInTheDocument();
   });
 
+  it("keeps table controls visible for empty clicky tables", () => {
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [
+          { name: "date", label: "Date", sortable: true },
+          { name: "description", label: "Description", grow: true },
+        ],
+        rows: [],
+      },
+    };
+
+    render(
+      <Clicky
+        data={clickyDocument}
+        timeRange={{
+          from: "2026-06-01",
+          to: "2026-06-30",
+          onApply: vi.fn(),
+        }}
+        externalFilters={[
+          {
+            key: "kind",
+            kind: "enum",
+            label: "Kind",
+            value: "",
+            options: [
+              { value: "invoice", label: "Invoice" },
+              { value: "payment", label: "Payment" },
+            ],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /date/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
+    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
+  });
+
   it("expands clicky table rows with all fields and inline tag actions", async () => {
     const clickyDocument: ClickyDocument = {
       version: 1,

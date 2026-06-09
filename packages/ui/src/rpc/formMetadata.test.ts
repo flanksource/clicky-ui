@@ -92,6 +92,7 @@ describe("parametersToFormConfig", () => {
           name: "q",
           in: "query",
           description: "Search query",
+          placeholder: "Search widgets…",
           "x-clicky": { role: "search" },
         },
         { name: "kind", in: "query", "x-clicky": { role: "filter" } },
@@ -103,11 +104,30 @@ describe("parametersToFormConfig", () => {
     );
 
     expect(config.search?.value).toBe("bolt");
-    expect(config.search?.placeholder).toBe("Search query");
+    // Placeholder is the explicit placeholder field, not the description.
+    expect(config.search?.placeholder).toBe("Search widgets…");
     expect(config.filters.map((f) => f.key)).toEqual(["kind"]);
 
     config.search?.onChange("gasket");
     expect(updates).toEqual([{ q: "gasket", kind: "" }]);
+  });
+
+  it("omits the search placeholder when only a description is provided", () => {
+    const values = { q: "" };
+    const config = parametersToFormConfig(
+      [
+        {
+          name: "q",
+          in: "query",
+          description: "Search query",
+          "x-clicky": { role: "search" },
+        },
+      ],
+      values,
+      () => {},
+    );
+
+    expect(config.search?.placeholder).toBeUndefined();
   });
 
   it("partitions time-from/time-to role parameters into the time range", () => {

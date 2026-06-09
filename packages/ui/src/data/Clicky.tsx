@@ -2506,7 +2506,7 @@ export function ClickyTable({
   const effectivePagination = pagination ?? runtime.tablePagination;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
 
-  if (columns.length === 0 || rows.length === 0) {
+  if (columns.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
   }
 

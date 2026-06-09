@@ -65,7 +65,20 @@ export interface OpenAPIParameter {
   description?: string;
   required?: boolean;
   schema?: OpenAPISchema;
+  /** Hint text shown inside the empty input. Distinct from `description`,
+   *  which is help text and must NOT be used as a placeholder. */
+  placeholder?: string;
   "x-clicky"?: ClickyParameterMeta;
+  /** Vendor-extension placeholder, set server-side by clicky's converter.
+   *  Takes precedence over `placeholder` when both are present. */
+  "x-clicky-placeholder"?: string;
+}
+
+/** Resolves the input placeholder for a parameter, drawing ONLY from explicit
+ *  placeholder fields — never from `description` (help text). Returns undefined
+ *  when no placeholder is declared so callers can apply their own fallback. */
+export function parameterPlaceholder(param: OpenAPIParameter): string | undefined {
+  return param["x-clicky-placeholder"] ?? param.placeholder;
 }
 
 export interface OpenAPIOperation {

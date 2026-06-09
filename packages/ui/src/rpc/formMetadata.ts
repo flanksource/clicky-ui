@@ -12,7 +12,7 @@ import type {
   OperationLookupFilter,
   OperationLookupResponse,
 } from "./types";
-import { isPositionalParam } from "./types";
+import { isPositionalParam, parameterPlaceholder } from "./types";
 
 export type ParameterValues = Record<string, string>;
 export type ParameterValuesSetter = Dispatch<SetStateAction<ParameterValues>>;
@@ -267,7 +267,7 @@ export function parametersToFormConfig(
           value: splitCommaValues(value),
           disabled,
           options: lookupOptionsToFieldOptions(lookupFilter),
-          placeholder: param.description ?? "value-1, value-2",
+          placeholder: parameterPlaceholder(param) ?? "value-1, value-2",
           onChange: (next) =>
             setValues((current) => ({ ...current, [param.name]: next.join(",") })),
         });
@@ -281,7 +281,7 @@ export function parametersToFormConfig(
         value,
         disabled,
         options: lookupOptionsToFieldOptions(lookupFilter),
-        placeholder: param.description ?? label,
+        placeholder: parameterPlaceholder(param) ?? label,
         inputType:
           lookupFilter.type === "number"
             ? "number"
@@ -299,7 +299,7 @@ export function parametersToFormConfig(
       label,
       value,
       disabled,
-      placeholder: param.description ?? label,
+      placeholder: parameterPlaceholder(param) ?? label,
       onChange: (next) => onChange(next),
     });
   }
@@ -310,13 +310,14 @@ export function parametersToFormConfig(
     const searchValue = searchDisabled
       ? (lockedValues[searchParam.name] ?? "")
       : (values[searchParam.name] ?? "");
+    const searchPlaceholder = parameterPlaceholder(searchParam);
     config.search = {
       value: searchValue,
       onChange: (next) => {
         if (searchDisabled) return;
         setValues((current) => ({ ...current, [searchParam.name]: next }));
       },
-      ...(searchParam.description ? { placeholder: searchParam.description } : {}),
+      ...(searchPlaceholder ? { placeholder: searchPlaceholder } : {}),
       ariaLabel: lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
     };
   }

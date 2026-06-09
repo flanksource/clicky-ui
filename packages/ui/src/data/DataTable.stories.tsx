@@ -7,6 +7,10 @@ import {
   UiJson,
   UiMarkdown,
 } from "../icons";
+import type {
+  FilterBarFilter,
+  FilterBarMultiFilterMode,
+} from "../components/FilterBar";
 import {
   DataTable,
   type DataTableColumn,
@@ -591,6 +595,96 @@ function RowDetailDialogShowcase() {
   );
 }
 
+function FilterDescriptionsShowcase() {
+  const [status, setStatus] = useState<Record<string, FilterBarMultiFilterMode>>(
+    {},
+  );
+  const [owner, setOwner] = useState("");
+  const [minRestarts, setMinRestarts] = useState("");
+  const [service, setService] = useState("");
+
+  const filters: FilterBarFilter[] = [
+    {
+      key: "service",
+      kind: "enum",
+      label: "Service",
+      description:
+        "Single-select: show only the chosen service, or leave empty for all.",
+      placeholder: "any service",
+      value: service,
+      options: rows.map((row) => ({ value: row.service })),
+      onChange: setService,
+    },
+    {
+      key: "status",
+      kind: "multi",
+      label: "Status",
+      description:
+        "Include or exclude services by health. Click once to include, again to exclude.",
+      value: status,
+      options: [
+        { value: "healthy", label: "healthy" },
+        { value: "degraded", label: "degraded" },
+      ],
+      onChange: setStatus,
+    },
+    {
+      key: "owner",
+      kind: "text",
+      label: "Owner",
+      description:
+        "Match the owning team by substring, e.g. `plat` matches `platform`.",
+      placeholder: "team name…",
+      value: owner,
+      onChange: setOwner,
+    },
+    {
+      key: "restarts",
+      kind: "number",
+      label: "Min restarts",
+      description:
+        "Only show services that have restarted at least this many times.",
+      value: { min: minRestarts },
+      domainMin: 0,
+      domainMax: 5,
+      step: 1,
+      onChange: (value) => setMinRestarts(value.min ?? ""),
+    },
+  ];
+
+  const includes = Object.entries(status)
+    .filter(([, mode]) => mode === "include")
+    .map(([value]) => value);
+  const excludes = Object.entries(status)
+    .filter(([, mode]) => mode === "exclude")
+    .map(([value]) => value);
+  const ownerQuery = owner.trim().toLowerCase();
+  const minRestartCount = minRestarts === "" ? null : Number(minRestarts);
+
+  const filtered = rows.filter((row) => {
+    if (service && row.service !== service) return false;
+    if (includes.length > 0 && !includes.includes(row.status)) return false;
+    if (excludes.includes(row.status)) return false;
+    if (ownerQuery && !row.owner.toLowerCase().includes(ownerQuery)) {
+      return false;
+    }
+    if (minRestartCount !== null && row.restarts < minRestartCount) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <DataTable
+      data={filtered}
+      columns={columns}
+      defaultSort={{ key: "restarts", dir: "asc" }}
+      externalFilters={filters}
+      columnResizeStorageKey="clicky-ui-story-data-table-filter-descriptions"
+    />
+  );
+}
+
 const meta = {
   title: "Data/DataTable",
   component: DataTable,
@@ -656,4 +750,16 @@ export const StatusDots: Story = {
 
 export const RowDetailDialog: Story = {
   render: () => <RowDetailDialogShowcase />,
+};
+
+export const FilterDescriptions: Story = {
+  render: () => <FilterDescriptionsShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Caller-owned filters that each carry a `description`, shown as helper text in the filter popover (and as the control's tooltip). The filters here actually narrow the rows: status include/exclude, an owner substring match, and a minimum restart count.",
+      },
+    },
+  },
 };
