@@ -1,26 +1,7 @@
 import { Icon } from "../Icon";
 import { UiRestart, UiDebugStepOver, UiMethod } from "../../icons";
 import type { ParsedGoroutine, ParsedGoroutineFrame } from "./stacktrace";
-
-export function goroutineStateBadge(state: string): string {
-  if (state.includes("running"))
-    return "bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-300";
-  if (state.includes("chan") || state.includes("wait"))
-    return "bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300";
-  if (state.includes("sleep"))
-    return "bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
-  if (state.includes("select"))
-    return "bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300";
-  return "bg-muted text-muted-foreground";
-}
-
-export function goroutineStateDot(state: string): string {
-  if (state.includes("running")) return "bg-green-500";
-  if (state.includes("chan") || state.includes("wait")) return "bg-blue-500";
-  if (state.includes("sleep")) return "bg-amber-500";
-  if (state.includes("select")) return "bg-violet-500";
-  return "bg-muted-foreground/40";
-}
+import { goroutineStateBadge, goroutineStateDot } from "./state-styles";
 
 export type GoroutineCardProps = {
   goroutine: ParsedGoroutine;

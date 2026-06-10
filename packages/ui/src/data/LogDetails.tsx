@@ -1,18 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
-import {
-  getFilterTokens,
-  type DataTableColumn,
-  type DataTableRowDetailContext,
-} from "./DataTable";
+import { useMemo, useState } from "react";
+import type { DataTableColumn } from "./DataTable";
+import { getFilterTokens } from "./data-table-utils";
 import { Properties, type PropertiesAction, type PropertiesItem } from "./Properties";
-import {
-  TagActionsProvider,
-  TagPropertiesList,
-  type TagActionsContextValue,
-  normalizeTags,
-} from "./cells/TagList";
+import { TagActionsProvider, TagPropertiesList } from "./cells/TagList";
+import { normalizeTags, type TagActionsContextValue } from "./cells/tag-utils";
 import { formatPropertyLabel } from "./properties-utils";
-import type { LogsTableRow } from "./LogsTable";
+import type { LogsTableRow } from "./logs-normalize";
 import { asRecord } from "./log-utils";
 import { UiChevronDown, UiChevronRight, UiCopy, UiZoomIn, UiZoomOut } from "../icons";
 
@@ -20,19 +13,6 @@ const TAGS_PATH = "details.tags";
 
 // Key column shrinks to its content (no min/fixed width), never wider than 30ch.
 const DETAIL_ROW_CLASS = "grid-cols-[fit-content(30ch)_minmax(0,1fr)]";
-
-export function renderLogDetails(
-  row: LogsTableRow,
-  context: DataTableRowDetailContext<LogsTableRow>,
-): ReactNode {
-  return (
-    <LogDetails
-      row={row}
-      filterActions={context.filterActionsByColumn}
-      columns={context.columns}
-    />
-  );
-}
 
 /**
  * Maps a top-level detail field path (`details.<columnKey>`) to its column key.
@@ -45,7 +25,7 @@ function fieldColumnKey(path: string): string | undefined {
   return rest && !rest.includes(".") ? rest : undefined;
 }
 
-function LogDetails({
+export function LogDetails({
   row,
   filterActions,
   columns,

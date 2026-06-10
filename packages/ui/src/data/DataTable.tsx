@@ -9,7 +9,8 @@ import {
   type TdHTMLAttributes,
 } from "react";
 import { useSort, type SortDir } from "../hooks/use-sort";
-import { DensityValueProvider, type Density } from "../hooks/use-density";
+import { type Density } from "../hooks/use-density";
+import { DensityValueProvider } from "../hooks/density-provider";
 import { useResolvedTheme, type Theme } from "../hooks/use-theme";
 import { cn } from "../lib/utils";
 import { Modal, type ModalSize } from "../overlay/Modal";
@@ -17,8 +18,6 @@ import {
   FilterBar,
   FilterBarFilterPanel,
   FilterBarRangePanel,
-  clearFilterBarFilter,
-  isFilterBarFilterActive,
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberValue,
@@ -27,6 +26,8 @@ import {
   type FilterBarRangeProps,
   type FilterBarSearchProps,
 } from "../components/FilterBar";
+import { clearFilterBarFilter, isFilterBarFilterActive } from "../components/filter-bar-utils";
+import { getFilterCandidate, getFilterTokens, prettifyKey, resolvePath } from "./data-table-utils";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -48,18 +49,17 @@ import {
   UiSun,
 } from "../icons";
 import { SortableHeader } from "./SortableHeader";
+import { Timestamp } from "./cells/Timestamp";
 import {
-  Timestamp,
   chooseTimestampFormat,
   modeToFormat,
   parseTimestamp,
   resolveDateMath,
   type TimestampFormat,
   type TimestampOptions,
-} from "./cells/Timestamp";
+} from "./cells/timestamp-format";
+import { TagActionsProvider, TagList } from "./cells/TagList";
 import {
-  TagActionsProvider,
-  TagList,
   normalizeTags,
   splitTagToken,
   tagActionsFromRecord,
@@ -68,7 +68,7 @@ import {
   type TagFilterMode,
   type TagsOptions,
   type TagsValue,
-} from "./cells/TagList";
+} from "./cells/tag-utils";
 import { StatusDot } from "./cells/StatusDot";
 import { normalizeStatus } from "./cells/status-mapping";
 import type { BadgeStatus } from "./Badge";
@@ -2100,38 +2100,11 @@ function getSortValue<T extends Record<string, unknown>>(
   return column.sortValue ? column.sortValue(rawValue, row) : rawValue;
 }
 
-function getFilterCandidate<T extends Record<string, unknown>>(
-  row: T,
-  column: DataTableColumn<T>,
-) {
-  const rawValue = resolvePath(row, column.key);
-  return column.filterValue ? column.filterValue(rawValue, row) : rawValue;
-}
-
-export function getFilterTokens<T extends Record<string, unknown>>(
-  row: T,
-  column: DataTableColumn<T>,
-) {
-  return normalizeTokens(getFilterCandidate(row, column));
-}
-
 function getFilterNumbers<T extends Record<string, unknown>>(
   row: T,
   column: DataTableColumn<T>,
 ) {
   return normalizeNumbers(getFilterCandidate(row, column));
-}
-
-function normalizeTokens(value: FilterValue | unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizeTokens(item)).filter(Boolean);
-  }
-
-  if (value == null) return [];
-  if (typeof value === "object") return [JSON.stringify(value)];
-
-  const token = String(value).trim();
-  return token ? [token] : [];
 }
 
 function normalizeNumbers(value: FilterValue | unknown): number[] {
@@ -2254,15 +2227,6 @@ function pruneFilterState<T>(
       ([key, value]) => allowed.has(key) && !isEmpty(value),
     ),
   ) as Record<string, T>;
-}
-
-function resolvePath(obj: unknown, path: string): unknown {
-  return path.split(".").reduce<unknown>((current, key) => {
-    if (current && typeof current === "object") {
-      return (current as Record<string, unknown>)[key];
-    }
-    return undefined;
-  }, obj);
 }
 
 function formatCell(value: unknown): ReactNode {
@@ -2392,14 +2356,6 @@ function applyKindDefaults<T extends Record<string, unknown>>(
   }
 
   return column;
-}
-
-function prettifyKey(key: string) {
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]/g, " ")
-    .replace(/\b\w/g, (value) => value.toUpperCase())
-    .trim();
 }
 
 function labelText<T extends Record<string, unknown>>(
@@ -2808,26 +2764,6 @@ function cellContentClassName<T extends Record<string, unknown>>(
   if (column.shrink)
     return cn(base, "min-w-0 whitespace-nowrap", !resized && "max-w-[16rem]");
   return cn(base, "min-w-0", !resized && "max-w-[18rem]");
-}
-
-export function inferColumns<T extends Record<string, unknown>>(
-  data: T[],
-): DataTableColumn<T>[] {
-  if (data.length === 0) return [];
-
-  const keys = new Set<string>();
-  for (const row of data.slice(0, 20)) {
-    Object.keys(row)
-      .filter((key) => !key.startsWith("_"))
-      .forEach((key) => keys.add(key));
-  }
-
-  return Array.from(keys).map((key) => ({
-    key,
-    label: prettifyKey(key),
-    sortable: true,
-    filterable: true,
-  }));
 }
 
 export function DataTable<T extends Record<string, unknown>>({

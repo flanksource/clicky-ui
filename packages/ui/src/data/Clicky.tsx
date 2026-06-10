@@ -68,13 +68,8 @@ import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { Badge, type BadgeShape } from "./Badge";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
-import {
-  TagActionsProvider,
-  TagList,
-  normalizeTags,
-  type NormalizedTag,
-  type TagsValue,
-} from "./cells/TagList";
+import { TagActionsProvider, TagList } from "./cells/TagList";
+import { normalizeTags, type NormalizedTag, type TagsValue } from "./cells/tag-utils";
 
 export type ClickyStyle = {
   className?: string;

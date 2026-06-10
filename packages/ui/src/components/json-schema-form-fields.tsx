@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { LabelIcon, type LabelIconSpec } from "../data/Icon";
-import { formatDateTimeRelative } from "../data/cells/Timestamp";
+import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
 import type { FieldControl, FieldOption, FormLayout } from "./json-schema-form-types";

@@ -54,6 +54,8 @@ export type DropdownMenuProps = {
   onOpenChange?: (open: boolean) => void;
   /** Browser tooltip / accessible label for the default trigger. */
   title?: string;
+  /** Accessible label (`aria-label`) for the floating menu element itself. */
+  menuLabel?: string;
   /** Classes applied to the wrapper. */
   className?: string;
   /** Classes applied to the floating menu. */
@@ -72,6 +74,7 @@ export function DropdownMenu({
   align = "right",
   onOpenChange,
   title,
+  menuLabel,
   className,
   menuClassName,
 }: DropdownMenuProps) {
@@ -148,6 +151,7 @@ export function DropdownMenu({
             <div
               ref={refs.setFloating}
               role="menu"
+              aria-label={menuLabel}
               style={floatingStyles}
               className={cn(
                 "z-[9999] min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",

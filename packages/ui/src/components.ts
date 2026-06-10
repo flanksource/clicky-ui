@@ -1,12 +1,9 @@
-export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { Button, type ButtonProps } from "./components/button";
+export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
-export {
-  FormatOptionsDropdown,
-  CLICKY_FORMAT_OPTIONS,
-  type FormatOptionsDropdownProps,
-  type FormatOption,
-} from "./components/FormatOptionsDropdown";
+export { FormatOptionsDropdown, type FormatOptionsDropdownProps } from "./components/FormatOptionsDropdown";
+export { CLICKY_FORMAT_OPTIONS, type FormatOption } from "./components/format-options";
 export { DateField, type DateFieldMode, type DateFieldProps } from "./components/DateField";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
 export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
@@ -87,6 +84,12 @@ export {
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
+export {
+  DEFAULT_PREFERENCES_STORAGE_KEY,
+  readPreferences,
+  writePreferences,
+} from "./components/json-schema-form-preferences";
+export type { FormPreferences, LayoutMode } from "./components/json-schema-form-preferences";
 export {
   resolveControl,
   effectiveProperties,

@@ -83,6 +83,23 @@ const meta = {
       description: "Namespaces generated input ids so multiple forms on one page don't collide.",
       table: { category: "Behavior" },
     },
+    showPreferencesMenu: {
+      control: "boolean",
+      description:
+        "Show the top-right three-dot display-options menu (size + layout). Controls only this form's appearance, never global density or values.",
+      table: { category: "Appearance", defaultValue: { summary: "true" } },
+    },
+    persistPreferences: {
+      control: "boolean",
+      description: "Persist menu selections to localStorage so they survive remounts.",
+      table: { category: "Behavior", defaultValue: { summary: "true" } },
+    },
+    preferencesStorageKey: {
+      control: "text",
+      description:
+        "localStorage key the display preferences are stored under. Pass a distinct key to isolate a form.",
+      table: { category: "Behavior", defaultValue: { summary: "clicky-ui-json-schema-form-preferences" } },
+    },
     title: { control: "text", table: { category: "Appearance" } },
     hiddenKeys: { control: "object", table: { category: "Behavior" } },
     onChange: { control: false, table: { category: "Events" } },
@@ -260,7 +277,14 @@ function SizeColumn({ size }: { size: FormSize }) {
   return (
     <div className="min-w-64 space-y-2">
       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{size}</div>
-      <JsonSchemaForm schema={scalarSchema} value={value} onChange={setValue} size={size} idPrefix={size} />
+      <JsonSchemaForm
+        schema={scalarSchema}
+        value={value}
+        onChange={setValue}
+        size={size}
+        idPrefix={size}
+        showPreferencesMenu={false}
+      />
     </div>
   );
 }
@@ -277,7 +301,22 @@ export const Sizes: Story = {
     docs: {
       description: {
         story:
-          "The `size` prop scales every input and label form-wide across `xs`–`xl` (default `md`). Each column is an independent controlled form, so you can compare the full scale side by side — smaller sizes also tighten the vertical gaps between fields, larger sizes cap their spacing at `lg`.",
+          "The `size` prop scales every input and label form-wide across `xs`–`xl` (default `md`). Each column is an independent controlled form, so you can compare the full scale side by side — smaller sizes also tighten the vertical gaps between fields, larger sizes cap their spacing at `lg`. The display-options menu is disabled here so a persisted preference doesn't collapse the comparison.",
+      },
+    },
+  },
+};
+
+export const PreferencesMenu: Story = {
+  args: {
+    title: "Profile",
+    preferencesStorageKey: "storybook-json-schema-form-preferences",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Every form shows a top-right three-dot menu (enabled by default) for picking the **Size** (`xs`–`xl`) and **Layout** (stacked / inline). Selections apply immediately and — with `persistPreferences` (default) — persist to localStorage under `preferencesStorageKey`, so they survive a remount and are shared across forms using the same key. The menu only changes this form's appearance; it never touches global page density or the field values. Pass `showPreferencesMenu={false}` to hide it, or `persistPreferences={false}` to keep changes in-memory only.",
       },
     },
   },

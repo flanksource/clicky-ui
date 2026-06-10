@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { DensityProvider, useDensity } from "./use-density";
+import { useDensity } from "./use-density";
+import { DensityProvider } from "./density-provider";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <DensityProvider>{children}</DensityProvider>;

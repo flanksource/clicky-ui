@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 import type {
@@ -831,6 +831,132 @@ describe("JsonSchemaForm x-layout: stack", () => {
       <JsonSchemaForm schema={schema} value={{ addresses: { Business: {} } }} onChange={vi.fn()} />,
     );
     expect(screen.getByText("Address Role")).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm preferences menu", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: { Name: { type: "string" } },
+  };
+  const KEY = "test-form-prefs";
+
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  function openMenu(): void {
+    fireEvent.click(screen.getByRole("button", { name: "Form display options" }));
+  }
+
+  function firstInput(container: HTMLElement): HTMLElement {
+    const el = container.querySelector<HTMLElement>("input[data-jsf-input]");
+    if (!el) throw new Error("no [data-jsf-input] input rendered");
+    return el;
+  }
+
+  function inlineGrid(container: HTMLElement): HTMLElement | null {
+    return (
+      [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+        el.style.gridTemplateColumns.includes("minmax"),
+      ) ?? null
+    );
+  }
+
+  it("shows the display-options trigger by default", () => {
+    render(<JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Form display options" })).toBeInTheDocument();
+  });
+
+  it("hides the trigger when showPreferencesMenu is false", () => {
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Form display options" })).not.toBeInTheDocument();
+  });
+
+  it("selecting xs shrinks the input and persists under the supplied key", () => {
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        preferencesStorageKey={KEY}
+      />,
+    );
+    expect(firstInput(container).className).toContain("h-9");
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Extra small" }));
+    expect(firstInput(container).className).toContain("h-7");
+    expect(JSON.parse(localStorage.getItem(KEY) as string)).toEqual({ size: "xs" });
+  });
+
+  it("selecting Inline switches to the inline grid and persists", () => {
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        preferencesStorageKey={KEY}
+      />,
+    );
+    expect(inlineGrid(container)).toBeNull();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Inline" }));
+    expect(inlineGrid(container)).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY) as string)).toEqual({ layoutMode: "inline" });
+  });
+
+  it("restores stored preferences on remount", () => {
+    localStorage.setItem(KEY, JSON.stringify({ size: "xl" }));
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        preferencesStorageKey={KEY}
+      />,
+    );
+    expect(firstInput(container).className).toContain("h-11");
+  });
+
+  it("persistPreferences={false} changes the instance but never touches localStorage", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        persistPreferences={false}
+        preferencesStorageKey={KEY}
+      />,
+    );
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Extra small" }));
+    expect(firstInput(container).className).toContain("h-7");
+    expect(getItem).not.toHaveBeenCalledWith(KEY);
+    expect(setItem).not.toHaveBeenCalledWith(KEY, expect.anything());
+  });
+
+  it("falls back to the size prop when stored preferences are invalid", () => {
+    localStorage.setItem(KEY, JSON.stringify({ size: "gigantic" }));
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        size="lg"
+        preferencesStorageKey={KEY}
+      />,
+    );
+    expect(firstInput(container).className).toContain("h-10");
   });
 });
 

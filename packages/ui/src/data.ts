@@ -1,9 +1,9 @@
 export { AnsiHtml, type AnsiHtmlProps } from "./data/AnsiHtml";
 export { Avatar, type AvatarKind, type AvatarProps, type AvatarVariant } from "./data/Avatar";
 export { AvatarBadge, type AvatarBadgeProps } from "./data/AvatarBadge";
+export { badgeVariants } from "./data/badge-variants";
 export {
   Badge,
-  badgeVariants,
   type BadgeProps,
   type BadgeShape,
   type BadgeSize,
@@ -13,9 +13,9 @@ export {
   type BadgeVariant,
 } from "./data/Badge";
 export { CodeBlock, type CodeBlockProps } from "./data/CodeBlock";
+export { inferColumns } from "./data/data-table-utils";
 export {
   DataTable,
-  inferColumns,
   type DataTableColumn,
   type DataTableColumnInput,
   type DataTableColumnKind,
@@ -25,8 +25,8 @@ export {
   type TagsOptions,
   type TimestampOptions,
 } from "./data/DataTable";
+export { Timestamp, type TimestampProps } from "./data/cells/Timestamp";
 export {
-  Timestamp,
   chooseTimestampFormat,
   formatDateTimeRelative,
   formatRelativeTime,
@@ -35,11 +35,9 @@ export {
   modeToFormat,
   type TimestampFormat,
   type TimestampMode,
-  type TimestampProps,
-} from "./data/cells/Timestamp";
+} from "./data/cells/timestamp-format";
+export { TagActionsProvider, TagList, type TagListProps } from "./data/cells/TagList";
 export {
-  TagActionsProvider,
-  TagList,
   normalizeTags,
   splitTagToken,
   tagActionsFromRecord,
@@ -50,9 +48,8 @@ export {
   type TagActionsContextValue,
   type TagFilterMode,
   type TagInput,
-  type TagListProps,
   type TagsValue,
-} from "./data/cells/TagList";
+} from "./data/cells/tag-utils";
 export { StatusDot, type StatusDotProps, type StatusDotSize } from "./data/cells/StatusDot";
 export { normalizeStatus, STATUS_TOKEN_GROUPS } from "./data/cells/status-mapping";
 export {
@@ -89,11 +86,11 @@ export { formatPropertyLabel } from "./data/properties-utils";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
 export {
   LogsTable,
-  normalizeLogsTableRows,
   type LogsTableInput,
   type LogsTableProps,
   type LogsTableRow,
 } from "./data/LogsTable";
+export { normalizeLogsTableRows } from "./data/logs-normalize";
 export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
