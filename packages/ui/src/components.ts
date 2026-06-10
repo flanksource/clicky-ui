@@ -54,17 +54,16 @@ export {
   type ComboboxSingleProps,
   type ComboboxMultiProps,
 } from "./components/Combobox";
+export { WorkloadPicker, type WorkloadPickerProps } from "./components/WorkloadPicker";
 export {
-  WorkloadPicker,
   workloadKey,
   parseWorkloadKey,
   kindForValue,
   loadedWorkloads,
-  type WorkloadPickerProps,
   type WorkloadKind,
   type WorkloadResource,
   type ParsedWorkloadKey,
-} from "./components/WorkloadPicker";
+} from "./components/workload-picker-utils";
 export {
   SecretKeySelector,
   type SecretKeySelectorProps,
