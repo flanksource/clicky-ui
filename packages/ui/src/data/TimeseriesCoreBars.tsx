@@ -100,7 +100,16 @@ export function deriveCoreBars(
     fill: clamp01(usageCores - i),
   }));
 
-  return { hasUsage, usageCores, limitCores, coreCount, pct, bars };
+  // limitCores is an optional field under exactOptionalPropertyTypes — only set
+  // the key when a limit resolved, rather than assigning an explicit undefined.
+  return {
+    hasUsage,
+    usageCores,
+    coreCount,
+    pct,
+    bars,
+    ...(limitCores !== undefined && { limitCores }),
+  };
 }
 
 function CoreBarsIcon({ icon }: { icon: string | StaticIconComponent }) {

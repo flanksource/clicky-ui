@@ -6,11 +6,11 @@ import { Combobox, type ComboboxOption } from "./Combobox";
 
 // SecretKeySelector picks a Secret or ConfigMap and one of its keys, with a
 // mid-masked preview of every key's value so the operator can tell which key
-// holds the host vs the db vs a password. With `allowLiteral` it also offers a
-// "Value" mode for typing a static inline string. It is presentational: it
-// fetches nothing — the consumer supplies async `loadResources` /
-// `loadKeyPreview` getters. It emits a discriminated value the consumer lowers
-// into whatever reference shape it needs.
+// holds the host vs the db vs a password. It also offers a "Value" mode (on by
+// default; opt out with `allowLiteral={false}`) for typing a static inline
+// string. It is presentational: it fetches nothing — the consumer supplies
+// async `loadResources` / `loadKeyPreview` getters. It emits a discriminated
+// value the consumer lowers into whatever reference shape it needs.
 
 export type SecretKind = "secret" | "configmap";
 
@@ -38,7 +38,11 @@ export type SecretKeySelectorProps = {
   loadResources: (kind: SecretKind) => Promise<SecretResource[]>;
   /** Loads mid-masked previews for the named resource's keys. */
   loadKeyPreview: (kind: SecretKind, name: string) => Promise<KeyPreview[]>;
-  /** Offer a third "Value" toggle for typing a static inline literal. */
+  /**
+   * Offer a third "Value" toggle for typing a static inline literal. Enabled by
+   * default; pass `false` to restrict the selector to Secret/ConfigMap
+   * references only.
+   */
   allowLiteral?: boolean;
   /**
    * When true, a chosen secret/configmap name absent from the loaded resources,
@@ -55,7 +59,7 @@ export function SecretKeySelector({
   onChange,
   loadResources,
   loadKeyPreview,
-  allowLiteral = false,
+  allowLiteral = true,
   strict = false,
   className,
 }: SecretKeySelectorProps) {
