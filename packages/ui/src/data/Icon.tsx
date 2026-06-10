@@ -61,12 +61,12 @@ export type IconProps = CommonIconProps &
   );
 
 const TONE_CLASSES: Record<IconTone, string> = {
-  emerald: "text-emerald-700 ring-emerald-200/80",
-  amber: "text-amber-700 ring-amber-200/80",
-  rose: "text-rose-700 ring-rose-200/80",
-  slate: "text-slate-700 ring-slate-200/80",
-  sky: "text-sky-700 ring-sky-200/80",
-  violet: "text-violet-700 ring-violet-200/80",
+  emerald: "text-emerald-700 ring-emerald-200/80 dark:text-emerald-400 dark:ring-emerald-500/30",
+  amber: "text-amber-700 ring-amber-200/80 dark:text-amber-400 dark:ring-amber-500/30",
+  rose: "text-rose-700 ring-rose-200/80 dark:text-rose-400 dark:ring-rose-500/30",
+  slate: "text-slate-700 ring-slate-200/80 dark:text-slate-300 dark:ring-slate-500/30",
+  sky: "text-sky-700 ring-sky-200/80 dark:text-sky-400 dark:ring-sky-500/30",
+  violet: "text-violet-700 ring-violet-200/80 dark:text-violet-400 dark:ring-violet-500/30",
   neutral: "text-foreground ring-border",
 };
 
@@ -222,7 +222,7 @@ export function Icon({
       aria-label={title}
       role={title ? "img" : undefined}
       className={cn(
-        "inline-flex items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-inset",
+        "inline-flex items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-inset",
         TONE_CLASSES[tone],
         className,
       )}

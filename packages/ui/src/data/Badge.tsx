@@ -83,20 +83,20 @@ type ToneStyle = {
 
 const STATUS_STYLES: Record<BadgeStatus, ToneStyle> = {
   success: {
-    soft: "bg-emerald-500/12 text-emerald-700 border-emerald-200",
-    outlined: "bg-background text-emerald-700 border-emerald-300",
+    soft: "bg-emerald-500/12 text-emerald-700 border-emerald-200 dark:text-emerald-300 dark:border-emerald-500/30",
+    outlined: "bg-background text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-500/40",
   },
   error: {
-    soft: "bg-rose-500/12 text-rose-700 border-rose-200",
-    outlined: "bg-background text-rose-700 border-rose-300",
+    soft: "bg-rose-500/12 text-rose-700 border-rose-200 dark:text-rose-300 dark:border-rose-500/30",
+    outlined: "bg-background text-rose-700 border-rose-300 dark:text-rose-400 dark:border-rose-500/40",
   },
   warning: {
-    soft: "bg-amber-400/15 text-amber-800 border-amber-200",
-    outlined: "bg-background text-amber-800 border-amber-300",
+    soft: "bg-amber-400/15 text-amber-800 border-amber-200 dark:text-amber-300 dark:border-amber-500/30",
+    outlined: "bg-background text-amber-800 border-amber-300 dark:text-amber-400 dark:border-amber-500/40",
   },
   info: {
-    soft: "bg-sky-500/12 text-sky-700 border-sky-200",
-    outlined: "bg-background text-sky-700 border-sky-300",
+    soft: "bg-sky-500/12 text-sky-700 border-sky-200 dark:text-sky-300 dark:border-sky-500/30",
+    outlined: "bg-background text-sky-700 border-sky-300 dark:text-sky-400 dark:border-sky-500/40",
   },
 };
 
@@ -859,3 +859,4 @@ export function Badge({
     ),
   });
 }
+// HMR probe

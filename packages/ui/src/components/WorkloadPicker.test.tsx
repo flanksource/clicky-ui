@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { WorkloadPicker } from "./WorkloadPicker";
 import {
-  WorkloadPicker,
   kindForValue,
   loadedWorkloads,
   parseWorkloadKey,
   workloadKey,
   type WorkloadKind,
   type WorkloadResource,
-} from "./WorkloadPicker";
+} from "./workload-picker-utils";
 
 const FIXTURE: Record<WorkloadKind, WorkloadResource[]> = {
   service: [{ name: "demo-svc" }],

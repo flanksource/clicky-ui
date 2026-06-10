@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTags, splitTagToken, tagFilterTokens } from "./TagList";
+import { normalizeTags, splitTagToken, tagFilterTokens } from "./tag-utils";
 
 describe("normalizeTags", () => {
   it("parses key=value strings", () => {

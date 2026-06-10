@@ -5,14 +5,14 @@ import type { TaskSnapshot } from "./TaskSnapshot";
 // so the React and Preact renderers agree on icon/color semantics.
 
 const STATUS_COLORS: Record<string, string> = {
-  success: "text-green-600",
-  PASS: "text-green-600",
-  completed: "text-green-600",
-  failed: "text-red-600",
-  FAIL: "text-red-600",
-  ERR: "text-red-600",
-  warning: "text-yellow-600",
-  running: "text-blue-600",
+  success: "text-green-600 dark:text-green-400",
+  PASS: "text-green-600 dark:text-green-400",
+  completed: "text-green-600 dark:text-green-400",
+  failed: "text-red-600 dark:text-red-400",
+  FAIL: "text-red-600 dark:text-red-400",
+  ERR: "text-red-600 dark:text-red-400",
+  warning: "text-yellow-600 dark:text-yellow-400",
+  running: "text-blue-600 dark:text-blue-400",
   pending: "text-gray-400",
   canceled: "text-gray-400",
   SKIP: "text-gray-400",
@@ -33,15 +33,15 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 const STATUS_BG: Record<string, string> = {
-  success: "bg-green-100",
-  completed: "bg-green-100",
-  PASS: "bg-green-100",
-  failed: "bg-red-100",
-  FAIL: "bg-red-100",
-  ERR: "bg-red-100",
-  warning: "bg-yellow-100",
-  running: "bg-blue-100",
-  pending: "bg-gray-100",
+  success: "bg-green-100 dark:bg-green-500/20",
+  completed: "bg-green-100 dark:bg-green-500/20",
+  PASS: "bg-green-100 dark:bg-green-500/20",
+  failed: "bg-red-100 dark:bg-red-500/20",
+  FAIL: "bg-red-100 dark:bg-red-500/20",
+  ERR: "bg-red-100 dark:bg-red-500/20",
+  warning: "bg-yellow-100 dark:bg-yellow-500/20",
+  running: "bg-blue-100 dark:bg-blue-500/20",
+  pending: "bg-gray-100 dark:bg-gray-500/20",
 };
 
 export function taskStatusColor(s: string): string {
@@ -53,7 +53,7 @@ export function taskStatusIcon(s: string): string {
 }
 
 export function taskStatusBg(s: string): string {
-  return STATUS_BG[s] ?? "bg-gray-100";
+  return STATUS_BG[s] ?? "bg-gray-100 dark:bg-gray-500/20";
 }
 
 export function logLevelColor(level: string): string {
@@ -61,7 +61,7 @@ export function logLevelColor(level: string): string {
     case "error":
       return "text-red-500";
     case "warn":
-      return "text-yellow-600";
+      return "text-yellow-600 dark:text-yellow-400";
     case "debug":
       return "text-gray-400";
     default:

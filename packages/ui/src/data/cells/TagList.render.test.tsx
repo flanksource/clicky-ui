@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { TagList, normalizeTags } from "./TagList";
+import { TagList } from "./TagList";
+import { normalizeTags } from "./tag-utils";
 
 describe("TagList", () => {
   it("hides overflow tags until the +N trigger is hovered", () => {

@@ -111,6 +111,9 @@ function TristateSwitch({
       <span
         aria-hidden
         className={cn(
+          // The knob stays white in BOTH themes (standard switch look): on the
+          // dark-mode muted/red/green tracks white is the high-contrast choice,
+          // while bg-background would vanish against the track.
           "pointer-events-none absolute left-0.5 top-0.5 z-20 flex size-4 items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-150",
           SLOT_TRANSLATE[slot],
         )}

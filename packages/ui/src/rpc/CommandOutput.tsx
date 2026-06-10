@@ -257,7 +257,7 @@ function OutputBody({
     const iframe = (
       <iframe
         srcDoc={text}
-        className="h-[600px] w-full rounded-md border bg-white"
+        className="h-[600px] w-full rounded-md border bg-background"
         sandbox="allow-same-origin"
       />
     );
