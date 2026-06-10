@@ -39,6 +39,13 @@ export interface JsonSchemaProperty {
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
   else?: JsonSchemaProperty;
+  // Explicit property render order for an object: listed keys render first (in
+  // this order), unlisted keys keep document order after them. Lets emitters
+  // whose serializer alphabetizes maps (e.g. Go) state the intended UX order.
+  "x-order"?: string[];
+  // Human label per enum value ({ "20": "Business" }); the option renders as
+  // "Business (20)" while the raw value is what's stored.
+  "x-enum-labels"?: Record<string, string>;
   // Consumer extension keys pass through untouched.
   [key: string]: unknown;
 }
@@ -180,6 +187,59 @@ export type PostExtension = (
   nodes: { label: ReactNode; value: ReactNode },
 ) => { label: ReactNode; value: ReactNode };
 
+// FieldArgs is the raw input for rendering one field: the property key/schema,
+// whether it is required, and the current value + committer.
+export interface FieldArgs {
+  key: string;
+  prop: JsonSchemaProperty;
+  required: boolean;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}
+
+// RenderApi is the recursive render pipeline, injected into RenderContext so
+// container controls (array/object/map) can descend without importing the
+// renderer module — keeping the module graph one-directional (controls never
+// import the renderer), which Vite HMR needs to hot-apply edits instead of
+// falling back to full page reloads.
+export interface RenderApi {
+  renderFieldNodes(args: FieldArgs, ctx: RenderContext): { label: ReactNode; value: ReactNode } | null;
+  renderFieldRow(args: FieldArgs, ctx: RenderContext, opts?: { labelOverride?: string }): ReactNode | null;
+  renderObjectFields(
+    schema: JsonSchemaObject,
+    value: Record<string, unknown>,
+    onChange: (next: Record<string, unknown>) => void,
+    ctx: RenderContext,
+    opts?: { hiddenKeys?: string[] },
+  ): ReactNode[];
+}
+
+// RenderContext carries everything the recursive renderer needs to descend into
+// array items and object/map values: readOnly/inline layout, the consumer's
+// pre/post extension stacks (so they apply at EVERY depth, not just the top
+// level), and the current depth (for keys/labels).
+export interface RenderContext {
+  readOnly: boolean;
+  // Drop fields whose resolved control is read-only (schema `readOnly: true`)
+  // instead of rendering them as value displays. Applies at every depth.
+  hideReadOnlyFields: boolean;
+  // Resolved form layout (mode + inline width caps); see FormLayout.
+  layout: FormLayout;
+  // Form-wide size token scaling inputs and labels; see FormSize.
+  size: FormSize;
+  // Optional namespace for generated input ids, so multiple forms on one page
+  // don't collide on duplicate ids (which would break label/input focus).
+  idPrefix?: string;
+  // requiredFirst stably reorders each object level so required fields render
+  // before optional ones (see JsonSchemaFormProps.requiredFirst).
+  requiredFirst: boolean;
+  pre: PreExtension[];
+  post: PostExtension[];
+  depth: number;
+  // The recursion entry points (see RenderApi).
+  render: RenderApi;
+}
+
 // FormLayout describes how a form arranges each field's label and value. It is
 // resolved once at the top level and threaded through every depth via
 // RenderContext, so width caps apply uniformly to nested objects and array items.
@@ -191,7 +251,11 @@ export interface FormLayout {
    * at this width, truncating longer labels with an ellipsis. Default "40ch".
    */
   labelMaxWidth?: string;
-  /** Inline only: max width of the value column (CSS length). Default "600px". */
+  /**
+   * Max width of the value column (inline) or the whole label+value stack
+   * (stacked), as a CSS length. Default "600px". Keeps controls readable on
+   * wide viewports instead of stretching edge to edge.
+   */
   valueMaxWidth?: string;
 }
 
@@ -238,4 +302,23 @@ export interface JsonSchemaFormProps {
   title?: string;
   pre?: PreExtension[];
   post?: PostExtension[];
+  /**
+   * Show the top-right three-dot display-options menu (size + layout mode).
+   * Defaults to true. The menu controls only this form's appearance — never
+   * global page density or field values. When false the form renders exactly as
+   * before and performs no preference reads/writes.
+   */
+  showPreferencesMenu?: boolean;
+  /**
+   * Persist menu selections to localStorage so they survive remounts. Defaults
+   * to true. When false the menu still adjusts the current instance, but nothing
+   * is read from or written to localStorage.
+   */
+  persistPreferences?: boolean;
+  /**
+   * localStorage key the display preferences are stored under. Defaults to a
+   * shared key, so by default every form shares one set of preferences; pass a
+   * distinct key to isolate a screen or form.
+   */
+  preferencesStorageKey?: string;
 }

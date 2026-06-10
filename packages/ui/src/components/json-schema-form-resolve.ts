@@ -31,7 +31,15 @@ function schemaHasType(prop: JsonSchemaProperty, type: string): boolean {
 }
 
 function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
-  return (prop.enum ?? []).map((v) => ({ value: String(v), label: String(v) }));
+  const labels = prop["x-enum-labels"];
+  return (prop.enum ?? []).map((v) => {
+    const value = String(v);
+    const desc = labels?.[value];
+    return {
+      value,
+      label: typeof desc === "string" && desc && desc !== value ? `${desc} (${value})` : value,
+    };
+  });
 }
 
 // enumBranch returns the first anyOf/oneOf member carrying a non-empty `enum`,

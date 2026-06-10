@@ -1,27 +1,48 @@
+import { useState } from "react";
 import { cn } from "../lib/utils";
-import { renderObjectFields, type RenderContext } from "./json-schema-form-render";
+import { Icon } from "../data/Icon";
+import { UiCheck, UiEllipsis } from "../icons";
+import { DropdownMenu } from "../overlay/DropdownMenu";
+import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import {
   DEFAULT_FORM_SIZE,
   fieldInnerGapClass,
   inlineRowGapClass,
   labelSizeClass,
   stackedRowGapClass,
+  type FormSize,
 } from "./json-schema-form-size";
-import type { FormLayout, JsonSchemaFormProps } from "./json-schema-form-types";
+import {
+  DEFAULT_PREFERENCES_STORAGE_KEY,
+  readPreferences,
+  writePreferences,
+  type FormPreferences,
+  type LayoutMode,
+} from "./json-schema-form-preferences";
+import type { FormLayout, JsonSchemaFormProps, RenderContext } from "./json-schema-form-types";
 
 const DEFAULT_LABEL_MAX_WIDTH = "40ch";
 const DEFAULT_VALUE_MAX_WIDTH = "600px";
 
-// resolveFormLayout maps the `layout`/`inline` props to a single resolved
-// FormLayout. An explicit `layout` wins; otherwise `inline` selects the inline
-// preset. Width caps are only filled for inline mode.
-function resolveFormLayout(layout: FormLayout | undefined, inline: boolean): FormLayout {
-  const base = layout ?? { mode: inline ? "inline" : "stacked" };
-  if (base.mode !== "inline") return { mode: "stacked" };
+// resolveFormLayout maps the `layout`/`inline` props plus an optional menu-driven
+// `modeOverride` to a single resolved FormLayout. An explicit `layout` sets the
+// base; `inline` is the shorthand for it; `modeOverride` (from the preferences
+// menu) wins over both but only flips the mode — width caps from `layout` are
+// preserved. Both modes fill valueMaxWidth (inline value column / stacked
+// label+value stack); the label cap only applies inline.
+function resolveFormLayout(
+  layout: FormLayout | undefined,
+  inline: boolean,
+  modeOverride: LayoutMode | undefined,
+): FormLayout {
+  const baseMode = layout?.mode ?? (inline ? "inline" : "stacked");
+  const mode = modeOverride ?? baseMode;
+  const valueMaxWidth = layout?.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH;
+  if (mode !== "inline") return { mode: "stacked", valueMaxWidth };
   return {
     mode: "inline",
-    labelMaxWidth: base.labelMaxWidth ?? DEFAULT_LABEL_MAX_WIDTH,
-    valueMaxWidth: base.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH,
+    labelMaxWidth: layout?.labelMaxWidth ?? DEFAULT_LABEL_MAX_WIDTH,
+    valueMaxWidth,
   };
 }
 
@@ -45,26 +66,160 @@ export function JsonSchemaForm({
   title,
   pre,
   post,
+  showPreferencesMenu = true,
+  persistPreferences = true,
+  preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
 }: JsonSchemaFormProps) {
-  const resolvedLayout = resolveFormLayout(layout, inline);
+  // When the menu is hidden, never touch localStorage and start from an empty
+  // override so behaviour is identical to before this feature existed.
+  const [prefs, setPrefs] = useState<FormPreferences>(() =>
+    showPreferencesMenu && persistPreferences ? readPreferences(preferencesStorageKey) : {},
+  );
+
+  const effectiveSize = prefs.size ?? size;
+  const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode);
+
+  const applyPrefs = (next: FormPreferences) => {
+    setPrefs(next);
+    if (persistPreferences) writePreferences(preferencesStorageKey, next);
+  };
+
   const ctx: RenderContext = {
     readOnly,
     hideReadOnlyFields,
     layout: resolvedLayout,
-    size,
+    size: effectiveSize,
     requiredFirst,
     pre: pre ?? [],
     post: post ?? [],
     depth: 0,
+    render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
   };
   const rows = renderObjectFields(schema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
 
-  const rowGap = resolvedLayout.mode === "inline" ? inlineRowGapClass[size] : stackedRowGapClass[size];
+  const rowGap =
+    resolvedLayout.mode === "inline" ? inlineRowGapClass[effectiveSize] : stackedRowGapClass[effectiveSize];
   return (
-    <div className={cn("flex flex-col", fieldInnerGapClass[size])}>
-      {title && <h3 className={cn("font-semibold", labelSizeClass[size])}>{title}</h3>}
+    <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
+      {showPreferencesMenu && (
+        <PreferencesMenu
+          size={effectiveSize}
+          layoutMode={resolvedLayout.mode}
+          onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
+          onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
+        />
+      )}
+      {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
       <div className={cn("grid", rowGap)}>{rows}</div>
     </div>
+  );
+}
+
+const SIZE_OPTIONS: { value: FormSize; label: string }[] = [
+  { value: "xs", label: "Extra small" },
+  { value: "sm", label: "Small" },
+  { value: "md", label: "Medium" },
+  { value: "lg", label: "Large" },
+  { value: "xl", label: "Extra large" },
+];
+
+const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
+  { value: "stacked", label: "Stacked" },
+  { value: "inline", label: "Inline" },
+];
+
+// PreferencesMenu is the compact top-right ellipsis menu controlling this form's
+// size and layout mode. Selecting an item fires the matching callback and closes
+// the menu; the parent decides whether to persist.
+function PreferencesMenu({
+  size,
+  layoutMode,
+  onSelectSize,
+  onSelectLayout,
+}: {
+  size: FormSize;
+  layoutMode: LayoutMode;
+  onSelectSize: (size: FormSize) => void;
+  onSelectLayout: (mode: LayoutMode) => void;
+}) {
+  return (
+    <DropdownMenu
+      align="right"
+      menuLabel="Form display options"
+      className="absolute right-0 top-0 z-10"
+      trigger={
+        <button
+          type="button"
+          aria-label="Form display options"
+          aria-haspopup="menu"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Icon icon={UiEllipsis} className="text-sm" />
+        </button>
+      }
+    >
+      {(closeMenu) => (
+        <>
+          <PreferenceSection title="Size" />
+          {SIZE_OPTIONS.map((opt) => (
+            <PreferenceItem
+              key={opt.value}
+              label={opt.label}
+              selected={opt.value === size}
+              onSelect={() => {
+                onSelectSize(opt.value);
+                closeMenu();
+              }}
+            />
+          ))}
+          <PreferenceSection title="Layout" />
+          {LAYOUT_OPTIONS.map((opt) => (
+            <PreferenceItem
+              key={opt.value}
+              label={opt.label}
+              selected={opt.value === layoutMode}
+              onSelect={() => {
+                onSelectLayout(opt.value);
+                closeMenu();
+              }}
+            />
+          ))}
+        </>
+      )}
+    </DropdownMenu>
+  );
+}
+
+function PreferenceSection({ title }: { title: string }) {
+  return (
+    <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {title}
+    </div>
+  );
+}
+
+function PreferenceItem({
+  label,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={selected}
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+      onClick={onSelect}
+    >
+      <span className="flex w-3.5 shrink-0 justify-center">
+        {selected && <Icon icon={UiCheck} className="text-xs" />}
+      </span>
+      {label}
+    </button>
   );
 }
