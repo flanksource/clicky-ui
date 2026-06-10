@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { useState } from "react";
 import { Modal } from "./Modal";
@@ -40,6 +40,84 @@ describe("Modal", () => {
       </Modal>,
     );
     expect(screen.queryByRole("button", { name: "Expand to fullscreen" })).not.toBeInTheDocument();
+  });
+
+  describe("confirmClose", () => {
+    function ConfirmHarness({ confirmClose }: { confirmClose: boolean }) {
+      const [open, setOpen] = useState(true);
+      return (
+        <Modal open={open} onClose={() => setOpen(false)} confirmClose={confirmClose} title="Edit">
+          <p>body</p>
+        </Modal>
+      );
+    }
+
+    it("closes immediately when the guard is off", () => {
+      const onClose = vi.fn();
+      render(
+        <Modal open onClose={onClose} confirmClose={false} title="Edit">
+          <p>body</p>
+        </Modal>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("prompts instead of closing, and only closes once discard is confirmed", () => {
+      render(<ConfirmHarness confirmClose />);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+      // The modal is still mounted; a confirmation prompt is shown instead.
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("keeps the modal open when the prompt is cancelled", () => {
+      render(<ConfirmHarness confirmClose />);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("routes Escape and backdrop clicks through the guard", () => {
+      const onClose = vi.fn();
+      render(
+        <Modal open onClose={onClose} confirmClose title="Edit">
+          <p>body</p>
+        </Modal>,
+      );
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+      // A second Escape dismisses the prompt rather than the modal.
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("renders custom confirmation copy", () => {
+      render(
+        <Modal
+          open
+          onClose={() => {}}
+          confirmClose={{ title: "Leave wizard?", confirmLabel: "Leave" }}
+          title="Edit"
+        >
+          <p>body</p>
+        </Modal>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(screen.getByText("Leave wizard?")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Leave" })).toBeInTheDocument();
+    });
   });
 
   it("resets to the configured size after the modal is closed and reopened", () => {

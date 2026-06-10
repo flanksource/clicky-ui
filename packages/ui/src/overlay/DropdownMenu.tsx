@@ -1,4 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useListNavigation,
+  useRole,
+} from "@floating-ui/react";
 import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
@@ -62,7 +76,8 @@ export function DropdownMenu({
   menuClassName,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const listRef = useRef<(HTMLElement | null)[]>([]);
 
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
@@ -70,44 +85,57 @@ export function DropdownMenu({
     onOpenChangeRef.current?.(open);
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  const { refs, floatingStyles, context } = useFloating<HTMLDivElement>({
+    open,
+    onOpenChange: setOpen,
+    // bottom-end / bottom-start reproduce the previous right/left alignment.
+    placement: align === "right" ? "bottom-end" : "bottom-start",
+    whileElementsMounted: autoUpdate,
+    // offset(4) ≈ the previous mt-1; flip opens upward at the bottom edge and
+    // shift slides the menu back on-screen at the horizontal edges.
+    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: "menu" });
+  const listNav = useListNavigation(context, {
+    listRef,
+    activeIndex,
+    onNavigate: setActiveIndex,
+    loop: true,
+  });
+
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([
+    click,
+    dismiss,
+    role,
+    listNav,
+  ]);
 
   const closeMenu = () => setOpen(false);
-  const toggle = () => setOpen((v) => !v);
 
   return (
-    <div className={cn("relative inline-flex", className)} ref={wrapperRef}>
+    <div className={cn("relative inline-flex", className)}>
       {trigger ? (
         <span
-          className="contents"
-          onClick={toggle}
+          ref={refs.setReference}
+          className="inline-flex"
           aria-haspopup="menu"
           aria-expanded={open}
+          {...getReferenceProps()}
         >
           {trigger}
         </span>
       ) : (
         <Button
+          ref={refs.setReference as React.Ref<HTMLButtonElement>}
           variant={variant}
           size={size}
-          onClick={toggle}
           title={title}
           aria-haspopup="menu"
           aria-expanded={open}
+          {...getReferenceProps()}
         >
           {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
           {label}
@@ -115,40 +143,59 @@ export function DropdownMenu({
         </Button>
       )}
       {open && (
-        <div
-          role="menu"
-          className={cn(
-            "absolute z-20 mt-1 min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",
-            align === "right" ? "right-0" : "left-0",
-            menuClassName,
-          )}
-        >
-          {children
-            ? children(closeMenu)
-            : items?.map((item, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  role="menuitem"
-                  disabled={item.disabled}
-                  title={item.title}
-                  onClick={() => {
-                    item.onSelect();
-                    closeMenu();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-                >
-                  {item.icon && (
-                    <Icon
-                      {...(typeof item.icon === "string"
-                        ? { name: item.icon }
-                        : { icon: item.icon })}
-                    />
-                  )}
-                  {item.label}
-                </button>
-              ))}
-        </div>
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              role="menu"
+              style={floatingStyles}
+              className={cn(
+                "z-[9999] min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",
+                menuClassName,
+              )}
+              {...getFloatingProps()}
+            >
+              {children
+                ? children(closeMenu)
+                : items?.map((item, i) => (
+                    <button
+                      key={i}
+                      ref={(node) => {
+                        listRef.current[i] = node;
+                      }}
+                      type="button"
+                      role="menuitem"
+                      tabIndex={i === activeIndex ? 0 : -1}
+                      disabled={item.disabled}
+                      title={item.title}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                      {...getItemProps({
+                        onClick: () => {
+                          item.onSelect();
+                          closeMenu();
+                        },
+                        onKeyDown: (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            item.onSelect();
+                            closeMenu();
+                          }
+                        },
+                      })}
+                    >
+                      {item.icon && (
+                        <Icon
+                          {...(typeof item.icon === "string"
+                            ? { name: item.icon }
+                            : { icon: item.icon })}
+                        />
+                      )}
+                      {item.label}
+                    </button>
+                  ))}
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );

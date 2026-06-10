@@ -1,4 +1,5 @@
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export {
   FormatOptionsDropdown,
@@ -56,6 +57,25 @@ export {
   type ComboboxSingleProps,
   type ComboboxMultiProps,
 } from "./components/Combobox";
+export {
+  WorkloadPicker,
+  workloadKey,
+  parseWorkloadKey,
+  kindForValue,
+  loadedWorkloads,
+  type WorkloadPickerProps,
+  type WorkloadKind,
+  type WorkloadResource,
+  type ParsedWorkloadKey,
+} from "./components/WorkloadPicker";
+export {
+  SecretKeySelector,
+  type SecretKeySelectorProps,
+  type SecretKind,
+  type SecretKeyValue,
+  type SecretResource,
+  type KeyPreview,
+} from "./components/SecretKeySelector";
 export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
 export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
 export {

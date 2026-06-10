@@ -228,3 +228,76 @@ export const OptionIcons: Story = {
     );
   },
 };
+
+const GROUPED_OPTIONS = [
+  { value: "demo-svc", label: "demo-svc", group: "Service", icon: <span aria-hidden>🟦</span> },
+  { value: "db-svc", label: "db-svc", group: "Service", icon: <span aria-hidden>🟦</span> },
+  { value: "demo-ing", label: "demo-ing (demo.example.com)", group: "Ingress", icon: <span aria-hidden>🌐</span> },
+  { value: "demo-web", label: "demo-web", group: "Deployment", icon: <span aria-hidden>📦</span> },
+  { value: "demo-cycle", label: "demo-cycle", group: "StatefulSet", icon: <span aria-hidden>🗄️</span> },
+];
+
+export const Grouped: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Options carrying a `group` render a non-interactive section header above the first option of each group (grouped by contiguous `group` value, in the order provided). Open the menu to see the four `Service` / `Ingress` / `Deployment` / `StatefulSet` headers. Headers are derived from the *filtered* options, so typing a query that empties a group also hides its header, and keyboard navigation skips headers entirely.",
+      },
+    },
+  },
+  render: () => {
+    const [value, setValue] = useState("");
+    return (
+      <div className="w-72 space-y-3">
+        <Combobox
+          label="Workload"
+          placeholder="Select workload / service…"
+          value={value}
+          onChange={setValue}
+          options={GROUPED_OPTIONS}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};
+
+const MIXED_GROUP_OPTIONS = [
+  // Ungrouped options come first and render with no header…
+  { value: "recommended", label: "(recommended default)" },
+  { value: "none", label: "(none)" },
+  // …then the grouped options each start their own section.
+  { value: "demo-svc", label: "demo-svc", group: "Service" },
+  { value: "demo-ing", label: "demo-ing", group: "Ingress" },
+];
+
+export const MixedGrouping: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`group` is optional. Options without a `group` render no header — place them first so the ungrouped entries read as a lead-in before the first grouped section. Mixing ungrouped and grouped options in one list is supported.",
+      },
+    },
+  },
+  render: () => {
+    const [value, setValue] = useState("");
+    return (
+      <div className="w-72 space-y-3">
+        <Combobox
+          label="Backend"
+          placeholder="Pick a backend"
+          value={value}
+          onChange={setValue}
+          options={MIXED_GROUP_OPTIONS}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};

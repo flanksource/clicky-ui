@@ -49,6 +49,12 @@ const meta: Meta<typeof Modal> = {
       description: "Show the expand/restore-to-fullscreen button.",
       table: { category: "Behavior", defaultValue: { summary: "true" } },
     },
+    confirmClose: {
+      control: "boolean",
+      description:
+        "Guard every close path behind a discard-confirmation prompt; onClose only fires once confirmed. Pass an options object to customise the copy.",
+      table: { category: "Behavior", defaultValue: { summary: "false" } },
+    },
     onClose: { control: false, table: { category: "Events" } },
     children: { control: false, table: { category: "Content" } },
     footer: { control: false, table: { category: "Content" } },
@@ -154,6 +160,44 @@ export const WithFooter: Story = {
           }
         >
           <p className="text-sm">This action cannot be undone.</p>
+        </Modal>
+      </>
+    );
+  },
+};
+
+export const ConfirmClose: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "With `confirmClose` set, the close button, Escape, and backdrop all surface a discard prompt; `onClose` runs only after the user confirms. Use it to guard modals holding unsaved edits.",
+      },
+    },
+  },
+  render: () => {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button
+          className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground"
+          onClick={() => setOpen(true)}
+        >
+          Open guarded modal
+        </button>
+        <Modal
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Edit context"
+          size="lg"
+          confirmClose={{
+            title: "Discard this context?",
+            message: "The endpoints you configured haven't been saved yet.",
+            confirmLabel: "Discard",
+            cancelLabel: "Keep editing",
+          }}
+        >
+          <p className="text-sm">Try the close button, Escape, or clicking the backdrop.</p>
         </Modal>
       </>
     );
