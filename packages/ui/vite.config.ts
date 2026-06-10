@@ -79,6 +79,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       globals: true,
+      globalSetup: ["./scripts/vitest-global-setup.ts"],
       setupFiles: ["./src/test/setup.ts"],
       include: ["src/**/*.test.{ts,tsx}", "oxlint-plugins/**/*.test.{ts,tsx}"],
       css: true,

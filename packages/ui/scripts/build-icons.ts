@@ -11,7 +11,7 @@
  * variant and `Ui<PascalCase>Filled` for the filled variant. Aliases re-export
  * the canonical component.
  */
-import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
+import { mkdir, writeFile, rm, rename, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,14 +22,21 @@ const pkgRoot = join(here, "..");
 const selectionsPath = join(pkgRoot, "icons", "icon-selections.json");
 const svgIncumbentDir = join(pkgRoot, "icons", "svg");
 const iconsRoot = join(pkgRoot, "src", "icons");
-const outDir = join(iconsRoot, "components");
-const indexPath = join(iconsRoot, "index.ts");
 const noticePath = join(pkgRoot, "NOTICE.md");
 const remoteSvgCacheDir = join(svgIncumbentDir, "remote");
 const flanksourceIconsRawBase =
   "https://raw.githubusercontent.com/flanksource/flanksource-icons/main/svg";
 
-const force = process.argv.includes("--force");
+/** Whether a prior run already emitted the full generated `src/icons/` tree. */
+function generatedIconsPresent(): boolean {
+  return (
+    existsSync(join(iconsRoot, "index.ts")) &&
+    existsSync(join(iconsRoot, "types.ts")) &&
+    existsSync(join(iconsRoot, "changeIconAliases.ts")) &&
+    existsSync(join(iconsRoot, "components")) &&
+    existsSync(noticePath)
+  );
+}
 
 type SelectionRow = {
   consumerName: string;
@@ -207,16 +214,6 @@ function resolveAliasTarget(consumerName: string): string | null {
 
 function cacheFileName(spec: string): string {
   return spec.replace(/[^a-zA-Z0-9._-]+/g, "__") + ".svg";
-}
-
-function generatedIconsPresent(): boolean {
-  return (
-    existsSync(indexPath) &&
-    existsSync(join(iconsRoot, "types.ts")) &&
-    existsSync(join(iconsRoot, "changeIconAliases.ts")) &&
-    existsSync(outDir) &&
-    existsSync(noticePath)
-  );
 }
 
 async function downloadSvg(url: string, cachePath: string): Promise<string> {
@@ -637,7 +634,7 @@ const SUB_ICONS_BY_BASE: Record<string, SubIconRecipe[]> = {
   ],
 };
 
-async function main() {
+export async function buildIcons({ force = false }: { force?: boolean } = {}): Promise<void> {
   if (!force && generatedIconsPresent()) {
     console.log("Generated icon files already exist; skipping.");
     return;
@@ -645,8 +642,13 @@ async function main() {
 
   const sel: Selections = JSON.parse(await readFile(selectionsPath, "utf8"));
 
-  await rm(iconsRoot, { recursive: true, force: true });
-  await mkdir(outDir, { recursive: true });
+  // Emit into a staging dir first, then atomically swap it in. Generation
+  // fetches some SVGs over the network and can fail partway; building beside the
+  // live tree means a failure never leaves `src/icons/` half-written or deleted.
+  const stagingRoot = `${iconsRoot}.tmp`;
+  const stagingComponents = join(stagingRoot, "components");
+  await rm(stagingRoot, { recursive: true, force: true });
+  await mkdir(stagingComponents, { recursive: true });
 
   // Map consumerName → row for alias resolution.
   const rowByName = new Map(sel.rows.map((r) => [r.consumerName, r]));
@@ -828,7 +830,7 @@ async function main() {
           if (reExportFilled) exports.push(`${targetBase}Filled as ${aliasBase}Filled`);
           const file = `${aliasBase}.ts`;
           const body = `export { ${exports.join(", ")} } from "./${targetBase}";\n`;
-          await writeFile(join(outDir, file), body);
+          await writeFile(join(stagingComponents, file), body);
           if (reExportOutline) generated.push({ component: aliasBase, file });
           if (reExportFilled) generated.push({ component: `${aliasBase}Filled`, file });
         }
@@ -945,13 +947,13 @@ async function main() {
 
     if (componentNames.length === 0) continue;
     const file = `${baseName}.tsx`;
-    await writeFile(join(outDir, file), parts.join("\n"));
+    await writeFile(join(stagingComponents, file), parts.join("\n"));
     for (const c of componentNames) generated.push({ component: c, file });
   }
 
   // types.ts — single shared IconProps definition.
   await writeFile(
-    join(iconsRoot, "types.ts"),
+    join(stagingRoot, "types.ts"),
     `import type { FC, SVGProps } from "react";
 
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "color"> & {
@@ -1027,7 +1029,7 @@ export function getChangeIcon(
   return opts.filled ? entry.filled ?? entry.outline : entry.outline;
 }
 `;
-    await writeFile(join(iconsRoot, "changeIconAliases.ts"), body);
+    await writeFile(join(stagingRoot, "changeIconAliases.ts"), body);
   }
 
   // Barrel index.
@@ -1042,7 +1044,13 @@ export function getChangeIcon(
   lines.push(`export type { IconProps, IconComponent } from "./types";`);
   lines.push(`export { changeIconAliases, getChangeIcon } from "./changeIconAliases";`);
   lines.push(`export type { ChangeIconEntry } from "./changeIconAliases";`);
-  await writeFile(indexPath, lines.join("\n") + "\n");
+  await writeFile(join(stagingRoot, "index.ts"), lines.join("\n") + "\n");
+
+  // Atomic swap: only now that the full tree is staged do we replace the live
+  // `src/icons/`. A mid-generation failure above throws before this point and
+  // leaves the existing tree untouched.
+  await rm(iconsRoot, { recursive: true, force: true });
+  await rename(stagingRoot, iconsRoot);
 
   // NOTICE.md — per-icon attribution, generated from selections.
   const noticeLines: string[] = [
@@ -1095,7 +1103,11 @@ export function getChangeIcon(
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Run as a CLI: `tsx build-icons.ts [--force]`. Imported as a module (e.g. the
+// vitest global setup), nothing runs until `buildIcons()` is called.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  buildIcons({ force: process.argv.includes("--force") }).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
