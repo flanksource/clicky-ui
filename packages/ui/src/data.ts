@@ -141,6 +141,7 @@ export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export * from "./data/test-runner";
+export * from "./data/cache-browser";
 export {
   type LogEntry,
   type TaskSnapshot,
