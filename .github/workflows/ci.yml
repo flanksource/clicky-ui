@@ -28,6 +28,11 @@ jobs:
         run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
 
       - run: vp install
+      # gavel auto-discovers and runs `vitest` directly, bypassing the package's
+      # `test` script that would otherwise generate the gitignored `src/icons/`
+      # tree first. Pre-generate it here so `src/icons.ts`'s barrel resolves.
+      - name: Generate icons
+        run: pnpm --filter @flanksource/clicky-ui run build:icons
       - name: Gavel test + lint
         uses: flanksource/gavel@1632f718fbd850658c4a04818b800991039f1b74 # v0.0.46
         with:
