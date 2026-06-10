@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import {
-  CLICKY_FORMAT_OPTIONS,
-  FormatOptionsDropdown,
-  type FormatOption,
-} from "./FormatOptionsDropdown";
+import { FormatOptionsDropdown } from "./FormatOptionsDropdown";
+import { CLICKY_FORMAT_OPTIONS, type FormatOption } from "./format-options";
 
 describe("FormatOptionsDropdown", () => {
   it("labels the primary button with the active format", () => {

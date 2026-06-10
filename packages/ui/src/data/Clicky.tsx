@@ -1106,7 +1106,7 @@ function ClickyPdfPreview({ src }: { src: string }) {
       <iframe
         title="Clicky PDF preview"
         src={src}
-        className="h-[720px] w-full bg-white"
+        className="h-[720px] w-full bg-background"
       />
     </div>
   );
@@ -1129,7 +1129,7 @@ function ClickyHtmlPreview({ src }: { src: string }) {
       <iframe
         title="Clicky HTML preview"
         src={src}
-        className="h-[720px] w-full bg-white"
+        className="h-[720px] w-full bg-background"
         sandbox="allow-same-origin"
       />
     </div>

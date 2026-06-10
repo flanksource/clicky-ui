@@ -35,7 +35,7 @@ export const PullRequests: Story = {
     segments: [
       { count: 30, color: "bg-emerald-500", label: "merged" },
       { count: 14, color: "bg-sky-500", label: "open" },
-      { count: 6, color: "bg-gray-400", label: "closed" },
+      { count: 6, color: "bg-muted-foreground/40", label: "closed" },
     ],
   },
 };

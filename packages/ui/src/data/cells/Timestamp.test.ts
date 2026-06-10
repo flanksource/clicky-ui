@@ -5,7 +5,7 @@ import {
   formatTimestamp,
   parseTimestamp,
   resolveDateMath,
-} from "./Timestamp";
+} from "./timestamp-format";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;

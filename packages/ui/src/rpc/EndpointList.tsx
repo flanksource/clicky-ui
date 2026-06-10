@@ -72,7 +72,7 @@ export function EndpointList({
             key: `${op.method}:${op.path}`,
             to: getCommandHref(operationId, op),
             className:
-              "flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-emerald-200 hover:bg-emerald-50/50",
+              "flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-emerald-200 hover:bg-emerald-50/50 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10",
             children: (
               <>
                 <MethodBadge method={op.method} />
