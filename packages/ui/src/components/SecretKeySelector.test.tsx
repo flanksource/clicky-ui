@@ -73,10 +73,23 @@ describe("SecretKeySelector", () => {
 });
 
 describe("SecretKeySelector literal value", () => {
-  it("does not offer the Value toggle unless allowLiteral is set", () => {
+  it("offers the Value toggle by default", () => {
     render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "" }}
+        onChange={vi.fn()}
+        loadResources={loadResources}
+        loadKeyPreview={loadKeyPreview}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Value/ })).toBeInTheDocument();
+  });
+
+  it("hides the Value toggle when allowLiteral is false", () => {
+    render(
+      <SecretKeySelector
+        value={{ kind: "secret", name: "db", key: "" }}
+        allowLiteral={false}
         onChange={vi.fn()}
         loadResources={loadResources}
         loadKeyPreview={loadKeyPreview}

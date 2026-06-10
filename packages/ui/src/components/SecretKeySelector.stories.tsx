@@ -44,7 +44,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Picks a Secret or ConfigMap and one of its keys, showing a mid-masked preview of each key's value so the operator can tell which key holds the host vs the db vs a password. Fetches nothing itself — the consumer supplies `loadResources` / `loadKeyPreview` getters — and emits a `{kind,name,key}` value.",
+          "Picks a Secret or ConfigMap and one of its keys, showing a mid-masked preview of each key's value so the operator can tell which key holds the host vs the db vs a password. A third **Value** toggle (on by default; opt out with `allowLiteral={false}`) lets the operator type a static inline literal instead. Fetches nothing itself — the consumer supplies `loadResources` / `loadKeyPreview` getters — and emits a `{kind,name,key}` reference or `{kind:'value', value}` literal.",
       },
     },
   },
@@ -97,9 +97,23 @@ export const WithLiteralValue: Story = {
     docs: {
       description: {
         story:
-          "With `allowLiteral`, a third **Value** toggle lets the operator type a static inline string instead of referencing a Secret/ConfigMap key. The emitted value is `{kind:'value', value}`.",
+          "The **Value** toggle (available by default) lets the operator type a static inline string instead of referencing a Secret/ConfigMap key. The emitted value is `{kind:'value', value}`.",
       },
     },
   },
-  render: () => <Playground allowLiteral initial={{ kind: "value", value: "prod.example.com" }} />,
+  render: () => <Playground initial={{ kind: "value", value: "prod.example.com" }} />,
+};
+
+export const ReferenceOnly: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Pass `allowLiteral={false}` to restrict the selector to Secret/ConfigMap references and hide the **Value** toggle.",
+      },
+    },
+  },
+  render: () => (
+    <Playground allowLiteral={false} initial={{ kind: "secret", name: "db", key: "host" }} />
+  ),
 };
