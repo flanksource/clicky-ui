@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, render, renderHook } from "@testing-library/react";
-import { ThemeProvider, useTheme } from "./use-theme";
+import { useTheme } from "./use-theme";
+import { ThemeProvider } from "./theme-provider";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <ThemeProvider defaultTheme="light">{children}</ThemeProvider>;

@@ -226,7 +226,7 @@ const SOURCE_LABEL: Record<SecretValueSource, string> = {
 // buildKeyOptions labels each key with its mid-masked preview value when one is
 // available. A selected key absent from the list is pinned so the selection
 // stays visible.
-export function buildKeyOptions(
+function buildKeyOptions(
   keys: string[],
   previews: KeyPreview[],
   selectedKey: string,

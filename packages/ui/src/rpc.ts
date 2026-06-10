@@ -1,14 +1,13 @@
 export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
 export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
+export { AcceptPicker, type AcceptPickerProps } from "./rpc/AcceptPicker";
 export {
   ACCEPT_OPTIONS,
-  AcceptPicker,
   VIEW_OPTIONS,
   type AcceptOption,
-  type AcceptPickerProps,
   type AcceptValue,
   type OperationPreviewMode,
-} from "./rpc/AcceptPicker";
+} from "./rpc/accept-options";
 export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
 export { CommandOutput, type CommandOutputProps } from "./rpc/CommandOutput";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";

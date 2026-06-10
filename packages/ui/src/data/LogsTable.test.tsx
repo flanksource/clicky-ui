@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
-import { LogsTable, normalizeLogsTableRows } from "./LogsTable";
+import { LogsTable } from "./LogsTable";
+import { normalizeLogsTableRows } from "./logs-normalize";
 
 const nestedLine = JSON.stringify({
   "@timestamp": "2026-05-03T10:09:30.288Z",

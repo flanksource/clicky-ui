@@ -9,7 +9,8 @@ import type {
   ClickyTableRowHref,
 } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
-import { AcceptPicker, type OperationPreviewMode } from "./AcceptPicker";
+import { AcceptPicker } from "./AcceptPicker";
+import type { OperationPreviewMode } from "./accept-options";
 import { CommandForm, pathParamNames, submitValue } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
 import type { RenderLink } from "./EndpointList";

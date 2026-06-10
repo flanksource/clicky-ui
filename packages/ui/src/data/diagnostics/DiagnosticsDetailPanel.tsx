@@ -5,8 +5,9 @@ import { UiDebug, UiDebugSmall, UiRefresh, UiSearch, UiServerProcess, UiLoader }
 import type { ProcessNode, RunMeta } from "./types";
 import { formatBytes, processLabel, processStateColor, processStateIcon } from "./utils";
 import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
-import { GoroutineCard, goroutineStateDot } from "./GoroutineCard";
-import { ThreadCard, threadStateDot } from "./ThreadCard";
+import { GoroutineCard } from "./GoroutineCard";
+import { ThreadCard } from "./ThreadCard";
+import { goroutineStateDot, threadStateDot } from "./state-styles";
 import type { JvmFrameSourceResolver } from "./JvmStackTrace";
 
 const STACK_MIN_LINES = 10;

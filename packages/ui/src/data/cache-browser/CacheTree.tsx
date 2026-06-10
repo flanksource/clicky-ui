@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "../../lib/utils";
-import { formatBytes, formatDuration, formatShort } from "../../lib/format";
+import { formatBytes, formatShort } from "../../lib/format";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
   UiBraces,
@@ -219,18 +219,18 @@ export function CacheNodeRow({
       {icon}
       <span className="truncate font-mono text-xs">{node.name}</span>
       {!isLeaf(node) && (
-        <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">
-          {formatShort(node.keys)}
-        </span>
-      )}
-      {isLeaf(node) && (
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
           {node.bytes ? <span>{formatBytes(node.bytes)}</span> : null}
-          {node.ttlSeconds !== undefined && node.ttlSeconds >= 0 && (
-            <span>ttl {formatDuration(node.ttlSeconds, { from: "s" })}</span>
-          )}
+          <span className="rounded-full bg-muted px-1.5">
+            {formatShort(node.keys)}
+          </span>
         </span>
       )}
+      {isLeaf(node) && node.bytes ? (
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+          {formatBytes(node.bytes)}
+        </span>
+      ) : null}
       {error != null && (
         <span className="shrink-0 text-[10px] text-red-600 dark:text-red-400">
           load failed

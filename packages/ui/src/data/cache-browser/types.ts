@@ -18,7 +18,10 @@ export type CacheTreeNode = {
   type?: string;
   /** Leaf TTL in seconds; -1 means no expiry. */
   ttlSeconds?: number;
-  /** Leaf MEMORY USAGE when the server supports it. */
+  /**
+   * MEMORY USAGE when the server supports it: a leaf's own size, or for a
+   * group the aggregated size of every key beneath it.
+   */
   bytes?: number;
 };
 
