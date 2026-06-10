@@ -1,15 +1,10 @@
 # Pre-test hooks run from the repo root before `gavel test` discovers and runs
-# the suites. gavel auto-discovers the e2e Playwright project and runs all three
-# browser projects (chromium/firefox/webkit), so unlike the dedicated `e2e` CI
-# job (which builds the lib and scopes to chromium) it needs the library built
-# and every browser installed first.
+# the suites. gavel auto-discovers the e2e Playwright project; that config
+# defaults to chromium driven by the runner's system Chrome (no browser
+# download), so the only setup gavel needs is the library build.
 pre:
   # Builds @flanksource/clicky-ui (chains build:icons → generates the gitignored
   # src/icons/ tree) so the vitest barrel resolves and the kitchen-sink dev
   # server that Playwright boots can import the package.
   - name: build
     run: pnpm --filter @flanksource/clicky-ui run build
-  # firefox + webkit + chromium aren't preinstalled on the runner; without this
-  # Playwright fails with `browserType.launch: Executable doesn't exist`.
-  - name: install-browsers
-    run: pnpm --filter e2e exec playwright install --with-deps
