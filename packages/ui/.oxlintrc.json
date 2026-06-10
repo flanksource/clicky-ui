@@ -1,8 +1,20 @@
 {
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "jsPlugins": ["./oxlint-plugins/no-iconify-names.js"],
+  "plugins": ["unicorn", "typescript", "oxc", "import", "react"],
   "rules": {
-    "clicky-icons/no-iconify-names": "error"
+    "clicky-icons/no-iconify-names": "error",
+    "react/only-export-components": ["error", { "allowConstantExport": true }],
+    "import/no-cycle": "error",
+    "react-hooks/exhaustive-deps": "off"
   },
+  "overrides": [
+    {
+      "files": ["**/*.stories.tsx", "**/*.test.tsx", "**/*.test.ts"],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["src/icons/components/**", "scripts/build-icons.ts"]
 }

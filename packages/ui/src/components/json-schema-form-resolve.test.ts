@@ -42,6 +42,35 @@ describe("resolveControl", () => {
     expect(c.allowCustomValue).toBeUndefined();
   });
 
+  it("labels enum options from x-enum-labels, keeping the raw value", () => {
+    const c = control("AddressType", {
+      type: "string",
+      enum: ["20", "30"],
+      "x-enum-labels": { "20": "Business" },
+    });
+    expect(c.options).toEqual([
+      { value: "20", label: "Business (20)" },
+      { value: "30", label: "30" }, // unlabelled values stay raw
+    ]);
+  });
+
+  it("labels map key options from propertyNames x-enum-labels", () => {
+    const c = control("addresses", {
+      type: "object",
+      propertyNames: {
+        type: "string",
+        enum: ["01", "Business"],
+        "x-enum-labels": { "01": "Residence" },
+      },
+      additionalProperties: { type: "object" },
+    });
+    expect(c.kind).toBe("string-map");
+    expect(c.keyOptions).toEqual([
+      { value: "01", label: "Residence (01)" },
+      { value: "Business", label: "Business" },
+    ]);
+  });
+
   it("infers an array control carrying its item schema", () => {
     const c = control("command", { type: "array", items: { type: "string" } });
     expect(c.kind).toBe("array");

@@ -611,11 +611,30 @@ describe("JsonSchemaForm layout", () => {
     );
   });
 
-  it("applies no width caps in the default stacked layout", () => {
+  it("caps the stacked label+value pair at 600px instead of an inline grid", () => {
     const { container } = render(
       <JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} />,
     );
     expect(inlineGrid(container)).toBeNull();
+    const capped = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (el) => el.style.maxWidth === "600px",
+    );
+    expect(capped).toBeTruthy();
+  });
+
+  it("honors layout.valueMaxWidth in stacked mode", () => {
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        layout={{ mode: "stacked", valueMaxWidth: "40rem" }}
+      />,
+    );
+    const capped = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (el) => el.style.maxWidth === "40rem",
+    );
+    expect(capped).toBeTruthy();
   });
 });
 
@@ -791,5 +810,45 @@ describe("JsonSchemaForm x-layout: stack", () => {
     // The address object's children render stacked (no inline grid), despite the
     // form-level inline mode.
     expect(inlineGrid(container)).toBeNull();
+  });
+
+  it("labels a stacked map entry's key picker from propertyNames.title", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        addresses: {
+          type: "object",
+          propertyNames: { type: "string", title: "Address Role", enum: ["Home", "Business"] },
+          additionalProperties: {
+            type: "object",
+            "x-layout": "stack",
+            properties: { city: { type: "string" } },
+          },
+        },
+      },
+    };
+    render(
+      <JsonSchemaForm schema={schema} value={{ addresses: { Business: {} } }} onChange={vi.fn()} />,
+    );
+    expect(screen.getByText("Address Role")).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm x-order", () => {
+  it("renders x-order keys first, the rest in document order", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      // Document order is alphabetical (a Go-map emitter); x-order restores the
+      // intended discriminator-first order.
+      properties: {
+        AddressType: { type: "string" },
+        CountryCode: { type: "string" },
+        fields: { type: "string" },
+      },
+      "x-order": ["CountryCode", "AddressType"],
+    };
+    const { container } = render(<JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} />);
+    const labels = [...container.querySelectorAll("label")].map((el) => el.textContent);
+    expect(labels).toEqual(["CountryCode", "AddressType", "fields"]);
   });
 });

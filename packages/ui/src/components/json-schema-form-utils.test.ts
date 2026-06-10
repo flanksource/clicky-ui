@@ -6,7 +6,7 @@ import {
   seedFromSchema,
   setIndex,
   softError,
-} from "./json-schema-form-render";
+} from "./json-schema-form-utils";
 import type { FieldControl } from "./json-schema-form-types";
 
 function field(over: Partial<FieldControl>): FieldControl {

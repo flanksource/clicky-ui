@@ -3,23 +3,22 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiChevronDown, UiChevronUp, UiClose, UiTrash } from "../icons";
 import { Button } from "./button";
-import { defaultPlaceholder } from "./json-schema-form-fields";
 import { controlMinHeightClass, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
 import { isScalarStringItems } from "./json-schema-form-resolve";
 import {
+  defaultPlaceholder,
+  isPlainObject,
   moveItem,
   removeIndex,
-  renderFieldNodes,
-  renderFieldRow,
   seedFromSchema,
   setIndex,
-  type RenderContext,
-} from "./json-schema-form-render";
-import type { FieldControl, JsonSchemaProperty } from "./json-schema-form-types";
+} from "./json-schema-form-utils";
+import type { FieldControl, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
 
 // ArrayControl is a hybrid: plain string-item arrays keep the compact tag UI;
 // anything richer (objects, numbers, enums, nested arrays) renders one recursive
-// control per item with add / remove / reorder.
+// control per item with add / remove / reorder. Recursion goes through
+// ctx.render so this module never imports the renderer (no import cycle).
 export function ArrayControl({
   field,
   fieldId,
@@ -50,7 +49,7 @@ export function ArrayControl({
       {items.map((item, i) => (
         <div key={i} className="grid grid-cols-[1fr_auto] items-start gap-2">
           <div className="min-w-0">
-            {renderFieldRow(
+            {ctx.render.renderFieldRow(
               {
                 key: `${field.key}[${i}]`,
                 prop: itemSchema,
@@ -113,7 +112,7 @@ function TableArray({
 
   function cell(item: unknown, rowIndex: number, col: string, prop: JsonSchemaProperty): ReactNode {
     const obj = isPlainObject(item) ? item : {};
-    const nodes = renderFieldNodes(
+    const nodes = ctx.render.renderFieldNodes(
       {
         key: `${field.key}[${rowIndex}].${col}`,
         prop,
@@ -179,10 +178,6 @@ function TableArray({
       )}
     </div>
   );
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function ItemControls({
