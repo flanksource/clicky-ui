@@ -32,7 +32,7 @@ describe("DropdownMenu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("closes on outside mousedown", () => {
+  it("closes on outside pointer press", () => {
     render(
       <div>
         <DropdownMenu label="Download" items={items()} />
@@ -41,7 +41,7 @@ describe("DropdownMenu", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /download/i }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByText("outside"));
+    fireEvent.pointerDown(screen.getByText("outside"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
@@ -70,5 +70,33 @@ describe("DropdownMenu", () => {
     expect(screen.getByText("apply")).toBeInTheDocument();
     fireEvent.click(screen.getByText("apply"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  // Portal + edge positioning. The flip/shift geometry needs a real browser, so
+  // those assertions live in DropdownMenu.stories.tsx (Storybook test runner).
+  // Here we only verify the menu escapes its container via the body portal.
+  it("renders the open menu in a body portal so a clipping ancestor cannot hide it", () => {
+    render(
+      <div data-testid="container" style={{ overflow: "hidden" }}>
+        <DropdownMenu label="Download" items={items()} />
+      </div>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    const menu = screen.getByRole("menu");
+    expect(screen.getByTestId("container").contains(menu)).toBe(false);
+    expect(document.body.contains(menu)).toBe(true);
+  });
+
+  it("opens via a custom trigger and selects an item", () => {
+    const onSelect = vi.fn();
+    render(
+      <DropdownMenu
+        trigger={<button type="button">menu</button>}
+        items={[{ label: "Profile", onSelect }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Profile" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 });

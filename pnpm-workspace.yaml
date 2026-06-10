@@ -7,6 +7,8 @@ allowBuilds:
   vue-demi: true
 
 catalog:
+  '@floating-ui/react': ^0.27.19
+  "@oxlint/plugins": ^1.60.0
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3
   "@radix-ui/react-accordion": ^1.2.2
@@ -42,7 +44,6 @@ catalog:
   dompurify: ^3.4.7
   jsdom: ^26.0.0
   marked: ^15.0.0
-  "@oxlint/plugins": ^1.60.0
   oxlint: ^1.60.0
   postcss: ^8.4.49
   preact: ^10.25.3

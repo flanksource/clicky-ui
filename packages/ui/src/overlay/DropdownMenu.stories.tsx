@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { DropdownMenu } from "./DropdownMenu";
 import { Button } from "../components/button";
 import { UiDownload, UiJson, UiMarkdown, UiMenu } from "../icons";
@@ -69,3 +70,73 @@ export const CustomContent: Story = {
     ),
   },
 };
+
+export const Interaction: Story = {
+  args: {
+    label: "Actions",
+    items: [
+      { label: "Edit", onSelect: fn() },
+      { label: "Duplicate", onSelect: fn() },
+      { label: "Delete", onSelect: fn() },
+    ],
+  },
+  play: async ({ args, canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await step("opens the menu in a portal above the canvas", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
+      const menu = await body.findByRole("menu");
+      await expect(canvasElement.contains(menu)).toBe(false);
+      await expect(document.body.contains(menu)).toBe(true);
+    });
+
+    await step("selecting an item fires its handler and closes", async () => {
+      await userEvent.click(body.getByRole("menuitem", { name: "Edit" }));
+      await expect(args.items?.[0]?.onSelect).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
+    });
+  },
+};
+
+// Pin the trigger to each viewport corner and assert the opened menu stays
+// within the viewport — proof flip (vertical) + shift (horizontal) keep it
+// on-screen. These run in a real browser via the Storybook test runner.
+function makeEdgeStory(position: string): Story {
+  return {
+    args: {
+      label: "Actions",
+      items: [
+        { label: "Edit", onSelect: fn() },
+        { label: "Duplicate", onSelect: fn() },
+        { label: "Delete", onSelect: fn() },
+      ],
+    },
+    decorators: [
+      (Story) => (
+        <div className="fixed inset-0">
+          <div className={`absolute ${position}`}>
+            <Story />
+          </div>
+        </div>
+      ),
+    ],
+    play: async ({ canvasElement }) => {
+      const canvas = within(canvasElement);
+      const body = within(document.body);
+      await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
+      const menu = await body.findByRole("menu");
+      const rect = menu.getBoundingClientRect();
+      const margin = 1; // sub-pixel tolerance
+      await expect(rect.left).toBeGreaterThanOrEqual(-margin);
+      await expect(rect.top).toBeGreaterThanOrEqual(-margin);
+      await expect(rect.right).toBeLessThanOrEqual(window.innerWidth + margin);
+      await expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight + margin);
+    },
+  };
+}
+
+export const EdgeTopLeft = makeEdgeStory("top-1 left-1");
+export const EdgeTopRight = makeEdgeStory("top-1 right-1");
+export const EdgeBottomLeft = makeEdgeStory("bottom-1 left-1");
+export const EdgeBottomRight = makeEdgeStory("bottom-1 right-1");

@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -23,6 +24,12 @@ export type ComboboxOption = {
   disabled?: boolean;
   /** Leading glyph for the option: a runtime icon name or a rendered node. */
   icon?: LabelIconSpec;
+  /**
+   * Optional section label. A non-interactive header renders above the first
+   * option of each group (options are grouped by contiguous `group` value in
+   * the order provided). Options without a `group` render no header.
+   */
+  group?: string;
 };
 
 type ComboboxBaseProps = {
@@ -36,6 +43,12 @@ type ComboboxBaseProps = {
   disabled?: boolean;
   /** When true, the value cannot be cleared (the clear button is hidden). */
   required?: boolean;
+  /**
+   * Marks the control as invalid: renders a destructive border and sets
+   * aria-invalid. Purely presentational — the consumer decides what invalid
+   * means (e.g. a value absent from the options in a strict picker).
+   */
+  invalid?: boolean;
   /**
    * When false, the value is restricted to the provided options — typed text
    * that does not match an option is discarded instead of committed. Defaults
@@ -91,6 +104,7 @@ export function Combobox(props: ComboboxProps) {
     label,
     disabled,
     required,
+    invalid,
     allowCustomValue = true,
     id,
     size,
@@ -270,7 +284,9 @@ export function Combobox(props: ComboboxProps) {
   function scrollToHighlighted(index: number) {
     const list = listRef.current;
     if (!list) return;
-    const item = list.children[index] as HTMLElement | undefined;
+    // Query option rows by role rather than child index — interleaved group
+    // header rows are direct children too, so children[index] would be offset.
+    const item = list.querySelectorAll<HTMLElement>('[role="option"]')[index];
     item?.scrollIntoView({ block: "nearest" });
   }
 
@@ -331,6 +347,7 @@ export function Combobox(props: ComboboxProps) {
           aria-controls={listId}
           aria-activedescendant={highlighted >= 0 ? `${listId}-${highlighted}` : undefined}
           aria-label={ariaLabel}
+          aria-invalid={invalid || undefined}
           autoComplete="off"
           disabled={disabled}
           placeholder={placeholder}
@@ -347,6 +364,7 @@ export function Combobox(props: ComboboxProps) {
             showClear ? "pr-14" : "pr-8",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",
+            invalid && "border-destructive focus-visible:ring-destructive",
           )}
           style={label != null ? labelPadding(label) : undefined}
         />
@@ -415,32 +433,47 @@ export function Combobox(props: ComboboxProps) {
           )}
           {filtered.map((opt, i) => {
             const selected = isSelected(opt.value);
+            // A header renders above the first option of each group. Derived
+            // from the surviving (filtered) options, so an empty group emits no
+            // header. The option keeps `i` (its index in `filtered`) for
+            // id/highlight/select — headers are role="presentation", never
+            // counted in the highlight/scroll index.
+            const showHeader = opt.group != null && opt.group !== filtered[i - 1]?.group;
             return (
-              <div
-                key={opt.value}
-                id={listId ? `${listId}-${i}` : undefined}
-                role="option"
-                aria-selected={selected}
-                aria-disabled={opt.disabled}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (!opt.disabled) selectOption(opt);
-                }}
-                onMouseEnter={() => setHighlighted(i)}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
-                  i === highlighted && "bg-accent",
-                  selected && "font-medium",
-                  opt.disabled && "cursor-not-allowed opacity-50",
+              <Fragment key={opt.value}>
+                {showHeader && (
+                  <div
+                    role="presentation"
+                    className="select-none px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    {opt.group}
+                  </div>
                 )}
-              >
-                <Icon
-                  icon={UiCheck}
-                  className={cn("text-xs shrink-0", selected ? "opacity-100" : "opacity-0")}
-                />
-                <LabelIcon icon={opt.icon} className="text-sm text-muted-foreground" />
-                <span className="min-w-0 truncate">{opt.label}</span>
-              </div>
+                <div
+                  id={listId ? `${listId}-${i}` : undefined}
+                  role="option"
+                  aria-selected={selected}
+                  aria-disabled={opt.disabled}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (!opt.disabled) selectOption(opt);
+                  }}
+                  onMouseEnter={() => setHighlighted(i)}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                    i === highlighted && "bg-accent",
+                    selected && "font-medium",
+                    opt.disabled && "cursor-not-allowed opacity-50",
+                  )}
+                >
+                  <Icon
+                    icon={UiCheck}
+                    className={cn("text-xs shrink-0", selected ? "opacity-100" : "opacity-0")}
+                  />
+                  <LabelIcon icon={opt.icon} className="text-sm text-muted-foreground" />
+                  <span className="min-w-0 truncate">{opt.label}</span>
+                </div>
+              </Fragment>
             );
           })}
         </div>,

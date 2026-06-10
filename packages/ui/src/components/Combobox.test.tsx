@@ -292,6 +292,42 @@ describe("Combobox option icons", () => {
   });
 });
 
+describe("Combobox group headers", () => {
+  const GROUPED = [
+    { value: "demo-svc", label: "demo-svc", group: "Service" },
+    { value: "db-svc", label: "db-svc", group: "Service" },
+    { value: "demo-ing", label: "demo-ing", group: "Ingress" },
+  ];
+
+  it("renders a section header above the first option of each group", () => {
+    render(<Combobox value="" onChange={vi.fn()} options={GROUPED} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    expect(screen.getByText("Service")).toBeInTheDocument();
+    expect(screen.getByText("Ingress")).toBeInTheDocument();
+    // One header per group, not one per option.
+    expect(screen.getAllByText("Service")).toHaveLength(1);
+  });
+
+  it("renders headers as presentation rows, never as selectable options", () => {
+    render(<Combobox value="" onChange={vi.fn()} options={GROUPED} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    // Headers are not options: the option count equals the data length.
+    expect(screen.getAllByRole("option")).toHaveLength(GROUPED.length);
+    expect(screen.queryByRole("option", { name: "Service" })).toBeNull();
+    expect(screen.getByText("Service").getAttribute("role")).toBe("presentation");
+  });
+
+  it("hides a group's header when filtering removes all its options", () => {
+    render(<Combobox value="" onChange={vi.fn()} options={GROUPED} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "ing" } });
+    // Only the Ingress option survives, so the Service header is gone.
+    expect(screen.queryByText("Service")).toBeNull();
+    expect(screen.getByText("Ingress")).toBeInTheDocument();
+  });
+});
+
 describe("Combobox onSearch (server-side)", () => {
   it("debounces onSearch and fires once with the typed query", () => {
     vi.useFakeTimers();
