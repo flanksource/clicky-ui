@@ -40,6 +40,37 @@ describe("findListEndpoint", () => {
     const ops = [op("/p", "get", { operationId: "p_list" })];
     expect(findListEndpoint(ops, [])).toBeUndefined();
   });
+
+  it("falls back to the promoted entity-root GET when no `_list` op exists", () => {
+    const ops = [
+      op("/api/v1/user/{id}", "get", {
+        operationId: "user_get",
+        tags: ["user"],
+        parameters: [{ name: "id", in: "path" }],
+      }),
+      op("/api/v1/user", "get", { operationId: "user" }),
+      op("/api/v1/user", "post", { operationId: "user_create", tags: ["user"] }),
+    ];
+    expect(findListEndpoint(ops, ["user"])?.path).toBe("/api/v1/user");
+  });
+
+  it("prefers an explicit `<entity>_list` over the promoted root", () => {
+    const ops = [
+      op("/api/v1/user", "get", { operationId: "user" }),
+      op("/api/v1/user/list", "get", { operationId: "user_list", tags: ["user"] }),
+    ];
+    expect(findListEndpoint(ops, ["user"])?.operation.operationId).toBe("user_list");
+  });
+
+  it("never mistakes a `<entity>/{id}` detail GET for the promoted root", () => {
+    const ops = [
+      op("/api/v1/security-group/{id}", "get", {
+        operationId: "security-group",
+        parameters: [{ name: "id", in: "path" }],
+      }),
+    ];
+    expect(findListEndpoint(ops, ["security-group"])).toBeUndefined();
+  });
 });
 
 describe("findDetailEndpoint", () => {
@@ -129,5 +160,18 @@ describe("filterOperationsByDomain", () => {
 
   it("returns empty array when entities is empty", () => {
     expect(filterOperationsByDomain([op("/a", "get", { tags: ["policy"] })], [])).toEqual([]);
+  });
+
+  it("includes the untagged promoted entity-root GET", () => {
+    const ops = [
+      op("/api/v1/user", "get", { operationId: "user" }),
+      op("/api/v1/order", "get", { operationId: "order" }),
+    ];
+    expect(filterOperationsByDomain(ops, ["user"]).map((o) => o.path)).toEqual(["/api/v1/user"]);
+  });
+
+  it("excludes a non-GET op whose operationId matches the entity", () => {
+    const ops = [op("/api/v1/user", "post", { operationId: "user" })];
+    expect(filterOperationsByDomain(ops, ["user"])).toEqual([]);
   });
 });

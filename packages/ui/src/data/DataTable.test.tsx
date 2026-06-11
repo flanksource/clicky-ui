@@ -1344,4 +1344,86 @@ describe("DataTable caller-owned FilterBar inputs", () => {
       screen.queryByPlaceholderText("Search all columns…"),
     ).not.toBeInTheDocument();
   });
+
+  it("reads cell value and sort key from a column accessor", () => {
+    type SqlRow = Record<string, unknown>;
+    // Keys a SQL result set can produce that a dotted-path resolver would
+    // misread: "a.b" (literal, not nested) and "" (unnamed column).
+    const sqlRows: SqlRow[] = [
+      { "a.b": "alpha", "": 2 },
+      { "a.b": "bravo", "": 1 },
+    ];
+    const sqlColumns: DataTableColumn<SqlRow>[] = [
+      { key: "label", label: "Dotted", accessor: (row) => row["a.b"] },
+      {
+        key: "count",
+        label: "Count",
+        accessor: (row) => row[""],
+        sortValue: (value) => Number(value ?? 0),
+      },
+    ];
+
+    render(
+      <DataTable
+        data={sqlRows}
+        columns={sqlColumns}
+        defaultSort={{ key: "count" }}
+      />,
+    );
+
+    const table = within(screen.getByRole("table"));
+    // Accessor drives both rendering (the dotted key resolves to a value
+    // instead of undefined) and sorting (ascending by the unnamed count).
+    expect(table.getAllByRole("row")[1]).toHaveTextContent("bravo");
+    expect(table.getAllByRole("row")[2]).toHaveTextContent("alpha");
+  });
+
+  it("incrementally reveals rows on scroll when clientReveal is set", () => {
+    let latestCallback: IntersectionObserverCallback | null = null;
+    class MockIntersectionObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        latestCallback = callback;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+
+    const manyRows: ServiceRow[] = Array.from({ length: 25 }, (_, index) => ({
+      service: `svc-${index}`,
+      status: "healthy",
+      restarts: index,
+      notes: "",
+      tags: [],
+    }));
+
+    render(
+      <DataTable
+        data={manyRows}
+        columns={columns}
+        clientReveal={{ batchSize: 10 }}
+        defaultSort={{ key: "restarts" }}
+      />,
+    );
+
+    // Only the first batch is rendered; a sentinel advertises more.
+    expect(screen.getByText("svc-0")).toBeInTheDocument();
+    expect(screen.queryByText("svc-10")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading more…")).toBeInTheDocument();
+
+    // Scrolling the sentinel into view reveals the next batch.
+    act(() => {
+      latestCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(screen.getByText("svc-10")).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
 });

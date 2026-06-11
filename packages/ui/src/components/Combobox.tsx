@@ -77,6 +77,8 @@ type ComboboxBaseProps = {
   onSearch?: (query: string) => void;
   /** Called when a key is pressed in the input. */
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** Trailing in-field adornment, rendered left of the clear/chevron controls. */
+  suffix?: ReactNode;
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {
@@ -112,6 +114,7 @@ export function Combobox(props: ComboboxProps) {
     loading,
     onSearch,
     onKeyDown: onKeyDownProp,
+    suffix,
   } = props;
   const multiple = props.multiple === true;
   const selectedValues = useMemo<string[]>(
@@ -332,7 +335,7 @@ export function Combobox(props: ComboboxProps) {
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      <div ref={anchorRef} className="relative flex items-center">
+      <div ref={anchorRef} data-jsf-control className="relative flex items-center">
         {label != null && (
           <span className="pointer-events-none absolute left-2 z-10 whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground text-[10px]">
             {label}
@@ -361,13 +364,18 @@ export function Combobox(props: ComboboxProps) {
           className={cn(
             "w-full rounded-md border border-input bg-background text-foreground",
             size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
-            showClear ? "pr-14" : "pr-8",
+            suffix ? (showClear ? "pr-[5.5rem]" : "pr-14") : showClear ? "pr-14" : "pr-8",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",
             invalid && "border-destructive focus-visible:ring-destructive",
           )}
           style={label != null ? labelPadding(label) : undefined}
         />
+        {suffix && (
+          <div className={cn("absolute flex h-full items-center", showClear ? "right-[3.75rem]" : "right-7")}>
+            {suffix}
+          </div>
+        )}
         {showClear && (
           <button
             type="button"

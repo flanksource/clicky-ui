@@ -54,6 +54,19 @@ describe("TreeNode", () => {
     expect(onSelect.mock.calls[0]![0]).toMatchObject({ id: "b" });
   });
 
+  it("clicking the caret toggles without selecting the row", () => {
+    const onSelect = vi.fn();
+    renderTree({ onSelect });
+    // Node "a" is expandable; its caret is the Expand/Collapse button.
+    const caret = screen.getByRole("button", { name: "Expand" });
+    expect(screen.queryByText("a1")).toBeNull();
+    fireEvent.click(caret);
+    // Caret expands the node...
+    expect(screen.getByText("a1")).toBeInTheDocument();
+    // ...but never selects it (no onSelect, unlike a row-label click).
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("marks selected row via aria-selected", () => {
     renderTree({ selected: tree.children![1] });
     const selected = screen.getByText("b").closest("[role='treeitem']")!;
@@ -97,6 +110,36 @@ describe("TreeNode", () => {
       />,
     );
     expect(screen.queryByText("a")).toBeNull();
+  });
+
+  it("expandAll recursively reveals depths that mount only as ancestors open", () => {
+    // A 4-level chain rendered fully collapsed: only the root row is mounted, so
+    // a one-level expand would stop short. Flipping expandAll → true must cascade
+    // through every newly-mounted descendant down to the deepest leaf.
+    const deep: Node = {
+      id: "r",
+      label: "r",
+      children: [{ id: "x", label: "x", children: [{ id: "y", label: "y", children: [{ id: "z", label: "z" }] }] }],
+    };
+    const props = {
+      node: deep,
+      getChildren: (n: Node) => n.children,
+      getKey: (n: Node) => n.id,
+      renderRow: ({ node }: { node: Node }) => <span>{node.label}</span>,
+      defaultOpen: () => false,
+    };
+    const { rerender } = render(<TreeNode<Node> {...props} expandAll={null} />);
+    // Collapsed: only the root is visible.
+    expect(screen.getByText("r")).toBeInTheDocument();
+    expect(screen.queryByText("z")).toBeNull();
+
+    rerender(<TreeNode<Node> {...props} expandAll={true} />);
+    // The deepest leaf is now visible — proves the cascade is recursive.
+    expect(screen.getByText("z")).toBeInTheDocument();
+
+    rerender(<TreeNode<Node> {...props} expandAll={false} />);
+    // Collapse-all returns to the root only.
+    expect(screen.queryByText("x")).toBeNull();
   });
 
   it("applies depth-based indentation", () => {

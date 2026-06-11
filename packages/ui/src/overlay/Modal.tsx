@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { Button } from "../components/button";
 import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
+import { useModalStack } from "./modalStack";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -34,7 +35,7 @@ export type ModalProps = {
   title?: ReactNode;
   /** Width/height preset for the dialog. */
   size?: ModalSize;
-  /** Close when the backdrop is clicked. */
+  /** Close when the backdrop is clicked. Off by default; close via Escape or the close button. */
   closeOnBackdrop?: boolean;
   /** Close when Escape is pressed. */
   closeOnEsc?: boolean;
@@ -73,7 +74,7 @@ export function Modal({
   confirmClose = false,
   title,
   size = "md",
-  closeOnBackdrop = true,
+  closeOnBackdrop = false,
   closeOnEsc = true,
   hideClose = false,
   expandable = true,
@@ -83,6 +84,7 @@ export function Modal({
   children,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const { isTop, depth } = useModalStack(open);
   const [expanded, setExpanded] = useState(false);
   // When confirmClose is active, a close request opens this prompt instead of
   // closing outright; onClose only fires once the user confirms the discard.
@@ -109,7 +111,9 @@ export function Modal({
   }, [confirmClose]);
 
   useEffect(() => {
-    if (!open || !closeOnEsc) return;
+    // Only the topmost modal handles Escape so a keypress closes one nested
+    // layer at a time instead of every open modal at once.
+    if (!open || !closeOnEsc || !isTop) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // While the prompt is up, Escape dismisses the prompt rather than the modal.
@@ -118,7 +122,7 @@ export function Modal({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, closeOnEsc, confirming, confirmClose, onClose]);
+  }, [open, closeOnEsc, isTop, confirming, confirmClose, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -131,7 +135,12 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className={cn(
+        "fixed inset-0 flex items-center justify-center",
+        // Nested modals dim less so the dialog they opened over stays visible.
+        depth === 0 ? "bg-black/40" : "bg-black/20",
+      )}
+      style={{ zIndex: 50 + depth * 10 }}
       onClick={closeOnBackdrop ? requestClose : undefined}
       role="presentation"
     >

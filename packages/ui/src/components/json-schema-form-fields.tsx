@@ -15,16 +15,44 @@ import {
   controlHeightClass,
   controlMinHeightClass,
   fieldInnerGapClass,
+  inlineRowGapClass,
   labelSizeClass,
+  stackedRowGapClass,
   type FormSize,
 } from "./json-schema-form-size";
 
-// FieldWrapper lays out a label + value (+ helper/error) either inline (2-col)
-// or stacked, mirroring the convention used elsewhere in the library. In inline
-// mode the label column shrinks to fit its content but is capped/truncated at
-// labelMaxWidth, and the value column is capped at valueMaxWidth (see
-// FormLayout); the grid template is set inline because Tailwind can't
-// interpolate runtime widths.
+// FieldsGrid is the container every group of field rows renders into — the
+// top-level form and each nested object/map. In inline mode it owns the single
+// 2-column track definition: `fit-content(labelMaxWidth)` for the label column,
+// `minmax(0, valueMaxWidth)` for the value column. Every field row is a
+// `subgrid` that inherits these tracks, so all labels share one column width and
+// every value lines up — a real form grid, not per-row independent grids.
+// (`fit-content()` is the only valid CSS for "size to content, clamped to a max"
+// — `min(w, max-content)` is rejected by the browser, which silently drops the
+// whole declaration and collapses every row to a stacked-looking column. The
+// template is an inline style because Tailwind can't interpolate runtime widths.)
+// Stacked mode is a plain single-column grid.
+export function FieldsGrid({ layout, size, children }: { layout: FormLayout; size: FormSize; children: ReactNode }) {
+  if (layout.mode === "inline") {
+    const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
+    const valueMaxWidth = layout.valueMaxWidth ?? "600px";
+    return (
+      <div
+        className={cn("grid", inlineRowGapClass[size])}
+        style={{ gridTemplateColumns: `fit-content(${labelMaxWidth}) minmax(0, ${valueMaxWidth})` }}
+      >
+        {children}
+      </div>
+    );
+  }
+  return <div className={cn("grid", stackedRowGapClass[size])}>{children}</div>;
+}
+
+// FieldWrapper lays out a single label + value (+ helper/error). In inline mode
+// it is a `subgrid` row spanning the parent FieldsGrid's two columns, so its
+// label and value snap to the shared label/value tracks (helper/error sit under
+// the value column). In stacked mode the label sits tight above its control as
+// one unit, capped at valueMaxWidth so controls don't stretch edge to edge.
 export function FieldWrapper({
   label,
   value,
@@ -41,15 +69,8 @@ export function FieldWrapper({
   size: FormSize;
 }) {
   if (layout.mode === "inline") {
-    const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
-    const valueMaxWidth = layout.valueMaxWidth ?? "600px";
     return (
-      <div
-        className="grid items-start gap-x-3 gap-y-0.5"
-        style={{
-          gridTemplateColumns: `minmax(0, min(${labelMaxWidth}, max-content)) minmax(0, ${valueMaxWidth})`,
-        }}
-      >
+      <div className="col-span-2 grid grid-cols-subgrid items-start gap-x-3 gap-y-0.5">
         <div className={cn("flex min-w-0 items-center", controlMinHeightClass[size])}>{label}</div>
         <div className="min-w-0">{value}</div>
         {helper && <p className="col-start-2 text-xs text-muted-foreground">{helper}</p>}
@@ -57,10 +78,6 @@ export function FieldWrapper({
       </div>
     );
   }
-  // Stacked: the label sits tight (gap-1) above its control so the pair reads
-  // as one unit against the larger row-to-row gap, and the whole stack is
-  // capped at valueMaxWidth so controls don't stretch edge to edge on wide
-  // viewports (mirroring the inline value column cap).
   return (
     <div
       className="flex w-full flex-col gap-1"
@@ -94,7 +111,9 @@ export function FieldLabel({ field, fieldId, size }: { field: FieldControl; fiel
 // ObjectSection renders a nested object as a labelled section: a header row
 // (the field label + required/badge) above its fields, which fill the full
 // width below. It replaces the inline label + bordered box so nested objects
-// read as flat, headed groups rather than indented sub-forms.
+// read as flat, headed groups rather than indented sub-forms. `col-span-full`
+// makes it span both tracks of an inline FieldsGrid (full width, not crammed
+// into the value column); in a stacked single-column grid it is a no-op.
 export function ObjectSection({
   label,
   required,
@@ -113,7 +132,7 @@ export function ObjectSection({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col", fieldInnerGapClass[size])}>
+    <div className={cn("col-span-full flex flex-col", fieldInnerGapClass[size])}>
       <div className={cn("flex items-center gap-2 border-b border-border pb-1 font-semibold", labelSizeClass[size])}>
         <LabelIcon icon={labelIcon} className="text-[15px] text-muted-foreground" />
         <span>{label}</span>
@@ -150,6 +169,21 @@ export function ReadOnlyValue({ field, fieldId, size }: { field: FieldControl; f
   );
 }
 
+// FieldSuffixWrapper positions a field's trailing in-field adornment
+// (FieldControl.suffix) at the right edge of the input. The container is tagged
+// data-jsf-control so the adornment can locate its sibling input[data-jsf-input]
+// (e.g. for caret-aware insertion). With no suffix it renders the input bare, so
+// fields without an adornment are byte-for-byte unchanged.
+function FieldSuffixWrapper({ suffix, children }: { suffix?: ReactNode; children: ReactNode }) {
+  if (!suffix) return <>{children}</>;
+  return (
+    <div data-jsf-control className="relative">
+      {children}
+      <div className="absolute inset-y-0 right-1.5 flex items-center">{suffix}</div>
+    </div>
+  );
+}
+
 export function StringControl({
   field,
   fieldId,
@@ -162,16 +196,18 @@ export function StringControl({
   size: FormSize;
 }) {
   return (
-    <input
-      id={fieldId}
-      type="text"
-      data-jsf-input
-      className={inputClass(size)}
-      value={toText(field.value)}
-      disabled={readOnly}
-      placeholder={defaultPlaceholder(field.schema)}
-      onChange={(e) => field.onChange(e.target.value)}
-    />
+    <FieldSuffixWrapper suffix={field.suffix}>
+      <input
+        id={fieldId}
+        type="text"
+        data-jsf-input
+        className={cn(inputClass(size), field.suffix && "pr-8")}
+        value={toText(field.value)}
+        disabled={readOnly}
+        placeholder={defaultPlaceholder(field.schema)}
+        onChange={(e) => field.onChange(e.target.value)}
+      />
+    </FieldSuffixWrapper>
   );
 }
 
@@ -189,25 +225,27 @@ export function NumberControl({
   // type="text" (not number) so non-numeric values a consumer permits — e.g.
   // template tokens — are not silently dropped by the browser.
   return (
-    <input
-      id={fieldId}
-      type="text"
-      inputMode="decimal"
-      data-jsf-input
-      className={inputClass(size)}
-      value={toText(field.value)}
-      disabled={readOnly}
-      placeholder={defaultPlaceholder(field.schema)}
-      onChange={(e) => {
-        const raw = e.target.value;
-        const coerce = field.coerceNumber !== false;
-        if (coerce && raw.trim() !== "" && Number.isFinite(Number(raw))) {
-          field.onChange(Number(raw));
-        } else {
-          field.onChange(raw);
-        }
-      }}
-    />
+    <FieldSuffixWrapper suffix={field.suffix}>
+      <input
+        id={fieldId}
+        type="text"
+        inputMode="decimal"
+        data-jsf-input
+        className={cn(inputClass(size), field.suffix && "pr-8")}
+        value={toText(field.value)}
+        disabled={readOnly}
+        placeholder={defaultPlaceholder(field.schema)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const coerce = field.coerceNumber !== false;
+          if (coerce && raw.trim() !== "" && Number.isFinite(Number(raw))) {
+            field.onChange(Number(raw));
+          } else {
+            field.onChange(raw);
+          }
+        }}
+      />
+    </FieldSuffixWrapper>
   );
 }
 
@@ -244,10 +282,11 @@ export function DateControl({
       id={fieldId}
       aria-label={field.label}
       data-jsf-input
-      inputClassName={cn(inputClass(size), "pr-8")}
+      inputClassName={cn(inputClass(size), field.suffix ? "pr-14" : "pr-8")}
       value={text}
       onChange={(next) => field.onChange(next)}
       placeholder={defaultPlaceholder(field.schema)}
+      suffix={field.suffix}
     />
   );
 }
@@ -310,6 +349,7 @@ export function EnumControl({
       size={size}
       allowCustomValue={field.allowCustomValue ?? false}
       onChange={(v) => field.onChange(v)}
+      suffix={field.suffix}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
   );

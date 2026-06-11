@@ -203,7 +203,10 @@ export function renderObjectFields(
       },
       ctx,
     );
-    return row ? [<div key={key}>{row}</div>] : [];
+    // `contents` keeps the keyed wrapper out of the box tree so the row's own
+    // node (a subgrid FieldWrapper or a full-width ObjectSection) is a direct
+    // child of the FieldsGrid and snaps to its label/value tracks.
+    return row ? [<div key={key} className="contents">{row}</div>] : [];
   });
 }
 

@@ -1,4 +1,4 @@
-import { forwardRef, useRef, type InputHTMLAttributes } from "react";
+import { forwardRef, useRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { UiCalendar } from "../icons";
 import { cn } from "../lib/utils";
@@ -13,6 +13,8 @@ export type DateTimePickerProps = Omit<
   inputClassName?: string;
   buttonClassName?: string;
   openButtonLabel?: string;
+  /** Trailing in-field adornment, rendered left of the calendar button. */
+  suffix?: ReactNode;
 };
 
 export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
@@ -24,6 +26,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
       inputClassName,
       buttonClassName,
       openButtonLabel = "Open time picker",
+      suffix,
       ...props
     },
     ref,
@@ -41,7 +44,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
     }
 
     return (
-      <div className={cn("relative", className)}>
+      <div data-jsf-control className={cn("relative", className)}>
         <input
           {...props}
           ref={assignRef}
@@ -62,6 +65,9 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
           value={toDateTimeLocalValue(value)}
           onChange={(event) => onChange?.(event.target.value)}
         />
+        {suffix && (
+          <div className="absolute inset-y-0 right-7 flex items-center">{suffix}</div>
+        )}
         <button
           type="button"
           aria-label={openButtonLabel}

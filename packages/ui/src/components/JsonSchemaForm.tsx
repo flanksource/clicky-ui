@@ -3,13 +3,12 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiEllipsis } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
+import { FieldsGrid } from "./json-schema-form-fields";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import {
   DEFAULT_FORM_SIZE,
   fieldInnerGapClass,
-  inlineRowGapClass,
   labelSizeClass,
-  stackedRowGapClass,
   type FormSize,
 } from "./json-schema-form-size";
 import {
@@ -98,8 +97,6 @@ export function JsonSchemaForm({
   };
   const rows = renderObjectFields(schema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
 
-  const rowGap =
-    resolvedLayout.mode === "inline" ? inlineRowGapClass[effectiveSize] : stackedRowGapClass[effectiveSize];
   return (
     <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
       {showPreferencesMenu && (
@@ -111,7 +108,9 @@ export function JsonSchemaForm({
         />
       )}
       {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
-      <div className={cn("grid", rowGap)}>{rows}</div>
+      <FieldsGrid layout={resolvedLayout} size={effectiveSize}>
+        {rows}
+      </FieldsGrid>
     </div>
   );
 }

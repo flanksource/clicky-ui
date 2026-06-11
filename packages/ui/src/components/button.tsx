@@ -3,6 +3,7 @@ import { type VariantProps } from "class-variance-authority";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { buttonVariants } from "./button-variants";
+import { LoadingDots } from "./loading";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonVariants> & {
@@ -13,49 +14,6 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
     /** Label to render while loading; defaults to the normal children. */
     loadingLabel?: ReactNode;
   };
-
-function ButtonSpinner() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4 shrink-0"
-    >
-      <circle cx="4" cy="12" r="3" fill="#151515">
-        <animate
-          id="SVG7x14Dcom"
-          fill="freeze"
-          attributeName="opacity"
-          begin="0;SVGqSjG0dUp.end-0.25s"
-          dur="0.75s"
-          values="1;0.2"
-        />
-      </circle>
-      <circle cx="12" cy="12" r="3" fill="#151515" opacity="0.4">
-        <animate
-          fill="freeze"
-          attributeName="opacity"
-          begin="SVG7x14Dcom.begin+0.15s"
-          dur="0.75s"
-          values="1;0.2"
-        />
-      </circle>
-      <circle cx="20" cy="12" r="3" fill="#151515" opacity="0.3">
-        <animate
-          id="SVGqSjG0dUp"
-          fill="freeze"
-          attributeName="opacity"
-          begin="SVG7x14Dcom.begin+0.3s"
-          dur="0.75s"
-          values="1;0.2"
-        />
-      </circle>
-    </svg>
-  );
-}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
@@ -97,7 +55,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading && <ButtonSpinner />}
+        {loading && <LoadingDots className="size-4" />}
         {content}
       </Comp>
     );
