@@ -94,13 +94,6 @@ export function TreeNode<T>({
   // The chevron shows when there is something to reveal: either real children
   // are present, or the node is lazy and has not been loaded yet.
   const expandable = hasChildren || lazyUnloaded;
-  const initialOpen = defaultOpen ? defaultOpen(node, depth) : depth < 1;
-  const [open, setOpen] = useState(initialOpen);
-  const prevExpandAll = useRef(expandAll);
-  const isSelected = selected === node;
-  const key = getKey(node);
-  const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
-  const isOpen = isForcedOpen || open;
   // A node opts out of bulk expand-all in two distinct cases:
   //
   //  1. The node itself is secondary (its edge from the parent is
@@ -118,6 +111,24 @@ export function TreeNode<T>({
   const childrenAllSecondary =
     hasChildren && isSecondary != null && children!.every((c) => isSecondary(c));
   const skipExpandAll = secondaryNode || childrenAllSecondary;
+  // A non-null `expandAll` is a live bulk state, not just a one-off change
+  // signal: a node mounted *while* expand-all is active (because an ancestor
+  // just opened) inherits it as its initial open state, so opening a parent
+  // cascades all the way down — expand/collapse-all are recursive. The
+  // skipExpandAll guard keeps secondary subtrees from auto-flooding. When
+  // expandAll is null (before any toolbar click) we fall back to defaultOpen.
+  const initialOpen =
+    expandAll !== null && !skipExpandAll
+      ? expandAll
+      : defaultOpen
+        ? defaultOpen(node, depth)
+        : depth < 1;
+  const [open, setOpen] = useState(initialOpen);
+  const prevExpandAll = useRef(expandAll);
+  const isSelected = selected === node;
+  const key = getKey(node);
+  const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
+  const isOpen = isForcedOpen || open;
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
@@ -183,10 +194,20 @@ export function TreeNode<T>({
         }}
       >
         {expandable ? (
-          <Icon
-            icon={isOpen ? UiChevronDown : UiChevronRight}
-            className="text-muted-foreground text-xs w-3"
-          />
+          <button
+            type="button"
+            aria-label={isOpen ? "Collapse" : "Expand"}
+            // The caret only toggles expansion — stopPropagation keeps the row's
+            // onClick (which selects) from firing, so expanding a node never
+            // selects it.
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle();
+            }}
+            className="flex shrink-0 items-center text-muted-foreground"
+          >
+            <Icon icon={isOpen ? UiChevronDown : UiChevronRight} className="text-xs w-3" />
+          </button>
         ) : (
           <span className="w-3 shrink-0" aria-hidden />
         )}

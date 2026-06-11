@@ -129,6 +129,13 @@ export interface FieldControl {
   // adornment hints (set by pre-extensions)
   badge?: string;
   helper?: string;
+  // Generic trailing in-field adornment. When set, the control renders this node
+  // inside the input's wrapper (before any built-in trailing controls such as a
+  // combobox chevron or date calendar button), positioned absolutely at the
+  // right. The wrapper carries `data-jsf-control` so the adornment can locate its
+  // sibling `input[data-jsf-input]` (e.g. for caret-aware text insertion). Set by
+  // a pre-extension; clicky-ui only positions it — the consumer owns the node.
+  suffix?: ReactNode;
 
   // number
   minimum?: number;

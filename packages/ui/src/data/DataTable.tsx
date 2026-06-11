@@ -1,7 +1,9 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -27,7 +29,13 @@ import {
   type FilterBarSearchProps,
 } from "../components/FilterBar";
 import { clearFilterBarFilter, isFilterBarFilterActive } from "../components/filter-bar-utils";
-import { getFilterCandidate, getFilterTokens, prettifyKey, resolvePath } from "./data-table-utils";
+import {
+  getFilterCandidate,
+  getFilterTokens,
+  prettifyKey,
+  resolveColumnValue,
+  resolvePath,
+} from "./data-table-utils";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -174,6 +182,14 @@ export type DataTableColumn<
   key: string;
   /** Header label. */
   label: ReactNode;
+  /**
+   * Reads the cell value from the row. When set, it is used for rendering,
+   * sorting, and filtering instead of resolving `key` as a (possibly nested)
+   * path. Use this for arbitrary SQL columns whose names are empty, contain
+   * dots ("a.b" as a literal key, not a nested path), or collide — the `key`
+   * then only needs to be a stable, unique column id.
+   */
+  accessor?: (row: T) => unknown;
   /** Enables header click sorting for this column. */
   sortable?: boolean;
   /** Enables a generated column filter when `autoFilter` is true. */
@@ -271,8 +287,21 @@ type DataTableInnerProps<
   loadingRowCount?: number;
   /** Message used when there are no rows after filtering. */
   emptyMessage?: string;
+  /**
+   * Client-side incremental reveal (infinite scroll). When set — and no server
+   * `pagination` is provided — the table renders `batchSize` rows at a time and
+   * grows by `batchSize` as a trailing sentinel scrolls into view. Use for
+   * large in-memory result sets (e.g. ad-hoc SQL output) to keep the first
+   * paint cheap without paginating.
+   */
+  clientReveal?: { batchSize: number };
   /** Classes applied to the table shell. */
   className?: string;
+  /**
+   * Classes for the scrollable table region. Defaults to `min-h-0 flex-1`
+   * (fills a bounded flex parent). Pass e.g. `max-h-[26rem]` to cap height.
+   */
+  scrollContainerClassName?: string;
   /** Generate filters from filterable columns. */
   autoFilter?: boolean;
   /** Show the global search input. */
@@ -416,7 +445,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   loadingMessage = "Loading results…",
   loadingRowCount = 8,
   emptyMessage: _emptyMessage = "No data",
+  clientReveal,
   className,
+  scrollContainerClassName,
   autoFilter = false,
   showGlobalFilter = true,
   globalFilter,
@@ -623,7 +654,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       if (column.kind !== "timestamp") continue;
       const dates: Date[] = [];
       for (const row of data) {
-        const raw = resolvePath(row, column.key);
+        const raw = resolveColumnValue(row, column);
         const parsed = parseTimestamp(raw);
         if (parsed) dates.push(parsed);
       }
@@ -1044,6 +1075,42 @@ function DataTableInner<T extends Record<string, unknown>>({
     ...(defaultSort?.key ? { defaultKey: defaultSort.key } : {}),
   });
 
+  // Client-side incremental reveal: when `clientReveal` is set (and the caller
+  // is not doing server pagination), only the first `visibleCount` sorted rows
+  // are rendered; a trailing sentinel grows the window as it scrolls into view.
+  const revealEnabled = !!clientReveal && !pagination;
+  const revealBatchSize = clientReveal?.batchSize ?? 0;
+  const [visibleCount, setVisibleCount] = useState(revealBatchSize);
+  const revealObserver = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    // Reset the window whenever the filtered/sorted set or batch size changes
+    // so a new query starts from the top rather than mid-scroll.
+    if (revealEnabled) setVisibleCount(revealBatchSize);
+  }, [revealEnabled, revealBatchSize, sorted]);
+
+  const visibleSorted = revealEnabled ? sorted.slice(0, visibleCount) : sorted;
+  const hasMoreRows = revealEnabled && visibleCount < sorted.length;
+
+  const revealSentinelRef = useCallback(
+    (node: HTMLTableRowElement | null) => {
+      if (revealObserver.current) revealObserver.current.disconnect();
+      if (!node || !hasMoreRows) return;
+      revealObserver.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) {
+            setVisibleCount((current) =>
+              Math.min(current + revealBatchSize, sorted.length),
+            );
+          }
+        },
+        { rootMargin: "200px" },
+      );
+      revealObserver.current.observe(node);
+    },
+    [hasMoreRows, revealBatchSize, sorted.length],
+  );
+
   const startColumnResize = (
     event: ReactMouseEvent<HTMLElement>,
     column: DataTableColumn<T>,
@@ -1177,7 +1244,10 @@ function DataTableInner<T extends Record<string, unknown>>({
         )}
 
         <div
-          className="min-h-0 flex-1 overflow-auto rounded-md border border-border"
+          className={cn(
+            "overflow-auto rounded-md border border-border",
+            scrollContainerClassName ?? "min-h-0 flex-1",
+          )}
           aria-busy={loading || undefined}
         >
           <table className="w-max table-auto text-left text-sm">
@@ -1287,7 +1357,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   message={loadingMessage}
                 />
               ) : (
-                sorted.map((record) => {
+                visibleSorted.map((record) => {
                   const href = getRowHref?.(record.row);
                   const expanded = expandedRows[record.id] ?? false;
                   const expandedContent =
@@ -1326,7 +1396,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                         }}
                       >
                         {visibleColumns.map((column, index) => {
-                          const rawValue = resolvePath(record.row, column.key);
+                          const rawValue = resolveColumnValue(record.row, column);
                           let content: ReactNode = column.render
                             ? column.render(rawValue, record.row)
                             : formatCell(rawValue);
@@ -1388,6 +1458,16 @@ function DataTableInner<T extends Record<string, unknown>>({
                     </Fragment>
                   );
                 })
+              )}
+              {hasMoreRows && (
+                <tr ref={revealSentinelRef} aria-hidden>
+                  <td
+                    colSpan={visibleColumns.length}
+                    className="p-density-2 text-center text-xs text-muted-foreground"
+                  >
+                    Loading more…
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -2096,7 +2176,7 @@ function getSortValue<T extends Record<string, unknown>>(
   row: T,
   column: DataTableColumn<T>,
 ) {
-  const rawValue = resolvePath(row, column.key);
+  const rawValue = resolveColumnValue(row, column);
   return column.sortValue ? column.sortValue(rawValue, row) : rawValue;
 }
 

@@ -81,6 +81,46 @@ describe("JsonSchemaForm extension pipeline", () => {
   });
 });
 
+describe("JsonSchemaForm field suffix slot", () => {
+  it("renders a pre-extension's suffix inside the control wrapper for a string field", () => {
+    const withSuffix: PreExtension = (field) => ({
+      ...field,
+      suffix: <button type="button">adorn {field.key}</button>,
+    });
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { Name: { type: "string" } } }}
+        value={{ Name: "" }}
+        onChange={vi.fn()}
+        pre={[withSuffix]}
+      />,
+    );
+    const suffix = screen.getByRole("button", { name: "adorn Name" });
+    const wrapper = suffix.closest("[data-jsf-control]");
+    expect(wrapper).not.toBeNull();
+    // The control's input is a sibling under the same data-jsf-control wrapper, so
+    // a suffix adornment can locate it for caret-aware insertion.
+    expect(wrapper?.querySelector("input[data-jsf-input]")).not.toBeNull();
+  });
+
+  it("renders the suffix inside an enum (combobox) field's control wrapper", () => {
+    const withSuffix: PreExtension = (field) => ({
+      ...field,
+      suffix: <button type="button">adorn {field.key}</button>,
+    });
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { role: { type: "string", enum: ["A", "B"] } } }}
+        value={{ role: "A" }}
+        onChange={vi.fn()}
+        pre={[withSuffix]}
+      />,
+    );
+    const suffix = screen.getByRole("button", { name: "adorn role" });
+    expect(suffix.closest("[data-jsf-control]")).not.toBeNull();
+  });
+});
+
 describe("JsonSchemaForm number coercion", () => {
   const schema: JsonSchemaObject = { type: "object", properties: { Amount: { type: "number" } } };
 
@@ -592,7 +632,7 @@ describe("JsonSchemaForm layout", () => {
       <JsonSchemaForm schema={schema} value={{ Name: "" }} onChange={vi.fn()} inline />,
     );
     expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
-      "minmax(0, min(40ch, max-content)) minmax(0, 600px)",
+      "fit-content(40ch) minmax(0, 600px)",
     );
   });
 
@@ -607,7 +647,7 @@ describe("JsonSchemaForm layout", () => {
       />,
     );
     expect(inlineGrid(container)?.style.gridTemplateColumns).toBe(
-      "minmax(0, min(12rem, max-content)) minmax(0, 600px)",
+      "fit-content(12rem) minmax(0, 600px)",
     );
   });
 
@@ -771,28 +811,24 @@ describe("JsonSchemaForm x-layout: table", () => {
     expect(lastCall(onChange)).toEqual({ rows: [{ name: "b", port: 80 }] });
   });
 
-  it("renders full-width (no inline label/value grid) even when the form is inline", () => {
-    const inlineGrid = (container: HTMLElement): HTMLElement | null =>
-      [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
-        el.style.gridTemplateColumns.includes("minmax"),
-      ) ?? null;
+  it("renders the table as a full-width section, not an inline label/value row, when the form is inline", () => {
     const { container } = render(
       <JsonSchemaForm schema={schema} value={{ rows: [{ name: "a", port: 80 }] }} onChange={vi.fn()} inline />,
     );
-    // The table is laid out as a headed full-width section, not crammed into the
-    // narrow inline value column — so no minmax label/value grid wraps it.
-    expect(inlineGrid(container)).toBeNull();
+    // The form is inline: its FieldsGrid owns the 2-column track template.
+    const fieldsGrid = [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+      el.style.gridTemplateColumns.includes("fit-content"),
+    );
+    expect(fieldsGrid).toBeTruthy();
+    // But the table is a full-width section spanning both columns (col-span-full),
+    // not crammed into the narrow value column as a 2-col label/value subgrid row.
+    expect(container.querySelector(".col-span-full")).toBeTruthy();
+    expect(container.querySelector(".grid-cols-subgrid")).toBeNull();
     expect(screen.getByRole("columnheader", { name: "name" })).toBeInTheDocument();
   });
 });
 
 describe("JsonSchemaForm x-layout: stack", () => {
-  function inlineGrid(container: HTMLElement): HTMLElement | null {
-    return [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
-      el.style.gridTemplateColumns.includes("minmax"),
-    ) ?? null;
-  }
-
   it("forces a stacked subtree even when the form is inline", () => {
     const schema: JsonSchemaObject = {
       type: "object",
@@ -807,9 +843,14 @@ describe("JsonSchemaForm x-layout: stack", () => {
     const { container } = render(
       <JsonSchemaForm schema={schema} value={{ addr: { city: "", state: "" } }} onChange={vi.fn()} inline />,
     );
-    // The address object's children render stacked (no inline grid), despite the
-    // form-level inline mode.
-    expect(inlineGrid(container)).toBeNull();
+    // The top-level form is inline (its FieldsGrid owns the 2-column template)...
+    const fieldsGrid = [...container.querySelectorAll<HTMLElement>("div")].find((el) =>
+      el.style.gridTemplateColumns.includes("fit-content"),
+    );
+    expect(fieldsGrid).toBeTruthy();
+    // ...but the address object declares x-layout: stack, so its city/state fields
+    // render stacked — there is no inline label/value subgrid row anywhere.
+    expect(container.querySelector(".grid-cols-subgrid")).toBeNull();
   });
 
   it("labels a stacked map entry's key picker from propertyNames.title", () => {

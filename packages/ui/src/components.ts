@@ -1,4 +1,11 @@
 export { Button, type ButtonProps } from "./components/button";
+export {
+  Loading,
+  LoadingDots,
+  type LoadingProps,
+  type LoadingSize,
+  type LoadingVariant,
+} from "./components/loading";
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
@@ -54,6 +61,7 @@ export {
   type ComboboxSingleProps,
   type ComboboxMultiProps,
 } from "./components/Combobox";
+export { TreePickerField, type TreePickerFieldProps } from "./components/TreePickerField";
 export { WorkloadPicker, type WorkloadPickerProps } from "./components/WorkloadPicker";
 export {
   workloadKey,

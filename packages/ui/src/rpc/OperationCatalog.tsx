@@ -8,9 +8,10 @@ import { Modal } from "../overlay/Modal";
 import { filterOperationsByDomain, findListEndpoint } from "./classify";
 import {
   filterOperationsBySurface,
-  findSurfaceCollectionActions,
+  findSurfaceActions,
   findSurfaceListOperation,
   getOperationClickyMeta,
+  surfaceActionLabel,
 } from "./clickyMetadata";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
@@ -21,7 +22,6 @@ import {
   type ExecutionResponse,
   type OperationLookupResponse,
   type ResolvedOperation,
-  isPositionalParam,
 } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
 import {
@@ -151,15 +151,17 @@ export function OperationCatalog({
 
   const actionOps = useMemo(() => {
     if (useSurfaceMetadata) {
-      return findSurfaceCollectionActions(domainOps, surfaceKey);
+      return findSurfaceActions(domainOps, surfaceKey);
     }
 
-    return domainOps.filter(
-      (op) =>
-        op.method !== "get" &&
-        !op.path.includes("{") &&
-        !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
-    );
+    // A collection-level action is any non-GET operation that lives at the
+    // collection path (no `{param}` segment). clicky promotes id-bearing
+    // mutations (create/update/delete) onto the collection root and
+    // query-encodes the entity id as an *optional* positional argument
+    // (description "Positional argument from command"). That positional id
+    // must NOT disqualify the op — the action modal collects it. Detail-scoped
+    // routes keep their `{id}` path segment and are excluded by the path check.
+    return domainOps.filter((op) => op.method !== "get" && !op.path.includes("{"));
   }, [domainOps, surfaceKey, useSurfaceMetadata]);
 
   const filterBarConfig = useMemo(() => {
@@ -288,43 +290,29 @@ export function OperationCatalog({
       {actionOps.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {actionOps.map((op) => {
-            const commandName = op.operation.operationId || op.path;
-            const tooltip = op.operation.description
-              ? `${commandName} — ${op.operation.description}`
-              : commandName;
-            if (useSurfaceMetadata) {
-              return (
-                <Button
-                  key={`${op.method}:${op.path}`}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  title={tooltip}
-                  onClick={() => {
-                    setActiveAction(op);
-                    setActionResult(null);
-                    setActionError("");
-                  }}
-                >
-                  <Icon icon={UiAdd} className="text-xs" />
-                  {op.operation.summary || getOperationClickyMeta(op)?.actionName || commandName}
-                </Button>
-              );
-            }
-
-            return renderLink({
-              key: `${op.method}:${op.path}`,
-              to: getCommandHref(op.operation.operationId ?? commandName, op),
-              title: tooltip,
-              className:
-                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-              children: (
-                <>
-                  <Icon icon={UiAdd} className="text-xs" />
-                  {op.operation.summary || commandName}
-                </>
-              ),
-            });
+            const label = surfaceActionLabel(op);
+            const summary = op.operation.summary || op.operation.description;
+            const tooltip = summary ? `${label} — ${summary}` : label;
+            // Every action opens the execution dialog (Modal) inline — the
+            // FilterForm collects params (including any id an entity-scoped
+            // action needs) and the result renders without leaving the list.
+            return (
+              <Button
+                key={`${op.method}:${op.path}`}
+                type="button"
+                variant="outline"
+                size="sm"
+                title={tooltip}
+                onClick={() => {
+                  setActiveAction(op);
+                  setActionResult(null);
+                  setActionError("");
+                }}
+              >
+                <Icon icon={UiAdd} className="text-xs" />
+                {label}
+              </Button>
+            );
           })}
         </div>
       )}

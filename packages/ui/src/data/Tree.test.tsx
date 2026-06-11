@@ -186,4 +186,37 @@ describe("Tree", () => {
 
     expect(screen.getByText("id")).toBeInTheDocument();
   });
+
+  it("Expand all / Collapse all act recursively from a fully-collapsed tree", () => {
+    const deep: Node[] = [
+      {
+        id: "r",
+        label: "r",
+        children: [
+          { id: "x", label: "x", children: [{ id: "y", label: "y", children: [{ id: "z", label: "z" }] }] },
+        ],
+      },
+    ];
+    render(
+      <Tree<Node>
+        roots={deep}
+        getChildren={(node) => node.children}
+        getKey={(node) => node.id}
+        defaultOpen={() => false}
+        renderRow={({ node }) => <span>{node.label}</span>}
+      />,
+    );
+
+    // Fully collapsed: only the root row shows.
+    expect(screen.getByText("r")).toBeInTheDocument();
+    expect(screen.queryByText("z")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+    // One click reveals the deepest leaf — recursive expansion.
+    expect(screen.getByText("z")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+    // Collapse-all returns to the root only.
+    expect(screen.queryByText("x")).toBeNull();
+  });
 });

@@ -16,7 +16,8 @@ import {
   isPlainObject,
   keyPickerOptions,
 } from "./json-schema-form-utils";
-import { fieldInnerGapClass, stackedRowGapClass } from "./json-schema-form-size";
+import { FieldsGrid } from "./json-schema-form-fields";
+import { fieldInnerGapClass } from "./json-schema-form-size";
 
 // ObjectControl renders a nested structured object as a sub-form: its own
 // properties, required markers, if/then, soft errors — all via the shared
@@ -37,13 +38,13 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
   // form-level readOnly on so child inputs are disabled (and any child the
   // schema marks readOnly still renders as a value span).
   return (
-    <div className={cn("grid", stackedRowGapClass[ctx.size])}>
+    <FieldsGrid layout={ctx.layout} size={ctx.size}>
       {ctx.render.renderObjectFields(subSchema, obj, (next) => field.onChange(next), {
         ...ctx,
         readOnly: ctx.readOnly || field.readOnly === true,
         depth: ctx.depth + 1,
       })}
-    </div>
+    </FieldsGrid>
   );
 }
 

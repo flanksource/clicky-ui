@@ -5,15 +5,31 @@ import { isPositionalParam, type ExecutionResponse, type ResolvedOperation } fro
 // operationIds of the form `<entity>_list`. Matching exactly on that form
 // keeps the default table view deterministic — a non-list GET never gets
 // promoted to list by accident.
+//
+// When a `<entity> list` command is promoted onto the bare entity-root
+// (clicky's promoteListToEntityRoot), the collection is exposed instead as
+// `GET /api/v1/<entity>` with operationId `<entity>` and no `_list` suffix.
+// Fall back to that promoted root when no explicit `<entity>_list` exists.
+// A path/positional parameter disqualifies it, so a `<entity>/{id}` detail
+// GET can never be mistaken for the listing.
 export function findListEndpoint(
   operations: ResolvedOperation[],
   entities: string[],
 ): ResolvedOperation | undefined {
-  const wanted = new Set(entities.map((e) => `${e}_list`));
-  if (wanted.size === 0) return undefined;
+  if (entities.length === 0) return undefined;
+  const listIds = new Set(entities.map((e) => `${e}_list`));
+  const explicit = operations.find(
+    (op) =>
+      op.method === "get" && !!op.operation.operationId && listIds.has(op.operation.operationId),
+  );
+  if (explicit) return explicit;
+
+  const rootIds = new Set(entities);
   return operations.find(
     (op) =>
-      op.method === "get" && !!op.operation.operationId && wanted.has(op.operation.operationId),
+      op.method === "get" &&
+      rootIds.has(op.operation.operationId ?? "") &&
+      !op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
   );
 }
 
@@ -96,5 +112,10 @@ export function filterOperationsByDomain(
 ): ResolvedOperation[] {
   if (entities.length === 0) return [];
   const wanted = new Set(entities);
-  return operations.filter((op) => (op.operation.tags ?? []).some((tag) => wanted.has(tag)));
+  return operations.filter((op) => {
+    if ((op.operation.tags ?? []).some((tag) => wanted.has(tag))) return true;
+    // clicky promotes a collection to a bare entity-root GET (operationId
+    // `<entity>`, no tag). Include it so the catalog can resolve the listing.
+    return op.method === "get" && wanted.has(op.operation.operationId ?? "");
+  });
 }

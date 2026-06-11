@@ -120,6 +120,73 @@ describe("Modal", () => {
     });
   });
 
+  it("does not close on backdrop click by default", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+    // The backdrop is the presentation wrapper around the dialog.
+    fireEvent.click(getDialog().parentElement as HTMLElement);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("still closes on backdrop click when opted in", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} closeOnBackdrop title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+    fireEvent.click(getDialog().parentElement as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe("nesting", () => {
+    function NestedHarness() {
+      const [outer, setOuter] = useState(true);
+      const [inner, setInner] = useState(true);
+      return (
+        <>
+          <Modal open={outer} onClose={() => setOuter(false)} title="Outer">
+            <p>outer body</p>
+          </Modal>
+          <Modal open={inner} onClose={() => setInner(false)} title="Inner">
+            <p>inner body</p>
+          </Modal>
+        </>
+      );
+    }
+
+    it("keeps the underlying modal mounted when a second opens on top", () => {
+      render(<NestedHarness />);
+      expect(screen.getByText("outer body")).toBeInTheDocument();
+      expect(screen.getByText("inner body")).toBeInTheDocument();
+    });
+
+    it("Escape closes only the topmost modal, one layer at a time", () => {
+      render(<NestedHarness />);
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      // Inner closed, outer still open.
+      expect(screen.queryByText("inner body")).not.toBeInTheDocument();
+      expect(screen.getByText("outer body")).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByText("outer body")).not.toBeInTheDocument();
+    });
+
+    it("renders the topmost modal above the one beneath it", () => {
+      render(<NestedHarness />);
+      const zIndex = (text: string) => {
+        const backdrop = screen.getByText(text).closest("[role='presentation']") as HTMLElement;
+        return Number(backdrop.style.zIndex);
+      };
+      expect(zIndex("inner body")).toBeGreaterThan(zIndex("outer body"));
+    });
+  });
+
   it("resets to the configured size after the modal is closed and reopened", () => {
     function Harness() {
       const [open, setOpen] = useState(true);
