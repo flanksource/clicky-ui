@@ -30,8 +30,21 @@ const FIXED_DOT_SIZE: Record<Exclude<LoadingSize, "responsive">, string> = {
 // large area (a full-page load) grows the dots. Floors at 1.25rem (20px) in
 // tight panels, climbs to 2.5rem (40px) on big loads. Pure CSS — no
 // ResizeObserver, SSR-safe.
-const RESPONSIVE_DOT_SIZE = "size-[clamp(1.25rem,18cqmin,2.5rem)]";
-const RESPONSIVE_LABEL_SIZE = "text-[clamp(0.72rem,4.5cqmin,0.9rem)]";
+//
+// These are inline styles, NOT Tailwind arbitrary classes (`size-[clamp(…)]`):
+// a dynamic arbitrary class only ships if the consumer's Tailwind happens to
+// scan a file containing that exact literal. The moment the served component
+// and the scanned `dist` diverge (e.g. a linked local checkout vs a stale
+// node_modules) the class is never generated, the SVG loses its width/height,
+// and `h-full` balloons it to fill the page. Inline styles resolve natively in
+// every consumer regardless of their content-scan config.
+const RESPONSIVE_DOT_STYLE = {
+  width: "clamp(1.25rem, 18cqmin, 2.5rem)",
+  height: "clamp(1.25rem, 18cqmin, 2.5rem)",
+} as const;
+const RESPONSIVE_LABEL_STYLE = {
+  fontSize: "clamp(0.72rem, 4.5cqmin, 0.9rem)",
+} as const;
 
 /**
  * Three bouncing dots. `fill="currentColor"` so the dots inherit the surrounding
@@ -98,9 +111,8 @@ export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
     const effectiveSize =
       variant === "inline" && size === "responsive" ? "sm" : size;
     const isResponsive = effectiveSize === "responsive";
-    const dotClass = isResponsive
-      ? RESPONSIVE_DOT_SIZE
-      : FIXED_DOT_SIZE[effectiveSize];
+    const dotClass = isResponsive ? "" : FIXED_DOT_SIZE[effectiveSize];
+    const dotStyle = isResponsive ? RESPONSIVE_DOT_STYLE : undefined;
 
     if (variant === "centered") {
       return (
@@ -115,9 +127,12 @@ export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
           )}
           {...props}
         >
-          <LoadingDots className={dotClass} />
+          <LoadingDots className={dotClass} style={dotStyle} />
           {label != null && (
-            <span className={cn(isResponsive ? RESPONSIVE_LABEL_SIZE : "text-sm")}>
+            <span
+              className={isResponsive ? undefined : "text-sm"}
+              style={isResponsive ? RESPONSIVE_LABEL_STYLE : undefined}
+            >
               {label}
             </span>
           )}
@@ -136,7 +151,7 @@ export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
         )}
         {...props}
       >
-        <LoadingDots className={dotClass} />
+        <LoadingDots className={dotClass} style={dotStyle} />
         {label != null && <span className="text-sm">{label}</span>}
       </div>
     );

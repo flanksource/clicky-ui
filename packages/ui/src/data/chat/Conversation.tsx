@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
-import { Message } from "./Message";
+import { Icon } from "../Icon";
+import { UiArrowDown } from "../../icons";
+import { Message, type MessageActionHandlers } from "./Message";
 import type { UIMessage } from "./types";
 
-export type ConversationProps = {
+export type ConversationProps = MessageActionHandlers & {
   messages: UIMessage[];
   /** Shown when there are no messages yet. */
   emptyState?: React.ReactNode;
@@ -11,42 +13,61 @@ export type ConversationProps = {
 };
 
 /** A scrollable message log that sticks to the bottom as new content streams
- *  in, unless the user has scrolled up. */
-export function Conversation({ messages, emptyState, className }: ConversationProps) {
+ *  in, unless the user has scrolled up — in which case a jump-to-bottom button
+ *  appears. */
+export function Conversation({ messages, emptyState, className, ...actions }: ConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pinnedRef = useRef(true);
+  const [pinned, setPinned] = useState(true);
 
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    pinnedRef.current = distance < 32;
+    setPinned(distance < 32);
   };
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && pinnedRef.current) {
+    if (el && pinned) {
       el.scrollTop = el.scrollHeight;
     }
   });
 
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+
   return (
-    <div
-      ref={scrollRef}
-      onScroll={onScroll}
-      role="log"
-      className={cn("relative flex-1 overflow-y-auto", className)}
-    >
-      {messages.length === 0 && emptyState ? (
-        <div className="flex size-full flex-col items-center justify-center gap-3 p-8 text-center">
-          {emptyState}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-8 p-4">
-          {messages.map((message) => (
-            <Message key={message.id} message={message} />
-          ))}
-        </div>
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        role="log"
+        className={cn("flex-1 overflow-y-auto", className)}
+      >
+        {messages.length === 0 && emptyState ? (
+          <div className="flex size-full flex-col items-center justify-center gap-3 p-8 text-center">
+            {emptyState}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8 p-4">
+            {messages.map((message) => (
+              <Message key={message.id} message={message} {...actions} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {!pinned && messages.length > 0 && (
+        <button
+          type="button"
+          aria-label="Scroll to latest"
+          onClick={scrollToBottom}
+          className="absolute bottom-3 left-1/2 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md hover:text-foreground"
+        >
+          <Icon icon={UiArrowDown} className="size-4" />
+        </button>
       )}
     </div>
   );

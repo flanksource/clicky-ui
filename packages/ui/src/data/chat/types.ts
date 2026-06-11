@@ -1,6 +1,47 @@
-import type { UIMessage, ToolUIPart, DynamicToolUIPart, ChatStatus } from "ai";
+import type {
+  UIMessage,
+  ToolUIPart,
+  DynamicToolUIPart,
+  ChatStatus,
+  ReasoningUIPart,
+  FileUIPart,
+} from "ai";
 
-export type { UIMessage, ToolUIPart, DynamicToolUIPart, ChatStatus };
+export type { UIMessage, ToolUIPart, DynamicToolUIPart, ChatStatus, ReasoningUIPart, FileUIPart };
+
+/** A selectable chat model, as served by the backend's GET /api/chat/models.
+ *  `configured` is false for catalogued models whose provider has no API key. */
+export interface ChatModel {
+  id: string;
+  provider: string;
+  label: string;
+  reasoning: boolean;
+  configured?: boolean;
+}
+
+/** A suggested prompt shown on the empty state. A bare string is both the label
+ *  and the submitted text; the object form separates them. */
+export type Suggestion = string | { label: string; prompt: string };
+
+/** The label shown for a suggestion. */
+export function suggestionLabel(s: Suggestion): string {
+  return typeof s === "string" ? s : s.label;
+}
+
+/** The text submitted when a suggestion is clicked. */
+export function suggestionPrompt(s: Suggestion): string {
+  return typeof s === "string" ? s : s.prompt;
+}
+
+/** Returns true for an assistant reasoning ("thinking") part. */
+export function isReasoningPart(part: { type: string }): part is ReasoningUIPart {
+  return part.type === "reasoning";
+}
+
+/** Returns true for a file/attachment part. */
+export function isFilePart(part: { type: string }): part is FileUIPart {
+  return part.type === "file";
+}
 
 /** A tool part as it appears in an assistant UIMessage — either a typed
  *  `tool-<name>` part or the generic `dynamic-tool` part. clicky operations

@@ -26,6 +26,11 @@ export interface TaskSnapshot {
   completed?: number;
   failed?: number;
   running?: number;
+  /** Per-task (type === "task") live stage label and bounded progress. */
+  description?: string;
+  progress?: number;
+  /** Progress denominator; 0/undefined means the task has no bounded progress. */
+  maxValue?: number;
   /** Stable parent-run id (tasks) or the run's own id (groups). */
   groupId?: string;
   kind?: string;
