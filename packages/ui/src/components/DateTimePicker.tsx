@@ -5,7 +5,9 @@ import { cn } from "../lib/utils";
 
 export type DateTimePickerProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
-  "type" | "value" | "onChange"
+  // `prefix` is a global HTML attribute typed as string; omit it so our
+  // ReactNode adornment prop below is not intersected down to `string & ReactNode`.
+  "type" | "value" | "onChange" | "prefix"
 > & {
   value?: string;
   onChange?: (value: string) => void;
@@ -15,6 +17,8 @@ export type DateTimePickerProps = Omit<
   openButtonLabel?: string;
   /** Trailing in-field adornment, rendered left of the calendar button. */
   suffix?: ReactNode;
+  /** Leading in-field adornment, rendered at the left edge of the input. */
+  prefix?: ReactNode;
 };
 
 export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
@@ -27,6 +31,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
       buttonClassName,
       openButtonLabel = "Open time picker",
       suffix,
+      prefix,
       ...props
     },
     ref,
@@ -45,6 +50,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
 
     return (
       <div data-jsf-control className={cn("relative", className)}>
+        {prefix && <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>}
         <input
           {...props}
           ref={assignRef}
@@ -52,6 +58,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
           value={value}
           className={cn(
             "h-8 w-full rounded-md border border-input bg-background px-2 pr-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            prefix && "pl-8",
             inputClassName,
           )}
           onChange={(event) => onChange?.(event.target.value)}

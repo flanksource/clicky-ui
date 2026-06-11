@@ -18,6 +18,18 @@ describe("Modal", () => {
     expect(getDialog().className).toMatch(/max-w-2xl/);
   });
 
+  it("renders a subtitle beneath the title without displacing the close button", () => {
+    render(
+      <Modal open onClose={() => {}} title="Detail" subtitle={<nav>tab switcher</nav>}>
+        <p>body</p>
+      </Modal>,
+    );
+    // The subtitle content renders, and the close button is still present on the
+    // title row (the subtitle sits on its own row, so it can't push it down).
+    expect(screen.getByText("tab switcher")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+
   it("toggles between the configured size and fullscreen when clicked", () => {
     render(
       <Modal open onClose={() => {}} size="lg" title="Detail">

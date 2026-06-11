@@ -5,7 +5,7 @@ import { Icon } from "../data/Icon";
 import { UiAdd, UiListFlat, UiTable } from "../icons";
 import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
-import { filterOperationsByDomain, findListEndpoint } from "./classify";
+import { filterOperationsByDomain } from "./classify";
 import {
   filterOperationsBySurface,
   findSurfaceActions,
@@ -17,6 +17,7 @@ import type { ClickyCommandRuntime } from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
+import { applyFilterExtensions, type FilterExtension } from "../components/FilterBar";
 import {
   type DomainDefinition,
   type ExecutionResponse,
@@ -39,13 +40,10 @@ export type OperationCatalogProps = {
   // Override to return all operations (e.g. for an "API explorer" domain
   // that shouldn't be filtered by entity tags).
   allOperations?: boolean;
-  // Restrict the domain to operationIds with a shared prefix when tags alone
-  // are too coarse (for example admin_ or catalog_ surfaces).
-  operationIdPrefix?: string;
-  // Explicit operation id for domains whose canonical list route does not
-  // follow the default `<entity>_list` pattern.
-  listOperationId?: string;
   surfaceKey?: string;
+  // Domain-specific filter decorators (e.g. stamp an entity icon by filter
+  // name). Composed in array order; mirrors JsonSchemaForm's `pre`.
+  filterPre?: FilterExtension[];
   getCommandHref?: (operationId: string, op: ResolvedOperation) => string;
   renderError?: (err: unknown, title: string) => ReactNode;
   kind?: "operations" | "configuration";
@@ -70,9 +68,8 @@ export function OperationCatalog({
   client,
   renderLink,
   allOperations = false,
-  operationIdPrefix,
-  listOperationId,
   surfaceKey,
+  filterPre,
   getCommandHref = defaultCommandHref,
   renderError = defaultRenderError,
   kind,
@@ -91,26 +88,22 @@ export function OperationCatalog({
   );
   const useSurfaceMetadata = surfaceOps.length > 0;
 
+  // domainOps are the operations scoped to this domain: a surface's operations
+  // when surfaceKey resolves, otherwise the entity-tagged operations — used only
+  // to render the generic operation-page fallback, never to guess a table.
   const domainOps = useMemo(() => {
-    if (useSurfaceMetadata) {
-      return surfaceOps;
-    }
+    if (useSurfaceMetadata) return surfaceOps;
+    return allOperations ? operations : filterOperationsByDomain(operations, entities);
+  }, [allOperations, entities, operations, surfaceOps, useSurfaceMetadata]);
 
-    return (allOperations ? operations : filterOperationsByDomain(operations, entities)).filter(
-      (op) =>
-        operationIdPrefix ? (op.operation.operationId ?? "").startsWith(operationIdPrefix) : true,
-    );
-  }, [allOperations, entities, operationIdPrefix, operations, surfaceOps, useSurfaceMetadata]);
-
+  // The list table is driven solely by x-clicky surface metadata. Without a
+  // surface there is no authoritative list op, so listEndpoint stays undefined
+  // and the catalog renders the generic EndpointList fallback instead of
+  // guessing a table from operationId/path conventions.
   const listEndpoint = useMemo(() => {
-    if (useSurfaceMetadata) {
-      return findSurfaceListOperation(domainOps, surfaceKey);
-    }
-
-    return listOperationId
-      ? domainOps.find((op) => op.method === "get" && op.operation.operationId === listOperationId)
-      : findListEndpoint(domainOps, entities);
-  }, [domainOps, entities, listOperationId, surfaceKey, useSurfaceMetadata]);
+    if (!useSurfaceMetadata) return undefined;
+    return findSurfaceListOperation(domainOps, surfaceKey);
+  }, [domainOps, surfaceKey, useSurfaceMetadata]);
   const [filters, setFilters] = useState<Record<string, string>>(() => readFiltersFromUrl());
   const listParameters = listEndpoint?.operation.parameters ?? [];
 
@@ -149,20 +142,13 @@ export function OperationCatalog({
     retry: 0,
   });
 
-  const actionOps = useMemo(() => {
-    if (useSurfaceMetadata) {
-      return findSurfaceActions(domainOps, surfaceKey);
-    }
-
-    // A collection-level action is any non-GET operation that lives at the
-    // collection path (no `{param}` segment). clicky promotes id-bearing
-    // mutations (create/update/delete) onto the collection root and
-    // query-encodes the entity id as an *optional* positional argument
-    // (description "Positional argument from command"). That positional id
-    // must NOT disqualify the op — the action modal collects it. Detail-scoped
-    // routes keep their `{id}` path segment and are excluded by the path check.
-    return domainOps.filter((op) => op.method !== "get" && !op.path.includes("{"));
-  }, [domainOps, surfaceKey, useSurfaceMetadata]);
+  // Action buttons come only from surface metadata. In the generic fallback the
+  // EndpointList already exposes every operation as a runnable card, so there is
+  // no separate action bar to guess at.
+  const actionOps = useMemo(
+    () => (useSurfaceMetadata ? findSurfaceActions(domainOps, surfaceKey) : []),
+    [domainOps, surfaceKey, useSurfaceMetadata],
+  );
 
   const filterBarConfig = useMemo(() => {
     const options: ParameterFormOptions = {
@@ -176,6 +162,10 @@ export function OperationCatalog({
   const dataTablePagination = useMemo(
     () => dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),
     [filterBarConfig.pagination, listQuery.data],
+  );
+  const decoratedFilters = useMemo(
+    () => filterBarConfig.filters.map((filter) => applyFilterExtensions(filter, filterPre)),
+    [filterBarConfig.filters, filterPre],
   );
 
   const hasTable = !!listEndpoint;
@@ -332,8 +322,8 @@ export function OperationCatalog({
               {...(commandRuntime ? { commandRuntime } : {})}
               {...(filterBarConfig.search ? { search: filterBarConfig.search } : {})}
               {...(filterBarConfig.timeRange ? { timeRange: filterBarConfig.timeRange } : {})}
-              {...(filterBarConfig.filters.length > 0
-                ? { externalFilters: filterBarConfig.filters }
+              {...(decoratedFilters.length > 0
+                ? { externalFilters: decoratedFilters }
                 : {})}
               {...(dataTablePagination ? { pagination: dataTablePagination } : {})}
             />

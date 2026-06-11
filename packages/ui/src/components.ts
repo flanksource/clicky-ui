@@ -28,6 +28,8 @@ export {
 } from "./components/RangeSlider";
 export {
   FilterBar,
+  applyFilterExtensions,
+  type FilterExtension,
   type FilterBarBooleanFilter,
   type FilterBarEnumFilter,
   type FilterBarFilter,
@@ -61,6 +63,13 @@ export {
   type ComboboxSingleProps,
   type ComboboxMultiProps,
 } from "./components/Combobox";
+export { Field, type FieldProps } from "./components/Field";
+export {
+  useForm,
+  type UseFormOptions,
+  type UseFormResult,
+  type FieldErrors,
+} from "./components/use-form";
 export { TreePickerField, type TreePickerFieldProps } from "./components/TreePickerField";
 export { WorkloadPicker, type WorkloadPickerProps } from "./components/WorkloadPicker";
 export {
@@ -133,3 +142,4 @@ export {
 } from "./overlay/DropdownMenu";
 export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export { useModalStack, type ModalStackPosition } from "./overlay/modalStack";

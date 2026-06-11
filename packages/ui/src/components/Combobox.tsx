@@ -39,6 +39,12 @@ type ComboboxBaseProps = {
   placeholder?: string;
   /** Optional label rendered inline inside the control, before the input. */
   label?: ReactNode;
+  /**
+   * Accessible name for the input. Use when `label` is a non-string node (e.g.
+   * an icon) so the control still has a text name for screen readers; defaults
+   * to `label` when it is a string.
+   */
+  ariaLabel?: string;
   /** Disables the input. */
   disabled?: boolean;
   /** When true, the value cannot be cleared (the clear button is hidden). */
@@ -79,6 +85,8 @@ type ComboboxBaseProps = {
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   /** Trailing in-field adornment, rendered left of the clear/chevron controls. */
   suffix?: ReactNode;
+  /** Leading in-field adornment, rendered at the left edge of the input. */
+  prefix?: ReactNode;
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {
@@ -104,6 +112,7 @@ export function Combobox(props: ComboboxProps) {
     options,
     placeholder,
     label,
+    ariaLabel: ariaLabelProp,
     disabled,
     required,
     invalid,
@@ -115,6 +124,7 @@ export function Combobox(props: ComboboxProps) {
     onSearch,
     onKeyDown: onKeyDownProp,
     suffix,
+    prefix,
   } = props;
   const multiple = props.multiple === true;
   const selectedValues = useMemo<string[]>(
@@ -193,16 +203,23 @@ export function Combobox(props: ComboboxProps) {
 
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (e: MouseEvent) => {
+    // Dismiss when the pointer goes down, OR focus moves, anywhere outside the
+    // control and its portaled listbox — so clicking elsewhere in a dialog (the
+    // backdrop never intercepts a document-level listener) or tabbing to another
+    // field both close the menu. The listbox is portaled out of rootRef, so a
+    // click inside it would otherwise read as "outside" and close before select.
+    const onAway = (e: Event) => {
       const target = e.target as Node;
-      // The listbox is portaled out of rootRef, so a click inside it would
-      // otherwise read as "outside" and close the menu before selection.
       if (!rootRef.current?.contains(target) && !listRef.current?.contains(target)) {
         commitAndClose();
       }
     };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    document.addEventListener("mousedown", onAway);
+    document.addEventListener("focusin", onAway);
+    return () => {
+      document.removeEventListener("mousedown", onAway);
+      document.removeEventListener("focusin", onAway);
+    };
   });
 
   // Position the portaled listbox with fixed coordinates measured from the
@@ -330,7 +347,7 @@ export function Combobox(props: ComboboxProps) {
   }
 
   const listId = id ? `${id}-listbox` : undefined;
-  const ariaLabel = typeof label === "string" ? label : undefined;
+  const ariaLabel = ariaLabelProp ?? (typeof label === "string" ? label : undefined);
   const showClear = !required && !loading && !disabled && selectedValues.length > 0;
 
   return (
@@ -364,6 +381,7 @@ export function Combobox(props: ComboboxProps) {
           className={cn(
             "w-full rounded-md border border-input bg-background text-foreground",
             size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
+            prefix && "pl-8",
             suffix ? (showClear ? "pr-[5.5rem]" : "pr-14") : showClear ? "pr-14" : "pr-8",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -371,6 +389,9 @@ export function Combobox(props: ComboboxProps) {
           )}
           style={label != null ? labelPadding(label) : undefined}
         />
+        {prefix && (
+          <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>
+        )}
         {suffix && (
           <div className={cn("absolute flex h-full items-center", showClear ? "right-[3.75rem]" : "right-7")}>
             {suffix}
@@ -492,10 +513,12 @@ export function Combobox(props: ComboboxProps) {
 }
 
 // Reserve room on the left of the input for the inline label so typed text
-// does not overlap it. Roughly 0.6rem per character plus padding.
+// does not overlap it. Node labels (an icon from comboboxLabelProps) are
+// compact, so reserve a fixed icon-sized inset; text labels scale with their
+// character count at roughly 0.6rem per character plus padding.
 function labelPadding(label: ReactNode) {
-  const length = typeof label === "string" ? label.length : 6;
-  return { paddingLeft: `${Math.min(length * 0.62 + 0.75, 9)}rem` };
+  if (typeof label !== "string") return { paddingLeft: "1.75rem" };
+  return { paddingLeft: `${Math.min(label.length * 0.62 + 0.75, 9)}rem` };
 }
 
 // withSelectedOptions returns the option list plus any selected value that isn't

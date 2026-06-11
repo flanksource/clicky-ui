@@ -1,4 +1,6 @@
 import {
+  cloneElement,
+  isValidElement,
   useCallback,
   createContext,
   useContext,
@@ -7,6 +9,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type ReactElement,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -284,6 +288,21 @@ export type FilterBarFilter =
   | FilterBarNumberFilter
   | FilterBarEnumFilter
   | FilterBarBooleanFilter;
+
+// FilterExtension decorates a resolved filter before it renders — the FilterBar
+// analogue of JsonSchemaForm's PreExtension. Consumers compose these in array
+// order (each sees the prior's output) to stamp domain-specific touches such as
+// an entity `icon` keyed on the filter's name, keeping FilterBar domain-agnostic.
+export type FilterExtension = (filter: FilterBarFilter) => FilterBarFilter;
+
+// applyFilterExtensions runs a filter through the composed extension stack.
+export function applyFilterExtensions(
+  filter: FilterBarFilter,
+  extensions: FilterExtension[] | undefined,
+): FilterBarFilter {
+  if (!extensions || extensions.length === 0) return filter;
+  return extensions.reduce((current, ext) => ext(current), filter);
+}
 
 export type FilterBarRangePreset = {
   /** Visible preset label. */
@@ -757,7 +776,10 @@ function OverflowFiltersMenu({
                     className="flex min-w-0 items-center gap-1 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
                     title={filter.description ?? filter.label}
                   >
-                    <LabelIcon icon={filter.icon} className="text-[12px] normal-case" />
+                    <LabelIcon
+                      icon={sizedIcon(filter.icon, 12)}
+                      className="text-[12px] normal-case"
+                    />
                     <span className="truncate">{filter.label}</span>
                   </label>
                   <span className="text-sm text-muted-foreground">=</span>
@@ -866,7 +888,7 @@ function TextFilterValueControl({ filter }: { filter: FilterBarTextFilter }) {
       type="text"
       aria-label={filter.label}
       className={valueInputClassName(filter.disabled)}
-      placeholder={filter.placeholder ?? "Filter..."}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       value={draft}
       disabled={filter.disabled}
       onChange={(event) => setDraft(event.target.value)}
@@ -957,7 +979,7 @@ function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
-      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       className="w-full"
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
@@ -986,7 +1008,8 @@ function SelectMultiFilterValueControl({ filter }: { filter: FilterBarSelectMult
       options={filter.options}
       value={filter.value}
       onChange={filter.onChange}
-      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      ariaLabel={`${filter.label} filter`}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
       triggerClassName="h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-none"
       menuClassName="left-auto right-0"
@@ -1033,12 +1056,12 @@ export function FilterBarRangePanel({
 function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: boolean }) {
   return (
     <Combobox
-      label={filter.label}
+      {...comboboxLabelProps(filter)}
       options={enumOptionsToCombobox(filter.options)}
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
-      placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
@@ -1117,7 +1140,7 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
         type="text"
         aria-label={filter.label}
         className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
-        placeholder={filter.placeholder ?? "Filter…"}
+        {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
         value={draft}
         disabled={filter.disabled}
         onChange={(event) => setDraft(event.target.value)}
@@ -1135,6 +1158,40 @@ function FilterFieldLabel({ icon, label }: { icon?: LabelIconSpec; label: string
       {label}
     </span>
   );
+}
+
+// sizedIcon constrains a filter icon to `px`. A node icon (e.g. a lucide
+// component, which otherwise renders at its own default 24px) is cloned with an
+// explicit inline width/height — done in clicky-ui via a real style so it never
+// depends on a Tailwind arbitrary class being generated in the consumer's build.
+// A string (runtime/iconify) icon is returned as-is and sized by the wrapper's
+// font-size. An existing inline size on the node wins (consumer override).
+function sizedIcon(icon: LabelIconSpec | undefined, px: number): LabelIconSpec | undefined {
+  if (!isValidElement(icon)) return icon;
+  const el = icon as ReactElement<{ style?: CSSProperties }>;
+  return cloneElement(el, {
+    style: { width: `${px}px`, height: `${px}px`, ...(el.props.style ?? {}) },
+  });
+}
+
+// comboboxLabelProps maps a filter to the Combobox `label`/`ariaLabel`: when the
+// filter carries an `icon`, the icon replaces the inline text label (with the
+// field name kept as tooltip + accessible name); otherwise the text label shows.
+// clicky-ui owns the size (10px default) — the consumer supplies only the icon
+// and its colour.
+function comboboxLabelProps(filter: { icon?: LabelIconSpec; label: string }): {
+  label: ReactNode;
+  ariaLabel?: string;
+} {
+  if (filter.icon == null) return { label: filter.label };
+  return {
+    label: (
+      <span title={filter.label} className="inline-flex items-center text-[10px]">
+        <LabelIcon icon={sizedIcon(filter.icon, 10)} className="normal-case" />
+      </span>
+    ),
+    ariaLabel: filter.label,
+  };
 }
 
 function lookupFieldWidthClass(grow: boolean) {
@@ -1190,7 +1247,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
 
   return (
     <Combobox
-      label={filter.label}
+      {...comboboxLabelProps(filter)}
       options={lookupOptionsToCombobox(filter.options)}
       value={filter.value}
       onChange={filter.onChange}
@@ -1212,7 +1269,7 @@ function LookupMultiFilterField({
   return (
     <Combobox
       multiple
-      label={filter.label}
+      {...comboboxLabelProps(filter)}
       options={lookupOptionsToCombobox(filter.options)}
       value={filter.value}
       onChange={filter.onChange}
@@ -1322,7 +1379,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                   step={bounds.step}
                   aria-label={`${filter.label} minimum`}
                   className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+                  {...(filter.minPlaceholder !== undefined ? { placeholder: filter.minPlaceholder } : {})}
                   value={draft.min ?? ""}
                   onChange={(event) =>
                     setDraft(
@@ -1342,7 +1399,7 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
                   step={bounds.step}
                   aria-label={`${filter.label} maximum`}
                   className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+                  {...(filter.maxPlaceholder !== undefined ? { placeholder: filter.maxPlaceholder } : {})}
                   value={draft.max ?? ""}
                   onChange={(event) =>
                     setDraft(
@@ -1436,7 +1493,7 @@ function NumberFilterPanel({
               step={bounds.step}
               aria-label={`${filter.label} minimum`}
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder={filter.minPlaceholder ?? formatNumberValue(bounds.min, filter)}
+              {...(filter.minPlaceholder !== undefined ? { placeholder: filter.minPlaceholder } : {})}
               value={draft.min ?? ""}
               onChange={(event) =>
                 setDraft(
@@ -1456,7 +1513,7 @@ function NumberFilterPanel({
               step={bounds.step}
               aria-label={`${filter.label} maximum`}
               className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder={filter.maxPlaceholder ?? formatNumberValue(bounds.max, filter)}
+              {...(filter.maxPlaceholder !== undefined ? { placeholder: filter.maxPlaceholder } : {})}
               value={draft.max ?? ""}
               onChange={(event) =>
                 setDraft(
@@ -2227,7 +2284,8 @@ function SelectMultiFilterField({
         options={filter.options}
         value={filter.value}
         onChange={filter.onChange}
-        placeholder={filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}
+        ariaLabel={`${filter.label} filter`}
+        {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
         {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
         triggerClassName="h-6 min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         menuClassName="left-auto right-0"

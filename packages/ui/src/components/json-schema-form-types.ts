@@ -136,6 +136,13 @@ export interface FieldControl {
   // sibling `input[data-jsf-input]` (e.g. for caret-aware text insertion). Set by
   // a pre-extension; clicky-ui only positions it — the consumer owns the node.
   suffix?: ReactNode;
+  // Generic leading in-field adornment — the left-edge mirror of `suffix`. When
+  // set, the control renders this node inside the input's wrapper, positioned
+  // absolutely at the left, and reserves left padding so it never overlaps the
+  // text. The wrapper carries `data-jsf-control` so the adornment can locate its
+  // sibling `input[data-jsf-input]`. Set by a pre-extension; clicky-ui only
+  // positions it — the consumer owns the node.
+  prefix?: ReactNode;
 
   // number
   minimum?: number;
