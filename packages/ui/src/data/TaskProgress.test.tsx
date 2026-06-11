@@ -67,6 +67,32 @@ describe("TaskProgress", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "4");
   });
 
+  it("renders an x/y count, percent, description, and a bar for a running task with bounded progress", () => {
+    const snapshots: TaskSnapshot[] = [
+      { id: "g", name: "ast all", type: "group", status: "running", groupId: "g", total: 2, running: 1 },
+      {
+        id: "p1",
+        name: "transactions",
+        type: "task",
+        groupId: "g",
+        status: "running",
+        description: "emitting FooBar",
+        progress: 31,
+        maxValue: 120,
+      },
+      { id: "p2", name: "finalize", type: "task", groupId: "g", status: "pending" },
+    ];
+    render(<TaskProgress snapshots={snapshots} />);
+
+    expect(screen.getByText("emitting FooBar")).toBeInTheDocument();
+    expect(screen.getByText("31/120 · 26%")).toBeInTheDocument();
+
+    // Two bars now: the group aggregate (max 2) and the per-task bar (max 120).
+    const taskBar = screen.getAllByRole("progressbar").find((b) => b.getAttribute("aria-valuemax") === "120");
+    expect(taskBar).toBeDefined();
+    expect(taskBar).toHaveAttribute("aria-valuenow", "31");
+  });
+
   it("shows an empty message when there are no group snapshots", () => {
     render(<TaskProgress snapshots={[]} title="Fixes" />);
     expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument();

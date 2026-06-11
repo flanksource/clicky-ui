@@ -158,6 +158,11 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
   // Promote the latest warning message inline so a `warning` row shows its
   // reason without expanding. Suppressed when an error is already shown.
   const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
+  // Bounded per-task progress (e.g. records emitted in a phase): render an x/y
+  // count, a percentage, and a thin bar while the task runs.
+  const hasProgress = typeof t.maxValue === "number" && t.maxValue > 0;
+  const done = t.progress ?? 0;
+  const pct = hasProgress ? Math.round((done / (t.maxValue as number)) * 100) : 0;
 
   return (
     <div
@@ -186,6 +191,27 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
           </span>
           {t.duration && <span className="shrink-0 text-xs text-muted-foreground">{t.duration}</span>}
         </div>
+        {(t.description || hasProgress) && (
+          <div className="mt-0.5 flex items-center gap-2">
+            {t.description && (
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{t.description}</span>
+            )}
+            {hasProgress && (
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {done}/{t.maxValue} · {pct}%
+              </span>
+            )}
+          </div>
+        )}
+        {hasProgress && t.status === "running" && (
+          <div className="mt-1">
+            <ProgressBar
+              segments={[{ count: done, color: "bg-blue-500", label: "done" }]}
+              total={t.maxValue as number}
+              height="h-1"
+            />
+          </div>
+        )}
         {expanded && hasLogs && (
           <div className="mt-1 ml-1 max-h-48 space-y-0.5 overflow-y-auto border-l-2 pl-2">
             {logs.map((l, i) => (

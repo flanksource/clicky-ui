@@ -3,9 +3,24 @@
 
 export { Chat, type ChatProps } from "./Chat";
 export { Conversation, type ConversationProps } from "./Conversation";
-export { Message, type MessageProps } from "./Message";
+export { Message, type MessageProps, type MessageActionHandlers } from "./Message";
+export { MessageActions, type MessageActionsProps } from "./MessageActions";
+export { Reasoning, type ReasoningProps } from "./Reasoning";
 export { PromptInput, type PromptInputProps } from "./PromptInput";
 export { ToolCall, type ToolCallProps } from "./ToolCall";
+export { Suggestions, type SuggestionsProps } from "./Suggestion";
+export {
+  ModelSelector,
+  type ModelSelectorProps,
+  EffortSelector,
+  type EffortSelectorProps,
+} from "./ModelSelector";
+export {
+  AttachmentButton,
+  type AttachmentButtonProps,
+  AttachmentList,
+  type AttachmentListProps,
+} from "./Attachment";
 
 export {
   clickyOperationsToTools,
@@ -15,13 +30,21 @@ export {
 export {
   isDynamicToolPart,
   isTypedToolPart,
+  isReasoningPart,
+  isFilePart,
   toolPartName,
+  suggestionLabel,
+  suggestionPrompt,
   type AnyToolPart,
+  type ChatModel,
   type ChatStatus,
   type ChatToolInputSchema,
   type ChatToolMeta,
   type DynamicToolUIPart,
+  type FileUIPart,
   type JSONSchemaProperty,
+  type ReasoningUIPart,
+  type Suggestion,
   type ToolUIPart,
   type UIMessage,
 } from "./types";

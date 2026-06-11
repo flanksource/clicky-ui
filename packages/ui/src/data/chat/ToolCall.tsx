@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "../../lib/utils";
+import { Button } from "../../components/button";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { CodeBlock } from "../CodeBlock";
 import {
@@ -18,6 +19,10 @@ export type ToolCallProps = {
   part: AnyToolPart;
   /** Whether the call body starts expanded. Defaults to false. */
   defaultOpen?: boolean;
+  /** Respond to an approval request (only used when state is
+   *  `approval-requested`). Receives the approval id, the decision, and an
+   *  optional reason. */
+  onApprove?: ((approvalId: string, approved: boolean, reason?: string) => void) | undefined;
   className?: string;
 };
 
@@ -47,8 +52,9 @@ const STATUS_ICON: Record<ToolState, { icon: StaticIconComponent; className: str
  *  tool name + status, expanding to its JSON input and (once available) output
  *  or error. Renders both clicky `dynamic-tool` parts and typed `tool-<name>`
  *  parts, keyed off `part.state`. */
-export function ToolCall({ part, defaultOpen = false, className }: ToolCallProps) {
-  const [open, setOpen] = useState(defaultOpen);
+export function ToolCall({ part, defaultOpen = false, onApprove, className }: ToolCallProps) {
+  const needsApproval = part.state === "approval-requested";
+  const [open, setOpen] = useState(defaultOpen || needsApproval);
   const status = STATUS_ICON[part.state];
   const name = toolPartName(part);
 
@@ -81,6 +87,36 @@ export function ToolCall({ part, defaultOpen = false, className }: ToolCallProps
           <ToolOutput part={part} />
         </div>
       )}
+
+      {needsApproval && <ApprovalControls part={part} onApprove={onApprove} />}
+    </div>
+  );
+}
+
+/** Approve/Deny controls shown while a tool call awaits human approval. The
+ *  approval id comes from the part's `approval` envelope (AI SDK v6). */
+function ApprovalControls({
+  part,
+  onApprove,
+}: {
+  part: AnyToolPart;
+  onApprove: ToolCallProps["onApprove"];
+}) {
+  const approval = "approval" in part ? part.approval : undefined;
+  if (!approval || !onApprove) return null;
+  return (
+    <div className="mt-1.5 flex items-center gap-2 pl-4">
+      <Button type="button" size="sm" onClick={() => onApprove(approval.id, true)}>
+        Approve
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onApprove(approval.id, false)}
+      >
+        Deny
+      </Button>
     </div>
   );
 }
