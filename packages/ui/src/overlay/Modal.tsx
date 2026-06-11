@@ -33,6 +33,12 @@ export type ModalProps = {
   confirmClose?: boolean | ConfirmCloseOptions;
   /** Header title and accessible dialog label when it is a string. */
   title?: ReactNode;
+  /**
+   * Secondary header content rendered on its own row directly beneath the title.
+   * The title stays a single row alongside the expand/close buttons, so a tall
+   * subtitle (e.g. a tab switcher) never pushes those buttons down.
+   */
+  subtitle?: ReactNode;
   /** Width/height preset for the dialog. */
   size?: ModalSize;
   /** Close when the backdrop is clicked. Off by default; close via Escape or the close button. */
@@ -73,6 +79,7 @@ export function Modal({
   onClose,
   confirmClose = false,
   title,
+  subtitle,
   size = "md",
   closeOnBackdrop = false,
   closeOnEsc = true,
@@ -157,34 +164,37 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {(title || headerSlot || expandable || !hideClose) && (
-          <div className="flex items-center gap-density-2 px-density-4 py-density-3 border-b border-border">
-            {title ? (
-              <h2 className="text-sm font-semibold flex-1">{title}</h2>
-            ) : (
-              <span className="flex-1" />
-            )}
-            {headerSlot}
-            {expandable && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                aria-label={expanded ? "Restore size" : "Expand to fullscreen"}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Icon icon={expanded ? UiFullscreenFilled : UiFullscreen} />
-              </button>
-            )}
-            {!hideClose && (
-              <button
-                type="button"
-                onClick={requestClose}
-                aria-label="Close"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Icon icon={UiClose} />
-              </button>
-            )}
+        {(title || subtitle || headerSlot || expandable || !hideClose) && (
+          <div className="px-density-4 py-density-3 border-b border-border">
+            <div className="flex items-center gap-density-2">
+              {title ? (
+                <h2 className="text-sm font-semibold flex-1">{title}</h2>
+              ) : (
+                <span className="flex-1" />
+              )}
+              {headerSlot}
+              {expandable && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  aria-label={expanded ? "Restore size" : "Expand to fullscreen"}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Icon icon={expanded ? UiFullscreenFilled : UiFullscreen} />
+                </button>
+              )}
+              {!hideClose && (
+                <button
+                  type="button"
+                  onClick={requestClose}
+                  aria-label="Close"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Icon icon={UiClose} />
+                </button>
+              )}
+            </div>
+            {subtitle ? <div className="mt-density-2">{subtitle}</div> : null}
           </div>
         )}
         <div className="flex-1 overflow-auto px-density-4 py-density-3">{children}</div>

@@ -1,10 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Icon } from "../data/Icon";
+import { UiCloud, UiDatabase, UiNamespace, UiServer, UiTag } from "../icons";
 import {
+  applyFilterExtensions,
   FilterBar,
   type FilterBarFilter,
   type FilterBarNumberValue,
   type FilterBarProps,
+  type FilterExtension,
 } from "./FilterBar";
 
 type FilterBarShowcaseProps = Pick<
@@ -205,6 +209,131 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+// Icons keyed by filter name. A FilterExtension stamps these onto each lookup so
+// FilterBar itself stays domain-agnostic — the consumer owns the icon mapping.
+const ENTITY_ICONS: Record<string, ReactNode> = {
+  namespace: <Icon icon={UiNamespace} />,
+  cluster: <Icon icon={UiCloud} />,
+  database: <Icon icon={UiDatabase} />,
+  service: <Icon icon={UiServer} />,
+  label: <Icon icon={UiTag} />,
+};
+
+const withEntityIcons: FilterExtension = (filter) => {
+  const icon = ENTITY_ICONS[filter.key];
+  return icon ? { ...filter, icon } : filter;
+};
+
+const NAMESPACE_OPTIONS = [
+  { value: "default", label: "default" },
+  { value: "kube-system", label: "kube-system" },
+  { value: "monitoring", label: "monitoring" },
+  { value: "platform", label: "platform" },
+];
+const CLUSTER_OPTIONS = [
+  { value: "prod-eu-1", label: "prod-eu-1" },
+  { value: "prod-us-1", label: "prod-us-1" },
+  { value: "staging-eu-1", label: "staging-eu-1" },
+];
+const DATABASE_OPTIONS = [
+  { value: "orders", label: "orders" },
+  { value: "billing", label: "billing" },
+  { value: "analytics", label: "analytics" },
+];
+const SERVICE_OPTIONS = [
+  { value: "api", label: "api" },
+  { value: "web", label: "web" },
+  { value: "worker", label: "worker" },
+];
+
+// withPlaceholder controls whether each lookup carries ghost text. The
+// placeholder is shown only while the field is empty; selecting a value hides it
+// (the input shows the selected option's label instead), so the two stories
+// share one showcase and differ only by this flag.
+function LookupExtensionShowcase({
+  withPlaceholder,
+  preselectCluster,
+}: {
+  withPlaceholder: boolean;
+  preselectCluster?: boolean;
+}) {
+  const [namespace, setNamespace] = useState("");
+  const [cluster, setCluster] = useState(preselectCluster ? "prod-eu-1" : "");
+  const [database, setDatabase] = useState("");
+  const [service, setService] = useState("");
+
+  const placeholder = (label: string) => (withPlaceholder ? { placeholder: label } : {});
+
+  const baseFilters: FilterBarFilter[] = [
+    {
+      key: "namespace",
+      kind: "lookup",
+      label: "Namespace",
+      value: namespace,
+      onChange: setNamespace,
+      options: NAMESPACE_OPTIONS,
+      ...placeholder("Namespace"),
+    },
+    {
+      key: "cluster",
+      kind: "lookup",
+      label: "Cluster",
+      value: cluster,
+      onChange: setCluster,
+      options: CLUSTER_OPTIONS,
+      ...placeholder("Cluster"),
+    },
+    {
+      key: "database",
+      kind: "lookup",
+      label: "Database",
+      value: database,
+      onChange: setDatabase,
+      options: DATABASE_OPTIONS,
+      ...placeholder("Database"),
+    },
+    {
+      key: "service",
+      kind: "lookup",
+      label: "Service",
+      value: service,
+      onChange: setService,
+      options: SERVICE_OPTIONS,
+      ...placeholder("Service"),
+    },
+  ];
+
+  const filters = baseFilters.map((filter) =>
+    applyFilterExtensions(filter, [withEntityIcons]),
+  );
+
+  return <FilterBar filters={filters} onApply={() => undefined} />;
+}
+
+export const LookupIconsOnly: Story = {
+  render: () => <LookupExtensionShowcase withPlaceholder={false} />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Lookup filters decorated by a `FilterExtension` that stamps an entity icon keyed on each filter's name. With an `icon` present and no `placeholder`, the icon replaces the inline text label (the field name stays as tooltip + accessible name) and the field reads as an icon plus its selected value.",
+      },
+    },
+  },
+};
+
+export const LookupIconsWithPlaceholder: Story = {
+  render: () => <LookupExtensionShowcase withPlaceholder preselectCluster />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Same icon-stamping extension, but each lookup also carries a `placeholder`. While a field is empty the placeholder shows as ghost text next to the icon; selecting a value hides the placeholder and shows the chosen option instead (here **Cluster** is pre-selected to contrast with the empty fields).",
+      },
+    },
+  },
+};
 
 export const Playground: Story = {
   render: (args) => (

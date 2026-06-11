@@ -15,6 +15,7 @@ function makeSpec(): OpenAPISpec {
         get: {
           operationId: "widget_list",
           tags: ["widget"],
+          "x-clicky": { surface: "widgets", verb: "list", scope: "collection" },
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
             {
@@ -45,6 +46,7 @@ function makeSpec(): OpenAPISpec {
         post: {
           operationId: "widget_create",
           tags: ["widget"],
+          "x-clicky": { surface: "widgets", verb: "create", scope: "collection" },
           responses: {},
         },
       },
@@ -52,6 +54,7 @@ function makeSpec(): OpenAPISpec {
         get: {
           operationId: "widget_get",
           tags: ["widget"],
+          "x-clicky": { surface: "widgets", verb: "get", scope: "entity", idParam: "id" },
           parameters: [{ name: "id", in: "path" }],
           responses: {},
         },
@@ -213,6 +216,7 @@ function renderCatalog(client: OperationsApiClient) {
           description: "All the widgets.",
         }}
         entities={["widget"]}
+        surfaceKey="widgets"
         client={client}
         renderLink={renderFakeLink}
       />

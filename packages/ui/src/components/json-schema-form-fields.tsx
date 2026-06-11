@@ -169,17 +169,26 @@ export function ReadOnlyValue({ field, fieldId, size }: { field: FieldControl; f
   );
 }
 
-// FieldSuffixWrapper positions a field's trailing in-field adornment
-// (FieldControl.suffix) at the right edge of the input. The container is tagged
-// data-jsf-control so the adornment can locate its sibling input[data-jsf-input]
-// (e.g. for caret-aware insertion). With no suffix it renders the input bare, so
-// fields without an adornment are byte-for-byte unchanged.
-function FieldSuffixWrapper({ suffix, children }: { suffix?: ReactNode; children: ReactNode }) {
-  if (!suffix) return <>{children}</>;
+// FieldAdornmentWrapper positions a field's leading/trailing in-field adornments
+// (FieldControl.prefix at the left edge, FieldControl.suffix at the right). The
+// container is tagged data-jsf-control so an adornment can locate its sibling
+// input[data-jsf-input] (e.g. for caret-aware insertion). With neither adornment
+// it renders the input bare, so unadorned fields are byte-for-byte unchanged.
+function FieldAdornmentWrapper({
+  prefix,
+  suffix,
+  children,
+}: {
+  prefix?: ReactNode;
+  suffix?: ReactNode;
+  children: ReactNode;
+}) {
+  if (!prefix && !suffix) return <>{children}</>;
   return (
     <div data-jsf-control className="relative">
+      {prefix && <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>}
       {children}
-      <div className="absolute inset-y-0 right-1.5 flex items-center">{suffix}</div>
+      {suffix && <div className="absolute inset-y-0 right-1.5 flex items-center">{suffix}</div>}
     </div>
   );
 }
@@ -196,18 +205,18 @@ export function StringControl({
   size: FormSize;
 }) {
   return (
-    <FieldSuffixWrapper suffix={field.suffix}>
+    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
       <input
         id={fieldId}
         type="text"
         data-jsf-input
-        className={cn(inputClass(size), field.suffix && "pr-8")}
+        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8")}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
         onChange={(e) => field.onChange(e.target.value)}
       />
-    </FieldSuffixWrapper>
+    </FieldAdornmentWrapper>
   );
 }
 
@@ -225,13 +234,13 @@ export function NumberControl({
   // type="text" (not number) so non-numeric values a consumer permits — e.g.
   // template tokens — are not silently dropped by the browser.
   return (
-    <FieldSuffixWrapper suffix={field.suffix}>
+    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
       <input
         id={fieldId}
         type="text"
         inputMode="decimal"
         data-jsf-input
-        className={cn(inputClass(size), field.suffix && "pr-8")}
+        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8")}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
@@ -245,7 +254,7 @@ export function NumberControl({
           }
         }}
       />
-    </FieldSuffixWrapper>
+    </FieldAdornmentWrapper>
   );
 }
 
@@ -282,10 +291,11 @@ export function DateControl({
       id={fieldId}
       aria-label={field.label}
       data-jsf-input
-      inputClassName={cn(inputClass(size), field.suffix ? "pr-14" : "pr-8")}
+      inputClassName={cn(inputClass(size), field.prefix && "pl-8", field.suffix ? "pr-14" : "pr-8")}
       value={text}
       onChange={(next) => field.onChange(next)}
       placeholder={defaultPlaceholder(field.schema)}
+      prefix={field.prefix}
       suffix={field.suffix}
     />
   );
@@ -349,6 +359,7 @@ export function EnumControl({
       size={size}
       allowCustomValue={field.allowCustomValue ?? false}
       onChange={(v) => field.onChange(v)}
+      prefix={field.prefix}
       suffix={field.suffix}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />

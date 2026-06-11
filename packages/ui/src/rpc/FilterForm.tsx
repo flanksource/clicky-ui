@@ -246,7 +246,7 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
         disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.value)}
       >
-        <option value="">{filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}</option>
+        <option value="">{filter.placeholder ?? ""}</option>
         {filter.options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label ?? option.value}
@@ -281,7 +281,7 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
           type={filter.inputType === "number" ? "number" : "text"}
           aria-label={filter.label}
           className={inputClassName}
-          placeholder={filter.placeholder ?? "Value"}
+          {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
           value={filter.value}
           list={listId}
           disabled={filter.disabled}
@@ -310,7 +310,7 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
           type="text"
           aria-label={filter.label}
           className={inputClassName}
-          placeholder={filter.placeholder ?? "value-1, value-2"}
+          {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
           value={filter.value.join(", ")}
           list={listId}
           disabled={filter.disabled}
@@ -341,7 +341,7 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
         type="text"
         aria-label={filter.label}
         className={inputClassName}
-        placeholder={filter.placeholder ?? "Value"}
+        {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
         value={filter.value}
         disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.value)}

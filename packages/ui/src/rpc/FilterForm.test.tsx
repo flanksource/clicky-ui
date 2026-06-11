@@ -83,13 +83,14 @@ describe("FilterForm time range", () => {
 });
 
 describe("FilterForm placeholders", () => {
-  it("does not use a param's description as the input placeholder", async () => {
+  it("renders no placeholder when the field has a label and none is explicit", async () => {
     renderFilterForm();
 
     const policyInput = (await screen.findByLabelText("Policy")) as HTMLInputElement;
-    // `policy` declares description "Policy number" but no placeholder, so the
-    // input falls back to its label and never echoes the help text.
-    expect(policyInput.placeholder).toBe("Policy");
+    // `policy` declares description "Policy number" but no explicit placeholder.
+    // The field already carries the "Policy" label, so no placeholder is
+    // synthesized — not the description, not the label, not generic junk.
+    expect(policyInput.placeholder).toBe("");
     expect(policyInput.placeholder).not.toBe("Policy number");
   });
 });

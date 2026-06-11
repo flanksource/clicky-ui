@@ -24,6 +24,10 @@ export type MultiSelectProps = {
   onChange: (next: string[]) => void;
   /** Trigger text when nothing is selected. Also labels the menu. */
   placeholder?: string;
+  /** Accessible name for the trigger. Use when the field is labelled
+   *  elsewhere so the trigger doesn't have to borrow `placeholder` for its
+   *  name (which would force a synthesized placeholder). */
+  ariaLabel?: string;
   /** Disables opening and changing selections. */
   disabled?: boolean;
   /** Classes applied to the root wrapper. */
@@ -39,6 +43,7 @@ export function MultiSelect({
   value,
   onChange,
   placeholder = "Select options",
+  ariaLabel,
   disabled,
   className,
   triggerClassName,
@@ -100,7 +105,7 @@ export function MultiSelect({
         variant="outline"
         size="sm"
         disabled={disabled}
-        aria-label={`${placeholder} filter`}
+        aria-label={ariaLabel ?? `${placeholder} filter`}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}

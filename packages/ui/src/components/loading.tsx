@@ -24,11 +24,14 @@ const FIXED_DOT_SIZE: Record<Exclude<LoadingSize, "responsive">, string> = {
   lg: "size-10",
 };
 
-// Scales with the nearest `container-type` ancestor's inline size: floors at
-// 1.5rem (24px) in tight panels, climbs to 4.5rem (72px) on full-page loads,
-// interpolating smoothly between. Pure CSS — no ResizeObserver, SSR-safe.
-const RESPONSIVE_DOT_SIZE = "size-[clamp(1.5rem,12cqi,4.5rem)]";
-const RESPONSIVE_LABEL_SIZE = "text-[clamp(0.7rem,4cqi,0.95rem)]";
+// Scales with the SMALLER of the container's two dimensions (`cqmin`, enabled by
+// `container-type: size` on the centered wrapper). Using `cqmin` rather than the
+// width alone means a wide-but-short panel reads as small — only a genuinely
+// large area (a full-page load) grows the dots. Floors at 1.25rem (20px) in
+// tight panels, climbs to 2.5rem (40px) on big loads. Pure CSS — no
+// ResizeObserver, SSR-safe.
+const RESPONSIVE_DOT_SIZE = "size-[clamp(1.25rem,18cqmin,2.5rem)]";
+const RESPONSIVE_LABEL_SIZE = "text-[clamp(0.72rem,4.5cqmin,0.9rem)]";
 
 /**
  * Three bouncing dots. `fill="currentColor"` so the dots inherit the surrounding
@@ -83,10 +86,12 @@ LoadingDots.displayName = "LoadingDots";
 /**
  * Loading indicator built on the shared 3-dot animation.
  *
- * `centered` establishes a size container (`container-type: inline-size`) so the
- * default `responsive` size scales the dots to the space the loader is given —
- * small inside a narrow panel, large on a full-page route shell. The `inline`
- * variant is not a container, so a `responsive` request there renders at `sm`.
+ * `centered` fills the space it is given (`h-full` within a `min-h-32` floor) and
+ * establishes a size container (`container-type: size`) so the default
+ * `responsive` size scales the dots to that space via `cqmin` — small inside a
+ * narrow/short panel, large on a full-page route shell that stretches it tall.
+ * The `inline` variant is not a container, so a `responsive` request there
+ * renders at `sm`.
  */
 export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
   ({ size = "responsive", variant = "inline", label, className, ...props }, ref) => {
@@ -104,8 +109,8 @@ export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
           role="status"
           aria-label="Loading"
           className={cn(
-            "flex min-h-32 w-full flex-col items-center justify-center gap-3 text-muted-foreground",
-            "[container-type:inline-size]",
+            "flex h-full min-h-32 w-full flex-col items-center justify-center gap-3 text-muted-foreground",
+            "[container-type:size]",
             className,
           )}
           {...props}

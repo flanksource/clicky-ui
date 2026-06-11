@@ -204,6 +204,11 @@ export function parametersToFormConfig(
     if (disabled && hideLocked) continue;
     const value = disabled ? (lockedValues[param.name] ?? "") : (values[param.name] ?? "");
     const label = lookupFilters[param.name]?.label ?? titleCase(param.name);
+    // Only an explicit placeholder is rendered — never synthesize one. The
+    // field already carries `label`, so a fallback placeholder is redundant
+    // and generic defaults (e.g. "value-1, value-2") read as fake data.
+    const placeholder = parameterPlaceholder(param);
+    const placeholderProp = placeholder !== undefined ? { placeholder } : {};
     const onChange = (next: string | boolean) => {
       if (disabled) return;
       const stringValue = typeof next === "boolean" ? (next ? "true" : "false") : next;
@@ -267,7 +272,7 @@ export function parametersToFormConfig(
           value: splitCommaValues(value),
           disabled,
           options: lookupOptionsToFieldOptions(lookupFilter),
-          placeholder: parameterPlaceholder(param) ?? "value-1, value-2",
+          ...placeholderProp,
           onChange: (next) =>
             setValues((current) => ({ ...current, [param.name]: next.join(",") })),
         });
@@ -281,7 +286,7 @@ export function parametersToFormConfig(
         value,
         disabled,
         options: lookupOptionsToFieldOptions(lookupFilter),
-        placeholder: parameterPlaceholder(param) ?? label,
+        ...placeholderProp,
         inputType:
           lookupFilter.type === "number"
             ? "number"
@@ -299,7 +304,7 @@ export function parametersToFormConfig(
       label,
       value,
       disabled,
-      placeholder: parameterPlaceholder(param) ?? label,
+      ...placeholderProp,
       onChange: (next) => onChange(next),
     });
   }

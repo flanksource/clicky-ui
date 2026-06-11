@@ -896,6 +896,32 @@ describe("FilterBar label icons", () => {
     const trigger = screen.getByRole("button", { name: /restarts filter/i });
     expect(within(trigger).getByTestId("restarts-icon")).toBeInTheDocument();
   });
+
+  it("shows a lookup combobox's icon instead of its text label, keeping the aria-label", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "product",
+            kind: "lookup",
+            label: "Product",
+            icon: <span data-testid="product-icon">P</span>,
+            value: "",
+            options: [{ value: "p1", label: "Plan One" }],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    // The combobox keeps its text accessible name even though the visible inline
+    // label is the icon node, not the "Product" text.
+    const input = screen.getByLabelText("Product");
+    expect(input).toHaveAttribute("role", "combobox");
+    expect(screen.getByTestId("product-icon")).toBeInTheDocument();
+    // No visible "Product" text label inside the combobox control.
+    const control = input.closest("[data-jsf-control]");
+    expect(control?.textContent).not.toContain("Product");
+  });
 });
 
 describe("FilterBar date lookup rendering", () => {
