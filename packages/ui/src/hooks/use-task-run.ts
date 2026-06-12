@@ -152,9 +152,11 @@ export interface UseTaskRunsResult {
   status: string;
 }
 
-// useTaskRuns lists all runs (TaskRunMeta) for the manager view by polling the
-// runs endpoint. The listing has no completion terminal of its own, so it polls
-// on an interval (cheap GET) regardless of transport.
+// useTaskRuns lists all runs (TaskRunMeta) for the manager view. It is SSE-first:
+// it subscribes to clicky's runs stream (event: runs carrying the full listing)
+// and falls back to polling the JSON runs endpoint only when EventSource is
+// unavailable or forced off. The listing has no completion terminal of its own —
+// a manager view stays subscribed to observe new and changing runs.
 export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult {
   const {
     kind,
@@ -163,6 +165,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     basePath = DEFAULT_BASE,
     enabled = true,
     pollMs = DEFAULT_POLL_MS,
+    forcePoll = false,
   } = options;
 
   const [runs, setRuns] = useState<TaskRunMeta[]>([]);
@@ -170,8 +173,6 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
 
   useEffect(() => {
     if (!enabled) return;
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const params = new URLSearchParams();
     if (kind) params.set("kind", kind);
@@ -179,26 +180,44 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     for (const [k, v] of Object.entries(labels ?? {})) params.append("label", `${k}=${v}`);
     const query = params.toString();
 
-    const tick = async () => {
-      try {
-        const res = await fetch(`${basePath}/tasks${query ? `?${query}` : ""}`, {
-          headers: { Accept: "application/json" },
-        });
-        if (res.ok) {
-          setRuns((await res.json()) as TaskRunMeta[]);
-          setStatus("ok");
+    // Polling fallback transport.
+    if (forcePoll || !hasEventSource()) {
+      let stopped = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const tick = async () => {
+        try {
+          const res = await fetch(`${basePath}/tasks${query ? `?${query}` : ""}`, {
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            setRuns((await res.json()) as TaskRunMeta[]);
+            setStatus("polling");
+          }
+        } catch {
+          setStatus("connection lost — retrying");
         }
+        if (!stopped) timer = setTimeout(tick, pollMs);
+      };
+      void tick();
+      return () => {
+        stopped = true;
+        if (timer) clearTimeout(timer);
+      };
+    }
+
+    // SSE transport (default).
+    const es = new EventSource(`${basePath}/tasks/runs/stream${query ? `?${query}` : ""}`);
+    setStatus("connected");
+    es.addEventListener("runs", (e) => {
+      try {
+        setRuns(JSON.parse((e as MessageEvent).data) as TaskRunMeta[]);
       } catch {
-        setStatus("connection lost — retrying");
+        /* ignore malformed frame */
       }
-      if (!stopped) timer = setTimeout(tick, pollMs);
-    };
-    void tick();
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [kind, statusFilter, JSON.stringify(labels ?? {}), basePath, enabled, pollMs]);
+    });
+    es.onerror = () => setStatus("connection lost — retrying");
+    return () => es.close();
+  }, [kind, statusFilter, JSON.stringify(labels ?? {}), basePath, enabled, pollMs, forcePoll]);
 
   return { runs, status };
 }

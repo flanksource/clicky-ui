@@ -93,6 +93,25 @@ describe("TaskProgress", () => {
     expect(taskBar).toHaveAttribute("aria-valuenow", "31");
   });
 
+  it("omits the x/y count and bar for a task whose bounded progress is still zero", () => {
+    const snapshots: TaskSnapshot[] = [
+      { id: "g", name: "ast all", type: "group", status: "running", groupId: "g", total: 1, running: 1 },
+      {
+        id: "p1",
+        name: "transactions",
+        type: "task",
+        groupId: "g",
+        status: "running",
+        progress: 0,
+        maxValue: 100,
+      },
+    ];
+    render(<TaskProgress snapshots={snapshots} />);
+
+    expect(screen.queryByText("0/100 · 0%")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")?.getAttribute("aria-valuemax")).not.toBe("100");
+  });
+
   it("shows an empty message when there are no group snapshots", () => {
     render(<TaskProgress snapshots={[]} title="Fixes" />);
     expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument();

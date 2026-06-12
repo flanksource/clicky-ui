@@ -160,8 +160,10 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
   const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
   // Bounded per-task progress (e.g. records emitted in a phase): render an x/y
   // count, a percentage, and a thin bar while the task runs.
-  const hasProgress = typeof t.maxValue === "number" && t.maxValue > 0;
   const done = t.progress ?? 0;
+  // Only surface bounded progress once work has actually started — an untouched
+  // task should not render a "0/100 · 0%" placeholder.
+  const hasProgress = typeof t.maxValue === "number" && t.maxValue > 0 && done > 0;
   const pct = hasProgress ? Math.round((done / (t.maxValue as number)) * 100) : 0;
 
   return (
