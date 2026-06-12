@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  isEmptyValue,
   moveItem,
+  orderByPriority,
   orderRequiredFirst,
   removeIndex,
   seedFromSchema,
@@ -63,6 +65,48 @@ describe("orderRequiredFirst", () => {
 
   it("ignores required keys that are not present", () => {
     expect(orderRequiredFirst(entries, ["x", "b"]).map(([k]) => k)).toEqual(["b", "a", "c", "d"]);
+  });
+});
+
+describe("isEmptyValue", () => {
+  it("treats nullish, empty string, empty array and empty object as empty", () => {
+    expect(isEmptyValue(undefined)).toBe(true);
+    expect(isEmptyValue(null)).toBe(true);
+    expect(isEmptyValue("")).toBe(true);
+    expect(isEmptyValue([])).toBe(true);
+    expect(isEmptyValue({})).toBe(true);
+  });
+  it("treats false, zero, and populated containers as filled", () => {
+    expect(isEmptyValue(false)).toBe(false);
+    expect(isEmptyValue(0)).toBe(false);
+    expect(isEmptyValue("x")).toBe(false);
+    expect(isEmptyValue([1])).toBe(false);
+    expect(isEmptyValue({ a: 1 })).toBe(false);
+  });
+});
+
+describe("orderByPriority", () => {
+  const entries: [string, number][] = [
+    ["a", 1],
+    ["b", 2],
+    ["c", 3],
+    ["d", 4],
+  ];
+
+  it("ranks required-filled, required-empty, optional-filled, optional-empty", () => {
+    // a: optional+filled (1), b: required+empty (2), c: required+filled (3), d: optional+empty (0)
+    const values = { a: "x", b: "", c: "y", d: "" };
+    expect(orderByPriority(entries, ["b", "c"], values).map(([k]) => k)).toEqual([
+      "c",
+      "b",
+      "a",
+      "d",
+    ]);
+  });
+
+  it("keeps incoming order among equally-scored keys", () => {
+    // every key is optional+empty → all score 0, so order is unchanged
+    expect(orderByPriority(entries, [], {}).map(([k]) => k)).toEqual(["a", "b", "c", "d"]);
   });
 });
 

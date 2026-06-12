@@ -6,9 +6,17 @@ import type { FormSize } from "./json-schema-form-size";
 export interface FormPreferences {
   size?: FormSize;
   layoutMode?: LayoutMode;
+  sortMode?: SortMode;
 }
 
 export type LayoutMode = "stacked" | "inline";
+
+// SortMode controls the order fields render in at every object level:
+// - "schema": schema/x-order order (the default).
+// - "required-first": required keys first, then optional, each group stable.
+// - "priority": required AND non-empty keys bubble to the top — required-and-
+//   filled, then required-and-empty, then optional-and-filled, then the rest.
+export type SortMode = "schema" | "required-first" | "priority";
 
 export const DEFAULT_PREFERENCES_STORAGE_KEY = "clicky-ui-json-schema-form-preferences";
 
@@ -20,6 +28,10 @@ function isFormSize(value: unknown): value is FormSize {
 
 function isLayoutMode(value: unknown): value is LayoutMode {
   return value === "stacked" || value === "inline";
+}
+
+function isSortMode(value: unknown): value is SortMode {
+  return value === "schema" || value === "required-first" || value === "priority";
 }
 
 // readPreferences loads stored preferences, tolerating anything malformed: a
@@ -49,6 +61,7 @@ export function readPreferences(storageKey: string): FormPreferences {
   const prefs: FormPreferences = {};
   if (isFormSize(record.size)) prefs.size = record.size;
   if (isLayoutMode(record.layoutMode)) prefs.layoutMode = record.layoutMode;
+  if (isSortMode(record.sortMode)) prefs.sortMode = record.sortMode;
   return prefs;
 }
 
