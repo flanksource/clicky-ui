@@ -24,6 +24,7 @@ import type {
 } from "./json-schema-form-types";
 import {
   fieldInputId,
+  orderByPriority,
   orderByXOrder,
   orderRequiredFirst,
   softError,
@@ -190,7 +191,12 @@ export function renderObjectFields(
   const { properties, required } = effectiveProperties(schema, value);
   const hidden = new Set(opts?.hiddenKeys ?? []);
   const ordered = orderByXOrder(Object.entries(properties), schema["x-order"]);
-  const entries = ctx.requiredFirst ? orderRequiredFirst(ordered, required) : ordered;
+  const entries =
+    ctx.sortMode === "required-first"
+      ? orderRequiredFirst(ordered, required)
+      : ctx.sortMode === "priority"
+        ? orderByPriority(ordered, required, value)
+        : ordered;
   return entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
     const row = renderFieldRow(

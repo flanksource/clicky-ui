@@ -77,6 +77,35 @@ export function orderRequiredFirst<T>(
   return [...head, ...tail];
 }
 
+// isEmptyValue reports whether a field's value carries no data, so priority
+// sorting can sink unfilled fields. Empty = undefined/null/"" plus empty arrays
+// and empty plain objects; `false` and `0` count as filled (they are choices).
+export function isEmptyValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object") return Object.keys(value).length === 0;
+  return false;
+}
+
+// orderByPriority sorts property entries so the fields that matter most surface
+// first, ranking each by a score: +2 if required, +1 if its value is non-empty.
+// Required-and-filled lead, then required-and-empty, then optional-and-filled,
+// then optional-and-empty. Ties keep their incoming order (explicit index
+// tie-break, so it does not depend on the engine's sort stability).
+export function orderByPriority<T>(
+  entries: [string, T][],
+  required: string[],
+  values: Record<string, unknown>,
+): [string, T][] {
+  const isRequired = new Set(required);
+  const score = (key: string): number =>
+    (isRequired.has(key) ? 2 : 0) + (isEmptyValue(values[key]) ? 0 : 1);
+  return entries
+    .map((entry, index) => ({ entry, index, score: score(entry[0]) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((ranked) => ranked.entry);
+}
+
 // softError computes a display-only validation hint. It never blocks onChange.
 // Consumers suppress the unknown-enum hint by setting allowCustomValue.
 export function softError(field: FieldControl): string | undefined {

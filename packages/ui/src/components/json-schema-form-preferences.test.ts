@@ -17,9 +17,17 @@ describe("readPreferences", () => {
     expect(readPreferences(KEY)).toEqual({});
   });
 
-  it("reads a valid stored size and layout mode", () => {
-    localStorage.setItem(KEY, JSON.stringify({ size: "lg", layoutMode: "inline" }));
-    expect(readPreferences(KEY)).toEqual({ size: "lg", layoutMode: "inline" });
+  it("reads a valid stored size, layout mode, and sort mode", () => {
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ size: "lg", layoutMode: "inline", sortMode: "priority" }),
+    );
+    expect(readPreferences(KEY)).toEqual({ size: "lg", layoutMode: "inline", sortMode: "priority" });
+  });
+
+  it("drops an invalid sort mode but keeps the rest", () => {
+    localStorage.setItem(KEY, JSON.stringify({ size: "md", sortMode: "by-name" }));
+    expect(readPreferences(KEY)).toEqual({ size: "md" });
   });
 
   it("ignores invalid JSON", () => {

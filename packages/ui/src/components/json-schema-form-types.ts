@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LabelIconSpec } from "../data/Icon";
 import type { FormSize } from "./json-schema-form-size";
+import type { SortMode } from "./json-schema-form-preferences";
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -244,9 +245,10 @@ export interface RenderContext {
   // Optional namespace for generated input ids, so multiple forms on one page
   // don't collide on duplicate ids (which would break label/input focus).
   idPrefix?: string;
-  // requiredFirst stably reorders each object level so required fields render
-  // before optional ones (see JsonSchemaFormProps.requiredFirst).
-  requiredFirst: boolean;
+  // sortMode reorders each object level: "schema" keeps schema/x-order order,
+  // "required-first" floats required fields up, "priority" floats required AND
+  // non-empty fields up (see SortMode and JsonSchemaFormProps.requiredFirst).
+  sortMode: SortMode;
   pre: PreExtension[];
   post: PostExtension[];
   depth: number;
@@ -317,7 +319,7 @@ export interface JsonSchemaFormProps {
   pre?: PreExtension[];
   post?: PostExtension[];
   /**
-   * Show the top-right three-dot display-options menu (size + layout mode).
+   * Show the top-right three-dot display-options menu (size, layout, and sort).
    * Defaults to true. The menu controls only this form's appearance — never
    * global page density or field values. When false the form renders exactly as
    * before and performs no preference reads/writes.

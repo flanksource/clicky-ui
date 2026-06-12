@@ -17,6 +17,7 @@ import {
   writePreferences,
   type FormPreferences,
   type LayoutMode,
+  type SortMode,
 } from "./json-schema-form-preferences";
 import type { FormLayout, JsonSchemaFormProps, RenderContext } from "./json-schema-form-types";
 
@@ -77,6 +78,8 @@ export function JsonSchemaForm({
 
   const effectiveSize = prefs.size ?? size;
   const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode);
+  // The `requiredFirst` prop sets the base sort; a menu selection overrides it.
+  const effectiveSortMode = prefs.sortMode ?? (requiredFirst ? "required-first" : "schema");
 
   const applyPrefs = (next: FormPreferences) => {
     setPrefs(next);
@@ -88,7 +91,7 @@ export function JsonSchemaForm({
     hideReadOnlyFields,
     layout: resolvedLayout,
     size: effectiveSize,
-    requiredFirst,
+    sortMode: effectiveSortMode,
     pre: pre ?? [],
     post: post ?? [],
     depth: 0,
@@ -103,8 +106,10 @@ export function JsonSchemaForm({
         <PreferencesMenu
           size={effectiveSize}
           layoutMode={resolvedLayout.mode}
+          sortMode={effectiveSortMode}
           onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
           onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
+          onSelectSort={(next) => applyPrefs({ ...prefs, sortMode: next })}
         />
       )}
       {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
@@ -128,19 +133,29 @@ const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
   { value: "inline", label: "Inline" },
 ];
 
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: "schema", label: "Schema order" },
+  { value: "required-first", label: "Required first" },
+  { value: "priority", label: "Required & filled first" },
+];
+
 // PreferencesMenu is the compact top-right ellipsis menu controlling this form's
 // size and layout mode. Selecting an item fires the matching callback and closes
 // the menu; the parent decides whether to persist.
 function PreferencesMenu({
   size,
   layoutMode,
+  sortMode,
   onSelectSize,
   onSelectLayout,
+  onSelectSort,
 }: {
   size: FormSize;
   layoutMode: LayoutMode;
+  sortMode: SortMode;
   onSelectSize: (size: FormSize) => void;
   onSelectLayout: (mode: LayoutMode) => void;
+  onSelectSort: (mode: SortMode) => void;
 }) {
   return (
     <DropdownMenu
@@ -180,6 +195,18 @@ function PreferencesMenu({
               selected={opt.value === layoutMode}
               onSelect={() => {
                 onSelectLayout(opt.value);
+                closeMenu();
+              }}
+            />
+          ))}
+          <PreferenceSection title="Sort" />
+          {SORT_OPTIONS.map((opt) => (
+            <PreferenceItem
+              key={opt.value}
+              label={opt.label}
+              selected={opt.value === sortMode}
+              onSelect={() => {
+                onSelectSort(opt.value);
                 closeMenu();
               }}
             />
