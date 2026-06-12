@@ -219,4 +219,69 @@ describe("Tree", () => {
     // Collapse-all returns to the root only.
     expect(screen.queryByText("x")).toBeNull();
   });
+
+  describe("revealSelected", () => {
+    // A deep collapsed tree whose leaf would be hidden under defaultOpen=false.
+    const leaf: Node = { id: "z", label: "z" };
+    const makeDeepTree = (): Node[] => [
+      {
+        id: "r",
+        label: "r",
+        children: [{ id: "x", label: "x", children: [{ id: "y", label: "y", children: [leaf] }] }],
+      },
+    ];
+
+    it("force-opens the selected node's ancestors so a deep leaf is revealed", () => {
+      render(
+        <Tree<Node>
+          roots={makeDeepTree()}
+          getChildren={(node) => node.children}
+          getKey={(node) => node.id}
+          selected={leaf}
+          revealSelected
+          defaultOpen={() => false}
+          renderRow={({ node }) => <span>{node.label}</span>}
+        />,
+      );
+
+      // Despite defaultOpen=false, the selected leaf and its ancestors render.
+      expect(screen.getByText("x")).toBeInTheDocument();
+      expect(screen.getByText("y")).toBeInTheDocument();
+      expect(screen.getByText("z")).toBeInTheDocument();
+    });
+
+    it("keeps the selected branch open when its ancestor's chevron is clicked", () => {
+      render(
+        <Tree<Node>
+          roots={makeDeepTree()}
+          getChildren={(node) => node.children}
+          getKey={(node) => node.id}
+          selected={leaf}
+          revealSelected
+          defaultOpen={() => false}
+          renderRow={({ node }) => <span>{node.label}</span>}
+        />,
+      );
+
+      // The ancestor's collapse control is forced-open and cannot hide the leaf.
+      fireEvent.click(screen.getAllByRole("button", { name: "Collapse" })[0]);
+      expect(screen.getByText("z")).toBeInTheDocument();
+    });
+
+    it("does not reveal the selected node without revealSelected", () => {
+      render(
+        <Tree<Node>
+          roots={makeDeepTree()}
+          getChildren={(node) => node.children}
+          getKey={(node) => node.id}
+          selected={leaf}
+          defaultOpen={() => false}
+          renderRow={({ node }) => <span>{node.label}</span>}
+        />,
+      );
+
+      expect(screen.getByText("r")).toBeInTheDocument();
+      expect(screen.queryByText("z")).toBeNull();
+    });
+  });
 });
