@@ -18,6 +18,10 @@ import { inputSizeClass, type FormSize } from "./json-schema-form-size";
 // before they truncate. The menu's minimum is always the input's width.
 const MENU_MAX_WIDTH_PX = 400;
 
+// Matches the menu's `max-h-64` (16rem) cap; also the threshold below which the
+// menu flips above the input instead of opening downward off-screen.
+const MENU_MAX_HEIGHT_PX = 256;
+
 export type ComboboxOption = {
   value: string;
   label: string;
@@ -141,11 +145,15 @@ export function Combobox(props: ComboboxProps) {
   // input row. `width` is the input width (the menu's minimum); `maxWidth` caps
   // content growth at 400px, further bounded by the viewport. Null until first
   // measured so we never render at (0,0).
+  // Either `top` (opening downward) or `bottom` (flipped upward when space below
+  // is tight, e.g. a control docked near the viewport bottom) is set, never both.
   const [menuPos, setMenuPos] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     width: number;
     maxWidth: number;
+    maxHeight: number;
   } | null>(null);
   // `query` is the type-ahead filter text, kept separate from the committed
   // value. It is empty unless the user is actively typing, so opening the
@@ -238,7 +246,22 @@ export function Combobox(props: ComboboxProps) {
       // (leaving an 8px gutter). Never let the cap fall below the input width.
       const viewportCap = window.innerWidth - rect.left - 8;
       const maxWidth = Math.max(rect.width, Math.min(MENU_MAX_WIDTH_PX, viewportCap));
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width, maxWidth });
+      // Flip upward when there isn't room below for the menu but there is above
+      // (the input is docked near the viewport bottom). The available side bounds
+      // the menu height so it never runs off-screen.
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const openUp = spaceBelow < MENU_MAX_HEIGHT_PX && spaceAbove > spaceBelow;
+      const maxHeight = Math.min(MENU_MAX_HEIGHT_PX, openUp ? spaceAbove : spaceBelow);
+      setMenuPos({
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+        left: rect.left,
+        width: rect.width,
+        maxWidth,
+        maxHeight,
+      });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -377,6 +400,12 @@ export function Combobox(props: ComboboxProps) {
             if (!open) setOpen(true);
           }}
           onFocus={openMenu}
+          // Reopen on click too: focus only fires on the first focus, so a click
+          // on an already-focused-but-closed input (e.g. after selecting, or
+          // after Escape) would otherwise do nothing.
+          onClick={() => {
+            if (!open) openMenu();
+          }}
           onKeyDown={onKeyDown}
           className={cn(
             "w-full rounded-md border border-input bg-background text-foreground",
@@ -444,15 +473,16 @@ export function Combobox(props: ComboboxProps) {
           aria-multiselectable={multiple || undefined}
           style={{
             position: "fixed",
-            top: menuPos.top,
+            ...(menuPos.top != null ? { top: menuPos.top } : { bottom: menuPos.bottom }),
             left: menuPos.left,
             // Grow to fit the widest option, but never narrower than the input
             // nor wider than 400px (beyond which option labels truncate). The
             // cap is also bounded by the viewport so the menu can't overflow.
             minWidth: menuPos.width,
             maxWidth: menuPos.maxWidth,
+            maxHeight: menuPos.maxHeight,
           }}
-          className="z-[9999] max-h-64 w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+          className="z-[9999] w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
         >
           {loading && filtered.length === 0 && (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">Loading…</div>

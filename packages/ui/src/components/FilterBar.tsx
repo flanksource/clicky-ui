@@ -165,6 +165,13 @@ export type FilterBarMultiFilter = {
    * absent, the search box filters the static `options` client-side only.
    */
   onSearch?: (query: string) => Promise<MultiSelectOption[]> | void;
+  /**
+   * Lets the user commit a value absent from `options` (a free-typed name or a
+   * `*` wildcard). The option search box stays visible and an "Add" row appears
+   * when the query matches no listed option; committed customs pin to the top so
+   * they stay toggleable. Use for MatchItem-style filters (table/login patterns).
+   */
+  allowCustomValue?: boolean;
   disabled?: boolean;
   className?: string;
 };
@@ -1570,26 +1577,49 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
   }, [onSearch, optionQuery]);
 
   const summary = summarizeMultiFilter(filter.label, draft);
-  // Truncated or async-searchable filters always expose the search box; small
-  // static lists only get it past a threshold (matching the original behaviour).
-  const showOptionFilter = filter.truncated || Boolean(onSearch) || filter.options.length > 7;
+  // allowCustomValue: any toggled value absent from `options` (a free-typed name
+  // or a `*` wildcard) is synthesised as a pinned option so it renders and stays
+  // toggleable across reopens.
+  const allowCustomValue = Boolean(filter.allowCustomValue);
+  const baseOptions = useMemo(() => {
+    if (!allowCustomValue) return filter.options;
+    const known = new Set(filter.options.map((o) => o.value));
+    const pinned = Object.keys(draft)
+      .filter((v) => !known.has(v))
+      .map((v) => ({ value: v, label: v }));
+    return mergeMultiSelectOptions(pinned, filter.options);
+  }, [allowCustomValue, filter.options, draft]);
+  // Truncated, async-searchable, or custom-value filters always expose the search
+  // box; small static lists only get it past a threshold (original behaviour).
+  const showOptionFilter =
+    filter.truncated || Boolean(onSearch) || allowCustomValue || filter.options.length > 7;
   const visibleOptions = useMemo(() => {
     const query = optionQuery.trim();
-    // No query → the head set, as supplied.
-    if (!query) return filter.options;
+    // No query → the base set (options + pinned customs), as supplied.
+    if (!query) return baseOptions;
     // Server search active → the matches REPLACE the head, but any head option
     // the user has already toggled (include/exclude) stays pinned so their
     // selection remains visible and changeable. Selected first, then matches.
     if (onSearch) {
-      const selectedHead = filter.options.filter((o) => draft[o.value] !== undefined);
+      const selectedHead = baseOptions.filter((o) => draft[o.value] !== undefined);
       return mergeMultiSelectOptions(selectedHead, searchOptions);
     }
     // No server search (static/AsCode list) → client-side substring filter.
     const lowered = query.toLowerCase();
-    return filter.options.filter((option) =>
+    return baseOptions.filter((option) =>
       multiSelectOptionText(option).toLowerCase().includes(lowered),
     );
-  }, [filter.options, searchOptions, optionQuery, onSearch, draft]);
+  }, [baseOptions, searchOptions, optionQuery, onSearch, draft]);
+  // canAddCustom: offer an "Add" row when the typed query names no listed option.
+  const trimmedQuery = optionQuery.trim();
+  const canAddCustom =
+    allowCustomValue &&
+    trimmedQuery !== "" &&
+    !visibleOptions.some((o) => o.value === trimmedQuery);
+  const addCustom = () => {
+    setDraft(updateMultiFilterValue(draft, trimmedQuery, "include"));
+    setOptionQuery("");
+  };
   const moreCount =
     filter.truncated && filter.total ? Math.max(filter.total - filter.options.length, 0) : 0;
 
@@ -1690,7 +1720,24 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
                 </div>
               );
             })}
-            {visibleOptions.length === 0 && (
+            {canAddCustom && (
+              <div
+                role="button"
+                tabIndex={0}
+                data-filter-add-custom={trimmedQuery}
+                className="rounded-md px-2 py-1 text-sm text-primary hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+                onClick={addCustom}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    addCustom();
+                  }
+                }}
+              >
+                Add “{trimmedQuery}”
+              </div>
+            )}
+            {visibleOptions.length === 0 && !canAddCustom && (
               <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
             )}
           </div>
@@ -1704,6 +1751,40 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
         </div>
       )}
     </div>
+  );
+}
+
+export type TriStateMultiSelectProps = {
+  /** Trigger label and popover heading. */
+  label: string;
+  /** Map of option value → include/exclude. Neutral options are absent. */
+  value: Record<string, FilterBarMultiFilterMode>;
+  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
+  /** Chip options. When `truncated`, this is only the head set. */
+  options: MultiSelectOption[];
+  icon?: LabelIconSpec;
+  description?: string;
+  truncated?: boolean;
+  total?: number;
+  onSearch?: (query: string) => Promise<MultiSelectOption[]> | void;
+  /** Allow committing free-typed / `*`-wildcard values absent from `options`. */
+  allowCustomValue?: boolean;
+  disabled?: boolean;
+  className?: string;
+  /** Fill the available width (form field) vs. shrink to content. Default true. */
+  grow?: boolean;
+};
+
+// TriStateMultiSelect is the standalone include/exclude/neutral multi-select used
+// by FilterBar's "multi" kind, exposed for hand-written forms. It renders a
+// popover of FilterPill chips that cycle neutral → include → exclude. It commits
+// changes immediately (autoSubmit:false) since a controlled form owns the value.
+export function TriStateMultiSelect({ grow = true, ...rest }: TriStateMultiSelectProps) {
+  const filter: FilterBarMultiFilter = { key: rest.label, kind: "multi", ...rest };
+  return (
+    <FilterBarContext.Provider value={{ autoSubmit: false }}>
+      <MultiFilterField filter={filter} grow={grow} />
+    </FilterBarContext.Provider>
   );
 }
 
