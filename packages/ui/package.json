@@ -70,6 +70,11 @@
       "import": "./dist/chat.js",
       "require": "./dist/chat.cjs"
     },
+    "./ai": {
+      "types": "./dist/ai.d.ts",
+      "import": "./dist/ai.js",
+      "require": "./dist/ai.cjs"
+    },
     "./styles.css": "./dist/styles.css",
     "./tailwind-preset": {
       "types": "./dist/tailwind-preset.d.ts",
@@ -113,6 +118,7 @@
     "jsdom": "^26.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-rnd": "^10.5.3",
     "recharts": "^3.8.1",
     "streamdown": "^2.5.0",
     "svgo": "^3.2.0",
@@ -132,6 +138,7 @@
     "marked": "^15.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
+    "react-rnd": "^10.5.0",
     "recharts": "^3.0.0",
     "shiki": "^1.24.0",
     "streamdown": "^2.5.0",
@@ -160,6 +167,9 @@
       "optional": true
     },
     "shiki": {
+      "optional": true
+    },
+    "react-rnd": {
       "optional": true
     }
   }

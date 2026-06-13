@@ -138,6 +138,22 @@ describe("JsonSchemaForm number coercion", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "{{intake.fileId}}" } });
     expect(onChange).toHaveBeenCalledWith({ Amount: "{{intake.fileId}}" });
   });
+
+  it("keeps an in-progress decimal as raw text while typing, then coerces on blur", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ Amount: "" }} onChange={onChange} />);
+    const input = screen.getByRole("textbox");
+    // "33." would round-trip to "33" (text changes), so it must NOT coerce —
+    // otherwise the user can never type the fractional part of "33.33".
+    fireEvent.change(input, { target: { value: "33." } });
+    expect(onChange).toHaveBeenLastCalledWith({ Amount: "33." });
+    // The completed decimal round-trips cleanly and coerces immediately.
+    fireEvent.change(input, { target: { value: "33.33" } });
+    expect(onChange).toHaveBeenLastCalledWith({ Amount: 33.33 });
+    // Blur finalizes a still-uncoerced trailing-dot value into a Number.
+    fireEvent.blur(input, { target: { value: "33." } });
+    expect(onChange).toHaveBeenLastCalledWith({ Amount: 33 });
+  });
 });
 
 describe("JsonSchemaForm boolean fallback", () => {

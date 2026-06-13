@@ -11,6 +11,10 @@ import {
 import "@flanksource/clicky-ui/styles.css";
 import "./preview.css";
 
+// react-rnd (used by ChatWindow's draggable frame) reads `process.env` in its
+// drag logger; the browser has no `process`, so provide a minimal shim.
+(globalThis as { process?: { env: Record<string, string> } }).process ??= { env: {} };
+
 function GlobalSync({ theme, density }: { theme: Theme; density: Density }) {
   const { setTheme } = useTheme();
   const { setDensity } = useDensity();

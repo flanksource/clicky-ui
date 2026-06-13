@@ -1,13 +1,31 @@
 import { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { OperationCatalog } from "@flanksource/clicky-ui/rpc";
+import { EntityExplorerApp } from "@flanksource/clicky-ui/rpc";
 import type {
   ExecutionResponse,
   OpenAPISpec,
   OperationsApiClient,
   RenderLink,
 } from "@flanksource/clicky-ui/rpc";
+import { mockChatTransport, MOCK_MODELS } from "@flanksource/clicky-ui/chat";
+import type { ThreadSource, ThreadSummary } from "@flanksource/clicky-ui/ai";
 import { DemoSection } from "./Section";
+
+// In-memory thread source for the assistant's conversation switcher — the demo
+// has no chat backend, so it serves sample threads (and supports delete)
+// directly instead of fetching an endpoint.
+const SAMPLE_THREADS: ThreadSummary[] = [
+  { id: "t-001", title: "Reconcile stuck widgets", totalCostUsd: 0.12 },
+  { id: "t-002", title: "Why is wgt_77 failing?", totalCostUsd: 0.04 },
+];
+let threads = [...SAMPLE_THREADS];
+const THREADS_SOURCE: ThreadSource = {
+  load: () => Promise.resolve(threads),
+  remove: (id) => {
+    threads = threads.filter((t) => t.id !== id);
+    return Promise.resolve();
+  },
+};
 
 const SAMPLE_SPEC: OpenAPISpec = {
   openapi: "3.0.0",
@@ -120,6 +138,8 @@ const FAKE_CLIENT: OperationsApiClient = {
   },
 };
 
+// Navigation links are intercepted so the demo doesn't push history onto the
+// kitchen-sink URL; the explorer therefore stays on the widgets surface.
 const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => (
   <a
     key={key}
@@ -132,7 +152,7 @@ const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => 
   </a>
 );
 
-export function OperationExplorerDemo() {
+export function EntityExplorerDemo() {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
     [],
@@ -140,30 +160,35 @@ export function OperationExplorerDemo() {
 
   return (
     <DemoSection
-      id="operation-explorer"
-      title="OperationCatalog"
+      id="entity-explorer"
+      title="EntityExplorerApp"
       description={
         <>
-          Operations-mode explorer driven by an in-memory <code>OpenAPISpec</code> with{" "}
-          <code>x-clicky</code> surface metadata. The fake <code>OperationsApiClient</code> returns
-          a Clicky table for the list endpoint; navigation links are intercepted so the demo doesn't
-          hijack the kitchen-sink URL. Filter inputs still write to <code>?q=…</code> on the page —
-          a known side effect of <code>OperationCatalog</code>.
+          The full metadata-driven entity explorer — surface sidebar, Clicky table and action
+          dialogs — driven by an in-memory <code>OpenAPISpec</code> with <code>x-clicky</code> surface
+          metadata. The <code>chat</code> prop mounts the floating assistant (FAB, bottom-right) whose
+          tool-preferences popover is derived from the very same RPC operations the explorer exposes,
+          grouped by surface and defaulting to <em>Ask</em> (human approval). The assistant footer
+          carries a model picker with provider brand icons and a token/cost gauge; the header has a
+          conversation thread switcher (mock data). Navigation links are intercepted so the demo
+          doesn&apos;t hijack the kitchen-sink URL.
         </>
       }
     >
       <QueryClientProvider client={queryClient}>
         <div className="h-[640px] overflow-auto rounded-md border border-border p-4">
-          <OperationCatalog
-            definition={{
-              key: "widgets",
-              title: "Widgets",
-              description: "Demo widget surface backed by a fake client.",
-            }}
-            entities={["widget"]}
+          <EntityExplorerApp
             client={FAKE_CLIENT}
+            pathname="/widgets"
             renderLink={renderDemoLink}
-            surfaceKey="widgets"
+            showApiExplorer={false}
+            chat={{
+              transport: mockChatTransport(),
+              models: MOCK_MODELS,
+              modelsApi: null,
+              defaultModel: "anthropic/claude-sonnet-4-5",
+            }}
+            chatThreadsSource={THREADS_SOURCE}
           />
         </div>
       </QueryClientProvider>

@@ -24,8 +24,8 @@ export type MatrixTableProps = {
   rowLabelClassName?: string;
   cellClassName?: string;
   // headerClassName is appended to the header row and every header cell (corner
-  // + columns). Use it to override the default gray header background, e.g.
-  // "bg-transparent", since tailwind-merge lets the later class win.
+  // + columns). The header has no background by default; use this to add one,
+  // e.g. "bg-muted", since tailwind-merge lets the later class win.
   headerClassName?: string;
 };
 
@@ -74,11 +74,11 @@ export function MatrixTable({
           </colgroup>
         )}
         <thead>
-          <tr className={cn("bg-muted/40", !angledHeaders && "border-b border-border", headerClassName)}>
+          <tr className={cn(!angledHeaders && "border-b border-border", headerClassName)}>
             <th
               scope="col"
               className={cn(
-                "sticky left-0 top-0 z-30 min-w-44 border-r border-border bg-muted text-left font-medium",
+                "sticky left-0 top-0 z-30 min-w-44 border-r border-border text-left font-medium",
                 headerCellPadding,
                 angledHeaders ? "align-bottom" : cn("border-b border-border", columnClassName),
                 headerClassName,
@@ -93,7 +93,7 @@ export function MatrixTable({
                   scope="col"
                   title={columnTitle(column)}
                   className={cn(
-                    "sticky top-0 z-20 overflow-visible border-b border-border bg-muted p-0 align-bottom",
+                    "sticky top-0 z-20 overflow-visible border-b border-border p-0 align-bottom",
                     columnClassName,
                     headerClassName,
                   )}
@@ -141,7 +141,7 @@ export function MatrixTable({
                   key={index}
                   scope="col"
                   className={cn(
-                    "sticky top-0 z-20 min-w-24 whitespace-nowrap border-b border-border bg-muted text-center text-xs font-medium text-muted-foreground",
+                    "sticky top-0 z-20 min-w-24 whitespace-nowrap border-b border-border text-center text-xs font-medium text-muted-foreground",
                     headerCellPadding,
                     columnClassName,
                     headerClassName,

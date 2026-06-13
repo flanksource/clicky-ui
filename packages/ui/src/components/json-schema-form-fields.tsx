@@ -233,6 +233,7 @@ export function NumberControl({
 }) {
   // type="text" (not number) so non-numeric values a consumer permits — e.g.
   // template tokens — are not silently dropped by the browser.
+  const coerce = field.coerceNumber !== false;
   return (
     <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
       <input
@@ -246,11 +247,21 @@ export function NumberControl({
         placeholder={defaultPlaceholder(field.schema)}
         onChange={(e) => {
           const raw = e.target.value;
-          const coerce = field.coerceNumber !== false;
-          if (coerce && raw.trim() !== "" && Number.isFinite(Number(raw))) {
+          // Coerce mid-typing ONLY when the parse round-trips to the same text
+          // (e.g. "100", "33.5") — so an in-progress decimal like "33." or a
+          // trailing-zero "33.30" keeps its raw text instead of collapsing to a
+          // number and stranding the caret. Non-numeric tokens fall through to
+          // the raw string. Blur finalizes any still-uncoerced numeric text.
+          if (coerce && raw.trim() !== "" && String(Number(raw)) === raw.trim()) {
             field.onChange(Number(raw));
           } else {
             field.onChange(raw);
+          }
+        }}
+        onBlur={(e) => {
+          const raw = e.target.value;
+          if (coerce && raw.trim() !== "" && Number.isFinite(Number(raw))) {
+            field.onChange(Number(raw));
           }
         }}
       />

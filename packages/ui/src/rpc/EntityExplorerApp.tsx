@@ -13,6 +13,8 @@ import { OperationEntityPage } from "./OperationEntityPage";
 import type { ClickySurface } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { useOperations } from "./useOperations";
+import { ChatFab, ChatWindowLayer, ChatWindowManagerProvider, type ThreadSource } from "../data/ai";
+import { clickyOperationsToTools, type ChatProps } from "../data/chat";
 
 export type EntityExplorerAppProps = {
   client: OperationsApiClient;
@@ -24,6 +26,19 @@ export type EntityExplorerAppProps = {
   // to the group label. Lets the host app drop in brand SVGs (e.g. Xero,
   // Takealot) without coupling clicky-ui to any specific iconography.
   surfaceIcons?: Record<string, ReactNode>;
+  // chat, when provided, mounts a floating AI assistant (FAB + window) whose
+  // tool list is derived from the RPC operations, so the tool-preferences
+  // popover reflects the same commands the explorer exposes. Forwarded to the
+  // inner <Chat>.
+  chat?: Partial<ChatProps>;
+  // chatThreadsApi enables the conversation thread switcher in the assistant
+  // header and points it at a threads CRUD endpoint. Null (the default) hides
+  // the picker and shows a static title instead.
+  chatThreadsApi?: string | null;
+  // chatThreadsSource injects the conversation list/delete directly instead of
+  // fetching chatThreadsApi (e.g. an app loading threads via its own client).
+  // Takes precedence over chatThreadsApi and shows the picker.
+  chatThreadsSource?: ThreadSource;
 };
 
 // SURFACE_GROUP_STATE_KEY persists open/closed state of sidebar groups across
@@ -37,8 +52,12 @@ export function EntityExplorerApp({
   basePath = "",
   showApiExplorer = true,
   surfaceIcons,
+  chat,
+  chatThreadsApi = null,
+  chatThreadsSource,
 }: EntityExplorerAppProps) {
   const { operations, spec } = useOperations(client);
+  const chatTools = useMemo(() => clickyOperationsToTools(operations), [operations]);
   const surfaces = useMemo(() => getClickySurfaces(spec), [spec]);
   const surfaceGroups = useMemo(() => groupSurfacesByParent(surfaces), [surfaces]);
   const listHrefBySurface = useMemo(() => {
@@ -115,7 +134,7 @@ export function EntityExplorerApp({
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, [basePath, defaultSurface, relativePath]);
 
-  return (
+  const content = (
     <div className="flex h-full">
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 p-4">
         <div className="mb-6">
@@ -234,6 +253,23 @@ export function EntityExplorerApp({
         )}
       </main>
     </div>
+  );
+
+  if (!chat) {
+    return content;
+  }
+
+  return (
+    <ChatWindowManagerProvider storageId="entity-explorer">
+      {content}
+      <ChatFab />
+      <ChatWindowLayer
+        threadsApi={chatThreadsApi}
+        tools={chatTools}
+        chat={chat}
+        {...(chatThreadsSource ? { threadsSource: chatThreadsSource } : {})}
+      />
+    </ChatWindowManagerProvider>
   );
 }
 
