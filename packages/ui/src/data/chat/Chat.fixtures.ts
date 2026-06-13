@@ -3,9 +3,31 @@ import type { ChatModel } from "./types";
 
 /** A sample model menu for stories driving the model selector. */
 export const MOCK_MODELS: ChatModel[] = [
-  { id: "anthropic/claude-sonnet-4-5", provider: "anthropic", label: "Claude Sonnet 4.5", reasoning: true, configured: true },
-  { id: "openai/gpt-4o", provider: "openai", label: "GPT-4o", reasoning: false, configured: true },
-  { id: "googleai/gemini-2.5-pro", provider: "googleai", label: "Gemini 2.5 Pro", reasoning: true, configured: false },
+  { id: "anthropic/claude-sonnet-4-5", provider: "anthropic", label: "Claude Sonnet 4.5", reasoning: true, configured: true, contextWindow: 200_000 },
+  { id: "openai/gpt-4o", provider: "openai", label: "GPT-4o", reasoning: false, configured: true, contextWindow: 128_000 },
+  { id: "googleai/gemini-2.5-pro", provider: "googleai", label: "Gemini 2.5 Pro", reasoning: true, configured: false, contextWindow: 1_048_576 },
+];
+
+/** A seeded conversation that already contains a completed tool call, so a
+ *  story shows the collapsible tool-call panel (args → result) on load, without
+ *  the user sending a message. clicky operations surface as dynamic tools. */
+export const SAMPLE_TOOL_MESSAGES: UIMessage[] = [
+  { id: "u1", role: "user", parts: [{ type: "text", text: "List the pods in default" }] },
+  {
+    id: "a1",
+    role: "assistant",
+    parts: [
+      {
+        type: "dynamic-tool",
+        toolCallId: "call_listPods",
+        toolName: "listPods",
+        state: "output-available",
+        input: { namespace: "default", limit: 5 },
+        output: { count: 2, pods: ["api-7c9", "worker-1f2"] },
+      },
+      { type: "text", text: "Found **2 pods** in `default`: `api-7c9` and `worker-1f2`." },
+    ],
+  },
 ];
 
 /** Emits the given chunks as a ReadableStream, with a small delay between each
@@ -37,7 +59,14 @@ const TEXT_TURN: UIMessageChunk[] = [
   { type: "text-delta", id: "t0", delta: "- one\n- two\n- three" },
   { type: "text-end", id: "t0" },
   { type: "finish-step" },
-  { type: "finish" },
+  {
+    type: "finish",
+    messageMetadata: {
+      usage: { inputTokens: 920, outputTokens: 280, totalTokens: 1200 },
+      contextTokens: 1200,
+      cost: 0.004,
+    },
+  },
 ];
 
 const TOOL_TURN: UIMessageChunk[] = [
@@ -60,7 +89,14 @@ const TOOL_TURN: UIMessageChunk[] = [
   { type: "text-delta", id: "t1", delta: "Found **2 pods** in `default`." },
   { type: "text-end", id: "t1" },
   { type: "finish-step" },
-  { type: "finish" },
+  {
+    type: "finish",
+    messageMetadata: {
+      usage: { inputTokens: 2600, outputTokens: 800, totalTokens: 3400 },
+      contextTokens: 3400,
+      cost: 0.011,
+    },
+  },
 ];
 
 const REASONING_TURN: UIMessageChunk[] = [

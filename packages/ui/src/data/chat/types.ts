@@ -17,6 +17,34 @@ export interface ChatModel {
   label: string;
   reasoning: boolean;
   configured?: boolean;
+  /** Max context tokens — the denominator for a usage gauge. */
+  contextWindow?: number;
+}
+
+/** Per-message metadata the backend rides on the SSE `finish` part
+ *  (`messageMetadata`), applied by the AI SDK to the assistant `UIMessage`. */
+export interface ChatMessageMetadata {
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+  /** This turn's cost in USD. */
+  cost?: number;
+  /** Cumulative thread cost in USD (when the turn is persisted to a thread). */
+  threadCostUsd?: number;
+  /** This turn's input-token count, ≈ current context-window occupancy. */
+  contextTokens?: number;
+}
+
+/** A flattened usage snapshot a chat surfaces for a gauge: tokens used out of the
+ *  model's context window, plus cumulative cost. */
+export interface ChatUsageSummary {
+  usedTokens: number;
+  maxTokens: number;
+  cost?: number;
+  messageCount: number;
+  modelLabel?: string;
 }
 
 /** A suggested prompt shown on the empty state. A bare string is both the label
@@ -48,17 +76,23 @@ export function isFilePart(part: { type: string }): part is FileUIPart {
  *  surface as dynamic tools, so the chat UI renders both shapes. */
 export type AnyToolPart = ToolUIPart | DynamicToolUIPart;
 
-/** AI-tool metadata derived from a clicky RPC operation. The Go backend owns
- *  execution; the client uses this only for display and to scope which tools a
- *  request may call (passed in the transport `body`). */
-export interface ChatToolMeta {
+/** Tool metadata shared by the chat shell. It both configures the
+ *  tool-preferences popover (`name`/`label`/`group`) and carries the schema
+ *  derived from a clicky RPC operation (`description`/`inputSchema`). The Go
+ *  backend owns execution; the client uses this only for display and to scope
+ *  which tools a request may call (passed in the transport `body`). */
+export interface ToolMeta {
   /** Stable tool name sent to the model (the operation id). */
   name: string;
-  /** Human-readable description shown in tool pickers / tool-call headers. */
-  description?: string | undefined;
-  /** JSON-Schema for the tool's input, assembled from the operation's
-   *  parameters + request body. */
-  inputSchema: ChatToolInputSchema;
+  /** Human-readable label shown in the tool-preferences popover. */
+  label: string;
+  /** Bucket heading in the popover — the clicky surface for RPC operations. */
+  group?: string;
+  /** Description shown in tool pickers / tool-call headers. */
+  description?: string;
+  /** JSON-Schema for the tool's input, assembled from an operation's
+   *  parameters + request body. Omitted for hand-authored tools. */
+  inputSchema?: ChatToolInputSchema;
 }
 
 export interface ChatToolInputSchema {
