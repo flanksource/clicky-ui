@@ -15,6 +15,8 @@ export default defineConfig({
       { find: /^@flanksource\/clicky-ui\/styles\.css$/, replacement: resolve(uiSrc, "styles.ts") },
       { find: /^@flanksource\/clicky-ui\/icons$/, replacement: resolve(uiSrc, "icons.ts") },
       { find: /^@flanksource\/clicky-ui\/rpc$/, replacement: resolve(uiSrc, "rpc.ts") },
+      { find: /^@flanksource\/clicky-ui\/chat$/, replacement: resolve(uiSrc, "chat.ts") },
+      { find: /^@flanksource\/clicky-ui\/ai$/, replacement: resolve(uiSrc, "ai.ts") },
       { find: /^@flanksource\/clicky-ui$/, replacement: resolve(uiSrc, "index.ts") },
       { find: /^preact$/, replacement: preactPath("dist/preact.module.js") },
       { find: /^preact\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },

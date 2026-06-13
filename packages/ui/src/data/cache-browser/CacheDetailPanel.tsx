@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "../../lib/utils";
 import { formatBytes, formatDuration, formatShort } from "../../lib/format";
 import { Icon } from "../Icon";
-import { UiFolder, UiRefresh, UiTrash } from "../../icons";
+import { UiDownload, UiFolder, UiRefresh, UiTrash } from "../../icons";
 import { KeyValueList } from "../KeyValueList";
 import { TabButton } from "../TabButton";
 import { Section } from "../../layout/Section";
@@ -57,6 +57,7 @@ function KeyPanel({ client, registry, node, onDeleted, className }: CacheDetailP
       <PanelHeader
         title={key}
         onRefresh={() => detail.refetch()}
+        onDownload={detail.data ? () => downloadJson(key, detail.data!) : undefined}
         onDelete={remove}
         deleteLabel="Delete key"
       />
@@ -179,11 +180,13 @@ function PrefixPanel({ client, node, onDeleted, onSelect, className }: CacheDeta
 function PanelHeader({
   title,
   onRefresh,
+  onDownload,
   onDelete,
   deleteLabel,
 }: {
   title: React.ReactNode;
   onRefresh: () => void;
+  onDownload?: (() => void) | undefined;
   onDelete: () => void;
   deleteLabel: string;
 }) {
@@ -199,6 +202,17 @@ function PanelHeader({
       >
         <Icon icon={UiRefresh} className="text-sm" />
       </button>
+      {onDownload && (
+        <button
+          type="button"
+          onClick={onDownload}
+          aria-label="Download JSON"
+          title="Download JSON"
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          <Icon icon={UiDownload} className="text-sm" />
+        </button>
+      )}
       <button
         type="button"
         onClick={onDelete}
@@ -210,6 +224,17 @@ function PanelHeader({
       </button>
     </div>
   );
+}
+
+/** Serialize a key's detail and trigger a browser download as `<key>.json`. */
+export function downloadJson(key: string, detail: object) {
+  const blob = new Blob([JSON.stringify(detail, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${key.replace(/[^\w.-]+/g, "_")}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function PanelError({ error }: { error: unknown }) {

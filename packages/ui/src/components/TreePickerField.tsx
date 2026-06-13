@@ -138,7 +138,11 @@ export function TreePickerField<T>({
               position: "fixed",
               top: pos.top,
               left: pos.left,
-              width: pos.width,
+              // Grow to fit the widest row/toolbar, but never narrower than the
+              // trigger nor wider than maxWidth — so labels show in full and the
+              // toolbar's intrinsic-width search input never forces a scrollbar.
+              minWidth: pos.width,
+              width: "max-content",
               maxWidth: pos.maxWidth,
             }}
             className={cn(

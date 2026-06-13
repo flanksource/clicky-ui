@@ -93,4 +93,16 @@ describe("TreePickerField", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(panel()).toBeNull();
   });
+
+  it("sizes the panel to its content rather than pinning it to the trigger width", () => {
+    renderField();
+    fireEvent.click(screen.getByRole("button"));
+    const popup = panel();
+    expect(popup).not.toBeNull();
+    // The panel grows to fit the widest row (capped by maxWidth) instead of
+    // taking a fixed trigger width — otherwise long labels truncate and the
+    // toolbar's intrinsic-width search input forces a horizontal scrollbar.
+    expect(popup!.style.width).toBe("max-content");
+    expect(popup!.style.maxWidth).toBe("480px");
+  });
 });
