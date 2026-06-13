@@ -4,15 +4,16 @@ import type {
   OpenAPISchema,
   ResolvedOperation,
 } from "../../rpc/types";
-import type { ChatToolInputSchema, ChatToolMeta, JSONSchemaProperty } from "./types";
+import type { ChatToolInputSchema, JSONSchemaProperty, ToolMeta } from "./types";
 
 /** Converts a clicky RPC operation catalog into AI-tool metadata for display
  *  and request scoping. Execution stays in the Go backend; this maps an
- *  operation's `operationId` → tool name, `summary`/`description` → description,
+ *  operation's `operationId` → tool name, a short `x-clicky` verb/action →
+ *  label, the `x-clicky` surface → group, `summary`/`description` → description,
  *  and `parameters` + `requestBody` → a JSON-Schema input. Operations without an
  *  `operationId` are skipped (a tool needs a stable name). */
-export function clickyOperationsToTools(operations: ResolvedOperation[]): ChatToolMeta[] {
-  const tools: ChatToolMeta[] = [];
+export function clickyOperationsToTools(operations: ResolvedOperation[]): ToolMeta[] {
+  const tools: ToolMeta[] = [];
   for (const resolved of operations) {
     const tool = operationToTool(resolved.operation);
     if (tool) {
@@ -22,15 +23,39 @@ export function clickyOperationsToTools(operations: ResolvedOperation[]): ChatTo
   return tools;
 }
 
-export function operationToTool(operation: OpenAPIOperation): ChatToolMeta | null {
+export function operationToTool(operation: OpenAPIOperation): ToolMeta | null {
   if (!operation.operationId) {
     return null;
   }
+  const meta = operation["x-clicky"];
+  const description = operation.description ?? operation.summary;
   return {
     name: operation.operationId,
-    description: operation.description ?? operation.summary,
+    label: toolLabel(operation),
+    ...(meta?.surface ? { group: meta.surface } : {}),
+    ...(description ? { description } : {}),
     inputSchema: buildInputSchema(operation),
   };
+}
+
+/** A concise popover label: the clicky action/verb (capitalized) when present,
+ *  else the operation summary, else a humanized operationId. Mirrors the intent
+ *  of rpc/clickyMetadata.ts `surfaceActionLabel`. */
+function toolLabel(operation: OpenAPIOperation): string {
+  const meta = operation["x-clicky"];
+  const short = meta?.actionName?.trim() || meta?.verb?.trim();
+  if (short && short !== "action") {
+    return short.charAt(0).toUpperCase() + short.slice(1);
+  }
+  if (operation.summary) {
+    return operation.summary;
+  }
+  return humanize(operation.operationId ?? "");
+}
+
+function humanize(operationId: string): string {
+  const spaced = operationId.replace(/[_-]+/g, " ").replace(/([a-z\d])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function buildInputSchema(operation: OpenAPIOperation): ChatToolInputSchema {

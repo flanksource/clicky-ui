@@ -15,6 +15,8 @@ export {
   EffortSelector,
   type EffortSelectorProps,
 } from "./ModelSelector";
+export { providerIcon, type ProviderGlyph } from "./provider-icons";
+export { ContextUsage, type ContextUsageProps } from "./ContextUsage";
 export {
   AttachmentButton,
   type AttachmentButtonProps,
@@ -27,6 +29,10 @@ export {
   operationToTool,
 } from "./clickyOperationsToTools";
 
+// Backend-free mocks for previews, stories and demos: a transport that streams
+// a canned assistant turn and a sample model menu.
+export { mockChatTransport, MOCK_MODELS } from "./Chat.fixtures";
+
 export {
   isDynamicToolPart,
   isTypedToolPart,
@@ -37,9 +43,11 @@ export {
   suggestionPrompt,
   type AnyToolPart,
   type ChatModel,
+  type ChatMessageMetadata,
+  type ChatUsageSummary,
   type ChatStatus,
   type ChatToolInputSchema,
-  type ChatToolMeta,
+  type ToolMeta,
   type DynamicToolUIPart,
   type FileUIPart,
   type JSONSchemaProperty,

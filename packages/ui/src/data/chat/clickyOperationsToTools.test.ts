@@ -43,6 +43,14 @@ const createPod: OpenAPIOperation = {
   responses: {},
 };
 
+const listOrders: OpenAPIOperation = {
+  operationId: "orders_list",
+  summary: "List orders",
+  parameters: [],
+  responses: {},
+  "x-clicky": { surface: "orders", verb: "list", scope: "collection" },
+};
+
 function resolve(op: OpenAPIOperation, method = "get", path = "/x"): ResolvedOperation {
   return { path, method, operation: op };
 }
@@ -52,12 +60,24 @@ describe("clickyOperationsToTools", () => {
     const [tool] = clickyOperationsToTools([resolve(listPods)]);
     expect(tool.name).toBe("listPods");
     expect(tool.description).toBe("List pods in a namespace");
-    expect(tool.inputSchema.properties.namespace).toEqual({
+    expect(tool.inputSchema?.properties.namespace).toEqual({
       type: "string",
       description: "namespace to scope to",
     });
-    expect(tool.inputSchema.properties.limit).toEqual({ type: "integer", default: 50 });
-    expect(tool.inputSchema.required).toEqual(["namespace"]);
+    expect(tool.inputSchema?.properties.limit).toEqual({ type: "integer", default: 50 });
+    expect(tool.inputSchema?.required).toEqual(["namespace"]);
+  });
+
+  it("derives the popover label and surface group from x-clicky metadata", () => {
+    const tool = operationToTool(listOrders);
+    expect(tool?.label).toBe("List");
+    expect(tool?.group).toBe("orders");
+  });
+
+  it("labels from the summary and omits group when x-clicky is absent", () => {
+    const tool = operationToTool(listPods);
+    expect(tool?.label).toBe("List pods");
+    expect(tool?.group).toBeUndefined();
   });
 
   it("falls back to summary when description is absent", () => {
@@ -67,8 +87,8 @@ describe("clickyOperationsToTools", () => {
 
   it("merges requestBody properties into the input schema", () => {
     const tool = operationToTool(createPod);
-    expect(tool?.inputSchema.properties.name).toEqual({ type: "string", description: "pod name" });
-    expect(tool?.inputSchema.properties.image).toEqual({ type: "string" });
+    expect(tool?.inputSchema?.properties.name).toEqual({ type: "string", description: "pod name" });
+    expect(tool?.inputSchema?.properties.image).toEqual({ type: "string" });
   });
 
   it("skips operations without an operationId (no stable tool name)", () => {

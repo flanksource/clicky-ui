@@ -11,7 +11,13 @@ import { Conversation } from "./Conversation";
 import { PromptInput } from "./PromptInput";
 import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
-import type { ChatModel, Suggestion } from "./types";
+import { providerIcon } from "./provider-icons";
+import { ContextUsage } from "./ContextUsage";
+import type { ChatModel, ChatMessageMetadata, ChatUsageSummary, Suggestion } from "./types";
+
+/** Assistant messages carry token usage + cost the backend rode on the finish
+ *  part's `messageMetadata`. */
+type ChatUIMessage = UIMessage<ChatMessageMetadata>;
 
 export type ChatProps = {
   /** Endpoint that speaks the AI SDK v6 UI Message Stream protocol.
@@ -30,6 +36,9 @@ export type ChatProps = {
   defaultReasoningEffort?: string;
   /** Notified when the user changes the model. */
   onModelChange?: (id: string) => void;
+  /** Notified after each assistant turn with a usage snapshot (tokens used out
+   *  of the model's context window + cumulative cost), for a usage gauge. */
+  onUsage?: (usage: ChatUsageSummary) => void;
   /** Suggested prompts shown on the empty state. */
   suggestions?: Suggestion[];
   /** Enables file/image attachments. */
@@ -64,6 +73,7 @@ export function Chat({
   reasoningEfforts = DEFAULT_EFFORTS,
   defaultReasoningEffort = "",
   onModelChange,
+  onUsage,
   suggestions,
   enableAttachments = false,
   toolApproval,
@@ -78,6 +88,7 @@ export function Chat({
   const [models, setModels] = useState<ChatModel[]>(modelsProp ?? []);
   const [model, setModel] = useState<string | undefined>(defaultModel);
   const [effort, setEffort] = useState(defaultReasoningEffort);
+  const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
   useEffect(() => {
@@ -116,22 +127,58 @@ export function Chat({
   );
 
   const { messages, sendMessage, regenerate, addToolApprovalResponse, status, stop } =
-    useChat<UIMessage>({
+    useChat<ChatUIMessage>({
       transport: resolvedTransport,
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-      ...(initialMessages ? { messages: initialMessages } : {}),
+      ...(initialMessages ? { messages: initialMessages as ChatUIMessage[] } : {}),
     });
+
+  // Surface a usage snapshot after each settled assistant turn. The backend
+  // rides usage/cost on the finish part's messageMetadata; we read it off the
+  // last assistant message and resolve maxTokens from the selected model.
+  const onUsageRef = useRef(onUsage);
+  onUsageRef.current = onUsage;
+  useEffect(() => {
+    if (status !== "ready") return;
+    const last = [...messages].reverse().find((m) => m.role === "assistant");
+    const meta = last?.metadata;
+    if (!meta) return;
+    const cost = meta.threadCostUsd ?? meta.cost;
+    const snapshot: ChatUsageSummary = {
+      usedTokens: meta.contextTokens ?? meta.usage?.totalTokens ?? 0,
+      maxTokens: selectedModel?.contextWindow ?? 0,
+      messageCount: messages.length,
+      ...(cost != null ? { cost } : {}),
+      ...(selectedModel?.label ? { modelLabel: selectedModel.label } : {}),
+    };
+    setUsage(snapshot);
+    onUsageRef.current?.(snapshot);
+  }, [messages, status, selectedModel]);
 
   const onModelSelect = (id: string) => {
     setModel(id);
     onModelChange?.(id);
   };
 
-  const toolbar = models.length > 0 || showEffort ? (
-    <div className="flex items-center gap-2">
+  const ModelGlyph = providerIcon(selectedModel?.provider);
+  const toolbar = models.length > 0 || showEffort || (usage && usage.maxTokens > 0) ? (
+    <div className="flex flex-1 items-center gap-2">
       <ModelSelector models={models} value={model} onChange={onModelSelect} />
       {showEffort && (
         <EffortSelector efforts={reasoningEfforts} value={effort} onChange={setEffort} />
+      )}
+      {usage && usage.maxTokens > 0 && (
+        <>
+          <div className="flex-1" />
+          <ContextUsage
+            usedTokens={usage.usedTokens}
+            maxTokens={usage.maxTokens}
+            {...(usage.messageCount != null ? { messageCount: usage.messageCount } : {})}
+            {...(usage.cost != null ? { cost: usage.cost } : {})}
+            {...(usage.modelLabel ? { modelLabel: usage.modelLabel } : {})}
+            {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
+          />
+        </>
       )}
     </div>
   ) : undefined;
