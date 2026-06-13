@@ -1,0 +1,44 @@
+// Public surface of the chat application shell. Re-exported from ../../ai.ts so
+// consumers import from "@flanksource/clicky-ui/ai".
+
+export {
+  ChatWindowManagerProvider,
+  type ChatWindowManagerProviderProps,
+} from "./ChatWindowManager";
+export {
+  useChatWindowManager,
+  nextPromptId,
+  type ChatWindowManagerValue,
+  type ChatWindowState,
+  type OpenPanelOpts,
+} from "./chat-window-context";
+
+export { ChatWindow, ChatWindowLayer, type ChatWindowProps } from "./ChatWindow";
+export { ChatFab, type ChatFabProps } from "./ChatFab";
+export {
+  ThreadPicker,
+  type ThreadPickerProps,
+  type ThreadSummary,
+  type ThreadSource,
+} from "./ThreadPicker";
+export {
+  ContextBadges,
+  ContextBadgesReadonly,
+  type ContextBadgesProps,
+} from "./ContextBadges";
+export {
+  ToolPreferences,
+  type ToolPreferencesProps,
+  type ToolMeta,
+  type ToolMode,
+} from "./ToolPreferences";
+export { ContextUsage, type ContextUsageProps } from "../chat/ContextUsage";
+
+export {
+  serializeContext,
+  parseContextPrefix,
+  makeContextId,
+  type ChatContextItem,
+  type ContextTypeConfig,
+  type ContextTypeStyle,
+} from "./context";
