@@ -9,6 +9,14 @@ export {
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedOption,
+  type SegmentedSize,
+} from "./components/SegmentedControl";
+export { SearchInput, type SearchInputProps } from "./components/SearchInput";
+export { Switch, type SwitchProps } from "./components/Switch";
 export { FormatOptionsDropdown, type FormatOptionsDropdownProps } from "./components/FormatOptionsDropdown";
 export { CLICKY_FORMAT_OPTIONS, type FormatOption } from "./components/format-options";
 export { DateField, type DateFieldMode, type DateFieldProps } from "./components/DateField";
@@ -153,3 +161,5 @@ export {
 export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 export { useModalStack, type ModalStackPosition } from "./overlay/modalStack";
+export { ToastProvider, type ToastProviderProps } from "./overlay/Toast";
+export { useToast, type ToastOptions, type ToastTone } from "./overlay/toast-context";

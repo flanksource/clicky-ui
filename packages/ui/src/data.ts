@@ -137,6 +137,7 @@ export {
 export { Tree, type TreeProps } from "./data/Tree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
+export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
 export * from "./data/test-runner";
 export * from "./data/cache-browser";
 export {
