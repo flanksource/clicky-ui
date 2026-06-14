@@ -142,6 +142,20 @@ export const DEMO_GROUPS: DemoGroup[] = [
       },
     ],
   },
+  {
+    title: "Gavel",
+    items: [
+      { id: "segmented-control", label: "SegmentedControl", component: SegmentedControlDemo },
+      { id: "search-input", label: "SearchInput", component: SearchInputDemo },
+      { id: "timeline", label: "Timeline", component: TimelineDemo },
+      { id: "toast", label: "Toast", component: ToastDemo },
+      {
+        id: "gavel-styling-comparison",
+        label: "Styling comparison",
+        component: GavelStylingComparisonDemo,
+      },
+    ],
+  },
 ];
 
 export const DEFAULT_DEMO_ID = DEMO_GROUPS[0]?.items[0]?.id ?? "switchers";
