@@ -30,6 +30,11 @@ export type TestRunnerProps = {
   now?: number;
   busy?: { rerun?: boolean; stop?: boolean };
 
+  /** Controlled active detail-tab id; omit to let the detail pane own tab state. */
+  activeTab?: string;
+  /** Called with the picked tab id when `activeTab` is controlled. */
+  onTabChange?: (tabId: string) => void;
+
   onSelect: (node: Test | null) => void;
   onFiltersChange: (next: TestFilters) => void;
   onExpandAllChange: (next: boolean | null) => void;
@@ -82,6 +87,8 @@ export function TestRunner({
   statusText,
   now,
   busy,
+  activeTab,
+  onTabChange,
   onSelect,
   onFiltersChange,
   onExpandAllChange,
@@ -107,6 +114,8 @@ export function TestRunner({
       filters,
       expandAll,
       busy: busy ?? {},
+      activeTab,
+      onTabChange,
       onSelect,
       onFiltersChange,
       onExpandAllChange,
@@ -124,6 +133,8 @@ export function TestRunner({
       filters,
       expandAll,
       busy,
+      activeTab,
+      onTabChange,
       onSelect,
       onFiltersChange,
       onExpandAllChange,

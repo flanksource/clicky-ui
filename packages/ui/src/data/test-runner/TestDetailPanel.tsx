@@ -124,7 +124,16 @@ function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
 export function TestDetailPanel() {
   const runner = useTestRunner();
   const node = runner.selected;
-  const [activeTab, setActiveTab] = useState<string>("detail");
+  // Tab state is controlled when the host supplies activeTab (e.g. to mirror it
+  // into the URL); otherwise the panel owns it. The render below tolerates an
+  // unknown id by falling back to the built-in "detail" tab.
+  const controlled = runner.activeTab !== undefined;
+  const [internalTab, setInternalTab] = useState<string>("detail");
+  const activeTab = controlled ? runner.activeTab! : internalTab;
+  const setActiveTab = (id: string) => {
+    if (controlled) runner.onTabChange?.(id);
+    else setInternalTab(id);
+  };
 
   if (!node) {
     return (

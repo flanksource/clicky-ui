@@ -30,6 +30,14 @@ export type TestRunnerContext = {
   /** In-flight action flags driving button disabled/spinner states. */
   busy: { rerun?: boolean; stop?: boolean };
 
+  /**
+   * Active detail-tab id. When provided, TestDetailPanel renders this tab
+   * (controlled); when omitted it keeps its own internal tab state.
+   */
+  activeTab?: string | undefined;
+  /** Called with the picked tab id when the detail tab is controlled. */
+  onTabChange?: ((tabId: string) => void) | undefined;
+
   onSelect: (node: Test | null) => void;
   onFiltersChange: (next: TestFilters) => void;
   onExpandAllChange: (next: boolean | null) => void;

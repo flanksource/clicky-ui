@@ -42,6 +42,36 @@ function Harness({
   );
 }
 
+// ControlledHarness mirrors the active detail tab into host state via
+// activeTab/onTabChange, the contract a router-backed host uses to put the tab
+// in the URL.
+function ControlledHarness({ initialTab = "detail" }: { initialTab?: string }) {
+  const [selected, setSelected] = useState<Test | null>(null);
+  const [filters, setFilters] = useState<TestFilters>(emptyTestFilters());
+  const [expandAll, setExpandAll] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const visible = filterTests(completedTests, filters.status, filters.framework);
+  return (
+    <>
+      <span data-testid="active-tab">{activeTab}</span>
+      <TestRunner
+        tests={visible}
+        selected={selected}
+        filters={filters}
+        expandAll={expandAll}
+        done
+        now={0}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onSelect={setSelected}
+        onFiltersChange={setFilters}
+        onExpandAllChange={setExpandAll}
+        adapters={createTestRunnerRegistry([setupAdapter])}
+      />
+    </>
+  );
+}
+
 const tree = () => screen.getByRole("tree");
 
 describe("TestRunner", () => {
@@ -97,5 +127,26 @@ describe("TestRunner", () => {
     // 4 roots, each a "group N" container, render at the top level.
     expect(within(tree()).getByText("group 0")).toBeInTheDocument();
     expect(within(tree()).getByText("group 3")).toBeInTheDocument();
+  });
+
+  it("switches the detail tab from internal state when uncontrolled", () => {
+    render(<Harness adapters={createTestRunnerRegistry([setupAdapter])} />);
+    fireEvent.click(within(tree()).getByText("setup"));
+    // Starts on the built-in Detail tab.
+    expect(screen.getByText("Custom setup panel")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Context" }));
+    expect(screen.getByText(/Context tab for/)).toBeInTheDocument();
+  });
+
+  it("renders the host-controlled tab and reports clicks via onTabChange", () => {
+    render(<ControlledHarness initialTab="context" />);
+    fireEvent.click(within(tree()).getByText("setup"));
+    // The host's activeTab ("context") drives the rendered body, not internal state.
+    expect(screen.getByText(/Context tab for/)).toBeInTheDocument();
+    expect(screen.queryByText("Custom setup panel")).not.toBeInTheDocument();
+    // Clicking Detail bubbles up to the host, which flips its state to "detail".
+    fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("detail");
+    expect(screen.getByText("Custom setup panel")).toBeInTheDocument();
   });
 });

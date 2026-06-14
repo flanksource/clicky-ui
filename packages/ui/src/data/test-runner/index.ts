@@ -48,6 +48,8 @@ export {
 
 export { frameworkIcon } from "./frameworkIcon";
 
+export { slugify, annotateRoutePaths, findNodeByRoutePath } from "./routePath";
+
 export {
   type FilterMode,
   type FilterState,
