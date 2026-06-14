@@ -63,11 +63,16 @@ export type JsonSchemaType =
 // An `allOf` member is either a conditional (if/then) or an unconditional
 // composition member that contributes its own `properties`/`required` — the
 // latter is what an inlined `$ref` (a flattened component schema) collapses to.
+// An unconditional member is a full subschema, so it can also carry the standard
+// subschema fields a flattened `$ref` keeps (e.g. `additionalProperties`,
+// `description`).
 export interface JsonSchemaConditional {
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
+  additionalProperties?: boolean | JsonSchemaProperty;
+  description?: string;
 }
 
 // JsonSchemaObject is the flat object subschema the form renders — one control

@@ -49,6 +49,8 @@ export {
   type FilterBarSearchProps,
   type FilterBarSelectMultiFilter,
   type FilterBarTextFilter,
+  TriStateMultiSelect,
+  type TriStateMultiSelectProps,
 } from "./components/FilterBar";
 export {
   MultiSelect,
