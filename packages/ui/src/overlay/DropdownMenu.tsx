@@ -100,7 +100,16 @@ export function DropdownMenu({
   });
 
   const click = useClick(context);
-  const dismiss = useDismiss(context);
+  const dismiss = useDismiss(context, {
+    // A modal opened from inside the menu (e.g. a log dialog) portals to
+    // document.body, so a press within it counts as "outside" the menu and would
+    // otherwise dismiss it — unmounting the modal along with the menu's children.
+    // Keep the menu open while the press lands inside any [role="dialog"].
+    outsidePress: (event) => {
+      const target = event.target as Element | null;
+      return !target?.closest?.("[role='dialog']");
+    },
+  });
   const role = useRole(context, { role: "menu" });
   const listNav = useListNavigation(context, {
     listRef,

@@ -54,6 +54,23 @@ describe("Modal", () => {
     expect(screen.queryByRole("button", { name: "Expand to fullscreen" })).not.toBeInTheDocument();
   });
 
+  it("portals the overlay to document.body so it escapes a transformed ancestor", () => {
+    // A CSS transform on an ancestor makes a descendant's position:fixed resolve
+    // against that ancestor, which would clip the modal. Portaling to document.body
+    // is what prevents that — assert the overlay is a direct child of the body, not
+    // of the transformed wrapper it was declared in.
+    render(
+      <div style={{ transform: "translateX(0)" }} data-testid="wrapper">
+        <Modal open onClose={() => {}} title="Detail">
+          <p>body</p>
+        </Modal>
+      </div>,
+    );
+    const overlay = getDialog().closest("[role='presentation']") as HTMLElement;
+    expect(overlay.parentElement).toBe(document.body);
+    expect(screen.getByTestId("wrapper")).not.toContainElement(overlay);
+  });
+
   describe("confirmClose", () => {
     function ConfirmHarness({ confirmClose }: { confirmClose: boolean }) {
       const [open, setOpen] = useState(true);
