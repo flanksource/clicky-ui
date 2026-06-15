@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AppShell } from "./AppShell";
 
@@ -34,5 +34,62 @@ describe("AppShell", () => {
       </AppShell>,
     );
     expect(screen.getByTestId("toolbar")).toBeTruthy();
+  });
+
+  it("renders nav sections and hides item labels when the rail is collapsed", () => {
+    render(
+      <AppShell
+        navSections={[{ label: "Operations", items: [{ key: "p", label: "Policies" }] }]}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+    expect(screen.getByText("Policies")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    // Collapsed: labels are dropped from the DOM, only icons remain.
+    expect(screen.queryByText("Policies")).toBeNull();
+  });
+
+  it("invokes a nav item's onClick", () => {
+    let clicked = "";
+    render(
+      <AppShell navSections={[{ items: [{ key: "p", label: "Policies", onClick: () => (clicked = "p") }] }]}>
+        <p>content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Policies" }));
+    expect(clicked).toBe("p");
+  });
+
+  it("renders the fixed body header and body actions on the same row", () => {
+    render(
+      <AppShell bodyHeader={<div>HeaderBar</div>} bodyActions={<button>Run</button>}>
+        <p>content</p>
+      </AppShell>,
+    );
+    expect(screen.getByText("HeaderBar")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Run" })).toBeTruthy();
+    expect(screen.getByText("content")).toBeTruthy();
+  });
+
+  it("renders a body-sidebar split alongside the scrolling body-main", () => {
+    render(
+      <AppShell bodySidebar={<nav>tree</nav>}>
+        <p>content</p>
+      </AppShell>,
+    );
+    expect(screen.getByText("tree")).toBeTruthy();
+    expect(screen.getByText("content")).toBeTruthy();
+  });
+
+  it("passes the collapsed flag to a custom sidebar render-prop", () => {
+    render(
+      <AppShell sidebar={(collapsed) => <div>rail:{collapsed ? "min" : "full"}</div>}>
+        <p>content</p>
+      </AppShell>,
+    );
+    expect(screen.getByText("rail:full")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(screen.getByText("rail:min")).toBeTruthy();
   });
 });

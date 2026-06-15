@@ -54,6 +54,14 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--fs-font-sans);
   --font-mono: var(--fs-font-mono);
 }
@@ -85,6 +93,18 @@
     --input: var(--fs-border-default);
     --ring: var(--fs-primary-blue);
     --radius: var(--fs-radius-lg);
+
+    /* Sidebar: a medium navy surface (same in light & dark), used by the
+     * AppShell nav rail — modeled on oipa-cli's dark sidebar but lighter than
+     * near-black so it reads as navy rather than black. */
+    --sidebar: #1e2b48;
+    --sidebar-foreground: #c2cce0;
+    --sidebar-border: #33425f;
+    --sidebar-accent: #2c3c5e;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-primary: #7cb0ff;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-ring: var(--fs-primary-blue);
   }
 
   :root,
