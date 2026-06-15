@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 test("renders the kitchen-sink page with Button showcase", async ({ page }) => {
   await page.goto("/?demo=button", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: "Clicky UI — Kitchen Sink" })).toBeVisible();
+  await expect(page.getByText("Clicky UI · Kitchen Sink")).toBeVisible();
   const buttonDemo = page.locator("#button");
   await expect(buttonDemo.getByRole("button", { name: "Destructive", exact: true })).toBeVisible();
   await expect(buttonDemo.getByRole("button", { name: "Outline", exact: true })).toBeVisible();
@@ -25,7 +25,7 @@ test("theme switcher updates <html data-theme> and persists", async ({ page }) =
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-theme", /light|dark/);
 
-  await page.getByRole("button", { name: "Theme" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Theme" }).click();
   await page.getByRole("menuitemradio", { name: "dark" }).click();
   await expect(html).toHaveAttribute("data-theme", "dark");
 
@@ -36,7 +36,7 @@ test("theme switcher updates <html data-theme> and persists", async ({ page }) =
 test("density switcher updates <html data-density> and persists", async ({ page }) => {
   const html = page.locator("html");
 
-  await page.getByRole("button", { name: "Density" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Density" }).click();
   await page.getByRole("menuitemradio", { name: "compact" }).click();
   await expect(html).toHaveAttribute("data-density", "compact");
 
