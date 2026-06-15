@@ -1,5 +1,13 @@
-import { DensityProvider, TabButton, ThemeProvider, useHistoryRoute } from "@flanksource/clicky-ui";
-import { Sidebar } from "./Sidebar";
+import { useMemo, useState } from "react";
+import {
+  AppShell,
+  DensityProvider,
+  DensitySwitcher,
+  ThemeProvider,
+  ThemeSwitcher,
+  useHistoryRoute,
+  type AppShellNavSection,
+} from "@flanksource/clicky-ui";
 import { DEFAULT_DEMO_ID, DEMO_GROUPS, findDemoEntry, findDemoGroup } from "./demo-catalog";
 
 export function App() {
@@ -14,8 +22,26 @@ export function App() {
     build: (next) => `?demo=${encodeURIComponent(next.demo)}`,
   });
 
+  const [query, setQuery] = useState("");
+
   const activeDemo = findDemoEntry(route.demo) ?? findDemoEntry(DEFAULT_DEMO_ID);
   const activeGroup = findDemoGroup(activeDemo?.id ?? DEFAULT_DEMO_ID) ?? DEMO_GROUPS[0];
+
+  const navSections = useMemo<AppShellNavSection[]>(() => {
+    const q = query.trim().toLowerCase();
+    return DEMO_GROUPS.map((group) => ({
+      label: group.title,
+      items: group.items
+        .filter((item) => !q || item.label.toLowerCase().includes(q))
+        .map((item) => ({
+          key: item.id,
+          label: item.label,
+          ...(item.icon ? { icon: item.icon } : {}),
+          active: item.id === activeDemo?.id,
+          onClick: () => navigate({ demo: item.id }),
+        })),
+    })).filter((section) => section.items.length > 0);
+  }, [query, activeDemo?.id, navigate]);
 
   if (!activeDemo || !activeGroup) {
     return null;
@@ -26,45 +52,50 @@ export function App() {
   return (
     <ThemeProvider>
       <DensityProvider>
-        <div className="mx-auto flex max-w-6xl gap-density-6 p-density-4">
-          <Sidebar
-            groups={DEMO_GROUPS}
-            activeId={activeDemo.id}
-            onSelect={(demo) => navigate({ demo })}
-          />
-          <main className="min-w-0 flex-1 space-y-density-5">
-            <header className="space-y-density-2">
-              <h1 className="text-2xl font-bold">Clicky UI — Kitchen Sink</h1>
-              <p className="text-muted-foreground text-sm">
-                One component per tab. Preact-hosted via <code>preact/compat</code>.
-              </p>
-              <div className="space-y-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {activeGroup.title}
-                </div>
-                <div
-                  className="flex flex-wrap gap-2"
-                  role="tablist"
-                  aria-label={`${activeGroup.title} tabs`}
-                >
-                  {activeGroup.items.map((item) => (
-                    <TabButton
-                      key={item.id}
-                      active={item.id === activeDemo.id}
-                      onClick={() => navigate({ demo: item.id })}
-                      label={item.label}
-                      className="rounded-full"
-                    />
-                  ))}
-                </div>
-              </div>
-            </header>
-
-            <div id={`demo-panel-${activeDemo.id}`} role="tabpanel" className="min-w-0">
-              <ActiveDemoComponent />
+        <AppShell
+          brand={
+            <>
+              <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                C
+              </span>
+              <span className="font-semibold tracking-tight">Clicky UI · Kitchen Sink</span>
+            </>
+          }
+          search={
+            <input
+              value={query}
+              onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
+              placeholder="Filter components…"
+              aria-label="Filter components"
+              className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
+            />
+          }
+          actions={
+            <>
+              <ThemeSwitcher />
+              <DensitySwitcher />
+            </>
+          }
+          navSections={navSections}
+          collapsedStorageKey="kitchen-sink:sidebar:collapsed"
+          bodyHeader={
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {activeGroup.title}
+              </span>
+              <span className="text-muted-foreground">›</span>
+              <span className="font-medium">{activeDemo.label}</span>
             </div>
-          </main>
-        </div>
+          }
+        >
+          <div
+            id={`demo-panel-${activeDemo.id}`}
+            role="tabpanel"
+            className="min-w-0 p-density-4"
+          >
+            <ActiveDemoComponent />
+          </div>
+        </AppShell>
       </DensityProvider>
     </ThemeProvider>
   );

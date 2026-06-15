@@ -25,7 +25,7 @@ export function IconDemo() {
       <DemoRow label="Samples">
         {ICONS.map((name) => (
           <div key={name} className="flex items-center gap-density-2 text-sm">
-            <iconify-icon icon={name} className="text-xl" />
+            <iconify-icon icon={name} class="text-xl" />
             <code className="text-xs text-muted-foreground">{name}</code>
           </div>
         ))}
