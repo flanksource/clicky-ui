@@ -4,5 +4,6 @@
  * the resolved utility-class rules alongside the tokens, so consumers don't
  * need to add their own `@source` directive pointing at our node_modules. */
 @import "tailwindcss";
+@import "./fs-tokens.css";
 @source "../**/*.{ts,tsx}";
 @import "./tokens.css";

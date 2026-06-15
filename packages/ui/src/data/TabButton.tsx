@@ -2,6 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "./Icon";
 
+/** Visual style: a filled `pill` (default) or an `underline` tab. */
+export type TabButtonVariant = "pill" | "underline";
+
 export type TabButtonProps = {
   /** Current selected state. */
   active: boolean;
@@ -15,9 +18,25 @@ export type TabButtonProps = {
   count?: number;
   /** Classes for the count badge background. */
   countColor?: string;
+  /** Visual style. Defaults to `pill`. */
+  variant?: TabButtonVariant;
   /** Classes applied to the button. */
   className?: string;
 };
+
+const variantClasses: Record<TabButtonVariant, { base: string; active: string; inactive: string }> =
+  {
+    pill: {
+      base: "rounded-md",
+      active: "bg-primary text-primary-foreground",
+      inactive: "text-muted-foreground hover:bg-accent hover:text-foreground",
+    },
+    underline: {
+      base: "rounded-none border-b-2 -mb-px",
+      active: "border-primary text-foreground font-medium",
+      inactive: "border-transparent text-muted-foreground hover:text-foreground",
+    },
+  };
 
 export function TabButton({
   active,
@@ -26,8 +45,10 @@ export function TabButton({
   icon,
   count,
   countColor = "bg-muted-foreground",
+  variant = "pill",
   className,
 }: TabButtonProps) {
+  const v = variantClasses[variant];
   return (
     <button
       type="button"
@@ -35,10 +56,9 @@ export function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 px-density-3 py-density-1.5 text-sm rounded-md transition-colors",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "inline-flex items-center gap-1.5 px-density-3 py-density-1.5 text-sm transition-colors",
+        v.base,
+        active ? v.active : v.inactive,
         className,
       )}
     >

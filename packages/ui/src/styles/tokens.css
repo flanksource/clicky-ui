@@ -28,74 +28,82 @@
  * / etc. are runtime-switchable with the `data-theme` attribute. Without
  * the `inline` keyword, Tailwind tries to resolve var(--primary) at
  * compile time, finds nothing, and drops the token silently.
+ *
+ * The shadcn tokens (--background, --primary, …) are full-color aliases of
+ * the Flanksource fs-tokens (see fs-tokens.css and the @layer below), so the
+ * utilities reference them directly with `var(--token)` (no `hsl()` wrapper).
+ * Tailwind v4 still applies opacity modifiers (`bg-primary/10`) via color-mix.
  */
 @theme inline {
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--fs-font-sans);
+  --font-mono: var(--fs-font-mono);
 }
 
 @layer clicky-tokens {
-  :root,
-  [data-theme="light"] {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
+  /* shadcn-style tokens aliased to the Flanksource fs-tokens. These are
+   * theme-independent here — fs-tokens.css redefines the referenced --fs-*
+   * variables under [data-theme="dark"], so light/dark flips automatically.
+   * Token *names* are unchanged, so every bg-primary / text-foreground /
+   * border-border utility keeps working. */
+  :root {
+    --background: var(--fs-bg-canvas);
+    --foreground: var(--fs-fg-1);
+    --card: var(--fs-bg-canvas);
+    --card-foreground: var(--fs-fg-1);
+    --popover: var(--fs-bg-canvas);
+    --popover-foreground: var(--fs-fg-1);
+    --primary: var(--fs-primary-blue);
+    --primary-foreground: var(--fs-fg-on-brand);
+    --secondary: var(--fs-bg-muted);
+    --secondary-foreground: var(--fs-fg-1);
+    --muted: var(--fs-bg-muted);
+    --muted-foreground: var(--fs-fg-muted);
+    --accent: var(--fs-bg-muted);
+    --accent-foreground: var(--fs-fg-1);
+    --destructive: var(--fs-error);
+    --destructive-foreground: var(--fs-fg-on-brand);
+    --border: var(--fs-border-subtle);
+    --input: var(--fs-border-default);
+    --ring: var(--fs-primary-blue);
+    --radius: var(--fs-radius-lg);
 
-  [data-theme="dark"] {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    /* Sidebar: a medium navy surface (same in light & dark), used by the
+     * AppShell nav rail. It is lighter than near-black so it reads as navy. */
+    --sidebar: #1e2b48;
+    --sidebar-foreground: #c2cce0;
+    --sidebar-border: #33425f;
+    --sidebar-accent: #2c3c5e;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-primary: #7cb0ff;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-ring: var(--fs-primary-blue);
   }
 
   :root,
@@ -121,12 +129,13 @@
   }
 
   * {
-    border-color: hsl(var(--border));
+    border-color: var(--border);
   }
 
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
   }
 }
 
@@ -175,7 +184,7 @@
   width: 3rem;
   padding-right: 0.5rem;
   text-align: right;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   user-select: none;
 }
 

@@ -7,8 +7,8 @@ allowBuilds:
   vue-demi: true
 
 catalog:
-  '@ai-sdk/react': ^3.0.201
-  '@floating-ui/react': ^0.27.19
+  "@ai-sdk/react": ^3.0.201
+  "@floating-ui/react": ^0.27.19
   "@oxlint/plugins": ^1.60.0
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3

@@ -1,0 +1,254 @@
+/* ==========================================================================
+   Flanksource Design System — Colors & Type
+   Based on Flanksource Brand Guidelines (Mission Control, Canary Checker, Config DB)
+
+   Vendored into clicky-ui as the canonical token source. The shadcn tokens in
+   tokens.css alias these `--fs-*` variables. Fonts (Open Sans / Merriweather /
+   Fira Code) are NOT @imported here — a remote @import is invalid mid-bundle;
+   consumers load the font faces themselves (e.g. a <link> in the page shell).
+
+   Light values bind to both :root and [data-theme="light"] so a nested
+   light-themed subtree on a dark page resets correctly (mirrors clicky's
+   original convention).
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  /* -----------------------------------------------------------------
+     COLORS — Primary / Brand
+     ----------------------------------------------------------------- */
+  --fs-primary-blue: #3578e5;        /* Links, CTAs, primary actions */
+  --fs-cta-blue: #0053f8;            /* High-emphasis buttons */
+  --fs-dark-navy: #131f3b;           /* Footer, dark backgrounds */
+
+  /* Accent */
+  --fs-sky-500: #0ea5e9;             /* Accent highlights */
+  --fs-indigo-500: #6366f1;          /* Secondary accent */
+
+  /* Grayscale (Tailwind-style scale used throughout Flanksource products) */
+  --fs-gray-50:  #f9fafb;
+  --fs-gray-100: #f3f4f6;
+  --fs-gray-200: #e5e7eb;
+  --fs-gray-300: #d1d5db;
+  --fs-gray-400: #9ca3af;
+  --fs-gray-500: #6b7280;
+  --fs-gray-600: #4b5563;
+  --fs-gray-700: #374151;
+  --fs-gray-800: #1f2937;
+  --fs-gray-900: #111827;
+  --fs-gray-950: #030712;
+
+  /* -----------------------------------------------------------------
+     SEMANTIC — Tailwind-derived modern palette
+     Built on Tailwind v3 ramps. We bias one stop deeper than typical
+     "candy" usage (600 over 500) for calmer, more legible UI.
+     ----------------------------------------------------------------- */
+
+  /* Success — Tailwind emerald (less neon than green-500) */
+  --fs-success-50:  #ecfdf5;  /* emerald-50 */
+  --fs-success-100: #d1fae5;  /* emerald-100 */
+  --fs-success-200: #a7f3d0;  /* emerald-200 */
+  --fs-success-500: #10b981;  /* emerald-500 */
+  --fs-success-600: #059669;  /* emerald-600 */
+  --fs-success-700: #047857;  /* emerald-700 */
+  --fs-success: var(--fs-success-600);
+
+  /* Error — Tailwind rose (warmer & less harsh than red-600) */
+  --fs-error-50:  #fff1f2;    /* rose-50 */
+  --fs-error-100: #ffe4e6;    /* rose-100 */
+  --fs-error-200: #fecdd3;    /* rose-200 */
+  --fs-error-500: #f43f5e;    /* rose-500 */
+  --fs-error-600: #e11d48;    /* rose-600 */
+  --fs-error-700: #be123c;    /* rose-700 */
+  --fs-error: var(--fs-error-600);
+
+  /* Warning — Tailwind amber, deepened to 600 for body text contrast */
+  --fs-warning-50:  #fffbeb;  /* amber-50 */
+  --fs-warning-100: #fef3c7;  /* amber-100 */
+  --fs-warning-200: #fde68a;  /* amber-200 */
+  --fs-warning-500: #f59e0b;  /* amber-500 */
+  --fs-warning-600: #d97706;  /* amber-600 */
+  --fs-warning-700: #b45309;  /* amber-700 */
+  --fs-warning: var(--fs-warning-600);
+
+  /* Info — Tailwind sky (distinct from #3578e5 brand blue) */
+  --fs-info-50:  #f0f9ff;     /* sky-50 */
+  --fs-info-100: #e0f2fe;     /* sky-100 */
+  --fs-info-200: #bae6fd;     /* sky-200 */
+  --fs-info-500: #0ea5e9;     /* sky-500 */
+  --fs-info-600: #0284c7;     /* sky-600 */
+  --fs-info-700: #0369a1;     /* sky-700 */
+  --fs-info: var(--fs-info-600);
+
+  /* Hint — Tailwind teal, for tooltips & "did you know" */
+  --fs-hint-50:  #f0fdfa;     /* teal-50 */
+  --fs-hint-100: #ccfbf1;     /* teal-100 */
+  --fs-hint-200: #99f6e4;     /* teal-200 */
+  --fs-hint-500: #14b8a6;     /* teal-500 */
+  --fs-hint-600: #0d9488;     /* teal-600 */
+  --fs-hint-700: #0f766e;     /* teal-700 */
+  --fs-hint: var(--fs-hint-600);
+
+  /* Prerequisite — Tailwind violet, for "you need this first" */
+  --fs-prereq-50:  #f5f3ff;   /* violet-50 */
+  --fs-prereq-100: #ede9fe;   /* violet-100 */
+  --fs-prereq-200: #ddd6fe;   /* violet-200 */
+  --fs-prereq-500: #8b5cf6;   /* violet-500 */
+  --fs-prereq-600: #7c3aed;   /* violet-600 */
+  --fs-prereq-700: #6d28d9;   /* violet-700 */
+  --fs-prereq: var(--fs-prereq-600);
+
+  /* -----------------------------------------------------------------
+     SEMANTIC COLOR TOKENS — light mode default
+     ----------------------------------------------------------------- */
+  /* Foreground */
+  --fs-fg-1: #061431;                /* Primary text */
+  --fs-fg-2: #030712;                /* Heading text */
+  --fs-fg-3: #374151;                /* Secondary body */
+  --fs-fg-muted: #666666;            /* Muted / tertiary */
+  --fs-fg-subtle: #9ca3af;           /* Captions, placeholders */
+  --fs-fg-on-brand: #ffffff;         /* Text on blue */
+  --fs-fg-link: var(--fs-primary-blue);
+
+  /* Background */
+  --fs-bg-canvas: #ffffff;           /* App canvas */
+  --fs-bg-subtle: #f9fafb;           /* Section bg */
+  --fs-bg-muted:  #f3f4f6;           /* Card panels */
+  --fs-bg-inset:  #e5e7eb;           /* Inset / code bg */
+  --fs-bg-inverse: var(--fs-dark-navy);
+  --fs-bg-brand: var(--fs-primary-blue);
+  --fs-bg-cta: var(--fs-cta-blue);
+
+  /* Border */
+  --fs-border-subtle: #e5e7eb;
+  --fs-border-default: #d1d5db;
+  --fs-border-strong: #9ca3af;
+  --fs-border-focus: var(--fs-primary-blue);
+
+  /* -----------------------------------------------------------------
+     TYPOGRAPHY — families
+     ----------------------------------------------------------------- */
+  --fs-font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  --fs-font-serif: 'Merriweather', Georgia, serif;
+  --fs-font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Sizes (from brand guidelines) */
+  --fs-text-xs:   0.8125rem;  /* 13px */
+  --fs-text-sm:   0.875rem;   /* 14px */
+  --fs-text-base: 1rem;       /* 16px */
+  --fs-text-md:   1rem;       /* H3-H6 */
+  --fs-text-lg:   1.25rem;    /* H2, 20px */
+  --fs-text-xl:   1.5rem;     /* H1, 24px */
+  --fs-text-2xl:  2rem;       /* Display S, 32px */
+  --fs-text-3xl:  2.5rem;     /* Display M, 40px */
+  --fs-text-4xl:  3.5rem;     /* Display L, 56px */
+
+  /* Weights */
+  --fs-weight-regular: 400;
+  --fs-weight-medium: 500;
+  --fs-weight-semibold: 600;
+  --fs-weight-bold: 700;
+
+  /* Line heights */
+  --fs-lh-body: 1.75;
+  --fs-lh-tight: 1.5;
+  --fs-lh-heading: 1.2;
+
+  /* Letter spacing */
+  --fs-tracking-body: 0.03rem;
+  --fs-tracking-heading: normal;
+  --fs-tracking-wide: 0.08rem;
+
+  /* -----------------------------------------------------------------
+     RADII
+     ----------------------------------------------------------------- */
+  --fs-radius-xs: 2px;
+  --fs-radius-sm: 4px;
+  --fs-radius-md: 6px;
+  --fs-radius-lg: 8px;
+  --fs-radius-xl: 12px;
+  --fs-radius-2xl: 16px;
+  --fs-radius-full: 9999px;
+
+  /* -----------------------------------------------------------------
+     SHADOWS (Tailwind-style, matched to Flanksource surfaces)
+     ----------------------------------------------------------------- */
+  --fs-shadow-xs: 0 1px 2px 0 rgba(6, 20, 49, 0.05);
+  --fs-shadow-sm: 0 1px 2px 0 rgba(6, 20, 49, 0.06), 0 1px 3px 0 rgba(6, 20, 49, 0.10);
+  --fs-shadow-md: 0 4px 6px -1px rgba(6, 20, 49, 0.08), 0 2px 4px -2px rgba(6, 20, 49, 0.06);
+  --fs-shadow-lg: 0 10px 15px -3px rgba(6, 20, 49, 0.08), 0 4px 6px -4px rgba(6, 20, 49, 0.05);
+  --fs-shadow-xl: 0 20px 25px -5px rgba(6, 20, 49, 0.10), 0 8px 10px -6px rgba(6, 20, 49, 0.06);
+  --fs-shadow-focus: 0 0 0 3px rgba(53, 120, 229, 0.25);
+
+  /* -----------------------------------------------------------------
+     SPACING (4px base unit)
+     ----------------------------------------------------------------- */
+  --fs-space-1: 4px;
+  --fs-space-2: 8px;
+  --fs-space-3: 12px;
+  --fs-space-4: 16px;
+  --fs-space-5: 20px;
+  --fs-space-6: 24px;
+  --fs-space-8: 32px;
+  --fs-space-10: 40px;
+  --fs-space-12: 48px;
+  --fs-space-16: 64px;
+  --fs-space-20: 80px;
+  --fs-space-24: 96px;
+
+  /* -----------------------------------------------------------------
+     TRANSITIONS
+     ----------------------------------------------------------------- */
+  --fs-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fs-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --fs-duration-fast: 120ms;
+  --fs-duration-base: 180ms;
+  --fs-duration-slow: 280ms;
+}
+
+/* ==========================================================================
+   Dark mode overrides — applied via [data-theme="dark"]
+   Mission Control dark UI uses gray-900/950 canvas
+   ========================================================================== */
+[data-theme="dark"] {
+  --fs-fg-1: #f9fafb;
+  --fs-fg-2: #ffffff;
+  --fs-fg-3: #d1d5db;
+  --fs-fg-muted: #9ca3af;
+  --fs-fg-subtle: #6b7280;
+
+  --fs-bg-canvas: #030712;
+  --fs-bg-subtle: #111827;
+  --fs-bg-muted:  #1f2937;
+  --fs-bg-inset:  #374151;
+
+  --fs-border-subtle: #1f2937;
+  --fs-border-default: #374151;
+  --fs-border-strong: #4b5563;
+
+  /* Semantic — dark mode lifts the subtle/border stops, keeps mid-stop for icons */
+  /* dark-mode: invert ramp — surface goes deep, text goes light */
+  --fs-success-50: #022c22; --fs-success-100: #064e3b; --fs-success-200: #065f46;
+  --fs-success-500: #34d399; --fs-success-600: #6ee7b7; --fs-success-700: #a7f3d0;
+  --fs-success: var(--fs-success-500);
+
+  --fs-error-50: #4c0519; --fs-error-100: #881337; --fs-error-200: #9f1239;
+  --fs-error-500: #fb7185; --fs-error-600: #fda4af; --fs-error-700: #fecdd3;
+  --fs-error: var(--fs-error-500);
+
+  --fs-warning-50: #451a03; --fs-warning-100: #78350f; --fs-warning-200: #92400e;
+  --fs-warning-500: #fbbf24; --fs-warning-600: #fcd34d; --fs-warning-700: #fde68a;
+  --fs-warning: var(--fs-warning-500);
+
+  --fs-info-50: #082f49; --fs-info-100: #0c4a6e; --fs-info-200: #075985;
+  --fs-info-500: #38bdf8; --fs-info-600: #7dd3fc; --fs-info-700: #bae6fd;
+  --fs-info: var(--fs-info-500);
+
+  --fs-hint-50: #042f2e; --fs-hint-100: #134e4a; --fs-hint-200: #115e59;
+  --fs-hint-500: #2dd4bf; --fs-hint-600: #5eead4; --fs-hint-700: #99f6e4;
+  --fs-hint: var(--fs-hint-500);
+
+  --fs-prereq-50: #2e1065; --fs-prereq-100: #4c1d95; --fs-prereq-200: #5b21b6;
+  --fs-prereq-500: #a78bfa; --fs-prereq-600: #c4b5fd; --fs-prereq-700: #ddd6fe;
+  --fs-prereq: var(--fs-prereq-500);
+}
