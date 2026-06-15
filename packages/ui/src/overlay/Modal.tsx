@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { Button } from "../components/button";
@@ -140,14 +141,17 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  const overlay = (
     <div
       className={cn(
         "fixed inset-0 flex items-center justify-center",
         // Nested modals dim less so the dialog they opened over stays visible.
         depth === 0 ? "bg-black/40" : "bg-black/20",
       )}
-      style={{ zIndex: 50 + depth * 10 }}
+      // Above the z-[9999] popover/overlay layer (dropdowns, tooltips, toasts) so a
+      // modal opened from one of them stacks on top; +depth keeps nested modals
+      // above their parent.
+      style={{ zIndex: 10000 + depth * 10 }}
       onClick={closeOnBackdrop ? requestClose : undefined}
       role="presentation"
     >
@@ -212,6 +216,12 @@ export function Modal({
       </div>
     </div>
   );
+
+  // Render into document.body so the fixed-position overlay escapes any ancestor
+  // transform/overflow (e.g. a dropdown menu positioned via a CSS transform),
+  // which would otherwise trap position:fixed inside that ancestor's box and clip
+  // the modal to it.
+  return typeof document !== "undefined" ? createPortal(overlay, document.body) : null;
 }
 
 function ConfirmClosePrompt({

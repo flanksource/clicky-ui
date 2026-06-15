@@ -45,6 +45,24 @@ describe("DropdownMenu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
+  it("stays open when an outside press lands inside a [role=dialog]", () => {
+    // A modal opened from the menu portals to document.body, so a press inside it
+    // is "outside" the menu. It must not dismiss the menu, which would unmount the
+    // modal (the menu's own render-prop child) along with it.
+    render(
+      <div>
+        <DropdownMenu label="Download" items={items()} />
+        <div role="dialog" aria-modal="true">
+          <button type="button">in dialog</button>
+        </div>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByText("in dialog"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
   it("does not fire onSelect for a disabled item", () => {
     const onSelect = vi.fn();
     render(
