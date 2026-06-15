@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import type { RenderLink } from "./EndpointList";
-import { EntityExplorerApp, type EntityExplorerAppProps } from "./EntityExplorerApp";
-import { mockChatTransport } from "../data/chat/Chat.fixtures";
+import { EntityExplorerApp } from "./EntityExplorerApp";
 import { ThemeProvider } from "../hooks/theme-provider";
 
 function makeClient(): OperationsApiClient {
@@ -39,30 +38,28 @@ const renderLink: RenderLink = ({ to, className, children, key }) => (
   </a>
 );
 
-function renderApp(extra?: Pick<EntityExplorerAppProps, "chat">) {
+function renderApp() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
-        <EntityExplorerApp
-          client={makeClient()}
-          pathname="/widgets"
-          renderLink={renderLink}
-          {...extra}
-        />
+        <EntityExplorerApp client={makeClient()} pathname="/widgets" renderLink={renderLink} />
       </QueryClientProvider>
     </ThemeProvider>,
   );
 }
 
-describe("EntityExplorerApp chat integration", () => {
-  it("mounts the chat launch FAB when a chat config is provided", () => {
-    renderApp({ chat: { modelsApi: null, transport: mockChatTransport() } });
-    expect(screen.getByTestId("chat-fab")).toBeTruthy();
+describe("EntityExplorerApp", () => {
+  it("renders a sidebar nav link for each surface declared in the spec", async () => {
+    renderApp();
+    // The "widgets" surface from makeClient()'s x-clicky spec renders as a
+    // clickable nav link labelled with its title once the OpenAPI spec resolves.
+    const links = await screen.findAllByRole("link", { name: "Widgets" });
+    expect(links.length).toBeGreaterThan(0);
   });
 
-  it("renders no chat affordance when chat is omitted", () => {
+  it("shows the spec's title in the sidebar header", async () => {
     renderApp();
-    expect(screen.queryByTestId("chat-fab")).toBeNull();
+    expect(await screen.findByText("test")).toBeTruthy();
   });
 });
