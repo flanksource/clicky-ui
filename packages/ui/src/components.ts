@@ -138,7 +138,12 @@ export type {
 } from "./components/json-schema-form-types";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
-export { AppShell, type AppShellProps } from "./layout/AppShell";
+export {
+  AppShell,
+  type AppShellProps,
+  type AppShellNavItem,
+  type AppShellNavSection,
+} from "./layout/AppShell";
 export { Panel, type PanelProps, type PanelTone } from "./layout/Panel";
 export { Tabs, type TabsProps, type TabItem } from "./layout/Tabs";
 export {
