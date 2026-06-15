@@ -97,7 +97,7 @@ export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
-export { TabButton, type TabButtonProps } from "./data/TabButton";
+export { TabButton, type TabButtonProps, type TabButtonVariant } from "./data/TabButton";
 export {
   TimeseriesPanel,
   resolveSeries,
