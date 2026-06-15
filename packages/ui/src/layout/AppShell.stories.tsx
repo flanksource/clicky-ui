@@ -96,7 +96,7 @@ export const NoToolbar: Story = {
   ),
 };
 
-// OIPA / Mission-Control style: collapsible nav rail, a centered search,
+// Mission-Control style: collapsible nav rail, a centered search,
 // right-side icon buttons + an org/settings picker, and a body with a fixed
 // header + actions row over a bodySidebar | body-main split.
 export const WithSidebar: Story = {
@@ -140,7 +140,7 @@ export const WithSidebar: Story = {
                 Docs
               </Button>
               <Button variant="outline" size="sm">
-                LAB_OIPA_QA ▾
+                LAB_DEMO_QA ▾
               </Button>
             </>
           }

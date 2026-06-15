@@ -29,8 +29,8 @@ import {
 } from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
 
-// Mirrors oipa-cli's nav (www/src/lib/navigation.ts) so the demo reads as a
-// faithful Mission-Control-for-OIPA replica for side-by-side comparison.
+// Mirrors a production app nav so the demo reads as a faithful application
+// shell replica for side-by-side comparison.
 const NAV = [
   { section: undefined, items: [{ key: "dashboard", label: "Dashboard", icon: UiLayoutDashboard }] },
   {
@@ -98,7 +98,7 @@ export function AppShellDemo() {
     <DemoSection
       id="app-shell"
       title="AppShell"
-      description="Sidebar-first application shell (a router-agnostic port of oipa-cli's Layout/Sidebar/Header): a full-height dark nav rail owns the brand + collapse toggle and renders grouped, icon'd nav sections; the top bar (search, actions) sits to its right; the body has a fixed bodyHeader + bodyActions row over a bodySidebar | body-main split. Toggle by the logo to collapse the rail."
+      description="Sidebar-first application shell: a full-height dark nav rail owns the brand + collapse toggle and renders grouped, icon'd nav sections; the top bar (search, actions) sits to its right; the body has a fixed bodyHeader + bodyActions row over a bodySidebar | body-main split. Toggle by the logo to collapse the rail."
     >
       <div className="h-[640px] overflow-hidden rounded-lg border border-border">
         <AppShell
@@ -120,7 +120,7 @@ export function AppShellDemo() {
                 Docs
               </Button>
               <Button variant="outline" size="sm">
-                LAB_OIPA_QA ▾
+                LAB_DEMO_QA ▾
               </Button>
             </>
           }

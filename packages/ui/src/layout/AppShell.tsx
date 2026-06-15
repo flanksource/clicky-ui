@@ -4,9 +4,8 @@ import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiSidebar } from "../icons";
 import { SplitPane } from "./SplitPane";
 
-// AppShell is a sidebar-first application shell (a router-agnostic port of
-// oipa-cli's Layout/Sidebar/Header). The full-height DARK nav rail owns the
-// brand + collapse toggle and renders grouped nav sections; the top bar
+// AppShell is a sidebar-first application shell. The full-height DARK nav rail
+// owns the brand + collapse toggle and renders grouped nav sections; the top bar
 // (search, actions) sits to the RIGHT of the rail — there is no full-width top
 // bar when a rail is present. With no rail, the top bar spans full width. The
 // body carries a fixed bodyHeader + bodyActions row over an optional

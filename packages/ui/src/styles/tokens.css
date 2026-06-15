@@ -95,8 +95,7 @@
     --radius: var(--fs-radius-lg);
 
     /* Sidebar: a medium navy surface (same in light & dark), used by the
-     * AppShell nav rail — modeled on oipa-cli's dark sidebar but lighter than
-     * near-black so it reads as navy rather than black. */
+     * AppShell nav rail. It is lighter than near-black so it reads as navy. */
     --sidebar: #1e2b48;
     --sidebar-foreground: #c2cce0;
     --sidebar-border: #33425f;
