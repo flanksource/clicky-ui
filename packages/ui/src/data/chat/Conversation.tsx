@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import { UiArrowDown, UiLoader } from "../../icons";
+import { UiArrowDown, UiCircleX, UiLoader } from "../../icons";
 import { Message, type MessageActionHandlers } from "./Message";
 import type { ChatStatus, UIMessage } from "./types";
 
@@ -9,6 +9,10 @@ export type ConversationProps = MessageActionHandlers & {
   messages: UIMessage[];
   /** Current chat status; used for transient pending/error affordances. */
   status?: ChatStatus | undefined;
+  /** Last request error from the chat transport, if any. */
+  error?: Error | undefined;
+  /** Clears the visible transport error. */
+  onClearError?: (() => void) | undefined;
   /** Shown when there are no messages yet. */
   emptyState?: React.ReactNode;
   className?: string;
@@ -20,6 +24,8 @@ export type ConversationProps = MessageActionHandlers & {
 export function Conversation({
   messages,
   status,
+  error,
+  onClearError,
   emptyState,
   className,
   ...actions
@@ -27,6 +33,7 @@ export function Conversation({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
   const isWaiting = status === "submitted" || (status === "streaming" && !hasVisibleAssistantResponse(messages));
+  const errorText = error?.message || (status === "error" ? "The assistant request failed." : undefined);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -65,6 +72,7 @@ export function Conversation({
               <Message key={message.id} message={message} {...actions} />
             ))}
             {isWaiting && <LoadingIndicator />}
+            {errorText && <ErrorNotice message={errorText} onClear={onClearError} />}
           </div>
         )}
       </div>
@@ -98,6 +106,23 @@ function LoadingIndicator() {
     <div className="flex w-full max-w-[95%] items-center gap-2 text-sm text-muted-foreground">
       <Icon icon={UiLoader} className="size-4 shrink-0 animate-spin" />
       <span>Waiting for response...</span>
+    </div>
+  );
+}
+
+function ErrorNotice({ message, onClear }: { message: string; onClear?: (() => void) | undefined }) {
+  return (
+    <div
+      role="alert"
+      className="flex w-full max-w-[95%] items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+    >
+      <Icon icon={UiCircleX} className="mt-0.5 size-4 shrink-0" />
+      <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">{message}</div>
+      {onClear && (
+        <button type="button" className="shrink-0 text-xs underline-offset-2 hover:underline" onClick={onClear}>
+          Dismiss
+        </button>
+      )}
     </div>
   );
 }
