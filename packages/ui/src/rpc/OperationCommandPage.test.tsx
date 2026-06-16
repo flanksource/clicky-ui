@@ -251,6 +251,67 @@ describe("OperationCommandPage", () => {
     await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(1));
   });
 
+  it("keeps lookup date range filters with an auto-run GET result", async () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "test", version: "1" },
+      paths: {
+        "/api/v1/transactions": {
+          get: {
+            operationId: "transaction_list",
+            summary: "List transactions",
+            tags: ["transaction"],
+            parameters: [
+              { name: "entity", in: "query", required: false },
+              { name: "account", in: "query", required: false },
+              { name: "since", in: "query", required: false },
+              { name: "to", in: "query", required: false },
+            ],
+            responses: {},
+          },
+        },
+      },
+    };
+    const executeMock = vi.fn(async () =>
+      clickyResponse({
+        version: 1,
+        node: {
+          kind: "table",
+          columns: [{ name: "reference", label: "Reference" }],
+          rows: [],
+        },
+      }),
+    );
+    const lookupMock = vi.fn(async () => ({
+      filters: {
+        entity: { label: "Entity" },
+        account: { label: "Account" },
+        since: { label: "Since", type: "from" as const },
+        to: { label: "To", type: "to" as const },
+      },
+    }));
+    const client: OperationsApiClient = {
+      getOpenAPISpec: async () => spec,
+      executeCommand: executeMock,
+      lookupFilters: lookupMock,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCommandPage client={client} operationId="transaction_list" />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole("heading", { name: "List transactions" });
+    await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByLabelText("Date range filter")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Since")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
+  });
+
   it("honors explicit autoRun false for GET operations", async () => {
     const spec: OpenAPISpec = {
       openapi: "3.0.0",

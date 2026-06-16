@@ -9,6 +9,11 @@ export {
   type OperationPreviewMode,
 } from "./rpc/accept-options";
 export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
+export {
+  normalizeParameters,
+  pathParamNames,
+  submitValue,
+} from "./rpc/command-form-utils";
 export { CommandOutput, type CommandOutputProps } from "./rpc/CommandOutput";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
 export { InlineError, type InlineErrorProps } from "./rpc/InlineError";

@@ -25,7 +25,7 @@ function jsonResponse(data: unknown, init: ResponseInit = {}) {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(init.headers ?? {}),
+      ...init.headers,
     },
   });
 }
@@ -141,7 +141,9 @@ describe("createOperationsApiClient", () => {
       }),
     );
     const [, init] = fetchMock.mock.calls[0];
-    expect((init?.headers as Headers).get("Authorization")).toBe("Bearer token");
-    expect((init?.headers as Headers).get("Accept")).toBe("application/json");
+    expect(init).toBeDefined();
+    const headers = init!.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer token");
+    expect(headers.get("Accept")).toBe("application/json");
   });
 });

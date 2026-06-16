@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { UiSidebar } from "../icons";
+import { UiClose, UiMenu, UiSidebar } from "../icons";
 import { useRouter } from "../rpc/router";
 import type { RenderLink } from "../rpc/EndpointList";
 import { SplitPane } from "./SplitPane";
@@ -71,6 +71,8 @@ export type AppShellProps = {
   sidebarWidth?: number;
   /** Collapsed rail width in px. Defaults to 56. */
   collapsedWidth?: number;
+  /** Accessible label for the mobile navigation drawer. Defaults to "Navigation". */
+  mobileSidebarLabel?: string;
 
   // ── Body ─────────────────────────────────────────────────
   /** Fixed header row, left side (breadcrumb, title, tabs). */
@@ -114,6 +116,7 @@ export function AppShell(props: AppShellProps) {
     collapsedStorageKey,
     sidebarWidth = 240,
     collapsedWidth = 56,
+    mobileSidebarLabel = "Navigation",
     bodyHeader,
     bodyActions,
     bodySidebar,
@@ -128,6 +131,7 @@ export function AppShell(props: AppShellProps) {
   } = props;
 
   const hasSidebar = sidebar !== undefined || (navSections?.length ?? 0) > 0;
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState(
     () =>
@@ -140,6 +144,15 @@ export function AppShell(props: AppShellProps) {
       window.localStorage.setItem(collapsedStorageKey, String(collapsed));
   }, [collapsed, collapsedStorageKey]);
 
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileSidebarOpen]);
+
   const railWidth = collapsed ? collapsedWidth : sidebarWidth;
   const hasTopBar =
     (!hasSidebar && brand !== undefined) ||
@@ -147,7 +160,20 @@ export function AppShell(props: AppShellProps) {
     search !== undefined ||
     actions !== undefined ||
     toolbar !== undefined;
+  const hasMobileHeader = hasSidebar;
   const hasBodyHeader = bodyHeader !== undefined || bodyActions !== undefined;
+  const renderSidebarContent = (collapsedValue: boolean, onNavigate?: () => void) =>
+    typeof sidebar === "function"
+      ? sidebar(collapsedValue)
+      : sidebar !== undefined
+        ? sidebar
+        : navSections && (
+            <NavSections
+              sections={navSections}
+              collapsed={collapsedValue}
+              {...(onNavigate ? { onNavigate } : {})}
+            />
+          );
 
   return (
     <div className={cn("flex h-full min-h-0 w-full bg-background", className)}>
@@ -155,7 +181,7 @@ export function AppShell(props: AppShellProps) {
         <aside
           style={{ width: railWidth }}
           className={cn(
-            "flex shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
+            "hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
             sidebarClassName,
           )}
         >
@@ -188,13 +214,7 @@ export function AppShell(props: AppShellProps) {
             </div>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto py-density-2">
-            {typeof sidebar === "function"
-              ? sidebar(collapsed)
-              : sidebar !== undefined
-                ? sidebar
-                : navSections && (
-                    <NavSections sections={navSections} collapsed={collapsed} />
-                  )}
+            {renderSidebarContent(collapsed)}
           </div>
           {sidebarFooter && (
             <div className="mt-auto shrink-0 border-t border-sidebar-border px-density-3 py-density-2">
@@ -205,11 +225,45 @@ export function AppShell(props: AppShellProps) {
       )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {hasTopBar && (
+        {(hasTopBar || hasMobileHeader) && (
           <header className="shrink-0 border-b border-border bg-card">
+            {hasMobileHeader && (
+              <div className="flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:hidden">
+                <button
+                  type="button"
+                  aria-label={`Open ${mobileSidebarLabel}`}
+                  title={mobileSidebarLabel}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent"
+                  onClick={() => setMobileSidebarOpen(true)}
+                >
+                  <Icon icon={UiMenu} className="h-4 w-4" />
+                </button>
+                {brand && (
+                  <div className="flex min-w-0 flex-1 items-center gap-density-2">
+                    {brand}
+                  </div>
+                )}
+                {actions && (
+                  <div className="ml-auto flex shrink-0 items-center gap-density-2">
+                    {actions}
+                  </div>
+                )}
+                {search !== undefined && (
+                  <div className="basis-full min-w-0">
+                    {search}
+                  </div>
+                )}
+                {nav && (
+                  <div className="basis-full min-w-0 overflow-x-auto">
+                    {nav}
+                  </div>
+                )}
+              </div>
+            )}
             <div
               className={cn(
-                "flex h-14 items-center gap-density-3 px-density-4",
+                "hidden h-14 items-center gap-density-3 px-density-4 md:flex",
+                !hasSidebar && "flex",
                 headerClassName,
               )}
             >
@@ -236,7 +290,7 @@ export function AppShell(props: AppShellProps) {
             {toolbar && (
               <div
                 className={cn(
-                  "flex items-center gap-density-2 border-t border-border bg-muted px-density-4 py-density-2",
+                  "flex flex-wrap items-center gap-density-2 border-t border-border bg-muted px-density-3 py-density-2 md:px-density-4",
                   toolbarClassName,
                 )}
               >
@@ -249,13 +303,13 @@ export function AppShell(props: AppShellProps) {
         {hasBodyHeader && (
           <div
             className={cn(
-              "flex shrink-0 items-start justify-between gap-density-3 border-b border-border bg-card px-density-4 py-density-2",
+              "flex shrink-0 flex-col items-stretch gap-density-2 border-b border-border bg-card px-density-3 py-density-2 md:flex-row md:items-start md:justify-between md:gap-density-3 md:px-density-4",
               bodyHeaderClassName,
             )}
           >
             <div className="min-w-0 flex-1">{bodyHeader}</div>
             {bodyActions && (
-              <div className="flex shrink-0 items-center gap-density-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-density-2">
                 {bodyActions}
               </div>
             )}
@@ -263,19 +317,34 @@ export function AppShell(props: AppShellProps) {
         )}
 
         {bodySidebar !== undefined ? (
-          <SplitPane
-            className="min-h-0 flex-1"
-            defaultSplit={bodySplit}
-            minLeft={12}
-            minRight={30}
-            left={bodySidebar}
-            right={
-              <div className={cn("h-full min-w-0", contentClassName)}>
-                {children}
+          <>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
+              <div className="max-h-[40vh] shrink-0 overflow-y-auto border-b border-border bg-background">
+                {bodySidebar}
               </div>
-            }
-            rightClass="overflow-y-auto"
-          />
+              <main
+                className={cn(
+                  "min-h-0 min-w-0 flex-1 overflow-auto",
+                  contentClassName,
+                )}
+              >
+                {children}
+              </main>
+            </div>
+            <SplitPane
+              className="hidden min-h-0 flex-1 md:flex"
+              defaultSplit={bodySplit}
+              minLeft={12}
+              minRight={30}
+              left={bodySidebar}
+              right={
+                <div className={cn("h-full min-w-0", contentClassName)}>
+                  {children}
+                </div>
+              }
+              rightClass="overflow-y-auto"
+            />
+          </>
         ) : (
           <main
             className={cn(
@@ -287,6 +356,51 @@ export function AppShell(props: AppShellProps) {
           </main>
         )}
       </div>
+      {hasSidebar && mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="presentation"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label={mobileSidebarLabel}
+            className={cn(
+              "relative z-10 flex h-full w-[min(20rem,85vw)] flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl",
+              sidebarClassName,
+            )}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-density-3">
+              {brand && <div className="flex min-w-0 items-center gap-2">{brand}</div>}
+              <button
+                type="button"
+                aria-label={`Close ${mobileSidebarLabel}`}
+                title="Close"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                onClick={() => setMobileSidebarOpen(false)}
+              >
+                <Icon icon={UiClose} className="h-4 w-4" />
+              </button>
+            </div>
+            {sidebarHeader && (
+              <div className="shrink-0 border-b border-sidebar-border px-density-3 py-density-2">
+                {sidebarHeader}
+              </div>
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto py-density-2">
+              {renderSidebarContent(false, () => setMobileSidebarOpen(false))}
+            </div>
+            {sidebarFooter && (
+              <div className="mt-auto shrink-0 border-t border-sidebar-border px-density-3 py-density-2">
+                {sidebarFooter}
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
@@ -294,9 +408,11 @@ export function AppShell(props: AppShellProps) {
 function NavSections({
   sections,
   collapsed,
+  onNavigate,
 }: {
   sections: AppShellNavSection[];
   collapsed: boolean;
+  onNavigate?: () => void;
 }) {
   const { renderLink } = useRouter();
   return (
@@ -322,6 +438,7 @@ function NavSections({
               item={item}
               collapsed={collapsed}
               renderLink={renderLink}
+              {...(onNavigate ? { onNavigate } : {})}
             />
           ))}
         </div>
@@ -334,10 +451,12 @@ function NavItemRow({
   item,
   collapsed,
   renderLink,
+  onNavigate,
 }: {
   item: AppShellNavItem;
   collapsed: boolean;
   renderLink: RenderLink;
+  onNavigate?: () => void;
 }) {
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md px-density-2 py-1.5 text-left text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -370,16 +489,24 @@ function NavItemRow({
         title={title}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={onNavigate}
       >
         {inner}
       </a>
     );
   }
-  return renderLink({
+  const link = renderLink({
     key: item.key,
     to: item.to,
     className,
     children: inner,
     ...(title ? { title } : {}),
   });
+
+  if (!onNavigate) return link;
+  return (
+    <div onClick={onNavigate}>
+      {link}
+    </div>
+  );
 }
