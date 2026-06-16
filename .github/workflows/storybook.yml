@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build UI package
+        run: pnpm --filter @flanksource/clicky-ui build
+
       - name: Build Storybook
         run: pnpm --filter storybook build
         env:
