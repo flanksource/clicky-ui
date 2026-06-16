@@ -43,6 +43,18 @@ export type TestRunnerProps = {
 
   /** Domain node adapters, or a pre-built registry. Defaults to default-only. */
   adapters?: TestNodeAdapter[] | TestNodeAdapterRegistry;
+  /**
+   * Header title. Defaults (when omitted) to the "Test Results" beaker heading.
+   * Pass `null` to render no title — e.g. a host that owns the title in its own
+   * dialog/page header and embeds the runner below it.
+   */
+  title?: ReactNode;
+  /**
+   * Render the built-in run summary (counts + progress) in the header. Defaults
+   * to true; pass false when the host shows the summary itself (e.g. in a dialog
+   * header) to avoid duplicating it.
+   */
+  showSummary?: boolean;
   /** Extra header content (e.g. export/download controls owned by the host). */
   headerSlot?: ReactNode;
   /** Initial left-pane width percentage. */
@@ -95,6 +107,8 @@ export function TestRunner({
   onRerun,
   onStop,
   adapters,
+  title,
+  showSummary = true,
   headerSlot,
   defaultSplit = 45,
   startTime,
@@ -154,22 +168,28 @@ export function TestRunner({
         <div className="border-b border-border bg-card px-density-4 py-density-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h1 className="inline-flex items-center gap-1.5 text-lg font-bold">
-                <Icon icon={UiBeaker} className="text-primary" />
-                Test Results
-              </h1>
+              {title === undefined ? (
+                <h1 className="inline-flex items-center gap-1.5 text-lg font-bold">
+                  <Icon icon={UiBeaker} className="text-primary" />
+                  Test Results
+                </h1>
+              ) : (
+                title
+              )}
               {statusText && <span className="text-sm text-muted-foreground">{statusText}</span>}
             </div>
             <div className="flex items-center gap-3">
               {headerSlot}
-              <TestRunSummary
-                tests={tests}
-                startTime={startTime}
-                endTime={endTime}
-                done={done}
-                now={now}
-                runMeta={runMeta}
-              />
+              {showSummary && (
+                <TestRunSummary
+                  tests={tests}
+                  startTime={startTime}
+                  endTime={endTime}
+                  done={done}
+                  now={now}
+                  runMeta={runMeta}
+                />
+              )}
             </div>
           </div>
           {hasContent && (

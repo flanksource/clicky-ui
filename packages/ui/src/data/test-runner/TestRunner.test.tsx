@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { TestRunner } from "./TestRunner";
@@ -16,9 +16,13 @@ import {
 function Harness({
   tests = completedTests,
   adapters,
+  title,
+  showSummary,
 }: {
   tests?: Test[];
   adapters?: ReturnType<typeof createTestRunnerRegistry>;
+  title?: ReactNode;
+  showSummary?: boolean;
 }) {
   const [selected, setSelected] = useState<Test | null>(null);
   const [filters, setFilters] = useState<TestFilters>(emptyTestFilters());
@@ -38,6 +42,8 @@ function Harness({
       onFiltersChange={setFilters}
       onExpandAllChange={setExpandAll}
       {...(adapters ? { adapters } : {})}
+      {...(title !== undefined ? { title } : {})}
+      {...(showSummary !== undefined ? { showSummary } : {})}
     />
   );
 }
@@ -136,6 +142,26 @@ describe("TestRunner", () => {
     expect(screen.getByText("Custom setup panel")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Context" }));
     expect(screen.getByText(/Context tab for/)).toBeInTheDocument();
+  });
+
+  it("renders the default Test Results title and the run summary", () => {
+    render(<Harness />);
+    expect(screen.getByText("Test Results")).toBeInTheDocument();
+    expect(screen.getByText(/\d+ tests/)).toBeInTheDocument();
+  });
+
+  it("omits the title when title is null and the summary when showSummary is false", () => {
+    render(<Harness title={null} showSummary={false} />);
+    // A host that owns the title/summary in its own header (e.g. a dialog) embeds
+    // the runner with both suppressed so they are not duplicated.
+    expect(screen.queryByText("Test Results")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ tests/)).not.toBeInTheDocument();
+  });
+
+  it("renders a custom title node in place of the default", () => {
+    render(<Harness title={<span>My Run</span>} />);
+    expect(screen.getByText("My Run")).toBeInTheDocument();
+    expect(screen.queryByText("Test Results")).not.toBeInTheDocument();
   });
 
   it("renders the host-controlled tab and reports clicks via onTabChange", () => {
