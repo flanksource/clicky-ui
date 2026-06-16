@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DropdownMenu } from "./DropdownMenu";
+import { Modal } from "./Modal";
 
 const items = (onSelect = vi.fn()) => [
   { label: "JSON", onSelect },
@@ -45,10 +46,31 @@ describe("DropdownMenu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("stays open when an outside press lands inside a [role=dialog]", () => {
-    // A modal opened from the menu portals to document.body, so a press inside it
-    // is "outside" the menu. It must not dismiss the menu, which would unmount the
-    // modal (the menu's own render-prop child) along with it.
+  it("stays open when a press lands inside a Modal it renders as a child", () => {
+    // The Modal portals to document.body, so a press inside it is "outside" the
+    // menu in the DOM. Because it is rendered through the menu's children render
+    // prop, React's synthetic events still propagate to the floating element, so
+    // useDismiss treats it as inside and keeps the menu open — otherwise the menu
+    // (and the Modal it owns) would unmount on the first click in the Modal.
+    render(
+      <DropdownMenu label="Download">
+        {() => (
+          <Modal open onClose={() => {}} title="Log">
+            <button type="button">in modal</button>
+          </Modal>
+        )}
+      </DropdownMenu>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByText("in modal"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("dismisses on a press inside an unrelated dialog it does not own", () => {
+    // A dialog that is a sibling (owned by some other component), not a child of
+    // the menu, is genuinely outside — pressing into it dismisses the menu. This
+    // is harmless: closing the menu does not unmount a Modal it does not render.
     render(
       <div>
         <DropdownMenu label="Download" items={items()} />
@@ -60,7 +82,7 @@ describe("DropdownMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: /download/i }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
     fireEvent.pointerDown(screen.getByText("in dialog"));
-    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("does not fire onSelect for a disabled item", () => {
@@ -75,14 +97,13 @@ describe("DropdownMenu", () => {
 
   it("renders custom children with a working close callback", () => {
     render(
-      <DropdownMenu
-        label="Filters"
-        children={(close) => (
+      <DropdownMenu label="Filters">
+        {(close) => (
           <button type="button" onClick={close}>
             apply
           </button>
         )}
-      />,
+      </DropdownMenu>,
     );
     fireEvent.click(screen.getByRole("button", { name: /filters/i }));
     expect(screen.getByText("apply")).toBeInTheDocument();

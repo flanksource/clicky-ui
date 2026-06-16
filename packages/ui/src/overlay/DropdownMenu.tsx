@@ -100,16 +100,14 @@ export function DropdownMenu({
   });
 
   const click = useClick(context);
-  const dismiss = useDismiss(context, {
-    // A modal opened from inside the menu (e.g. a log dialog) portals to
-    // document.body, so a press within it counts as "outside" the menu and would
-    // otherwise dismiss it — unmounting the modal along with the menu's children.
-    // Keep the menu open while the press lands inside any [role="dialog"].
-    outsidePress: (event) => {
-      const target = event.target as Element | null;
-      return !target?.closest?.("[role='dialog']");
-    },
-  });
+  // useDismiss is React-tree aware: a press inside anything rendered through the
+  // menu's `children` render-prop — including a Modal that portals to
+  // document.body — propagates via React's synthetic events to the floating
+  // element and counts as "inside", so it won't dismiss the menu (which would
+  // unmount that child Modal). A Modal owned by a sibling/parent instead of this
+  // menu correctly does dismiss the menu, which is harmless since closing the
+  // menu does not unmount a Modal it doesn't own.
+  const dismiss = useDismiss(context);
   const role = useRole(context, { role: "menu" });
   const listNav = useListNavigation(context, {
     listRef,
