@@ -61,6 +61,7 @@ export {
   type FilterMode,
 } from "./data/FilterPill";
 export { Gauge, type GaugeProps, type GaugeTone } from "./data/Gauge";
+export { RadialGauge, type RadialGaugeProps } from "./data/RadialGauge";
 export {
   Icon,
   LabelIcon,
