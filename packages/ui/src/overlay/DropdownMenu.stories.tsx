@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { DropdownMenu } from "./DropdownMenu";
+import { Modal } from "./Modal";
 import { Button } from "../components/button";
 import { UiDownload, UiJson, UiMarkdown, UiMenu } from "../icons";
 
@@ -68,6 +70,68 @@ export const CustomContent: Story = {
         </Button>
       </div>
     ),
+  },
+};
+
+export const OpensModal: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A button inside the menu opens a Modal. Because the Modal portals to `document.body`, it renders centered over the whole viewport instead of being clipped to the dropdown's box — and the menu stays open behind it (closing the menu would otherwise unmount the Modal it renders).",
+      },
+    },
+  },
+  render: () => {
+    const [open, setOpen] = useState(false);
+    return (
+      <DropdownMenu label="Actions">
+        {() => (
+          <div className="px-1 py-1">
+            <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+              View log
+            </Button>
+            <Modal open={open} onClose={() => setOpen(false)} title="Log output" size="lg">
+              <pre className="whitespace-pre-wrap text-xs">
+                {[
+                  "[12:00:01] starting build…",
+                  "[12:00:03] compiling 248 modules",
+                  "[12:00:07] bundle written to dist/",
+                  "[12:00:07] done in 6.2s",
+                ].join("\n")}
+              </pre>
+            </Modal>
+          </div>
+        )}
+      </DropdownMenu>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await step("opens a Modal from a button inside the menu", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
+      await body.findByRole("menu");
+      await userEvent.click(body.getByRole("button", { name: "View log" }));
+    });
+
+    await step("the Modal escapes the dropdown's box", async () => {
+      const menu = body.getByRole("menu");
+      const dialog = await body.findByRole("dialog");
+      // Portaled out of the menu's DOM subtree, and overflows the menu's box
+      // rather than being clipped to it.
+      await expect(menu.contains(dialog)).toBe(false);
+      const menuRect = menu.getBoundingClientRect();
+      const dialogRect = dialog.getBoundingClientRect();
+      await expect(dialogRect.width).toBeGreaterThan(menuRect.width);
+      await expect(dialogRect.right).toBeGreaterThan(menuRect.right);
+    });
+
+    await step("the menu stays open behind the Modal", async () => {
+      // Closing the menu would unmount the Modal it renders, so it must persist.
+      await expect(body.queryByRole("menu")).not.toBeNull();
+    });
   },
 };
 

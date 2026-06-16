@@ -377,6 +377,55 @@ function MenuActionsShowcase() {
   );
 }
 
+// View-switch entries carry section: "View" so they group above the download
+// formats — this is how Clicky surfaces a table's view modes and download
+// formats inside the overflow ("3-dot") menu instead of a standalone bar.
+const sectionedMenuActions: DataTableMenuAction[] = [
+  {
+    id: "view-clicky",
+    label: "Clicky",
+    icon: UiJson,
+    section: "View",
+    disabled: true,
+    onSelect: () => {
+      console.info("View Clicky");
+    },
+  },
+  {
+    id: "view-json",
+    label: "JSON",
+    icon: UiJson,
+    section: "View",
+    onSelect: () => {
+      console.info("View JSON");
+    },
+  },
+  {
+    id: "view-pdf",
+    label: "PDF",
+    icon: UiFileText,
+    iconClassName: "text-rose-600 dark:text-rose-400",
+    section: "View",
+    onSelect: () => {
+      console.info("View PDF");
+    },
+  },
+  ...downloadMenuActions,
+];
+
+function GroupedMenuActionsShowcase() {
+  return (
+    <DataTable
+      data={wideRows}
+      columns={wideColumns}
+      autoFilter
+      defaultSort={{ key: "latency", dir: "asc" }}
+      menuActions={sectionedMenuActions}
+      columnResizeStorageKey="clicky-ui-story-data-table-grouped-menu-actions"
+    />
+  );
+}
+
 type LogRow = {
   ts: string;
   level: string;
@@ -734,6 +783,18 @@ export const LotsOfColumns: Story = {
 
 export const MenuActions: Story = {
   render: () => <MenuActionsShowcase />,
+};
+
+export const GroupedMenuActions: Story = {
+  render: () => <GroupedMenuActionsShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Menu actions with a `section` heading group together in the overflow menu. Clicky uses this to host a table's view modes (Clicky/JSON/PDF) and download formats in the 3-dot menu instead of a standalone view bar.",
+      },
+    },
+  },
 };
 
 export const Timestamps: Story = {
