@@ -4,6 +4,7 @@
     "noEmit": true,
     "types": ["vite/client"],
     "paths": {
+      "@flanksource/clicky-ui": ["../../packages/ui/src/index.ts"],
       "@flanksource/clicky-ui/icons": ["../../packages/ui/src/icons.ts"],
       "react": ["../../node_modules/preact/compat"],
       "react/jsx-runtime": ["../../node_modules/preact/jsx-runtime"],

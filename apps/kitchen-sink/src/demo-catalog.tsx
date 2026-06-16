@@ -5,6 +5,7 @@ import { IconDemo } from "./demos/IconDemo";
 import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
+import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
@@ -42,7 +43,12 @@ import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
 import { CommandFormDemo } from "./demos/CommandFormDemo";
 import { OperationDialogsDemo } from "./demos/OperationDialogsDemo";
-import { OperationExplorerDemo } from "./demos/OperationExplorerDemo";
+import { EntityExplorerDemo } from "./demos/EntityExplorerDemo";
+import { SegmentedControlDemo } from "./demos/SegmentedControlDemo";
+import { SearchInputDemo } from "./demos/SearchInputDemo";
+import { TimelineDemo } from "./demos/TimelineDemo";
+import { ToastDemo } from "./demos/ToastDemo";
+import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
 import {
   type StaticIconComponent,
   UiToggleOn, UiSelect, UiSparkles, UiImage,
@@ -146,7 +152,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       {
         id: "operation-explorer",
         label: "OperationCatalog",
-        component: OperationExplorerDemo,
+        component: EntityExplorerDemo,
         icon: UiTerminal,
       },
     ],
