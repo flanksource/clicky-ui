@@ -46,3 +46,5 @@ hack/
 *.png
 .antigravitycli/
 .playwright-cli/
+.mcp.json
+.handoff/

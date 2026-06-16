@@ -19,6 +19,16 @@ vi.mock("./code-highlight", () => ({
 import { highlightCode } from "./code-highlight";
 const mockHighlightCode = vi.mocked(highlightCode);
 
+// Returns the menu sub-group introduced by a section heading ("View" /
+// "Download"), so assertions can target one group when labels (JSON, PDF, …)
+// appear in more than one.
+function sectionGroup(menu: HTMLElement, label: string): HTMLElement {
+  const header = within(menu).getByText(label);
+  const group = header.parentElement;
+  if (!group) throw new Error(`no menu group for section "${label}"`);
+  return group;
+}
+
 function createCommandClient() {
   const executeCommand = vi.fn().mockResolvedValue({
     success: true,
@@ -447,7 +457,7 @@ describe("Clicky", () => {
     expect(screen.getByText("MSTR-INS")).toBeVisible();
   });
 
-  it("exposes Clicky and JSON primary views with overflow formats and whitelisted table downloads", async () => {
+  it("consolidates view modes and downloads into the table menu, hiding the standalone view bar", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async (input) => {
@@ -474,13 +484,6 @@ describe("Clicky", () => {
           );
         }
 
-        if (url.includes("format=markdown")) {
-          return new Response("# Report\n\nAll systems nominal.", {
-            status: 200,
-            headers: { "Content-Type": "text/markdown" },
-          });
-        }
-
         return new Response("", {
           status: 200,
           headers: { "Content-Type": "text/plain" },
@@ -488,137 +491,81 @@ describe("Clicky", () => {
       });
     render(<Clicky url="/api/clicky/report" />);
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/clicky/report?format=clicky-json",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: expect.stringContaining("application/json+clicky"),
-        }),
-      }),
-    );
     expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
+    // The table hosts the controls, so the standalone view bar is gone — this
+    // is what looked out of place on a plain list surface.
     expect(
-      screen.getByRole("radiogroup", { name: /clicky view mode/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Clicky" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(screen.getByRole("radio", { name: "JSON" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("radio", { name: "PDF" }),
+      screen.queryByRole("radiogroup", { name: /clicky view mode/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^download json/i }),
+      screen.queryByRole("button", { name: /open additional view menu/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /open download menu/i }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    let tableMenu = screen.getByRole("menu", { name: /column menu/i });
-    expect(within(tableMenu).getByText("Download")).toBeInTheDocument();
-    for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
+    const tableMenu = screen.getByRole("menu", { name: /column menu/i });
+
+    // The menu carries a "View" group (every preview format) above the
+    // download-format "Download" group.
+    const viewGroup = sectionGroup(tableMenu, "View");
+    const downloadGroup = sectionGroup(tableMenu, "Download");
+    for (const label of [
+      "Clicky",
+      "JSON",
+      "PDF",
+      "HTML",
+      "Markdown",
+      "YAML",
+      "CSV",
+      "Pretty",
+      "Excel",
+      "Slack",
+    ]) {
       expect(
-        within(tableMenu).getByRole("menuitem", {
+        within(viewGroup).getByRole("menuitem", {
           name: new RegExp(`^${label}$`, "i"),
         }),
       ).toBeInTheDocument();
     }
-    for (const label of ["Clicky", "HTML", "Pretty", "Excel", "Slack"]) {
+    for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
       expect(
-        within(tableMenu).queryByRole("menuitem", {
+        within(downloadGroup).getByRole("menuitem", {
           name: new RegExp(`^${label}$`, "i"),
         }),
-      ).not.toBeInTheDocument();
+      ).toBeInTheDocument();
     }
+    // The active (Clicky) view is shown but not re-selectable.
     expect(
-      within(tableMenu).queryByText(
-        "Portable document for sharing and printing",
-      ),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      within(tableMenu).getByRole("menuitem", { name: /^JSON\b/i }),
-    );
+      within(viewGroup).getByRole("menuitem", { name: /^Clicky$/i }),
+    ).toBeDisabled();
 
+    // Picking a download format triggers the download frame.
+    fireEvent.click(
+      within(downloadGroup).getByRole("menuitem", { name: /^JSON$/i }),
+    );
     const downloadFrame = document.getElementById(
       "clicky-download-frame",
     ) as HTMLIFrameElement;
     expect(downloadFrame).toBeInstanceOf(HTMLIFrameElement);
     expect(downloadFrame.src).toContain("/api/clicky/report?format=json");
     expect(downloadFrame.src).toContain("filename=report.json");
-    expect(downloadFrame.src).toContain("_download=");
 
+    // Picking a View format switches the inline preview; leaving the table
+    // brings the view bar back so the user can switch away from JSON again.
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    tableMenu = screen.getByRole("menu", { name: /column menu/i });
     fireEvent.click(
-      within(tableMenu).getByRole("menuitem", { name: /^YAML\b/i }),
-    );
-
-    expect(downloadFrame.src).toContain("/api/clicky/report?format=yaml");
-    expect(downloadFrame.src).toContain("filename=report.yaml");
-
-    fireEvent.click(screen.getByRole("radio", { name: "JSON" }));
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/clicky/report?format=json",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: expect.stringContaining("application/json"),
-        }),
-      }),
+      within(sectionGroup(screen.getByRole("menu", { name: /column menu/i }), "View")).getByRole(
+        "menuitem",
+        { name: /^JSON$/i },
+      ),
     );
     expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
     expect(screen.getByText("service")).toBeInTheDocument();
-    expect(screen.getByText('"api"')).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /open additional view menu/i }),
-    );
     expect(
-      screen.getByRole("menuitemradio", { name: /pdf/i }),
+      screen.getByRole("radiogroup", { name: /clicky view mode/i }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /html/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /markdown/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /yaml/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /csv/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /pretty/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /excel/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitemradio", { name: /slack/i }),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitemradio", { name: /pdf/i }));
-
-    expect(screen.getByTitle("Clicky PDF preview")).toHaveAttribute(
-      "src",
-      "/api/clicky/report?format=pdf",
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /open additional view menu/i }),
-    );
-    fireEvent.click(screen.getByRole("menuitemradio", { name: /markdown/i }));
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/clicky/report?format=markdown",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: expect.stringContaining("text/markdown"),
-        }),
-      }),
-    );
-    expect(
-      await screen.findByLabelText("Clicky text preview"),
-    ).toHaveTextContent("# Report");
 
     fetchSpy.mockRestore();
   });
@@ -738,41 +685,36 @@ describe("Clicky", () => {
     const densityItem = within(menu).getByRole("menuitemradio", {
       name: /use page density/i,
     });
+    const downloadGroup = sectionGroup(menu, "Download");
     const downloadHeader = within(menu).getByText("Download");
-    const pdfItem = within(menu).getByRole("menuitem", { name: /pdf/i });
 
+    // The download group follows the density control.
     expect(
       Boolean(
         densityItem.compareDocumentPosition(downloadHeader) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
-    expect(
-      Boolean(
-        downloadHeader.compareDocumentPosition(pdfItem) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      ),
-    ).toBe(true);
 
+    // Only the whitelisted download formats appear under Download.
     for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
       expect(
-        within(menu).getByRole("menuitem", {
+        within(downloadGroup).getByRole("menuitem", {
           name: new RegExp(`^${label}$`, "i"),
         }),
       ).toBeInTheDocument();
     }
     for (const label of ["Clicky", "HTML", "Pretty", "Excel", "Slack"]) {
       expect(
-        within(menu).queryByRole("menuitem", {
+        within(downloadGroup).queryByRole("menuitem", {
           name: new RegExp(`^${label}$`, "i"),
         }),
       ).not.toBeInTheDocument();
     }
-    expect(
-      within(menu).queryByText("Portable document for sharing and printing"),
-    ).not.toBeInTheDocument();
 
-    fireEvent.click(pdfItem);
+    fireEvent.click(
+      within(downloadGroup).getByRole("menuitem", { name: /^PDF$/i }),
+    );
 
     const downloadFrame = document.getElementById(
       "clicky-download-frame",

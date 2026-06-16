@@ -39,7 +39,7 @@ describe("AppShell", () => {
   it("renders nav sections and hides item labels when the rail is collapsed", () => {
     render(
       <AppShell
-        navSections={[{ label: "Operations", items: [{ key: "p", label: "Policies" }] }]}
+        navSections={[{ label: "Operations", items: [{ key: "p", label: "Policies", to: "/policies" }] }]}
       >
         <p>content</p>
       </AppShell>,
@@ -50,15 +50,16 @@ describe("AppShell", () => {
     expect(screen.queryByText("Policies")).toBeNull();
   });
 
-  it("invokes a nav item's onClick", () => {
-    let clicked = "";
+  it("renders nav items as anchor links pointing at their `to`", () => {
     render(
-      <AppShell navSections={[{ items: [{ key: "p", label: "Policies", onClick: () => (clicked = "p") }] }]}>
+      <AppShell navSections={[{ items: [{ key: "p", label: "Policies", to: "/policies" }] }]}>
         <p>content</p>
       </AppShell>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Policies" }));
-    expect(clicked).toBe("p");
+    // No RouterProvider → the default browser adapter renders a real <a href>.
+    const link = screen.getByRole("link", { name: "Policies" });
+    expect(link.getAttribute("href")).toBe("/policies");
+    expect(screen.queryByRole("button", { name: "Policies" })).toBeNull();
   });
 
   it("renders the fixed body header and body actions on the same row", () => {

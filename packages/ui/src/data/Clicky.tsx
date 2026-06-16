@@ -640,8 +640,36 @@ function ClickyRemoteRenderer({
   const canDownload = downloadFormats.length > 0 && !downloadHandledByTable;
   const loadingMessage = `Fetching ${formattedUrl}`;
 
+  const runtime = useContext(ClickyRuntimeContext);
+  // When the payload renders as a table, fold the inline view switcher into the
+  // table's overflow ("3-dot") menu alongside its download formats and hide the
+  // standalone view bar — that bar is what looks out of place on a plain list
+  // surface. Non-table payloads, and the JSON/PDF/HTML previews, keep the bar so
+  // the user can always switch back to the table.
+  const tableHostsControls = downloadHandledByTable && activeView === "clicky";
+  const viewMenuActions = useMemo<DataTableMenuAction[]>(() => {
+    if (!tableHostsControls || availableViews.length <= 1) return [];
+    return availableViews.map((format) => {
+      const meta = getRemoteFormatMeta(format);
+      return {
+        id: `view-${format}`,
+        label: formatViewLabel(format),
+        icon: meta.icon,
+        ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
+        section: "View",
+        disabled: format === activeView,
+        onSelect: () => setActiveView(format),
+      };
+    });
+  }, [tableHostsControls, availableViews, activeView]);
+  const combinedTableActions = useMemo<DataTableMenuAction[]>(
+    () => [...viewMenuActions, ...(runtime.tableMenuActions ?? [])],
+    [viewMenuActions, runtime.tableMenuActions],
+  );
+
   return (
     <div className={cn("space-y-density-3", className)}>
+      {!tableHostsControls && (
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
         {primaryViews.length > 1 && (
           <div
@@ -691,6 +719,7 @@ function ClickyRemoteRenderer({
           )}
         </div>
       </div>
+      )}
 
       {activeView === "pdf" ? (
         <ClickyPdfPreview src={formattedUrl} />
@@ -724,7 +753,11 @@ function ClickyRemoteRenderer({
                 tone="warning"
               />
             )}
-            <ClickyContent data={effectiveClickyData} />
+            <ClickyRuntimeContext.Provider
+              value={{ ...runtime, tableMenuActions: combinedTableActions }}
+            >
+              <ClickyContent data={effectiveClickyData} />
+            </ClickyRuntimeContext.Provider>
           </>
         )
       ) : activeView === "json" ? (

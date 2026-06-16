@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiSidebar } from "../icons";
+import { useRouter } from "../rpc/router";
+import type { RenderLink } from "../rpc/EndpointList";
 import { SplitPane } from "./SplitPane";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
@@ -21,11 +23,9 @@ export type AppShellNavItem = {
   icon?: string | StaticIconComponent;
   /** Highlights the item as the current location. */
   active?: boolean;
-  /** Click handler (rendered as a button when no `href`). */
-  onClick?: () => void;
-  /** Destination (rendered as an anchor). */
-  href?: string;
-  /** Opens `href` in a new tab. */
+  /** Routing destination; rendered as an anchor via the RouterAdapter. */
+  to: string;
+  /** Opens `to` in a new tab. */
   external?: boolean;
   /** Trailing adornment (count, status dot). */
   badge?: ReactNode;
@@ -162,10 +162,14 @@ export function AppShell(props: AppShellProps) {
           <div
             className={cn(
               "flex h-14 shrink-0 items-center border-b border-sidebar-border",
-              collapsed ? "justify-center px-2" : "justify-between px-density-3",
+              collapsed
+                ? "justify-center px-2"
+                : "justify-between px-density-3",
             )}
           >
-            {!collapsed && brand && <div className="flex min-w-0 items-center gap-2">{brand}</div>}
+            {!collapsed && brand && (
+              <div className="flex min-w-0 items-center gap-2">{brand}</div>
+            )}
             {collapsible && (
               <button
                 type="button"
@@ -188,7 +192,9 @@ export function AppShell(props: AppShellProps) {
               ? sidebar(collapsed)
               : sidebar !== undefined
                 ? sidebar
-                : navSections && <NavSections sections={navSections} collapsed={collapsed} />}
+                : navSections && (
+                    <NavSections sections={navSections} collapsed={collapsed} />
+                  )}
           </div>
           {sidebarFooter && (
             <div className="mt-auto shrink-0 border-t border-sidebar-border px-density-3 py-density-2">
@@ -202,10 +208,15 @@ export function AppShell(props: AppShellProps) {
         {hasTopBar && (
           <header className="shrink-0 border-b border-border bg-card">
             <div
-              className={cn("flex h-14 items-center gap-density-3 px-density-4", headerClassName)}
+              className={cn(
+                "flex h-14 items-center gap-density-3 px-density-4",
+                headerClassName,
+              )}
             >
               {!hasSidebar && brand && (
-                <div className="flex shrink-0 items-center gap-density-2">{brand}</div>
+                <div className="flex shrink-0 items-center gap-density-2">
+                  {brand}
+                </div>
               )}
               {nav && <div className="flex shrink-0 items-center">{nav}</div>}
               {search !== undefined && (
@@ -217,7 +228,9 @@ export function AppShell(props: AppShellProps) {
               )}
               {search === undefined && <div className="flex-1" />}
               {actions && (
-                <div className="flex shrink-0 items-center gap-density-2">{actions}</div>
+                <div className="flex shrink-0 items-center gap-density-2">
+                  {actions}
+                </div>
               )}
             </div>
             {toolbar && (
@@ -242,7 +255,9 @@ export function AppShell(props: AppShellProps) {
           >
             <div className="min-w-0 flex-1">{bodyHeader}</div>
             {bodyActions && (
-              <div className="flex shrink-0 items-center gap-density-2">{bodyActions}</div>
+              <div className="flex shrink-0 items-center gap-density-2">
+                {bodyActions}
+              </div>
             )}
           </div>
         )}
@@ -254,11 +269,20 @@ export function AppShell(props: AppShellProps) {
             minLeft={12}
             minRight={30}
             left={bodySidebar}
-            right={<div className={cn("h-full min-w-0", contentClassName)}>{children}</div>}
+            right={
+              <div className={cn("h-full min-w-0", contentClassName)}>
+                {children}
+              </div>
+            }
             rightClass="overflow-y-auto"
           />
         ) : (
-          <main className={cn("min-h-0 min-w-0 flex-1 overflow-auto", contentClassName)}>
+          <main
+            className={cn(
+              "min-h-0 min-w-0 flex-1 overflow-auto",
+              contentClassName,
+            )}
+          >
             {children}
           </main>
         )}
@@ -274,8 +298,14 @@ function NavSections({
   sections: AppShellNavSection[];
   collapsed: boolean;
 }) {
+  const { renderLink } = useRouter();
   return (
-    <nav className={cn("flex flex-col gap-0.5", collapsed ? "px-2" : "px-density-2")}>
+    <nav
+      className={cn(
+        "flex flex-col gap-0.5",
+        collapsed ? "px-2" : "px-density-2",
+      )}
+    >
       {sections.map((section, i) => (
         <div key={section.label ?? `section-${i}`} className="flex flex-col">
           {section.label &&
@@ -287,7 +317,12 @@ function NavSections({
               </div>
             ))}
           {section.items.map((item) => (
-            <NavItemRow key={item.key} item={item} collapsed={collapsed} />
+            <NavItemRow
+              key={item.key}
+              item={item}
+              collapsed={collapsed}
+              renderLink={renderLink}
+            />
           ))}
         </div>
       ))}
@@ -295,7 +330,15 @@ function NavSections({
   );
 }
 
-function NavItemRow({ item, collapsed }: { item: AppShellNavItem; collapsed: boolean }) {
+function NavItemRow({
+  item,
+  collapsed,
+  renderLink,
+}: {
+  item: AppShellNavItem;
+  collapsed: boolean;
+  renderLink: RenderLink;
+}) {
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md px-density-2 py-1.5 text-left text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
     collapsed && "justify-center px-0",
@@ -305,30 +348,38 @@ function NavItemRow({ item, collapsed }: { item: AppShellNavItem; collapsed: boo
     <>
       {item.icon && (
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-          <Icon {...(typeof item.icon === "string" ? { name: item.icon } : { icon: item.icon })} />
+          <Icon
+            {...(typeof item.icon === "string"
+              ? { name: item.icon }
+              : { icon: item.icon })}
+          />
         </span>
       )}
       {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
       {!collapsed && item.badge}
     </>
   );
-  const title = collapsed && typeof item.label === "string" ? item.label : undefined;
+  const title =
+    collapsed && typeof item.label === "string" ? item.label : undefined;
 
-  if (item.href) {
+  if (item.external) {
     return (
       <a
-        href={item.href}
+        href={item.to}
         className={className}
         title={title}
-        {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        target="_blank"
+        rel="noopener noreferrer"
       >
         {inner}
       </a>
     );
   }
-  return (
-    <button type="button" onClick={item.onClick} className={className} title={title}>
-      {inner}
-    </button>
-  );
+  return renderLink({
+    key: item.key,
+    to: item.to,
+    className,
+    children: inner,
+    ...(title ? { title } : {}),
+  });
 }

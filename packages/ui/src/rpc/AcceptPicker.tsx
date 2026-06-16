@@ -37,6 +37,7 @@ export function AcceptPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const pad = size === "sm" ? "px-2 py-0.5" : "px-2.5 py-1";
+  const activeLabel = options.find((opt) => opt.value === value)?.label ?? value;
 
   useEffect(() => {
     if (!open) return;
@@ -57,69 +58,92 @@ export function AcceptPicker({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={cn("relative flex flex-wrap gap-1", className)}>
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={cn(
-            "rounded-md border text-xs transition-colors",
-            pad,
-            value === opt.value
-              ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
-              : "text-muted-foreground hover:border-foreground/20 hover:text-foreground",
-          )}
+    <div ref={rootRef} className={cn("relative flex", className)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="Open format menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cn("h-auto gap-1.5", pad)}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="text-xs font-medium">{activeLabel}</span>
+        <Icon icon={UiEllipsis} className="text-muted-foreground" />
+      </Button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Format and preview options"
+          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
         >
-          {opt.label}
-        </button>
-      ))}
-      {onPreviewModeChange && (
-        <>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label="Open preview menu"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            className={cn("h-auto", pad)}
-            onClick={() => setOpen((current) => !current)}
-          >
-            <Icon icon={UiEllipsis} />
-          </Button>
-          {open && (
-            <div
-              role="menu"
-              aria-label="Preview options"
-              className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
-            >
-              {PREVIEW_OPTIONS.map((option) => {
-                const active = option.value === previewMode;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={active}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
-                      "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                    )}
-                    onClick={() => {
-                      onPreviewModeChange(option.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="min-w-0 flex-1">{option.label}</span>
-                    {active ? <Icon icon={UiCheck} className="shrink-0" /> : null}
-                  </button>
-                );
-              })}
-            </div>
+          <MenuSectionLabel>Format</MenuSectionLabel>
+          {options.map((opt) => (
+            <MenuRadioItem
+              key={opt.value}
+              label={opt.label}
+              active={opt.value === value}
+              onSelect={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            />
+          ))}
+          {onPreviewModeChange && (
+            <>
+              <div role="separator" className="my-1 h-px bg-border" />
+              <MenuSectionLabel>Preview</MenuSectionLabel>
+              {PREVIEW_OPTIONS.map((option) => (
+                <MenuRadioItem
+                  key={option.value}
+                  label={option.label}
+                  active={option.value === previewMode}
+                  onSelect={() => {
+                    onPreviewModeChange(option.value);
+                    setOpen(false);
+                  }}
+                />
+              ))}
+            </>
           )}
-        </>
+        </div>
       )}
     </div>
+  );
+}
+
+function MenuSectionLabel({ children }: { children: string }) {
+  return (
+    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function MenuRadioItem({
+  label,
+  active,
+  onSelect,
+}: {
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={active}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
+        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
+        active && "font-medium",
+      )}
+      onClick={onSelect}
+    >
+      <span className="min-w-0 flex-1">{label}</span>
+      {active ? <Icon icon={UiCheck} className="shrink-0" /> : null}
+    </button>
   );
 }

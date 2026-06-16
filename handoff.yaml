@@ -1,0 +1,19 @@
+schemaVersion: 2
+repoRoot: /Users/moshe/go/src/github.com/flanksource/clicky-ui
+targets:
+  - id: clicky-ui-storybook
+    label: Clicky UI Storybook Docs
+    authState: target
+    diff: always
+    networkSettleMs: 250
+    discovery:
+      entryUrl: /
+      waitForSelector: main
+      linkSelector: a
+      mode: static
+      urls: null
+    baseUrl: http://localhost:5270/
+    sample: false
+    storybook:
+      indexPath: /Users/moshe/go/src/github.com/flanksource/clicky-ui/apps/storybook/storybook-static/index.json
+loginSnippets: []

@@ -3,8 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import type { OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
-import type { RenderLink } from "./EndpointList";
 import { EntityExplorerApp } from "./EntityExplorerApp";
+import { useMemoryRouter } from "./router";
+import { RouterProvider } from "./RouterProvider";
 import { ThemeProvider } from "../hooks/theme-provider";
 
 function makeClient(): OperationsApiClient {
@@ -32,21 +33,22 @@ function makeClient(): OperationsApiClient {
   };
 }
 
-const renderLink: RenderLink = ({ to, className, children, key }) => (
-  <a key={key} href={to} className={className}>
-    {children}
-  </a>
-);
-
-function renderApp() {
+function Harness() {
+  const adapter = useMemoryRouter("/widgets");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return (
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
-        <EntityExplorerApp client={makeClient()} pathname="/widgets" renderLink={renderLink} />
+        <RouterProvider adapter={adapter}>
+          <EntityExplorerApp client={makeClient()} />
+        </RouterProvider>
       </QueryClientProvider>
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+}
+
+function renderApp() {
+  return render(<Harness />);
 }
 
 describe("EntityExplorerApp", () => {
