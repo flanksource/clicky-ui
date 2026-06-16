@@ -1,4 +1,4 @@
-import type { MergedRow, ResolvedSeries } from "./TimeseriesPanel";
+import type { MergedRow, ResolvedSeries } from "./TimeseriesPanel.model";
 
 export type AxisOrientation = "left" | "right";
 

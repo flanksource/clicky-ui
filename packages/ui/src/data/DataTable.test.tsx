@@ -438,8 +438,13 @@ describe("DataTable", () => {
   it("uses max-content auto table layout without handle padding by default", () => {
     render(<DataTable data={rows} columns={columns} />);
 
-    expect(screen.getByRole("table")).toHaveClass("w-max", "table-auto");
+    expect(screen.getByRole("table")).toHaveClass("w-max", "min-w-full", "table-auto");
     expect(screen.getByRole("table")).not.toHaveClass("w-full");
+    expect(screen.getByRole("table").parentElement).toHaveClass(
+      "max-w-full",
+      "overflow-auto",
+      "overscroll-x-contain",
+    );
     expect(screen.getByRole("columnheader", { name: /service/i })).toHaveClass(
       "whitespace-nowrap",
     );

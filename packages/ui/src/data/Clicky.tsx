@@ -70,6 +70,7 @@ import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 import { TagActionsProvider, TagList } from "./cells/TagList";
 import { normalizeTags, type NormalizedTag, type TagsValue } from "./cells/tag-utils";
+import { parseClickyData, type ParsedClicky } from "./clicky-parse";
 
 export type ClickyStyle = {
   className?: string;
@@ -318,10 +319,6 @@ export type ClickyTableProps = {
   /** Extra actions rendered in the table menu. */
   menuActions?: DataTableMenuAction[] | undefined;
 };
-
-type ParsedClicky =
-  | { ok: true; document: ClickyDocument }
-  | { ok: false; message: string; raw: string };
 
 type ClickyRemoteResponse =
   | { kind: "text"; text: string; contentType: string }
@@ -1010,23 +1007,6 @@ function useDismissablePopup(
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose, open, rootRef, triggerRef]);
-}
-
-export function parseClickyData(data: ClickyProps["data"]): ParsedClicky {
-  if (typeof data === "string") {
-    try {
-      return normalizeClickyDocument(JSON.parse(data) as unknown);
-    } catch (error) {
-      return {
-        ok: false,
-        message:
-          error instanceof Error ? error.message : "Failed to parse JSON",
-        raw: data,
-      };
-    }
-  }
-
-  return normalizeClickyDocument(data);
 }
 
 function fetchRemoteFormat(
@@ -1756,44 +1736,6 @@ function triggerDownload(url: string) {
 
 function isAbsoluteUrl(url: string) {
   return /^[a-z][a-z\d+\-.]*:/i.test(url) || url.startsWith("//");
-}
-
-function normalizeClickyDocument(data: unknown): ParsedClicky {
-  if (!data || typeof data !== "object") {
-    return {
-      ok: false,
-      message: "Payload must be an object",
-      raw: String(data ?? ""),
-    };
-  }
-
-  const candidate = data as Partial<ClickyDocument> & Partial<ClickyNode>;
-  if (
-    "version" in candidate &&
-    candidate.version === 1 &&
-    candidate.node &&
-    isClickyNode(candidate.node)
-  ) {
-    return { ok: true, document: candidate as ClickyDocument };
-  }
-
-  if (isClickyNode(candidate)) {
-    return { ok: true, document: { version: 1, node: candidate } };
-  }
-
-  return {
-    ok: false,
-    message: "Payload is neither a Clicky document nor a Clicky node",
-    raw: JSON.stringify(data, null, 2),
-  };
-}
-
-function isClickyNode(value: unknown): value is ClickyNode {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    typeof (value as { kind?: unknown }).kind === "string"
-  );
 }
 
 function ClickyNodeRenderer({ node }: ClickyNodeViewProps) {

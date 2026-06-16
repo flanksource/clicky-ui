@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assignAxes, latestOf, mergeSeries, resolveBreakdown, resolveSeries } from "./TimeseriesPanel";
+import { assignAxes, latestOf } from "./TimeseriesPanel.axes";
+import { mergeSeries, resolveBreakdown, resolveSeries } from "./TimeseriesPanel.model";
 
 describe("resolveSeries", () => {
   it("normalises a single url into a one-element series", () => {

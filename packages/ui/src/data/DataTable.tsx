@@ -1216,7 +1216,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   return (
     <DensityValueProvider density={densityOverride ?? "comfortable"}>
       <div
-        className={cn("flex min-h-0 flex-col gap-3", className)}
+        className={cn("flex min-h-0 min-w-0 flex-col gap-3", className)}
         data-density={densityOverride}
       >
         {showFilterBar && (
@@ -1249,12 +1249,12 @@ function DataTableInner<T extends Record<string, unknown>>({
 
         <div
           className={cn(
-            "overflow-auto rounded-md border border-border",
+            "max-w-full overflow-auto overscroll-x-contain rounded-md border border-border",
             scrollContainerClassName ?? "min-h-0 flex-1",
           )}
           aria-busy={loading || undefined}
         >
-          <table className="w-max table-auto text-left text-sm">
+          <table className="w-max min-w-full table-auto text-left text-sm">
             <colgroup>
               {visibleColumns.map((column) => (
                 <col
@@ -1333,7 +1333,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                         role="separator"
                         aria-label={`Resize ${labelText(column)} column`}
                         aria-orientation="vertical"
-                        className="absolute right-0 top-0 flex h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20"
+                        className="absolute right-0 top-0 hidden h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20 md:flex"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1597,9 +1597,9 @@ function DataTablePaginationFooter({
       : `${visibleRowCount} row${visibleRowCount === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center justify-between gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground">
+    <div className="flex min-h-9 flex-col items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div aria-live="polite">{loading ? loadingMessage : rangeLabel}</div>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <label className="flex items-center gap-1.5">
           <span>Rows per page</span>
           <select
@@ -1753,7 +1753,7 @@ function HeaderFilterMenu({
     <div
       role="dialog"
       aria-label={`${label} column filter`}
-      className="fixed z-50 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+      className="fixed z-50 max-h-[calc(100vh-1rem)] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
       style={{ left: anchor.x, top: anchor.y }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
@@ -1871,7 +1871,7 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
     <div
       role="menu"
       aria-label="Column menu"
-      className="fixed z-50 min-w-[16rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
+      className="fixed z-50 max-h-[calc(100vh-1rem)] min-w-[16rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
       style={{ left: anchor.x, top: anchor.y }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}

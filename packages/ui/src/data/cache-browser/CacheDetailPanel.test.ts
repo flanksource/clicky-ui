@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadJson } from "./CacheDetailPanel";
+import { downloadJson } from "./download";
 import type { CacheKeyDetail } from "./types";
 
 afterEach(() => {
