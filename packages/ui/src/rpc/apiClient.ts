@@ -148,7 +148,7 @@ export function createOperationsApiClient(
       }
 
       const response = await request(resolved.path, upper, {
-        headers: { "Content-Type": "application/json", ...(headers ?? {}) },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(scoped),
       });
       return parseExecutionResponse(response, await readResponseBody(response, responseKind(accept)), {
@@ -160,7 +160,7 @@ export function createOperationsApiClient(
     async executeCommandBody(path, body, headers) {
       const accept = headerValue(headers, "Accept");
       const response = await request(path, "POST", {
-        headers: { "Content-Type": "application/json", ...(headers ?? {}) },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(body),
       });
       return parseExecutionResponse(response, await readResponseBody(response, responseKind(accept)), {
@@ -176,7 +176,7 @@ export function createOperationsApiClient(
       if (upper === "GET") {
         const requestUrl = appendQuery(resolved.path, { ...resolved.params, __lookup: "filters" });
         const response = await request(requestUrl, "GET", {
-          headers: { Accept: "application/json+clicky", ...(headers ?? {}) },
+          headers: { Accept: "application/json+clicky", ...headers },
         });
         if (response.status === 404) return { filters: {} };
         const parsed = await readResponseBody(response, "json");
@@ -188,7 +188,7 @@ export function createOperationsApiClient(
         headers: {
           Accept: "application/json+clicky",
           "Content-Type": "application/json",
-          ...(headers ?? {}),
+          ...headers,
         },
         body: JSON.stringify(resolved.params),
       });

@@ -65,14 +65,16 @@ export { RadialGauge, type RadialGaugeProps } from "./data/RadialGauge";
 export {
   Icon,
   LabelIcon,
-  setFallbackIconProvider,
-  type FallbackIconProps,
   type IconProps,
   type IconStyle,
   type IconTone,
   type LabelIconSpec,
   type StaticIconComponent,
 } from "./data/Icon";
+export {
+  setFallbackIconProvider,
+  type FallbackIconProps,
+} from "./data/icon-fallback";
 export * from "./icons";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
@@ -101,15 +103,26 @@ export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader"
 export { TabButton, type TabButtonProps, type TabButtonVariant } from "./data/TabButton";
 export {
   TimeseriesPanel,
+  type TimeseriesPanelProps,
+} from "./data/TimeseriesPanel";
+export {
   resolveSeries,
   resolveBreakdown,
+  mergeSeries,
   type BreakdownItem,
+  type MergedRow,
   type ResolvedSeries,
-  type TimeseriesPanelProps,
   type TimeseriesPoint,
   type TimeseriesResponse,
   type TimeseriesSeries,
-} from "./data/TimeseriesPanel";
+} from "./data/TimeseriesPanel.model";
+export {
+  assignAxes,
+  latestOf,
+  type AxisAssignment,
+  type AxisOrientation,
+  type AxisSpec,
+} from "./data/TimeseriesPanel.axes";
 export {
   TimeseriesGauge,
   type GaugeSeries,
@@ -117,18 +130,20 @@ export {
 } from "./data/TimeseriesGauge";
 export {
   TimeseriesCoreBars,
-  deriveCoreBars,
   type TimeseriesCoreBarsProps,
+} from "./data/TimeseriesCoreBars";
+export {
+  deriveCoreBars,
   type CoreBar,
   type CoreBarsModel,
-} from "./data/TimeseriesCoreBars";
+} from "./data/TimeseriesCoreBars.model";
 export {
   StatusRows,
   StackedStatusBar,
-  segment,
   type StatusSegment,
   type StatusRenderLink,
 } from "./data/StatusBreakdown";
+export { segment } from "./data/status-breakdown-utils";
 export { Version, type VersionProps } from "./data/Version";
 export {
   getVersionInfo,
@@ -197,9 +212,11 @@ export {
 } from "./data/diagnostics/JvmStackTrace";
 export {
   FrameSourceWindow,
+} from "./data/diagnostics/FrameSourceWindow";
+export {
   frameHasSource,
   type FrameSource,
-} from "./data/diagnostics/FrameSourceWindow";
+} from "./data/diagnostics/FrameSourceWindow.utils";
 export {
   StackTrace,
   type StackTraceProps,

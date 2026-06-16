@@ -350,7 +350,7 @@ export function parametersToFormConfig(
           [rangeEnd.name]: to,
         })),
       ...(rangeMeta?.presets ? { presets: rangeMeta.presets } : {}),
-      ...(rangeMeta?.timeEnabled !== undefined ? { timeEnabled: rangeMeta.timeEnabled } : {}),
+      timeEnabled: rangeMeta?.timeEnabled ?? false,
       ...(rangeMeta?.timeZone ? { timeZone: rangeMeta.timeZone } : {}),
       ...(rangeMeta?.timeZones ? { timeZones: rangeMeta.timeZones } : {}),
       ...(rangeStart.description ? { fromPlaceholder: rangeStart.description } : {}),

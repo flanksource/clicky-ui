@@ -11,7 +11,8 @@ import type {
 import { MethodBadge } from "../data/MethodBadge";
 import { AcceptPicker } from "./AcceptPicker";
 import type { OperationPreviewMode } from "./accept-options";
-import { CommandForm, pathParamNames, submitValue } from "./CommandForm";
+import { CommandForm } from "./CommandForm";
+import { pathParamNames, submitValue } from "./command-form-utils";
 import { CommandOutput } from "./CommandOutput";
 import type { RenderLink } from "./EndpointList";
 import {
@@ -438,6 +439,9 @@ export function OperationCommandPage({
               : {})}
             {...(isGet && effectiveAutoRun && formConfig.filters.length > 0
               ? { externalFilters: formConfig.filters }
+              : {})}
+            {...(isGet && effectiveAutoRun && formConfig.timeRange
+              ? { timeRange: formConfig.timeRange }
               : {})}
             {...(isGet && effectiveAutoRun && dataTablePagination
               ? { pagination: dataTablePagination }

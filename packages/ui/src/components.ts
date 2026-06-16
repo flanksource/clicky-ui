@@ -36,8 +36,6 @@ export {
 } from "./components/RangeSlider";
 export {
   FilterBar,
-  applyFilterExtensions,
-  type FilterExtension,
   type FilterBarBooleanFilter,
   type FilterBarEnumFilter,
   type FilterBarFilter,
@@ -60,6 +58,10 @@ export {
   TriStateMultiSelect,
   type TriStateMultiSelectProps,
 } from "./components/FilterBar";
+export {
+  applyFilterExtensions,
+  type FilterExtension,
+} from "./components/filter-bar-utils";
 export {
   MultiSelect,
   type MultiSelectOption,
@@ -144,6 +146,15 @@ export {
   type AppShellNavItem,
   type AppShellNavSection,
 } from "./layout/AppShell";
+export {
+  AppSidebar,
+  AppLayout,
+  type AppSidebarProps,
+  type AppLayoutProps,
+  type AppNavItem,
+  type AppNavGroup,
+  type AppNavSection,
+} from "./layout/AppSidebar";
 export { Panel, type PanelProps, type PanelTone } from "./layout/Panel";
 export { Tabs, type TabsProps, type TabItem } from "./layout/Tabs";
 export {

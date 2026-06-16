@@ -7,7 +7,6 @@ import type {
 import { DataTable, type DataTableColumn, type DataTablePagination } from "../data/DataTable";
 import {
   Clicky,
-  parseClickyData,
   type ClickyCommandRuntime,
   type ClickyDocument,
   type ClickyNode,
@@ -15,6 +14,7 @@ import {
   type ClickyTableRowHref,
   type ClickyTableRowPredicate,
 } from "../data/Clicky";
+import { parseClickyData } from "../data/clicky-parse";
 import { JsonView } from "../data/JsonView";
 import { cn } from "../lib/utils";
 import type { ExecutionResponse } from "./types";

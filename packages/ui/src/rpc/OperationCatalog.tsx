@@ -17,7 +17,7 @@ import type { ClickyCommandRuntime } from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
-import { applyFilterExtensions, type FilterExtension } from "../components/FilterBar";
+import { applyFilterExtensions, type FilterExtension } from "../components/filter-bar-utils";
 import {
   type DomainDefinition,
   type ExecutionResponse,

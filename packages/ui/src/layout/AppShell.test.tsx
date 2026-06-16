@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AppShell } from "./AppShell";
 
@@ -79,8 +79,9 @@ describe("AppShell", () => {
         <p>content</p>
       </AppShell>,
     );
-    expect(screen.getByText("tree")).toBeTruthy();
-    expect(screen.getByText("content")).toBeTruthy();
+    expect(screen.getAllByText("tree")).toHaveLength(2);
+    expect(screen.getAllByText("content")).toHaveLength(2);
+    expect(screen.getByRole("separator", { name: "" })).toBeTruthy();
   });
 
   it("passes the collapsed flag to a custom sidebar render-prop", () => {
@@ -92,5 +93,25 @@ describe("AppShell", () => {
     expect(screen.getByText("rail:full")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(screen.getByText("rail:min")).toBeTruthy();
+  });
+
+  it("opens and closes nav sections in the mobile drawer", () => {
+    render(
+      <AppShell
+        brand={<span>Brand</span>}
+        navSections={[
+          { label: "Operations", items: [{ key: "p", label: "Policies", to: "/policies" }] },
+        ]}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Navigation" }));
+    const drawer = screen.getByRole("dialog", { name: "Navigation" });
+    expect(within(drawer).getByRole("link", { name: "Policies" })).toBeTruthy();
+
+    fireEvent.click(within(drawer).getByRole("link", { name: "Policies" }));
+    expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
   });
 });
