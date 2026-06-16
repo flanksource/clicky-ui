@@ -3,13 +3,12 @@ import { useState, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { UiCloud, UiDatabase, UiNamespace, UiServer, UiTag } from "../icons";
 import {
-  applyFilterExtensions,
   FilterBar,
   type FilterBarFilter,
   type FilterBarNumberValue,
   type FilterBarProps,
-  type FilterExtension,
 } from "./FilterBar";
+import { applyFilterExtensions, type FilterExtension } from "./filter-bar-utils";
 
 type FilterBarShowcaseProps = Pick<
   FilterBarProps,

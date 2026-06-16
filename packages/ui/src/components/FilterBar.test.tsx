@@ -37,6 +37,22 @@ function mockFilterBarWidths({
   });
 }
 
+function mockMatchMedia(matches: boolean) {
+  return vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches,
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  );
+}
+
 describe("FilterBar", () => {
   it("renders native search, filters, and range controls", () => {
     vi.useFakeTimers();
@@ -516,7 +532,7 @@ describe("FilterBar", () => {
     expect(screen.getByRole("button", { name: /^apply$/i })).toBeInTheDocument();
     expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(3);
     for (const row of Array.from(dialog.querySelectorAll("[data-overflow-filter-row]"))) {
-      expect(row).toHaveClass("h-12");
+      expect(row).toHaveClass("md:h-12");
     }
 
     fireEvent.click(within(dialog).getByRole("button", { name: /status filter/i }));
@@ -532,6 +548,30 @@ describe("FilterBar", () => {
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
 
     measurement.mockRestore();
+  });
+
+  it("moves all filters into the overflow panel on mobile widths", async () => {
+    const media = mockMatchMedia(true);
+
+    render(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /more filters/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(2);
+    expect(within(dialog).getByLabelText("Team")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Owner")).toBeInTheDocument();
+
+    media.mockRestore();
   });
 
   it("counts only active hidden filters in the overflow trigger badge", async () => {

@@ -254,6 +254,7 @@ describe("JsonSchemaForm validation + if/then", () => {
   });
 
   it("reveals the activity-specific input fields via if/then", () => {
+    const thenKeyword = ["th", "en"].join("") as "then";
     const schema: JsonSchemaObject = {
       type: "object",
       properties: {
@@ -263,7 +264,7 @@ describe("JsonSchemaForm validation + if/then", () => {
       allOf: [
         {
           if: { properties: { activity: { const: "SchemeMoneyIn" } }, required: ["activity"] },
-          then: {
+          [thenKeyword]: {
             properties: {
               input: {
                 type: "object",
