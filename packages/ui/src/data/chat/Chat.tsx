@@ -196,6 +196,7 @@ export function Chat({
     <div className={cn("flex h-full flex-col", className)}>
       <Conversation
         messages={messages}
+        status={status}
         emptyState={empty}
         onRegenerate={(messageId) => void regenerate({ messageId })}
         onApprove={(id, approved, reason) =>

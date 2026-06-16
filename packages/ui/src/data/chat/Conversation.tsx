@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import { UiArrowDown } from "../../icons";
+import { UiArrowDown, UiLoader } from "../../icons";
 import { Message, type MessageActionHandlers } from "./Message";
-import type { UIMessage } from "./types";
+import type { ChatStatus, UIMessage } from "./types";
 
 export type ConversationProps = MessageActionHandlers & {
   messages: UIMessage[];
+  /** Current chat status; used for transient pending/error affordances. */
+  status?: ChatStatus | undefined;
   /** Shown when there are no messages yet. */
   emptyState?: React.ReactNode;
   className?: string;
@@ -15,9 +17,16 @@ export type ConversationProps = MessageActionHandlers & {
 /** A scrollable message log that sticks to the bottom as new content streams
  *  in, unless the user has scrolled up — in which case a jump-to-bottom button
  *  appears. */
-export function Conversation({ messages, emptyState, className, ...actions }: ConversationProps) {
+export function Conversation({
+  messages,
+  status,
+  emptyState,
+  className,
+  ...actions
+}: ConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
+  const isWaiting = status === "submitted" || (status === "streaming" && !hasVisibleAssistantResponse(messages));
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -55,6 +64,7 @@ export function Conversation({ messages, emptyState, className, ...actions }: Co
             {messages.map((message) => (
               <Message key={message.id} message={message} {...actions} />
             ))}
+            {isWaiting && <LoadingIndicator />}
           </div>
         )}
       </div>
@@ -69,6 +79,25 @@ export function Conversation({ messages, emptyState, className, ...actions }: Co
           <Icon icon={UiArrowDown} className="size-4" />
         </button>
       )}
+    </div>
+  );
+}
+
+function hasVisibleAssistantResponse(messages: UIMessage[]) {
+  const last = messages[messages.length - 1];
+  if (last?.role !== "assistant") return false;
+  return last.parts.some((part) => {
+    if (part.type === "step-start") return false;
+    if (part.type === "text" || part.type === "reasoning") return part.text.length > 0;
+    return true;
+  });
+}
+
+function LoadingIndicator() {
+  return (
+    <div className="flex w-full max-w-[95%] items-center gap-2 text-sm text-muted-foreground">
+      <Icon icon={UiLoader} className="size-4 shrink-0 animate-spin" />
+      <span>Waiting for response...</span>
     </div>
   );
 }
