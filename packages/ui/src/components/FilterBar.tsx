@@ -296,21 +296,6 @@ export type FilterBarFilter =
   | FilterBarEnumFilter
   | FilterBarBooleanFilter;
 
-// FilterExtension decorates a resolved filter before it renders — the FilterBar
-// analogue of JsonSchemaForm's PreExtension. Consumers compose these in array
-// order (each sees the prior's output) to stamp domain-specific touches such as
-// an entity `icon` keyed on the filter's name, keeping FilterBar domain-agnostic.
-export type FilterExtension = (filter: FilterBarFilter) => FilterBarFilter;
-
-// applyFilterExtensions runs a filter through the composed extension stack.
-export function applyFilterExtensions(
-  filter: FilterBarFilter,
-  extensions: FilterExtension[] | undefined,
-): FilterBarFilter {
-  if (!extensions || extensions.length === 0) return filter;
-  return extensions.reduce((current, ext) => ext(current), filter);
-}
-
 export type FilterBarRangePreset = {
   /** Visible preset label. */
   label: string;
@@ -393,6 +378,7 @@ export function FilterBar({
   const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
   const allFilters = filters ?? [];
   const responsiveOverflow = overflowMode === "responsive" && allFilters.length > 0;
+  const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
   const filterListRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
@@ -411,17 +397,27 @@ export function FilterBar({
   // setVisibleFilterCount fired → repeat).
   const allFiltersRef = useRef(allFilters);
   const responsiveOverflowRef = useRef(responsiveOverflow);
+  const mobileFilterOverflowRef = useRef(mobileFilterOverflow);
   allFiltersRef.current = allFilters;
   responsiveOverflowRef.current = responsiveOverflow;
+  mobileFilterOverflowRef.current = mobileFilterOverflow;
 
   useLayoutEffect(() => {
-    setVisibleFilterCount(allFiltersRef.current.length);
-  }, [filterKeys]);
+    setVisibleFilterCount(
+      responsiveOverflowRef.current && mobileFilterOverflowRef.current
+        ? 0
+        : allFiltersRef.current.length,
+    );
+  }, [filterKeys, mobileFilterOverflow]);
 
   const measureOverflow = useCallback(() => {
     const current = allFiltersRef.current;
     if (!responsiveOverflowRef.current) {
       setVisibleFilterCount(current.length);
+      return;
+    }
+    if (mobileFilterOverflowRef.current) {
+      setVisibleFilterCount(0);
       return;
     }
 
@@ -485,7 +481,7 @@ export function FilterBar({
       observer.disconnect();
       window.removeEventListener("resize", measureOverflow);
     };
-  }, [measureOverflow, responsiveOverflow]);
+  }, [measureOverflow, responsiveOverflow, mobileFilterOverflow]);
 
   const inlineFilters = responsiveOverflow
     ? allFilters.slice(0, Math.min(visibleFilterCount, allFilters.length))
@@ -507,7 +503,8 @@ export function FilterBar({
     <FilterBarContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex flex-nowrap items-center gap-2 overflow-visible bg-background py-1.5",
+          "flex flex-nowrap items-center gap-2 overflow-visible rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
+          "flex-wrap md:flex-nowrap",
           overflowMode === "wrap" && "flex-wrap",
           className,
         )}
@@ -550,9 +547,15 @@ export function FilterBar({
         )}
 
         {(hasRangeControls || trailing || showApply) && (
-          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
+          <div className="ml-auto flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
             {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
-            {timeRange && <RangeControlButton kind="time" label="Time range" {...timeRange} />}
+            {timeRange && (
+              <RangeControlButton
+                kind={timeRange.timeEnabled === false ? "date" : "time"}
+                label={timeRange.timeEnabled === false ? "Date range" : "Time range"}
+                {...timeRange}
+              />
+            )}
             {trailing}
             {showApply && (
               <Button
@@ -742,7 +745,7 @@ function OverflowFiltersMenu({
         <div
           role="dialog"
           aria-label="Overflow filters"
-          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-[min(34rem,calc(100vw-2rem))] overflow-visible rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+          className="fixed inset-x-2 bottom-4 top-16 z-50 flex flex-col overflow-hidden rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/10 md:absolute md:bottom-auto md:left-auto md:right-0 md:top-[calc(100%+0.375rem)] md:block md:w-[min(34rem,calc(100vw-2rem))] md:overflow-visible md:shadow-black/5"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="mb-2 flex items-center justify-between gap-2 px-1">
@@ -769,14 +772,14 @@ function OverflowFiltersMenu({
               </button>
             </div>
           </div>
-          <div className="divide-y divide-border/70 rounded-md border border-border/70">
+          <div className="min-h-0 flex-1 divide-y divide-border/70 overflow-y-auto rounded-md border border-border/70 md:overflow-visible">
             {stagedFilters.map((filter) => {
               const active = isFilterBarFilterActive(filter);
               return (
                 <div
                   key={filter.key}
                   data-overflow-filter-row={filter.key}
-                  className="grid h-12 grid-cols-[minmax(7rem,10rem)_auto_minmax(0,1fr)_auto] items-center gap-2 overflow-visible p-2"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 overflow-visible p-3 md:h-12 md:grid-cols-[minmax(7rem,10rem)_auto_minmax(0,1fr)_auto] md:items-center md:p-2"
                 >
                   <label
                     htmlFor={filterInputId(filter)}
@@ -789,8 +792,8 @@ function OverflowFiltersMenu({
                     />
                     <span className="truncate">{filter.label}</span>
                   </label>
-                  <span className="text-sm text-muted-foreground">=</span>
-                  <div className="min-w-0 overflow-visible">
+                  <span className="hidden text-sm text-muted-foreground md:block">=</span>
+                  <div className="col-span-2 min-w-0 overflow-visible md:col-span-1">
                     <FilterBarContext.Provider value={{ autoSubmit: false }}>
                       <FilterBarKeyValueControl filter={filter} />
                     </FilterBarContext.Provider>
@@ -1102,7 +1105,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
   const [draft, setDraft] = useDebouncedTextDraft(search.value, search.onChange);
 
   return (
-    <div className="flex min-w-[14rem] max-w-[24rem] flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-2 md:min-w-[14rem] md:max-w-[24rem]">
       <label
         className={cn(
           "flex h-8 min-w-0 flex-1 items-center rounded-md border border-input bg-background px-3 text-sm",
@@ -1177,7 +1180,7 @@ function sizedIcon(icon: LabelIconSpec | undefined, px: number): LabelIconSpec |
   if (!isValidElement(icon)) return icon;
   const el = icon as ReactElement<{ style?: CSSProperties }>;
   return cloneElement(el, {
-    style: { width: `${px}px`, height: `${px}px`, ...(el.props.style ?? {}) },
+    style: { width: `${px}px`, height: `${px}px`, ...el.props.style },
   });
 }
 
@@ -2438,6 +2441,24 @@ function useDismissablePopup(
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose, open, rootRef, triggerRef]);
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia(query);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener?.("change", onChange);
+    return () => media.removeEventListener?.("change", onChange);
+  }, [query]);
+
+  return matches;
 }
 
 function summarizeMultiFilter(

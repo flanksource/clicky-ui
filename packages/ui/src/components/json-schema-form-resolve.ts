@@ -227,7 +227,7 @@ export function effectiveProperties(
   schema: JsonSchemaObject,
   value: Record<string, unknown>,
 ): EffectiveProperties {
-  const properties: Record<string, JsonSchemaProperty> = { ...(schema.properties ?? {}) };
+  const properties: Record<string, JsonSchemaProperty> = { ...schema.properties };
   const required = new Set(schema.required ?? []);
   for (const clause of schema.allOf ?? []) {
     // Unconditional composition member: merge its own properties/required.

@@ -309,8 +309,8 @@ export function TimeRange({
           role="dialog"
           aria-label={label}
           className={cn(
-            "absolute top-[calc(100%+0.375rem)] z-50 w-[22.5rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg shadow-black/5 outline-none",
-            align === "left" ? "left-0" : "right-0",
+            "fixed inset-x-2 bottom-4 top-16 z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg shadow-black/10 outline-none md:absolute md:bottom-auto md:top-[calc(100%+0.375rem)] md:block md:w-[22.5rem] md:shadow-black/5",
+            align === "left" ? "md:left-0" : "md:right-0",
             panelClassName,
           )}
         >
@@ -323,60 +323,65 @@ export function TimeRange({
             </span>
           </div>
 
-          {activeChipRows.length > 0 && (
-            <ChipRowList rows={activeChipRows} activeToken={activeToken} onApply={applyRange} />
-          )}
-          {activePresets.length > 0 && (
-            <div className={activeChipRows.length > 0 ? "px-3.5 pb-3" : "px-3.5 pt-3"}>
-              <PresetList presets={activePresets} onApply={applyRange} />
-            </div>
-          )}
-
-          <div className="border-t border-border/60 bg-muted/30 px-3.5 py-2.5">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Custom
+          <div className="min-h-0 flex-1 overflow-y-auto md:overflow-visible">
+            {activeChipRows.length > 0 && (
+              <ChipRowList rows={activeChipRows} activeToken={activeToken} onApply={applyRange} />
+            )}
+            {activePresets.length > 0 && (
+              <div className={activeChipRows.length > 0 ? "px-3.5 pb-3" : "px-3.5 pt-3"}>
+                <PresetList presets={activePresets} onApply={applyRange} />
               </div>
-              {timeEnabled && (
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    TZ
-                  </span>
-                  <Select
-                    aria-label={`${label} timezone`}
-                    value={selectedTimeZone}
-                    options={activeTimeZones.map((zone) => ({
-                      value: zone,
-                      label: zone,
-                    }))}
-                    onChange={(event) => setSelectedTimeZone(event.target.value)}
-                    className="h-7 w-40 truncate px-2 pr-7 font-mono text-xs"
-                  />
+            )}
+
+            <div className="border-t border-border/60 bg-muted/30 px-3.5 py-2.5">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Custom
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
-              <DraftRangeInput
-                aria-label={`${label} from`}
-                placeholder={
-                  fromPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now-1d" : "now-24h")
-                }
-                value={draftFrom}
-                onChange={setDraftFrom}
-                onClear={() => setDraftFrom("")}
-                pickerKind={kind}
-                timeEnabled={timeEnabled}
-              />
-              <Icon icon={UiArrowRight} className="text-muted-foreground text-[12px]" />
-              <DraftRangeInput
-                aria-label={`${label} to`}
-                placeholder={toPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now" : "now")}
-                value={draftTo}
-                onChange={setDraftTo}
-                onClear={() => setDraftTo("")}
-                pickerKind={kind}
-                timeEnabled={timeEnabled}
-              />
+                {timeEnabled && (
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      TZ
+                    </span>
+                    <Select
+                      aria-label={`${label} timezone`}
+                      value={selectedTimeZone}
+                      options={activeTimeZones.map((zone) => ({
+                        value: zone,
+                        label: zone,
+                      }))}
+                      onChange={(event) => setSelectedTimeZone(event.target.value)}
+                      className="h-7 w-40 truncate px-2 pr-7 font-mono text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-1.5 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                <DraftRangeInput
+                  aria-label={`${label} from`}
+                  placeholder={
+                    fromPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now-1d" : "now-24h")
+                  }
+                  value={draftFrom}
+                  onChange={setDraftFrom}
+                  onClear={() => setDraftFrom("")}
+                  pickerKind={kind}
+                  timeEnabled={timeEnabled}
+                />
+                <Icon
+                  icon={UiArrowRight}
+                  className="hidden text-muted-foreground text-[12px] md:block"
+                />
+                <DraftRangeInput
+                  aria-label={`${label} to`}
+                  placeholder={toPlaceholder ?? (kind === "date" ? "YYYY-MM-DD or now" : "now")}
+                  value={draftTo}
+                  onChange={setDraftTo}
+                  onClear={() => setDraftTo("")}
+                  pickerKind={kind}
+                  timeEnabled={timeEnabled}
+                />
+              </div>
             </div>
           </div>
 

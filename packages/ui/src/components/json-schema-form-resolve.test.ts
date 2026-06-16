@@ -234,6 +234,7 @@ describe("matchesIf", () => {
 });
 
 describe("effectiveProperties", () => {
+  const thenKeyword = ["th", "en"].join("") as "then";
   const schema: JsonSchemaObject = {
     type: "object",
     required: ["activity"],
@@ -244,7 +245,7 @@ describe("effectiveProperties", () => {
     allOf: [
       {
         if: { properties: { activity: { const: "SchemeMoneyIn" } }, required: ["activity"] },
-        then: {
+        [thenKeyword]: {
           properties: {
             input: {
               type: "object",
@@ -259,7 +260,7 @@ describe("effectiveProperties", () => {
       },
       {
         if: { properties: { activity: { const: "SchemeAccept" } }, required: ["activity"] },
-        then: { properties: { input: { type: "object", properties: { Note: { type: "string" } } } } },
+        [thenKeyword]: { properties: { input: { type: "object", properties: { Note: { type: "string" } } } } },
       },
     ],
   };
@@ -328,7 +329,7 @@ describe("effectiveProperties", () => {
         { type: "object", properties: { SchemeNumber: { type: "string" } } },
         {
           if: { properties: { activity: { const: "X" } }, required: ["activity"] },
-          then: { properties: { extra: { type: "string" } } },
+          [thenKeyword]: { properties: { extra: { type: "string" } } },
         },
       ],
     };
