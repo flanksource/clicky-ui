@@ -147,14 +147,6 @@ export {
 export { Panel, type PanelProps, type PanelTone } from "./layout/Panel";
 export { Tabs, type TabsProps, type TabItem } from "./layout/Tabs";
 export {
-  AppShell,
-  type AppShellProps,
-  type AppShellNavItem,
-  type AppShellNavSection,
-} from "./layout/AppShell";
-export { Panel, type PanelProps, type PanelTone } from "./layout/Panel";
-export { Tabs, type TabsProps, type TabItem } from "./layout/Tabs";
-export {
   Section,
   DetailEmptyState,
   type SectionProps,
