@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { RadialGauge } from "./RadialGauge";
 import { Icon } from "./Icon";
+import { UiGitPr } from "../icons";
 
 const meta: Meta<typeof RadialGauge> = {
   title: "Data/RadialGauge",
@@ -41,7 +42,7 @@ export const Default: Story = {};
 
 export const WithCenterIcon: Story = {
   args: {
-    center: <Icon name="mdi:github" width={13} height={13} />,
+    center: <Icon icon={UiGitPr} width={13} height={13} />,
     label: "Rate Limit",
   },
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveCoreBars } from "./TimeseriesCoreBars";
+import { deriveCoreBars } from "./TimeseriesCoreBars.model";
 
 const ONE_CORE = 1000; // millicores per core
 

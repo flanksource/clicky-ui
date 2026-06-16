@@ -1,7 +1,8 @@
-import type { CSSProperties, ComponentType, ElementType, ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
+import { getFallbackIconProvider } from "./icon-fallback";
 
 // LabelIconSpec is the icon a label may carry: an iconify/runtime name (resolved
 // via the fallback provider) or a fully-rendered node the caller supplies.
@@ -72,33 +73,6 @@ const TONE_CLASSES: Record<IconTone, string> = {
 
 const DEFAULT_PLAIN_ICON_SIZE = "1em";
 
-/**
- * Optional secondary icon provider for user-supplied runtime names.
- * Built-in/default icons should pass an imported component via `icon`.
- */
-export type FallbackIconProps = {
-  /** Runtime icon name to resolve. */
-  name?: string;
-  /** Classes applied by Icon. */
-  className?: string;
-  /** Requested glyph size. */
-  size?: string | number;
-  /** Accessible label. */
-  alt?: string;
-};
-
-type FallbackIconComponent = ComponentType<FallbackIconProps>;
-
-let fallbackIcon: FallbackIconComponent | null = null;
-
-/**
- * Register a secondary glyph provider. Pass the flanksource Icon/ResourceIcon
- * (or any compatible component) to resolve user-supplied runtime names.
- */
-export function setFallbackIconProvider(component: FallbackIconComponent | null): void {
-  fallbackIcon = component;
-}
-
 function renderImportedGlyph(
   ImportedIcon: StaticIconComponent,
   glyphWidth: number | string | undefined,
@@ -136,6 +110,7 @@ function renderRuntimeGlyph(
   glyphClassName: string | undefined,
   title: string | undefined,
 ): JSX.Element {
+  const fallbackIcon = getFallbackIconProvider();
   if (fallbackIcon) {
     const Fallback = fallbackIcon;
     const glyphSize = typeof glyphWidth === "number" ? glyphWidth : glyphHeight;

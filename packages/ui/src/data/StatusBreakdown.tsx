@@ -22,11 +22,6 @@ export interface StatusSegment {
   href?: string;
 }
 
-/** Builds a StatusSegment, clamping the count to a non-negative integer. */
-export function segment(key: string, label: string, count: number, className: string): StatusSegment {
-  return { key, label, count: Math.max(0, count || 0), className };
-}
-
 /** Render-prop for a status row's link, so callers supply their router's Link (or a plain <a>). */
 export type StatusRenderLink = (args: {
   to: string;

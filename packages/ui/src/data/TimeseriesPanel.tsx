@@ -20,174 +20,27 @@ import { ProgressBar, type ProgressSegment } from "./ProgressBar";
 import { UiFullscreen } from "../icons";
 import { Icon, type StaticIconComponent } from "./Icon";
 import { assignAxes, latestOf } from "./TimeseriesPanel.axes";
+import {
+  mergeSeries,
+  resolveBreakdown,
+  resolveSeries,
+  type BreakdownItem,
+  type MergedRow,
+  type ResolvedSeries,
+  type TimeseriesPanelProps,
+  type TimeseriesResponse,
+} from "./TimeseriesPanel.model";
 
-export { assignAxes, latestOf } from "./TimeseriesPanel.axes";
 export type { AxisAssignment, AxisOrientation, AxisSpec } from "./TimeseriesPanel.axes";
-
-export interface TimeseriesPoint {
-  at: string;
-  value: number;
-}
-
-export interface TimeseriesResponse {
-  id: string;
-  points: TimeseriesPoint[];
-}
-
-/** One metric plotted on a panel. Its request URL is `baseUrl + id`. */
-export interface TimeseriesSeries {
-  /** Metric id appended to the panel's baseUrl, e.g. "sqlserver.iops.read". */
-  id: string;
-  /** Tooltip/legend label; defaults to the id. */
-  label?: string;
-  /**
-   * Maps each point's value before plotting — e.g. writes pass `(v) => -v` to
-   * render below the zero axis. Identity when omitted.
-   */
-  transform?: (value: number) => number;
-  /**
-   * Stroke/fill override as a CSS color value (e.g. "#10b981", "var(--chart-3)")
-   * or a Tailwind color class (e.g. "bg-emerald-500"); Tailwind classes are
-   * resolved to a CSS value for the chart. Defaults cycle a small palette by index.
-   */
-  color?: string;
-  /**
-   * Grafana-style unit key for this series' readout/tooltip (e.g. "percent",
-   * "short"). Falls back to the panel-level `unit`. Lets one panel mix units
-   * (e.g. a percent series alongside a plain-count series).
-   */
-  unit?: string;
-  /**
-   * Instantaneous value for the `breakdown` variant — the size of this series'
-   * bar segment and its legend readout. When omitted, the breakdown falls back
-   * to the latest polled point. Ignored by the time-series variants.
-   */
-  current?: number;
-}
-
-export interface TimeseriesPanelProps {
-  /**
-   * Single-metric endpoint returning a TimeseriesResponse,
-   * e.g. "/api/v1/metrics/sqlserver.cpu". Mutually exclusive with baseUrl/series.
-   */
-  url?: string;
-  /** Common prefix for a multi-series panel; each series requests `baseUrl + series.id`. */
-  baseUrl?: string;
-  /** Metrics to plot on one chart. Provide together with baseUrl. */
-  series?: TimeseriesSeries[];
-  title: string;
-  /** Iconify name or static icon component shown beside the title. */
-  icon?: string | StaticIconComponent;
-  /**
-   * Default Grafana-style unit key for the panel (e.g. "bytes", "percent",
-   * "ms", "short"); each series may override it. Unknown strings are appended
-   * as a raw suffix (so "%" still works). Used for the readout, axis, and tooltip.
-   */
-  unit?: string;
-  /** Look-back window passed as ?since=; defaults to "1h". */
-  range?: string;
-  /** Poll interval in ms; defaults to 5000. Pass 0 to disable polling. */
-  refreshMs?: number;
-  /** Chart height in px; defaults to 160. */
-  height?: number;
-  /**
-   * "area" (overlaid, default), "line", "stacked" (areas sum vertically), or
-   * "breakdown" (an instantaneous stacked bar + legend; the expand modal still
-   * shows a time-series graph of the polled history).
-   */
-  variant?: "area" | "line" | "stacked" | "breakdown";
-  /**
-   * Chart variant rendered in the expand modal. Defaults to `variant` for the
-   * time-series variants and to "area" for `breakdown` (which has no inline chart).
-   */
-  expandVariant?: "area" | "line" | "stacked";
-  /**
-   * Denominator for the `breakdown` bar and per-segment percentages. Defaults to
-   * the sum of the series' `current` values when omitted.
-   */
-  total?: number;
-  /** Show a header button that opens the chart larger in a modal. Default true. */
-  expandable?: boolean;
-  /** Override the default fetch (e.g. to route through an app's API client). */
-  fetcher?: (url: string) => Promise<TimeseriesResponse>;
-  className?: string;
-}
-
-const SERIES_PALETTE = [
-  "var(--chart-1, #3b82f6)",
-  "var(--chart-2, #ef4444)",
-  "var(--chart-3, #10b981)",
-  "var(--chart-4, #f59e0b)",
-] as const;
-
-function paletteColor(index: number): string {
-  return SERIES_PALETTE[index % SERIES_PALETTE.length] ?? SERIES_PALETTE[0];
-}
-
-/** A series with its full request URL, resolved label, color, and unit. Exported for tests. */
-export interface ResolvedSeries {
-  /** Stable key used as the merged-row field and recharts dataKey. */
-  key: string;
-  url: string;
-  label: string;
-  color: string;
-  /** Resolved Grafana unit key: the series' own unit, else the panel default. */
-  unit?: string;
-  transform?: (value: number) => number;
-  /** Instantaneous value used by the `breakdown` variant. */
-  current?: number;
-}
-
-/** Normalises the single-url and baseUrl+series forms to one list. Exported for tests. */
-export function resolveSeries(props: TimeseriesPanelProps): ResolvedSeries[] {
-  const base = props.baseUrl ?? "";
-  const list = props.series ?? (props.url ? [{ id: props.url }] : []);
-  return list.map((s, i) => ({
-    key: s.id,
-    url: base + s.id,
-    label: s.label ?? s.id,
-    color: s.color ?? paletteColor(i),
-    ...(s.unit ?? props.unit ? { unit: s.unit ?? props.unit } : {}),
-    ...(s.transform ? { transform: s.transform } : {}),
-    ...(s.current !== undefined ? { current: s.current } : {}),
-  }));
-}
-
-/** One legend/bar row of the breakdown variant: resolved value, color, label, unit, percentage. */
-export interface BreakdownItem {
-  key: string;
-  label: string;
-  color: string;
-  unit?: string;
-  value: number;
-  /** Share of `total`, clamped to 0..100. */
-  percent: number;
-}
-
-/**
- * Derives the breakdown bar segments and per-item percentages from the resolved
- * series' `current` values. `total` defaults to the sum of those values; the
- * percentage is each value's share of that denominator, clamped to 0..100.
- * Latest polled point fills in for a series with no explicit `current`. Pure —
- * exported for tests.
- */
-export function resolveBreakdown(
-  series: ResolvedSeries[],
-  rows: MergedRow[],
-  total?: number,
-): { items: BreakdownItem[]; total: number } {
-  const withValue = series.map((s) => ({ s, value: s.current ?? latestOf(rows, s.key) ?? 0 }));
-  const denom = total ?? withValue.reduce((acc, w) => acc + w.value, 0);
-  const items = withValue.map(({ s, value }) => ({
-    key: s.key,
-    label: s.label,
-    color: s.color,
-    ...(s.unit ? { unit: s.unit } : {}),
-    value,
-    percent: denom > 0 ? Math.min(100, Math.max(0, (value / denom) * 100)) : 0,
-  }));
-  return { items, total: denom };
-}
+export type {
+  BreakdownItem,
+  MergedRow,
+  ResolvedSeries,
+  TimeseriesPanelProps,
+  TimeseriesPoint,
+  TimeseriesResponse,
+  TimeseriesSeries,
+} from "./TimeseriesPanel.model";
 
 const defaultFetcher = async (url: string): Promise<TimeseriesResponse> => {
   const res = await fetch(url);
@@ -199,36 +52,6 @@ function formatClock(at: string): string {
   const date = new Date(at);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-/**
- * One row of the merged chart data: the timestamp in `at` plus each series'
- * value under its key. Values are absent (undefined) where a series has no
- * point at that timestamp.
- */
-export interface MergedRow {
-  at: string;
-  [seriesKey: string]: string | number | undefined;
-}
-
-/**
- * Joins per-series point lists into rows keyed by timestamp and applies each
- * series' transform. Timestamps present in any series produce a row; missing
- * values are left undefined so recharts gaps the line rather than drawing zero.
- */
-export function mergeSeries(
-  series: ResolvedSeries[],
-  pointsBySeries: (TimeseriesPoint[] | undefined)[],
-): MergedRow[] {
-  const rows = new Map<string, MergedRow>();
-  series.forEach((s, i) => {
-    for (const p of pointsBySeries[i] ?? []) {
-      const row = rows.get(p.at) ?? { at: p.at };
-      row[s.key] = s.transform ? s.transform(p.value) : p.value;
-      rows.set(p.at, row);
-    }
-  });
-  return [...rows.values()].sort((a, b) => a.at.localeCompare(b.at));
 }
 
 export function TimeseriesPanel(props: TimeseriesPanelProps) {

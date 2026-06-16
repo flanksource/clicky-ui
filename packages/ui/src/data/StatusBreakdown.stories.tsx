@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { StackedStatusBar, StatusRows, segment } from "./StatusBreakdown";
+import { StackedStatusBar, StatusRows } from "./StatusBreakdown";
+import { segment } from "./status-breakdown-utils";
 
 const SEGMENTS = [
   segment("healthy", "Healthy", 142, "bg-emerald-500"),

@@ -1,24 +1,10 @@
+import type { FrameSource } from "./FrameSourceWindow.utils";
+
 // FrameSourceWindow renders a decompiled / resolved source window beneath a
 // stack frame: a gutter of absolute line numbers with the focal line (the one
 // the frame points at) highlighted. It is the plain (non-Shiki) renderer shared
 // by the JVM thread-dump frames and the exception stack-trace frames so both
 // surfaces show inline source the same way.
-
-export interface FrameSource {
-  /** Source lines around the focal line. */
-  sourceLines?: string[];
-  /** Absolute line number for each entry in sourceLines (preferred gutter). */
-  sourceLineNumbers?: number[];
-  /** Line number of sourceLines[0] when sourceLineNumbers is absent. */
-  sourceStartLine?: number;
-  /** The frame's focal line, highlighted when it falls inside the window. */
-  line?: number;
-}
-
-export function frameHasSource(frame: FrameSource): boolean {
-  return !!frame.sourceLines && frame.sourceLines.length > 0;
-}
-
 export function FrameSourceWindow({ frame }: { frame: FrameSource }) {
   const lines = frame.sourceLines ?? [];
   if (lines.length === 0) return null;

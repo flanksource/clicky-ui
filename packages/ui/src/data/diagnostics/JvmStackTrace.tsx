@@ -1,7 +1,8 @@
 import { Icon } from "../Icon";
 import { UiChip, UiDebugStepOver, UiLock, UiSync, UiMethod, UiWatch } from "../../icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
-import { FrameSourceWindow, frameHasSource } from "./FrameSourceWindow";
+import { FrameSourceWindow } from "./FrameSourceWindow";
+import { frameHasSource } from "./FrameSourceWindow.utils";
 
 // JvmFrameSourceResolver returns a source window for a frame, or undefined when
 // no source is available (a missing class must never blank out the frame). Used
