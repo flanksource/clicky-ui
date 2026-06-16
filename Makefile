@@ -1,5 +1,7 @@
 .PHONY: build icons test clean handoff
 
+export PATH := /opt/homebrew/opt/node@24/bin:/usr/local/opt/node/bin:$(PATH)
+
 build:
 	pnpm run build
 
