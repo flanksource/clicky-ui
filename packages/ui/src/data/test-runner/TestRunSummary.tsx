@@ -15,6 +15,12 @@ export type TestRunSummaryProps = {
   /** Injected clock (epoch ms) so the component stays pure. */
   now?: number | undefined;
   runMeta?: RunMeta | undefined;
+  /**
+   * Single-line layout for embedding in a host header (e.g. a dialog header):
+   * counts + a short inline progress bar on one row, instead of the default
+   * two-line right-aligned column.
+   */
+  compact?: boolean | undefined;
   className?: string | undefined;
 };
 
@@ -44,6 +50,7 @@ export function TestRunSummary({
   done,
   now,
   runMeta,
+  compact = false,
   className,
 }: TestRunSummaryProps) {
   const t = totals(tests);
@@ -70,6 +77,48 @@ export function TestRunSummary({
     { n: t.running, label: "running", tone: "text-blue-600 dark:text-blue-400" },
     { n: t.pending, label: "queued", tone: "text-muted-foreground" },
   ];
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground",
+          className,
+        )}
+      >
+        <span className="font-medium text-foreground">
+          {t.total} tests
+          {runMeta?.kind === "rerun" ? ` · rerun #${runMeta.sequence}` : ""}
+        </span>
+        {chips
+          .filter((c) => c.n > 0)
+          .map((c) => (
+            <span key={c.label} className={c.tone}>
+              {c.n} {c.label}
+            </span>
+          ))}
+        {elapsed && (
+          <span className="inline-flex items-center gap-1">
+            <Icon icon={UiClock} className="text-xs" />
+            {elapsed}
+          </span>
+        )}
+        {t.total > 0 && (
+          <span className="inline-flex items-center gap-1.5">
+            <ProgressBar className="w-24" segments={segments} total={t.total} height="h-1.5" />
+            <span className="text-xs font-medium text-green-600 dark:text-green-400">
+              {pct(t.passed, t.total)}%
+            </span>
+          </span>
+        )}
+        {done ? (
+          <Icon icon={UiCheck} className="text-green-600 dark:text-green-400" />
+        ) : (
+          <Icon icon={UiLoader} className="animate-spin text-blue-500" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex min-w-[18rem] flex-col items-end gap-1.5", className)}>
