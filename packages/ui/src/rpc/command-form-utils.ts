@@ -1,7 +1,7 @@
 import type { OpenAPIParameter } from "./types";
 
 export function pathParamNames(path: string): string[] {
-  return [...path.matchAll(/\{([^}]+)\}/g)]
+  return [...path.matchAll(/\{([^{}]+)\}/g)]
     .map((match) => match[1])
     .filter((name): name is string => Boolean(name));
 }

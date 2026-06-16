@@ -355,7 +355,7 @@ describe("OperationCatalog", () => {
     expect(screen.getByLabelText("Team")).toHaveRole("combobox");
     expect(screen.getByLabelText("Tags")).toHaveRole("combobox");
     expect(screen.getByLabelText("Include archived")).toHaveAttribute("type", "checkbox");
-    expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /date range filter/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
   });

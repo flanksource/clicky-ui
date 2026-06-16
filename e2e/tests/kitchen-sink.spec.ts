@@ -13,7 +13,9 @@ test.beforeEach(async ({ page }) => {
 test("renders the kitchen-sink page with Button showcase", async ({ page }) => {
   await page.goto("/?demo=button", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("Clicky UI · Kitchen Sink")).toBeVisible();
+  await expect(
+    page.getByRole("complementary").getByText("Clicky UI · Kitchen Sink"),
+  ).toBeVisible();
   const buttonDemo = page.locator("#button");
   await expect(buttonDemo.getByRole("button", { name: "Destructive", exact: true })).toBeVisible();
   await expect(buttonDemo.getByRole("button", { name: "Outline", exact: true })).toBeVisible();
