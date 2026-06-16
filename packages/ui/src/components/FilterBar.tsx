@@ -507,7 +507,7 @@ export function FilterBar({
     <FilterBarContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex flex-nowrap items-center gap-2 overflow-visible rounded-lg border border-input bg-background px-2 py-1.5 shadow-sm",
+          "flex flex-nowrap items-center gap-2 overflow-visible bg-background py-1.5",
           overflowMode === "wrap" && "flex-wrap",
           className,
         )}
