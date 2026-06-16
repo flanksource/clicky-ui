@@ -10,8 +10,10 @@ export const AUTORUN_QUERY_PARAM = "autoRun";
 export const ARG_QUERY_PREFIX = "__arg";
 
 export function trimTrailingSlash(value: string): string {
-  if (!value) return "";
-  return value.length > 1 ? value.replace(/\/+$/, "") : value;
+  if (value.length <= 1) return value;
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end--;
+  return value.slice(0, end);
 }
 
 export function withBasePath(basePath: string, pathname: string): string {
