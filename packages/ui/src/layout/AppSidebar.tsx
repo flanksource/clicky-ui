@@ -3,14 +3,19 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiSidebar } from "../icons";
 import type { RenderLink } from "../rpc/EndpointList";
+import { useRouter } from "../rpc/router";
 
 // AppSidebar / AppLayout are a router-agnostic application shell: a collapsible
 // left navigation rail driven by declarative sections, plus a flex layout that
-// pairs it with an optional header and the routed content. Navigation is
-// expressed through `renderLink` (the same render-prop EndpointList uses) so the
-// host app supplies react-router's Link, a plain <a>, or any custom navigator
-// without coupling the library to a router. Active state is derived from the
-// `pathname` prop rather than a router hook for the same reason.
+// pairs it with an optional header and the routed content. Navigation and active
+// state come from the RouterAdapter (see ../rpc/router) — by default a plain
+// <a href={to}> browser adapter, or the host's react-router/memory adapter via
+// RouterProvider. The `pathname` and `renderLink` props still override the
+// adapter for cases where a rail's active state is independent of the URL.
+//
+// A section may carry flat `items` and/or collapsible `groups`. Groups are for
+// high-cardinality clusters (e.g. provider surfaces) that benefit from being
+// folded away; their open/closed state persists per `group.key`.
 
 export interface AppNavItem {
   /** Stable key; also used as the React key. */
@@ -25,29 +30,48 @@ export interface AppNavItem {
   badge?: ReactNode;
 }
 
+export interface AppNavGroup {
+  /** Stable key; also the persistence key for collapsed state. */
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  /** Collapsed on first render until the user toggles it. */
+  defaultCollapsed?: boolean;
+  items?: AppNavItem[];
+  /** Nested groups (one extra level, e.g. Providers > Xero). */
+  groups?: AppNavGroup[];
+}
+
 export interface AppNavSection {
   /** Section heading; omitted for the leading section. */
   label?: string;
-  items: AppNavItem[];
+  items?: AppNavItem[];
+  /** Collapsible groups rendered after the flat items. */
+  groups?: AppNavGroup[];
 }
 
 export interface AppSidebarProps {
   sections: AppNavSection[];
-  /** Current path, used to compute the active item. */
-  pathname: string;
-  renderLink: RenderLink;
+  /** Current path for active-state. Defaults to the RouterAdapter's pathname. */
+  pathname?: string;
+  /** Render routed links. Defaults to the RouterAdapter's renderLink (a plain
+   *  <a href={to}> unless a RouterProvider supplies a router Link). */
+  renderLink?: RenderLink;
   /** Branding shown at the top of the expanded rail (logo/title). */
   header?: ReactNode;
   /** Pinned to the bottom of the rail (theme switcher, version, etc.). */
   footer?: ReactNode;
-  /** localStorage key persisting the collapsed state. */
+  /** localStorage key persisting the rail collapsed state. */
   collapsedStorageKey?: string;
+  /** localStorage key persisting per-group collapsed state. */
+  groupCollapsedStorageKey?: string;
   /** Override the default prefix-match active test. */
   isActive?: (pathname: string, to: string) => boolean;
   className?: string;
 }
 
 const DEFAULT_COLLAPSE_KEY = "clicky-ui:app-sidebar:collapsed";
+const DEFAULT_GROUP_COLLAPSE_KEY = "clicky-ui:app-sidebar:groups";
 
 function defaultIsActive(pathname: string, to: string): boolean {
   if (to === "/") return pathname === "/";
@@ -66,17 +90,64 @@ function useCollapsed(storageKey: string): [boolean, () => void] {
   return [collapsed, () => setCollapsed((c) => !c)];
 }
 
+interface GroupState {
+  isCollapsed: (key: string, fallback: boolean) => boolean;
+  toggle: (key: string, fallback: boolean) => void;
+}
+
+function readGroupState(storageKey: string): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function useGroupCollapsed(storageKey: string): GroupState {
+  const [state, setState] = useState<Record<string, boolean>>(() => readGroupState(storageKey));
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // Sidebar state is a UX nicety; private-mode storage failures are safe to swallow.
+    }
+  }, [state, storageKey]);
+  return {
+    isCollapsed: (key, fallback) => state[key] ?? fallback,
+    toggle: (key, fallback) => setState((prev) => ({ ...prev, [key]: !(prev[key] ?? fallback) })),
+  };
+}
+
+function flattenGroupItems(groups: AppNavGroup[]): AppNavItem[] {
+  const out: AppNavItem[] = [];
+  for (const group of groups) {
+    if (group.items) out.push(...group.items);
+    if (group.groups) out.push(...flattenGroupItems(group.groups));
+  }
+  return out;
+}
+
 export function AppSidebar({
   sections,
-  pathname,
-  renderLink,
+  pathname: pathnameProp,
+  renderLink: renderLinkProp,
   header,
   footer,
   collapsedStorageKey = DEFAULT_COLLAPSE_KEY,
+  groupCollapsedStorageKey = DEFAULT_GROUP_COLLAPSE_KEY,
   isActive = defaultIsActive,
   className,
 }: AppSidebarProps) {
+  const router = useRouter();
+  const pathname = pathnameProp ?? router.pathname;
+  const renderLink = renderLinkProp ?? router.renderLink;
   const [collapsed, toggleCollapsed] = useCollapsed(collapsedStorageKey);
+  const groupState = useGroupCollapsed(groupCollapsedStorageKey);
   return (
     <nav
       className={cn(
@@ -107,7 +178,7 @@ export function AppSidebar({
         {sections.map((section, i) => (
           <div key={section.label ?? `section-${i}`} className="flex flex-col">
             {section.label && <SectionLabel collapsed={collapsed}>{section.label}</SectionLabel>}
-            {section.items.map((item) => (
+            {section.items?.map((item) => (
               <SidebarItem
                 key={item.key}
                 item={item}
@@ -116,12 +187,90 @@ export function AppSidebar({
                 renderLink={renderLink}
               />
             ))}
+            {section.groups?.map((group) =>
+              collapsed ? (
+                flattenGroupItems([group]).map((item) => (
+                  <SidebarItem
+                    key={item.key}
+                    item={item}
+                    active={isActive(pathname, item.to)}
+                    collapsed
+                    renderLink={renderLink}
+                  />
+                ))
+              ) : (
+                <SidebarGroup
+                  key={group.key}
+                  group={group}
+                  pathname={pathname}
+                  isActive={isActive}
+                  renderLink={renderLink}
+                  groupState={groupState}
+                />
+              ),
+            )}
           </div>
         ))}
       </div>
 
       {footer && <div className={cn("mt-auto border-t border-border py-3", collapsed ? "px-2" : "px-4")}>{footer}</div>}
     </nav>
+  );
+}
+
+function SidebarGroup({
+  group,
+  pathname,
+  isActive,
+  renderLink,
+  groupState,
+}: {
+  group: AppNavGroup;
+  pathname: string;
+  isActive: (pathname: string, to: string) => boolean;
+  renderLink: RenderLink;
+  groupState: GroupState;
+}) {
+  const fallback = group.defaultCollapsed ?? false;
+  const collapsed = groupState.isCollapsed(group.key, fallback);
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => groupState.toggle(group.key, fallback)}
+        aria-expanded={!collapsed}
+        className="flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:bg-accent/40"
+      >
+        {group.icon && <span className="flex h-4 w-4 shrink-0 items-center justify-center">{group.icon}</span>}
+        <span className="flex-1 truncate text-left">{group.label}</span>
+        <span aria-hidden className="text-[0.65rem] opacity-60">
+          {collapsed ? "▸" : "▾"}
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="ml-2 mt-0.5 flex flex-col gap-0.5 border-l border-border/60 pl-2">
+          {group.items?.map((item) => (
+            <SidebarItem
+              key={item.key}
+              item={item}
+              active={isActive(pathname, item.to)}
+              collapsed={false}
+              renderLink={renderLink}
+            />
+          ))}
+          {group.groups?.map((sub) => (
+            <SidebarGroup
+              key={sub.key}
+              group={sub}
+              pathname={pathname}
+              isActive={isActive}
+              renderLink={renderLink}
+              groupState={groupState}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

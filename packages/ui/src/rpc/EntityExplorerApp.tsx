@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ThemeSwitcher } from "../components/theme-switcher";
-import type { ClickyCommandRuntime, ClickyResolvedCommand } from "../data/Clicky";
+import type { ClickyCommandRuntime } from "../data/Clicky";
 import {
   findSurfaceListOperation,
   getClickySurfaces,
   makeSurfaceDefinition,
 } from "./clickyMetadata";
-import type { RenderLink } from "./EndpointList";
+import {
+  ARG_QUERY_PREFIX,
+  AUTORUN_QUERY_PARAM,
+  buildCommandHref,
+  trimTrailingSlash,
+  withBasePath,
+} from "./commandHref";
+import { useRouter } from "./router";
 import { OperationCatalog } from "./OperationCatalog";
 import { OperationCommandPage } from "./OperationCommandPage";
 import { OperationEntityPage } from "./OperationEntityPage";
@@ -16,8 +23,6 @@ import { useOperations } from "./useOperations";
 
 export type EntityExplorerAppProps = {
   client: OperationsApiClient;
-  pathname: string;
-  renderLink: RenderLink;
   basePath?: string;
   showApiExplorer?: boolean;
   // surfaceIcons maps a ClickySurface.parent slug to a ReactNode rendered next
@@ -32,12 +37,11 @@ const SURFACE_GROUP_STATE_KEY = "clicky-ui:sidebar:groupCollapsed";
 
 export function EntityExplorerApp({
   client,
-  pathname,
-  renderLink,
   basePath = "",
   showApiExplorer = true,
   surfaceIcons,
 }: EntityExplorerAppProps) {
+  const { pathname, renderLink, navigate } = useRouter();
   const { operations, spec } = useOperations(client);
   const surfaces = useMemo(() => getClickySurfaces(spec), [spec]);
   const surfaceGroups = useMemo(() => groupSurfacesByParent(surfaces), [surfaces]);
@@ -77,14 +81,13 @@ export function EntityExplorerApp({
       hrefForCommand: (resolved) => buildCommandHref(basePath, resolved),
       onNavigate: (resolved) => {
         const href = buildCommandHref(basePath, resolved);
-        if (!href || typeof window === "undefined") return;
-        window.history.pushState(window.history.state, "", href);
-        window.dispatchEvent(new PopStateEvent("popstate"));
+        if (!href) return;
+        navigate(href);
       },
     }),
-    [basePath, client],
+    [basePath, client, navigate],
   );
-  const { initialValues: commandInitialValues, autoRun: commandAutoRun } = useMemo(
+  const { initialValues: commandInitialValues } = useMemo(
     () =>
       resolvedRoute.kind === "command"
         ? readCommandQueryParams()
@@ -101,19 +104,9 @@ export function EntityExplorerApp({
   );
 
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      defaultSurface == null ||
-      relativePath !== "/" ||
-      window.location.pathname !== withBasePath(basePath, "/")
-    ) {
-      return;
-    }
-
-    const target = withBasePath(basePath, `/${defaultSurface.key}`);
-    window.history.replaceState(window.history.state, "", target);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, [basePath, defaultSurface, relativePath]);
+    if (defaultSurface == null || relativePath !== "/") return;
+    navigate(withBasePath(basePath, `/${defaultSurface.key}`), { replace: true });
+  }, [basePath, defaultSurface, relativePath, navigate]);
 
   const content = (
     <div className="flex h-full">
@@ -215,7 +208,7 @@ export function EntityExplorerApp({
             renderLink={renderLink}
             commandRuntime={commandRuntime}
             initialValues={commandInitialValues}
-            autoRun={commandAutoRun}
+            autoRun={true}
             {...(resolvedRoute.operationId ? { operationId: resolvedRoute.operationId } : {})}
           />
         ) : resolvedRoute.kind === "explorer" ? (
@@ -311,19 +304,6 @@ function stripBasePath(pathname: string, basePath: string) {
   return trimTrailingSlash(pathname) || "/";
 }
 
-function withBasePath(basePath: string, pathname: string) {
-  const base = trimTrailingSlash(basePath);
-  if (!base || base === "/") {
-    return pathname;
-  }
-  return `${base}${pathname}`;
-}
-
-function trimTrailingSlash(value: string) {
-  if (!value) return "";
-  return value.length > 1 ? value.replace(/\/+$/, "") : value;
-}
-
 function UnknownSurface({ surfaceKey }: { surfaceKey: string }) {
   return (
     <div className="p-6 text-sm text-muted-foreground">
@@ -332,53 +312,7 @@ function UnknownSurface({ surfaceKey }: { surfaceKey: string }) {
   );
 }
 
-const AUTORUN_QUERY_PARAM = "autoRun";
 const LEGACY_AUTORUN_QUERY_PARAM = "__autoRun";
-const ARG_QUERY_PREFIX = "__arg";
-
-function buildCommandHref(basePath: string, resolved: ClickyResolvedCommand): string | undefined {
-  const commandId = resolved.operation?.operation.operationId ?? resolved.request.command;
-  if (!commandId) return undefined;
-
-  const meta = resolved.operation?.operation["x-clicky"];
-  const args = resolved.request.args ?? [];
-  const flags = resolved.request.flags ?? {};
-
-  // Entity `get` commands route to the surface detail URL: /<surface>/<id>?<flags>
-  if (meta?.verb === "get" && meta?.scope === "entity" && meta.surface && args[0]) {
-    const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(flags)) {
-      if (value !== undefined && value !== "") {
-        search.set(key, value);
-      }
-    }
-    const query = search.toString();
-    const suffix = query ? `?${query}` : "";
-    return withBasePath(
-      basePath,
-      `/${encodeURIComponent(meta.surface)}/${encodeURIComponent(args[0])}${suffix}`,
-    );
-  }
-
-  const search = new URLSearchParams();
-  args.forEach((value, index) => {
-    if (value !== undefined && value !== "") {
-      search.set(`${ARG_QUERY_PREFIX}${index}`, value);
-    }
-  });
-  for (const [key, value] of Object.entries(flags)) {
-    if (value !== undefined && value !== "") {
-      search.set(key, value);
-    }
-  }
-  if (resolved.request.autoRun) {
-    search.set(AUTORUN_QUERY_PARAM, "1");
-  }
-
-  const query = search.toString();
-  const suffix = query ? `?${query}` : "";
-  return withBasePath(basePath, `/commands/${encodeURIComponent(commandId)}${suffix}`);
-}
 
 type SurfaceGroup = {
   parent: string; // the slug; "" for surfaces that declared no parent

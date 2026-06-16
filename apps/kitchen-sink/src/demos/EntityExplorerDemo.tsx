@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { EntityExplorerApp } from "@flanksource/clicky-ui/rpc";
+import { EntityExplorerApp, RouterProvider, useMemoryRouter } from "@flanksource/clicky-ui/rpc";
 import type {
   ExecutionResponse,
   OpenAPISpec,
   OperationsApiClient,
-  RenderLink,
 } from "@flanksource/clicky-ui/rpc";
 import { DemoSection } from "./Section";
 
@@ -120,25 +119,14 @@ const FAKE_CLIENT: OperationsApiClient = {
   },
 };
 
-// Navigation links are intercepted so the demo doesn't push history onto the
-// kitchen-sink URL; the explorer therefore stays on the widgets surface.
-const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => (
-  <a
-    key={key}
-    href={to}
-    className={className}
-    title={title}
-    onClick={(event) => event.preventDefault()}
-  >
-    {children}
-  </a>
-);
-
 export function EntityExplorerDemo() {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
     [],
   );
+  // An in-memory adapter keeps navigation inside the demo: clicking a surface
+  // link switches routes without touching the kitchen-sink's own URL.
+  const router = useMemoryRouter("/widgets");
 
   return (
     <DemoSection
@@ -149,20 +137,18 @@ export function EntityExplorerDemo() {
           The full metadata-driven entity explorer — surface sidebar, Clicky table and action
           dialogs — driven by an in-memory <code>OpenAPISpec</code> with <code>x-clicky</code> surface
           metadata. The AI assistant is opt-in and mounted separately by the host; this demo shows
-          the explorer on its own. Navigation links are intercepted so the demo doesn&apos;t hijack
-          the kitchen-sink URL.
+          the explorer on its own. Navigation is driven by an in-memory <code>RouterAdapter</code>
+          (via <code>RouterProvider</code>), so surface links switch routes without touching the
+          kitchen-sink URL.
         </>
       }
     >
       <QueryClientProvider client={queryClient}>
-        <div className="h-[640px] overflow-auto rounded-md border border-border p-4">
-          <EntityExplorerApp
-            client={FAKE_CLIENT}
-            pathname="/widgets"
-            renderLink={renderDemoLink}
-            showApiExplorer={false}
-          />
-        </div>
+        <RouterProvider adapter={router}>
+          <div className="h-[640px] overflow-auto rounded-md border border-border p-4">
+            <EntityExplorerApp client={FAKE_CLIENT} showApiExplorer={false} />
+          </div>
+        </RouterProvider>
       </QueryClientProvider>
     </DemoSection>
   );

@@ -264,6 +264,10 @@ export type DataTableMenuAction = {
   icon?: StaticIconComponent;
   iconClassName?: string;
   disabled?: boolean;
+  /** Heading the action is grouped under in the overflow menu. Actions with
+   * the same section render together below one label; defaults to "Download"
+   * so existing download actions keep their heading. */
+  section?: string;
   onSelect: () => void;
 };
 
@@ -1969,6 +1973,25 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
   );
 }
 
+// Groups menu actions by their `section` heading, preserving the order each
+// section first appears. Actions without a section fall under "Download" so the
+// existing download menu is unchanged.
+function groupMenuActions(
+  actions: DataTableMenuAction[],
+): { section: string; actions: DataTableMenuAction[] }[] {
+  const groups: { section: string; actions: DataTableMenuAction[] }[] = [];
+  for (const action of actions) {
+    const section = action.section ?? "Download";
+    let group = groups.find((g) => g.section === section);
+    if (!group) {
+      group = { section, actions: [] };
+      groups.push(group);
+    }
+    group.actions.push(action);
+  }
+  return groups;
+}
+
 function MenuActionSection({
   actions,
   separated,
@@ -1978,54 +2001,64 @@ function MenuActionSection({
   separated: boolean;
   onClose: () => void;
 }) {
+  const groups = groupMenuActions(actions);
   return (
-    <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
-      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-        Download
-      </div>
-      {actions.map((action) => {
-        const hasDescription = Boolean(action.description);
-        return (
-          <button
-            key={action.id}
-            type="button"
-            role="menuitem"
-            disabled={action.disabled}
-            className={cn(
-              "flex w-full gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-              hasDescription ? "items-start" : "items-center",
-              action.disabled && "cursor-not-allowed opacity-50",
-            )}
-            onClick={() => {
-              if (action.disabled) return;
-              action.onSelect();
-              onClose();
-            }}
-          >
-            {action.icon && (
-              <Icon
-                icon={action.icon}
+    <>
+      {groups.map((group, index) => (
+        <div
+          key={group.section}
+          className={cn(
+            (separated || index > 0) && "mt-1 border-t border-border pt-1",
+          )}
+        >
+          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            {group.section}
+          </div>
+          {group.actions.map((action) => {
+            const hasDescription = Boolean(action.description);
+            return (
+              <button
+                key={action.id}
+                type="button"
+                role="menuitem"
+                disabled={action.disabled}
                 className={cn(
-                  "shrink-0 text-sm",
-                  hasDescription && "mt-0.5",
-                  action.iconClassName ?? "text-muted-foreground",
+                  "flex w-full gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+                  hasDescription ? "items-start" : "items-center",
+                  action.disabled && "cursor-not-allowed opacity-50",
                 )}
-              />
-            )}
-            <span className="min-w-0 flex-1">
-              <span className={cn(hasDescription && "font-medium")}>
-                {action.label}
-              </span>
-              {action.description && (
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {action.description}
+                onClick={() => {
+                  if (action.disabled) return;
+                  action.onSelect();
+                  onClose();
+                }}
+              >
+                {action.icon && (
+                  <Icon
+                    icon={action.icon}
+                    className={cn(
+                      "shrink-0 text-sm",
+                      hasDescription && "mt-0.5",
+                      action.iconClassName ?? "text-muted-foreground",
+                    )}
+                  />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className={cn(hasDescription && "font-medium")}>
+                    {action.label}
+                  </span>
+                  {action.description && (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {action.description}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </>
   );
 }
 

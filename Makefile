@@ -1,7 +1,13 @@
-.PHONY: build icons test clean
+.PHONY: build icons test clean handoff
 
 build:
 	pnpm run build
+
+# Rebuild Storybook's story index and regenerate handoff.yaml with one
+# bare-iframe URL per Docs page (baseUrl -> Storybook dev server :5270).
+handoff:
+	pnpm --filter storybook build
+	node hack/gen-handoff.mjs
 
 icons:
 	pnpm --filter @flanksource/clicky-ui build:icons:force

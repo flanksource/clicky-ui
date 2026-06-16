@@ -16,6 +16,9 @@ import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { LogsTableDemo } from "./demos/LogsTableDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { PropertiesDemo } from "./demos/PropertiesDemo";
+import { CellsDemo } from "./demos/CellsDemo";
+import { TimeseriesDemo } from "./demos/TimeseriesDemo";
+import { CacheBrowserDemo } from "./demos/CacheBrowserDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
 import { TimeRangeDemo } from "./demos/TimeRangeDemo";
@@ -27,6 +30,7 @@ import { TabsDemo } from "./demos/TabsDemo";
 import { SectionDemo } from "./demos/SectionDemo";
 import { PanelDemo } from "./demos/PanelDemo";
 import { AppShellDemo } from "./demos/AppShellDemo";
+import { AppSidebarDemo } from "./demos/AppSidebarDemo";
 import { SplitPaneDemo } from "./demos/SplitPaneDemo";
 import { TreeDemo } from "./demos/TreeDemo";
 import { TreeGroupHeaderDemo } from "./demos/TreeGroupHeaderDemo";
@@ -87,11 +91,15 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "logs-table", label: "LogsTable", component: LogsTableDemo, icon: UiTable },
       { id: "properties", label: "Properties", component: PropertiesDemo, icon: UiListDashes },
       { id: "markdown", label: "Markdown", component: MarkdownDemo, icon: UiMarkdown },
+      { id: "cells", label: "Table cells", component: CellsDemo, icon: UiListDashes },
+      { id: "timeseries", label: "Timeseries", component: TimeseriesDemo, icon: UiChartBar },
+      { id: "cache-browser", label: "CacheBrowser", component: CacheBrowserDemo, icon: UiTable },
     ],
   },
   {
     title: "Controls",
     items: [
+      { id: "form-fields", label: "Form fields", component: FormFieldsDemo, icon: UiForm },
       { id: "filter-bar", label: "FilterBar / MultiSelect", component: FilterBarDemo, icon: UiFilter },
       { id: "filter-pill", label: "FilterPill", component: FilterPillDemo, icon: UiFunnelData },
       { id: "time-range", label: "TimeRange / DateField", component: TimeRangeDemo, icon: UiCalendar },
@@ -105,6 +113,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     title: "Layout",
     items: [
       { id: "app-shell", label: "AppShell", component: AppShellDemo, icon: UiLayoutDashboard },
+      { id: "app-sidebar", label: "AppSidebar", component: AppSidebarDemo, icon: UiListTree },
       { id: "panel", label: "Panel", component: PanelDemo, icon: UiSquare },
       { id: "tabs", label: "Tabs", component: TabsDemo, icon: UiKanban },
       { id: "section", label: "Section", component: SectionDemo, icon: UiRows },

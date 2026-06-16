@@ -47,6 +47,19 @@ export {
   parseJsonBody,
 } from "./rpc/classify";
 export {
+  getClickySurfaces,
+  findSurfaceListOperation,
+  makeSurfaceDefinition,
+} from "./rpc/clickyMetadata";
+export { buildCommandHref, withBasePath } from "./rpc/commandHref";
+export {
+  type RouterAdapter,
+  useRouter,
+  useBrowserRouter,
+  useMemoryRouter,
+} from "./rpc/router";
+export { RouterProvider } from "./rpc/RouterProvider";
+export {
   type ClickyOperationMeta,
   type ClickySpecMeta,
   type ClickySurface,
