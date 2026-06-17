@@ -659,7 +659,7 @@ function OverflowFiltersMenu({
   activeHidden,
   onApply,
 }: {
-  triggerRef: RefObject<HTMLButtonElement>;
+  triggerRef: RefObject<HTMLButtonElement | null>;
   filters: FilterBarFilter[];
   activeHidden: number;
   onApply?: () => void;

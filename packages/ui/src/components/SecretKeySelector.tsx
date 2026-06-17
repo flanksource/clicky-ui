@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
 import { K8SSecret, K8SConfigmap } from "@flanksource/icons/mi";
 import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
@@ -208,10 +208,9 @@ export function SecretKeySelector({
   );
 }
 
-// Icons share a className-only call shape; the flanksource FCs carry extra
-// static metadata that doesn't unify with ComponentType, so type the slot as a
-// plain render function instead.
-const SOURCE_ICON: Record<SecretValueSource, (p: { className?: string }) => ReactNode> = {
+// Icons share a className-only call shape; ElementType accepts both regular
+// components and metadata-bearing icon components under React 19's async-capable FC type.
+const SOURCE_ICON: Record<SecretValueSource, ElementType<{ className?: string }>> = {
   secret: K8SSecret,
   configmap: K8SConfigmap,
   value: UiEdit,

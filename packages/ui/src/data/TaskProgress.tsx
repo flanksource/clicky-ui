@@ -16,17 +16,6 @@ import {
 // status icon, duration, error, and expandable logs. Presentational only —
 // callers feed it snapshots from useTaskRun (SSE) or any other source.
 
-// Iconify web component, loaded by the host app (same as clicky's task UI). The
-// intrinsic element keeps TaskProgress free of clicky-ui's icon registry.
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      "iconify-icon": { icon: string; class?: string };
-    }
-  }
-}
-
 const MAX_COMPLETED = 5;
 const MAX_PENDING = 3;
 

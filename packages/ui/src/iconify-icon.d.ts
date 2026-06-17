@@ -1,6 +1,6 @@
-import type React from "react";
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
 
-type IconifyIconProps = React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+type IconifyIconProps = DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
   icon?: string;
   class?: string;
   width?: string | number;

@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import {
@@ -227,4 +228,4 @@ function IconMenuPickerInner<T extends string>(
 
 export const IconMenuPicker = forwardRef(IconMenuPickerInner) as <T extends string>(
   props: IconMenuPickerProps<T> & { ref?: React.Ref<HTMLDivElement> },
-) => JSX.Element;
+) => ReactElement | null;
