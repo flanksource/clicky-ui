@@ -2,7 +2,7 @@ import { createContext } from "react";
 import type {
   MissionControlPluginClient,
   MissionControlPluginInstance,
-} from "./sdk";
+} from "@flanksource/plugin-ui-sdk";
 
 export type MissionControlContextValue = MissionControlPluginClient;
 

@@ -1,0 +1,23 @@
+{
+  "name": "@flanksource/plugin-ui-sdk",
+  "version": "0.1.4",
+  "description": "Browser UI SDK for Mission Control plugin tabs",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flanksource/plugin-ui-sdk.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts"
+}

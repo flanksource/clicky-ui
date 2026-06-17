@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, type UseMutationOptions, type UseQueryOptions } from "@tanstack/react-query";
-import type { PluginInvokeOptions, QueryParams } from "./sdk";
+import type { PluginInvokeOptions, QueryParams } from "@flanksource/plugin-ui-sdk";
 import { usePluginScope } from "./context-hooks";
 
 export type PluginQueryParams = Record<string, unknown>;

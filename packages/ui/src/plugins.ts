@@ -48,4 +48,4 @@ export {
   type PluginOperation,
   type QueryParams,
   type QueryValue,
-} from "./plugins/sdk";
+} from "@flanksource/plugin-ui-sdk";

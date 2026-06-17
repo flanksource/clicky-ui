@@ -101,6 +101,7 @@
   },
   "dependencies": {
     "@flanksource/icons": "1.0.60",
+    "@flanksource/plugin-ui-sdk": "file:../../vendor/plugin-ui-sdk",
     "@floating-ui/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",

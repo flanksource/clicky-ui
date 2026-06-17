@@ -5,7 +5,7 @@ import {
   type MissionControlPluginClient,
   type MissionControlPluginClientOptions,
   type MissionControlPluginInstance,
-} from "./sdk";
+} from "@flanksource/plugin-ui-sdk";
 import { useMissionControl } from "./context-hooks";
 import { MissionControlContext, PluginScopeContext } from "./context-state";
 

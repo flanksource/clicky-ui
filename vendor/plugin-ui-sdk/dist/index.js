@@ -1,71 +1,9 @@
-export type QueryValue = string | number | boolean | null | undefined;
-
-export type QueryParams = Record<string, QueryValue | readonly QueryValue[]>;
-
-export type ConnectionMode = "pass-through" | "proxy";
-
-export type PluginComponentType = "panel" | "table" | "timeseries" | "action";
-
-export type PluginInvokeOptions = Omit<RequestInit, "body"> & {
-  /** Use Mission Control's /proxy/:operation endpoint instead of /invoke/:operation. */
-  proxy?: boolean;
-};
-
-export type MissionControlPluginClientOptions = {
-  mode: ConnectionMode;
-  baseUrl: string;
-  fetch?: typeof fetch;
-  EventSource?: typeof EventSource;
-};
-
-export type MissionControlPluginClient = {
-  mode: ConnectionMode;
-  baseUrl: string;
-  New(pluginRef: string, configId?: string): MissionControlPluginInstance;
-};
-
-export type MissionControlPluginInstance = {
-  pluginRef: string;
-  configId?: string;
-  invoke(
-    operation: string,
-    bodyOrQueryParams?: unknown,
-    options?: PluginInvokeOptions,
-  ): Promise<Response>;
-  stream(operation: string, query?: QueryParams): EventSource;
-};
-
-export type PluginManifest = {
-  ref: string;
-  name: string;
-  version?: string;
-  description?: string;
-  operations?: PluginOperation[];
-  components?: PluginComponent[];
-};
-
-export type PluginOperation = {
-  name: string;
-  method?: "GET" | "POST";
-  streaming?: boolean;
-  inputSchema?: unknown;
-  outputSchema?: unknown;
-};
-
-export type PluginComponent = {
-  name: string;
-  type: PluginComponentType;
-  operation?: string;
-};
-
 const DEFAULT_PLUGIN_BASE_PATH = "/api/plugins";
 const FALLBACK_BASE_URL = "http://plugin-ui-sdk.local";
 const CONFIG_ID_QUERY_PARAM = "config_id";
 
-/** Creates a Mission Control plugin client. Vendored from @flanksource/plugin-ui-sdk. */
-export function createMissionControlPluginClient(
-  options: MissionControlPluginClientOptions,
-): MissionControlPluginClient {
+/** Creates a Mission Control plugin client. */
+export function createMissionControlPluginClient(options) {
   const mode = options.mode;
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const fetchImpl = options.fetch;
@@ -77,7 +15,7 @@ export function createMissionControlPluginClient(
     mode,
     baseUrl,
 
-    New(pluginRef: string, configId?: string): MissionControlPluginInstance {
+    New(pluginRef, configId) {
       const normalizedPluginRef = requirePathSegment(pluginRef, "pluginRef");
       const normalizedConfigId = normalizeOptionalString(configId);
 
@@ -85,11 +23,7 @@ export function createMissionControlPluginClient(
         pluginRef: normalizedPluginRef,
         ...(normalizedConfigId ? { configId: normalizedConfigId } : {}),
 
-        invoke(
-          operation: string,
-          bodyOrQueryParams?: unknown,
-          invokeOptions: PluginInvokeOptions = {},
-        ): Promise<Response> {
+        invoke(operation, bodyOrQueryParams, invokeOptions = {}) {
           const { proxy, method: configuredMethod, ...requestInit } = invokeOptions;
           const method = requestMethod(configuredMethod);
           const bodyless = isBodylessMethod(method);
@@ -118,7 +52,7 @@ export function createMissionControlPluginClient(
           });
         },
 
-        stream(operation: string, query?: QueryParams): EventSource {
+        stream(operation, query) {
           const url = pluginOperationURL(
             {
               basePath: pluginBasePath,
@@ -140,16 +74,7 @@ export function createMissionControlPluginClient(
 
 export const createMissionControlClient = createMissionControlPluginClient;
 
-function pluginOperationURL(
-  args: {
-    basePath: string;
-    pluginRef: string;
-    operation: string;
-    configId?: string;
-    query?: QueryParams;
-  },
-  endpoint: "invoke" | "proxy",
-): string {
+function pluginOperationURL(args, endpoint) {
   const pluginRef = requirePathSegment(args.pluginRef, "pluginRef");
   const operation = requirePathSegment(args.operation, "operation");
   const url = new URL(
@@ -163,7 +88,7 @@ function pluginOperationURL(
   return stripFallbackOrigin(url);
 }
 
-function appendQuery(searchParams: URLSearchParams, query?: QueryParams): void {
+function appendQuery(searchParams, query) {
   if (!query) return;
 
   for (const [key, value] of Object.entries(query)) {
@@ -175,27 +100,23 @@ function appendQuery(searchParams: URLSearchParams, query?: QueryParams): void {
   }
 }
 
-function requireQueryParams(value: unknown): QueryParams | undefined {
+function requireQueryParams(value) {
   if (value === undefined || value === null) return undefined;
   if (isPlainQueryParams(value)) return value;
   throw sdkError("GET and HEAD requests require query params as a plain object");
 }
 
-function isPlainQueryParams(value: unknown): value is QueryParams {
+function isPlainQueryParams(value) {
   if (!value || typeof value !== "object") return false;
   if (isBodyInit(value)) return false;
   return Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function queryValues(value: QueryValue | readonly QueryValue[]): readonly QueryValue[] {
-  return isQueryValueArray(value) ? value : [value];
+function queryValues(value) {
+  return Array.isArray(value) ? value : [value];
 }
 
-function isQueryValueArray(value: QueryValue | readonly QueryValue[]): value is readonly QueryValue[] {
-  return Array.isArray(value);
-}
-
-function encodeBody(body: unknown, headers: Headers): BodyInit {
+function encodeBody(body, headers) {
   if (isBodyInit(body)) return body;
 
   if (!headers.has("content-type")) {
@@ -205,7 +126,7 @@ function encodeBody(body: unknown, headers: Headers): BodyInit {
   return JSON.stringify(body);
 }
 
-function isBodyInit(value: unknown): value is BodyInit {
+function isBodyInit(value) {
   return (
     typeof value === "string" ||
     (typeof Blob !== "undefined" && value instanceof Blob) ||
@@ -217,64 +138,64 @@ function isBodyInit(value: unknown): value is BodyInit {
   );
 }
 
-function requestMethod(method: string | undefined): string {
+function requestMethod(method) {
   return (method ?? "POST").toUpperCase();
 }
 
-function isBodylessMethod(method: string): boolean {
+function isBodylessMethod(method) {
   return method === "GET" || method === "HEAD";
 }
 
-function credentialsForMode(mode: ConnectionMode): RequestCredentials {
+function credentialsForMode(mode) {
   return mode === "pass-through" ? "include" : "same-origin";
 }
 
-function globalFetch(): typeof fetch {
+function globalFetch() {
   if (typeof fetch === "undefined") {
     throw sdkError("fetch is not available in this environment");
   }
   return fetch;
 }
 
-function globalEventSource(): typeof EventSource {
+function globalEventSource() {
   if (typeof EventSource === "undefined") {
     throw sdkError("EventSource is not available in this environment");
   }
   return EventSource;
 }
 
-function normalizeBaseUrl(baseUrl: string): string {
+function normalizeBaseUrl(baseUrl) {
   const trimmed = baseUrl.trim();
   if (!trimmed) throw sdkError("baseUrl is required");
   return trimTrailingSlash(trimmed);
 }
 
-function normalizeOptionalString(value: string | undefined): string | undefined {
+function normalizeOptionalString(value) {
   const trimmed = value?.trim();
   return trimmed || undefined;
 }
 
-function requirePathSegment(value: string, field: string): string {
+function requirePathSegment(value, field) {
   const trimmed = value.trim();
   if (!trimmed) throw sdkError(`${field} is required`);
   if (trimmed.includes("/")) throw sdkError(`${field} must be a single path segment`);
   return trimmed;
 }
 
-function trimTrailingSlash(value: string): string {
+function trimTrailingSlash(value) {
   return value.trim().replace(/\/+$/, "");
 }
 
-function joinURL(base: string, path: string): string {
+function joinURL(base, path) {
   return `${trimTrailingSlash(base)}/${path.replace(/^\/+/u, "")}`;
 }
 
-function fallbackBaseURL(): string {
+function fallbackBaseURL() {
   if (typeof window !== "undefined") return window.location.href;
   return FALLBACK_BASE_URL;
 }
 
-function stripFallbackOrigin(url: URL): string {
+function stripFallbackOrigin(url) {
   if (url.origin === FALLBACK_BASE_URL) {
     return `${url.pathname}${url.search}`;
   }
@@ -286,6 +207,6 @@ function stripFallbackOrigin(url: URL): string {
   return url.toString();
 }
 
-function sdkError(message: string): Error {
+function sdkError(message) {
   return new Error(`plugin-ui-sdk: ${message}`);
 }
