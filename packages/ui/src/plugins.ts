@@ -11,9 +11,11 @@ export {
   useMissionControl,
   usePluginScope,
 } from "./plugins/context-hooks";
-export type {
-  MissionControlContextValue,
-  PluginScopeContextValue,
+export {
+  MissionControlContext,
+  PluginScopeContext,
+  type MissionControlContextValue,
+  type PluginScopeContextValue,
 } from "./plugins/context-state";
 export {
   invokePluginJson,
