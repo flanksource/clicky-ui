@@ -1,0 +1,13 @@
+import{j as r}from"./iframe-arejdGqO.js";import{C as s}from"./Conversation-DmPa1lmb.js";import{S as l}from"./Chat.fixtures-BmVP6U6L.js";import"./preload-helper-D5l2DbWZ.js";import"./utils-BLSKlp9E.js";import"./Icon-C86pXtXX.js";import"./Message-tJPcc8Pa.js";import"./Markdown-RvoBtKa2.js";import"./ToolCall-B7sWvHnE.js";import"./button-DXx6_iX5.js";import"./index-1evVQkiP.js";import"./loading-mRDMzzrx.js";import"./CodeBlock-BeCs6kre.js";import"./JsonView-Bh8s5VUw.js";import"./code-highlight-DzzumZyi.js";import"./types-CS5Tgc-R.js";import"./UiCircleX-Bej6OdpR.js";import"./UiCheck-DP4n0Dhh.js";import"./UiClock-C4tEjKyh.js";import"./UiCircleOutline-rZCz1oVI.js";import"./UiWrench-DlJwKgvC.js";import"./UiChevronDown-BB4_FLML.js";import"./MessageActions-AOWZl22X.js";import"./UiCopy-Duwy_KpN.js";import"./UiRefresh-BRTHPodx.js";import"./Reasoning-CdedjnAU.js";import"./UiBrain-BU4IEQbi.js";import"./UiFile-e0u5XToK.js";import"./UiArrowDown-CiXHjK4L.js";import"./UiLoader-BA5SBbMg.js";const{fn:a}=__STORYBOOK_MODULE_TEST__,q={title:"Chat/Conversation",component:s,tags:["autodocs"],parameters:{docs:{description:{component:"A scrollable message log that auto-sticks to the bottom as content streams in — unless the user has scrolled up, when a jump-to-bottom button appears. Renders each `UIMessage` via `Message`."}}},argTypes:{messages:{control:!1},emptyState:{control:!1}},args:{messages:l,onRegenerate:a(),onApprove:a()}},e={render:o=>r.jsx("div",{className:"h-[420px] max-w-2xl rounded-md border border-border",children:r.jsx(s,{...o})})},t={args:{messages:[],emptyState:r.jsx("p",{className:"text-sm text-muted-foreground",children:"Ask anything to get started."})},render:o=>r.jsx("div",{className:"h-[280px] max-w-2xl rounded-md border border-border",children:r.jsx(s,{...o})})};var m,n,p;e.parameters={...e.parameters,docs:{...(m=e.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  render: args => <div className="h-[420px] max-w-2xl rounded-md border border-border">
+      <Conversation {...args} />
+    </div>
+}`,...(p=(n=e.parameters)==null?void 0:n.docs)==null?void 0:p.source}}};var d,i,c;t.parameters={...t.parameters,docs:{...(d=t.parameters)==null?void 0:d.docs,source:{originalSource:`{
+  args: {
+    messages: [],
+    emptyState: <p className="text-sm text-muted-foreground">Ask anything to get started.</p>
+  },
+  render: args => <div className="h-[280px] max-w-2xl rounded-md border border-border">
+      <Conversation {...args} />
+    </div>
+}`,...(c=(i=t.parameters)==null?void 0:i.docs)==null?void 0:c.source}}};const z=["Default","Empty"];export{e as Default,t as Empty,z as __namedExportsOrder,q as default};
