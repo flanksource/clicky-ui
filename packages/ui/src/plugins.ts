@@ -26,18 +26,6 @@ export {
   type PluginStream,
 } from "./plugins/hooks";
 export {
-  PluginDataTable,
-  PluginTimeseriesPanel,
-  type PluginDataTableProps,
-  type PluginTimeseriesPanelProps,
-} from "./plugins/components";
-import { PluginDataTable, PluginTimeseriesPanel } from "./plugins/components";
-
-export const Plugin = {
-  DataTable: PluginDataTable,
-  TimeseriesPanel: PluginTimeseriesPanel,
-};
-export {
   createMissionControlClient,
   createMissionControlPluginClient,
   type MissionControlPluginClientOptions,
