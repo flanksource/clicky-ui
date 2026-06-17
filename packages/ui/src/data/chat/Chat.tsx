@@ -126,7 +126,7 @@ export function Chat({
     [transport, api],
   );
 
-  const { messages, sendMessage, regenerate, addToolApprovalResponse, status, stop } =
+  const { messages, sendMessage, regenerate, addToolApprovalResponse, status, error, clearError, stop } =
     useChat<ChatUIMessage>({
       transport: resolvedTransport,
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
@@ -196,6 +196,9 @@ export function Chat({
     <div className={cn("flex h-full flex-col", className)}>
       <Conversation
         messages={messages}
+        status={status}
+        error={error}
+        onClearError={clearError}
         emptyState={empty}
         onRegenerate={(messageId) => void regenerate({ messageId })}
         onApprove={(id, approved, reason) =>
