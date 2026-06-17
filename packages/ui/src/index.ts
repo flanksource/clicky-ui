@@ -4,3 +4,4 @@ export * from "./components";
 export * from "./data";
 export * from "./clicky";
 export * from "./rpc";
+export * from "./plugins";

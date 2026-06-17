@@ -65,6 +65,11 @@
       "import": "./dist/rpc.js",
       "require": "./dist/rpc.cjs"
     },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "require": "./dist/plugins.cjs"
+    },
     "./chat": {
       "types": "./dist/chat.d.ts",
       "import": "./dist/chat.js",

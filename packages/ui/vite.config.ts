@@ -17,6 +17,7 @@ const entry = {
   icons: resolve(__dirname, "src/icons.ts"),
   clicky: resolve(__dirname, "src/clicky.ts"),
   rpc: resolve(__dirname, "src/rpc.ts"),
+  plugins: resolve(__dirname, "src/plugins.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
