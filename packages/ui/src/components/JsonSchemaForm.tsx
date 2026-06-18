@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiEllipsis } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-fields";
+import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import {
   DEFAULT_FORM_SIZE,
@@ -98,7 +99,11 @@ export function JsonSchemaForm({
     render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
   };
-  const rows = renderObjectFields(schema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
+  // A bundled schema (components under `$defs`, referenced by local `#/$defs`
+  // pointers) is resolved once into a self-contained tree the renderer walks
+  // directly; a non-bundled schema passes through untouched.
+  const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
+  const rows = renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
 
   return (
     <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>

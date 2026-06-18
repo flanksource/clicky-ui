@@ -47,6 +47,8 @@ export type AppShellProps = {
   search?: ReactNode;
   /** Right-aligned cluster (icon buttons, settings/org picker, …). */
   actions?: ReactNode;
+  /** Compact action cluster used in the mobile header. Defaults to `actions`. */
+  mobileActions?: ReactNode;
   /** Optional second top-bar row for filters / bulk actions. */
   toolbar?: ReactNode;
   /** Max width of the centered search slot. Defaults to 28rem. */
@@ -105,6 +107,7 @@ export function AppShell(props: AppShellProps) {
     nav,
     search,
     actions,
+    mobileActions,
     toolbar,
     searchMaxWidth = "28rem",
     navSections,
@@ -154,11 +157,13 @@ export function AppShell(props: AppShellProps) {
   }, [mobileSidebarOpen]);
 
   const railWidth = collapsed ? collapsedWidth : sidebarWidth;
+  const compactActions = mobileActions ?? actions;
   const hasTopBar =
     (!hasSidebar && brand !== undefined) ||
     nav !== undefined ||
     search !== undefined ||
     actions !== undefined ||
+    mobileActions !== undefined ||
     toolbar !== undefined;
   const hasMobileHeader = hasSidebar;
   const hasBodyHeader = bodyHeader !== undefined || bodyActions !== undefined;
@@ -243,9 +248,9 @@ export function AppShell(props: AppShellProps) {
                     {brand}
                   </div>
                 )}
-                {actions && (
-                  <div className="ml-auto flex shrink-0 items-center gap-density-2">
-                    {actions}
+                {compactActions && (
+                  <div className="ml-auto flex min-w-0 shrink items-center justify-end gap-density-2">
+                    {compactActions}
                   </div>
                 )}
                 {search !== undefined && (

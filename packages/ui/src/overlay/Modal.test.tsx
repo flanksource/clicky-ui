@@ -18,6 +18,20 @@ describe("Modal", () => {
     expect(getDialog().className).toMatch(/max-w-2xl/);
   });
 
+  it("bounds the dialog to the mobile viewport with internal scrolling", () => {
+    render(
+      <Modal open onClose={() => {}} size="lg" title="Detail" footer={<button>Save</button>}>
+        <p>body</p>
+      </Modal>,
+    );
+
+    const overlay = getDialog().closest("[role='presentation']") as HTMLElement;
+    expect(overlay.className).toContain("p-density-2");
+    expect(getDialog().style.maxHeight).toBe("calc(100dvh - 2rem)");
+    expect(getDialog().className).toContain("w-full");
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
   it("renders a subtitle beneath the title without displacing the close button", () => {
     render(
       <Modal open onClose={() => {}} title="Detail" subtitle={<nav>tab switcher</nav>}>

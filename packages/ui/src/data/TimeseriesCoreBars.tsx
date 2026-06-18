@@ -6,6 +6,8 @@ import type { GaugeSeries } from "./TimeseriesGauge";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
 import { deriveCoreBars } from "./TimeseriesCoreBars.model";
 
+export type TimeseriesCoreBarsVariant = "default" | "cell";
+
 export interface TimeseriesCoreBarsProps {
   /** Common prefix; the value/max requests are `baseUrl + id`. */
   baseUrl?: string;
@@ -30,6 +32,10 @@ export interface TimeseriesCoreBarsProps {
    * then red. Defaults to [75, 90].
    */
   thresholds?: [warning: number, danger: number];
+  /** Visual density/layout. `cell` is a compact inline form for table/grid cells. */
+  variant?: TimeseriesCoreBarsVariant;
+  /** Show the title text. Icons and values remain visible when false. */
+  showLabel?: boolean;
   /** Override the default fetch (e.g. to route through an app's API client). */
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -82,6 +88,8 @@ export function TimeseriesCoreBars({
   range = "1h",
   refreshMs = 5000,
   thresholds = [75, 90],
+  variant = "default",
+  showLabel = true,
   fetcher = defaultFetcher,
   className,
 }: TimeseriesCoreBarsProps) {
@@ -124,9 +132,54 @@ export function TimeseriesCoreBars({
   const caption = model.hasUsage
     ? `${formatCores(model.usageCores)} / ${model.limitCores !== undefined ? formatCores(model.limitCores) : "?"} cores`
     : "—";
+  const compactCaption = model.hasUsage
+    ? `${formatCores(model.usageCores)}/${model.limitCores !== undefined ? formatCores(model.limitCores) : "?"} cores`
+    : "—";
+  const titleText = `${title}: ${compactCaption}`;
+
+  if (variant === "cell") {
+    return (
+      <span
+        className={cn(
+          "inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap align-middle text-xs",
+          className,
+        )}
+        title={titleText}
+        aria-label={!showLabel ? titleText : undefined}
+      >
+        {icon ? <CoreBarsIcon icon={icon} /> : null}
+        {showLabel ? <span className="min-w-0 truncate text-muted-foreground">{title}</span> : null}
+        <span className="flex h-4 shrink-0 items-end gap-px" aria-hidden="true">
+          {model.bars.map((bar, i) => {
+            const corePct = Math.round(bar.fill * 100);
+            return (
+              <span
+                key={i}
+                className="relative h-full w-1.5 overflow-hidden rounded-[2px] bg-muted"
+                title={`core ${i + 1}: ${corePct}%`}
+                data-fill={bar.fill}
+              >
+                <span
+                  className={cn("absolute inset-x-0 bottom-0 transition-all duration-300", tone)}
+                  style={{ height: `${corePct}%` }}
+                />
+              </span>
+            );
+          })}
+        </span>
+        <span className="shrink-0 font-semibold tabular-nums text-foreground">
+          {compactCaption}
+        </span>
+      </span>
+    );
+  }
 
   return (
-    <div className={cn("flex flex-col items-center gap-1", className)}>
+    <div
+      className={cn("flex flex-col items-center gap-1", className)}
+      title={!showLabel ? titleText : undefined}
+      aria-label={!showLabel ? titleText : undefined}
+    >
       <div className="flex h-10 items-end gap-0.5">
         {model.bars.map((bar, i) => {
           const corePct = Math.round(bar.fill * 100);
@@ -147,10 +200,12 @@ export function TimeseriesCoreBars({
         })}
       </div>
       <span className="text-xs font-semibold text-foreground">{caption}</span>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        {icon ? <CoreBarsIcon icon={icon} /> : null}
-        <span>{title}</span>
-      </div>
+      {icon || showLabel ? (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          {icon ? <CoreBarsIcon icon={icon} /> : null}
+          {showLabel ? <span>{title}</span> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

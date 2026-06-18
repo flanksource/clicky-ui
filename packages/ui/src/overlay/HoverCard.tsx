@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
+import { useFloatingZIndex } from "./modalStack";
 
 export type HoverCardPlacement = "top" | "bottom" | "left" | "right";
 
@@ -40,6 +41,7 @@ export function HoverCard({
 }: HoverCardProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
+  const floatingZ = useFloatingZIndex();
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const openTimerRef = useRef<number | null>(null);
@@ -132,13 +134,14 @@ export function HoverCard({
             role="tooltip"
             onMouseEnter={cancelClose}
             onMouseLeave={onLeave}
-            style={
-              position
+            style={{
+              ...(position
                 ? { position: "fixed", top: position.top, left: position.left }
-                : { position: "fixed", top: -9999, left: -9999, visibility: "hidden" }
-            }
+                : { position: "fixed", top: -9999, left: -9999, visibility: "hidden" }),
+              zIndex: floatingZ,
+            }}
             className={cn(
-              "z-[9999] rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] shadow-lg",
+              "rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] shadow-lg",
               "whitespace-nowrap",
               cardClassName,
             )}

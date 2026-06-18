@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DropdownMenu } from "./DropdownMenu";
 import { Modal } from "./Modal";
+import { zIndex } from "./zIndex";
 
 const items = (onSelect = vi.fn()) => [
   { label: "JSON", onSelect },
@@ -137,5 +138,23 @@ describe("DropdownMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "menu" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Profile" }));
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("floats at the popover layer when no modal is open", () => {
+    render(<DropdownMenu label="Download" items={items()} />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    expect(Number(screen.getByRole("menu").style.zIndex)).toBe(zIndex.popover);
+  });
+
+  it("renders above an open modal it lives inside, not behind it", () => {
+    render(
+      <Modal open onClose={() => {}} title="Edit">
+        <DropdownMenu label="Download" items={items()} />
+      </Modal>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    const menuZ = Number(screen.getByRole("menu").style.zIndex);
+    const modalZ = Number(screen.getByRole("dialog").style.zIndex);
+    expect(menuZ).toBeGreaterThan(modalZ);
   });
 });

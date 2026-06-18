@@ -124,6 +124,7 @@ export {
   matchesIf,
   isOpenStringMap,
 } from "./components/json-schema-form-resolve";
+export { rehydrateRefs } from "./components/json-schema-form-refs";
 export type {
   JsonSchemaFormProps,
   FormLayout,

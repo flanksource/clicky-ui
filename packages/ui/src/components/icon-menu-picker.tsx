@@ -23,6 +23,7 @@ import {
 } from "@floating-ui/react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
+import { useFloatingZIndex } from "../overlay/modalStack";
 import { UiCheck, UiChevronDown } from "../icons";
 import { Button } from "./button";
 import { IconButton } from "./IconButton";
@@ -63,6 +64,7 @@ function IconMenuPickerInner<T extends string>(
   forwardedRef: React.Ref<HTMLDivElement>,
 ) {
   const [open, setOpen] = useState(false);
+  const floatingZ = useFloatingZIndex();
   // Index of the item highlighted by keyboard navigation. Null until the user
   // arrows/typeaheads, so a pointer-opened menu starts with the selected row
   // focused (selectedIndex below) rather than the first.
@@ -168,9 +170,9 @@ function IconMenuPickerInner<T extends string>(
               ref={refs.setFloating}
               role="menu"
               aria-label={ariaLabel}
-              style={floatingStyles}
+              style={{ ...floatingStyles, zIndex: floatingZ }}
               className={cn(
-                "z-[9999] min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5",
+                "min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5",
                 menuClassName,
               )}
               {...getFloatingProps()}

@@ -4,13 +4,16 @@ import { LabelIcon } from "../data/Icon";
 import {
   BooleanControl,
   DateControl,
+  DisplayControl,
   EnumControl,
   FieldLabel,
   FieldWrapper,
+  LinkControl,
   NumberControl,
   ObjectSection,
   ReadOnlyValue,
   StringControl,
+  TextareaControl,
 } from "./json-schema-form-fields";
 import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
@@ -45,11 +48,13 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
   // value as plain text, not a disabled input. (The form-level ctx.readOnly,
   // below, instead disables the real controls so the structure stays visible.)
   // Containers (array/object/map) still render structurally so nested read-only
-  // values surface; their own children resolve their own readOnly.
-  if (field.readOnly && field.kind !== "array" && field.kind !== "object" && field.kind !== "string-map") {
+  // values surface, and textarea/display/link own their non-editable rendering
+  // (multi-line text / static element / hyperlink), so all of these are excluded
+  // from the plain ReadOnlyValue fallback.
+  if (field.readOnly && !ownsReadOnlyRendering(field.kind)) {
     return <ReadOnlyValue field={field} fieldId={fieldId} size={ctx.size} />;
   }
-  const readOnly = ctx.readOnly;
+  const readOnly = ctx.readOnly || field.readOnly === true;
   const size = ctx.size;
   switch (field.kind) {
     case "enum":
@@ -60,6 +65,12 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
       return <NumberControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
     case "date":
       return <DateControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+    case "textarea":
+      return <TextareaControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+    case "display":
+      return <DisplayControl field={field} size={size} />;
+    case "link":
+      return <LinkControl field={field} fieldId={fieldId} size={size} />;
     case "array":
       return <ArrayControl field={field} fieldId={fieldId} ctx={ctx} />;
     case "object":
@@ -69,6 +80,21 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
     default:
       return <StringControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
   }
+}
+
+// ownsReadOnlyRendering reports whether a control renders its own non-editable
+// form, so the renderer must not pre-empt it with the plain ReadOnlyValue text:
+// containers recurse structurally, and textarea/display/link have bespoke
+// read-only output.
+function ownsReadOnlyRendering(kind: FieldControl["kind"]): boolean {
+  return (
+    kind === "array" ||
+    kind === "object" ||
+    kind === "string-map" ||
+    kind === "textarea" ||
+    kind === "display" ||
+    kind === "link"
+  );
 }
 
 // buildField resolves a control, applies the pre-extensions (any returning
@@ -150,6 +176,11 @@ export function renderFieldRow(
         {built.value}
       </ObjectSection>
     );
+  }
+  // A display field (heading/divider/info/spacer) is the label — it carries no
+  // value column, so it spans the full grid width with no inline label cell.
+  if (field.kind === "display") {
+    return <div className="col-span-full">{built.value}</div>;
   }
   const label = opts?.labelOverride ? (
     <span className={cn("flex items-center gap-2 font-medium", labelSizeClass[ctx.size])}>

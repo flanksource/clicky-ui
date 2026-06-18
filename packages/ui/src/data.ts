@@ -60,7 +60,7 @@ export {
   type FilterPillGroupProps,
   type FilterMode,
 } from "./data/FilterPill";
-export { Gauge, type GaugeProps, type GaugeTone } from "./data/Gauge";
+export { Gauge, type GaugeProps, type GaugeTone, type GaugeVariant } from "./data/Gauge";
 export { RadialGauge, type RadialGaugeProps } from "./data/RadialGauge";
 export {
   Icon,
@@ -127,10 +127,12 @@ export {
   TimeseriesGauge,
   type GaugeSeries,
   type TimeseriesGaugeProps,
+  type TimeseriesGaugeVariant,
 } from "./data/TimeseriesGauge";
 export {
   TimeseriesCoreBars,
   type TimeseriesCoreBarsProps,
+  type TimeseriesCoreBarsVariant,
 } from "./data/TimeseriesCoreBars";
 export {
   deriveCoreBars,
