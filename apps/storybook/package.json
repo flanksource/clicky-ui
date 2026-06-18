@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter @flanksource/clicky-ui build:icons && storybook dev -p 5270",
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && storybook build",
+    "serve": "pnpm --filter @flanksource/clicky-ui build:icons && storybook build && vite preview --host 127.0.0.1 --port 5270 --strictPort --outDir storybook-static",
     "test": "pnpm --filter @flanksource/clicky-ui build:icons && vitest run",
     "check": "tsc -b --noEmit && oxlint .storybook --deny-warnings"
   },
@@ -15,13 +16,18 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@chromatic-com/storybook": "catalog:",
     "@storybook/addon-docs": "10.3.5",
+    "@storybook/addon-vitest": "catalog:",
     "@storybook/react": "10.3.5",
     "@storybook/react-vite": "10.3.5",
     "@storybook/test": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/browser": "3.2.4",
+    "@vitest/coverage-v8": "3.2.4",
     "autoprefixer": "catalog:",
+    "playwright": "^1.61.0",
     "postcss": "catalog:",
     "storybook": "10.3.5",
     "tailwindcss": "catalog:",

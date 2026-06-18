@@ -8,6 +8,7 @@ allowBuilds:
 
 catalog:
   "@ai-sdk/react": ^3.0.201
+  '@chromatic-com/storybook': ^5.2.1
   "@floating-ui/react": ^0.27.19
   "@oxlint/plugins": ^1.60.0
   "@playwright/test": ^1.49.1
@@ -28,6 +29,7 @@ catalog:
   "@shikijs/themes": ^1.24.0
   "@shikijs/transformers": ^1.24.0
   "@storybook/addon-essentials": ^8.6.18
+  '@storybook/addon-vitest': 10.3.5
   "@storybook/react": ^8.6.18
   "@storybook/react-vite": ^8.6.18
   "@storybook/test": ^8.6.18
@@ -52,6 +54,7 @@ catalog:
   prettier: ^3.8.3
   react: ^18.3.1
   react-dom: ^18.3.1
+  serve: ^14.2.6
   shiki: ^1.24.0
   sonner: ^1.7.1
   storybook: ^8.6.18
