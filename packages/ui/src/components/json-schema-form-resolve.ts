@@ -100,6 +100,10 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   if (prop.format === "date" || prop.format === "date-time") {
     return { ...base, kind: "date", dateFormat: prop.format };
   }
+  // A long-form string declares `format: textarea` to render a multi-line box.
+  if (prop.format === "textarea" && schemaHasType(prop, "string")) {
+    return { ...base, kind: "textarea" };
+  }
   if (schemaHasType(prop, "boolean")) {
     return { ...base, kind: "boolean" };
   }
@@ -108,6 +112,8 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       ...base,
       kind: "number",
       coerceNumber: true,
+      // A percent number carries a static "%" unit shown inside the input.
+      ...(prop.format === "percent" ? { unit: "%" } : {}),
       ...(typeof prop.minimum === "number" ? { minimum: prop.minimum } : {}),
     };
   }

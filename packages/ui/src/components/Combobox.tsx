@@ -13,6 +13,7 @@ import { cn } from "../lib/utils";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiClose, UiCheck } from "../icons";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
+import { useFloatingZIndex } from "../overlay/modalStack";
 
 // Upper bound the open dropdown grows to in order to show full option labels
 // before they truncate. The menu's minimum is always the input's width.
@@ -141,6 +142,7 @@ export function Combobox(props: ComboboxProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const floatingZ = useFloatingZIndex();
   // Fixed-position coordinates for the portaled listbox, measured from the
   // input row. `width` is the input width (the menu's minimum); `maxWidth` caps
   // content growth at 400px, further bounded by the viewport. Null until first
@@ -481,8 +483,9 @@ export function Combobox(props: ComboboxProps) {
             minWidth: menuPos.width,
             maxWidth: menuPos.maxWidth,
             maxHeight: menuPos.maxHeight,
+            zIndex: floatingZ,
           }}
-          className="z-[9999] w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+          className="w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
         >
           {loading && filtered.length === 0 && (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">Loading…</div>

@@ -94,7 +94,21 @@ export type FieldControlKind =
   | "date"
   | "string-map"
   | "array"
-  | "object";
+  | "object"
+  // A multi-line text box (a long-form string). Resolved from `format: textarea`
+  // or set by a consumer pre-extension.
+  | "textarea"
+  // A static, non-editable presentation element (a heading, a block of info
+  // text, a horizontal divider, or an empty spacer) — carries no input. Used for
+  // schema fields that label/structure a form rather than collect a value.
+  | "display"
+  // A read-only external hyperlink.
+  | "link";
+
+// How a display control renders (FieldControl.displayVariant): a bold section
+// "heading", a muted block of "text", a horizontal "divider", or an empty
+// "spacer" gap.
+export type DisplayVariant = "heading" | "text" | "divider" | "spacer";
 
 // How an enum control renders. "combobox" (default) is the searchable dropdown;
 // "radio" is a segmented radio-button group for small, fixed option sets.
@@ -156,6 +170,17 @@ export interface FieldControl {
   // Number; otherwise the raw string is preserved. Consumers set false to keep
   // non-numeric values (e.g. template tokens) intact.
   coerceNumber?: boolean;
+  // A static trailing unit rendered inside a number input (e.g. "%"). Display
+  // only — never part of the committed value. Resolved from `format: percent` or
+  // set by a consumer pre-extension.
+  unit?: string;
+
+  // display — which static element to render (no input). See DisplayVariant.
+  displayVariant?: DisplayVariant;
+
+  // link — the href for a read-only external link control. When unset, a value
+  // that looks like an absolute URL is used as the href.
+  href?: string;
 
   // date — which JSON Schema format produced this control: "date" (date only)
   // or "date-time" (date + time).

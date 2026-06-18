@@ -5,6 +5,7 @@
 // and keeping React-Fast-Refresh happy.
 import { createContext, useContext } from "react";
 import type { ChatContextItem } from "./context";
+import { zIndex } from "../../overlay/zIndex";
 
 /** Live state of one floating chat window. Position/size/maximized are
  *  persisted to localStorage; the rest is session-only. */
@@ -55,7 +56,7 @@ export const MAX_PANELS = 6;
 export const DEFAULT_WIDTH = 520;
 export const DEFAULT_HEIGHT = 700;
 export const CASCADE_OFFSET = 30;
-export const Z_BASE = 61;
+export const Z_BASE = zIndex.chatWindow;
 
 function storageKey(storageId: string) {
   return `chat-panels:${storageId}`;

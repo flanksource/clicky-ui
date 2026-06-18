@@ -19,6 +19,8 @@ export interface GaugeSeries {
   transform?: (value: number) => number;
 }
 
+export type TimeseriesGaugeVariant = "default" | "cell";
+
 export interface TimeseriesGaugeProps {
   /** Common prefix; the value/max requests are `baseUrl + id`. */
   baseUrl?: string;
@@ -51,6 +53,10 @@ export interface TimeseriesGaugeProps {
    * utilisation percentage of max (e.g. CPU usage out of its millicore limit).
    */
   centerDisplay?: "value" | "percent";
+  /** Visual density/layout. `cell` is a compact inline form for table/grid cells. */
+  variant?: TimeseriesGaugeVariant;
+  /** Show the title text. Icons and values remain visible when false. */
+  showLabel?: boolean;
   /** Override the default fetch (e.g. to route through an app's API client). */
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -108,6 +114,8 @@ export function TimeseriesGauge({
   expandable = true,
   thresholds = [75, 90],
   centerDisplay = "value",
+  variant = "default",
+  showLabel = true,
   fetcher = defaultFetcher,
   className,
 }: TimeseriesGaugeProps) {
@@ -151,6 +159,19 @@ export function TimeseriesGauge({
   const bounded = hasValue && limit !== undefined && limit > 0;
   const pct = bounded ? Math.min(100, Math.round((usage / (limit as number)) * 100)) : 0;
   const tone = toneClass(pct, thresholds);
+  const readout =
+    centerDisplay === "percent"
+      ? bounded
+        ? `${pct}%`
+        : hasValue
+          ? "n/a"
+          : "—"
+      : hasValue
+        ? formatUnit(usage, unit)
+        : "—";
+  const titleText = `${title}: ${readout}`;
+  const canExpand = expandable && variant === "default";
+  const readoutTone = bounded ? tone : "text-foreground";
 
   const chartSeries: TimeseriesSeries[] = useMemo(() => {
     const s: TimeseriesSeries[] = [{ id: value.id, label: "value", ...(value.transform ? { transform: value.transform } : {}) }];
@@ -158,8 +179,53 @@ export function TimeseriesGauge({
     return s;
   }, [value.id, value.transform, maxSeries]);
 
+  if (variant === "cell") {
+    return (
+      <span
+        className={cn(
+          "inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap align-middle text-xs",
+          className,
+        )}
+        title={titleText}
+        aria-label={!showLabel ? titleText : undefined}
+      >
+        {icon ? <GaugeIcon icon={icon} /> : null}
+        {showLabel ? <span className="min-w-0 truncate text-muted-foreground">{title}</span> : null}
+        <span className="relative h-4 w-8 shrink-0" aria-hidden="true">
+          <svg viewBox="0 0 100 50" className="h-full w-full overflow-visible">
+            <path
+              d={GAUGE_PATH}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={10}
+              strokeLinecap="round"
+              className="text-muted"
+            />
+            <path
+              d={GAUGE_PATH}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={10}
+              strokeLinecap="round"
+              className={tone}
+              strokeDasharray={GAUGE_ARC}
+              strokeDashoffset={GAUGE_ARC * (1 - pct / 100)}
+            />
+          </svg>
+        </span>
+        <span className={cn("shrink-0 font-semibold tabular-nums", readoutTone)}>
+          {readout}
+        </span>
+      </span>
+    );
+  }
+
   return (
-    <div className={cn("flex flex-col items-center gap-1", className)}>
+    <div
+      className={cn("flex flex-col items-center gap-1", className)}
+      title={!showLabel ? titleText : undefined}
+      aria-label={!showLabel ? titleText : undefined}
+    >
       <div className="relative h-10 w-20">
         <svg viewBox="0 0 100 50" className="h-full w-full overflow-visible">
           <path d={GAUGE_PATH} fill="none" stroke="currentColor" strokeWidth={9} strokeLinecap="round" className="text-muted" />
@@ -175,17 +241,9 @@ export function TimeseriesGauge({
           />
         </svg>
         <span className="absolute inset-x-0 bottom-0 text-center text-sm font-semibold text-foreground">
-          {centerDisplay === "percent"
-            ? bounded
-              ? `${pct}%`
-              : hasValue
-                ? "n/a"
-                : "—"
-            : hasValue
-              ? formatUnit(usage, unit)
-              : "—"}
+          {readout}
         </span>
-        {expandable && (
+        {canExpand && (
           <button
             type="button"
             aria-label="Expand chart"
@@ -196,12 +254,14 @@ export function TimeseriesGauge({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        {icon ? <GaugeIcon icon={icon} /> : null}
-        <span>{title}</span>
-      </div>
+      {icon || showLabel ? (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          {icon ? <GaugeIcon icon={icon} /> : null}
+          {showLabel ? <span>{title}</span> : null}
+        </div>
+      ) : null}
 
-      {expandable && (
+      {canExpand && (
         <Modal open={expanded} onClose={() => setExpanded(false)} title={title} size="xl">
           <TimeseriesPanel
             title={title}

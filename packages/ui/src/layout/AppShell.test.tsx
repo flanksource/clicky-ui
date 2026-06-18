@@ -21,6 +21,23 @@ describe("AppShell", () => {
     expect(screen.getByText("content")).toBeTruthy();
   });
 
+  it("renders compact mobile actions separately from desktop actions", () => {
+    render(
+      <AppShell
+        brand={<span>Brand</span>}
+        navSections={[{ items: [{ key: "p", label: "Policies", to: "/policies" }] }]}
+        actions={<button>Desktop Actions</button>}
+        mobileActions={<button>Mobile More</button>}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("button", { name: "Desktop Actions" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mobile More" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Navigation" })).toBeTruthy();
+  });
+
   it("renders the toolbar row only when a toolbar is provided", () => {
     const { rerender } = render(
       <AppShell>

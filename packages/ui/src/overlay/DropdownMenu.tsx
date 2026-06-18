@@ -17,6 +17,7 @@ import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown } from "../icons";
+import { useFloatingZIndex } from "./modalStack";
 
 export type DropdownMenuItem = {
   /** Visible label. */
@@ -80,6 +81,7 @@ export function DropdownMenu({
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const floatingZ = useFloatingZIndex();
   const listRef = useRef<(HTMLElement | null)[]>([]);
 
   const onOpenChangeRef = useRef(onOpenChange);
@@ -159,9 +161,9 @@ export function DropdownMenu({
               ref={refs.setFloating}
               role="menu"
               aria-label={menuLabel}
-              style={floatingStyles}
+              style={{ ...floatingStyles, zIndex: floatingZ }}
               className={cn(
-                "z-[9999] min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",
+                "min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",
                 menuClassName,
               )}
               {...getFloatingProps()}

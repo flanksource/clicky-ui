@@ -234,14 +234,20 @@ export function NumberControl({
   // type="text" (not number) so non-numeric values a consumer permits — e.g.
   // template tokens — are not silently dropped by the browser.
   const coerce = field.coerceNumber !== false;
+  // A static unit (e.g. "%") rides the right edge of the input as a display-only
+  // suffix; a consumer-set `suffix` (e.g. an insert-snippet button) wins if both
+  // are present (number insert triggers mount on the left as `prefix`).
+  const suffix = field.suffix ?? (field.unit ? (
+    <span className="pointer-events-none select-none text-muted-foreground">{field.unit}</span>
+  ) : undefined);
   return (
-    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
+    <FieldAdornmentWrapper prefix={field.prefix} suffix={suffix}>
       <input
         id={fieldId}
         type="text"
         inputMode="decimal"
         data-jsf-input
-        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8")}
+        className={cn(inputClass(size), field.prefix && "pl-8", suffix && "pr-8")}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
@@ -432,6 +438,105 @@ function RadioGroupControl({
         );
       })}
     </div>
+  );
+}
+
+// TextareaControl edits a long-form string in a multi-line box. Read-only, it
+// shows the value with line breaks preserved; editable, a resizable <textarea>.
+// The raw string is committed unchanged so a consumer-permitted template token
+// survives.
+export function TextareaControl({
+  field,
+  fieldId,
+  readOnly,
+  size,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+}) {
+  const text = toText(field.value);
+  if (readOnly) {
+    return (
+      <span
+        id={fieldId}
+        data-jsf-input
+        data-jsf-readonly
+        className={cn("block whitespace-pre-wrap break-words text-foreground", labelSizeClass[size])}
+        title={text || undefined}
+      >
+        {text || <span className="text-muted-foreground">—</span>}
+      </span>
+    );
+  }
+  return (
+    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
+      <textarea
+        id={fieldId}
+        data-jsf-input
+        rows={4}
+        className={cn(inputClass(size), "h-auto min-h-[5rem] resize-y", field.prefix && "pl-8", field.suffix && "pr-8")}
+        value={text}
+        disabled={readOnly}
+        placeholder={defaultPlaceholder(field.schema)}
+        onChange={(e) => field.onChange(e.target.value)}
+      />
+    </FieldAdornmentWrapper>
+  );
+}
+
+// DisplayControl renders a static, non-editable presentation element:
+// Label/Title (heading), Message (info text), Line (divider), or Blank/Filler
+// (spacer). It never collects a value; the heading/text source is the field's
+// title (label) and, for "text", its description. Rendered identically in the
+// form and the read-only Viewer.
+export function DisplayControl({ field, size }: { field: FieldControl; size: FormSize }) {
+  const variant = field.displayVariant ?? "text";
+  if (variant === "divider") {
+    return <hr data-jsf-input className="my-1 w-full border-t border-border" />;
+  }
+  if (variant === "spacer") {
+    return <div data-jsf-input aria-hidden className="h-2" />;
+  }
+  if (variant === "heading") {
+    return (
+      <div
+        data-jsf-input
+        className={cn("border-b border-border pb-1 font-semibold text-foreground", labelSizeClass[size])}
+      >
+        {field.label}
+      </div>
+    );
+  }
+  const text = field.description ?? toText(field.value) ?? field.label;
+  return (
+    <p data-jsf-input className={cn("text-muted-foreground", labelSizeClass[size])}>
+      {text || field.label}
+    </p>
+  );
+}
+
+// LinkControl renders a read-only external hyperlink. The
+// href is field.href, falling back to the value when it is an absolute URL; with
+// neither it degrades to a plain read-only value.
+export function LinkControl({ field, fieldId, size }: { field: FieldControl; fieldId: string; size: FormSize }) {
+  const text = toText(field.value);
+  const href = field.href ?? (/^https?:\/\//i.test(text) ? text : undefined);
+  if (!href) {
+    return <ReadOnlyValue field={field} fieldId={fieldId} size={size} />;
+  }
+  return (
+    <a
+      id={fieldId}
+      data-jsf-input
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={cn("inline-flex items-center text-primary underline underline-offset-2", controlHeightClass[size], labelSizeClass[size])}
+    >
+      {text || field.label || href}
+    </a>
   );
 }
 

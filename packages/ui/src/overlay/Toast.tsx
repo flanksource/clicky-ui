@@ -9,6 +9,7 @@ import {
   type ToastOptions,
   type ToastTone,
 } from "./toast-context";
+import { zIndex } from "./zIndex";
 
 const DEFAULT_DURATION_MS = 2200;
 
@@ -78,7 +79,10 @@ export function ToastProvider({ children, durationMs = DEFAULT_DURATION_MS }: To
       {children}
       {typeof document !== "undefined" &&
         createPortal(
-          <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[9999] flex flex-col items-center gap-density-2">
+          <div
+            className="pointer-events-none fixed inset-x-0 bottom-6 flex flex-col items-center gap-density-2"
+            style={{ zIndex: zIndex.toast }}
+          >
             {toasts.map((entry) => (
               <ToastView key={entry.id} entry={entry} onDismiss={() => dismiss(entry.id)} />
             ))}

@@ -5,6 +5,7 @@ import { Icon } from "../data/Icon";
 import { Button } from "../components/button";
 import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
 import { useModalStack } from "./modalStack";
+import { zIndex } from "./zIndex";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -61,11 +62,11 @@ export type ModalProps = {
 };
 
 const sizeClass: Record<ModalSize, string> = {
-  sm: "max-w-sm max-h-[90vh]",
-  md: "max-w-md max-h-[90vh]",
-  lg: "max-w-2xl max-h-[90vh]",
-  xl: "max-w-4xl max-h-[90vh]",
-  full: "max-w-[95vw] max-h-[95vh]",
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+  full: "max-w-[95vw]",
 };
 
 const DEFAULT_CONFIRM: Required<ConfirmCloseOptions> = {
@@ -144,14 +145,15 @@ export function Modal({
   const overlay = (
     <div
       className={cn(
-        "fixed inset-0 flex items-center justify-center",
+        "fixed inset-0 flex items-center justify-center p-density-2 sm:p-density-4",
         // Nested modals dim less so the dialog they opened over stays visible.
         depth === 0 ? "bg-black/40" : "bg-black/20",
       )}
-      // Above the z-[9999] popover/overlay layer (dropdowns, tooltips, toasts) so a
-      // modal opened from one of them stacks on top; +depth keeps nested modals
-      // above their parent.
-      style={{ zIndex: 10000 + depth * 10 }}
+      // Sits in the modal band of the centralized z-index scale; +depth keeps
+      // nested modals above their parent. Floating content (dropdowns, tooltips)
+      // computes its z relative to this via useFloatingZIndex so it clears the
+      // modal instead of rendering behind it.
+      style={{ zIndex: zIndex.modal + depth * zIndex.modalStep }}
       onClick={closeOnBackdrop ? requestClose : undefined}
       role="presentation"
     >
@@ -162,10 +164,18 @@ export function Modal({
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
         className={cn(
-          "relative bg-background border border-border rounded-lg shadow-xl w-full flex flex-col",
+          "relative flex w-full flex-col rounded-lg border border-border bg-background shadow-xl",
           expanded ? sizeClass.full : sizeClass[size],
           className,
         )}
+        // Inline maxHeight (not an arbitrary Tailwind class) so the panel stays
+        // viewport-bounded even when a consumer's Tailwind build can't generate
+        // the dvh utility — e.g. www aliases clicky-ui to source but scans the
+        // published dist. When expanded, fill the viewport.
+        style={{
+          maxHeight: "calc(100dvh - 2rem)",
+          ...(expanded ? { height: "calc(100dvh - 2rem)" } : {}),
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || subtitle || headerSlot || expandable || !hideClose) && (

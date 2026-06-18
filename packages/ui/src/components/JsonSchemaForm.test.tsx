@@ -1036,3 +1036,67 @@ describe("JsonSchemaForm x-order", () => {
     expect(labels).toEqual(["CountryCode", "AddressType", "fields"]);
   });
 });
+
+describe("JsonSchemaForm textarea / percent / display / link controls", () => {
+  it("renders a `format: textarea` string as a multi-line textarea that commits raw text", () => {
+    const onChange = vi.fn();
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { Notes: { type: "string", format: "textarea" } },
+    };
+    const { container } = render(<JsonSchemaForm schema={schema} value={{ Notes: "line1" }} onChange={onChange} />);
+    const textarea = container.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect(textarea).toHaveValue("line1");
+    fireEvent.change(textarea!, { target: { value: "two\nlines" } });
+    expect(onChange).toHaveBeenCalledWith({ Notes: "two\nlines" });
+  });
+
+  it("renders a `format: percent` number with a static % unit and still coerces the number", () => {
+    const onChange = vi.fn();
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { Commission: { type: "number", format: "percent" } },
+    };
+    render(<JsonSchemaForm schema={schema} value={{ Commission: 12 }} onChange={onChange} />);
+    expect(screen.getByText("%")).toBeInTheDocument();
+    const input = screen.getByDisplayValue("12");
+    fireEvent.change(input, { target: { value: "15" } });
+    expect(onChange).toHaveBeenCalledWith({ Commission: 15 });
+  });
+
+  it("renders a display heading (no input) full width from a pre-extension", () => {
+    const asHeading: PreExtension = (field) =>
+      field.key === "SectionTitle" ? { ...field, kind: "display", displayVariant: "heading" } : field;
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { SectionTitle: { type: "string", title: "Beneficiaries" } },
+    };
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} pre={[asHeading]} />,
+    );
+    expect(screen.getByText("Beneficiaries")).toBeInTheDocument();
+    // A display field collects no value: it has no <input>/<textarea>.
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.querySelector("textarea")).toBeNull();
+  });
+
+  it("renders a display divider as an <hr>", () => {
+    const asDivider: PreExtension = (field) =>
+      field.key === "Sep" ? { ...field, kind: "display", displayVariant: "divider" } : field;
+    const schema: JsonSchemaObject = { type: "object", properties: { Sep: { type: "string" } } };
+    const { container } = render(<JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} pre={[asDivider]} />);
+    expect(container.querySelector("hr")).not.toBeNull();
+  });
+
+  it("renders a link control as an external anchor using the value as href", () => {
+    const asLink: PreExtension = (field) => (field.key === "Portal" ? { ...field, kind: "link" } : field);
+    const schema: JsonSchemaObject = { type: "object", properties: { Portal: { type: "string" } } };
+    render(
+      <JsonSchemaForm schema={schema} value={{ Portal: "https://example.com/x" }} onChange={vi.fn()} pre={[asLink]} />,
+    );
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "https://example.com/x");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+});

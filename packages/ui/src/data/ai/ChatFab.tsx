@@ -2,6 +2,7 @@ import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { UiComment } from "../../icons";
 import { useChatWindowManager } from "./chat-window-context";
+import { zIndex } from "../../overlay/zIndex";
 
 export type ChatFabProps = {
   /** Iconify name or imported icon component shown in the button. */
@@ -24,8 +25,9 @@ export function ChatFab({ icon = UiComment, label = "Open chat", className }: Ch
       title={label}
       aria-label={label}
       onClick={() => openPanel()}
+      style={{ zIndex: zIndex.chatFab }}
       className={cn(
-        "fixed bottom-4 right-4 z-[60] flex h-12 w-12 items-center justify-center",
+        "fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center",
         "rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90",
         className,
       )}

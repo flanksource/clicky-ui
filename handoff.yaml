@@ -16,4 +16,6 @@ targets:
     sample: false
     storybook:
       indexPath: /Users/moshe/go/src/github.com/flanksource/clicky-ui/apps/storybook/storybook-static/index.json
+      exclude:
+        - "*"
 loginSnippets: []
