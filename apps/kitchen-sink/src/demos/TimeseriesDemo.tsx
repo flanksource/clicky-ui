@@ -57,6 +57,7 @@ export function TimeseriesDemo() {
         <DemoRow label="Gauges">
           <TimeseriesGauge
             title="CPU"
+            icon={UiChip}
             unit="percent"
             centerDisplay="percent"
             value={{ id: "cpu.usage" }}
@@ -67,6 +68,7 @@ export function TimeseriesDemo() {
           />
           <TimeseriesGauge
             title="Memory"
+            icon={UiChip}
             unit="bytes"
             value={{ id: "mem.usage" }}
             max={{ id: "mem.limit" }}
@@ -82,6 +84,7 @@ export function TimeseriesDemo() {
         <DemoRow label="Core bars">
           <TimeseriesCoreBars
             title="4-core"
+            icon={UiChip}
             value={{ id: "cpu.usage" }}
             max={4000}
             refreshMs={0}
@@ -89,11 +92,69 @@ export function TimeseriesDemo() {
           />
           <TimeseriesCoreBars
             title="8-core"
+            icon={UiChip}
             value={{ id: "cpu.usage" }}
             max={8000}
             refreshMs={0}
             fetcher={latestFetcher([{ match: "cpu", latest: 7600 }])}
           />
+        </DemoRow>
+
+        <DemoRow label="Cells">
+          <div className="grid w-[24rem] grid-cols-2 overflow-hidden rounded-md border border-border bg-background text-sm">
+            <div className="border-b border-r border-border px-2 py-1.5">
+              <TimeseriesGauge
+                variant="cell"
+                title="CPU"
+                icon={UiChip}
+                unit="percent"
+                centerDisplay="percent"
+                value={{ id: "cpu.cell.usage" }}
+                max={100}
+                refreshMs={0}
+                expandable={false}
+                fetcher={latestFetcher([{ match: "cpu.cell", latest: 42 }])}
+              />
+            </div>
+            <div className="border-b border-border px-2 py-1.5">
+              <TimeseriesGauge
+                variant="cell"
+                showLabel={false}
+                title="CPU"
+                icon={UiChip}
+                unit="percent"
+                centerDisplay="percent"
+                value={{ id: "cpu.icon.usage" }}
+                max={100}
+                refreshMs={0}
+                expandable={false}
+                fetcher={latestFetcher([{ match: "cpu.icon", latest: 42 }])}
+              />
+            </div>
+            <div className="border-r border-border px-2 py-1.5">
+              <TimeseriesCoreBars
+                variant="cell"
+                title="4-core"
+                icon={UiChip}
+                value={{ id: "cores.cell.usage" }}
+                max={4000}
+                refreshMs={0}
+                fetcher={latestFetcher([{ match: "cores.cell", latest: 2300 }])}
+              />
+            </div>
+            <div className="px-2 py-1.5">
+              <TimeseriesCoreBars
+                variant="cell"
+                showLabel={false}
+                title="4-core"
+                icon={UiChip}
+                value={{ id: "cores.icon.usage" }}
+                max={4000}
+                refreshMs={0}
+                fetcher={latestFetcher([{ match: "cores.icon", latest: 2300 }])}
+              />
+            </div>
+          </div>
         </DemoRow>
       </DemoSection>
     </QueryClientProvider>

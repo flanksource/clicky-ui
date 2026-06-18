@@ -76,6 +76,50 @@ export function TabButtonDemo() {
           meta="live"
         />
       </DemoRow>
+      <DemoRow label="Gauge cells">
+        <div className="grid w-[22rem] grid-cols-2 overflow-hidden rounded-md border border-border bg-background text-sm">
+          <div className="border-b border-r border-border px-2 py-1.5">
+            <Gauge
+              variant="cell"
+              icon={PassIcon}
+              label="Passed"
+              value={92}
+              tone="success"
+              meta="fresh"
+            />
+          </div>
+          <div className="border-b border-border px-2 py-1.5">
+            <Gauge
+              variant="cell"
+              showLabel={false}
+              icon={PassIcon}
+              label="Passed"
+              value={92}
+              tone="success"
+              meta="fresh"
+            />
+          </div>
+          <div className="border-r border-border px-2 py-1.5">
+            <Gauge
+              variant="cell"
+              icon={WarningIcon}
+              label="Skipped"
+              value={5}
+              tone="warning"
+            />
+          </div>
+          <div className="px-2 py-1.5">
+            <Gauge
+              variant="cell"
+              showLabel={false}
+              icon={GraphIcon}
+              label="Coverage"
+              value={78}
+              tone="info"
+            />
+          </div>
+        </div>
+      </DemoRow>
     </DemoSection>
   );
 }
