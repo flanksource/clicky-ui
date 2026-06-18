@@ -102,6 +102,43 @@ export const NoToolbar: Story = {
   ),
 };
 
+export const CompactMobileActions: Story = {
+  render: () => (
+    <div className="h-[420px]">
+      <AppShell
+        brand={<span className="font-bold">gavel</span>}
+        navSections={[
+          { items: [{ key: "runs", label: "Runs", icon: UiGrid, to: "/runs" }] },
+        ]}
+        actions={
+          <>
+            <Button size="sm">Run capture</Button>
+            <Button variant="outline" size="sm">
+              Edit target
+            </Button>
+            <Button variant="outline" size="sm">
+              Workspace with a long name
+            </Button>
+          </>
+        }
+        mobileActions={
+          <>
+            <Button size="sm">Run</Button>
+            <Button variant="outline" size="sm">
+              More
+            </Button>
+          </>
+        }
+      >
+        <div className="p-density-4 text-sm text-muted-foreground">
+          Resize this story to a phone width: the mobile header keeps the primary
+          action compact while desktop still renders the full action cluster.
+        </div>
+      </AppShell>
+    </div>
+  ),
+};
+
 // Mission-Control style: collapsible nav rail, a centered search,
 // right-side icon buttons + an org/settings picker, and a body with a fixed
 // header + actions row over a bodySidebar | body-main split.

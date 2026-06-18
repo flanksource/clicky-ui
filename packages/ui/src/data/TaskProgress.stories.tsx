@@ -3,8 +3,14 @@ import { TaskProgress } from "./TaskProgress";
 import type { TaskSnapshot } from "./TaskSnapshot";
 
 const meta: Meta<typeof TaskProgress> = {
-  title: "Data/TaskProgress",
+  title: "Charts/TaskProgress",
   component: TaskProgress,
+  argTypes: {
+    title: { control: "text" },
+    compact: { control: "boolean" },
+    snapshots: { table: { disable: true } },
+    className: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -19,8 +25,12 @@ export default meta;
 type Story = StoryObj<typeof TaskProgress>;
 
 function run(status: string, tasks: Partial<TaskSnapshot>[]): TaskSnapshot[] {
-  const completed = tasks.filter((t) => ["success", "PASS"].includes(t.status ?? "")).length;
-  const failed = tasks.filter((t) => ["failed", "FAIL", "ERR"].includes(t.status ?? "")).length;
+  const completed = tasks.filter((t) =>
+    ["success", "PASS"].includes(t.status ?? ""),
+  ).length;
+  const failed = tasks.filter((t) =>
+    ["failed", "FAIL", "ERR"].includes(t.status ?? ""),
+  ).length;
   const running = tasks.filter((t) => t.status === "running").length;
   const group: TaskSnapshot = {
     id: "fix-run",
@@ -65,7 +75,9 @@ export const WithFailure: Story = {
         name: "UPDATE STATISTICS dbo.AsClient",
         status: "failed",
         error: "Lock request timeout",
-        logs: [{ level: "error", message: "Lock request time out period exceeded." }],
+        logs: [
+          { level: "error", message: "Lock request time out period exceeded." },
+        ],
       },
     ]),
   },
@@ -75,7 +87,11 @@ export const Complete: Story = {
   args: {
     snapshots: run("success", [
       { name: "REBUILD idx_policy", status: "success", duration: "2.1s" },
-      { name: "UPDATE STATISTICS dbo.AsClient", status: "success", duration: "0.4s" },
+      {
+        name: "UPDATE STATISTICS dbo.AsClient",
+        status: "success",
+        duration: "0.4s",
+      },
     ]),
     title: "Defrag fixes",
   },

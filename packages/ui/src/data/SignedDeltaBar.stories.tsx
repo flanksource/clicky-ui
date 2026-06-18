@@ -2,13 +2,26 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SignedDeltaBar } from "./SignedDeltaBar";
 
 const meta: Meta<typeof SignedDeltaBar> = {
-  title: "Data/SignedDeltaBar",
+  title: "Charts/SignedDeltaBar",
   component: SignedDeltaBar,
   args: {
     value: 12.4,
     max: 50,
     significant: true,
     positiveIsBad: false,
+    height: "h-4",
+  },
+  argTypes: {
+    value: { control: { type: "number", min: -250, max: 250, step: 0.1 } },
+    max: { control: { type: "number", min: 1, max: 250, step: 1 } },
+    significant: { control: "boolean" },
+    positiveIsBad: { control: "boolean" },
+    height: {
+      control: "select",
+      options: ["h-2", "h-3", "h-4", "h-5"],
+    },
+    format: { table: { disable: true } },
+    className: { table: { disable: true } },
   },
   parameters: {
     docs: {
@@ -51,8 +64,14 @@ export const BenchmarkSemantics: Story = {
         { label: "BenchSort", value: -4.8 },
       ].map((row) => (
         <div key={row.label} className="flex items-center gap-3 text-xs">
-          <span className="w-24 font-mono text-muted-foreground">{row.label}</span>
-          <SignedDeltaBar value={row.value} positiveIsBad significant={row.significant ?? true} />
+          <span className="w-24 font-mono text-muted-foreground">
+            {row.label}
+          </span>
+          <SignedDeltaBar
+            value={row.value}
+            positiveIsBad
+            significant={row.significant ?? true}
+          />
         </div>
       ))}
     </div>
