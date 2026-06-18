@@ -167,6 +167,39 @@ export const WithFooter: Story = {
   },
 };
 
+export const MobileScrollable: Story = {
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile1",
+    },
+  },
+  render: () => (
+    <Modal
+      open
+      onClose={() => {}}
+      title="Run capture"
+      size="lg"
+      footer={
+        <div className="flex flex-wrap justify-end gap-density-2">
+          <button className="rounded-md border border-border px-3 py-1 text-sm">Cancel</button>
+          <button className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground">
+            Run capture
+          </button>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-1 gap-density-3 sm:grid-cols-2">
+        {Array.from({ length: 18 }, (_, index) => (
+          <label key={index} className="flex min-w-0 flex-col gap-1 text-sm">
+            <span className="font-medium">Field {index + 1}</span>
+            <input className="min-w-0 rounded-md border border-border px-2 py-1.5" defaultValue="Responsive value" />
+          </label>
+        ))}
+      </div>
+    </Modal>
+  ),
+};
+
 export const ConfirmClose: Story = {
   parameters: {
     docs: {

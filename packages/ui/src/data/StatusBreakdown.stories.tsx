@@ -10,9 +10,21 @@ const SEGMENTS = [
 ];
 
 const meta = {
-  title: "Data/StatusBreakdown",
+  title: "Charts/StatusBreakdown",
   component: StatusRows,
   tags: ["autodocs"],
+  args: {
+    segments: SEGMENTS,
+    ariaLabel: "Service health",
+  },
+  argTypes: {
+    segments: { control: "object" },
+    ariaLabel: { control: "text" },
+    retryingKey: { control: "text" },
+    onRetry: { table: { disable: true } },
+    isRetryable: { table: { disable: true } },
+    renderLink: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -21,23 +33,27 @@ const meta = {
       },
     },
   },
+  render: (args) => (
+    <div className="w-96">
+      <StatusRows {...args} />
+    </div>
+  ),
 } satisfies Meta<typeof StatusRows>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Rows: Story = {
-  render: () => (
-    <div className="w-96">
-      <StatusRows segments={SEGMENTS} ariaLabel="Service health" />
-    </div>
-  ),
+  args: {},
 };
 
 export const StackedBar: Story = {
-  render: () => (
+  render: (args) => (
     <div className="w-96">
-      <StackedStatusBar segments={SEGMENTS} ariaLabel="Service health" />
+      <StackedStatusBar
+        segments={args.segments ?? SEGMENTS}
+        ariaLabel={args.ariaLabel}
+      />
     </div>
   ),
 };
@@ -47,8 +63,14 @@ export const WithLinksAndRetry: Story = {
     <div className="w-96">
       <StatusRows
         segments={[
-          { ...segment("down", "Down", 6, "bg-rose-500"), href: "/services?status=down" },
-          { ...segment("degraded", "Degraded", 18, "bg-amber-500"), href: "/services?status=degraded" },
+          {
+            ...segment("down", "Down", 6, "bg-rose-500"),
+            href: "/services?status=down",
+          },
+          {
+            ...segment("degraded", "Degraded", 18, "bg-amber-500"),
+            href: "/services?status=degraded",
+          },
         ]}
         ariaLabel="Failing services"
         isRetryable={(s) => s.key === "down"}

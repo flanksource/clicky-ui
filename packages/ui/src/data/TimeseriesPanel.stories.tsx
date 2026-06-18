@@ -18,19 +18,32 @@ function seededNoise(seed: string, i: number): number {
 }
 
 /** Builds a smooth wave for a metric id: sine trend + seeded jitter, scaled. */
-function buildPoints(id: string, scale: number, offset = 0): TimeseriesResponse["points"] {
+function buildPoints(
+  id: string,
+  scale: number,
+  offset = 0,
+): TimeseriesResponse["points"] {
   return Array.from({ length: POINTS }, (_, i) => {
     const wave = Math.sin(i / 6 + id.length) * 0.5 + 0.5;
     const value = offset + scale * (wave + seededNoise(id, i) * 0.15);
-    return { at: new Date(BASE_TIME + i * STEP_MS).toISOString(), value: Math.max(0, value) };
+    return {
+      at: new Date(BASE_TIME + i * STEP_MS).toISOString(),
+      value: Math.max(0, value),
+    };
   });
 }
 
 /** Fetcher that derives a series' shape from its URL — no network. */
-function makeFetcher(scaleByMatch: { match: string; scale: number; offset?: number }[]) {
+function makeFetcher(
+  scaleByMatch: { match: string; scale: number; offset?: number }[],
+) {
   return async (url: string): Promise<TimeseriesResponse> => {
-    const entry = scaleByMatch.find((e) => url.includes(e.match)) ?? scaleByMatch[0];
-    return { id: url, points: buildPoints(url, entry.scale, entry.offset ?? 0) };
+    const entry =
+      scaleByMatch.find((e) => url.includes(e.match)) ?? scaleByMatch[0];
+    return {
+      id: url,
+      points: buildPoints(url, entry.scale, entry.offset ?? 0),
+    };
   };
 }
 
@@ -38,11 +51,17 @@ const loadingForever = () => new Promise<TimeseriesResponse>(() => {});
 const alwaysErrors = async (): Promise<TimeseriesResponse> => {
   throw new Error("metrics request failed: 503");
 };
-const emptyResponse = async (url: string): Promise<TimeseriesResponse> => ({ id: url, points: [] });
+const emptyResponse = async (url: string): Promise<TimeseriesResponse> => ({
+  id: url,
+  points: [],
+});
 
 function PanelShowcase(args: ComponentProps<typeof TimeseriesPanel>) {
   const queryClient = useMemo(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      }),
     [],
   );
   return (
@@ -55,7 +74,7 @@ function PanelShowcase(args: ComponentProps<typeof TimeseriesPanel>) {
 }
 
 const meta: Meta<typeof TimeseriesPanel> = {
-  title: "Data/TimeseriesPanel",
+  title: "Charts/TimeseriesPanel",
   component: TimeseriesPanel,
   parameters: {
     docs: {
@@ -66,11 +85,27 @@ const meta: Meta<typeof TimeseriesPanel> = {
     },
   },
   argTypes: {
-    variant: { control: "select", options: ["area", "line", "stacked", "breakdown"] },
+    title: { control: "text" },
+    url: { control: "text" },
+    baseUrl: { control: "text" },
+    unit: { control: "select", options: ["percent", "bytes", "short", "ms"] },
+    range: { control: "text" },
+    refreshMs: { control: { type: "number", min: 0, step: 1000 } },
+    variant: {
+      control: "select",
+      options: ["area", "line", "stacked", "breakdown"],
+    },
+    expandVariant: {
+      control: "inline-radio",
+      options: ["area", "line", "stacked"],
+    },
     height: { control: { type: "range", min: 80, max: 360, step: 20 } },
+    total: { control: { type: "number", min: 0, step: 1000 } },
     expandable: { control: "boolean" },
+    icon: { table: { disable: true } },
     fetcher: { table: { disable: true } },
     series: { table: { disable: true } },
+    className: { table: { disable: true } },
   },
   render: (args) => <PanelShowcase {...args} />,
 };
@@ -102,7 +137,9 @@ export const Bytes: Story = {
     url: "/api/v1/metrics/sqlserver.memory",
     unit: "bytes",
     refreshMs: 0,
-    fetcher: makeFetcher([{ match: "memory", scale: 6_000_000_000, offset: 1_000_000_000 }]),
+    fetcher: makeFetcher([
+      { match: "memory", scale: 6_000_000_000, offset: 1_000_000_000 },
+    ]),
   },
 };
 
@@ -180,9 +217,24 @@ export const Breakdown: Story = {
     variant: "breakdown",
     total: 8_000_000_000,
     series: [
-      { id: "heap.eden", label: "Eden Space", color: "bg-emerald-500", current: 2_400_000_000 },
-      { id: "heap.survivor", label: "Survivor Space", color: "bg-amber-500", current: 300_000_000 },
-      { id: "heap.old", label: "Old Gen", color: "bg-rose-500", current: 3_100_000_000 },
+      {
+        id: "heap.eden",
+        label: "Eden Space",
+        color: "bg-emerald-500",
+        current: 2_400_000_000,
+      },
+      {
+        id: "heap.survivor",
+        label: "Survivor Space",
+        color: "bg-amber-500",
+        current: 300_000_000,
+      },
+      {
+        id: "heap.old",
+        label: "Old Gen",
+        color: "bg-rose-500",
+        current: 3_100_000_000,
+      },
     ],
     fetcher: makeFetcher([
       { match: "eden", scale: 2_400_000_000, offset: 500_000_000 },
@@ -201,9 +253,24 @@ export const BreakdownCssColors: Story = {
   args: {
     ...Breakdown.args,
     series: [
-      { id: "heap.eden", label: "Eden Space", color: "#10b981", current: 2_400_000_000 },
-      { id: "heap.survivor", label: "Survivor Space", color: "#f59e0b", current: 300_000_000 },
-      { id: "heap.old", label: "Old Gen", color: "var(--chart-2, #ef4444)", current: 3_100_000_000 },
+      {
+        id: "heap.eden",
+        label: "Eden Space",
+        color: "#10b981",
+        current: 2_400_000_000,
+      },
+      {
+        id: "heap.survivor",
+        label: "Survivor Space",
+        color: "#f59e0b",
+        current: 300_000_000,
+      },
+      {
+        id: "heap.old",
+        label: "Old Gen",
+        color: "var(--chart-2, #ef4444)",
+        current: 3_100_000_000,
+      },
     ],
   },
 };
@@ -221,11 +288,36 @@ export const BreakdownDiskUsage: Story = {
     variant: "breakdown",
     total: 512_000_000_000,
     series: [
-      { id: "disk.system", label: "System", color: "bg-sky-500", current: 64_000_000_000 },
-      { id: "disk.apps", label: "Applications", color: "bg-violet-500", current: 96_000_000_000 },
-      { id: "disk.data", label: "Data", color: "bg-emerald-500", current: 180_000_000_000 },
-      { id: "disk.logs", label: "Logs", color: "bg-amber-500", current: 48_000_000_000 },
-      { id: "disk.cache", label: "Cache", color: "bg-rose-500", current: 72_000_000_000 },
+      {
+        id: "disk.system",
+        label: "System",
+        color: "bg-sky-500",
+        current: 64_000_000_000,
+      },
+      {
+        id: "disk.apps",
+        label: "Applications",
+        color: "bg-violet-500",
+        current: 96_000_000_000,
+      },
+      {
+        id: "disk.data",
+        label: "Data",
+        color: "bg-emerald-500",
+        current: 180_000_000_000,
+      },
+      {
+        id: "disk.logs",
+        label: "Logs",
+        color: "bg-amber-500",
+        current: 48_000_000_000,
+      },
+      {
+        id: "disk.cache",
+        label: "Cache",
+        color: "bg-rose-500",
+        current: 72_000_000_000,
+      },
     ],
     fetcher: makeFetcher([
       { match: "system", scale: 64_000_000_000, offset: 10_000_000_000 },
@@ -250,9 +342,24 @@ export const BreakdownRequestStatus: Story = {
     refreshMs: 0,
     variant: "breakdown",
     series: [
-      { id: "http.2xx", label: "2xx Success", color: "bg-green-500", current: 8420 },
-      { id: "http.3xx", label: "3xx Redirect", color: "bg-blue-500", current: 640 },
-      { id: "http.4xx", label: "4xx Client", color: "bg-amber-500", current: 310 },
+      {
+        id: "http.2xx",
+        label: "2xx Success",
+        color: "bg-green-500",
+        current: 8420,
+      },
+      {
+        id: "http.3xx",
+        label: "3xx Redirect",
+        color: "bg-blue-500",
+        current: 640,
+      },
+      {
+        id: "http.4xx",
+        label: "4xx Client",
+        color: "bg-amber-500",
+        current: 310,
+      },
       { id: "http.5xx", label: "5xx Server", color: "bg-red-500", current: 47 },
     ],
     fetcher: makeFetcher([
@@ -265,13 +372,28 @@ export const BreakdownRequestStatus: Story = {
 };
 
 export const Loading: Story = {
-  args: { title: "CPU", url: "/api/v1/metrics/cpu", refreshMs: 0, fetcher: loadingForever },
+  args: {
+    title: "CPU",
+    url: "/api/v1/metrics/cpu",
+    refreshMs: 0,
+    fetcher: loadingForever,
+  },
 };
 
 export const ErrorState: Story = {
-  args: { title: "CPU", url: "/api/v1/metrics/cpu", refreshMs: 0, fetcher: alwaysErrors },
+  args: {
+    title: "CPU",
+    url: "/api/v1/metrics/cpu",
+    refreshMs: 0,
+    fetcher: alwaysErrors,
+  },
 };
 
 export const CollectingData: Story = {
-  args: { title: "CPU", url: "/api/v1/metrics/cpu", refreshMs: 0, fetcher: emptyResponse },
+  args: {
+    title: "CPU",
+    url: "/api/v1/metrics/cpu",
+    refreshMs: 0,
+    fetcher: emptyResponse,
+  },
 };

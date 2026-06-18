@@ -2,8 +2,27 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ProgressBar } from "./ProgressBar";
 
 const meta: Meta<typeof ProgressBar> = {
-  title: "Data/ProgressBar",
+  title: "Charts/ProgressBar",
   component: ProgressBar,
+  args: {
+    total: 120,
+    height: "h-2",
+    segments: [
+      { count: 90, color: "bg-green-500", label: "passed" },
+      { count: 12, color: "bg-red-500", label: "failed" },
+      { count: 8, color: "bg-yellow-400", label: "skipped" },
+      { count: 10, color: "bg-blue-400", label: "pending" },
+    ],
+  },
+  argTypes: {
+    total: { control: { type: "number", min: 0, step: 1 } },
+    height: {
+      control: "select",
+      options: ["h-1", "h-1.5", "h-2", "h-3", "h-4"],
+    },
+    segments: { control: "object" },
+    className: { table: { disable: true } },
+  },
   parameters: {
     docs: {
       description: {
@@ -16,6 +35,8 @@ const meta: Meta<typeof ProgressBar> = {
 
 export default meta;
 type Story = StoryObj<typeof ProgressBar>;
+
+export const Default: Story = {};
 
 export const TestRun: Story = {
   args: {

@@ -4,7 +4,7 @@ import { Icon } from "./Icon";
 import { UiGitPr } from "../icons";
 
 const meta: Meta<typeof RadialGauge> = {
-  title: "Data/RadialGauge",
+  title: "Charts/RadialGauge",
   component: RadialGauge,
   args: {
     value: 70,
@@ -23,6 +23,10 @@ const meta: Meta<typeof RadialGauge> = {
     max: { control: { type: "number", min: 1, max: 200, step: 1 } },
     size: { control: { type: "number", min: 16, max: 96, step: 2 } },
     thickness: { control: { type: "number", min: 1, max: 12, step: 1 } },
+    label: { control: "text" },
+    title: { control: "text" },
+    center: { table: { disable: true } },
+    className: { table: { disable: true } },
   },
   parameters: {
     docs: {
