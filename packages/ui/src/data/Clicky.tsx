@@ -68,6 +68,7 @@ import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { Badge, type BadgeShape } from "./Badge";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
+import { useEscapeLayer } from "../overlay/modalStack";
 import { TagActionsProvider, TagList } from "./cells/TagList";
 import { normalizeTags, type NormalizedTag, type TagsValue } from "./cells/tag-utils";
 import { parseClickyData, type ParsedClicky } from "./clicky-parse";
@@ -984,6 +985,11 @@ function useDismissablePopup(
   triggerRef: RefObject<HTMLElement | null>,
   onClose: () => void,
 ) {
+  useEscapeLayer(open, () => {
+    onClose();
+    triggerRef.current?.focus();
+  });
+
   useEffect(() => {
     if (!open) return;
 
@@ -993,18 +999,9 @@ function useDismissablePopup(
       }
     };
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
-      }
-    };
-
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose, open, rootRef, triggerRef]);
 }

@@ -73,6 +73,7 @@ function CoreBarsCellVariants() {
         <div className="border-r border-border px-2 py-1.5">
           <TimeseriesCoreBars
             variant="cell"
+            orientation="horizontal"
             title="Near limit"
             icon={UiChip}
             value={{ id: "cpu.warning.usage" }}
@@ -84,7 +85,9 @@ function CoreBarsCellVariants() {
         <div className="px-2 py-1.5">
           <TimeseriesCoreBars
             variant="cell"
+            orientation="horizontal"
             showLabel={false}
+            showValue={false}
             title="Near limit"
             icon={UiChip}
             value={{ id: "cpu.danger.usage" }}
@@ -105,7 +108,7 @@ const meta: Meta<typeof TimeseriesCoreBars> = {
     docs: {
       description: {
         component:
-          "CPU utilisation as a row of vertical bars — one per core (ceil of the CPU limit) — filled left to right by the latest usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Usage and limit are read live from the timeseries store. The pure `deriveCoreBars(usageMilli, limitMilli)` helper computes the model. Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
+          "CPU utilisation as a row of bars — one per core (ceil of the CPU limit) — filled by the latest usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Usage and limit are read live from the timeseries store. `showValue` controls the caption, and `orientation` switches the bars between vertical columns and horizontal rows. The pure `deriveCoreBars(usageMilli, limitMilli)` helper computes the model. Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
       },
     },
   },
@@ -115,7 +118,12 @@ const meta: Meta<typeof TimeseriesCoreBars> = {
     range: { control: "text" },
     refreshMs: { control: { type: "number", min: 0, step: 1000 } },
     variant: { control: "inline-radio", options: ["default", "cell"] },
+    orientation: {
+      control: "inline-radio",
+      options: ["horizontal", "vertical"],
+    },
     showLabel: { control: "boolean" },
+    showValue: { control: "boolean" },
     thresholds: { table: { disable: true } },
     icon: { table: { disable: true } },
     fetcher: { table: { disable: true } },
@@ -137,7 +145,23 @@ export const FourCores: Story = {
     value: { id: "cpu.usage" },
     max: 4000,
     refreshMs: 0,
+    showValue: true,
+    orientation: "vertical",
     fetcher: makeFetcher([{ match: "cpu", latest: 2300 }]),
+  },
+};
+
+export const Horizontal: Story = {
+  args: {
+    ...FourCores.args,
+    orientation: "horizontal",
+  },
+};
+
+export const ValueHidden: Story = {
+  args: {
+    ...FourCores.args,
+    showValue: false,
   },
 };
 

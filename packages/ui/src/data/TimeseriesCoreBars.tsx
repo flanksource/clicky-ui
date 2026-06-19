@@ -7,6 +7,7 @@ import type { TimeseriesResponse } from "./TimeseriesPanel";
 import { deriveCoreBars } from "./TimeseriesCoreBars.model";
 
 export type TimeseriesCoreBarsVariant = "default" | "cell";
+export type TimeseriesCoreBarsOrientation = "horizontal" | "vertical";
 
 export interface TimeseriesCoreBarsProps {
   /** Common prefix; the value/max requests are `baseUrl + id`. */
@@ -34,8 +35,12 @@ export interface TimeseriesCoreBarsProps {
   thresholds?: [warning: number, danger: number];
   /** Visual density/layout. `cell` is a compact inline form for table/grid cells. */
   variant?: TimeseriesCoreBarsVariant;
-  /** Show the title text. Icons and values remain visible when false. */
+  /** Show the title text. Icons and values remain visible unless separately hidden. */
   showLabel?: boolean;
+  /** Show the value/capacity caption. Icons and bars remain visible when false. */
+  showValue?: boolean;
+  /** Bar direction. Vertical bars fill bottom-up; horizontal bars fill left-to-right. */
+  orientation?: TimeseriesCoreBarsOrientation;
   /** Override the default fetch (e.g. to route through an app's API client). */
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -61,9 +66,23 @@ function toneClass(pct: number, [warn, danger]: [number, number]): string {
 
 function CoreBarsIcon({ icon }: { icon: string | StaticIconComponent }) {
   if (typeof icon === "string") {
-    return <Icon name={icon} width={14} height={14} className="text-muted-foreground" />;
+    return (
+      <Icon
+        name={icon}
+        width={14}
+        height={14}
+        className="text-muted-foreground"
+      />
+    );
   }
-  return <Icon icon={icon} width={14} height={14} className="text-muted-foreground" />;
+  return (
+    <Icon
+      icon={icon}
+      width={14}
+      height={14}
+      className="text-muted-foreground"
+    />
+  );
 }
 
 function formatCores(cores: number): string {
@@ -90,6 +109,8 @@ export function TimeseriesCoreBars({
   thresholds = [75, 90],
   variant = "default",
   showLabel = true,
+  showValue = true,
+  orientation,
   fetcher = defaultFetcher,
   className,
 }: TimeseriesCoreBarsProps) {
@@ -117,14 +138,24 @@ export function TimeseriesCoreBars({
   });
 
   const rawValue = latestValue(results[0]?.data);
-  const usage = rawValue === undefined ? undefined : value.transform ? value.transform(rawValue) : rawValue;
+  const usage =
+    rawValue === undefined
+      ? undefined
+      : value.transform
+        ? value.transform(rawValue)
+        : rawValue;
 
   let limit: number | undefined;
   if (typeof max === "number") {
     limit = max;
   } else if (maxSeries) {
     const rawMax = latestValue(results[1]?.data);
-    limit = rawMax === undefined ? undefined : maxSeries.transform ? maxSeries.transform(rawMax) : rawMax;
+    limit =
+      rawMax === undefined
+        ? undefined
+        : maxSeries.transform
+          ? maxSeries.transform(rawMax)
+          : rawMax;
   }
 
   const model = deriveCoreBars(usage, limit);
@@ -136,8 +167,90 @@ export function TimeseriesCoreBars({
     ? `${formatCores(model.usageCores)}/${model.limitCores !== undefined ? formatCores(model.limitCores) : "?"} cores`
     : "—";
   const titleText = `${title}: ${compactCaption}`;
+  const isCell = variant === "cell";
+  const resolvedOrientation = orientation ?? "vertical";
+  const isDense = model.coreCount > 4;
+  const valueText = isCell ? compactCaption : caption;
+  const hiddenAccessibleText = !showLabel || !showValue ? titleText : undefined;
+  const bars = (
+    <span
+      className={cn(
+        "flex shrink-0",
+        resolvedOrientation === "vertical"
+          ? cn("items-end", isCell ? "h-4 gap-px" : "h-10 gap-0.5")
+          : cn(
+              "flex-col justify-center",
+              isCell ? "h-4 w-10 gap-px" : "h-10 w-16 gap-0.5",
+            ),
+      )}
+      aria-hidden={isCell ? "true" : undefined}
+      data-orientation={resolvedOrientation}
+      data-core-count={model.coreCount}
+      data-core-density={isDense ? "compact" : "default"}
+    >
+      {model.bars.map((bar, i) => {
+        const corePct = Math.round(bar.fill * 100);
+        return (
+          <span
+            key={i}
+            className={cn(
+              "relative overflow-hidden bg-muted",
+              resolvedOrientation === "vertical"
+                ? cn(
+                    "h-full",
+                    isCell
+                      ? isDense
+                        ? "w-[3px] rounded-[2px]"
+                        : "w-1.5 rounded-[2px]"
+                      : isDense
+                        ? "w-1 rounded-sm"
+                        : "w-2 rounded-sm",
+                  )
+                : cn("min-h-px w-full flex-1 rounded-[2px]"),
+            )}
+            title={`core ${i + 1}: ${corePct}%`}
+            aria-label={!isCell ? `core ${i + 1}: ${corePct}%` : undefined}
+            data-fill={bar.fill}
+          >
+            <span
+              className={cn(
+                "absolute bottom-0 left-0 transition-all duration-300",
+                tone,
+              )}
+              style={
+                resolvedOrientation === "vertical"
+                  ? { height: `${corePct}%`, right: 0 }
+                  : { width: `${corePct}%`, top: 0 }
+              }
+            />
+          </span>
+        );
+      })}
+    </span>
+  );
+  const valueNode = showValue ? (
+    <span
+      className={cn(
+        "shrink-0 font-semibold tabular-nums text-foreground",
+        isCell ? null : "text-xs",
+      )}
+    >
+      {valueText}
+    </span>
+  ) : null;
+  const label =
+    icon || showLabel ? (
+      <span
+        className={cn(
+          "inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
+        )}
+      >
+        {icon ? <CoreBarsIcon icon={icon} /> : null}
+        {showLabel ? <span className="min-w-0 truncate">{title}</span> : null}
+      </span>
+    ) : null;
 
-  if (variant === "cell") {
+  if (isCell) {
     return (
       <span
         className={cn(
@@ -145,31 +258,11 @@ export function TimeseriesCoreBars({
           className,
         )}
         title={titleText}
-        aria-label={!showLabel ? titleText : undefined}
+        aria-label={hiddenAccessibleText}
       >
-        {icon ? <CoreBarsIcon icon={icon} /> : null}
-        {showLabel ? <span className="min-w-0 truncate text-muted-foreground">{title}</span> : null}
-        <span className="flex h-4 shrink-0 items-end gap-px" aria-hidden="true">
-          {model.bars.map((bar, i) => {
-            const corePct = Math.round(bar.fill * 100);
-            return (
-              <span
-                key={i}
-                className="relative h-full w-1.5 overflow-hidden rounded-[2px] bg-muted"
-                title={`core ${i + 1}: ${corePct}%`}
-                data-fill={bar.fill}
-              >
-                <span
-                  className={cn("absolute inset-x-0 bottom-0 transition-all duration-300", tone)}
-                  style={{ height: `${corePct}%` }}
-                />
-              </span>
-            );
-          })}
-        </span>
-        <span className="shrink-0 font-semibold tabular-nums text-foreground">
-          {compactCaption}
-        </span>
+        {label}
+        {bars}
+        {valueNode}
       </span>
     );
   }
@@ -177,35 +270,12 @@ export function TimeseriesCoreBars({
   return (
     <div
       className={cn("flex flex-col items-center gap-1", className)}
-      title={!showLabel ? titleText : undefined}
-      aria-label={!showLabel ? titleText : undefined}
+      title={hiddenAccessibleText}
+      aria-label={hiddenAccessibleText}
     >
-      <div className="flex h-10 items-end gap-0.5">
-        {model.bars.map((bar, i) => {
-          const corePct = Math.round(bar.fill * 100);
-          return (
-            <div
-              key={i}
-              className="relative h-full w-2 overflow-hidden rounded-sm bg-muted"
-              title={`core ${i + 1}: ${corePct}%`}
-              aria-label={`core ${i + 1}: ${corePct}%`}
-              data-fill={bar.fill}
-            >
-              <div
-                className={cn("absolute inset-x-0 bottom-0 transition-all duration-300", tone)}
-                style={{ height: `${corePct}%` }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <span className="text-xs font-semibold text-foreground">{caption}</span>
-      {icon || showLabel ? (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          {icon ? <CoreBarsIcon icon={icon} /> : null}
-          {showLabel ? <span>{title}</span> : null}
-        </div>
-      ) : null}
+      {bars}
+      {valueNode}
+      {label}
     </div>
   );
 }
