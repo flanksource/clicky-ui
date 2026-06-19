@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, waitFor, within } from "storybook/test";
+import { Button } from "./button";
+import { Modal } from "../overlay/Modal";
 import { JsonSchemaForm } from "./JsonSchemaForm";
+import { templateValuePre, type TemplateToken, type TemplateValuesLoader } from "./json-schema-form-template";
 import type { FormSize } from "./json-schema-form-size";
 import type {
   JsonSchemaFormProps,
@@ -513,6 +517,118 @@ export const Extensions: Story = {
           "A `pre` extension stamps a `Secret` badge and helper text onto the `token` field; a `post` extension adds an **Insert token** button beside its value that mutates the field through `onChange`.",
       },
     },
+  },
+};
+
+const TEMPLATE_TOKENS = ["{{mock.email}}", "{{mock.name}}", "{{mock.id}}", "{{mock.team}}", "{{now}}"];
+
+const templateValueSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    from: {
+      type: "string",
+      title: "From",
+      enum: ["noreply@example.com", "alerts@example.com", "support@example.com"],
+    },
+    subject: { type: "string", title: "Subject" },
+  },
+};
+
+export const TemplateValuePrefix: Story = {
+  args: {
+    schema: templateValueSchema,
+    value: { from: "{{mock.email}}", subject: "" },
+    title: "Message",
+    pre: [templateValuePre({ tokens: TEMPLATE_TOKENS })],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A `pre` extension hangs a `{ }` **template-value** menu off each field through `FieldControl.prefix`. Clicking it opens a *separate* dropdown of `{{mock.*}}` tokens; picking one splices the token into a text input at the caret, or replaces the value of an enum/combobox field. **From** is an `enum` with `allowCustomValue`, so an inserted token coexists with the preset addresses.",
+      },
+    },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    await step("Insert a token into the subject at the caret", async () => {
+      const triggers = canvas.getAllByRole("button", { name: "Insert template value" });
+      await userEvent.click(triggers[1]!);
+      await userEvent.click(await body.findByRole("menuitem", { name: "{{mock.name}}" }));
+      await waitFor(() => expect(canvasElement.textContent).toContain('"subject": "{{mock.name}}"'));
+    });
+  },
+};
+
+// Async loader: resolves the token list a tick after the menu first opens.
+const loadTemplateTokens: TemplateValuesLoader = () =>
+  new Promise<readonly TemplateToken[]>((resolve) =>
+    setTimeout(
+      () =>
+        resolve([
+          "{{mock.email}}",
+          "{{mock.name}}",
+          "{{mock.id}}",
+          { value: "{{mock.team}}", label: <span className="text-primary">Team</span> },
+        ]),
+      150,
+    ),
+  );
+
+export const TemplateValuePrefixInDialog: Story = {
+  render: () => {
+    const [open, setOpen] = useState(true);
+    const [moreOpen, setMoreOpen] = useState(false);
+    const [value, setValue] = useState<Record<string, unknown>>({ from: "{{mock.email}}", subject: "" });
+    const pre = [
+      templateValuePre({
+        tokens: loadTemplateTokens,
+        header: <span className="text-muted-foreground">Template variables</span>,
+        footer: (
+          <button type="button" className="text-primary hover:underline" onClick={() => setMoreOpen(true)}>
+            Show more…
+          </button>
+        ),
+      }),
+    ];
+    return (
+      <div className="p-density-4">
+        <Button onClick={() => setOpen(true)}>Edit message</Button>
+        <Modal open={open} onClose={() => setOpen(false)} title="Edit message">
+          <div className="space-y-4">
+            <JsonSchemaForm schema={templateValueSchema} value={value} onChange={setValue} pre={pre} />
+            <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+              {JSON.stringify(value, null, 2)}
+            </pre>
+          </div>
+        </Modal>
+        <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="All variables" size="sm">
+          <ul className="space-y-1 font-mono text-xs">
+            {TEMPLATE_TOKENS.map((token) => (
+              <li key={token}>{token}</li>
+            ))}
+          </ul>
+        </Modal>
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The same template-value prefix on a form **inside a Modal**. Tokens load lazily via an async loader (a `Loading…` row shows until they resolve), one token uses a rich `ReactNode` label, and the menu carries a `header` plus a **Show more…** `footer` link (here opening a nested dialog). The `{ }` dropdown stacks above the dialog via `useFloatingZIndex`.",
+      },
+    },
+  },
+  play: async ({ step }) => {
+    const body = within(document.body);
+    await step("Insert an async-loaded token from inside the dialog", async () => {
+      const triggers = body.getAllByRole("button", { name: "Insert template value" });
+      await userEvent.click(triggers[1]!);
+      await userEvent.click(await body.findByRole("menuitem", { name: "{{mock.name}}" }));
+      await waitFor(() => expect(document.body.textContent).toContain('"subject": "{{mock.name}}"'));
+    });
   },
 };
 

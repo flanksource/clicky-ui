@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { DropdownMenu } from "./DropdownMenu";
 import { Modal } from "./Modal";
 import { zIndex } from "./zIndex";
@@ -146,6 +147,28 @@ describe("DropdownMenu", () => {
     expect(Number(screen.getByRole("menu").style.zIndex)).toBe(zIndex.popover);
   });
 
+  it("renders header and footer nodes inside the menu, around the items", () => {
+    const onMore = vi.fn();
+    render(
+      <DropdownMenu
+        label="Download"
+        items={items()}
+        header={<span>Choose a format</span>}
+        footer={
+          <button type="button" onClick={onMore}>
+            Show more
+          </button>
+        }
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByText("Choose a format")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "JSON" })).toBeInTheDocument();
+    fireEvent.click(within(menu).getByRole("button", { name: "Show more" }));
+    expect(onMore).toHaveBeenCalledTimes(1);
+  });
+
   it("renders above an open modal it lives inside, not behind it", () => {
     render(
       <Modal open onClose={() => {}} title="Edit">
@@ -156,5 +179,53 @@ describe("DropdownMenu", () => {
     const menuZ = Number(screen.getByRole("menu").style.zIndex);
     const modalZ = Number(screen.getByRole("dialog").style.zIndex);
     expect(menuZ).toBeGreaterThan(modalZ);
+  });
+
+  it("Escape closes a menu inside a modal before closing the modal", () => {
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return (
+        <Modal open={open} onClose={() => setOpen(false)} title="Edit">
+          <DropdownMenu label="Download" items={items()} />
+        </Modal>
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Edit" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("Escape closes a child modal before the menu that rendered it", () => {
+    function Harness() {
+      const [modalOpen, setModalOpen] = useState(true);
+      return (
+        <DropdownMenu label="Download">
+          {() => (
+            <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log">
+              <button type="button">in modal</button>
+            </Modal>
+          )}
+        </DropdownMenu>
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Log" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Log" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

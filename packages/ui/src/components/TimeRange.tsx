@@ -1,7 +1,21 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from "@floating-ui/react";
 import { Icon } from "../data/Icon";
 import { UiArrowRight, UiCalendar, UiClose, UiWatch } from "../icons";
 import { cn } from "../lib/utils";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
 import { Select } from "./select";
 
@@ -226,8 +240,6 @@ export function TimeRange({
   triggerClassName,
   panelClassName,
 }: TimeRangeProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
@@ -241,7 +253,26 @@ export function TimeRange({
     chipRows,
   );
 
-  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+  // The popup is portaled (floating-ui) so it escapes the `overflow` clipping of
+  // scroll-container ancestors (e.g. AppLayout's `<main overflow-y-auto>`) — the
+  // same approach Combobox/DropdownMenu use. `flip`/`shift` keep it on-screen.
+  const floatingZ = useFloatingZIndex();
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: align === "left" ? "bottom-start" : "bottom-end",
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useClick(context),
+    useDismiss(context, { escapeKey: false }),
+    useRole(context, { role: "dialog" }),
+  ]);
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  });
 
   useEffect(() => {
     if (open) {
@@ -281,21 +312,19 @@ export function TimeRange({
   }
 
   return (
-    <div ref={rootRef} className={cn("relative inline-flex", className)}>
+    <div className={cn("inline-flex", className)}>
       <Button
-        ref={triggerRef}
+        ref={refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         aria-label={`${label} filter`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
         className={cn(
           "h-7 w-fit max-w-[12rem] min-w-0 gap-2 px-2 text-xs font-normal",
           triggerClassName,
         )}
+        {...getReferenceProps()}
       >
         <Icon
           icon={kind === "time" ? UiWatch : UiCalendar}
@@ -305,15 +334,19 @@ export function TimeRange({
       </Button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label={label}
-          className={cn(
-            "fixed inset-x-2 bottom-4 top-16 z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg shadow-black/10 outline-none md:absolute md:bottom-auto md:top-[calc(100%+0.375rem)] md:block md:w-[22.5rem] md:shadow-black/5",
-            align === "left" ? "md:left-0" : "md:right-0",
-            panelClassName,
-          )}
-        >
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              role="dialog"
+              aria-label={label}
+              style={{ ...floatingStyles, zIndex: floatingZ }}
+              className={cn(
+                "flex max-h-[min(32rem,calc(100vh-2rem))] w-[22.5rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg shadow-black/10 outline-none",
+                panelClassName,
+              )}
+              {...getFloatingProps()}
+            >
           <div className="flex items-center justify-between border-b border-border/60 px-3.5 py-2.5">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {label}
@@ -323,7 +356,7 @@ export function TimeRange({
             </span>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto md:overflow-visible">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {activeChipRows.length > 0 && (
               <ChipRowList rows={activeChipRows} activeToken={activeToken} onApply={applyRange} />
             )}
@@ -417,7 +450,9 @@ export function TimeRange({
               </Button>
             </div>
           </div>
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
@@ -719,37 +754,6 @@ function formatPresetRange({ from, to }: TimeRangePreset) {
   if (!from) return to;
   if (!to || to === "now") return from;
   return `${from} -> ${to}`;
-}
-
-function useDismissablePopup(
-  open: boolean,
-  rootRef: RefObject<HTMLElement | null>,
-  triggerRef: RefObject<HTMLElement | null>,
-  onClose: () => void,
-) {
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose, open, rootRef, triggerRef]);
 }
 
 function normalizeRangeValue(

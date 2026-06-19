@@ -23,7 +23,7 @@ import {
 } from "@floating-ui/react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { useFloatingZIndex } from "../overlay/modalStack";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { UiCheck, UiChevronDown } from "../icons";
 import { Button } from "./button";
 import { IconButton } from "./IconButton";
@@ -90,7 +90,7 @@ function IconMenuPickerInner<T extends string>(
   });
 
   const click = useClick(context);
-  const dismiss = useDismiss(context);
+  const dismiss = useDismiss(context, { escapeKey: false });
   const role = useRole(context, { role: "menu" });
   const listNav = useListNavigation(context, {
     listRef,
@@ -112,6 +112,10 @@ function IconMenuPickerInner<T extends string>(
     listNav,
     typeahead,
   ]);
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  });
 
   // Keep the trigger wrapper available both to floating-ui (as the positioning
   // reference) and to the consumer's forwarded ref.

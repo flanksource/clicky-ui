@@ -12,14 +12,31 @@ import {
   type CSSProperties,
   type ReactElement,
   type ReactNode,
+  type Ref,
   type RefObject,
 } from "react";
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useMergeRefs,
+  useRole,
+  type Placement,
+} from "@floating-ui/react";
 import { FilterPill, type FilterMode } from "../data/FilterPill";
 import { clearFilterBarFilter, isFilterBarFilterActive } from "./filter-bar-utils";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
 import { cn } from "../lib/utils";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
 import { Combobox, type ComboboxOption } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
@@ -664,7 +681,6 @@ function OverflowFiltersMenu({
   activeHidden: number;
   onApply?: () => void;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [stagedValues, setStagedValues] = useState<Record<string, FilterBarValue>>({});
   const hasHidden = filters.length > 0;
@@ -672,16 +688,24 @@ function OverflowFiltersMenu({
     () => filters.map((filter) => filter.key).join("\u0000"),
     [filters],
   );
-  const openOverflowMenu = useCallback(() => {
-    setStagedValues(createFilterValueMap(filters));
-    setOpen(true);
-  }, [filters]);
+  // Re-stage from the live filters on every open/close so an un-applied edit is
+  // discarded, preserving the prior close behaviour.
+  const { refs, floatingStyles, context, floatingZ, getReferenceProps, getFloatingProps } =
+    useAnchoredPopup(
+      open,
+      (next) => {
+        setStagedValues(createFilterValueMap(filters));
+        setOpen(next);
+      },
+      "bottom-end",
+    );
   const closeOverflowMenu = useCallback(() => {
     setStagedValues(createFilterValueMap(filters));
     setOpen(false);
   }, [filters]);
-
-  useDismissablePopup(open, rootRef, triggerRef, closeOverflowMenu);
+  // Merge floating-ui's reference ref with the caller's triggerRef (the parent
+  // measures the trigger width through it for overflow layout).
+  const setTriggerRef = useMergeRefs([refs.setReference, triggerRef]);
 
   useEffect(() => {
     if (!hasHidden) closeOverflowMenu();
@@ -706,32 +730,22 @@ function OverflowFiltersMenu({
 
   return (
     <div
-      ref={rootRef}
-      className={cn("relative shrink-0", !hasHidden && "invisible pointer-events-none")}
+      className={cn("inline-flex shrink-0", !hasHidden && "invisible pointer-events-none")}
       aria-hidden={!hasHidden || undefined}
     >
       <Button
-        ref={triggerRef}
+        ref={setTriggerRef}
         type="button"
         variant="outline"
         size="sm"
         aria-label="More filters"
-        aria-haspopup="dialog"
-        aria-expanded={hasHidden ? open : false}
         tabIndex={hasHidden ? 0 : -1}
         title={hasHidden ? "More filters" : undefined}
-        onClick={() => {
-          if (!hasHidden) return;
-          if (open) {
-            closeOverflowMenu();
-          } else {
-            openOverflowMenu();
-          }
-        }}
         className={cn(
           "h-8 min-w-0 gap-1.5 px-2 text-xs font-normal",
           activeHidden > 0 && "border-primary/40 text-primary",
         )}
+        {...getReferenceProps()}
       >
         <Icon icon={UiFilter} className="text-[14px]" />
         {activeHidden > 0 && (
@@ -742,12 +756,16 @@ function OverflowFiltersMenu({
       </Button>
 
       {hasHidden && open && (
-        <div
-          role="dialog"
-          aria-label="Overflow filters"
-          className="fixed inset-x-2 bottom-4 top-16 z-50 flex flex-col overflow-hidden rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/10 md:absolute md:bottom-auto md:left-auto md:right-0 md:top-[calc(100%+0.375rem)] md:block md:w-[min(34rem,calc(100vw-2rem))] md:overflow-visible md:shadow-black/5"
-          onClick={(event) => event.stopPropagation()}
-        >
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              role="dialog"
+              aria-label="Overflow filters"
+              style={{ ...floatingStyles, zIndex: floatingZ }}
+              className="flex max-h-[min(34rem,calc(100vh-2rem))] w-[min(34rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/10"
+              {...getFloatingProps()}
+            >
           <div className="mb-2 flex items-center justify-between gap-2 px-1">
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Filters
@@ -772,7 +790,7 @@ function OverflowFiltersMenu({
               </button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 divide-y divide-border/70 overflow-y-auto rounded-md border border-border/70 md:overflow-visible">
+          <div className="min-h-0 flex-1 divide-y divide-border/70 overflow-y-auto rounded-md border border-border/70">
             {stagedFilters.map((filter) => {
               const active = isFilterBarFilterActive(filter);
               return (
@@ -836,7 +854,9 @@ function OverflowFiltersMenu({
               Apply
             </Button>
           </div>
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
@@ -1294,11 +1314,8 @@ function LookupMultiFilterField({
 }
 
 function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; grow: boolean }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-
-  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+  const popup = useAnchoredPopup(open, setOpen);
 
   const bounds = resolveNumberFilterBounds(filter);
   const [draft, setDraft] = useDebouncedNumberDraft(filter.value, filter.onChange);
@@ -1310,30 +1327,27 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
 
   return (
     <div
-      ref={rootRef}
       title={filter.description}
       className={cn(
-        "relative min-w-0",
+        "inline-flex min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
     >
       <Button
-        ref={triggerRef}
+        ref={popup.refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         aria-label={`${filter.label} filter`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
         disabled={filter.disabled}
-        onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
           grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[9.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
+        {...popup.getReferenceProps()}
       >
         <LabelIcon icon={filter.icon} className="text-[14px] text-muted-foreground" />
         <span className="truncate">{summary}</span>
@@ -1341,7 +1355,16 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
       </Button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg shadow-black/5">
+        <FloatingPortal>
+          <FloatingFocusManager context={popup.context} modal={false}>
+            <div
+              ref={popup.refs.setFloating}
+              role="dialog"
+              aria-label={filter.label}
+              style={{ ...popup.floatingStyles, zIndex: popup.floatingZ }}
+              className="min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg shadow-black/5"
+              {...popup.getFloatingProps()}
+            >
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {filter.label}
@@ -1423,7 +1446,9 @@ function NumberFilterField({ filter, grow }: { filter: FilterBarNumberFilter; gr
               </div>
             </div>
           </div>
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
@@ -1541,17 +1566,20 @@ function NumberFilterPanel({
   );
 }
 
+const MULTI_FILTER_OPTION_ROW_HEIGHT = 30;
+const MULTI_FILTER_OPTION_LIST_HEIGHT = 288;
+const MULTI_FILTER_OPTION_OVERSCAN = 6;
+
 function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow: boolean }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
+  const [optionScrollTop, setOptionScrollTop] = useState(0);
   // Options fetched via onSearch for the current query. While a query is active
   // these replace the head (plus already-toggled head items); empty otherwise.
   const [searchOptions, setSearchOptions] = useState<MultiSelectOption[]>([]);
   const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
-  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+  const popup = useAnchoredPopup(open, setOpen);
 
   // Debounced server-side search. Runs only when onSearch is provided; clears
   // results for an empty query so the view reverts to the head set.
@@ -1613,6 +1641,25 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
       multiSelectOptionText(option).toLowerCase().includes(lowered),
     );
   }, [baseOptions, searchOptions, optionQuery, onSearch, draft]);
+  useEffect(() => {
+    setOptionScrollTop(0);
+  }, [optionQuery]);
+  const optionWindow = useMemo(() => {
+    const visibleRows = Math.ceil(MULTI_FILTER_OPTION_LIST_HEIGHT / MULTI_FILTER_OPTION_ROW_HEIGHT);
+    const start = Math.max(
+      0,
+      Math.floor(optionScrollTop / MULTI_FILTER_OPTION_ROW_HEIGHT) - MULTI_FILTER_OPTION_OVERSCAN,
+    );
+    const end = Math.min(
+      visibleOptions.length,
+      start + visibleRows + MULTI_FILTER_OPTION_OVERSCAN * 2,
+    );
+    return {
+      options: visibleOptions.slice(start, end),
+      totalHeight: visibleOptions.length * MULTI_FILTER_OPTION_ROW_HEIGHT,
+      top: start * MULTI_FILTER_OPTION_ROW_HEIGHT,
+    };
+  }, [optionScrollTop, visibleOptions]);
   // canAddCustom: offer an "Add" row when the typed query names no listed option.
   const trimmedQuery = optionQuery.trim();
   const canAddCustom =
@@ -1628,30 +1675,27 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
 
   return (
     <div
-      ref={rootRef}
       title={filter.description}
       className={cn(
-        "relative min-w-0",
+        "inline-flex min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
     >
       <Button
-        ref={triggerRef}
+        ref={popup.refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         aria-label={`${filter.label} filter`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
         disabled={filter.disabled}
-        onClick={() => setOpen((current) => !current)}
         className={cn(
           "min-w-0 gap-2 font-normal",
           grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
+        {...popup.getReferenceProps()}
       >
         <LabelIcon icon={filter.icon} className="text-[14px] text-muted-foreground" />
         <span className="truncate">{summary}</span>
@@ -1659,7 +1703,16 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
       </Button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5">
+        <FloatingPortal>
+          <FloatingFocusManager context={popup.context} modal={false}>
+            <div
+              ref={popup.refs.setFloating}
+              role="dialog"
+              aria-label={filter.label}
+              style={{ ...popup.floatingStyles, zIndex: popup.floatingZ }}
+              className="min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+              {...popup.getFloatingProps()}
+            >
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {filter.label}
@@ -1688,41 +1741,51 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
             </div>
           )}
 
-          <div className="max-h-72 space-y-0.5 overflow-auto">
-            {visibleOptions.map((option) => {
-              const mode = draft[option.value] ?? "neutral";
-              const title = option.title ?? multiSelectOptionText(option);
+          <div
+            className="max-h-72 overflow-auto"
+            onScroll={(event) => setOptionScrollTop(event.currentTarget.scrollTop)}
+          >
+            <div className="relative" style={{ height: optionWindow.totalHeight }}>
+              <div style={{ transform: `translateY(${optionWindow.top}px)` }}>
+                {optionWindow.options.map((option) => {
+                  const mode = draft[option.value] ?? "neutral";
+                  const title = option.title ?? multiSelectOptionText(option);
 
-              return (
-                <div
-                  key={option.value}
-                  role="button"
-                  tabIndex={0}
-                  data-filter-option={option.value}
-                  className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-                  onClick={() =>
-                    setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
-                    }
-                  }}
-                >
-                  <FilterPill
-                    className="w-full justify-between"
-                    label={option.label}
-                    mode={mode}
-                    title={title}
-                    togglePosition="right"
-                    onModeChange={(next) =>
-                      setDraft(updateMultiFilterValue(draft, option.value, next))
-                    }
-                  />
-                </div>
-              );
-            })}
+                  return (
+                    <div
+                      key={option.value}
+                      role="button"
+                      tabIndex={0}
+                      data-filter-option={option.value}
+                      className="box-border flex items-center rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
+                      style={{ height: MULTI_FILTER_OPTION_ROW_HEIGHT }}
+                      onClick={() =>
+                        setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setDraft(
+                            updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
+                          );
+                        }
+                      }}
+                    >
+                      <FilterPill
+                        className="w-full justify-between"
+                        label={option.label}
+                        mode={mode}
+                        title={title}
+                        togglePosition="right"
+                        onModeChange={(next) =>
+                          setDraft(updateMultiFilterValue(draft, option.value, next))
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             {canAddCustom && (
               <div
                 role="button"
@@ -1751,7 +1814,9 @@ function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow
               {onSearch ? " — type to search all" : ""}
             </div>
           )}
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
@@ -2102,15 +2167,13 @@ function NestedMultiFilterField({
   filter: FilterBarNestedMultiFilter;
   grow: boolean;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
 
-  useDismissablePopup(open, rootRef, triggerRef, () => {
-    setOpen(false);
-    setActiveGroup(null);
+  const popup = useAnchoredPopup(open, (next) => {
+    setOpen(next);
+    if (!next) setActiveGroup(null);
   });
 
   const summary = summarizeMultiFilter(filter.label, draft);
@@ -2158,50 +2221,43 @@ function NestedMultiFilterField({
 
   return (
     <div
-      ref={rootRef}
       title={filter.description}
       className={cn(
-        "relative min-w-0",
+        "inline-flex min-w-0",
         grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
         filter.disabled && "opacity-60",
         filter.className,
       )}
     >
       <Button
-        ref={triggerRef}
+        ref={popup.refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         aria-label={`${filter.label} filter`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
         disabled={filter.disabled}
-        onClick={() => {
-          setOpen((current) => !current);
-          if (open) setActiveGroup(null);
-        }}
         className={cn(
           "min-w-0 gap-2 font-normal",
           grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
           summary === filter.label && "text-muted-foreground",
         )}
+        {...popup.getReferenceProps()}
       >
         <span className="truncate">{summary}</span>
         <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
       </Button>
 
       {open && (
-        <div
-          role="dialog"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setOpen(false);
-              setActiveGroup(null);
-            }
-          }}
-          className="absolute left-0 top-[calc(100%+0.375rem)] z-50 flex"
-        >
+        <FloatingPortal>
+          <FloatingFocusManager context={popup.context} modal={false}>
+            <div
+              ref={popup.refs.setFloating}
+              role="dialog"
+              aria-label={filter.label}
+              style={{ ...popup.floatingStyles, zIndex: popup.floatingZ }}
+              className="flex"
+              {...popup.getFloatingProps()}
+            >
           <div className="min-w-[14rem] max-w-[16rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5">
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -2327,7 +2383,9 @@ function NestedMultiFilterField({
               </div>
             </div>
           )}
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
@@ -2412,35 +2470,32 @@ function RangeControlButton({
   );
 }
 
-function useDismissablePopup(
+// Anchored popup wired through floating-ui's portal so it escapes `overflow`
+// clipping from scroll-container ancestors (e.g. AppLayout's `<main>`), matching
+// Combobox/DropdownMenu. `flip`/`shift` keep it on-screen at viewport edges.
+function useAnchoredPopup(
   open: boolean,
-  rootRef: RefObject<HTMLElement | null>,
-  triggerRef: RefObject<HTMLElement | null>,
-  onClose: () => void,
+  onOpenChange: (open: boolean) => void,
+  placement: Placement = "bottom-start",
 ) {
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose, open, rootRef, triggerRef]);
+  const floatingZ = useFloatingZIndex();
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange,
+    placement,
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useClick(context),
+    useDismiss(context, { escapeKey: false }),
+    useRole(context, { role: "dialog" }),
+  ]);
+  useEscapeLayer(open, () => {
+    onOpenChange(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  });
+  return { refs, floatingStyles, context, floatingZ, getReferenceProps, getFloatingProps };
 }
 
 function useMediaQuery(query: string) {

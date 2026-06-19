@@ -1,8 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode, type Ref } from "react";
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from "@floating-ui/react";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiChevronDown, UiChevronUp } from "../icons";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 
 export type MultiSelectOption = {
   /** Stable option value written into the selected value array. */
@@ -49,33 +63,27 @@ export function MultiSelect({
   triggerClassName,
   menuClassName,
 }: MultiSelectProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  // Portaled (floating-ui) so the menu escapes `overflow` clipping from
+  // scroll-container ancestors, matching Combobox/DropdownMenu.
+  const floatingZ = useFloatingZIndex();
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: "bottom-start",
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useClick(context),
+    useDismiss(context, { escapeKey: false }),
+    useRole(context, { role: "menu" }),
+  ]);
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  });
 
   const selected = useMemo(() => {
     const selectedOptions = options.filter((option) => value.includes(option.value));
@@ -98,34 +106,38 @@ export function MultiSelect({
   }
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div className={cn("inline-flex", className)}>
       <Button
-        ref={triggerRef}
+        ref={refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         disabled={disabled}
         aria-label={ariaLabel ?? `${placeholder} filter`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
         className={cn(
           "w-fit max-w-[15rem] min-w-0 shrink-0 justify-between gap-3 text-left font-normal",
           triggerClassName,
           value.length === 0 && "text-muted-foreground",
         )}
+        {...getReferenceProps()}
       >
         <span className="truncate">{selected}</span>
         <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
       </Button>
       {open && (
-        <div
-          role="menu"
-          className={cn(
-            "absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[14rem] max-w-[20rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5",
-            menuClassName,
-          )}
-        >
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              role="menu"
+              aria-label={placeholder}
+              style={{ ...floatingStyles, zIndex: floatingZ }}
+              className={cn(
+                "min-w-[14rem] max-w-[20rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5",
+                menuClassName,
+              )}
+              {...getFloatingProps()}
+            >
           <div className="mb-1 flex items-center justify-between gap-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             <span>{placeholder}</span>
             <button
@@ -161,7 +173,9 @@ export function MultiSelect({
               );
             })}
           </div>
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );
