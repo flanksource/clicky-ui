@@ -96,13 +96,13 @@ describe("TimeRange", () => {
   it("opens a native date picker for the custom field when kind is date", () => {
     const onApply = vi.fn();
 
-    const { container } = render(
-      <TimeRange kind="date" label="Date range" from="" to="" onApply={onApply} />,
-    );
+    render(<TimeRange kind="date" label="Date range" from="" to="" onApply={onApply} />);
 
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
 
-    const picker = container.querySelector('input[type="date"]') as HTMLInputElement & {
+    // The popover is portaled to the document body (floating-ui), so query the
+    // hidden native date input from the document rather than the render container.
+    const picker = document.querySelector('input[type="date"]') as HTMLInputElement & {
       showPicker?: () => void;
     };
     if (!picker) {
@@ -117,11 +117,11 @@ describe("TimeRange", () => {
   it("keeps the custom time-of-day input opt-in when kind is time", () => {
     const onApply = vi.fn();
 
-    const { container } = render(<TimeRange from="now-24h" to="now" onApply={onApply} />);
+    render(<TimeRange from="now-24h" to="now" onApply={onApply} />);
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
 
-    const datePicker = container.querySelector('input[type="date"]') as HTMLInputElement & {
+    const datePicker = document.querySelector('input[type="date"]') as HTMLInputElement & {
       showPicker?: () => void;
     };
     expect(datePicker).not.toBeNull();
@@ -204,14 +204,12 @@ describe("TimeRange", () => {
   it("keeps the popover open when a date is picked from the native picker", () => {
     const onApply = vi.fn();
 
-    const { container } = render(
-      <TimeRange kind="date" label="Date range" from="" to="2026-05-05" onApply={onApply} />,
-    );
+    render(<TimeRange kind="date" label="Date range" from="" to="2026-05-05" onApply={onApply} />);
 
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
     expect(screen.getByRole("dialog", { name: /date range/i })).toBeInTheDocument();
 
-    const picker = container.querySelector('input[type="date"]') as HTMLInputElement;
+    const picker = document.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(picker, { target: { value: "2026-04-15" } });
 
     expect(onApply).not.toHaveBeenCalled();
