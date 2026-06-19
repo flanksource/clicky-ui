@@ -4,6 +4,7 @@ import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiClose, UiMenu, UiSidebar } from "../icons";
 import { useRouter } from "../rpc/router";
 import type { RenderLink } from "../rpc/EndpointList";
+import { useEscapeLayer } from "../overlay/modalStack";
 import { SplitPane } from "./SplitPane";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
@@ -147,14 +148,7 @@ export function AppShell(props: AppShellProps) {
       window.localStorage.setItem(collapsedStorageKey, String(collapsed));
   }, [collapsed, collapsedStorageKey]);
 
-  useEffect(() => {
-    if (!mobileSidebarOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileSidebarOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [mobileSidebarOpen]);
+  useEscapeLayer(mobileSidebarOpen, () => setMobileSidebarOpen(false));
 
   const railWidth = collapsed ? collapsedWidth : sidebarWidth;
   const compactActions = mobileActions ?? actions;
