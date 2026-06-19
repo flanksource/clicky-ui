@@ -4,7 +4,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { Button } from "../components/button";
 import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
-import { useModalStack } from "./modalStack";
+import { useEscapeLayer, useModalStack } from "./modalStack";
 import { zIndex } from "./zIndex";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
@@ -93,7 +93,7 @@ export function Modal({
   children,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { isTop, depth } = useModalStack(open);
+  const { depth } = useModalStack(open);
   const [expanded, setExpanded] = useState(false);
   // When confirmClose is active, a close request opens this prompt instead of
   // closing outright; onClose only fires once the user confirms the discard.
@@ -119,19 +119,15 @@ export function Modal({
     if (!confirmClose) setConfirming(false);
   }, [confirmClose]);
 
-  useEffect(() => {
-    // Only the topmost modal handles Escape so a keypress closes one nested
-    // layer at a time instead of every open modal at once.
-    if (!open || !closeOnEsc || !isTop) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+  useEscapeLayer(
+    open,
+    () => {
       // While the prompt is up, Escape dismisses the prompt rather than the modal.
       if (confirming) setConfirming(false);
       else requestClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, closeOnEsc, isTop, confirming, confirmClose, onClose]);
+    },
+    closeOnEsc,
+  );
 
   useEffect(() => {
     if (!open) return;
