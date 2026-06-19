@@ -17,7 +17,7 @@ import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown } from "../icons";
-import { useFloatingZIndex } from "./modalStack";
+import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 
 export type DropdownMenuItem = {
   /** Visible label. */
@@ -49,6 +49,10 @@ export type DropdownMenuProps = {
   items?: DropdownMenuItem[];
   /** Custom menu content. Use `closeMenu` to dismiss after a selection. */
   children?: (closeMenu: () => void) => ReactNode;
+  /** Rendered at the top of the menu, above the items/children. */
+  header?: ReactNode;
+  /** Rendered at the bottom of the menu, below the items/children (e.g. a "Show more…" link). */
+  footer?: ReactNode;
   /** Horizontal alignment of the menu relative to the trigger. */
   align?: "left" | "right";
   /** Notified whenever the menu opens or closes. */
@@ -72,6 +76,8 @@ export function DropdownMenu({
   trigger,
   items,
   children,
+  header,
+  footer,
   align = "right",
   onOpenChange,
   title,
@@ -109,7 +115,7 @@ export function DropdownMenu({
   // unmount that child Modal). A Modal owned by a sibling/parent instead of this
   // menu correctly does dismiss the menu, which is harmless since closing the
   // menu does not unmount a Modal it doesn't own.
-  const dismiss = useDismiss(context);
+  const dismiss = useDismiss(context, { escapeKey: false });
   const role = useRole(context, { role: "menu" });
   const listNav = useListNavigation(context, {
     listRef,
@@ -125,7 +131,11 @@ export function DropdownMenu({
     listNav,
   ]);
 
-  const closeMenu = () => setOpen(false);
+  const closeMenu = () => {
+    setOpen(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  };
+  useEscapeLayer(open, closeMenu);
 
   return (
     <div className={cn("relative inline-flex", className)}>
@@ -168,6 +178,9 @@ export function DropdownMenu({
               )}
               {...getFloatingProps()}
             >
+              {header != null && (
+                <div className="border-b border-border px-3 py-1.5">{header}</div>
+              )}
               {children
                 ? children(closeMenu)
                 : items?.map((item, i) => (
@@ -206,6 +219,9 @@ export function DropdownMenu({
                       {item.label}
                     </button>
                   ))}
+              {footer != null && (
+                <div className="border-t border-border px-3 py-1.5">{footer}</div>
+              )}
             </div>
           </FloatingFocusManager>
         </FloatingPortal>

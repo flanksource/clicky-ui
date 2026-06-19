@@ -4,6 +4,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiChevronDown } from "../icons";
 import { Tree, type TreeProps } from "../data/Tree";
+import { useEscapeLayer } from "../overlay/modalStack";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
 
 // Upper bound the open panel grows to so wide trees show full labels before
@@ -65,6 +66,11 @@ export function TreePickerField<T>({
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    anchorRef.current?.focus();
+  });
 
   // Position the portaled panel from the trigger rect, repositioning while open.
   useLayoutEffect(() => {
@@ -149,9 +155,6 @@ export function TreePickerField<T>({
               "z-50 flex max-h-[60vh] flex-col overflow-hidden rounded-md border border-border bg-popover shadow-md",
               panelClassName,
             )}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setOpen(false);
-            }}
           >
             <div className="min-h-0 flex-1 overflow-auto">
               <Tree<T>
