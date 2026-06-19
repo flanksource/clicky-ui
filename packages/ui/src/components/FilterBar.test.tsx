@@ -536,7 +536,9 @@ describe("FilterBar", () => {
     }
 
     fireEvent.click(within(dialog).getByRole("button", { name: /status filter/i }));
-    expect(within(dialog).getByText("Healthy")).toBeInTheDocument();
+    // The option list is portaled to the document body (floating-ui), so it lives
+    // outside the overflow dialog's DOM subtree — query the whole document.
+    expect(screen.getByText("Healthy")).toBeInTheDocument();
 
     width = 700;
     act(() => {
