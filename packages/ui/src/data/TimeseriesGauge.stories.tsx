@@ -1,11 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, type ComponentProps } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { UiChip } from "../icons";
+import { UiChip, UiMemoryStick } from "../icons";
 import { TimeseriesGauge } from "./TimeseriesGauge";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
 
 const BASE_TIME = Date.parse("2026-06-02T12:00:00Z");
+type TimeseriesGaugeStoryArgs = ComponentProps<typeof TimeseriesGauge> & {
+  latestValue: number;
+  maxLatestValue?: number;
+};
 
 /** Fetcher with no network: the latest value of each metric is matched by URL. */
 function makeFetcher(latestByMatch: { match: string; latest: number }[]) {
@@ -20,18 +24,37 @@ function makeFetcher(latestByMatch: { match: string; latest: number }[]) {
   };
 }
 
-function GaugeShowcase(args: ComponentProps<typeof TimeseriesGauge>) {
+function makeStoryFetcher(args: TimeseriesGaugeStoryArgs) {
+  const maxSeries = typeof args.max === "object" ? args.max : undefined;
+  return makeFetcher([
+    { match: args.value.id, latest: args.latestValue },
+    ...(maxSeries
+      ? [
+          {
+            match: maxSeries.id,
+            latest: args.maxLatestValue ?? args.latestValue,
+          },
+        ]
+      : []),
+  ]);
+}
+
+function GaugeShowcase(args: TimeseriesGaugeStoryArgs) {
+  const { latestValue, maxLatestValue, fetcher, ...gaugeArgs } = args;
   const queryClient = useMemo(
     () =>
       new QueryClient({
         defaultOptions: { queries: { retry: false, gcTime: 0 } },
       }),
-    [],
+    [latestValue, maxLatestValue],
   );
   return (
     <QueryClientProvider client={queryClient}>
       <div className="w-40">
-        <TimeseriesGauge {...args} />
+        <TimeseriesGauge
+          {...gaugeArgs}
+          fetcher={fetcher ?? makeStoryFetcher(args)}
+        />
       </div>
     </QueryClientProvider>
   );
@@ -81,7 +104,7 @@ function GaugeCellVariants() {
           <TimeseriesGauge
             variant="cell"
             title="Memory"
-            icon={UiChip}
+            icon={UiMemoryStick}
             unit="bytes"
             value={{ id: "mem.cell.usage" }}
             max={{ id: "mem.cell.limit" }}
@@ -98,7 +121,7 @@ function GaugeCellVariants() {
             variant="cell"
             showLabel={false}
             title="Memory"
-            icon={UiChip}
+            icon={UiMemoryStick}
             unit="bytes"
             value={{ id: "mem.icon.usage" }}
             max={{ id: "mem.icon.limit" }}
@@ -115,7 +138,7 @@ function GaugeCellVariants() {
   );
 }
 
-const meta: Meta<typeof TimeseriesGauge> = {
+const meta = {
   title: "Charts/TimeseriesGauge",
   component: TimeseriesGauge,
   parameters: {
@@ -131,6 +154,14 @@ const meta: Meta<typeof TimeseriesGauge> = {
     unit: { control: "select", options: ["percent", "bytes", "short", "ms"] },
     range: { control: "text" },
     refreshMs: { control: { type: "number", min: 0, step: 1000 } },
+    latestValue: {
+      name: "value",
+      control: { type: "number", min: 0, step: 1 },
+    },
+    maxLatestValue: {
+      name: "max value",
+      control: { type: "number", min: 0, step: 1 },
+    },
     centerDisplay: { control: "inline-radio", options: ["value", "percent"] },
     variant: { control: "inline-radio", options: ["default", "cell"] },
     showLabel: { control: "boolean" },
@@ -144,10 +175,10 @@ const meta: Meta<typeof TimeseriesGauge> = {
     className: { table: { disable: true } },
   },
   render: (args) => <GaugeShowcase {...args} />,
-};
+} satisfies Meta<TimeseriesGaugeStoryArgs>;
 
 export default meta;
-type Story = StoryObj<typeof TimeseriesGauge>;
+type Story = StoryObj<typeof meta>;
 
 export const Healthy: Story = {
   args: {
@@ -157,40 +188,49 @@ export const Healthy: Story = {
     centerDisplay: "percent",
     value: { id: "cpu.usage" },
     max: 100,
+    latestValue: 42,
+    maxLatestValue: 100,
     refreshMs: 0,
-    fetcher: makeFetcher([{ match: "cpu", latest: 42 }]),
   },
 };
 
 export const Warning: Story = {
   args: {
     ...Healthy.args,
-    fetcher: makeFetcher([{ match: "cpu", latest: 82 }]),
+    latestValue: 82,
   },
 };
 
 export const Danger: Story = {
   args: {
     ...Healthy.args,
-    fetcher: makeFetcher([{ match: "cpu", latest: 95 }]),
+    latestValue: 95,
+  },
+};
+
+export const Memory: Story = {
+  args: {
+    title: "Memory",
+    icon: UiMemoryStick,
+    unit: "bytes",
+    centerDisplay: "value",
+    value: { id: "mem.usage" },
+    max: { id: "mem.limit" },
+    latestValue: 3_200_000_000,
+    maxLatestValue: 8_000_000_000,
+    refreshMs: 0,
   },
 };
 
 export const MetricMax: Story = {
   args: {
-    title: "Memory",
-    unit: "bytes",
-    centerDisplay: "value",
-    value: { id: "mem.usage" },
-    max: { id: "mem.limit" },
-    refreshMs: 0,
-    fetcher: makeFetcher([
-      { match: "usage", latest: 3_200_000_000 },
-      { match: "limit", latest: 8_000_000_000 },
-    ]),
+    ...Memory.args,
   },
 };
 
 export const CellVariants: Story = {
+  args: {
+    ...Healthy.args,
+  },
   render: () => <GaugeCellVariants />,
 };

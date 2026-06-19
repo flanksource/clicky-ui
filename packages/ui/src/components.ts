@@ -125,6 +125,12 @@ export {
   isOpenStringMap,
 } from "./components/json-schema-form-resolve";
 export { rehydrateRefs } from "./components/json-schema-form-refs";
+export { templateValuePre } from "./components/json-schema-form-template";
+export type {
+  TemplateValueOptions,
+  TemplateToken,
+  TemplateValuesLoader,
+} from "./components/json-schema-form-template";
 export type {
   JsonSchemaFormProps,
   FormLayout,

@@ -131,9 +131,25 @@ export {
 } from "./data/TimeseriesGauge";
 export {
   TimeseriesCoreBars,
+  type TimeseriesCoreBarsOrientation,
   type TimeseriesCoreBarsProps,
   type TimeseriesCoreBarsVariant,
 } from "./data/TimeseriesCoreBars";
+export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
+export {
+  formatReplicaCounts,
+  workloadKindLabel,
+  workloadStatusLabel,
+  workloadStatusTone,
+  type WorkloadCardCpuMetric,
+  type WorkloadCardIcon,
+  type WorkloadCardKind,
+  type WorkloadCardMetrics,
+  type WorkloadCardReplicas,
+  type WorkloadCardResourceMetric,
+  type WorkloadCardStatus,
+  type WorkloadCardWorkload,
+} from "./data/WorkloadCard.model";
 export {
   deriveCoreBars,
   type CoreBar,
