@@ -47,6 +47,8 @@ export {
   type ChatUsageSummary,
   type ChatStatus,
   type ChatToolInputSchema,
+  type ToolResultRenderArgs,
+  type ToolResultRenderer,
   type ToolMeta,
   type DynamicToolUIPart,
   type FileUIPart,

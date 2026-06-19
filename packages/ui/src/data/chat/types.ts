@@ -6,6 +6,7 @@ import type {
   ReasoningUIPart,
   FileUIPart,
 } from "ai";
+import type { ReactNode } from "react";
 
 export type { UIMessage, ToolUIPart, DynamicToolUIPart, ChatStatus, ReasoningUIPart, FileUIPart };
 
@@ -126,3 +127,11 @@ export function toolPartName(part: AnyToolPart): string {
   }
   return part.type.slice("tool-".length);
 }
+
+export interface ToolResultRenderArgs {
+  part: AnyToolPart;
+  toolName: string;
+  output: unknown;
+}
+
+export type ToolResultRenderer = (args: ToolResultRenderArgs) => ReactNode;

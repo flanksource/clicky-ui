@@ -43,6 +43,21 @@ describe("ToolCall", () => {
     expect(screen.getByText("boom")).toBeInTheDocument();
   });
 
+  it("allows hosts to render recognized tool outputs", () => {
+    render(
+      <ToolCall
+        defaultOpen
+        part={dynamicPart({ toolName: "xero_formula_patch", output: { clientAction: { type: "formula.replace" } } })}
+        renderToolResult={({ toolName, output }) => (
+          <button type="button">{toolName}:{(output as { clientAction: { type: string } }).clientAction.type}</button>
+        )}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "xero_formula_patch:formula.replace" })).toBeInTheDocument();
+    expect(screen.queryByText("clientAction")).toBeNull();
+  });
+
   it("derives the name from a typed tool-<name> part", () => {
     render(
       <ToolCall

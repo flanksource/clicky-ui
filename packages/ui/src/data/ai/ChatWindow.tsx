@@ -8,7 +8,7 @@ import { useChatWindowManager, type ChatWindowState } from "./chat-window-contex
 import { ThreadPicker, type ThreadSource } from "./ThreadPicker";
 import { ContextBadges } from "./ContextBadges";
 import { ToolPreferences, type ToolMeta, type ToolMode } from "./ToolPreferences";
-import { serializeContext, type ContextTypeConfig } from "./context";
+import { serializeContext, type ChatContextItem, type ContextTypeConfig } from "./context";
 
 export type ChatWindowProps = {
   panel: ChatWindowState;
@@ -30,6 +30,8 @@ export type ChatWindowProps = {
    *  `body.toolPreferences`. Tools default to "ask" (approval required); the
    *  user can switch any tool to Auto/Off from the popover. */
   tools?: ToolMeta[];
+  /** Initial mode assigned to tools when they first load. Defaults to "ask". */
+  defaultToolMode?: ToolMode;
   /** Extra controls rendered in the header, e.g. a <ContextUsage/> gauge. */
   headerExtras?: ReactNode;
 };
@@ -43,6 +45,27 @@ const MAXIMIZE_CSS = `
   position: absolute !important;
 }`;
 
+export function chatWindowRequestBody({
+  base,
+  contextItems,
+  tools,
+  toolPrefs,
+}: {
+  base?: Record<string, unknown> | undefined;
+  contextItems: ChatContextItem[];
+  tools?: ToolMeta[] | undefined;
+  toolPrefs?: Record<string, ToolMode> | undefined;
+}): Record<string, unknown> {
+  return {
+    ...base,
+    ...(contextItems.length ? {
+      context: serializeContext(contextItems),
+      contextItems,
+    } : {}),
+    ...(tools ? { toolPreferences: toolPrefs ?? {} } : {}),
+  };
+}
+
 /** A draggable, resizable floating chat window. It lazy-loads `react-rnd` (an
  *  optional dependency, so consumers of just the inner <Chat> never pull it)
  *  and renders the existing <Chat> beneath a drag-handle header with thread
@@ -55,6 +78,7 @@ export function ChatWindow({
   threadsSource,
   contextTypeConfig,
   tools,
+  defaultToolMode = "ask",
   headerExtras,
 }: ChatWindowProps) {
   const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } = useChatWindowManager();
@@ -71,13 +95,13 @@ export function ChatWindow({
       let changed = false;
       for (const t of tools) {
         if (next[t.name] === undefined) {
-          next[t.name] = "ask";
+          next[t.name] = defaultToolMode;
           changed = true;
         }
       }
       return changed ? next : prev;
     });
-  }, [tools]);
+  }, [defaultToolMode, tools]);
 
   useEffect(() => {
     let active = true;
@@ -95,11 +119,12 @@ export function ChatWindow({
     [updatePanel, panel.id, panel.contextItems],
   );
 
-  const mergedBody: Record<string, unknown> = {
-    ...chat?.body,
-    ...(panel.contextItems.length ? { context: serializeContext(panel.contextItems) } : {}),
-    ...(tools ? { toolPreferences: toolPrefs } : {}),
-  };
+  const mergedBody = chatWindowRequestBody({
+    base: chat?.body,
+    contextItems: panel.contextItems,
+    tools,
+    toolPrefs,
+  });
 
   const header = (
     <div className="chat-drag-handle flex cursor-move items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
