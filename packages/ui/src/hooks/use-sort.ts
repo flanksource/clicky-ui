@@ -10,6 +10,9 @@ export type SortState = {
 export type UseSortOptions<T> = {
   defaultKey?: string;
   defaultDir?: SortDir;
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
+  manual?: boolean;
   resolvers?: Record<string, (item: T) => unknown>;
 };
 
@@ -26,28 +29,46 @@ function resolvePath(obj: unknown, path: string): unknown {
   }, obj);
 }
 
-export function useSort<T>(items: T[], options: UseSortOptions<T> = {}): UseSortReturn<T> {
-  const { defaultKey, defaultDir = "asc", resolvers } = options;
+export function useSort<T>(
+  items: T[],
+  options: UseSortOptions<T> = {},
+): UseSortReturn<T> {
+  const {
+    defaultKey,
+    defaultDir = "asc",
+    sort: controlledSort,
+    onSortChange,
+    manual = false,
+    resolvers,
+  } = options;
 
-  const [sort, setSort] = useState<SortState | null>(
+  const [localSort, setLocalSort] = useState<SortState | null>(
     defaultKey ? { key: defaultKey, dir: defaultDir } : null,
   );
+  const isControlled = controlledSort !== undefined;
+  const sort = isControlled ? controlledSort : localSort;
 
   function toggle(key: string) {
-    setSort((prev) => {
-      if (prev?.key === key) {
-        return prev.dir === "asc" ? { key, dir: "desc" } : null;
-      }
-      return { key, dir: "asc" };
-    });
+    const next =
+      sort?.key === key
+        ? sort.dir === "asc"
+          ? { key, dir: "desc" as const }
+          : null
+        : { key, dir: "asc" as const };
+    if (isControlled) {
+      onSortChange?.(next);
+    } else {
+      setLocalSort(next);
+    }
   }
 
   const sorted = useMemo(() => {
     if (!items) return [];
-    if (!sort) return items;
+    if (manual || !sort) return items;
     const { key, dir } = sort;
     const resolver = resolvers?.[key];
-    const get = (item: T) => (resolver ? resolver(item) : resolvePath(item, key));
+    const get = (item: T) =>
+      resolver ? resolver(item) : resolvePath(item, key);
     return [...items].sort((a, b) => {
       const av = get(a);
       const bv = get(b);
@@ -60,7 +81,7 @@ export function useSort<T>(items: T[], options: UseSortOptions<T> = {}): UseSort
           : String(av).localeCompare(String(bv));
       return dir === "asc" ? cmp : -cmp;
     });
-  }, [items, sort, resolvers]);
+  }, [items, manual, sort, resolvers]);
 
   return { sorted, sort, toggle };
 }

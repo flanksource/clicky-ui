@@ -1,8 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, type Ref } from "react";
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from "@floating-ui/react";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
 import { UiEllipsis, UiCheck } from "../icons";
 import { cn } from "../lib/utils";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import {
   ACCEPT_OPTIONS,
   type AcceptOption,
@@ -34,50 +48,55 @@ export function AcceptPicker({
   onPreviewModeChange,
   className,
 }: AcceptPickerProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const pad = size === "sm" ? "px-2 py-0.5" : "px-2.5 py-1";
   const activeLabel = options.find((opt) => opt.value === value)?.label ?? value;
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  // Portaled (floating-ui) so the menu escapes `overflow` clipping from
+  // scroll-container ancestors, matching Combobox/DropdownMenu.
+  const floatingZ = useFloatingZIndex();
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: "bottom-end",
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useClick(context),
+    useDismiss(context, { escapeKey: false }),
+    useRole(context, { role: "menu" }),
+  ]);
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+  });
 
   return (
-    <div ref={rootRef} className={cn("relative flex", className)}>
+    <div className={cn("flex", className)}>
       <Button
+        ref={refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
         size="sm"
         aria-label="Open format menu"
-        aria-haspopup="menu"
-        aria-expanded={open}
         className={cn("h-auto gap-1.5", pad)}
-        onClick={() => setOpen((current) => !current)}
+        {...getReferenceProps()}
       >
         <span className="text-xs font-medium">{activeLabel}</span>
         <Icon icon={UiEllipsis} className="text-muted-foreground" />
       </Button>
       {open && (
-        <div
-          role="menu"
-          aria-label="Format and preview options"
-          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
-        >
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              role="menu"
+              aria-label="Format and preview options"
+              style={{ ...floatingStyles, zIndex: floatingZ }}
+              className="min-w-[12rem] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+              {...getFloatingProps()}
+            >
           <MenuSectionLabel>Format</MenuSectionLabel>
           {options.map((opt) => (
             <MenuRadioItem
@@ -107,7 +126,9 @@ export function AcceptPicker({
               ))}
             </>
           )}
-        </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
     </div>
   );

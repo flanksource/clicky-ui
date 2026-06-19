@@ -106,6 +106,31 @@ describe("DataTable", () => {
     expect(table.getAllByRole("row")[2]).toHaveTextContent("cron");
   });
 
+  it("reports controlled manual sort without reordering the current page", () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        sort={{ key: "restarts", dir: "asc" }}
+        onSortChange={onSortChange}
+        manualSort
+      />,
+    );
+
+    const table = within(screen.getByRole("table"));
+    expect(table.getAllByRole("row")[1]).toHaveTextContent("api");
+    expect(table.getAllByRole("row")[2]).toHaveTextContent("worker");
+    expect(table.getAllByRole("row")[3]).toHaveTextContent("cron");
+
+    fireEvent.click(screen.getByRole("button", { name: /restarts/i }));
+
+    expect(onSortChange).toHaveBeenCalledWith({ key: "restarts", dir: "desc" });
+    expect(table.getAllByRole("row")[1]).toHaveTextContent("api");
+    expect(table.getAllByRole("row")[2]).toHaveTextContent("worker");
+    expect(table.getAllByRole("row")[3]).toHaveTextContent("cron");
+  });
+
   it("applies the built-in global search", () => {
     vi.useFakeTimers();
     render(<DataTable data={rows} columns={columns} autoFilter />);
@@ -438,7 +463,11 @@ describe("DataTable", () => {
   it("uses max-content auto table layout without handle padding by default", () => {
     render(<DataTable data={rows} columns={columns} />);
 
-    expect(screen.getByRole("table")).toHaveClass("w-max", "min-w-full", "table-auto");
+    expect(screen.getByRole("table")).toHaveClass(
+      "w-max",
+      "min-w-full",
+      "table-auto",
+    );
     expect(screen.getByRole("table")).not.toHaveClass("w-full");
     expect(screen.getByRole("table").parentElement).toHaveClass(
       "max-w-full",
@@ -661,6 +690,46 @@ describe("DataTable", () => {
     expect(window.localStorage.getItem(storageKey)).toBe(
       JSON.stringify({ notes: true }),
     );
+  });
+
+  it("keeps generated filters available when their columns are hidden", () => {
+    vi.useFakeTimers();
+    const storageKey = "clicky-ui-test-hidden-column-filters";
+    window.localStorage.setItem(storageKey, JSON.stringify({ status: true }));
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        autoFilter
+        columnVisibilityStorageKey={storageKey}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("columnheader", { name: /status/i }),
+    ).not.toBeInTheDocument();
+    const statusFilterButton = screen.getByRole("button", {
+      name: /status filter/i,
+    });
+
+    fireEvent.click(statusFilterButton);
+    const degradedFilter = document.querySelector(
+      '[data-filter-option="degraded"]',
+    );
+    if (!degradedFilter) {
+      throw new Error("Expected degraded filter option");
+    }
+    fireEvent.click(degradedFilter);
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.queryByText("api")).not.toBeInTheDocument();
+    expect(screen.queryByText("cron")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("restores hidden columns from localStorage and can show them from the column menu", () => {

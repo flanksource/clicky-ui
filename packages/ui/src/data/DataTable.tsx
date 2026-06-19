@@ -10,12 +10,13 @@ import {
   type ReactNode,
   type TdHTMLAttributes,
 } from "react";
-import { useSort, type SortDir } from "../hooks/use-sort";
+import { useSort, type SortDir, type SortState } from "../hooks/use-sort";
 import { type Density } from "../hooks/use-density";
 import { DensityValueProvider } from "../hooks/density-provider";
 import { useResolvedTheme, type Theme } from "../hooks/use-theme";
 import { cn } from "../lib/utils";
 import { Modal, type ModalSize } from "../overlay/Modal";
+import { useEscapeLayer } from "../overlay/modalStack";
 import {
   FilterBar,
   FilterBarFilterPanel,
@@ -28,7 +29,10 @@ import {
   type FilterBarRangeProps,
   type FilterBarSearchProps,
 } from "../components/FilterBar";
-import { clearFilterBarFilter, isFilterBarFilterActive } from "../components/filter-bar-utils";
+import {
+  clearFilterBarFilter,
+  isFilterBarFilterActive,
+} from "../components/filter-bar-utils";
 import {
   getFilterCandidate,
   getFilterTokens,
@@ -318,6 +322,12 @@ type DataTableInnerProps<
   globalFilterPlaceholder?: string;
   /** Initial sort state. */
   defaultSort?: { key: string; dir?: SortDir };
+  /** Controlled sort state, for server-backed tables. */
+  sort?: SortState | null;
+  /** Called when a sortable header changes the controlled sort state. */
+  onSortChange?: (sort: SortState | null) => void;
+  /** When true, header sorting updates state but does not reorder `data`. */
+  manualSort?: boolean;
   /** Extra props forwarded to the internal FilterBar. */
   filterBarProps?: Omit<FilterBarProps, "search" | "filters">;
   /**
@@ -458,6 +468,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   onGlobalFilterChange,
   globalFilterPlaceholder = "Search all columns…",
   defaultSort,
+  sort: controlledSort,
+  onSortChange,
+  manualSort = false,
   filterBarProps,
   externalSearch,
   externalTimeRange,
@@ -624,24 +637,20 @@ function DataTableInner<T extends Record<string, unknown>>({
     resolvedDensityStorageKey,
   ]);
 
+  const closeFloatingMenus = useCallback(() => {
+    setColumnMenu(null);
+    setHeaderFilterMenu(null);
+  }, []);
+
+  useEscapeLayer(Boolean(columnMenu || headerFilterMenu), closeFloatingMenus);
+
   useEffect(() => {
     if (!columnMenu && !headerFilterMenu) return;
-
-    const close = () => {
-      setColumnMenu(null);
-      setHeaderFilterMenu(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-
-    document.addEventListener("click", close);
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("click", closeFloatingMenus);
     return () => {
-      document.removeEventListener("click", close);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("click", closeFloatingMenus);
     };
-  }, [columnMenu, headerFilterMenu]);
+  }, [closeFloatingMenus, columnMenu, headerFilterMenu]);
 
   const rows = useMemo<InternalRow<T>[]>(
     () =>
@@ -715,25 +724,25 @@ function DataTableInner<T extends Record<string, unknown>>({
   const timeRangeColumn = useMemo(() => {
     if (filterBarProps?.timeRange) return null;
     return (
-      visibleColumns.find(
+      effectiveColumns.find(
         (column) =>
           column.kind === "timestamp" &&
           column.filterable !== false &&
           column.timestamp?.autoRangeFilter !== false,
       ) ?? null
     );
-  }, [filterBarProps?.timeRange, visibleColumns]);
+  }, [effectiveColumns, filterBarProps?.timeRange]);
 
   const filterableColumns = useMemo(
     () =>
-      visibleColumns.filter((column) => {
+      effectiveColumns.filter((column) => {
         if (column.filterable === false) return false;
         // Timestamp columns are filtered through the time-range picker, not
         // a per-column text/multi filter. Skip them in auto-filter generation.
         if (column.kind === "timestamp") return false;
         return true;
       }),
-    [visibleColumns],
+    [effectiveColumns],
   );
 
   const generatedFilters = useMemo<GeneratedFilter<T>[]>(() => {
@@ -1075,7 +1084,10 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   const { sorted, sort, toggle } = useSort(filteredRows, {
     defaultDir: defaultSort?.dir ?? "asc",
+    manual: manualSort,
     resolvers: sortResolvers,
+    ...(controlledSort !== undefined ? { sort: controlledSort } : {}),
+    ...(onSortChange ? { onSortChange } : {}),
     ...(defaultSort?.key ? { defaultKey: defaultSort.key } : {}),
   });
 
@@ -1400,7 +1412,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                         }}
                       >
                         {visibleColumns.map((column, index) => {
-                          const rawValue = resolveColumnValue(record.row, column);
+                          const rawValue = resolveColumnValue(
+                            record.row,
+                            column,
+                          );
                           let content: ReactNode = column.render
                             ? column.render(rawValue, record.row)
                             : formatCell(rawValue);
