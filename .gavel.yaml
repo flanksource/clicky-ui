@@ -1,10 +1,17 @@
 # Pre-test hooks run from the repo root before `gavel test` discovers and runs
-# the suites. gavel auto-discovers the e2e Playwright project; that config
-# defaults to chromium driven by the runner's system Chrome (no browser
-# download), so the only setup gavel needs is the library build.
+# the suites. gavel auto-discovers the e2e Playwright project (driven by the
+# runner's system Chrome, no download) and the apps/storybook vitest project
+# (browser mode via @vitest/browser's playwright provider, which needs a
+# downloaded chromium), so setup is the library build plus that browser install.
 pre:
   # Builds @flanksource/clicky-ui (chains build:icons → generates the gitignored
   # src/icons/ tree) so the vitest barrel resolves and the kitchen-sink dev
   # server that Playwright boots can import the package.
   - name: build
     run: pnpm --filter @flanksource/clicky-ui run build
+  # The apps/storybook vitest suite runs stories in a real headless chromium via
+  # @vitest/browser's playwright provider, which uses playwright's bundled
+  # chromium (separate from the system Chrome the e2e project uses) — install it
+  # so the browser launches instead of tearing the vite dep-scan server down.
+  - name: install-storybook-browser
+    run: pnpm --filter storybook exec playwright install chromium
