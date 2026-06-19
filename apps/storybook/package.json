@@ -24,7 +24,7 @@
     "@storybook/test": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitest/browser": "3.2.4",
+    "@vitest/browser": "3.2.5",
     "@vitest/coverage-v8": "3.2.4",
     "autoprefixer": "catalog:",
     "playwright": "^1.61.0",
