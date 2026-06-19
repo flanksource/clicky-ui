@@ -12,6 +12,7 @@ import {
   isReasoningPart,
   isFilePart,
   type AnyToolPart,
+  type ToolResultRenderer,
 } from "./types";
 
 /** Callbacks the conversation threads down to each message. */
@@ -20,6 +21,8 @@ export type MessageActionHandlers = {
   onRegenerate?: ((messageId: string) => void) | undefined;
   /** Respond to a tool approval request. */
   onApprove?: ((approvalId: string, approved: boolean, reason?: string) => void) | undefined;
+  /** Optional host renderer for recognized completed tool outputs. */
+  renderToolResult?: ToolResultRenderer;
 };
 
 export type MessageProps = MessageActionHandlers & {
@@ -30,7 +33,7 @@ export type MessageProps = MessageActionHandlers & {
 /** Renders one chat message. User messages are right-aligned bubbles; assistant
  *  messages render text as markdown, reasoning and tool parts inline, file parts
  *  as thumbnails/chips, and a hover action row (copy / regenerate). */
-export function Message({ message, className, onRegenerate, onApprove }: MessageProps) {
+export function Message({ message, className, onRegenerate, onApprove, renderToolResult }: MessageProps) {
   const isUser = message.role === "user";
   const text = message.parts
     .filter((p) => p.type === "text")
@@ -57,6 +60,7 @@ export function Message({ message, className, onRegenerate, onApprove }: Message
             part={part}
             isUser={isUser}
             onApprove={onApprove}
+            renderToolResult={renderToolResult}
           />
         ))}
       </div>
@@ -75,10 +79,12 @@ function MessagePart({
   part,
   isUser,
   onApprove,
+  renderToolResult,
 }: {
   part: UIMessage["parts"][number];
   isUser: boolean;
   onApprove: MessageActionHandlers["onApprove"];
+  renderToolResult: MessageActionHandlers["renderToolResult"];
 }) {
   if (part.type === "text") {
     if (isUser) {
@@ -93,7 +99,13 @@ function MessagePart({
     return <FilePart part={part} />;
   }
   if (isDynamicToolPart(part) || isTypedToolPart(part)) {
-    return <ToolCall part={part as AnyToolPart} onApprove={onApprove} />;
+    return (
+      <ToolCall
+        part={part as AnyToolPart}
+        onApprove={onApprove}
+        {...(renderToolResult ? { renderToolResult } : {})}
+      />
+    );
   }
   return null;
 }

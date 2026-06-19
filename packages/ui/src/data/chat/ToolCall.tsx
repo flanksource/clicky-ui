@@ -11,7 +11,7 @@ import {
   UiClock,
   UiWrench,
 } from "../../icons";
-import type { AnyToolPart } from "./types";
+import type { AnyToolPart, ToolResultRenderer } from "./types";
 import { toolPartName } from "./types";
 
 export type ToolCallProps = {
@@ -23,6 +23,7 @@ export type ToolCallProps = {
    *  `approval-requested`). Receives the approval id, the decision, and an
    *  optional reason. */
   onApprove?: ((approvalId: string, approved: boolean, reason?: string) => void) | undefined;
+  renderToolResult?: ToolResultRenderer;
   className?: string;
 };
 
@@ -52,7 +53,7 @@ const STATUS_ICON: Record<ToolState, { icon: StaticIconComponent; className: str
  *  tool name + status, expanding to its JSON input and (once available) output
  *  or error. Renders both clicky `dynamic-tool` parts and typed `tool-<name>`
  *  parts, keyed off `part.state`. */
-export function ToolCall({ part, defaultOpen = false, onApprove, className }: ToolCallProps) {
+export function ToolCall({ part, defaultOpen = false, onApprove, renderToolResult, className }: ToolCallProps) {
   const needsApproval = part.state === "approval-requested";
   const [open, setOpen] = useState(defaultOpen || needsApproval);
   const status = STATUS_ICON[part.state];
@@ -84,7 +85,7 @@ export function ToolCall({ part, defaultOpen = false, onApprove, className }: To
       {open && (
         <div className="space-y-1 pl-4 pt-0.5">
           <ToolInput input={part.input} />
-          <ToolOutput part={part} />
+          <ToolOutput part={part} {...(renderToolResult ? { renderToolResult } : {})} />
         </div>
       )}
 
@@ -132,18 +133,26 @@ function ToolInput({ input }: { input: AnyToolPart["input"] }) {
   );
 }
 
-function ToolOutput({ part }: { part: AnyToolPart }) {
+function ToolOutput({
+  part,
+  renderToolResult,
+}: {
+  part: AnyToolPart;
+  renderToolResult?: ToolResultRenderer | undefined;
+}) {
   const errorText = part.state === "output-error" ? part.errorText : undefined;
   const output = part.state === "output-available" ? part.output : undefined;
   if (output === undefined && errorText === undefined) {
     return null;
   }
+  const name = toolPartName(part);
+  const custom = output !== undefined ? renderToolResult?.({ part, toolName: name, output }) : null;
   return (
     <div className={cn("overflow-x-auto text-xs", errorText ? "text-destructive" : "text-muted-foreground")}>
       {errorText !== undefined && <div>{errorText}</div>}
-      {output !== undefined && (
+      {custom ?? (output !== undefined && (
         <CodeBlock language="json" source={typeof output === "string" ? output : JSON.stringify(output, null, 2)} />
-      )}
+      ))}
     </div>
   );
 }

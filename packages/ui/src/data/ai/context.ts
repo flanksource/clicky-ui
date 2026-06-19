@@ -10,6 +10,9 @@ export interface ChatContextItem {
   type: string;
   label: string;
   fields?: Record<string, string>;
+  /** Rich caller-owned data forwarded to the chat backend alongside the
+   *  serialized context summary. It is intentionally not rendered in badges. */
+  payload?: unknown;
 }
 
 /** Per-type display style for context badges, keyed by `ChatContextItem.type`. */

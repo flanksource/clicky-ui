@@ -13,7 +13,7 @@ import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
 import { providerIcon } from "./provider-icons";
 import { ContextUsage } from "./ContextUsage";
-import type { ChatModel, ChatMessageMetadata, ChatUsageSummary, Suggestion } from "./types";
+import type { ChatModel, ChatMessageMetadata, ChatUsageSummary, Suggestion, ToolResultRenderer } from "./types";
 
 /** Assistant messages carry token usage + cost the backend rode on the finish
  *  part's `messageMetadata`. */
@@ -47,6 +47,8 @@ export type ChatProps = {
   toolApproval?: "auto" | "manual";
   /** Thread id to persist this conversation under (forwarded in the body). */
   threadId?: string;
+  /** Optional host renderer for recognized completed tool outputs. */
+  renderToolResult?: ToolResultRenderer;
   /** Extra fields merged into every request body. */
   body?: Record<string, unknown>;
   /** Pre-built transport (e.g. a mock for stories/tests). */
@@ -78,6 +80,7 @@ export function Chat({
   enableAttachments = false,
   toolApproval,
   threadId,
+  renderToolResult,
   body,
   transport,
   initialMessages,
@@ -89,6 +92,7 @@ export function Chat({
   const [model, setModel] = useState<string | undefined>(defaultModel);
   const [effort, setEffort] = useState(defaultReasoningEffort);
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
+  const lastDefaultModel = useRef(defaultModel);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
   useEffect(() => {
@@ -106,6 +110,12 @@ export function Chat({
       cancelled = true;
     };
   }, [modelsProp, modelsApi]);
+
+  useEffect(() => {
+    if (!defaultModel || defaultModel === lastDefaultModel.current) return;
+    lastDefaultModel.current = defaultModel;
+    setModel(defaultModel);
+  }, [defaultModel]);
 
   const selectedModel = models.find((m) => m.id === model);
   const showEffort = !selectedModel || selectedModel.reasoning;
@@ -204,6 +214,7 @@ export function Chat({
         onApprove={(id, approved, reason) =>
           void addToolApprovalResponse(reason ? { id, approved, reason } : { id, approved })
         }
+        {...(renderToolResult ? { renderToolResult } : {})}
       />
       <div className="p-4 pt-0">
         <PromptInput
