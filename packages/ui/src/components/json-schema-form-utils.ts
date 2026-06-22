@@ -64,6 +64,25 @@ export function orderByXOrder<T>(entries: [string, T][], order: unknown): [strin
   return [...listed, ...rest];
 }
 
+// orderByClickyOrder stably sorts property entries by each property's numeric
+// `x-clicky-order` (lower first); entries without it keep their incoming order
+// after the ordered ones. An explicit index tie-break keeps it stable regardless
+// of the engine's sort stability. Unlike the object-level `x-order` array, this
+// composes across merged if/then branches because each property carries its own
+// order — the right tool when fields come from different (embedded) sources.
+export function orderByClickyOrder(
+  entries: [string, JsonSchemaProperty][],
+): [string, JsonSchemaProperty][] {
+  const rank = (prop: JsonSchemaProperty): number => {
+    const o = prop["x-clicky-order"];
+    return typeof o === "number" ? o : Number.POSITIVE_INFINITY;
+  };
+  return entries
+    .map((entry, index) => ({ entry, index, rank: rank(entry[1]) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((ranked) => ranked.entry);
+}
+
 // orderRequiredFirst stably partitions property entries so the keys named in
 // `required` come first (in their original order), then the rest (in theirs).
 // A stable two-pass partition, so it never reshuffles within either group.

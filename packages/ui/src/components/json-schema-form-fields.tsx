@@ -1,9 +1,11 @@
-import { type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
+import { GridControl } from "./json-schema-form-grid";
+import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption, FormLayout } from "./json-schema-form-types";
 import {
   defaultPlaceholder,
@@ -362,6 +364,9 @@ export function EnumControl({
 }) {
   const value = toText(field.value);
   const options = withSyntheticValue(field.options ?? [], value);
+  if (field.display === "grid") {
+    return <GridControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+  }
   if (field.display === "radio") {
     return (
       <RadioGroupControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} />
@@ -378,6 +383,90 @@ export function EnumControl({
       onChange={(v) => field.onChange(v)}
       prefix={field.prefix}
       suffix={field.suffix}
+      {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
+    />
+  );
+}
+
+// LookupControl is the async entity-reference picker for an `x-clicky-lookup`
+// field. It wraps Combobox and fetches options lazily through the form's
+// LookupFetcher (from context): the head set loads when the menu opens and the
+// (debounced) typed query drives server-side search. Single-select keeps
+// allowCustomValue on so a value outside the option set still commits (e.g. an
+// inline DSN). When no fetcher is wired it degrades to a free-text combobox.
+export function LookupControl({
+  field,
+  fieldId,
+  readOnly,
+  size,
+  rootValue,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+  rootValue?: Record<string, unknown>;
+}) {
+  const fetcher = useLookupFetcher();
+  const descriptor = field.lookup;
+  const value = toText(field.value);
+  const [options, setOptions] = useState<FieldOption[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // rootValue is read through a ref so onSearch stays referentially stable: a new
+  // onSearch each render would retrigger Combobox's search effect on every
+  // setOptions, looping. The scopeKey effect below re-fetches when scope changes.
+  const rootRef = useRef(rootValue);
+  rootRef.current = rootValue;
+
+  const onSearch = useCallback(
+    (query: string) => {
+      if (!descriptor || !fetcher) return;
+      setLoading(true);
+      const root = rootRef.current;
+      fetcher({ descriptor, query, ...(root ? { rootValue: root } : {}) })
+        .then((next) => setOptions(next))
+        .catch(() => setOptions([]))
+        .finally(() => setLoading(false));
+    },
+    [descriptor, fetcher],
+  );
+
+  // Re-fetch the head set when the scope (a sibling field, e.g. provider type)
+  // changes so the out-of-scope set is replaced rather than shown stale.
+  const scopeKey = descriptor ? JSON.stringify(resolveLookupScope(descriptor, rootValue)) : "";
+  useEffect(() => {
+    if (descriptor && fetcher) onSearch("");
+    else setOptions([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey, onSearch]);
+
+  if (!descriptor || !fetcher) {
+    return (
+      <Combobox
+        id={fieldId}
+        options={withSyntheticValue([], value)}
+        value={value}
+        disabled={readOnly}
+        size={size}
+        allowCustomValue
+        onChange={(v) => field.onChange(v)}
+        {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
+      />
+    );
+  }
+
+  return (
+    <Combobox
+      id={fieldId}
+      options={withSyntheticValue(options, value)}
+      value={value}
+      disabled={readOnly}
+      size={size}
+      loading={loading}
+      allowCustomValue={field.allowCustomValue ?? false}
+      onSearch={onSearch}
+      onChange={(v) => field.onChange(v)}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
   );

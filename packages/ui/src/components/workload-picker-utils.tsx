@@ -13,8 +13,15 @@ import type { ComboboxOption } from "./Combobox";
 
 export type WorkloadKind = "service" | "ingress" | "deployment" | "statefulset";
 
-/** One workload returned by the loader. Ingresses may carry rule hostnames. */
-export type WorkloadResource = { name: string; hosts?: string[] };
+/** One exposed port of a workload/service. */
+export type WorkloadPort = { name?: string; number: number };
+
+/**
+ * One workload returned by the loader. Ingresses may carry rule hostnames;
+ * services/deployments/statefulsets may carry the ports a consumer offers when
+ * building a connection URL.
+ */
+export type WorkloadResource = { name: string; hosts?: string[]; ports?: WorkloadPort[] };
 
 type KindIconProps = { className?: string; title?: string; "aria-label"?: string };
 type KindMeta = { label: string; Icon: ComponentType<KindIconProps> };

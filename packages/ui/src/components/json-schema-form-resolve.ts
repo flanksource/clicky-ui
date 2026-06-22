@@ -1,8 +1,10 @@
 import type {
+  EnumDisplay,
   FieldControl,
   FieldOption,
   JsonSchemaObject,
   JsonSchemaProperty,
+  LookupDescriptor,
 } from "./json-schema-form-types";
 
 // isOpenStringMap reports whether a property is an object whose entries are
@@ -32,14 +34,28 @@ function schemaHasType(prop: JsonSchemaProperty, type: string): boolean {
 
 function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
   const labels = prop["x-enum-labels"];
+  const icons = prop["x-enum-icons"];
   return (prop.enum ?? []).map((v) => {
     const value = String(v);
     const desc = labels?.[value];
+    const icon = icons?.[value];
     return {
       value,
       label: typeof desc === "string" && desc && desc !== value ? `${desc} (${value})` : value,
+      ...(typeof icon === "string" && icon ? { icon } : {}),
     };
   });
+}
+
+// enumDisplay resolves how an enum should render: an explicit `x-enum-display`
+// wins; otherwise an enum carrying `x-enum-icons` defaults to the icon grid.
+// Returns undefined to keep the combobox default.
+function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
+  const d = prop["x-enum-display"];
+  if (d === "combobox" || d === "radio" || d === "grid") return d;
+  const icons = prop["x-enum-icons"];
+  if (icons && Object.keys(icons).length > 0) return "grid";
+  return undefined;
 }
 
 // enumBranch returns the first anyOf/oneOf member carrying a non-empty `enum`,
@@ -51,6 +67,16 @@ export function enumBranch(prop: JsonSchemaProperty): JsonSchemaProperty | undef
     if (Array.isArray(branch.enum) && branch.enum.length > 0) return branch;
   }
   return undefined;
+}
+
+// lookupDescriptor reads the `x-clicky-lookup` extension into a LookupDescriptor,
+// returning undefined when the keyword is absent or lacks its required url/filter.
+function lookupDescriptor(prop: JsonSchemaProperty): LookupDescriptor | undefined {
+  const raw = prop["x-clicky-lookup"];
+  if (!raw || typeof raw !== "object") return undefined;
+  const d = raw as Record<string, unknown>;
+  if (typeof d.url !== "string" || typeof d.filter !== "string") return undefined;
+  return raw as LookupDescriptor;
 }
 
 export interface ResolveControlArgs {
@@ -86,8 +112,16 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     ...(labelIcon != null && labelIcon !== "" ? { labelIcon: labelIcon as FieldControl["labelIcon"] } : {}),
   };
 
+  // An `x-clicky-lookup` field is an async entity-reference picker: options load
+  // lazily from another entity's list endpoint. Single-select also allows
+  // free-form entry so a typed value outside the option set still commits.
+  const lookup = lookupDescriptor(prop);
+  if (lookup) {
+    return { ...base, kind: "lookup", lookup, options: [], allowCustomValue: lookup.multi !== true };
+  }
   if (Array.isArray(prop.enum) && prop.enum.length > 0) {
-    return { ...base, kind: "enum", options: enumOptions(prop) };
+    const display = enumDisplay(prop);
+    return { ...base, kind: "enum", options: enumOptions(prop), ...(display ? { display } : {}) };
   }
   // A value-or-template union: the enum lives in an anyOf/oneOf branch alongside
   // free-form branches. Render it as a dropdown using that branch's enum; the

@@ -4,6 +4,8 @@ import { Icon } from "../data/Icon";
 import { UiCheck, UiEllipsis } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-fields";
+import { FormLookupProvider } from "./form-lookup-context";
+import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import {
@@ -70,6 +72,7 @@ export function JsonSchemaForm({
   showPreferencesMenu = true,
   persistPreferences = true,
   preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
+  lookupFetcher,
 }: JsonSchemaFormProps) {
   // When the menu is hidden, never touch localStorage and start from an empty
   // override so behaviour is identical to before this feature existed.
@@ -95,6 +98,7 @@ export function JsonSchemaForm({
     sortMode: effectiveSortMode,
     pre: pre ?? [],
     post: post ?? [],
+    rootValue: value,
     depth: 0,
     render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
@@ -103,11 +107,16 @@ export function JsonSchemaForm({
   // pointers) is resolved once into a self-contained tree the renderer walks
   // directly; a non-bundled schema passes through untouched.
   const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
-  const rows = renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
+  // A schema may name a discriminator property whose value selects a "kind"; the
+  // form then runs a two-phase pick-then-fill flow (see DiscriminatedForm).
+  const discKey =
+    typeof resolvedSchema["x-discriminator"] === "string" ? resolvedSchema["x-discriminator"] : undefined;
+  const inPickerPhase = discKey != null && (value[discKey] == null || value[discKey] === "");
 
   return (
+    <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
     <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
-      {showPreferencesMenu && (
+      {showPreferencesMenu && !inPickerPhase && (
         <PreferencesMenu
           size={effectiveSize}
           layoutMode={resolvedLayout.mode}
@@ -119,9 +128,20 @@ export function JsonSchemaForm({
       )}
       {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
       <FieldsGrid layout={resolvedLayout} size={effectiveSize}>
-        {rows}
+        {discKey ? (
+          <DiscriminatedForm
+            schema={resolvedSchema}
+            value={value}
+            onChange={onChange}
+            ctx={ctx}
+            discKey={discKey}
+          />
+        ) : (
+          renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined)
+        )}
       </FieldsGrid>
     </div>
+    </FormLookupProvider>
   );
 }
 

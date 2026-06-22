@@ -9,6 +9,7 @@ import {
   FieldLabel,
   FieldWrapper,
   LinkControl,
+  LookupControl,
   NumberControl,
   ObjectSection,
   ReadOnlyValue,
@@ -27,6 +28,7 @@ import type {
 } from "./json-schema-form-types";
 import {
   fieldInputId,
+  orderByClickyOrder,
   orderByPriority,
   orderByXOrder,
   orderRequiredFirst,
@@ -59,6 +61,16 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
   switch (field.kind) {
     case "enum":
       return <EnumControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+    case "lookup":
+      return (
+        <LookupControl
+          field={field}
+          fieldId={fieldId}
+          readOnly={readOnly}
+          size={size}
+          {...(ctx.rootValue ? { rootValue: ctx.rootValue } : {})}
+        />
+      );
     case "boolean":
       return <BooleanControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
     case "number":
@@ -108,7 +120,12 @@ function buildField(
   let field: FieldControl | null = base;
   for (const ext of ctx.pre) {
     if (!field) break;
-    field = ext(field, { key: args.key, prop: args.prop, value: args.value });
+    field = ext(field, {
+      key: args.key,
+      prop: args.prop,
+      value: args.value,
+      ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
+    });
   }
   if (!field) return null;
   // Drop read-only fields entirely when the form opts out of displaying them.
@@ -126,8 +143,9 @@ function buildField(
     ? { ...ctx, layout: { ...ctx.layout, mode: overrideMode } }
     : ctx;
   let value: ReactNode = renderValueControl(field, valueCtx);
+  const postCtx = ctx.rootValue ? { rootValue: ctx.rootValue } : {};
   for (const ext of ctx.post) {
-    const next = ext(field, { label, value });
+    const next = ext(field, { label, value }, postCtx);
     label = next.label;
     value = next.value;
   }
@@ -221,7 +239,9 @@ export function renderObjectFields(
 ): ReactNode[] {
   const { properties, required } = effectiveProperties(schema, value);
   const hidden = new Set(opts?.hiddenKeys ?? []);
-  const ordered = orderByXOrder(Object.entries(properties), schema["x-order"]);
+  // Per-property `x-clicky-order` wins (composes across merged branches); the
+  // object-level `x-order` array is the fallback; document order otherwise.
+  const ordered = orderByClickyOrder(orderByXOrder(Object.entries(properties), schema["x-order"]));
   const entries =
     ctx.sortMode === "required-first"
       ? orderRequiredFirst(ordered, required)
