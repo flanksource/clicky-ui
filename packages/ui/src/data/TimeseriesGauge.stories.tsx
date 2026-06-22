@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, type ComponentProps } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { UiChip, UiMemoryStick } from "../icons";
+import { UiChip, UiHardDrive, UiMemoryStick } from "../icons";
 import { TimeseriesGauge } from "./TimeseriesGauge";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
 
@@ -145,7 +145,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Half (180°) radial gauge whose fill is a metric's latest value over its maximum (a `.limit`-style metric or a fixed number), both read live from the timeseries store. The arc crosses warning/danger thresholds; an expand button opens the full value/max chart in a modal. Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
+          "Gauge whose fill is a metric's latest value over its maximum (a `.limit`-style metric or a fixed number), both read live from the timeseries store. `shape` switches between a half (180°) radial arc (default) and a horizontal linear progress bar; the fill crosses warning/danger thresholds and an expand button opens the full value/max chart in a modal. Hovering opens a card with the metric's current/min/max/avg/capacity over the window (`hoverCard`, default on). Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
       },
     },
   },
@@ -164,6 +164,7 @@ const meta = {
     },
     centerDisplay: { control: "inline-radio", options: ["value", "percent"] },
     variant: { control: "inline-radio", options: ["default", "cell"] },
+    shape: { control: "inline-radio", options: ["radial", "linear"] },
     showLabel: { control: "boolean" },
     expandable: { control: "boolean" },
     baseUrl: { control: "text" },
@@ -225,6 +226,22 @@ export const Memory: Story = {
 export const MetricMax: Story = {
   args: {
     ...Memory.args,
+  },
+};
+
+/** Disk usage rendered as a horizontal progress bar via `shape="linear"`. */
+export const Linear: Story = {
+  args: {
+    title: "Disk",
+    icon: UiHardDrive,
+    unit: "bytes",
+    centerDisplay: "percent",
+    shape: "linear",
+    value: { id: "disk.usage" },
+    max: { id: "disk.limit" },
+    latestValue: 18_000_000_000,
+    maxLatestValue: 64_000_000_000,
+    refreshMs: 0,
   },
 };
 

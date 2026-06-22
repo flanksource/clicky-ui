@@ -16,6 +16,7 @@ import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { LogsTableDemo } from "./demos/LogsTableDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
+import { MarkdownEditorDemo } from "./demos/MarkdownEditorDemo";
 import { PropertiesDemo } from "./demos/PropertiesDemo";
 import { CellsDemo } from "./demos/CellsDemo";
 import { TimeseriesDemo } from "./demos/TimeseriesDemo";
@@ -48,15 +49,43 @@ import { SegmentedControlDemo } from "./demos/SegmentedControlDemo";
 import { SearchInputDemo } from "./demos/SearchInputDemo";
 import { TimelineDemo } from "./demos/TimelineDemo";
 import { ToastDemo } from "./demos/ToastDemo";
+import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
 import {
   type StaticIconComponent,
-  UiToggleOn, UiSelect, UiSparkles, UiImage,
-  UiTag, UiUserCircle, UiLoader, UiTrendUp, UiFileCode, UiJson, UiTerminal,
-  UiListFlat, UiTable, UiListDashes, UiMarkdown,
-  UiFilter, UiFunnelData, UiCalendar, UiArrowDown, UiPulse, UiChartBar,
-  UiLayoutDashboard, UiSquare, UiKanban, UiRows, UiColumns, UiListTree,
-  UiComment, UiDotsVertical, UiBug, UiNetwork, UiForm, UiCommand,
+  UiToggleOn,
+  UiSelect,
+  UiSparkles,
+  UiImage,
+  UiTag,
+  UiUserCircle,
+  UiLoader,
+  UiTrendUp,
+  UiFileCode,
+  UiJson,
+  UiTerminal,
+  UiListFlat,
+  UiTable,
+  UiListDashes,
+  UiMarkdown,
+  UiFilter,
+  UiFunnelData,
+  UiCalendar,
+  UiArrowDown,
+  UiPulse,
+  UiChartBar,
+  UiLayoutDashboard,
+  UiSquare,
+  UiKanban,
+  UiRows,
+  UiColumns,
+  UiListTree,
+  UiComment,
+  UiDotsVertical,
+  UiBug,
+  UiNetwork,
+  UiForm,
+  UiCommand,
 } from "@flanksource/clicky-ui";
 
 export type DemoEntry = {
@@ -75,80 +104,277 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Foundations",
     items: [
-      { id: "switchers", label: "Switchers", component: SwitchersDemo, icon: UiToggleOn },
+      {
+        id: "switchers",
+        label: "Switchers",
+        component: SwitchersDemo,
+        icon: UiToggleOn,
+      },
       { id: "button", label: "Button", component: ButtonDemo, icon: UiSelect },
       { id: "icon", label: "Icon", component: IconDemo, icon: UiSparkles },
-      { id: "generated-icons", label: "Generated Icons", component: GeneratedIconsDemo, icon: UiImage },
+      {
+        id: "generated-icons",
+        label: "Generated Icons",
+        component: GeneratedIconsDemo,
+        icon: UiImage,
+      },
     ],
   },
   {
     title: "Display",
     items: [
       { id: "badge", label: "Badge", component: BadgeDemo, icon: UiTag },
-      { id: "avatar", label: "Avatar", component: AvatarDemo, icon: UiUserCircle },
-      { id: "progress", label: "ProgressBar", component: ProgressBarDemo, icon: UiLoader },
-      { id: "signed-delta-bar", label: "SignedDeltaBar", component: SignedDeltaBarDemo, icon: UiTrendUp },
-      { id: "clicky", label: "Clicky", component: ClickyDemo, icon: UiSparkles },
-      { id: "clicky-native", label: "Clicky Native", component: ClickyNativeDemo, icon: UiSparkles },
-      { id: "code-blocks", label: "CodeBlocks", component: CodeBlocksDemo, icon: UiFileCode },
-      { id: "json-view", label: "JsonView", component: JsonViewDemo, icon: UiJson },
-      { id: "ansi-html", label: "AnsiHtml", component: AnsiHtmlDemo, icon: UiTerminal },
-      { id: "log-viewer", label: "LogViewer", component: LogViewerDemo, icon: UiListFlat },
-      { id: "logs-table", label: "LogsTable", component: LogsTableDemo, icon: UiTable },
-      { id: "properties", label: "Properties", component: PropertiesDemo, icon: UiListDashes },
-      { id: "markdown", label: "Markdown", component: MarkdownDemo, icon: UiMarkdown },
-      { id: "cells", label: "Table cells", component: CellsDemo, icon: UiListDashes },
-      { id: "timeseries", label: "Timeseries", component: TimeseriesDemo, icon: UiChartBar },
-      { id: "cache-browser", label: "CacheBrowser", component: CacheBrowserDemo, icon: UiTable },
+      {
+        id: "avatar",
+        label: "Avatar",
+        component: AvatarDemo,
+        icon: UiUserCircle,
+      },
+      {
+        id: "progress",
+        label: "ProgressBar",
+        component: ProgressBarDemo,
+        icon: UiLoader,
+      },
+      {
+        id: "signed-delta-bar",
+        label: "SignedDeltaBar",
+        component: SignedDeltaBarDemo,
+        icon: UiTrendUp,
+      },
+      {
+        id: "clicky",
+        label: "Clicky",
+        component: ClickyDemo,
+        icon: UiSparkles,
+      },
+      {
+        id: "clicky-native",
+        label: "Clicky Native",
+        component: ClickyNativeDemo,
+        icon: UiSparkles,
+      },
+      {
+        id: "code-blocks",
+        label: "CodeBlocks",
+        component: CodeBlocksDemo,
+        icon: UiFileCode,
+      },
+      {
+        id: "json-view",
+        label: "JsonView",
+        component: JsonViewDemo,
+        icon: UiJson,
+      },
+      {
+        id: "ansi-html",
+        label: "AnsiHtml",
+        component: AnsiHtmlDemo,
+        icon: UiTerminal,
+      },
+      {
+        id: "log-viewer",
+        label: "LogViewer",
+        component: LogViewerDemo,
+        icon: UiListFlat,
+      },
+      {
+        id: "logs-table",
+        label: "LogsTable",
+        component: LogsTableDemo,
+        icon: UiTable,
+      },
+      {
+        id: "properties",
+        label: "Properties",
+        component: PropertiesDemo,
+        icon: UiListDashes,
+      },
+      {
+        id: "markdown",
+        label: "Markdown",
+        component: MarkdownDemo,
+        icon: UiMarkdown,
+      },
+      {
+        id: "markdown-editor",
+        label: "MarkdownEditor",
+        component: MarkdownEditorDemo,
+        icon: UiMarkdown,
+      },
+      {
+        id: "cells",
+        label: "Table cells",
+        component: CellsDemo,
+        icon: UiListDashes,
+      },
+      {
+        id: "timeseries",
+        label: "Timeseries",
+        component: TimeseriesDemo,
+        icon: UiChartBar,
+      },
+      {
+        id: "cache-browser",
+        label: "CacheBrowser",
+        component: CacheBrowserDemo,
+        icon: UiTable,
+      },
     ],
   },
   {
     title: "Controls",
     items: [
-      { id: "form-fields", label: "Form fields", component: FormFieldsDemo, icon: UiForm },
-      { id: "filter-bar", label: "FilterBar / MultiSelect", component: FilterBarDemo, icon: UiFilter },
-      { id: "filter-pill", label: "FilterPill", component: FilterPillDemo, icon: UiFunnelData },
-      { id: "time-range", label: "TimeRange / DateField", component: TimeRangeDemo, icon: UiCalendar },
-      { id: "sortable", label: "SortableHeader", component: SortableHeaderDemo, icon: UiArrowDown },
-      { id: "data-table", label: "DataTable", component: DataTableDemo, icon: UiTable },
-      { id: "trace-logs", label: "Trace logs", component: TraceLogsDemo, icon: UiPulse },
-      { id: "tab-gauge", label: "Tabs & Gauges", component: TabButtonDemo, icon: UiChartBar },
+      {
+        id: "form-fields",
+        label: "Form fields",
+        component: FormFieldsDemo,
+        icon: UiForm,
+      },
+      {
+        id: "filter-bar",
+        label: "FilterBar / MultiSelect",
+        component: FilterBarDemo,
+        icon: UiFilter,
+      },
+      {
+        id: "filter-pill",
+        label: "FilterPill",
+        component: FilterPillDemo,
+        icon: UiFunnelData,
+      },
+      {
+        id: "time-range",
+        label: "TimeRange / DateField",
+        component: TimeRangeDemo,
+        icon: UiCalendar,
+      },
+      {
+        id: "sortable",
+        label: "SortableHeader",
+        component: SortableHeaderDemo,
+        icon: UiArrowDown,
+      },
+      {
+        id: "data-table",
+        label: "DataTable",
+        component: DataTableDemo,
+        icon: UiTable,
+      },
+      {
+        id: "trace-logs",
+        label: "Trace logs",
+        component: TraceLogsDemo,
+        icon: UiPulse,
+      },
+      {
+        id: "tab-gauge",
+        label: "Tabs & Gauges",
+        component: TabButtonDemo,
+        icon: UiChartBar,
+      },
     ],
   },
   {
     title: "Layout",
     items: [
-      { id: "app-shell", label: "AppShell", component: AppShellDemo, icon: UiLayoutDashboard },
-      { id: "app-sidebar", label: "AppSidebar", component: AppSidebarDemo, icon: UiListTree },
+      {
+        id: "app-shell",
+        label: "AppShell",
+        component: AppShellDemo,
+        icon: UiLayoutDashboard,
+      },
+      {
+        id: "app-sidebar",
+        label: "AppSidebar",
+        component: AppSidebarDemo,
+        icon: UiListTree,
+      },
       { id: "panel", label: "Panel", component: PanelDemo, icon: UiSquare },
       { id: "tabs", label: "Tabs", component: TabsDemo, icon: UiKanban },
       { id: "section", label: "Section", component: SectionDemo, icon: UiRows },
-      { id: "split-pane", label: "SplitPane", component: SplitPaneDemo, icon: UiColumns },
+      {
+        id: "split-pane",
+        label: "SplitPane",
+        component: SplitPaneDemo,
+        icon: UiColumns,
+      },
       { id: "tree", label: "Tree", component: TreeDemo, icon: UiListTree },
-      { id: "tree-group", label: "TreeGroupHeader", component: TreeGroupHeaderDemo, icon: UiListTree },
+      {
+        id: "tree-group",
+        label: "TreeGroupHeader",
+        component: TreeGroupHeaderDemo,
+        icon: UiListTree,
+      },
     ],
   },
   {
     title: "Overlay",
     items: [
-      { id: "hover-card", label: "HoverCard", component: HoverCardDemo, icon: UiComment },
+      {
+        id: "hover-card",
+        label: "HoverCard",
+        component: HoverCardDemo,
+        icon: UiComment,
+      },
       { id: "modal", label: "Modal", component: ModalDemo, icon: UiSquare },
-      { id: "dropdown-menu", label: "DropdownMenu", component: DropdownMenuDemo, icon: UiDotsVertical },
+      {
+        id: "dropdown-menu",
+        label: "DropdownMenu",
+        component: DropdownMenuDemo,
+        icon: UiDotsVertical,
+      },
+    ],
+  },
+  {
+    title: "Comments",
+    items: [
+      {
+        id: "comments",
+        label: "Comments",
+        component: CommentsDemo,
+        icon: UiComment,
+      },
     ],
   },
   {
     title: "Diagnostics",
     items: [
-      { id: "diagnostics", label: "Process & Stack", component: DiagnosticsDemo, icon: UiBug },
-      { id: "stacktrace", label: "StackTrace", component: StackTraceDemo, icon: UiBug },
-      { id: "har-panel", label: "HarPanel", component: HarPanelDemo, icon: UiNetwork },
+      {
+        id: "diagnostics",
+        label: "Process & Stack",
+        component: DiagnosticsDemo,
+        icon: UiBug,
+      },
+      {
+        id: "stacktrace",
+        label: "StackTrace",
+        component: StackTraceDemo,
+        icon: UiBug,
+      },
+      {
+        id: "har-panel",
+        label: "HarPanel",
+        component: HarPanelDemo,
+        icon: UiNetwork,
+      },
     ],
   },
   {
     title: "Clicky-RPC",
     items: [
-      { id: "command-form", label: "CommandForm", component: CommandFormDemo, icon: UiForm },
-      { id: "operation-dialogs", label: "OperationDialogs", component: OperationDialogsDemo, icon: UiCommand },
+      {
+        id: "command-form",
+        label: "CommandForm",
+        component: CommandFormDemo,
+        icon: UiForm,
+      },
+      {
+        id: "operation-dialogs",
+        label: "OperationDialogs",
+        component: OperationDialogsDemo,
+        icon: UiCommand,
+      },
       {
         id: "operation-explorer",
         label: "OperationCatalog",
@@ -160,7 +386,11 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Gavel",
     items: [
-      { id: "segmented-control", label: "SegmentedControl", component: SegmentedControlDemo },
+      {
+        id: "segmented-control",
+        label: "SegmentedControl",
+        component: SegmentedControlDemo,
+      },
       { id: "search-input", label: "SearchInput", component: SearchInputDemo },
       { id: "timeline", label: "Timeline", component: TimelineDemo },
       { id: "toast", label: "Toast", component: ToastDemo },
@@ -184,5 +414,7 @@ export function findDemoEntry(id: string | null | undefined) {
 
 export function findDemoGroup(id: string | null | undefined) {
   if (!id) return undefined;
-  return DEMO_GROUPS.find((group) => group.items.some((item) => item.id === id));
+  return DEMO_GROUPS.find((group) =>
+    group.items.some((item) => item.id === id),
+  );
 }

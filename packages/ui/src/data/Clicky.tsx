@@ -37,7 +37,6 @@ import {
   type DataTableColumn,
   type DataTableMenuAction,
   type DataTablePagination,
-  type DataTableRowDetailContext,
 } from "./DataTable";
 import type {
   FilterBarFilter,
@@ -69,7 +68,7 @@ import { Badge, type BadgeShape } from "./Badge";
 import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 import { useEscapeLayer } from "../overlay/modalStack";
-import { TagActionsProvider, TagList } from "./cells/TagList";
+import { TagList } from "./cells/TagList";
 import {
   normalizeTags,
   type NormalizedTag,
@@ -2824,9 +2823,6 @@ export function ClickyTable({
           .filter(Boolean)
           .join("|")}`
       }
-      renderExpandedRow={(row, context) => (
-        <ClickyTableRowDetail row={row} columns={columns} context={context} />
-      )}
       {...(rowClick ? { onRowClick: rowClick } : {})}
       {...(rowHref ? { getRowHref: rowHref } : {})}
       {...(rowClick && (rowClickable || rowHref)
@@ -2842,100 +2838,6 @@ export function ClickyTable({
       {...(effectivePagination ? { pagination: effectivePagination } : {})}
       {...(effectiveMenuActions ? { menuActions: effectiveMenuActions } : {})}
     />
-  );
-}
-
-function ClickyTableRowDetail({
-  row,
-  columns,
-  context,
-}: {
-  row: ClickyRow;
-  columns: ClickyColumn[];
-  context: DataTableRowDetailContext<ClickyRow>;
-}) {
-  const tagFields = columns
-    .map((column) => ({
-      column,
-      tags: clickyNodeTags(row.cells[column.name], column),
-      tableKey: `cells.${column.name}`,
-    }))
-    .filter((field) => field.tags.length > 0);
-
-  return (
-    <div className="space-y-3">
-      {tagFields.length > 0 && (
-        <section className="space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Tags
-          </div>
-          <div className="grid gap-2">
-            {tagFields.map(({ column, tags, tableKey }) => {
-              const tagActions = context.filterActionsByColumn[tableKey];
-              const content = (
-                <TagList
-                  tags={tags}
-                  maxVisible={tags.length}
-                  actions="inline"
-                />
-              );
-
-              return (
-                <div
-                  key={column.name}
-                  className="grid gap-2 rounded-md border border-border bg-background p-2 md:grid-cols-[9rem_minmax(0,1fr)]"
-                >
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {column.label || prettifyName(column.name)}
-                  </div>
-                  <div className="min-w-0">
-                    {tagActions ? (
-                      <TagActionsProvider value={tagActions}>
-                        {content}
-                      </TagActionsProvider>
-                    ) : (
-                      content
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <section className="space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Fields
-        </div>
-        <dl className="grid gap-2 md:grid-cols-2">
-          {columns.map((column) => (
-            <div
-              key={column.name}
-              className="rounded-md border border-border bg-background p-2"
-            >
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {column.label || prettifyName(column.name)}
-              </dt>
-              <dd className="mt-1 min-w-0 text-sm text-foreground">
-                <ClickyNodeRenderer node={row.cells[column.name]} />
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {row.detail && (
-        <section className="space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Detail
-          </div>
-          <div className="rounded-md border border-border bg-background p-density-3">
-            <ClickyNodeRenderer node={row.detail} />
-          </div>
-        </section>
-      )}
-    </div>
   );
 }
 

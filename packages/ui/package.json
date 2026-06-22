@@ -50,6 +50,11 @@
       "import": "./dist/data.js",
       "require": "./dist/data.cjs"
     },
+    "./comments": {
+      "types": "./dist/comments.d.ts",
+      "import": "./dist/comments.js",
+      "require": "./dist/comments.cjs"
+    },
     "./icons": {
       "types": "./dist/icons.d.ts",
       "import": "./dist/icons.js",

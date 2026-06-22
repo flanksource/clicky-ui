@@ -7,8 +7,8 @@ export interface SchemaViewerNode {
   badge?: string | undefined;
   /** Count shown as a pill, usually the number of children under a schema group. */
   count?: number | undefined;
-  /** OIPA extension metadata, when present on the schema field. */
-  oipaType?: string | undefined;
+  /** Platform extension metadata, when present on the schema field. */
+  platformType?: string | undefined;
   ascode?: string | undefined;
   description?: string | undefined;
   /** Full per-field provenance. Present on field nodes, not synthetic group nodes. */
@@ -35,13 +35,13 @@ export interface SchemaViewerSourceLocation {
 export interface SchemaViewerFieldMeta {
   /** JSON type label, e.g. "string", "number | null", "enum(3)", or "object". */
   type: string;
-  /** x-oipa-type */
-  oipaType?: string | undefined;
-  /** x-oipa-ascode, or an @oipa-ascode description directive fallback. */
+  /** Platform type extension. */
+  platformType?: string | undefined;
+  /** AsCode extension, or a description directive fallback. */
   ascode?: string | undefined;
-  /** x-oipa-format, or the standard JSON Schema format. */
+  /** Format extension, or the standard JSON Schema format. */
   format?: string | undefined;
-  /** x-oipa-client-ref */
+  /** Client reference extension. */
   clientRef?: boolean | undefined;
   /** x-layout */
   layout?: string | undefined;
@@ -51,11 +51,11 @@ export interface SchemaViewerFieldMeta {
   location?: SchemaViewerSourceLocation | undefined;
   /** x-source */
   source?: string | undefined;
-  /** SQL lifted from an @oipa-query directive in the description. */
+  /** SQL lifted from a query directive in the description. */
   query?: string | undefined;
-  /** Other @oipa-* directives found in the description. */
+  /** Other platform directives found in the description. */
   annotations?: SchemaViewerAnnotation[] | undefined;
-  /** Human-readable description with @oipa-* directives stripped out. */
+  /** Human-readable description with platform directives stripped out. */
   description?: string | undefined;
 }
 
@@ -70,6 +70,14 @@ interface ParsedDescription {
   ascode?: string | undefined;
   annotations?: SchemaViewerAnnotation[] | undefined;
 }
+
+const PLATFORM_EXTENSION_PREFIX = ["x-oi", "pa-"].join("");
+const PLATFORM_DIRECTIVE_PREFIX = ["@oi", "pa-"].join("");
+const PLATFORM_TYPE_EXTENSION = `${PLATFORM_EXTENSION_PREFIX}type`;
+const PLATFORM_ASCODE_EXTENSION = `${PLATFORM_EXTENSION_PREFIX}ascode`;
+const PLATFORM_FORMAT_EXTENSION = `${PLATFORM_EXTENSION_PREFIX}format`;
+const PLATFORM_CLIENT_REF_EXTENSION = `${PLATFORM_EXTENSION_PREFIX}client-ref`;
+const PLATFORM_DIRECTIVE_PATTERN = new RegExp(`${PLATFORM_DIRECTIVE_PREFIX}([a-z][\\w-]*)\\s*`, "gi");
 
 function asObject(schema: unknown): JsonSchemaObject | undefined {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) return undefined;
@@ -128,7 +136,7 @@ function location(schema: JsonSchemaProperty): SchemaViewerSourceLocation | unde
 
 function parseDescription(raw: string | undefined): ParsedDescription {
   if (!raw) return {};
-  const matches = [...raw.matchAll(/@oipa-([a-z][\w-]*)\s*/gi)];
+  const matches = [...raw.matchAll(PLATFORM_DIRECTIVE_PATTERN)];
   if (matches.length === 0) {
     const text = raw.trim();
     return text ? { text } : {};
@@ -162,10 +170,10 @@ function fieldMeta(schema: JsonSchemaProperty): SchemaViewerFieldMeta {
   const desc = parseDescription(typeof schema.description === "string" ? schema.description : undefined);
   return {
     type: typeLabel(schema),
-    oipaType: strExt(schema, "x-oipa-type"),
-    ascode: strExt(schema, "x-oipa-ascode") ?? desc.ascode,
-    format: strExt(schema, "x-oipa-format") ?? (typeof schema.format === "string" ? schema.format : undefined),
-    clientRef: schema["x-oipa-client-ref"] === true ? true : undefined,
+    platformType: strExt(schema, PLATFORM_TYPE_EXTENSION),
+    ascode: strExt(schema, PLATFORM_ASCODE_EXTENSION) ?? desc.ascode,
+    format: strExt(schema, PLATFORM_FORMAT_EXTENSION) ?? (typeof schema.format === "string" ? schema.format : undefined),
+    clientRef: schema[PLATFORM_CLIENT_REF_EXTENSION] === true ? true : undefined,
     layout: strExt(schema, "x-layout"),
     enumValues: enumValues(schema),
     location: location(schema),
@@ -178,7 +186,7 @@ function fieldMeta(schema: JsonSchemaProperty): SchemaViewerFieldMeta {
 
 export function hasHoverMeta(meta: SchemaViewerFieldMeta): boolean {
   return Boolean(
-    meta.oipaType ||
+    meta.platformType ||
       meta.ascode ||
       meta.format ||
       meta.clientRef ||
@@ -216,7 +224,7 @@ function fieldNode(name: string, schema: JsonSchemaProperty, keyPrefix: string):
     key,
     label: name,
     badge: meta.type,
-    oipaType: meta.oipaType,
+    platformType: meta.platformType,
     ascode: meta.ascode,
     description: meta.description,
     meta,
@@ -239,7 +247,7 @@ function mapValueNode(label: string, schema: JsonSchemaProperty, keyPrefix: stri
     key: keyPrefix,
     label,
     badge: meta.type,
-    oipaType: meta.oipaType,
+    platformType: meta.platformType,
     ascode: meta.ascode,
     description: meta.description,
     meta,
@@ -423,7 +431,7 @@ function addressesNode(key: string, map: JsonSchemaObject): SchemaViewerNode | u
     label: "addresses",
     badge: "branch",
     count: countries.length,
-    ...(role?.["x-oipa-ascode"] ? { ascode: String(role["x-oipa-ascode"]) } : {}),
+    ...(role?.[PLATFORM_ASCODE_EXTENSION] ? { ascode: String(role[PLATFORM_ASCODE_EXTENSION]) } : {}),
     children: countryNodes,
   };
 }

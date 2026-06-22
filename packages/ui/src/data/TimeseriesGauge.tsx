@@ -10,6 +10,8 @@ import {
   type TimeseriesResponse,
   type TimeseriesSeries,
 } from "./TimeseriesPanel";
+import { GaugeHoverCard, type GaugeHoverRow } from "./GaugeHoverCard";
+import { seriesStats } from "./gauge-stats";
 
 /** A metric series whose latest value drives the gauge fill or its maximum. */
 export interface GaugeSeries {
@@ -20,6 +22,8 @@ export interface GaugeSeries {
 }
 
 export type TimeseriesGaugeVariant = "default" | "cell";
+/** Gauge fill geometry: a half-circle arc (default) or a horizontal progress bar. */
+export type TimeseriesGaugeShape = "radial" | "linear";
 
 export interface TimeseriesGaugeProps {
   /** Common prefix; the value/max requests are `baseUrl + id`. */
@@ -55,8 +59,15 @@ export interface TimeseriesGaugeProps {
   centerDisplay?: "value" | "percent";
   /** Visual density/layout. `cell` is a compact inline form for table/grid cells. */
   variant?: TimeseriesGaugeVariant;
+  /** Fill geometry: a radial half-gauge (default) or a horizontal progress bar. */
+  shape?: TimeseriesGaugeShape;
   /** Show the title text. Icons and values remain visible when false. */
   showLabel?: boolean;
+  /**
+   * Wrap the gauge in a hover card summarising the metric (label + current / min /
+   * max / avg / capacity over the window). Defaults to true.
+   */
+  hoverCard?: boolean;
   /** Override the default fetch (e.g. to route through an app's API client). */
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -78,6 +89,47 @@ function toneClass(pct: number, [warn, danger]: [number, number]): string {
   if (pct >= danger) return "text-red-500";
   if (pct >= warn) return "text-amber-500";
   return "text-emerald-500";
+}
+
+// toneBgClass mirrors toneClass for the linear bar's fill, which needs a
+// background colour rather than the arc's stroke (currentColor) tone.
+function toneBgClass(pct: number, [warn, danger]: [number, number]): string {
+  if (pct >= danger) return "bg-red-500";
+  if (pct >= warn) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+// GaugeArc is the half-circle SVG shared by the cell and default radial gauges;
+// only the stroke width differs between the two densities.
+function GaugeArc({ pct, tone, strokeWidth }: { pct: number; tone: string; strokeWidth: number }) {
+  return (
+    <svg viewBox="0 0 100 50" className="h-full w-full overflow-visible">
+      <path d={GAUGE_PATH} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" className="text-muted" />
+      <path
+        d={GAUGE_PATH}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        className={tone}
+        strokeDasharray={GAUGE_ARC}
+        strokeDashoffset={GAUGE_ARC * (1 - pct / 100)}
+      />
+    </svg>
+  );
+}
+
+// GaugeBar is the horizontal progress track shared by the cell and default linear
+// gauges; the caller sizes it via className (e.g. "h-1.5 w-12" or "h-2 w-full").
+function GaugeBar({ pct, toneBg, className }: { pct: number; toneBg: string; className?: string }) {
+  return (
+    <span className={cn("relative block overflow-hidden rounded-full bg-muted", className)} aria-hidden="true">
+      <span
+        className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-300", toneBg)}
+        style={{ width: `${pct}%` }}
+      />
+    </span>
+  );
 }
 
 function latestValue(resp: TimeseriesResponse | undefined): number | undefined {
@@ -115,7 +167,9 @@ export function TimeseriesGauge({
   thresholds = [75, 90],
   centerDisplay = "value",
   variant = "default",
+  shape = "radial",
   showLabel = true,
+  hoverCard = true,
   fetcher = defaultFetcher,
   className,
 }: TimeseriesGaugeProps) {
@@ -159,6 +213,7 @@ export function TimeseriesGauge({
   const bounded = hasValue && limit !== undefined && limit > 0;
   const pct = bounded ? Math.min(100, Math.round((usage / (limit as number)) * 100)) : 0;
   const tone = toneClass(pct, thresholds);
+  const toneBg = toneBgClass(pct, thresholds);
   const readout =
     centerDisplay === "percent"
       ? bounded
@@ -179,88 +234,123 @@ export function TimeseriesGauge({
     return s;
   }, [value.id, value.transform, maxSeries]);
 
+  // Hover card: reduce the value's points to current/min/max/avg (transformed to
+  // the display unit), plus the resolved capacity. The current row is tinted by
+  // its threshold tone when the reading is bounded.
+  const stats = seriesStats(results[0]?.data?.points, value.transform);
+  const fmt = (n: number) => formatUnit(n, unit);
+  const hoverRows: GaugeHoverRow[] = hasValue
+    ? [
+        { label: "Current", value: fmt(usage), ...(bounded ? { tone } : {}) },
+        ...(stats
+          ? [
+              { label: "Min", value: fmt(stats.min) },
+              { label: "Max", value: fmt(stats.max) },
+              { label: "Avg", value: fmt(stats.avg) },
+            ]
+          : []),
+        ...(limit !== undefined
+          ? [{ label: "Capacity", value: fmt(limit) }]
+          : []),
+      ]
+    : [];
+  const useHover = hoverCard && hoverRows.length > 0;
+  const footer = `over last ${range}`;
+
   if (variant === "cell") {
-    return (
+    const cell = (
       <span
         className={cn(
           "inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap align-middle text-xs",
           className,
         )}
-        title={titleText}
-        aria-label={!showLabel ? titleText : undefined}
+        {...(useHover ? {} : { title: titleText })}
+        aria-label={useHover || !showLabel ? titleText : undefined}
+        data-shape={shape}
       >
         {icon ? <GaugeIcon icon={icon} /> : null}
         {showLabel ? <span className="min-w-0 truncate text-muted-foreground">{title}</span> : null}
-        <span className="relative h-4 w-8 shrink-0" aria-hidden="true">
-          <svg viewBox="0 0 100 50" className="h-full w-full overflow-visible">
-            <path
-              d={GAUGE_PATH}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={10}
-              strokeLinecap="round"
-              className="text-muted"
-            />
-            <path
-              d={GAUGE_PATH}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={10}
-              strokeLinecap="round"
-              className={tone}
-              strokeDasharray={GAUGE_ARC}
-              strokeDashoffset={GAUGE_ARC * (1 - pct / 100)}
-            />
-          </svg>
-        </span>
+        {shape === "linear" ? (
+          <GaugeBar pct={pct} toneBg={toneBg} className="h-1.5 w-12 shrink-0" />
+        ) : (
+          <span className="relative h-4 w-8 shrink-0" aria-hidden="true">
+            <GaugeArc pct={pct} tone={tone} strokeWidth={10} />
+          </span>
+        )}
         <span className={cn("shrink-0 font-semibold tabular-nums", readoutTone)}>
           {readout}
         </span>
       </span>
     );
+    return useHover ? (
+      <GaugeHoverCard title={title} rows={hoverRows} footer={footer} trigger={cell} />
+    ) : (
+      cell
+    );
   }
 
-  return (
+  const body = (
     <div
       className={cn("flex flex-col items-center gap-1", className)}
-      title={!showLabel ? titleText : undefined}
-      aria-label={!showLabel ? titleText : undefined}
+      {...(useHover ? {} : { title: !showLabel ? titleText : undefined })}
+      aria-label={useHover || !showLabel ? titleText : undefined}
+      data-shape={shape}
     >
-      <div className="relative h-10 w-20">
-        <svg viewBox="0 0 100 50" className="h-full w-full overflow-visible">
-          <path d={GAUGE_PATH} fill="none" stroke="currentColor" strokeWidth={9} strokeLinecap="round" className="text-muted" />
-          <path
-            d={GAUGE_PATH}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={9}
-            strokeLinecap="round"
-            className={tone}
-            strokeDasharray={GAUGE_ARC}
-            strokeDashoffset={GAUGE_ARC * (1 - pct / 100)}
-          />
-        </svg>
-        <span className="absolute inset-x-0 bottom-0 text-center text-sm font-semibold text-foreground">
-          {readout}
-        </span>
-        {canExpand && (
-          <button
-            type="button"
-            aria-label="Expand chart"
-            onClick={() => setExpanded(true)}
-            className="absolute right-0 top-0 text-muted-foreground hover:text-foreground"
-          >
-            <Icon icon={UiFullscreen} width={12} height={12} />
-          </button>
-        )}
-      </div>
+      {shape === "linear" ? (
+        <div className="flex w-full items-center gap-2">
+          <GaugeBar pct={pct} toneBg={toneBg} className="h-2 w-full" />
+          <span className="shrink-0 text-sm font-semibold text-foreground">{readout}</span>
+          {canExpand && (
+            <button
+              type="button"
+              aria-label="Expand chart"
+              onClick={() => setExpanded(true)}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <Icon icon={UiFullscreen} width={12} height={12} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="relative h-10 w-20">
+          <GaugeArc pct={pct} tone={tone} strokeWidth={9} />
+          <span className="absolute inset-x-0 bottom-0 text-center text-sm font-semibold text-foreground">
+            {readout}
+          </span>
+          {canExpand && (
+            <button
+              type="button"
+              aria-label="Expand chart"
+              onClick={() => setExpanded(true)}
+              className="absolute right-0 top-0 text-muted-foreground hover:text-foreground"
+            >
+              <Icon icon={UiFullscreen} width={12} height={12} />
+            </button>
+          )}
+        </div>
+      )}
       {icon || showLabel ? (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           {icon ? <GaugeIcon icon={icon} /> : null}
           {showLabel ? <span>{title}</span> : null}
         </div>
       ) : null}
+    </div>
+  );
 
+  return (
+    <>
+      {useHover ? (
+        <GaugeHoverCard
+          title={title}
+          rows={hoverRows}
+          footer={footer}
+          trigger={body}
+          className="w-full justify-center"
+        />
+      ) : (
+        body
+      )}
       {canExpand && (
         <Modal open={expanded} onClose={() => setExpanded(false)} title={title} size="xl">
           <TimeseriesPanel
@@ -276,6 +366,6 @@ export function TimeseriesGauge({
           />
         </Modal>
       )}
-    </div>
+    </>
   );
 }

@@ -144,6 +144,10 @@ function metricGridClass(count: number): string {
   return "grid-cols-3";
 }
 
+// Memory renders as cores-style bars at one bar per gigabyte, matching CPU; bytes
+// are fed raw and TimeseriesCoreBars divides by perBar so captions read "x GB".
+const MEMORY_BAR_UNIT = { perBar: 1024 ** 3, label: "GB", barLabel: "GB" };
+
 function WorkloadIcon({
   icon,
   title,
@@ -200,8 +204,9 @@ function HeaderMeta({ children }: { children: ReactNode }) {
 /**
  * WorkloadCard is a compact resource card for Kubernetes-style workloads. It
  * shows workload identity, status, replica/age metadata, and CPU/memory/disk
- * utilization backed by the existing time-series primitives. Callers own the
- * metric ids; the card only composes the supplied series.
+ * utilization backed by the existing time-series primitives: CPU and memory as
+ * core-style bars (memory at one bar per GB) and disk as a linear progress bar.
+ * Callers own the metric ids; the card only composes the supplied series.
  */
 export function WorkloadCard({
   workload,
@@ -378,13 +383,11 @@ export function WorkloadCard({
             />
           ) : null}
           {metrics.memory ? (
-            <TimeseriesGauge
+            <TimeseriesCoreBars
               title={metrics.memory.title ?? "Memory"}
               icon={metrics.memory.icon ?? UiMemoryStick}
               value={metrics.memory.value}
-              unit={metrics.memory.unit ?? "bytes"}
-              expandable={false}
-              centerDisplay={metrics.memory.centerDisplay ?? "value"}
+              unit={MEMORY_BAR_UNIT}
               variant={sizeClasses.metricVariant}
               {...(metrics.memory.max !== undefined
                 ? { max: metrics.memory.max }
@@ -401,6 +404,7 @@ export function WorkloadCard({
               icon={metrics.disk.icon ?? UiHardDrive}
               value={metrics.disk.value}
               unit={metrics.disk.unit ?? "bytes"}
+              shape="linear"
               expandable={false}
               centerDisplay={metrics.disk.centerDisplay ?? "value"}
               variant={sizeClasses.metricVariant}
