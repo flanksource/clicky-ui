@@ -55,6 +55,10 @@ export type ChatProps = {
   transport?: ChatTransport<UIMessage>;
   /** Initial messages to seed the conversation. */
   initialMessages?: UIMessage[];
+  /** Prompt to send automatically once. A new `id` sends even when text repeats. */
+  initialPrompt?: { id: number; text: string } | null;
+  /** Called after `initialPrompt` has been handed to the chat transport. */
+  onInitialPromptSent?: () => void;
   placeholder?: string;
   emptyState?: React.ReactNode;
   className?: string;
@@ -84,6 +88,8 @@ export function Chat({
   body,
   transport,
   initialMessages,
+  initialPrompt,
+  onInitialPromptSent,
   placeholder,
   emptyState,
   className,
@@ -93,6 +99,7 @@ export function Chat({
   const [effort, setEffort] = useState(defaultReasoningEffort);
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const lastDefaultModel = useRef(defaultModel);
+  const sentInitialPromptId = useRef<number | null>(null);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
   useEffect(() => {
@@ -142,6 +149,16 @@ export function Chat({
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
       ...(initialMessages ? { messages: initialMessages as ChatUIMessage[] } : {}),
     });
+
+  useEffect(() => {
+    if (!initialPrompt || status !== "ready") return;
+    if (sentInitialPromptId.current === initialPrompt.id) return;
+    const text = initialPrompt.text.trim();
+    if (!text) return;
+    sentInitialPromptId.current = initialPrompt.id;
+    void sendMessage({ text });
+    onInitialPromptSent?.();
+  }, [initialPrompt, onInitialPromptSent, sendMessage, status]);
 
   // Surface a usage snapshot after each settled assistant turn. The backend
   // rides usage/cost on the finish part's messageMetadata; we read it off the
