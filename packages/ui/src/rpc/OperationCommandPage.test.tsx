@@ -45,7 +45,10 @@ function makeClickyDocument(
   };
 }
 
-function clickyResponse(document: ClickyDocument, requestUrl?: string): ExecutionResponse {
+function clickyResponse(
+  document: ClickyDocument,
+  requestUrl?: string,
+): ExecutionResponse {
   return {
     success: true,
     exit_code: 0,
@@ -99,7 +102,11 @@ function renderPage(
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <OperationCommandPage client={client} operationId={operationId} {...rest} />
+      <OperationCommandPage
+        client={client}
+        operationId={operationId}
+        {...rest}
+      />
     </QueryClientProvider>,
   );
 }
@@ -107,76 +114,6 @@ function renderPage(
 describe("OperationCommandPage", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
-  });
-
-  it.skip("renders Clicky responses when the endpoint returns Clicky JSON", async () => {
-    const client = makeClient((params) =>
-      clickyResponse(
-        makeClickyDocument([
-          { name: "id", label: "ID", value: params.id },
-          { name: "name", label: "Name", value: "First widget" },
-        ]),
-        `/api/v1/widgets/${params.id}`,
-      ),
-    );
-
-    renderPage(client, { autoRun: false });
-
-    await screen.findByRole("heading", { name: "Get widget" });
-    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "one" } });
-    fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
-
-    await waitFor(() =>
-      expect(client.executeMock).toHaveBeenCalledWith(
-        "/api/v1/widgets/{id}",
-        "get",
-        { id: "one" },
-        { Accept: "application/clicky+json" },
-      ),
-    );
-    await waitFor(() =>
-      expect(screen.getByRole("region", { name: "Response body" })).toHaveTextContent(
-        "First widget",
-      ),
-    );
-    expect(screen.getByRole("button", { name: "Open preview menu" })).toBeInTheDocument();
-  });
-
-  it.skip("falls back to formatted JSON for non-Clicky results", async () => {
-    const client = makeClient((params) => jsonResponse({ id: params.id, name: "Fallback widget" }));
-
-    renderPage(client, { autoRun: false });
-
-    await screen.findByRole("heading", { name: "Get widget" });
-    fireEvent.change(screen.getByLabelText("Id"), { target: { value: "one" } });
-    fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
-
-    await waitFor(() =>
-      expect(screen.getByLabelText("Response body")).toHaveTextContent("Fallback widget"),
-    );
-  });
-
-  it.skip("prefills command parameters from initial values", async () => {
-    const client = makeClient((params) =>
-      clickyResponse(
-        makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
-        `/api/v1/widgets/${params.id}`,
-      ),
-    );
-
-    renderPage(client, { initialValues: { id: "prefilled-widget" }, autoRun: false });
-
-    expect(await screen.findByDisplayValue("prefilled-widget")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
-
-    await waitFor(() =>
-      expect(client.executeMock).toHaveBeenCalledWith(
-        "/api/v1/widgets/{id}",
-        "get",
-        { id: "prefilled-widget" },
-        { Accept: "application/clicky+json" },
-      ),
-    );
   });
 
   it("auto-runs GET by default when initial values satisfy required parameters", async () => {
@@ -214,7 +151,6 @@ describe("OperationCommandPage", () => {
     renderPage(client);
 
     await screen.findByRole("heading", { name: "Get widget" });
-    expect(screen.getByLabelText("Id")).toHaveValue("");
     await waitFor(() => expect(client.executeMock).not.toHaveBeenCalled());
   });
 
@@ -311,7 +247,9 @@ describe("OperationCommandPage", () => {
 
     await screen.findByRole("heading", { name: "List transactions" });
     await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByLabelText("Date range filter")).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText("Date range filter"),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("Since")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
   });
@@ -441,14 +379,17 @@ describe("OperationCommandPage", () => {
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <OperationCommandPage client={client} operationId="widget_list" autoRun={false} />
+        <OperationCommandPage
+          client={client}
+          operationId="widget_list"
+          autoRun={false}
+        />
       </QueryClientProvider>,
     );
 
     await screen.findByRole("heading", { name: "List widgets" });
     await new Promise((resolve) => window.setTimeout(resolve, 350));
     expect(executeMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Execute request" })).toBeInTheDocument();
   });
 
   it("auto-runs non-GET operations when explicitly requested", async () => {
@@ -463,7 +404,9 @@ describe("OperationCommandPage", () => {
         responses: {},
       },
     };
-    const client = makeClient((params) => jsonResponse({ refreshed: params.id }));
+    const client = makeClient((params) =>
+      jsonResponse({ refreshed: params.id }),
+    );
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });

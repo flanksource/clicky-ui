@@ -2,22 +2,28 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiAdd, UiListFlat, UiTable } from "../icons";
-import { MethodBadge } from "../data/MethodBadge";
-import { Modal } from "../overlay/Modal";
+import { UiListFlat, UiTable } from "../icons";
 import { filterOperationsByDomain } from "./classify";
 import {
   filterOperationsBySurface,
-  findSurfaceActions,
+  findSurfaceCollectionActions,
+  findSurfaceDetailOperation,
   findSurfaceListOperation,
   getOperationClickyMeta,
-  surfaceActionLabel,
 } from "./clickyMetadata";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
-import { ExecutionResult } from "./ExecutionResult";
-import { FilterForm } from "./FilterForm";
-import { applyFilterExtensions, type FilterExtension } from "../components/filter-bar-utils";
+import { OperationActionBar } from "./OperationActionBar";
+import { OperationResultView, type ResultRenderer } from "./OperationResultView";
+import { type FormActionsRenderer } from "./SchemaActionForm";
+import {
+  applyFilterExtensions,
+  type FilterExtension,
+} from "../components/filter-bar-utils";
+import type {
+  PreExtension,
+  PostExtension,
+} from "../components/json-schema-form-types";
 import {
   type DomainDefinition,
   type ExecutionResponse,
@@ -48,6 +54,16 @@ export type OperationCatalogProps = {
   renderError?: (err: unknown, title: string) => ReactNode;
   kind?: "operations" | "configuration";
   commandRuntime?: ClickyCommandRuntime;
+  // Custom JsonSchemaForm field extensions forwarded to the create/edit form.
+  formPre?: PreExtension[];
+  formPost?: PostExtension[];
+  // Optional extra footer actions for the create/edit form (e.g. a connection
+  // "Test" button).
+  formActions?: FormActionsRenderer;
+  // Optional host override for the result surface, keyed off the current surface.
+  // Receives the default OperationResultView so non-overridden surfaces render
+  // unchanged.
+  resultRenderer?: ResultRenderer;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -57,7 +73,11 @@ function defaultRenderError(err: unknown, title: string) {
   return (
     <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
       <div className="font-medium">{title}</div>
-      {message && <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">{message}</div>}
+      {message && (
+        <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">
+          {message}
+        </div>
+      )}
     </div>
   );
 }
@@ -74,13 +94,13 @@ export function OperationCatalog({
   renderError = defaultRenderError,
   kind,
   commandRuntime,
+  formPre,
+  formPost,
+  formActions,
+  resultRenderer,
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
   const [view, setView] = useState<"table" | "endpoints">("table");
-  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
-  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
-  const [actionError, setActionError] = useState("");
-  const [isExecutingAction, setIsExecutingAction] = useState(false);
 
   const surfaceOps = useMemo(
     () => filterOperationsBySurface(operations, surfaceKey),
@@ -93,7 +113,9 @@ export function OperationCatalog({
   // to render the generic operation-page fallback, never to guess a table.
   const domainOps = useMemo(() => {
     if (useSurfaceMetadata) return surfaceOps;
-    return allOperations ? operations : filterOperationsByDomain(operations, entities);
+    return allOperations
+      ? operations
+      : filterOperationsByDomain(operations, entities);
   }, [allOperations, entities, operations, surfaceOps, useSurfaceMetadata]);
 
   // The list table is driven solely by x-clicky surface metadata. Without a
@@ -104,7 +126,18 @@ export function OperationCatalog({
     if (!useSurfaceMetadata) return undefined;
     return findSurfaceListOperation(domainOps, surfaceKey);
   }, [domainOps, surfaceKey, useSurfaceMetadata]);
-  const [filters, setFilters] = useState<Record<string, string>>(() => readFiltersFromUrl());
+  // The detail op turns each list row into a link to /<surface>/<id>; absent it
+  // (no surface metadata) rows stay non-navigable.
+  const detailOperation = useMemo(
+    () =>
+      useSurfaceMetadata
+        ? findSurfaceDetailOperation(domainOps, surfaceKey)
+        : undefined,
+    [domainOps, surfaceKey, useSurfaceMetadata],
+  );
+  const [filters, setFilters] = useState<Record<string, string>>(() =>
+    readFiltersFromUrl(),
+  );
   const listParameters = listEndpoint?.operation.parameters ?? [];
 
   useEffect(() => {
@@ -112,7 +145,12 @@ export function OperationCatalog({
   }, [filters]);
 
   const listQuery = useQuery<ExecutionResponse>({
-    queryKey: ["operation-list", listEndpoint?.method, listEndpoint?.path, filters],
+    queryKey: [
+      "operation-list",
+      listEndpoint?.method,
+      listEndpoint?.path,
+      filters,
+    ],
     queryFn: () =>
       client.executeCommand(
         listEndpoint!.path,
@@ -129,7 +167,12 @@ export function OperationCatalog({
   });
 
   const lookupQuery = useQuery<OperationLookupResponse>({
-    queryKey: ["operation-lookup", listEndpoint?.method, listEndpoint?.path, filters],
+    queryKey: [
+      "operation-lookup",
+      listEndpoint?.method,
+      listEndpoint?.path,
+      filters,
+    ],
     queryFn: async () =>
       (await client.lookupFilters?.(
         listEndpoint!.path,
@@ -142,11 +185,17 @@ export function OperationCatalog({
     retry: 0,
   });
 
-  // Action buttons come only from surface metadata. In the generic fallback the
+  // The list action bar shows only collection-scoped actions (create + bulk
+  // actions that operate on the filtered set). Entity-scoped actions
+  // (update/delete and per-id custom actions) need an {id}, so they live on the
+  // detail page (OperationEntityPage) instead. In the generic fallback the
   // EndpointList already exposes every operation as a runnable card, so there is
   // no separate action bar to guess at.
   const actionOps = useMemo(
-    () => (useSurfaceMetadata ? findSurfaceActions(domainOps, surfaceKey) : []),
+    () =>
+      useSurfaceMetadata
+        ? findSurfaceCollectionActions(domainOps, surfaceKey)
+        : [],
     [domainOps, surfaceKey, useSurfaceMetadata],
   );
 
@@ -160,11 +209,15 @@ export function OperationCatalog({
     return parametersToFormConfig(listParameters, filters, setFilters, options);
   }, [filters, listParameters, lookupQuery.data]);
   const dataTablePagination = useMemo(
-    () => dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),
+    () =>
+      dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),
     [filterBarConfig.pagination, listQuery.data],
   );
   const decoratedFilters = useMemo(
-    () => filterBarConfig.filters.map((filter) => applyFilterExtensions(filter, filterPre)),
+    () =>
+      filterBarConfig.filters.map((filter) =>
+        applyFilterExtensions(filter, filterPre),
+      ),
     [filterBarConfig.filters, filterPre],
   );
 
@@ -174,16 +227,17 @@ export function OperationCatalog({
     kind === "configuration" || definition.key.startsWith("config-")
       ? "Configuration"
       : "Operations";
-  const activeActionMeta = activeAction ? getOperationClickyMeta(activeAction) : undefined;
-
-  const actionLockedValues = useMemo(() => {
-    const meta = activeActionMeta;
-    if (!activeAction || meta == null || !meta.supportsFilterMode) {
+  // Lock the current list filters into a bulk action (supportsFilterMode), so a
+  // collection action like "pause" runs against the same set the table shows.
+  // Entity-scoped actions never reach here (they live on the detail page).
+  function getActionLockedValues(op: ResolvedOperation): Record<string, string> {
+    const meta = getOperationClickyMeta(op);
+    if (meta == null || !meta.supportsFilterMode) {
       return {};
     }
 
     const locked: Record<string, string> = {};
-    for (const param of activeAction.operation.parameters ?? []) {
+    for (const param of op.operation.parameters ?? []) {
       const value = filters[param.name];
       if (param.in === "query" && value) {
         locked[param.name] = value;
@@ -194,7 +248,7 @@ export function OperationCatalog({
       locked[meta.idParam] = "all";
     }
 
-    if ((activeAction.operation.parameters ?? []).some((param) => param.name === "filter")) {
+    if ((op.operation.parameters ?? []).some((param) => param.name === "filter")) {
       locked.filter =
         Object.entries(filters)
           .filter(([, value]) => value)
@@ -203,28 +257,6 @@ export function OperationCatalog({
     }
 
     return locked;
-  }, [activeAction, activeActionMeta, filters]);
-
-  async function executeAction(values: Record<string, string>) {
-    if (!activeAction) return;
-    setIsExecutingAction(true);
-    setActionError("");
-
-    try {
-      const response = await client.executeCommand(
-        activeAction.path,
-        activeAction.method,
-        packParameterValues(values, activeAction.operation.parameters ?? []),
-        { Accept: "application/json+clicky" },
-      );
-      setActionResult(response);
-      await listQuery.refetch();
-    } catch (err) {
-      setActionResult(null);
-      setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
-    } finally {
-      setIsExecutingAction(false);
-    }
   }
 
   if (isLoading) {
@@ -246,8 +278,12 @@ export function OperationCatalog({
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             {sectionLabel}
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{definition.title}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{definition.description}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {definition.title}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            {definition.description}
+          </p>
         </div>
         {hasTable && (
           <div className="flex gap-1 rounded-lg border p-1">
@@ -277,56 +313,58 @@ export function OperationCatalog({
         )}
       </div>
 
-      {actionOps.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {actionOps.map((op) => {
-            const label = surfaceActionLabel(op);
-            const summary = op.operation.summary || op.operation.description;
-            const tooltip = summary ? `${label} — ${summary}` : label;
-            // Every action opens the execution dialog (Modal) inline — the
-            // FilterForm collects params (including any id an entity-scoped
-            // action needs) and the result renders without leaving the list.
-            return (
-              <Button
-                key={`${op.method}:${op.path}`}
-                type="button"
-                variant="outline"
-                size="sm"
-                title={tooltip}
-                onClick={() => {
-                  setActiveAction(op);
-                  setActionResult(null);
-                  setActionError("");
-                }}
-              >
-                <Icon icon={UiAdd} className="text-xs" />
-                {label}
-              </Button>
-            );
-          })}
-        </div>
-      )}
+      <OperationActionBar
+        actions={actionOps}
+        client={client}
+        getLockedValues={getActionLockedValues}
+        onExecuted={() => void listQuery.refetch()}
+        {...(commandRuntime ? { commandRuntime } : {})}
+        {...(formPre ? { formPre } : {})}
+        {...(formPost ? { formPost } : {})}
+        {...(formActions ? { formActions } : {})}
+      />
 
       {showTable ? (
         <>
           {listQuery.isError && !listQuery.data ? (
-            renderError(listQuery.error, `Failed to load ${listEndpoint?.path ?? ""}`)
+            renderError(
+              listQuery.error,
+              `Failed to load ${listEndpoint?.path ?? ""}`,
+            )
           ) : (
-            <ExecutionResult
-              response={listQuery.data ?? null}
-              loading={listQuery.isFetching}
-              loadingMessage={`Loading ${definition.title} results…`}
-              emptyMessage="No records returned"
-              ariaLabel={`${definition.title} results`}
-              className="mt-0"
-              {...(commandRuntime ? { commandRuntime } : {})}
-              {...(filterBarConfig.search ? { search: filterBarConfig.search } : {})}
-              {...(filterBarConfig.timeRange ? { timeRange: filterBarConfig.timeRange } : {})}
-              {...(decoratedFilters.length > 0
-                ? { externalFilters: decoratedFilters }
-                : {})}
-              {...(dataTablePagination ? { pagination: dataTablePagination } : {})}
-            />
+            (() => {
+              const defaultView = (
+                <OperationResultView
+                  response={listQuery.data ?? null}
+                  loading={listQuery.isFetching}
+                  loadingMessage={`Loading ${definition.title} results…`}
+                  emptyMessage="No records returned"
+                  ariaLabel={`${definition.title} results`}
+                  className="mt-0"
+                  detailOperation={detailOperation}
+                  filterConfig={{
+                    filters: decoratedFilters,
+                    ...(filterBarConfig.search
+                      ? { search: filterBarConfig.search }
+                      : {}),
+                    ...(filterBarConfig.timeRange
+                      ? { timeRange: filterBarConfig.timeRange }
+                      : {}),
+                  }}
+                  {...(commandRuntime ? { commandRuntime } : {})}
+                  {...(dataTablePagination
+                    ? { pagination: dataTablePagination }
+                    : {})}
+                />
+              );
+              return resultRenderer
+                ? resultRenderer({
+                    response: listQuery.data ?? null,
+                    defaultView,
+                    ...(surfaceKey ? { surfaceKey } : {}),
+                  })
+                : defaultView;
+            })()
           )}
         </>
       ) : (
@@ -337,50 +375,6 @@ export function OperationCatalog({
           getCommandHref={getCommandHref}
         />
       )}
-
-      <Modal
-        open={activeAction != null}
-        onClose={() => setActiveAction(null)}
-        title={
-          activeAction?.operation.summary ||
-          activeActionMeta?.actionName ||
-          activeAction?.operation.operationId ||
-          "Action"
-        }
-        size="lg"
-      >
-        {activeAction && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <MethodBadge method={activeAction.method} />
-              <code className="rounded-md bg-muted px-2 py-1 text-sm">{activeAction.path}</code>
-            </div>
-            <FilterForm
-              client={client}
-              path={activeAction.path}
-              method={activeAction.method}
-              parameters={activeAction.operation.parameters ?? []}
-              lockedValues={actionLockedValues}
-              enableLookup={Boolean(activeActionMeta?.supportsLookup)}
-              submitLabel="Execute request"
-              submittingLabel="Executing…"
-              isSubmitting={isExecutingAction}
-              onSubmit={executeAction}
-            />
-            {actionError ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                {actionError}
-              </div>
-            ) : actionResult ? (
-              <ExecutionResult
-                response={actionResult}
-                className="mt-0"
-                {...(commandRuntime ? { commandRuntime } : {})}
-              />
-            ) : null}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
@@ -397,7 +391,11 @@ function readFiltersFromUrl(): Record<string, string> {
 }
 
 function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()} />;
+  return (
+    <div
+      className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()}
+    />
+  );
 }
 
 function writeFiltersToUrl(filters: Record<string, string>) {
@@ -408,7 +406,10 @@ function writeFiltersToUrl(filters: Record<string, string>) {
   }
   const query = search.toString();
   const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-  if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+  if (
+    next !==
+    `${window.location.pathname}${window.location.search}${window.location.hash}`
+  ) {
     window.history.replaceState(window.history.state, "", next);
   }
 }

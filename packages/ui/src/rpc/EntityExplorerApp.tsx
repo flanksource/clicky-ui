@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ThemeSwitcher } from "../components/theme-switcher";
+import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
 import type { ClickyCommandRuntime } from "../data/Clicky";
-import {
-  findSurfaceListOperation,
-  getClickySurfaces,
-  makeSurfaceDefinition,
-} from "./clickyMetadata";
+import { AppShell, type AppShellNavSection } from "../layout/AppShell";
+import { getClickySurfaces, makeSurfaceDefinition } from "./clickyMetadata";
 import {
   ARG_QUERY_PREFIX,
   AUTORUN_QUERY_PARAM,
@@ -15,8 +13,11 @@ import {
 } from "./commandHref";
 import { useRouter } from "./router";
 import { OperationCatalog } from "./OperationCatalog";
+import type { ResultRenderer } from "./OperationResultView";
 import { OperationCommandPage } from "./OperationCommandPage";
 import { OperationEntityPage } from "./OperationEntityPage";
+import type { FormActionsRenderer } from "./SchemaActionForm";
+import { resolveSurfaceIcon } from "./surfaceIconMap";
 import type { ClickySurface } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { useOperations } from "./useOperations";
@@ -25,49 +26,53 @@ export type EntityExplorerAppProps = {
   client: OperationsApiClient;
   basePath?: string;
   showApiExplorer?: boolean;
-  // surfaceIcons maps a ClickySurface.parent slug to a ReactNode rendered next
-  // to the group label. Lets the host app drop in brand SVGs (e.g. Xero,
-  // Takealot) without coupling clicky-ui to any specific iconography.
+  /**
+   * Custom JsonSchemaForm field extensions applied to every create/edit form the
+   * explorer renders — e.g. a SecretKeySelector widget keyed on an
+   * `x-clicky-component` schema hint. `pre` transforms a resolved control; `post`
+   * can replace the rendered value node with a custom component.
+   */
+  formExtensions?: { pre?: PreExtension[]; post?: PostExtension[] };
+  /**
+   * Optional extra footer actions added to every create/edit form (e.g. a
+   * connection "Test" split-button). The renderer receives the live form value
+   * and the action it submits to, so it can scope itself to a given entity.
+   */
+  formActions?: FormActionsRenderer;
+  /**
+   * @deprecated Superseded by per-surface icons emitted by the backend
+   * (x-clicky-icon → ClickySurface.icon). AppShell section labels are plain
+   * strings, so this group-header icon map is no longer rendered. Kept for
+   * source-compatibility only.
+   */
   surfaceIcons?: Record<string, ReactNode>;
+  /**
+   * Optional host override for the result surface. Called where an entity's
+   * result table renders, with the current surface key, the raw response, and
+   * the default OperationResultView element. Return `defaultView` to keep the
+   * standard table, or a custom node (e.g. a LogsTable for trace/log profiles
+   * flagged via x-clicky-render). Filtering/sorting policy is the host's choice.
+   */
+  resultRenderer?: ResultRenderer;
 };
 
-// SURFACE_GROUP_STATE_KEY persists open/closed state of sidebar groups across
-// reloads. Single localStorage entry, not per-user — operator UI only.
-const SURFACE_GROUP_STATE_KEY = "clicky-ui:sidebar:groupCollapsed";
+// SIDEBAR_COLLAPSED_KEY persists the AppShell rail collapsed flag across reloads.
+const SIDEBAR_COLLAPSED_KEY = "clicky-ui:sidebar:collapsed";
 
 export function EntityExplorerApp({
   client,
   basePath = "",
   showApiExplorer = true,
-  surfaceIcons,
+  formExtensions,
+  formActions,
+  resultRenderer,
 }: EntityExplorerAppProps) {
+  const formPre = formExtensions?.pre;
+  const formPost = formExtensions?.post;
   const { pathname, renderLink, navigate } = useRouter();
-  const { operations, spec } = useOperations(client);
+  const { spec } = useOperations(client);
   const surfaces = useMemo(() => getClickySurfaces(spec), [spec]);
   const surfaceGroups = useMemo(() => groupSurfacesByParent(surfaces), [surfaces]);
-  const listHrefBySurface = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const surface of surfaces) {
-      const listOp = findSurfaceListOperation(operations, surface.key);
-      if (!listOp?.operation.operationId) continue;
-      const href = buildCommandHref(basePath, {
-        operation: listOp,
-        request: { command: listOp.operation.operationId, autoRun: true },
-      });
-      if (href) out[surface.key] = href;
-    }
-    return out;
-  }, [basePath, operations, surfaces]);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() =>
-    readCollapsedGroups(),
-  );
-  const toggleGroup = useCallback((parent: string) => {
-    setCollapsedGroups((prev) => {
-      const next = { ...prev, [parent]: !prev[parent] };
-      writeCollapsedGroups(next);
-      return next;
-    });
-  }, []);
   const defaultSurface = useMemo(
     () => surfaces.find((surface) => !surface.admin) ?? surfaces[0],
     [surfaces],
@@ -102,6 +107,34 @@ export function EntityExplorerApp({
     }),
     [],
   );
+  const navSections = useMemo<AppShellNavSection[]>(() => {
+    const sections: AppShellNavSection[] = surfaceGroups.map((group) => ({
+      label: group.label,
+      items: group.surfaces.map((surface) => {
+        const icon = resolveSurfaceIcon(surface.icon);
+        return {
+          key: surface.key,
+          label: surface.title,
+          ...(icon ? { icon } : {}),
+          active: isSurfaceRouteActive(resolvedRoute, surface.key),
+          to: withBasePath(basePath, `/${surface.key}`),
+        };
+      }),
+    }));
+    if (showApiExplorer) {
+      sections.push({
+        items: [
+          {
+            key: explorerDefinition.key,
+            label: explorerDefinition.title,
+            active: resolvedRoute.kind === "explorer" || resolvedRoute.kind === "command",
+            to: withBasePath(basePath, "/explorer"),
+          },
+        ],
+      });
+    }
+    return sections;
+  }, [surfaceGroups, basePath, resolvedRoute, showApiExplorer, explorerDefinition]);
 
   useEffect(() => {
     if (defaultSurface == null || relativePath !== "/") return;
@@ -109,69 +142,23 @@ export function EntityExplorerApp({
   }, [basePath, defaultSurface, relativePath, navigate]);
 
   const content = (
-    <div className="flex h-full">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 p-4">
-        <div className="mb-6">
-          <div className="text-sm font-semibold">{spec?.info.title ?? "Clicky Explorer"}</div>
-          <div className="text-xs text-muted-foreground">Metadata-driven entity explorer</div>
+    <AppShell
+      brand={
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">
+            {spec?.info.title ?? "Clicky Explorer"}
+          </div>
+          <div className="truncate text-xs text-sidebar-foreground/60">
+            Metadata-driven entity explorer
+          </div>
         </div>
-        <nav className="flex flex-col gap-2">
-          {surfaceGroups.map((group) => {
-            const collapsed = collapsedGroups[group.parent] ?? false;
-            return (
-              <div key={group.parent} className="flex flex-col">
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.parent)}
-                  aria-expanded={!collapsed}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent/40"
-                >
-                  {surfaceIcons?.[group.parent] != null && (
-                    <span className="flex h-4 w-4 items-center justify-center text-current">
-                      {surfaceIcons[group.parent]}
-                    </span>
-                  )}
-                  <span className="flex-1 text-left">{group.label}</span>
-                  <span aria-hidden className="text-[0.65rem] opacity-60">
-                    {collapsed ? "▸" : "▾"}
-                  </span>
-                </button>
-                {!collapsed && (
-                  <div className="ml-2 mt-1 flex flex-col gap-1 border-l border-border/60 pl-2">
-                    {group.surfaces.map((surface) =>
-                      renderLink({
-                        key: surface.key,
-                        to:
-                          listHrefBySurface[surface.key] ??
-                          withBasePath(basePath, `/${surface.key}`),
-                        className: navLinkClassName(
-                          isSurfaceRouteActive(resolvedRoute, surface.key),
-                        ),
-                        children: surface.title,
-                      }),
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {showApiExplorer &&
-            renderLink({
-              key: explorerDefinition.key,
-              to: withBasePath(basePath, "/explorer"),
-              className: navLinkClassName(
-                resolvedRoute.kind === "explorer" || resolvedRoute.kind === "command",
-              ),
-              children: explorerDefinition.title,
-            })}
-        </nav>
-        <div className="mt-auto pt-4">
-          <ThemeSwitcher />
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto p-6">
-        {resolvedRoute.kind === "surface" ? (
+      }
+      navSections={navSections}
+      sidebarFooter={<ThemeSwitcher />}
+      collapsedStorageKey={SIDEBAR_COLLAPSED_KEY}
+      contentClassName="p-6"
+    >
+      {resolvedRoute.kind === "surface" ? (
           resolvedRoute.surface ? (
             <OperationCatalog
               definition={makeSurfaceDefinition(resolvedRoute.surface)}
@@ -180,6 +167,10 @@ export function EntityExplorerApp({
               renderLink={renderLink}
               surfaceKey={resolvedRoute.surface.key}
               commandRuntime={commandRuntime}
+              {...(formPre ? { formPre } : {})}
+              {...(formPost ? { formPost } : {})}
+              {...(formActions ? { formActions } : {})}
+              {...(resultRenderer ? { resultRenderer } : {})}
             />
           ) : (
             <UnknownSurface surfaceKey={resolvedRoute.surfaceKey} />
@@ -195,6 +186,9 @@ export function EntityExplorerApp({
               backHref={withBasePath(basePath, `/${resolvedRoute.surface.key}`)}
               backLabel={`Back to ${resolvedRoute.surface.title}`}
               commandRuntime={commandRuntime}
+              {...(formPre ? { formPre } : {})}
+              {...(formPost ? { formPost } : {})}
+              {...(formActions ? { formActions } : {})}
               {...(resolvedRoute.id ? { id: resolvedRoute.id } : {})}
             />
           ) : (
@@ -225,8 +219,7 @@ export function EntityExplorerApp({
         ) : (
           <div className="text-sm text-muted-foreground">Redirecting…</div>
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 
   return content;
@@ -283,13 +276,6 @@ function isSurfaceRouteActive(route: ExplorerRoute, surfaceKey: string) {
   );
 }
 
-function navLinkClassName(active: boolean) {
-  return [
-    "rounded-md px-2 py-1.5 text-sm transition-colors",
-    active ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent",
-  ].join(" ");
-}
-
 function stripBasePath(pathname: string, basePath: string) {
   const base = trimTrailingSlash(basePath);
   if (!base || base === "/") {
@@ -344,28 +330,6 @@ function groupSurfacesByParent(surfaces: ClickySurface[]): SurfaceGroup[] {
 function titleCase(value: string): string {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function readCollapsedGroups(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(SURFACE_GROUP_STATE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCollapsedGroups(state: Record<string, boolean>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SURFACE_GROUP_STATE_KEY, JSON.stringify(state));
-  } catch {
-    // Quota / private-mode failures are safe to swallow — sidebar state is
-    // purely a UX nicety, not a correctness signal.
-  }
 }
 
 function readCommandQueryParams(): { initialValues: Record<string, string>; autoRun: boolean } {

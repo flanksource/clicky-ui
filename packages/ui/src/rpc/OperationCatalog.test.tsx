@@ -58,6 +58,54 @@ function makeSpec(): OpenAPISpec {
           parameters: [{ name: "id", in: "path" }],
           responses: {},
         },
+        put: {
+          operationId: "widget_update",
+          tags: ["widget"],
+          summary: "Update a widget",
+          "x-clicky": { surface: "widgets", verb: "update", scope: "entity", idParam: "id" },
+          parameters: [{ name: "id", in: "path" }],
+          responses: {},
+        },
+        delete: {
+          operationId: "widget_delete",
+          tags: ["widget"],
+          summary: "Delete a widget",
+          "x-clicky": { surface: "widgets", verb: "delete", scope: "entity", idParam: "id" },
+          parameters: [{ name: "id", in: "path" }],
+          responses: {},
+        },
+      },
+      "/api/v1/widgets/{id}/restart": {
+        post: {
+          operationId: "widget_restart",
+          tags: ["widget"],
+          summary: "Restart a widget",
+          "x-clicky": {
+            surface: "widgets",
+            verb: "action",
+            actionName: "restart",
+            scope: "entity",
+            idParam: "id",
+          },
+          parameters: [{ name: "id", in: "path" }],
+          responses: {},
+        },
+      },
+      "/api/v1/widgets/pause": {
+        post: {
+          operationId: "widget_pause",
+          tags: ["widget"],
+          summary: "Pause widgets matching the current filters",
+          "x-clicky": {
+            surface: "widgets",
+            verb: "action",
+            actionName: "pause",
+            scope: "collection",
+            idParam: "id",
+            supportsFilterMode: true,
+          },
+          responses: {},
+        },
       },
     },
   };
@@ -253,6 +301,79 @@ describe("OperationCatalog", () => {
     expect(screen.getByText("one")).toBeInTheDocument();
   });
 
+  it("shows only collection-scoped actions in the list action bar", async () => {
+    const client = makeClient();
+    renderCatalog(client);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
+    );
+
+    // Collection-scoped actions belong on the list: create + the bulk pause
+    // (which acts on the filtered set).
+    expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+
+    // Entity-scoped actions require an {id} and live on the detail page; they
+    // must not leak onto the list action bar.
+    expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+  });
+
+  it("lets a resultRenderer replace the default result surface, receiving the response", async () => {
+    const client = makeClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    let seenSurfaceKey: string | undefined = "unset";
+    let seenSuccess: boolean | undefined;
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCatalog
+          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          renderLink={renderFakeLink}
+          resultRenderer={({ surfaceKey, response }) => {
+            seenSurfaceKey = surfaceKey;
+            if (response) seenSuccess = response.success;
+            return <div data-testid="custom-result">custom logs view</div>;
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("custom-result")).toBeInTheDocument());
+    // The renderer is re-invoked once the list response resolves.
+    await waitFor(() => expect(seenSuccess).toBe(true));
+    // The default clicky table cell must not render — the override replaced it.
+    expect(screen.queryByText("First")).not.toBeInTheDocument();
+    expect(seenSurfaceKey).toBe("widgets");
+  });
+
+  it("renders the default table when the resultRenderer returns defaultView", async () => {
+    const client = makeClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCatalog
+          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          renderLink={renderFakeLink}
+          resultRenderer={({ defaultView }) => defaultView}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("First")).toBeInTheDocument());
+  });
+
   it("paginates list tables through native table controls", async () => {
     const client = makeClient(
       clickyTablePageResponse(5, {
@@ -337,7 +458,9 @@ describe("OperationCatalog", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /endpoint list view/i }));
-    expect(screen.getByText("/api/v1/widgets/{id}")).toBeInTheDocument();
+    // The id path now carries several methods (get/put/delete), so it appears
+    // once per operation in the endpoint list.
+    expect(screen.getAllByText("/api/v1/widgets/{id}").length).toBeGreaterThan(0);
     expect(screen.getAllByText("GET").length).toBeGreaterThan(0);
     expect(screen.getAllByText("POST").length).toBeGreaterThan(0);
   });

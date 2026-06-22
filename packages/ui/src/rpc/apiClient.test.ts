@@ -117,6 +117,44 @@ describe("createOperationsApiClient", () => {
     } satisfies Partial<OperationsApiClientError>);
   });
 
+  it("getSchema returns the schema document when served as application/schema+json", async () => {
+    const schema = { $schema: "x", type: "object", properties: { name: { type: "string" } } };
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(schema, { headers: { "Content-Type": "application/schema+json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createOperationsApiClient();
+    const result = await client.getSchema("/api/v1/connection");
+
+    expect(result).toEqual(schema);
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init!.headers as Headers).get("Accept")).toBe("application/schema+json");
+  });
+
+  it("getSchema returns undefined when the resource serves data instead of a schema", async () => {
+    // Falls through to the list representation (no schema content type).
+    const fetchMock = vi.fn(async () => jsonResponse([{ name: "pg" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createOperationsApiClient();
+    expect(await client.getSchema("/api/v1/widget")).toBeUndefined();
+  });
+
+  it("submitForm sends the nested body verbatim with the chosen method", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createOperationsApiClient();
+    const body = { name: "pg", type: "postgres", properties: { sslmode: "disable" } };
+    await client.submitForm("/api/v1/connection", "POST", body);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/v1/connection");
+    expect(init!.method).toBe("POST");
+    expect(JSON.parse(init!.body as string)).toEqual(body);
+  });
+
   it("applies path params, default params, and prepared headers", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
