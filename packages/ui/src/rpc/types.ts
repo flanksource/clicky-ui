@@ -127,6 +127,8 @@ export interface ClickySurface {
   parent?: string;
   admin?: boolean;
   description?: string;
+  /** Opaque icon name emitted by the backend (x-clicky-icon), resolved to a glyph in the UI. */
+  icon?: string;
 }
 
 export interface ClickyOperationMeta {

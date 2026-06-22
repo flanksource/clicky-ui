@@ -1,9 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "../components/button";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
-import { Modal } from "../overlay/Modal";
 import { filterOperationsByDomain, findDetailEndpointForList, findListEndpoint } from "./classify";
 import {
   filterOperationsBySurface,
@@ -12,10 +10,11 @@ import {
   findSurfaceListOperation,
 } from "./clickyMetadata";
 import { ExecutionResult } from "./ExecutionResult";
-import { FilterForm } from "./FilterForm";
-import { packParameterValues } from "./formMetadata";
+import { OperationActionBar } from "./OperationActionBar";
+import { type FormActionsRenderer } from "./SchemaActionForm";
 import type { RenderLink } from "./EndpointList";
-import type { DomainDefinition, ExecutionResponse, ResolvedOperation } from "./types";
+import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
+import type { DomainDefinition } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
 
 export type OperationEntityPageProps = {
@@ -33,6 +32,12 @@ export type OperationEntityPageProps = {
   backLabel?: string;
   renderError?: (err: unknown, title: string) => ReactNode;
   commandRuntime?: ClickyCommandRuntime;
+  // Custom JsonSchemaForm field extensions forwarded to the edit form.
+  formPre?: PreExtension[];
+  formPost?: PostExtension[];
+  // Optional extra footer actions for the edit form (e.g. a connection "Test"
+  // button).
+  formActions?: FormActionsRenderer;
 };
 
 function defaultRenderError(err: unknown, title: string) {
@@ -60,12 +65,11 @@ export function OperationEntityPage({
   backLabel = "Back",
   renderError = defaultRenderError,
   commandRuntime,
+  formPre,
+  formPost,
+  formActions,
 }: OperationEntityPageProps) {
   const { operations, isLoading } = useOperations(client);
-  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
-  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
-  const [actionError, setActionError] = useState("");
-  const [isExecutingAction, setIsExecutingAction] = useState(false);
   const surfaceOps = useMemo(
     () => filterOperationsBySurface(operations, surfaceKey),
     [operations, surfaceKey],
@@ -139,6 +143,26 @@ export function OperationEntityPage({
     retry: 0,
   });
 
+  // Raw (non-clicky) detail used to pre-fill the schema-driven edit form. Only
+  // resources whose detail endpoint returns a plain object (e.g. connections)
+  // prefill; others (e.g. a profile detail that returns rows) start blank.
+  const rawDetailQuery = useQuery({
+    queryKey: ["entity-detail-raw", definition.key, id, resolvedDetailEndpoint?.path],
+    queryFn: async () =>
+      client.executeCommand(resolvedDetailEndpoint!.path, resolvedDetailEndpoint!.method, detailValues, {
+        Accept: "application/json",
+      }),
+    enabled: !!resolvedDetailEndpoint && !!id,
+    staleTime: 30_000,
+    retry: 0,
+  });
+  const editInitialValue = useMemo(() => {
+    const parsed = rawDetailQuery.data?.parsed;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  }, [rawDetailQuery.data]);
+
   const backLink =
     backHref == null ? null : renderLink ? (
       renderLink({
@@ -151,28 +175,6 @@ export function OperationEntityPage({
         {backLabel}
       </a>
     );
-
-  async function executeAction(values: Record<string, string>) {
-    if (!activeAction) return;
-    setIsExecutingAction(true);
-    setActionError("");
-
-    try {
-      const response = await client.executeCommand(
-        activeAction.path,
-        activeAction.method,
-        packParameterValues(values, activeAction.operation.parameters ?? []),
-        { Accept: "application/json+clicky" },
-      );
-      setActionResult(response);
-      await detailQuery.refetch();
-    } catch (err) {
-      setActionResult(null);
-      setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
-    } finally {
-      setIsExecutingAction(false);
-    }
-  }
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading entity…</div>;
@@ -205,26 +207,20 @@ export function OperationEntityPage({
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{definition.description}</p>
           </div>
         </div>
-        {actionOps.length > 0 && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            {actionOps.map((op) => (
-              <Button
-                key={`${op.method}:${op.path}`}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setActiveAction(op);
-                  setActionResult(null);
-                  setActionError("");
-                }}
-              >
-                {op.operation.summary || op.operation.operationId || op.path}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
+
+      <OperationActionBar
+        actions={actionOps}
+        client={client}
+        getLockedValues={() => ({ [idParameterName]: id })}
+        onExecuted={() => void detailQuery.refetch()}
+        hideLockedInForm
+        {...(editInitialValue ? { initialValue: editInitialValue } : {})}
+        {...(commandRuntime ? { commandRuntime } : {})}
+        {...(formPre ? { formPre } : {})}
+        {...(formPost ? { formPost } : {})}
+        {...(formActions ? { formActions } : {})}
+      />
 
       {detailQuery.isLoading ? (
         <section className="rounded-xl border bg-card p-4">
@@ -242,46 +238,6 @@ export function OperationEntityPage({
           />
         </section>
       )}
-
-      <Modal
-        open={activeAction != null}
-        onClose={() => setActiveAction(null)}
-        title={activeAction?.operation.summary || activeAction?.operation.operationId || "Action"}
-        size="lg"
-      >
-        {activeAction && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <MethodBadge method={activeAction.method} />
-              <code className="rounded-md bg-muted px-2 py-1 text-sm">{activeAction.path}</code>
-            </div>
-            <FilterForm
-              client={client}
-              path={activeAction.path}
-              method={activeAction.method}
-              parameters={activeAction.operation.parameters ?? []}
-              lockedValues={{ [idParameterName]: id }}
-              hideLocked
-              enableLookup={false}
-              submitLabel="Execute request"
-              submittingLabel="Executing…"
-              isSubmitting={isExecutingAction}
-              onSubmit={executeAction}
-            />
-            {actionError ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                {actionError}
-              </div>
-            ) : actionResult ? (
-              <ExecutionResult
-                response={actionResult}
-                className="mt-0"
-                {...(commandRuntime ? { commandRuntime } : {})}
-              />
-            ) : null}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

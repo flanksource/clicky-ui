@@ -60,8 +60,11 @@ describe("EntityExplorerApp", () => {
     expect(links.length).toBeGreaterThan(0);
   });
 
-  it("shows the spec's title in the sidebar header", async () => {
+  it("shows the spec's title as the AppShell brand", async () => {
     renderApp();
-    expect(await screen.findByText("test")).toBeTruthy();
+    // AppShell renders the brand in both the desktop rail and the mobile header,
+    // so the title appears more than once in the DOM.
+    const brands = await screen.findAllByText("test");
+    expect(brands.length).toBeGreaterThan(0);
   });
 });

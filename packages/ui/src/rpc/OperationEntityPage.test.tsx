@@ -60,6 +60,51 @@ function makeSpec(): OpenAPISpec {
   };
 }
 
+// A surface spec (operations carry x-clicky metadata) so the detail page renders
+// via findSurfaceEntityActions and labels actions with the short verb/actionName.
+function makeSurfaceSpec(): OpenAPISpec {
+  return {
+    openapi: "3.0.0",
+    info: { title: "test", version: "1" },
+    "x-clicky": { surfaces: [{ key: "widgets", entity: "widget", title: "Widgets" }] },
+    paths: {
+      "/api/v1/widgets": {
+        get: {
+          operationId: "widget_list",
+          tags: ["widget"],
+          "x-clicky": { surface: "widgets", verb: "list", scope: "collection" },
+          responses: {},
+        },
+      },
+      "/api/v1/widgets/{id}": {
+        get: {
+          operationId: "widget_get",
+          tags: ["widget"],
+          "x-clicky": { surface: "widgets", verb: "get", scope: "entity", idParam: "id" },
+          parameters: [{ name: "id", in: "path", required: true }],
+          responses: {},
+        },
+      },
+      "/api/v1/widgets/{id}/restart": {
+        post: {
+          operationId: "widget_restart",
+          summary: "Restart a widget",
+          tags: ["widget"],
+          "x-clicky": {
+            surface: "widgets",
+            verb: "action",
+            actionName: "restart",
+            scope: "entity",
+            idParam: "id",
+          },
+          parameters: [{ name: "id", in: "path", required: true }],
+          responses: {},
+        },
+      },
+    },
+  };
+}
+
 function makeClickyDocument(
   fields: Array<{ name: string; label: string; value: string }>,
 ): ClickyDocument {
@@ -256,5 +301,43 @@ describe("OperationEntityPage", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("Response body")).toHaveTextContent('name: "Fallback widget"'),
     );
+  });
+
+  it("labels surface-mode actions with the short verb, matching the list page", async () => {
+    const executeMock = vi.fn(
+      async (path: string, method: string, params: Record<string, string>) => {
+        if (path === "/api/v1/widgets/{id}" && method === "get") {
+          return clickyResponse(
+            makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
+          );
+        }
+        return jsonResponse([]);
+      },
+    );
+    const client: OperationsApiClient = {
+      getOpenAPISpec: async () => makeSurfaceSpec(),
+      executeCommand: executeMock,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationEntityPage
+          id="one"
+          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+        />
+      </QueryClientProvider>,
+    );
+
+    // The shared action bar uses surfaceActionLabel: the short actionName
+    // "restart" → "Restart", not the long OpenAPI summary "Restart a widget".
+    expect(await screen.findByRole("button", { name: "Restart" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restart a widget" }),
+    ).not.toBeInTheDocument();
   });
 });

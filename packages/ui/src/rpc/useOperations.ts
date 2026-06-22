@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import type {
   ExecutionResponse,
   OpenAPISpec,
@@ -26,7 +27,22 @@ export interface OperationsApiClient {
     method: string,
     filterKey: string,
     query: string,
+    // Extra query params merged into the lookup request (e.g. a scope filter
+    // derived from a sibling form field). Lets a form-field lookup narrow the
+    // option set beyond the search term.
+    extraParams?: Record<string, string>,
   ): Promise<OperationLookupFilter>;
+  // getSchema fetches a resource's JSON Schema via content negotiation; undefined
+  // when the resource exposes none. submitForm sends a nested JSON body (create
+  // POST / update PUT) preserving nested objects and arrays. Both are optional so
+  // alternative client implementations can omit schema-driven forms.
+  getSchema?(path: string): Promise<JsonSchemaObject | undefined>;
+  submitForm?(
+    path: string,
+    method: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+  ): Promise<ExecutionResponse>;
 }
 
 export function useOpenAPI(client: OperationsApiClient) {

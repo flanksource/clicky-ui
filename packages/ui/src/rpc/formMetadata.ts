@@ -411,7 +411,7 @@ function nonNegativeInt(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
+export function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
   const merged = new Map<string, { label?: string; title?: string }>();
 
   for (const [value, node] of Object.entries(filter.options ?? {})) {

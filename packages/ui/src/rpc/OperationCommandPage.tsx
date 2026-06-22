@@ -1,19 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FilterBar } from "../components/FilterBar";
-import type {
-  ClickyCommandRuntime,
-  ClickyNode,
-  ClickyRow,
-  ClickyTableRowClick,
-  ClickyTableRowHref,
-} from "../data/Clicky";
+import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
-import { AcceptPicker } from "./AcceptPicker";
-import type { OperationPreviewMode } from "./accept-options";
 import { CommandForm } from "./CommandForm";
 import { pathParamNames, submitValue } from "./command-form-utils";
-import { CommandOutput } from "./CommandOutput";
 import type { RenderLink } from "./EndpointList";
 import {
   buildInitialParameterValues,
@@ -27,13 +17,18 @@ import {
 } from "./formMetadata";
 import { InlineError } from "./InlineError";
 import { OperationActionDialog } from "./OperationActionDialog";
-import {
-  isPositionalParam,
-  type ExecutionResponse,
-  type OpenAPIParameter,
-  type ResolvedOperation,
+import { OperationResultView } from "./OperationResultView";
+import { hrefForOperation } from "./rowNavigation";
+import type {
+  ExecutionResponse,
+  OpenAPIParameter,
+  ResolvedOperation,
 } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
+
+// All operation results are fetched as clicky documents; the in-result View
+// menu re-fetches other formats on demand via the response's requestUrl.
+const RESULT_ACCEPT = "application/clicky+json";
 
 export type OperationCommandPageProps = {
   client: OperationsApiClient;
@@ -64,18 +59,19 @@ export function OperationCommandPage({
   backLabel = "Back",
   renderLink,
   onNavigate,
+  commandRuntime,
   hideLockedPathFilters = Boolean(providedOperation),
   className,
 }: OperationCommandPageProps) {
-  const lookup = useOperationById(client, providedOperation ? undefined : operationId);
+  const lookup = useOperationById(
+    client,
+    providedOperation ? undefined : operationId,
+  );
   const operation = providedOperation ?? lookup.operation;
   const isLoading = providedOperation ? false : lookup.isLoading;
-  const [accept, setAccept] = useState("application/clicky+json");
-  const [previewMode, setPreviewMode] = useState<OperationPreviewMode>("hidden");
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [submitError, setSubmitError] = useState("");
   const [hasAutoRun, setHasAutoRun] = useState(false);
   const parameters = operation?.operation.parameters ?? [];
   const isGet = (operation?.method ?? "").toUpperCase() === "GET";
@@ -120,17 +116,19 @@ export function OperationCommandPage({
     [operation, operations],
   );
   const relatedOperations = useMemo(
-    () => (operation ? findRelatedOperations(operation, operations, lockedPathValues) : []),
+    () =>
+      operation
+        ? findRelatedOperations(operation, operations, lockedPathValues)
+        : [],
     [lockedPathValues, operation, operations],
   );
 
   // GET-mode parameter state: filter values + pagination cursor are driven
-  // by the page so they can flow natively into <CommandOutput>'s filter bar
-  // and pagination footer instead of through a separate OperationQueryFilterBar.
+  // by the page so they can flow natively into the result table's in-table
+  // FilterBar and pagination footer (via OperationResultView's filterConfig).
   const [values, setValues] = useState<ParameterValues>(effectiveInitialValues);
   useEffect(() => {
     setValues(effectiveInitialValues);
-    setSubmitError("");
   }, [effectiveInitialValues]);
   const debouncedValues = useDebouncedRecord(values, 250);
 
@@ -140,7 +138,12 @@ export function OperationCommandPage({
   }, [isGet, operationKey, debouncedValues, parameterSignature]);
 
   const lookupQuery = useQuery({
-    queryKey: ["operation-query-lookup", operation?.method, operation?.path, debouncedValues],
+    queryKey: [
+      "operation-query-lookup",
+      operation?.method,
+      operation?.path,
+      debouncedValues,
+    ],
     queryFn: async () => {
       if (!operation) return { filters: {} };
       return (
@@ -168,39 +171,24 @@ export function OperationCommandPage({
       lockedValues: lockedPathValues,
       hideLocked: hideLockedPathFilters,
     });
-  }, [isGet, parameters, values, lookupQuery.data, lockedPathValues, hideLockedPathFilters]);
+  }, [
+    isGet,
+    parameters,
+    values,
+    lookupQuery.data,
+    lockedPathValues,
+    hideLockedPathFilters,
+  ]);
 
   const dataTablePagination = useMemo(
     () => dataTablePaginationFromForm(formConfig.pagination, result),
     [formConfig.pagination, result],
   );
 
-  // Ref tracking the last submitted parameter signature so that the
-  // auto-submit-on-debounced-change effect and the manual submit button
-  // both coordinate against the same "have I already fired this set of
-  // values" check.
+  // Ref tracking the last submitted parameter signature so the
+  // auto-submit-on-debounced-change effect coordinates against the same
+  // "have I already fired this set of values" check.
   const lastSubmittedSignature = useRef("");
-
-  function handleManualSubmit() {
-    if (!operation) return;
-    const merged = { ...values, ...lockedPathValues };
-    const missingRequired = parameters.filter((param) => {
-      if (!param.required) return false;
-      return (merged[param.name] ?? "").trim() === "";
-    });
-    if (missingRequired.length > 0) {
-      setSubmitError(
-        `Missing required fields: ${missingRequired
-          .map((param) => titleCase(param.name))
-          .join(", ")}`,
-      );
-      return;
-    }
-    setSubmitError("");
-    setHasAutoRun(true);
-    lastSubmittedSignature.current = JSON.stringify(pruneParameterValues(merged));
-    void executeOperation(merged);
-  }
 
   async function executeOperation(values: ParameterValues) {
     if (!operation) return;
@@ -213,7 +201,7 @@ export function OperationCommandPage({
         operation.path,
         operation.method,
         packParameterValues(values, operation.operation.parameters ?? []),
-        { Accept: accept },
+        { Accept: RESULT_ACCEPT },
       );
       setResult(response);
     } catch (err) {
@@ -244,10 +232,11 @@ export function OperationCommandPage({
     if (missingRequired.length > 0) return;
 
     setHasAutoRun(true);
-    lastSubmittedSignature.current = JSON.stringify(pruneParameterValues(effectiveInitialValues));
+    lastSubmittedSignature.current = JSON.stringify(
+      pruneParameterValues(effectiveInitialValues),
+    );
     void executeOperation(effectiveInitialValues);
   }, [
-    accept,
     effectiveAutoRun,
     effectiveInitialValues,
     hasAutoRun,
@@ -269,25 +258,13 @@ export function OperationCommandPage({
     if (lastSubmittedSignature.current === signature) return;
     lastSubmittedSignature.current = signature;
     void executeOperation(merged);
-  }, [isGet, hasAutoRun, debouncedValues, lockedPathValues, parameterSignature]);
-
-  const getRowDetailHref = useCallback<ClickyTableRowHref>(
-    (row) => {
-      if (!detailOperation) return undefined;
-      const id = getClickyRowId(row);
-      if (!id) return undefined;
-      return hrefForOperation(detailOperation, [], { id });
-    },
-    [detailOperation],
-  );
-
-  const handleTableRowClick = useCallback<ClickyTableRowClick>(
-    (row) => {
-      const href = getRowDetailHref(row);
-      if (href) onNavigate?.(href);
-    },
-    [getRowDetailHref, onNavigate],
-  );
+  }, [
+    isGet,
+    hasAutoRun,
+    debouncedValues,
+    lockedPathValues,
+    parameterSignature,
+  ]);
 
   const backLink =
     backHref == null ? null : renderLink ? (
@@ -297,13 +274,18 @@ export function OperationCommandPage({
         children: backLabel,
       })
     ) : (
-      <a href={backHref} className="text-sm text-primary underline-offset-4 hover:underline">
+      <a
+        href={backHref}
+        className="text-sm text-primary underline-offset-4 hover:underline"
+      >
         {backLabel}
       </a>
     );
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">Loading operation...</div>;
+    return (
+      <div className="text-sm text-muted-foreground">Loading operation...</div>
+    );
   }
 
   if (!operation) {
@@ -318,7 +300,6 @@ export function OperationCommandPage({
   }
 
   const { path, method, operation: op } = operation;
-  const preview = buildOperationPreview(operation, effectiveInitialValues, accept, previewMode);
 
   return (
     <div className={className ?? "min-w-0 flex-1 space-y-6 p-6"}>
@@ -327,28 +308,23 @@ export function OperationCommandPage({
           {backLink}
           <div className="flex items-center gap-3">
             <MethodBadge method={method} />
-            <h1 className="truncate text-xl font-bold">{op.summary || op.operationId || path}</h1>
+            <h1 className="truncate text-xl font-bold">
+              {op.summary || op.operationId || path}
+            </h1>
           </div>
           <p className="mt-1 font-mono text-xs text-muted-foreground">{path}</p>
           {op.operationId && op.summary && (
-            <p className="mt-2 font-mono text-xs text-muted-foreground">{op.operationId}</p>
+            <p className="mt-2 font-mono text-xs text-muted-foreground">
+              {op.operationId}
+            </p>
           )}
           {op.description && op.description !== op.summary && (
-            <p className="mt-1 text-sm text-muted-foreground">{op.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {op.description}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-3">
-          <div>
-            <div className="mb-1 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Accept
-            </div>
-            <AcceptPicker
-              value={accept}
-              onChange={setAccept}
-              previewMode={previewMode}
-              onPreviewModeChange={setPreviewMode}
-            />
-          </div>
           {relatedOperations.length > 0 && (
             <div className="flex flex-wrap justify-end gap-2">
               {relatedOperations.map((related) =>
@@ -377,7 +353,7 @@ export function OperationCommandPage({
                     client={client}
                     initialValues={lockedPathValues}
                     label={related.label}
-                    defaultAccept={accept}
+                    defaultAccept={RESULT_ACCEPT}
                     {...(onNavigate ? { onNavigateAction: onNavigate } : {})}
                   />
                 ),
@@ -387,35 +363,8 @@ export function OperationCommandPage({
         </div>
       </div>
 
-      <section className="space-y-3">
-        {method.toUpperCase() === "GET" ? (
-          parameters.length > 0 ? (
-            // Before a result lands the FilterBar lives here so users can
-            // fill in path params / required inputs and submit. Once a
-            // result is showing AND auto-run is on (sidebar flow), the same
-            // filter chips relocate into the DataTable's filter bar via
-            // externalFilters, which is the unified placement the user asked
-            // for. The two branches share `formConfig.filters` so the values
-            // stay in sync.
-            !result || !effectiveAutoRun ? (
-              <div className="space-y-2">
-                <FilterBar
-                  autoSubmit={effectiveAutoRun}
-                  filters={formConfig.filters}
-                  {...(!effectiveAutoRun ? { onApply: () => handleManualSubmit() } : {})}
-                  applyLabel="Execute request"
-                  isPending={isExecuting}
-                  {...(formConfig.timeRange ? { timeRange: formConfig.timeRange } : {})}
-                />
-                {submitError && (
-                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                    {submitError}
-                  </div>
-                )}
-              </div>
-            ) : null
-          ) : null
-        ) : (
+      {method.toUpperCase() !== "GET" && (
+        <section className="space-y-3">
           <div className="rounded-lg border p-4">
             <CommandForm
               parameters={parameters}
@@ -423,44 +372,37 @@ export function OperationCommandPage({
               isPending={isExecuting}
               method={method}
               path={path}
-              accept={accept}
+              accept={RESULT_ACCEPT}
               initialValues={effectiveInitialValues}
             />
           </div>
-        )}
-
-        {preview && (
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{preview}</pre>
-        )}
-      </section>
+        </section>
+      )}
 
       {error ? (
-        <InlineError title={`Failed to load ${path} as ${accept}`} error={error} />
+        <InlineError title={`Failed to load ${path}`} error={error} />
       ) : isExecuting || result ? (
-        <div role="region" aria-label="Response body">
-          <CommandOutput
-            response={result}
-            loading={isExecuting}
-            loadingMessage="Loading execution results…"
-            bare
-            {...(detailOperation
-              ? {
-                  getTableRowHref: getRowDetailHref,
-                  onTableRowClick: handleTableRowClick,
-                  isTableRowClickable: (row: ClickyRow) => Boolean(getRowDetailHref(row)),
-                }
-              : {})}
-            {...(isGet && effectiveAutoRun && formConfig.filters.length > 0
-              ? { externalFilters: formConfig.filters }
-              : {})}
-            {...(isGet && effectiveAutoRun && formConfig.timeRange
-              ? { timeRange: formConfig.timeRange }
-              : {})}
-            {...(isGet && effectiveAutoRun && dataTablePagination
-              ? { pagination: dataTablePagination }
-              : {})}
-          />
-        </div>
+        <OperationResultView
+          response={result}
+          loading={isExecuting}
+          loadingMessage="Loading execution results…"
+          ariaLabel="Response body"
+          detailOperation={detailOperation}
+          {...(commandRuntime ? { commandRuntime } : {})}
+          {...(isGet && effectiveAutoRun
+            ? {
+                filterConfig: {
+                  filters: formConfig.filters,
+                  ...(formConfig.timeRange
+                    ? { timeRange: formConfig.timeRange }
+                    : {}),
+                },
+              }
+            : {})}
+          {...(isGet && effectiveAutoRun && dataTablePagination
+            ? { pagination: dataTablePagination }
+            : {})}
+        />
       ) : null}
     </div>
   );
@@ -487,21 +429,35 @@ function findRelatedOperations(
       if (!candidate.path.startsWith(`${basePath}/`)) return false;
       if (!pathTemplateSatisfied(candidate.path, pathValues)) return false;
       const method = candidate.method.toUpperCase();
-      return method === "GET" || method === "POST" || method === "PUT" || method === "DELETE";
+      return (
+        method === "GET" ||
+        method === "POST" ||
+        method === "PUT" ||
+        method === "DELETE"
+      );
     })
     .map((related) => {
       const method = related.method.toUpperCase();
-      const href = method === "GET" ? hrefForOperation(related, [], pathValues) : undefined;
+      const href =
+        method === "GET"
+          ? hrefForOperation(related, [], pathValues)
+          : undefined;
       return {
         operation: related,
         label: operationLabel(related),
         ...(href ? { href } : {}),
       };
     })
-    .filter((related) => related.operation.method.toUpperCase() !== "GET" || related.href);
+    .filter(
+      (related) =>
+        related.operation.method.toUpperCase() !== "GET" || related.href,
+    );
 }
 
-function findDetailOperation(current: ResolvedOperation, operations: ResolvedOperation[]) {
+function findDetailOperation(
+  current: ResolvedOperation,
+  operations: ResolvedOperation[],
+) {
   const method = current.method.toUpperCase();
   const detailPath = `${current.path.replace(/\/+$/, "")}/{id}`;
   return operations.find(
@@ -512,41 +468,6 @@ function findDetailOperation(current: ResolvedOperation, operations: ResolvedOpe
         (param) => param.in === "path" && param.name === "id" && param.required,
       ),
   );
-}
-
-function hrefForOperation(
-  operation: ResolvedOperation,
-  args: string[] = [],
-  flags: Record<string, string> = {},
-): string | undefined {
-  let route = apiPathToRoutePath(operation.path);
-  const consumedFlags = new Set<string>();
-
-  pathParamNames(operation.path).forEach((name, index) => {
-    const value = flags[name] ?? args[index];
-    if (!value) return;
-    consumedFlags.add(name);
-    route = route.replace(`:${name}`, encodeURIComponent(value));
-  });
-
-  if (route.includes(":")) return undefined;
-
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(flags)) {
-    if (value && !consumedFlags.has(key)) search.set(key, value);
-  }
-  const query = search.toString();
-  return query ? `${route}?${query}` : route;
-}
-
-function apiPathToRoutePath(path: string): string {
-  const cliPath = path
-    .trim()
-    .replace(/^\/api\/v1\/?/, "")
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
-  if (!cliPath) return "/";
-  return `/${cliPath.replace(/\{([^}]+)\}/g, ":$1")}`;
 }
 
 function pathTemplateSatisfied(path: string, values: Record<string, string>) {
@@ -560,60 +481,6 @@ function operationLabel(operation: ResolvedOperation): string {
     operation.operation.operationId ||
     operation.method;
   return titleCase(actionName.replace(/[_-]+/g, " "));
-}
-
-function buildOperationPreview(
-  operation: ResolvedOperation,
-  values: ParameterValues,
-  accept: string,
-  mode: OperationPreviewMode,
-) {
-  if (mode === "hidden") return "";
-  if (mode === "cli") return buildCliPreview(operation, values);
-  return buildCurlPreview(operation, values, accept);
-}
-
-function buildCurlPreview(operation: ResolvedOperation, values: ParameterValues, accept: string) {
-  const params = operation.operation.parameters ?? [];
-  const parts = [`curl -X ${operation.method.toUpperCase()}`];
-  if (accept !== "application/json") parts.push(`-H "Accept: ${accept}"`);
-  let url = operation.path;
-  const queryParts: string[] = [];
-  for (const param of params) {
-    const value = submitValue(param, values[param.name]);
-    if (!value) continue;
-    if (param.in === "path") {
-      url = url.replace(`{${param.name}}`, encodeURIComponent(value));
-    } else if (param.in === "query") {
-      queryParts.push(`${encodeURIComponent(param.name)}=${encodeURIComponent(value)}`);
-    }
-  }
-  if (queryParts.length > 0) url += `?${queryParts.join("&")}`;
-  parts.push(`"${url}"`);
-  return parts.join(" ");
-}
-
-function buildCliPreview(operation: ResolvedOperation, values: ParameterValues) {
-  const command = operation.operation["x-clicky"]?.command;
-  if (!command) return buildCurlPreview(operation, values, "application/json");
-  const params = operation.operation.parameters ?? [];
-  const positionalNames = new Set(params.filter(isPositionalParam).map((param) => param.name));
-  const parts = [command.replaceAll("/", " ")];
-  for (const param of params) {
-    const value = submitValue(param, values[param.name]);
-    if (!value) continue;
-    if (param.in === "path" || positionalNames.has(param.name)) {
-      parts.push(shellQuote(value));
-      continue;
-    }
-    parts.push(`--${param.name}`, shellQuote(value));
-  }
-  return parts.join(" ");
-}
-
-function shellQuote(value: string) {
-  if (/^[a-zA-Z0-9_./:@-]+$/.test(value)) return value;
-  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function stripRunnerParams(values: ParameterValues): ParameterValues {
@@ -669,24 +536,4 @@ function writeQueryParameterValuesToUrl(
   if (next !== current) {
     window.history.replaceState(window.history.state, "", next);
   }
-}
-
-function getClickyRowId(row: ClickyRow) {
-  const candidates = ["_id", "id", "ID", "guid", "GUID"];
-  for (const key of candidates) {
-    const value = clickyNodeText(row.cells[key]);
-    if (value) return value;
-  }
-  return undefined;
-}
-
-function clickyNodeText(node: ClickyNode | undefined): string {
-  if (!node) return "";
-  if (node.plain) return node.plain;
-  if (node.text) return node.text;
-  if (node.source) return node.source;
-  if (node.children) return node.children.map(clickyNodeText).join("");
-  if (node.items) return node.items.map(clickyNodeText).join(" ");
-  if (node.fields) return node.fields.map((field) => clickyNodeText(field.value)).join(" ");
-  return "";
 }

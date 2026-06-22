@@ -17,4 +17,3 @@ export const VIEW_OPTIONS = [
 
 export type AcceptOption = { value: string; label: string };
 export type AcceptValue = (typeof ACCEPT_OPTIONS)[number]["value"];
-export type OperationPreviewMode = "hidden" | "curl" | "cli";

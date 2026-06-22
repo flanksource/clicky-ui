@@ -1,3 +1,4 @@
+import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import type {
   ExecutionPagination,
   ExecutionResponse,
@@ -70,9 +71,17 @@ export interface SharedOperationsApiClient extends OperationsApiClient {
     method: string,
     filterKey: string,
     query: string,
+    extraParams?: Record<string, string>,
   ): Promise<OperationLookupFilter>;
   executeCommandBody(
     path: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+  ): Promise<ExecutionResponse>;
+  getSchema(path: string): Promise<JsonSchemaObject | undefined>;
+  submitForm(
+    path: string,
+    method: string,
     body: Record<string, unknown>,
     headers?: Record<string, string>,
   ): Promise<ExecutionResponse>;
@@ -169,6 +178,39 @@ export function createOperationsApiClient(
       });
     },
 
+    // getSchema fetches a resource's JSON Schema via content negotiation
+    // (Accept: application/schema+json on the same endpoint). It returns
+    // undefined when the resource serves no schema (the request falls through to
+    // its data representation), so callers can fall back to a parameter form.
+    async getSchema(path) {
+      const response = await request(path, "GET", {
+        headers: { Accept: "application/schema+json" },
+      });
+      if (!response.ok) return undefined;
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("schema")) return undefined;
+      const parsed = await readResponseBody(response, "json");
+      const data = parsed.data;
+      return data && typeof data === "object" ? (data as JsonSchemaObject) : undefined;
+    },
+
+    // submitForm sends a nested JSON body with the given HTTP method (POST to
+    // create, PUT to update). Unlike executeCommand it preserves nested objects
+    // and arrays — the server reads the raw body (clicky's RequestFromContext),
+    // so connection `properties` and profile `provider`/`params`/`columns`
+    // survive intact.
+    async submitForm(path, method, body, headers) {
+      const upper = method.toUpperCase();
+      const response = await request(path, upper, {
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(body),
+      });
+      return parseExecutionResponse(response, await readResponseBody(response, "json"), {
+        method: upper,
+        requestUrl: path,
+      });
+    },
+
     async lookupFilters(path, method, params, headers) {
       const upper = method.toUpperCase();
       const resolved = resolvePathParams(path, params);
@@ -198,10 +240,11 @@ export function createOperationsApiClient(
       return (parsed.data as OperationLookupResponse | undefined) ?? { filters: {} };
     },
 
-    async lookupFilterOptions(path, method, filterKey, query) {
+    async lookupFilterOptions(path, method, filterKey, query, extraParams) {
       const upper = method.toUpperCase();
       const resolved = resolvePathParams(path, {});
       const queryParams = {
+        ...(extraParams ?? {}),
         __lookup: "filters",
         __lookup_filter: filterKey,
         __lookup_q: query,
