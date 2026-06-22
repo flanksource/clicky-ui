@@ -868,6 +868,50 @@ describe("FilterBar", () => {
     vi.useRealTimers();
   });
 
+  it("commits a selected onSearch match while the option query remains active", async () => {
+    vi.useFakeTimers();
+    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+    const onChange = vi.fn();
+
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "plan",
+            kind: "multi",
+            label: "Plan",
+            value: {},
+            options: [{ value: "plan-0000", label: "Plan 0000" }],
+            truncated: true,
+            total: 250,
+            onSearch,
+            onChange,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
+      target: { value: "plan-0225" },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Plan 0225$/ }));
+    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ "plan-0225": "include" });
+    expect(screen.getByLabelText("Filter Plan options")).toHaveValue("plan-0225");
+    vi.useRealTimers();
+  });
+
   it("does not call onSearch for an empty query and filters the head client-side", () => {
     const onSearch = vi.fn();
     render(
@@ -896,6 +940,56 @@ describe("FilterBar", () => {
     expect(onSearch).not.toHaveBeenCalled();
     expect(screen.getByText("Plan 7")).toBeInTheDocument();
     expect(screen.queryByText("Plan 1")).not.toBeInTheDocument();
+  });
+
+  it("keeps a pending multi-filter selection when the parent rebuilds an equivalent value", () => {
+    vi.useFakeTimers();
+    const onPlan = vi.fn();
+
+    function Fixture({ nonce }: { nonce: number }) {
+      const filters: FilterBarFilter[] = [
+        {
+          key: "plan",
+          kind: "multi",
+          label: "Plan",
+          value: {},
+          options: [{ value: "plan-0000", label: "Plan 0000" }],
+          onChange: onPlan,
+        },
+      ];
+      return (
+        <div data-nonce={nonce}>
+          <FilterBar filters={filters} />
+        </div>
+      );
+    }
+
+    const { rerender } = render(<Fixture nonce={0} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    const includeRegion = document.querySelector(
+      '[data-filter-option="plan-0000"] [data-tristate-region="include"]',
+    );
+    expect(includeRegion).toBeInstanceOf(HTMLElement);
+    fireEvent.click(includeRegion as HTMLElement);
+
+    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    rerender(<Fixture nonce={1} />);
+
+    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+    expect(onPlan).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(onPlan).toHaveBeenCalledWith({ "plan-0000": "include" });
+    vi.useRealTimers();
   });
 });
 

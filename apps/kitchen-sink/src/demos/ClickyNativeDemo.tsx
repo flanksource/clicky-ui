@@ -10,7 +10,12 @@ import { DemoSection } from "./Section";
 const summaryNode: ClickyNode = {
   kind: "text",
   children: [
-    { kind: "badge", badgeLabel: "env", badgeValue: "prod", badgeColor: "#2563eb" },
+    {
+      kind: "badge",
+      badgeLabel: "env",
+      badgeValue: "prod",
+      badgeColor: "#2563eb",
+    },
     { kind: "text", text: " " },
     {
       kind: "link",
@@ -23,11 +28,75 @@ const summaryNode: ClickyNode = {
   ],
 };
 
+const markdownBlocksNode: ClickyNode = {
+  kind: "list",
+  unstyled: true,
+  items: [
+    {
+      kind: "heading",
+      level: 2,
+      content: { kind: "text", text: "Accounting policy" },
+    },
+    {
+      kind: "blockquote",
+      content: {
+        kind: "text",
+        text: "Revenue is recognized when control transfers to the customer.",
+      },
+    },
+    {
+      kind: "admonition",
+      severity: "tip",
+      label: { kind: "text", text: "Reviewer note" },
+      content: {
+        kind: "text",
+        text: "Tie the revenue note back to the signed customer schedule before release.",
+      },
+    },
+    {
+      kind: "text",
+      text: "Receivables exclude intercompany balances",
+      children: [{ kind: "footnote-ref", id: "ar" }],
+    },
+    {
+      kind: "footnotes",
+      items: [
+        {
+          kind: "footnote",
+          id: "ar",
+          content: {
+            kind: "text",
+            text: "Intercompany balances eliminate on consolidation.",
+          },
+        },
+      ],
+    },
+  ],
+};
+
 const tableColumns: ClickyColumn[] = [
   { name: "service", label: "Service", sortable: true, grow: true },
-  { name: "status", label: "Status", kind: "status", sortable: true, shrink: true },
-  { name: "labels", label: "Labels", kind: "tags", filterable: true, grow: true },
-  { name: "updated", label: "Updated", kind: "timestamp", sortable: true, shrink: true },
+  {
+    name: "status",
+    label: "Status",
+    kind: "status",
+    sortable: true,
+    shrink: true,
+  },
+  {
+    name: "labels",
+    label: "Labels",
+    kind: "tags",
+    filterable: true,
+    grow: true,
+  },
+  {
+    name: "updated",
+    label: "Updated",
+    kind: "timestamp",
+    sortable: true,
+    shrink: true,
+  },
 ];
 
 const tableRows: ClickyRow[] = [
@@ -47,7 +116,11 @@ const tableRows: ClickyRow[] = [
     detail: {
       kind: "code",
       language: "json",
-      source: JSON.stringify({ requests: 12492, errors: 3, p95: "82ms" }, null, 2),
+      source: JSON.stringify(
+        { requests: 12492, errors: 3, p95: "82ms" },
+        null,
+        2,
+      ),
     },
   },
   {
@@ -63,7 +136,10 @@ const tableRows: ClickyRow[] = [
       },
       updated: { kind: "text", text: "2026-05-18T10:26:00Z" },
     },
-    detail: { kind: "text", text: "Retry queue is above the warning threshold." },
+    detail: {
+      kind: "text",
+      text: "Retry queue is above the warning threshold.",
+    },
   },
 ];
 
@@ -77,6 +153,16 @@ export function ClickyNativeDemo() {
       >
         <div className="rounded-md border border-border bg-background p-density-3">
           <ClickyNodeView node={summaryNode} />
+        </div>
+      </DemoSection>
+
+      <DemoSection
+        id="clicky-markdown-blocks"
+        title="Markdown Blocks"
+        description="Accounting disclosure example with section notes and source references."
+      >
+        <div className="rounded-md border border-border bg-background p-density-3">
+          <ClickyNodeView node={markdownBlocksNode} />
         </div>
       </DemoSection>
 

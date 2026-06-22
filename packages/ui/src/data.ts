@@ -79,6 +79,25 @@ export * from "./icons";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
 export {
+  SchemaViewer,
+  SchemaViewerRow,
+  SchemaFieldMetaPanel,
+  type SchemaViewerProps,
+  type SchemaFieldMetaPanelProps,
+} from "./data/SchemaViewer";
+export {
+  buildSchemaTree,
+  buildSchemaViewerTree,
+  buildStepBranchTree,
+  hasHoverMeta,
+  type SchemaNode,
+  type SchemaViewerAnnotation,
+  type SchemaViewerEnumValue,
+  type SchemaViewerFieldMeta,
+  type SchemaViewerNode,
+  type SchemaViewerSourceLocation,
+} from "./data/schema-viewer-model";
+export {
   Properties,
   type PropertiesAction,
   type PropertiesDensity,

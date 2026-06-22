@@ -2542,14 +2542,21 @@ function useDebouncedMultiDraft(
   const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
   const latestOnChange = useRef(onChange);
+  const latestValue = useRef(value);
+  const valueKey = multiFilterValueKey(value);
 
   useEffect(() => {
     latestOnChange.current = onChange;
   }, [onChange]);
 
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!sameMultiFilterValue(latestValue.current, value)) {
+      latestValue.current = value;
+      setDraft(value);
+      return;
+    }
+    latestValue.current = value;
+  }, [valueKey, value]);
 
   useEffect(() => {
     if (sameMultiFilterValue(draft, value)) return;
@@ -2564,9 +2571,16 @@ function useDebouncedMultiDraft(
     }, FILTER_INPUT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [autoSubmit, draft, value]);
+  }, [autoSubmit, draft, valueKey]);
 
   return [draft, setDraft] as const;
+}
+
+function multiFilterValueKey(value: Record<string, FilterBarMultiFilterMode>): string {
+  return Object.keys(value)
+    .sort()
+    .map((key) => `${key}:${value[key]}`)
+    .join("\u0000");
 }
 
 function sameMultiFilterValue(

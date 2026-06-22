@@ -27,7 +27,12 @@ import {
 } from "./formMetadata";
 import { InlineError } from "./InlineError";
 import { OperationActionDialog } from "./OperationActionDialog";
-import { isPositionalParam, type ExecutionResponse, type ResolvedOperation } from "./types";
+import {
+  isPositionalParam,
+  type ExecutionResponse,
+  type OpenAPIParameter,
+  type ResolvedOperation,
+} from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
 
 export type OperationCommandPageProps = {
@@ -91,7 +96,10 @@ export function OperationCommandPage({
             parameters,
             operation.method,
             {},
-            stripRunnerParams(initialValues),
+            {
+              ...readQueryParameterValuesFromUrl(parameters),
+              ...stripRunnerParams(initialValues),
+            },
           )
         : stripRunnerParams(initialValues),
     [initialValues, operation?.method, parameterSignature],
@@ -125,6 +133,11 @@ export function OperationCommandPage({
     setSubmitError("");
   }, [effectiveInitialValues]);
   const debouncedValues = useDebouncedRecord(values, 250);
+
+  useEffect(() => {
+    if (!isGet || !operation) return;
+    writeQueryParameterValuesToUrl(debouncedValues, parameters);
+  }, [isGet, operationKey, debouncedValues, parameterSignature]);
 
   const lookupQuery = useQuery({
     queryKey: ["operation-query-lookup", operation?.method, operation?.path, debouncedValues],
@@ -610,6 +623,52 @@ function stripRunnerParams(values: ParameterValues): ParameterValues {
     next[key] = value;
   }
   return next;
+}
+
+function readQueryParameterValuesFromUrl(
+  parameters: OpenAPIParameter[],
+): ParameterValues {
+  if (typeof window === "undefined") return {};
+  const queryParamNames = new Set(
+    parameters.filter((param) => param.in === "query").map((p) => p.name),
+  );
+  if (queryParamNames.size === 0) return {};
+
+  const values: ParameterValues = {};
+  const search = new URLSearchParams(window.location.search);
+  for (const name of queryParamNames) {
+    const value = search.get(name);
+    if (value != null && value !== "") {
+      values[name] = value;
+    }
+  }
+  return values;
+}
+
+function writeQueryParameterValuesToUrl(
+  values: ParameterValues,
+  parameters: OpenAPIParameter[],
+) {
+  if (typeof window === "undefined") return;
+  const queryParameters = parameters.filter((param) => param.in === "query");
+  if (queryParameters.length === 0) return;
+
+  const search = new URLSearchParams(window.location.search);
+  for (const param of queryParameters) {
+    const value = submitValue(param, values[param.name]);
+    if (value == null) {
+      search.delete(param.name);
+    } else {
+      search.set(param.name, value);
+    }
+  }
+
+  const query = search.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (next !== current) {
+    window.history.replaceState(window.history.state, "", next);
+  }
 }
 
 function getClickyRowId(row: ClickyRow) {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Clicky, type ClickyDocument, type ClickyNode } from "./Clicky";
-import { clickyFixture } from "./Clicky.fixtures";
+import { clickyFixture, clickyMarkdownBlocksFixture } from "./Clicky.fixtures";
 
 const meta: Meta<typeof Clicky> = {
   title: "Data/Clicky",
@@ -27,6 +27,73 @@ export const RichDocument: Story = {
 export const JsonStringPayload: Story = {
   args: {
     data: JSON.stringify(clickyFixture),
+  },
+};
+
+export const MarkdownBlocks: Story = {
+  args: {
+    data: clickyMarkdownBlocksFixture,
+  },
+};
+
+const admonitionSeveritiesDoc: ClickyDocument = {
+  version: 1,
+  node: {
+    kind: "list",
+    unstyled: true,
+    items: [
+      {
+        kind: "admonition",
+        severity: "note",
+        label: { kind: "text", text: "Note" },
+        content: {
+          kind: "text",
+          text: "Board approval is tracked separately.",
+        },
+      },
+      {
+        kind: "admonition",
+        severity: "info",
+        label: { kind: "text", text: "Information" },
+        content: {
+          kind: "text",
+          text: "Comparatives use the prior reporting pack.",
+        },
+      },
+      {
+        kind: "admonition",
+        severity: "tip",
+        label: { kind: "text", text: "Tip" },
+        content: {
+          kind: "text",
+          text: "Attach the signed trial balance before export.",
+        },
+      },
+      {
+        kind: "admonition",
+        severity: "warning",
+        label: { kind: "text", text: "Warning" },
+        content: {
+          kind: "text",
+          text: "Manual review is required for this note.",
+        },
+      },
+      {
+        kind: "admonition",
+        severity: "danger",
+        label: { kind: "text", text: "Danger" },
+        content: {
+          kind: "text",
+          text: "Publication is blocked until cash reconciles.",
+        },
+      },
+    ],
+  },
+};
+
+export const AdmonitionSeverities: Story = {
+  args: {
+    data: admonitionSeveritiesDoc,
   },
 };
 
