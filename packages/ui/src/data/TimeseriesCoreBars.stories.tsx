@@ -108,7 +108,7 @@ const meta: Meta<typeof TimeseriesCoreBars> = {
     docs: {
       description: {
         component:
-          "CPU utilisation as a row of bars — one per core (ceil of the CPU limit) — filled by the latest usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Usage and limit are read live from the timeseries store. `showValue` controls the caption, and `orientation` switches the bars between vertical columns and horizontal rows. The pure `deriveCoreBars(usageMilli, limitMilli)` helper computes the model. Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
+          "Quantised utilisation as a row of bars — one per unit of capacity (ceil of the limit) — filled by the latest usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Defaults to CPU cores; pass `unit` (e.g. `{ perBar: 1 GiB, label: 'GB' }`) to render memory or any other capacity. Usage and limit are read live from the timeseries store. `showValue` controls the caption, and `orientation` switches the bars between vertical columns and horizontal rows. The pure `deriveCoreBars(usage, limit, perBar)` helper computes the model. Hovering a gauge opens a card with its current/min/max/avg/capacity over the window (`hoverCard`, default on). Stories pass a synthetic `fetcher` and `refreshMs={0}`.",
       },
     },
   },
@@ -190,4 +190,16 @@ export const MetricLimit: Story = {
 
 export const CellVariants: Story = {
   render: () => <CoreBarsCellVariants />,
+};
+
+/** Memory as one bar per GB via the `unit` prop: 2.5 GB used of 4 GB. */
+export const MemoryGigabytes: Story = {
+  args: {
+    title: "Mem",
+    value: { id: "mem.rss" },
+    max: 4 * 1024 ** 3,
+    unit: { perBar: 1024 ** 3, label: "GB", barLabel: "GB" },
+    refreshMs: 0,
+    fetcher: makeFetcher([{ match: "mem", latest: 2.5 * 1024 ** 3 }]),
+  },
 };

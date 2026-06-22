@@ -45,6 +45,15 @@ describe("deriveCoreBars", () => {
     expect(deriveCoreBars(1.2 * ONE_CORE, 0).coreCount).toBe(2);
   });
 
+  it("scales bars by a custom perBar unit (1 GiB per bar)", () => {
+    const GiB = 1024 ** 3;
+    const model = deriveCoreBars(2.5 * GiB, 4 * GiB, GiB);
+    expect(model.coreCount).toBe(4);
+    expect(model.usageCores).toBeCloseTo(2.5);
+    expect(model.limitCores).toBeCloseTo(4);
+    expect(model.bars.map((b) => Number(b.fill.toFixed(2)))).toEqual([1, 1, 0.5, 0]);
+  });
+
   it("renders at least one (empty) bar with no usage reading", () => {
     const model = deriveCoreBars(undefined, 2 * ONE_CORE);
     expect(model.hasUsage).toBe(false);

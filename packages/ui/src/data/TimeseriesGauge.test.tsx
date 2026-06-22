@@ -60,4 +60,25 @@ describe("TimeseriesGauge", () => {
     expect(screen.queryByText("CPU")).not.toBeInTheDocument();
     expect(container.querySelector("svg")).toBeInTheDocument();
   });
+
+  it("renders a linear progress bar instead of the arc when shape is linear", async () => {
+    const { container } = renderWithQueryClient(
+      <TimeseriesGauge
+        shape="linear"
+        title="Disk"
+        unit="percent"
+        centerDisplay="percent"
+        value={{ id: "disk.usage" }}
+        max={100}
+        expandable={false}
+        refreshMs={0}
+        fetcher={fetcher}
+      />,
+    );
+
+    expect(await screen.findByText("42%")).toBeInTheDocument();
+    expect(container.querySelector('[data-shape="linear"]')).toBeInTheDocument();
+    // The linear shape replaces the SVG arc with a div-based progress bar.
+    expect(container.querySelector("svg")).not.toBeInTheDocument();
+  });
 });

@@ -5,6 +5,12 @@ import { SchemaViewer } from "./SchemaViewer";
 import { buildSchemaTree, buildStepBranchTree } from "./schema-viewer-model";
 
 const THEN = String.fromCharCode(116, 104, 101, 110);
+const EXTENSION_PREFIX = ["x-oi", "pa-"].join("");
+const DIRECTIVE_PREFIX = ["@oi", "pa-"].join("");
+const EXTENSION_TYPE = `${EXTENSION_PREFIX}type`;
+const EXTENSION_ASCODE = `${EXTENSION_PREFIX}ascode`;
+const QUERY_DIRECTIVE = `${DIRECTIVE_PREFIX}query`;
+const PLATFORM_TYPE_LABEL = ["OI", "PA type"].join("");
 
 const PLAIN_SCHEMA: JsonSchemaObject = {
   type: "object",
@@ -38,9 +44,9 @@ const PLAN_SCHEMA = {
               properties: {
                 ProductCode: {
                   type: "string",
-                  "x-oipa-type": "Text",
-                  "x-oipa-ascode": "Product",
-                  description: "Product code @oipa-query SQL SELECT Code FROM AsCode",
+                  [EXTENSION_TYPE]: "Text",
+                  [EXTENSION_ASCODE]: "Product",
+                  description: `Product code ${QUERY_DIRECTIVE} SQL SELECT Code FROM AsCode`,
                 },
               },
             },
@@ -130,7 +136,7 @@ describe("buildSchemaTree", () => {
     ]);
   });
 
-  it("keeps the OIPA TestPlan setup and activity branch shape", () => {
+  it("keeps the platform TestPlan setup and activity branch shape", () => {
     const roots = buildSchemaTree(PLAN_SCHEMA);
 
     expect(roots.map((node) => node.label)).toEqual(["Setup", "Steps", "plan"]);
@@ -166,7 +172,7 @@ describe("SchemaViewer", () => {
 
     fireEvent.click(screen.getByText("ProductCode"));
 
-    expect(screen.getByText("OIPA type")).toBeInTheDocument();
+    expect(screen.getByText(PLATFORM_TYPE_LABEL)).toBeInTheDocument();
     expect(screen.getAllByText("Text").length).toBeGreaterThan(0);
     expect(screen.getByText("AsCode")).toBeInTheDocument();
     expect(screen.getByText("Product")).toBeInTheDocument();

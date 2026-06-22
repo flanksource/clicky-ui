@@ -1,13 +1,23 @@
-export { OperationCatalog, type OperationCatalogProps } from "./rpc/OperationCatalog";
-export { EntityExplorerApp, type EntityExplorerAppProps } from "./rpc/EntityExplorerApp";
-export { AcceptPicker, type AcceptPickerProps } from "./rpc/AcceptPicker";
+export {
+  OperationCatalog,
+  type OperationCatalogProps,
+} from "./rpc/OperationCatalog";
+export {
+  EntityExplorerApp,
+  type EntityExplorerAppProps,
+} from "./rpc/EntityExplorerApp";
 export {
   ACCEPT_OPTIONS,
   VIEW_OPTIONS,
   type AcceptOption,
   type AcceptValue,
-  type OperationPreviewMode,
 } from "./rpc/accept-options";
+export {
+  SchemaActionForm,
+  type SchemaActionFormProps,
+  type FormActionContext,
+  type FormActionsRenderer,
+} from "./rpc/SchemaActionForm";
 export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
 export {
   normalizeParameters,
@@ -21,8 +31,21 @@ export {
   OperationActionDialog,
   type OperationActionDialogProps,
 } from "./rpc/OperationActionDialog";
-export { OperationEntityPage, type OperationEntityPageProps } from "./rpc/OperationEntityPage";
-export { OperationCommandPage, type OperationCommandPageProps } from "./rpc/OperationCommandPage";
+export {
+  OperationEntityPage,
+  type OperationEntityPageProps,
+} from "./rpc/OperationEntityPage";
+export {
+  OperationCommandPage,
+  type OperationCommandPageProps,
+} from "./rpc/OperationCommandPage";
+export {
+  OperationResultView,
+  type OperationResultViewProps,
+  type OperationResultFilterConfig,
+  type ResultRenderer,
+  type ResultRenderContext,
+} from "./rpc/OperationResultView";
 export {
   EndpointList,
   type EndpointListProps,

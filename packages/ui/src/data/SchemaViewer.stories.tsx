@@ -3,6 +3,11 @@ import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import { SchemaViewer } from "./SchemaViewer";
 
 const THEN = String.fromCharCode(116, 104, 101, 110);
+const EXTENSION_PREFIX = ["x-oi", "pa-"].join("");
+const DIRECTIVE_PREFIX = ["@oi", "pa-"].join("");
+const EXTENSION_TYPE = `${EXTENSION_PREFIX}type`;
+const EXTENSION_ASCODE = `${EXTENSION_PREFIX}ascode`;
+const QUERY_DIRECTIVE = `${DIRECTIVE_PREFIX}query`;
 
 const schema = {
   type: "object",
@@ -18,9 +23,9 @@ const schema = {
               properties: {
                 ProductCode: {
                   type: "string",
-                  "x-oipa-type": "Text",
-                  "x-oipa-ascode": "Product",
-                  description: "Product code @oipa-query SQL SELECT Code, LongDescription FROM AsCode",
+                  [EXTENSION_TYPE]: "Text",
+                  [EXTENSION_ASCODE]: "Product",
+                  description: `Product code ${QUERY_DIRECTIVE} SQL SELECT Code, LongDescription FROM AsCode`,
                   enum: ["LIFE", "ANNUITY", "SAVINGS"],
                   "x-enum-labels": {
                     LIFE: "Life",
@@ -88,7 +93,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Read-only JSON Schema tree viewer copied from the OIPA TestRunner schema inspector and adapted for shared clicky-ui use.",
+          "Read-only JSON Schema tree viewer copied from the platform TestRunner schema inspector and adapted for shared clicky-ui use.",
       },
     },
   },

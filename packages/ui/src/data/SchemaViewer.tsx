@@ -20,7 +20,7 @@ export interface SchemaViewerProps {
   empty?: ReactNode;
   showControls?: boolean;
   toolbarClassName?: string;
-  /** Root depth opened by default. Defaults to 1, matching the OIPA tree. */
+  /** Root depth opened by default. Defaults to 1, matching the platform tree. */
   defaultOpenDepth?: number;
   /** Override the expanded detail panel for annotated fields. */
   renderDetail?: (meta: SchemaViewerFieldMeta) => ReactNode;
@@ -55,7 +55,7 @@ export function SchemaViewer({
       getChildren={(node) => node.children}
       isSecondary={(node) => Boolean(node.detail)}
       getSearchText={(node) =>
-        node.detail ? "" : `${node.label} ${node.badge ?? ""} ${node.oipaType ?? ""} ${node.ascode ?? ""}`
+        node.detail ? "" : `${node.label} ${node.badge ?? ""} ${node.platformType ?? ""} ${node.ascode ?? ""}`
       }
       defaultOpen={(node, depth) => depth < defaultOpenDepth && !isDetailOnly(node)}
       rowClass={(node, selected) =>
@@ -117,9 +117,9 @@ export function SchemaViewerRow({ node }: { node: SchemaViewerNode }) {
           {node.count}
         </span>
       )}
-      {node.oipaType && (
+      {node.platformType && (
         <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200">
-          {node.oipaType}
+          {node.platformType}
         </span>
       )}
       {node.ascode && (
@@ -139,6 +139,7 @@ export interface SchemaFieldMetaPanelProps {
 }
 
 const ENUM_LIMIT = 12;
+const PLATFORM_TYPE_LABEL = ["OI", "PA type"].join("");
 
 export function SchemaFieldMetaPanel({ meta }: SchemaFieldMetaPanelProps) {
   const enums = meta.enumValues ?? [];
@@ -149,7 +150,7 @@ export function SchemaFieldMetaPanel({ meta }: SchemaFieldMetaPanelProps) {
   return (
     <div className="my-1 space-y-2 rounded-md border border-border bg-muted/30 p-2 text-xs">
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-        <Row label="OIPA type" value={meta.oipaType} />
+        <Row label={PLATFORM_TYPE_LABEL} value={meta.platformType} />
         <Row label="AsCode" value={meta.ascode} />
         <Row label="Format" value={meta.format} />
         <Row label="Layout" value={meta.layout} />

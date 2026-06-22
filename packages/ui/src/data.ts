@@ -73,6 +73,7 @@ export {
 } from "./data/Icon";
 export {
   setFallbackIconProvider,
+  type FallbackIconComponent,
   type FallbackIconProps,
 } from "./data/icon-fallback";
 export * from "./icons";
@@ -115,6 +116,16 @@ export {
 export { normalizeLogsTableRows } from "./data/logs-normalize";
 export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
+export { MarkdownEditor, type MarkdownEditorProps } from "./data/MarkdownEditor";
+export {
+  buildMarkdownPreviewUrl,
+  clickyFormatForMarkdownPreview,
+  MARKDOWN_EDITOR_PREVIEW_FORMATS,
+  type MarkdownEditorPreviewFormat,
+  type MarkdownEditorPreviewHeaders,
+  type MarkdownEditorPreviewRequest,
+  type MarkdownEditorPreviewResult,
+} from "./data/MarkdownEditor.model";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
@@ -146,14 +157,22 @@ export {
   TimeseriesGauge,
   type GaugeSeries,
   type TimeseriesGaugeProps,
+  type TimeseriesGaugeShape,
   type TimeseriesGaugeVariant,
 } from "./data/TimeseriesGauge";
 export {
   TimeseriesCoreBars,
+  type CoreBarsUnit,
   type TimeseriesCoreBarsOrientation,
   type TimeseriesCoreBarsProps,
   type TimeseriesCoreBarsVariant,
 } from "./data/TimeseriesCoreBars";
+export {
+  GaugeHoverCard,
+  type GaugeHoverCardProps,
+  type GaugeHoverRow,
+} from "./data/GaugeHoverCard";
+export { seriesStats, type SeriesStats } from "./data/gauge-stats";
 export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
 export {
   formatReplicaCounts,

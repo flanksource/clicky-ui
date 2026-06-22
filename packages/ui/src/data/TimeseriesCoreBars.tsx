@@ -5,9 +5,26 @@ import { Icon, type StaticIconComponent } from "./Icon";
 import type { GaugeSeries } from "./TimeseriesGauge";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
 import { deriveCoreBars } from "./TimeseriesCoreBars.model";
+import { GaugeHoverCard, type GaugeHoverRow } from "./GaugeHoverCard";
+import { seriesStats } from "./gauge-stats";
 
 export type TimeseriesCoreBarsVariant = "default" | "cell";
 export type TimeseriesCoreBarsOrientation = "horizontal" | "vertical";
+
+/**
+ * Describes what one bar represents, letting the same component render CPU cores,
+ * memory gigabytes, or any other quantised capacity. Defaults model CPU cores.
+ */
+export interface CoreBarsUnit {
+  /** Raw value that fills one bar, in the domain of `value`/`max`. Default 1000 (millicores → 1 core). */
+  perBar?: number;
+  /** Caption/tooltip suffix naming the unit, plural. Default "cores". */
+  label?: string;
+  /** Per-bar hover tooltip noun, singular. Default "core". */
+  barLabel?: string;
+  /** Format a bar-unit count for the caption. Default: integers as-is, else 1 decimal. */
+  format?: (units: number) => string;
+}
 
 export interface TimeseriesCoreBarsProps {
   /** Common prefix; the value/max requests are `baseUrl + id`. */
@@ -15,12 +32,14 @@ export interface TimeseriesCoreBarsProps {
   /** The metric whose latest value (CPU millicores) fills the bars. */
   value: GaugeSeries;
   /**
-   * The CPU capacity. Either a `.limit`-style metric series (its latest value in
-   * millicores) or a fixed number of millicores. Determines the number of bars
-   * (one per core). When omitted or 0, the bar count falls back to the ceiling of
-   * the usage in cores so an unbounded reading still renders.
+   * The capacity. Either a `.limit`-style metric series (its latest value) or a
+   * fixed number, in the same raw domain as `value`. Determines the number of
+   * bars (one per `unit.perBar`). When omitted or 0, the bar count falls back to
+   * the ceiling of the usage so an unbounded reading still renders.
    */
   max?: GaugeSeries | number;
+  /** What one bar represents. Defaults to CPU cores (perBar 1000, label "cores"). */
+  unit?: CoreBarsUnit;
   title: string;
   /** Iconify name or static icon component shown beside the label. */
   icon?: string | StaticIconComponent;
@@ -39,8 +58,19 @@ export interface TimeseriesCoreBarsProps {
   showLabel?: boolean;
   /** Show the value/capacity caption. Icons and bars remain visible when false. */
   showValue?: boolean;
+  /**
+   * Include the capacity in the caption ("2.3 / 4 cores"). Defaults to false — the
+   * caption shows only the current value ("2.3 cores") since the bars already
+   * convey capacity. Set true to append the "/ <capacity>".
+   */
+  showCapacity?: boolean;
   /** Bar direction. Vertical bars fill bottom-up; horizontal bars fill left-to-right. */
   orientation?: TimeseriesCoreBarsOrientation;
+  /**
+   * Wrap the bars in a hover card summarising the metric (label + current / min /
+   * max / avg / capacity over the window). Defaults to true.
+   */
+  hoverCard?: boolean;
   /** Override the default fetch (e.g. to route through an app's API client). */
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -102,6 +132,7 @@ export function TimeseriesCoreBars({
   baseUrl = "",
   value,
   max,
+  unit,
   title,
   icon,
   range = "1h",
@@ -110,10 +141,16 @@ export function TimeseriesCoreBars({
   variant = "default",
   showLabel = true,
   showValue = true,
+  showCapacity = false,
   orientation,
+  hoverCard = true,
   fetcher = defaultFetcher,
   className,
 }: TimeseriesCoreBarsProps) {
+  const perBar = unit?.perBar ?? 1000;
+  const unitLabel = unit?.label ?? "cores";
+  const barLabel = unit?.barLabel ?? "core";
+  const formatUnits = unit?.format ?? formatCores;
   const maxIsSeries = typeof max === "object";
   const maxSeries = maxIsSeries ? max : undefined;
   const ids = useMemo(() => {
@@ -158,16 +195,55 @@ export function TimeseriesCoreBars({
           : rawMax;
   }
 
-  const model = deriveCoreBars(usage, limit);
+  const model = deriveCoreBars(usage, limit, perBar);
   const tone = toneClass(model.pct, thresholds);
-  const caption = model.hasUsage
-    ? `${formatCores(model.usageCores)} / ${model.limitCores !== undefined ? formatCores(model.limitCores) : "?"} cores`
-    : "—";
-  const compactCaption = model.hasUsage
-    ? `${formatCores(model.usageCores)}/${model.limitCores !== undefined ? formatCores(model.limitCores) : "?"} cores`
-    : "—";
+  const usageText = formatUnits(model.usageCores);
+  const capacityText =
+    model.limitCores !== undefined ? formatUnits(model.limitCores) : "?";
+  const caption = !model.hasUsage
+    ? "—"
+    : showCapacity
+      ? `${usageText} / ${capacityText} ${unitLabel}`
+      : `${usageText} ${unitLabel}`;
+  const compactCaption = !model.hasUsage
+    ? "—"
+    : showCapacity
+      ? `${usageText}/${capacityText} ${unitLabel}`
+      : `${usageText} ${unitLabel}`;
   const titleText = `${title}: ${compactCaption}`;
   const isCell = variant === "cell";
+
+  // Hover card: reduce the fetched points to current/min/max/avg in bar-units
+  // (raw value transformed, then divided by perBar) so they read in the same unit
+  // as the caption. A bounded reading colours the current row by its threshold.
+  const pctTone =
+    model.limitCores === undefined
+      ? undefined
+      : model.pct >= thresholds[1]
+        ? "text-red-500"
+        : model.pct >= thresholds[0]
+          ? "text-amber-500"
+          : "text-emerald-500";
+  const stats = seriesStats(results[0]?.data?.points, (v) =>
+    (value.transform ? value.transform(v) : v) / perBar,
+  );
+  const fmt = (n: number) => `${formatUnits(n)} ${unitLabel}`;
+  const hoverRows: GaugeHoverRow[] = model.hasUsage
+    ? [
+        { label: "Current", value: fmt(model.usageCores), ...(pctTone ? { tone: pctTone } : {}) },
+        ...(stats
+          ? [
+              { label: "Min", value: fmt(stats.min) },
+              { label: "Max", value: fmt(stats.max) },
+              { label: "Avg", value: fmt(stats.avg) },
+            ]
+          : []),
+        ...(model.limitCores !== undefined
+          ? [{ label: "Capacity", value: fmt(model.limitCores) }]
+          : []),
+      ]
+    : [];
+
   const resolvedOrientation = orientation ?? "vertical";
   const isDense = model.coreCount > 4;
   const valueText = isCell ? compactCaption : caption;
@@ -208,8 +284,8 @@ export function TimeseriesCoreBars({
                   )
                 : cn("min-h-px w-full flex-1 rounded-[2px]"),
             )}
-            title={`core ${i + 1}: ${corePct}%`}
-            aria-label={!isCell ? `core ${i + 1}: ${corePct}%` : undefined}
+            title={`${barLabel} ${i + 1}: ${corePct}%`}
+            aria-label={!isCell ? `${barLabel} ${i + 1}: ${corePct}%` : undefined}
             data-fill={bar.fill}
           >
             <span
@@ -250,32 +326,51 @@ export function TimeseriesCoreBars({
       </span>
     ) : null;
 
+  const useHover = hoverCard && hoverRows.length > 0;
+  const footer = `over last ${range}`;
+
   if (isCell) {
-    return (
+    const cell = (
       <span
         className={cn(
           "inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap align-middle text-xs",
           className,
         )}
-        title={titleText}
-        aria-label={hiddenAccessibleText}
+        {...(useHover ? {} : { title: titleText })}
+        aria-label={useHover ? titleText : hiddenAccessibleText}
       >
         {label}
         {bars}
         {valueNode}
       </span>
     );
+    return useHover ? (
+      <GaugeHoverCard title={title} rows={hoverRows} footer={footer} trigger={cell} />
+    ) : (
+      cell
+    );
   }
 
-  return (
+  const block = (
     <div
       className={cn("flex flex-col items-center gap-1", className)}
-      title={hiddenAccessibleText}
-      aria-label={hiddenAccessibleText}
+      {...(useHover ? {} : { title: hiddenAccessibleText })}
+      aria-label={useHover ? titleText : hiddenAccessibleText}
     >
       {bars}
       {valueNode}
       {label}
     </div>
+  );
+  return useHover ? (
+    <GaugeHoverCard
+      title={title}
+      rows={hoverRows}
+      footer={footer}
+      trigger={block}
+      className="w-full justify-center"
+    />
+  ) : (
+    block
   );
 }

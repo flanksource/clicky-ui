@@ -72,7 +72,7 @@ const fetcher = async (url: string): Promise<TimeseriesResponse> => {
 
 describe("WorkloadCard", () => {
   it("renders workload identity, status, replicas, and configured resource metrics", async () => {
-    renderWithQueryClient(
+    const { container } = renderWithQueryClient(
       <WorkloadCard
         workload={workload}
         metrics={metrics}
@@ -87,10 +87,13 @@ describe("WorkloadCard", () => {
     expect(screen.getByText("ops")).toBeInTheDocument();
     expect(screen.getByText("2/3 ready")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(await screen.findByText("2.3 / 4 cores")).toBeInTheDocument();
+    expect(await screen.findByText("2.3 cores")).toBeInTheDocument();
     expect(screen.getByText("CPU")).toBeInTheDocument();
     expect(screen.getByText("Memory")).toBeInTheDocument();
     expect(screen.getByText("Disk")).toBeInTheDocument();
+    // Memory renders as GB bars (3.2 GB of 8 GB), disk as a linear progress bar.
+    expect(await screen.findByText("3.0 GB")).toBeInTheDocument();
+    expect(container.querySelector('[data-shape="linear"]')).toBeInTheDocument();
   });
 
   it("omits disk when no disk metric is configured", async () => {
@@ -103,7 +106,7 @@ describe("WorkloadCard", () => {
       />,
     );
 
-    expect(await screen.findByText("2.3 / 4 cores")).toBeInTheDocument();
+    expect(await screen.findByText("2.3 cores")).toBeInTheDocument();
     expect(screen.getByText("Memory")).toBeInTheDocument();
     expect(screen.queryByText("Disk")).not.toBeInTheDocument();
   });
@@ -124,7 +127,7 @@ describe("WorkloadCard", () => {
     expect(root).toHaveAttribute("data-size", "sm");
     expect(root).toHaveAttribute("data-variant", "elevated");
     expect(root).toHaveClass("shadow-sm");
-    expect(await screen.findByText("2.3/4 cores")).toBeInTheDocument();
+    expect(await screen.findByText("2.3 cores")).toBeInTheDocument();
   });
 
   it("opens a history modal with one panel per configured metric", async () => {

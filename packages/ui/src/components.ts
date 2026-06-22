@@ -84,6 +84,7 @@ export {
 } from "./components/use-form";
 export { TreePickerField, type TreePickerFieldProps } from "./components/TreePickerField";
 export { WorkloadPicker, type WorkloadPickerProps } from "./components/WorkloadPicker";
+export { NamespacePicker, type NamespacePickerProps } from "./components/NamespacePicker";
 export {
   workloadKey,
   parseWorkloadKey,
@@ -91,6 +92,7 @@ export {
   loadedWorkloads,
   type WorkloadKind,
   type WorkloadResource,
+  type WorkloadPort,
   type ParsedWorkloadKey,
 } from "./components/workload-picker-utils";
 export {
@@ -110,6 +112,11 @@ export {
 } from "./components/icon-menu-picker";
 
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
+export {
+  FormLookupProvider,
+  useLookupFetcher,
+  resolveLookupScope,
+} from "./components/form-lookup-context";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
 export {
@@ -144,6 +151,9 @@ export type {
   EnumDisplay,
   PreExtension,
   PostExtension,
+  LookupDescriptor,
+  LookupScope,
+  LookupFetcher,
 } from "./components/json-schema-form-types";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";

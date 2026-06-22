@@ -251,7 +251,7 @@ describe("Clicky", () => {
     expect(screen.getByText(/name\.toUpperCase/)).toBeInTheDocument();
   });
 
-  it("sorts tables and expands row detail", () => {
+  it("sorts tables", () => {
     render(<Clicky data={clickyFixture} />);
 
     const latencyHeader = screen.getByRole("button", { name: /latency/i });
@@ -261,16 +261,6 @@ describe("Clicky", () => {
     const rows = screen.getAllByRole("row");
     expect(rows[1]).toHaveTextContent("worker");
     expect(rows[2]).toHaveTextContent("api");
-
-    fireEvent.click(rows[2]);
-
-    expect(screen.getByText("platform")).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        (_, element) =>
-          element?.textContent?.includes("apiVersion: v1") ?? false,
-      )[0],
-    ).toBeInTheDocument();
   });
 
   it("passes raw table rows to the row click handler", () => {
@@ -301,6 +291,44 @@ describe("Clicky", () => {
 
     expect(onTableRowClick).toHaveBeenCalledTimes(1);
     expect(onTableRowClick.mock.calls[0][0].cells._id.plain).toBe("widget-1");
+  });
+
+  it("does not expand an inline row-detail panel on row click", () => {
+    const onTableRowClick = vi.fn();
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "name", label: "Name" }],
+        rows: [
+          {
+            cells: {
+              _id: { kind: "text", text: "widget-1", plain: "widget-1" },
+              name: {
+                kind: "text",
+                text: "First widget",
+                plain: "First widget",
+              },
+            },
+            detail: {
+              kind: "code",
+              language: "yaml",
+              source: "secret-detail-content",
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} onTableRowClick={onTableRowClick} />);
+    fireEvent.click(screen.getByText("First widget"));
+
+    // A row click goes to the handler (navigation), not an inline detail panel.
+    // The removed ClickyTableRowDetail used to surface the row's `detail` node
+    // and a "Fields" section on expand — neither should appear now.
+    expect(onTableRowClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("secret-detail-content")).toBeNull();
+    expect(screen.queryByText("Fields")).toBeNull();
   });
 
   it("supports auto-filtered clicky tables", async () => {
@@ -353,10 +381,6 @@ describe("Clicky", () => {
       },
     );
     expect(screen.getByText("api")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("api"));
-
-    expect(screen.getByText(/kind: Deployment/)).toBeInTheDocument();
   });
 
   it("keeps table controls visible for empty clicky tables", () => {
@@ -406,74 +430,6 @@ describe("Clicky", () => {
     expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
     expect(screen.queryByText("No data")).not.toBeInTheDocument();
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
-  });
-
-  it("expands clicky table rows with all fields and inline tag actions", async () => {
-    const clickyDocument: ClickyDocument = {
-      version: 1,
-      node: {
-        kind: "table",
-        autoFilter: true,
-        columns: [
-          { name: "service", label: "Service", grow: true },
-          { name: "tags", label: "Tags", grow: true },
-        ],
-        rows: [
-          {
-            cells: {
-              service: { kind: "text", text: "api", plain: "api" },
-              tags: {
-                kind: "list",
-                items: [
-                  { kind: "text", text: "env=prod", plain: "env=prod" },
-                  {
-                    kind: "text",
-                    text: "team=platform",
-                    plain: "team=platform",
-                  },
-                ],
-              },
-            },
-          },
-          {
-            cells: {
-              service: { kind: "text", text: "worker", plain: "worker" },
-              tags: {
-                kind: "list",
-                items: [
-                  { kind: "text", text: "env=staging", plain: "env=staging" },
-                ],
-              },
-            },
-          },
-        ],
-      },
-    };
-
-    render(<Clicky data={clickyDocument} />);
-
-    fireEvent.click(screen.getByText("api"));
-
-    expect(screen.getByText("Fields")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Include env=prod$/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Exclude env=prod$/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Copy env=prod$/ }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /^Include env=prod$/ }));
-
-    await waitFor(
-      () => expect(screen.queryByText("worker")).not.toBeInTheDocument(),
-      {
-        timeout: 1_500,
-      },
-    );
-    expect(screen.getAllByText("api").length).toBeGreaterThan(0);
   });
 
   it("renders table rows with struct cells as collapsed sections", () => {
