@@ -42,6 +42,32 @@ describe("resolveControl", () => {
     expect(c.allowCustomValue).toBeUndefined();
   });
 
+  it("infers a lookup control from x-clicky-lookup, allowing free-form single-select", () => {
+    const c = control("connection", {
+      type: "string",
+      "x-clicky-lookup": { url: "/api/v1/connection", filter: "connection" },
+    });
+    expect(c.kind).toBe("lookup");
+    expect(c.lookup).toEqual({ url: "/api/v1/connection", filter: "connection" });
+    // single-select keeps free-form entry so an inline value still commits
+    expect(c.allowCustomValue).toBe(true);
+  });
+
+  it("disables free-form entry for a multi-select lookup", () => {
+    const c = control("tags", {
+      type: "string",
+      "x-clicky-lookup": { url: "/api/v1/tag", filter: "tag", multi: true },
+    });
+    expect(c.kind).toBe("lookup");
+    expect(c.allowCustomValue).toBe(false);
+  });
+
+  it("ignores an x-clicky-lookup missing url/filter, falling back to string", () => {
+    const c = control("connection", { type: "string", "x-clicky-lookup": { url: "/x" } });
+    expect(c.kind).toBe("string");
+    expect(c.lookup).toBeUndefined();
+  });
+
   it("labels enum options from x-enum-labels, keeping the raw value", () => {
     const c = control("AddressType", {
       type: "string",
@@ -52,6 +78,35 @@ describe("resolveControl", () => {
       { value: "20", label: "Business (20)" },
       { value: "30", label: "30" }, // unlabelled values stay raw
     ]);
+  });
+
+  it("attaches per-value icons from x-enum-icons and defaults to a grid", () => {
+    const c = control("type", {
+      type: "string",
+      enum: ["postgres", "mysql"],
+      "x-enum-icons": { postgres: "postgres", mysql: "mysql" },
+    });
+    expect(c.kind).toBe("enum");
+    expect(c.options).toEqual([
+      { value: "postgres", label: "postgres", icon: "postgres" },
+      { value: "mysql", label: "mysql", icon: "mysql" },
+    ]);
+    // presence of icons defaults the presentation to the icon grid
+    expect(c.display).toBe("grid");
+  });
+
+  it("honours an explicit x-enum-display over the icon-grid default", () => {
+    const c = control("type", {
+      type: "string",
+      enum: ["a", "b"],
+      "x-enum-icons": { a: "a" },
+      "x-enum-display": "combobox",
+    });
+    expect(c.display).toBe("combobox");
+  });
+
+  it("leaves display unset for a plain enum (combobox default)", () => {
+    expect(control("status", { type: "string", enum: ["A", "B"] }).display).toBeUndefined();
   });
 
   it("labels map key options from propertyNames x-enum-labels", () => {

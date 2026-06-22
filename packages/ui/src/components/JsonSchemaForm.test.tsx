@@ -79,6 +79,40 @@ describe("JsonSchemaForm extension pipeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "insert Name" }));
     expect(onChange).toHaveBeenCalledWith({ Name: "{{token}}" });
   });
+
+  it("passes the form's root value to a post-extension so it can read sibling fields", () => {
+    const seen: Array<Record<string, unknown> | undefined> = [];
+    const readRoot: PostExtension = (field, nodes, ctx) => {
+      if (field.key === "url") seen.push(ctx?.rootValue);
+      return nodes;
+    };
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { namespace: { type: "string" }, url: { type: "string" } } }}
+        value={{ namespace: "prod", url: "" }}
+        onChange={vi.fn()}
+        post={[readRoot]}
+      />,
+    );
+    expect(seen.at(-1)).toEqual({ namespace: "prod", url: "" });
+  });
+
+  it("passes the form's root value to a pre-extension", () => {
+    const seen: Array<Record<string, unknown> | undefined> = [];
+    const readRoot: PreExtension = (field, ctx) => {
+      if (field.key === "url") seen.push(ctx.rootValue);
+      return field;
+    };
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { namespace: { type: "string" }, url: { type: "string" } } }}
+        value={{ namespace: "staging", url: "x" }}
+        onChange={vi.fn()}
+        pre={[readRoot]}
+      />,
+    );
+    expect(seen.at(-1)).toEqual({ namespace: "staging", url: "x" });
+  });
 });
 
 describe("JsonSchemaForm field suffix slot", () => {
@@ -1098,5 +1132,97 @@ describe("JsonSchemaForm textarea / percent / display / link controls", () => {
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "https://example.com/x");
     expect(link).toHaveAttribute("target", "_blank");
+  });
+});
+
+describe("JsonSchemaForm enum icon grid", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      type: {
+        type: "string",
+        enum: ["postgres", "mysql"],
+        "x-enum-icons": { postgres: "postgres", mysql: "mysql" },
+      },
+    },
+  };
+
+  it("renders a selectable card per option and commits the value on click", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ type: "" }} onChange={onChange} />);
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("radio", { name: /mysql/i }));
+    expect(onChange).toHaveBeenCalledWith({ type: "mysql" });
+  });
+
+  it("filters the grid by the search query", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "" }} onChange={vi.fn()} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "post" } });
+    const cards = screen.getAllByRole("radio");
+    expect(cards).toHaveLength(1);
+    expect(screen.getByRole("radio", { name: /postgres/i })).toBeInTheDocument();
+  });
+});
+
+describe("JsonSchemaForm discriminator wizard", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    "x-discriminator": "type",
+    required: ["type"],
+    properties: {
+      type: {
+        type: "string",
+        title: "Type",
+        enum: ["postgres", "mysql"],
+        "x-enum-icons": { postgres: "postgres", mysql: "mysql" },
+      },
+      name: { type: "string", title: "Name" },
+    },
+  };
+
+  it("shows only the type picker until a kind is chosen", () => {
+    render(<JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} />);
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
+    expect(screen.queryByText("Name")).not.toBeInTheDocument();
+  });
+
+  it("commits the chosen kind", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{}} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("radio", { name: /postgres/i }));
+    expect(onChange).toHaveBeenCalledWith({ type: "postgres" });
+  });
+
+  it("renders the branch fields + a change affordance once a kind is chosen, hiding the picker", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres" }} onChange={vi.fn()} />);
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /change type/i })).toBeInTheDocument();
+  });
+
+  it("clears the kind when the change affordance is clicked", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres", name: "x" }} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /change type/i }));
+    expect(onChange).toHaveBeenCalledWith({ name: "x" });
+  });
+});
+
+describe("JsonSchemaForm x-clicky-order", () => {
+  it("orders fields by per-property x-clicky-order regardless of document order", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        alpha: { type: "string", title: "Alpha", "x-clicky-order": 2 },
+        zeta: { type: "string", title: "Zeta", "x-clicky-order": 0 },
+        mid: { type: "string", title: "Mid", "x-clicky-order": 1 },
+        tail: { type: "string", title: "Tail" }, // no order → keeps doc order, after
+      },
+    };
+    render(<JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} />);
+    const order = screen
+      .getAllByText(/^(Alpha|Zeta|Mid|Tail)$/)
+      .map((n) => n.textContent);
+    expect(order).toEqual(["Zeta", "Mid", "Alpha", "Tail"]);
   });
 });

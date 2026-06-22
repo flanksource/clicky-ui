@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import { composeStories } from "@storybook/react-vite";
 import * as comboboxStories from "./Combobox.stories";
 import * as workloadStories from "./WorkloadPicker.stories";
+import * as namespaceStories from "./NamespacePicker.stories";
 import * as secretStories from "./SecretKeySelector.stories";
 
 // Smoke-renders every story so a broken story (bad prop, missing arg, runtime
@@ -12,6 +13,7 @@ import * as secretStories from "./SecretKeySelector.stories";
 describe.each([
   ["Combobox", comboboxStories],
   ["WorkloadPicker", workloadStories],
+  ["NamespacePicker", namespaceStories],
   ["SecretKeySelector", secretStories],
 ] as const)("%s stories render", (_name, mod) => {
   const composed = composeStories(mod);

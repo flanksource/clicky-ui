@@ -47,6 +47,17 @@ export interface JsonSchemaProperty {
   // Human label per enum value ({ "20": "Business" }); the option renders as
   // "Business (20)" while the raw value is what's stored.
   "x-enum-labels"?: Record<string, string>;
+  // Icon (runtime name resolved by the fallback provider) per enum value
+  // ({ "postgres": "postgres" }). Presence flips the enum control to a
+  // selectable icon grid unless x-enum-display says otherwise.
+  "x-enum-icons"?: Record<string, string>;
+  // Force the enum presentation: "combobox" (default), "radio", or "grid".
+  "x-enum-display"?: EnumDisplay;
+  // Per-property render order: lower values sort first, properties without it
+  // keep document order after the ordered ones. Composes across merged if/then
+  // branches (each field carries its own order), unlike the object-level
+  // `x-order` array.
+  "x-clicky-order"?: number;
   // Consumer extension keys pass through untouched.
   [key: string]: unknown;
 }
@@ -84,6 +95,11 @@ export interface JsonSchemaObject extends JsonSchemaProperty {
   required?: string[];
   additionalProperties?: boolean | JsonSchemaProperty;
   allOf?: JsonSchemaConditional[];
+  // Names a property whose value selects a "kind" (e.g. connection `type`). When
+  // set, the form renders that property first as a picker; once chosen it shows
+  // the matched branch's fields (the picker collapses to a compact header with a
+  // "change" affordance). Drives the two-phase connection form.
+  "x-discriminator"?: string;
 }
 
 export type FieldControlKind =
@@ -91,6 +107,9 @@ export type FieldControlKind =
   | "number"
   | "boolean"
   | "enum"
+  // An async entity-reference picker resolved from `x-clicky-lookup`: a searchable
+  // dropdown whose options are fetched lazily from another entity's list endpoint.
+  | "lookup"
   | "date"
   | "string-map"
   | "array"
@@ -111,8 +130,9 @@ export type FieldControlKind =
 export type DisplayVariant = "heading" | "text" | "divider" | "spacer";
 
 // How an enum control renders. "combobox" (default) is the searchable dropdown;
-// "radio" is a segmented radio-button group for small, fixed option sets.
-export type EnumDisplay = "combobox" | "radio";
+// "radio" is a segmented radio-button group for small, fixed option sets; "grid"
+// is a filterable grid of selectable icon cards (for enums with x-enum-icons).
+export type EnumDisplay = "combobox" | "radio" | "grid";
 
 // FieldControl is the resolved, render-ready descriptor for one property. The
 // orchestrator infers a base control from the schema, then lets pre-extensions
@@ -142,6 +162,13 @@ export interface FieldControl {
   // Generic free-text-allowed flag (the consumer's escape hatch for tokens /
   // values outside the enum). Never inferred from value syntax.
   allowCustomValue?: boolean;
+
+  // lookup — the async entity-reference descriptor, resolved from the schema's
+  // `x-clicky-lookup` extension. Drives the LookupControl, which fetches options
+  // lazily via the form's LookupFetcher.
+  lookup?: LookupDescriptor;
+  // lookup — true while options are being fetched (drives the combobox spinner).
+  loading?: boolean;
   // Enum presentation. Defaults to "combobox" when unset. A pre-extension sets
   // "radio" to render a small fixed option set as segmented radio buttons.
   display?: EnumDisplay;
@@ -216,20 +243,78 @@ export interface FieldControl {
 export interface FieldOption {
   value: string;
   label: string;
+  // Optional leading glyph (runtime icon name or a rendered node), shown by the
+  // grid enum display. Resolved from the schema's x-enum-icons.
+  icon?: LabelIconSpec;
 }
+
+// LookupDescriptor is the `x-clicky-lookup` schema extension on a form field: it
+// turns a string property into an async entity-reference picker. The form fetches
+// options from another entity's list endpoint (the `__lookup` convention) and
+// renders a searchable dropdown. Generic — any entity reference can use it.
+export interface LookupDescriptor {
+  // Entity list path that serves the lookup (e.g. "/api/v1/connection").
+  url: string;
+  // Filter key sent as `__lookup_filter`; the lookup response keys its options
+  // (and the committed value) under it.
+  filter: string;
+  // Query-string key for the search term. Informational — the client issues the
+  // standard `__lookup_q`. Defaults to "__lookup_q".
+  searchParam?: string;
+  // Whether multiple values may be selected. Single-select also allows free-form
+  // entry (so a typed value outside the option set still commits).
+  multi?: boolean;
+  // Optional scoping: derive an extra query param from a sibling form field so the
+  // lookup is filtered by it (e.g. a connection picker scoped to the provider type).
+  scope?: LookupScope;
+}
+
+// LookupScope derives an extra query param for a lookup from a sibling field, so
+// the option set is filtered by another part of the form's value.
+export interface LookupScope {
+  // Query-string key to send (e.g. "types").
+  param: string;
+  // Dotted path into the form's root value (e.g. "provider.type").
+  from: string;
+  // Maps the source value to the emitted value(s) (e.g. "sql" → [postgres, ...]).
+  // When absent the source value is sent verbatim.
+  map?: Record<string, string[]>;
+  // Joins mapped values into the param (default ",").
+  join?: string;
+}
+
+// LookupFetcher resolves the options for an `x-clicky-lookup` field. The host
+// wires it (typically from the operations api client's lookup endpoint), so the
+// form stays decoupled from any specific RPC client. `rootValue` lets the fetcher
+// scope the lookup by sibling fields (see LookupScope).
+export type LookupFetcher = (args: {
+  descriptor: LookupDescriptor;
+  query: string;
+  rootValue?: Record<string, unknown>;
+}) => Promise<FieldOption[]>;
 
 // PreExtension transforms a resolved control before it renders, or returns null
 // to drop the field. Composed in array order; each sees the prior's output.
+// `ctx.rootValue` is the form's top-level value (the same object at every depth),
+// so a widget can read sibling fields (e.g. a selected namespace) to scope itself.
 export type PreExtension = (
   field: FieldControl,
-  ctx: { key: string; prop: JsonSchemaProperty; value: unknown },
+  ctx: {
+    key: string;
+    prop: JsonSchemaProperty;
+    value: unknown;
+    rootValue?: Record<string, unknown>;
+  },
 ) => FieldControl | null;
 
 // PostExtension wraps the rendered label/value nodes (e.g. add a button beside
-// the value, or helper text under the label). Composed in array order.
+// the value, or helper text under the label). Composed in array order. The
+// optional third arg carries `rootValue` (the form's top-level value) so a
+// replacement widget can read sibling fields without global state.
 export type PostExtension = (
   field: FieldControl,
   nodes: { label: ReactNode; value: ReactNode },
+  ctx?: { rootValue?: Record<string, unknown> },
 ) => { label: ReactNode; value: ReactNode };
 
 // FieldArgs is the raw input for rendering one field: the property key/schema,
@@ -281,6 +366,9 @@ export interface RenderContext {
   sortMode: SortMode;
   pre: PreExtension[];
   post: PostExtension[];
+  // The form's top-level value, threaded unchanged through every depth so a
+  // widget can read sibling fields (e.g. a selected namespace).
+  rootValue?: Record<string, unknown>;
   depth: number;
   // The recursion entry points (see RenderApi).
   render: RenderApi;
@@ -348,6 +436,12 @@ export interface JsonSchemaFormProps {
   title?: string;
   pre?: PreExtension[];
   post?: PostExtension[];
+  /**
+   * Resolves options for `x-clicky-lookup` fields (async entity-reference
+   * pickers). When set, the form provides it to its lookup controls via context.
+   * Hosts typically build it from the operations api client's lookup endpoint.
+   */
+  lookupFetcher?: LookupFetcher;
   /**
    * Show the top-right three-dot display-options menu (size, layout, and sort).
    * Defaults to true. The menu controls only this form's appearance — never
