@@ -44,6 +44,8 @@ import type {
   FilterBarSearchProps,
 } from "../components/FilterBar";
 import { Tree } from "./Tree";
+import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
+import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
   UiCheck,
@@ -144,7 +146,9 @@ export type ClickyNode = {
     | "button-group"
     | "html"
     | "comment"
-    | "badge";
+    | "badge"
+    | "object-graph"
+    | "execution-tree";
   plain?: string;
   style?: ClickyStyle;
   text?: string;
@@ -190,6 +194,10 @@ export type ClickyNode = {
   badgeText?: string;
   badgeShape?: string;
   badgeIcon?: string;
+  // Set when kind === "object-graph" / "execution-tree": the roots handed to the
+  // dedicated <ObjectGraph> / <ExecutionTree> inspectors.
+  objects?: ObjectGraphNode[];
+  executionRoots?: ExecutionNode[];
 };
 
 export type ClickyDocument = {
@@ -1778,6 +1786,10 @@ function ClickyNodeRenderer({ node }: ClickyNodeViewProps) {
       return <ClickyTableNode node={node} />;
     case "tree":
       return <ClickyTreeNode node={node} />;
+    case "object-graph":
+      return <ObjectGraph roots={node.objects ?? []} />;
+    case "execution-tree":
+      return <ExecutionTree roots={node.executionRoots ?? []} />;
     case "code":
       return (
         <CodeBlock
