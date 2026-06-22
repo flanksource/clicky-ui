@@ -1,9 +1,11 @@
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { useEffect, type ReactNode } from "react";
 import { ChatWindowManagerProvider } from "./ChatWindowManager";
 import { useChatWindowManager } from "./chat-window-context";
-import { ChatWindowLayer, chatWindowRequestBody } from "./ChatWindow";
+import { ChatWindowLayer } from "./ChatWindow";
+import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 import type { ToolMeta } from "./ToolPreferences";
 import { mockChatTransport } from "../chat/Chat.fixtures";
 
@@ -12,12 +14,42 @@ const TOOLS: ToolMeta[] = [
   { name: "restartService", label: "Restart Service" },
 ];
 
+function completeTurn(): ReadableStream<UIMessageChunk> {
+  return new ReadableStream<UIMessageChunk>({
+    start(controller) {
+      controller.enqueue({ type: "start" });
+      controller.enqueue({ type: "start-step" });
+      controller.enqueue({ type: "finish-step" });
+      controller.enqueue({ type: "finish" });
+      controller.close();
+    },
+  });
+}
+
+function recordingTransport(sendMessages = vi.fn()): ChatTransport<UIMessage> {
+  return {
+    sendMessages(options) {
+      sendMessages(options);
+      return Promise.resolve(completeTurn());
+    },
+    reconnectToStream() {
+      return Promise.resolve(null);
+    },
+  };
+}
+
 /** Opens one window on mount so ChatWindowLayer has a panel to render. */
-function OpenOnMount({ children }: { children: ReactNode }) {
+function OpenOnMount({
+  children,
+  initialPrompt,
+}: {
+  children: ReactNode;
+  initialPrompt?: { id: number; text: string } | null;
+}) {
   const { openPanel } = useChatWindowManager();
   useEffect(() => {
-    openPanel();
-  }, [openPanel]);
+    openPanel({ initialPrompt });
+  }, [initialPrompt, openPanel]);
   return <>{children}</>;
 }
 
@@ -115,5 +147,23 @@ describe("ChatWindow tool approval default", () => {
 
     expect(await screen.findAllByText("Auto")).toHaveLength(TOOLS.length);
     expect(screen.queryByText("Ask")).toBeNull();
+  });
+
+  it("passes panel initial prompts into the inner chat", async () => {
+    const sendMessages = vi.fn();
+
+    render(
+      <ChatWindowManagerProvider storageId="initial-prompt">
+        <OpenOnMount initialPrompt={{ id: 1, text: "Fix this formula" }}>
+          <ChatWindowLayer
+            threadsApi={null}
+            chat={{ modelsApi: null, transport: recordingTransport(sendMessages) }}
+          />
+        </OpenOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
+    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain("Fix this formula");
   });
 });

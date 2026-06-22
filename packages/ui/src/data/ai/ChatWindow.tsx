@@ -8,7 +8,8 @@ import { useChatWindowManager, type ChatWindowState } from "./chat-window-contex
 import { ThreadPicker, type ThreadSource } from "./ThreadPicker";
 import { ContextBadges } from "./ContextBadges";
 import { ToolPreferences, type ToolMeta, type ToolMode } from "./ToolPreferences";
-import { serializeContext, type ChatContextItem, type ContextTypeConfig } from "./context";
+import type { ContextTypeConfig } from "./context";
+import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 
 export type ChatWindowProps = {
   panel: ChatWindowState;
@@ -44,27 +45,6 @@ const MAXIMIZE_CSS = `
   inset: 0 !important;
   position: absolute !important;
 }`;
-
-export function chatWindowRequestBody({
-  base,
-  contextItems,
-  tools,
-  toolPrefs,
-}: {
-  base?: Record<string, unknown> | undefined;
-  contextItems: ChatContextItem[];
-  tools?: ToolMeta[] | undefined;
-  toolPrefs?: Record<string, ToolMode> | undefined;
-}): Record<string, unknown> {
-  return {
-    ...base,
-    ...(contextItems.length ? {
-      context: serializeContext(contextItems),
-      contextItems,
-    } : {}),
-    ...(tools ? { toolPreferences: toolPrefs ?? {} } : {}),
-  };
-}
 
 /** A draggable, resizable floating chat window. It lazy-loads `react-rnd` (an
  *  optional dependency, so consumers of just the inner <Chat> never pull it)
@@ -126,6 +106,12 @@ export function ChatWindow({
     toolPrefs,
   });
 
+  const initialPrompt = panel.initialPrompt ?? chat?.initialPrompt ?? null;
+  const handleInitialPromptSent = useCallback(() => {
+    if (panel.initialPrompt) updatePanel(panel.id, { initialPrompt: null });
+    chat?.onInitialPromptSent?.();
+  }, [chat, panel.id, panel.initialPrompt, updatePanel]);
+
   const header = (
     <div className="chat-drag-handle flex cursor-move items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
       {threadsSource != null || threadsApi !== null ? (
@@ -175,6 +161,8 @@ export function ChatWindow({
           {...chat}
           {...(panel.threadId ? { threadId: panel.threadId } : {})}
           body={mergedBody}
+          initialPrompt={initialPrompt}
+          onInitialPromptSent={handleInitialPromptSent}
         />
       </div>
     </div>
