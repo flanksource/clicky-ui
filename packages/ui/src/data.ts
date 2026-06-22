@@ -207,6 +207,8 @@ export {
   type VersionInfo,
 } from "./data/version-info";
 export { Tree, type TreeProps } from "./data/Tree";
+export { ObjectGraph, type ObjectGraphNode, type ObjectGraphProps } from "./data/ObjectGraph";
+export { ExecutionTree, type ExecutionNode, type ExecutionTreeProps } from "./data/ExecutionTree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
