@@ -1,10 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ClickyNodeView, type ClickyNode } from "./Clicky";
+import { clickyMarkdownBlocksNode } from "./Clicky.fixtures";
 
 const node: ClickyNode = {
   kind: "text",
   children: [
-    { kind: "badge", badgeLabel: "region", badgeValue: "us-east", badgeColor: "#0f766e" },
+    {
+      kind: "badge",
+      badgeLabel: "region",
+      badgeValue: "us-east",
+      badgeColor: "#0f766e",
+    },
     { kind: "text", text: " " },
     { kind: "text", text: "cluster is accepting traffic" },
   ],
@@ -43,6 +49,68 @@ export const CodeNode: Story = {
       kind: "code",
       language: "json",
       source: JSON.stringify({ requests: 12492, errors: 3 }, null, 2),
+    },
+  },
+};
+
+export const MarkdownBlocks: Story = {
+  args: {
+    node: clickyMarkdownBlocksNode,
+  },
+};
+
+export const AdmonitionSeverities: Story = {
+  args: {
+    node: {
+      kind: "list",
+      unstyled: true,
+      items: [
+        {
+          kind: "admonition",
+          severity: "note",
+          label: { kind: "text", text: "Note" },
+          content: {
+            kind: "text",
+            text: "Board approval is tracked separately.",
+          },
+        },
+        {
+          kind: "admonition",
+          severity: "info",
+          label: { kind: "text", text: "Information" },
+          content: {
+            kind: "text",
+            text: "Comparatives use the prior reporting pack.",
+          },
+        },
+        {
+          kind: "admonition",
+          severity: "tip",
+          label: { kind: "text", text: "Tip" },
+          content: {
+            kind: "text",
+            text: "Attach the signed trial balance before export.",
+          },
+        },
+        {
+          kind: "admonition",
+          severity: "warning",
+          label: { kind: "text", text: "Warning" },
+          content: {
+            kind: "text",
+            text: "Manual review is required for this note.",
+          },
+        },
+        {
+          kind: "admonition",
+          severity: "danger",
+          label: { kind: "text", text: "Danger" },
+          content: {
+            kind: "text",
+            text: "Publication is blocked until cash reconciles.",
+          },
+        },
+      ],
     },
   },
 };

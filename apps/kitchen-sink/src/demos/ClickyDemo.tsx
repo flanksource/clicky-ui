@@ -1,14 +1,27 @@
-import { Clicky, type ClickyDocument, type ClickyTreeItem } from "@flanksource/clicky-ui";
+import {
+  Clicky,
+  type ClickyDocument,
+  type ClickyNode,
+  type ClickyTreeItem,
+} from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
 
 const topologyRoots: ClickyTreeItem[] = [
   {
     id: "cluster-prod-eu",
-    label: { kind: "text", text: "cluster / prod-eu", plain: "cluster / prod-eu" },
+    label: {
+      kind: "text",
+      text: "cluster / prod-eu",
+      plain: "cluster / prod-eu",
+    },
     children: [
       {
         id: "payments-namespace",
-        label: { kind: "text", text: "namespace / payments", plain: "namespace / payments" },
+        label: {
+          kind: "text",
+          text: "namespace / payments",
+          plain: "namespace / payments",
+        },
         children: [
           {
             id: "payments-api",
@@ -28,7 +41,11 @@ const topologyRoots: ClickyTreeItem[] = [
           },
           {
             id: "payments-ledger",
-            label: { kind: "text", text: "job / ledger-sync", plain: "job / ledger-sync" },
+            label: {
+              kind: "text",
+              text: "job / ledger-sync",
+              plain: "job / ledger-sync",
+            },
           },
           {
             id: "payments-db",
@@ -42,11 +59,19 @@ const topologyRoots: ClickyTreeItem[] = [
       },
       {
         id: "edge-namespace",
-        label: { kind: "text", text: "namespace / edge", plain: "namespace / edge" },
+        label: {
+          kind: "text",
+          text: "namespace / edge",
+          plain: "namespace / edge",
+        },
         children: [
           {
             id: "edge-gateway",
-            label: { kind: "text", text: "deployment / gateway", plain: "deployment / gateway" },
+            label: {
+              kind: "text",
+              text: "deployment / gateway",
+              plain: "deployment / gateway",
+            },
           },
           {
             id: "edge-cache",
@@ -66,17 +91,29 @@ const topologyRoots: ClickyTreeItem[] = [
           },
           {
             id: "edge-cert",
-            label: { kind: "text", text: "job / cert-rotator", plain: "job / cert-rotator" },
+            label: {
+              kind: "text",
+              text: "job / cert-rotator",
+              plain: "job / cert-rotator",
+            },
           },
         ],
       },
       {
         id: "ops-namespace",
-        label: { kind: "text", text: "namespace / ops", plain: "namespace / ops" },
+        label: {
+          kind: "text",
+          text: "namespace / ops",
+          plain: "namespace / ops",
+        },
         children: [
           {
             id: "ops-alerts",
-            label: { kind: "text", text: "deployment / alerts", plain: "deployment / alerts" },
+            label: {
+              kind: "text",
+              text: "deployment / alerts",
+              plain: "deployment / alerts",
+            },
           },
           {
             id: "ops-metrics",
@@ -108,11 +145,19 @@ const topologyRoots: ClickyTreeItem[] = [
   },
   {
     id: "cluster-staging-us",
-    label: { kind: "text", text: "cluster / staging-us", plain: "cluster / staging-us" },
+    label: {
+      kind: "text",
+      text: "cluster / staging-us",
+      plain: "cluster / staging-us",
+    },
     children: [
       {
         id: "preview-namespace",
-        label: { kind: "text", text: "namespace / preview", plain: "namespace / preview" },
+        label: {
+          kind: "text",
+          text: "namespace / preview",
+          plain: "namespace / preview",
+        },
         children: [
           {
             id: "preview-api",
@@ -132,7 +177,11 @@ const topologyRoots: ClickyTreeItem[] = [
           },
           {
             id: "preview-jobs",
-            label: { kind: "text", text: "job / preview-seed", plain: "job / preview-seed" },
+            label: {
+              kind: "text",
+              text: "job / preview-seed",
+              plain: "job / preview-seed",
+            },
           },
           {
             id: "preview-search",
@@ -146,7 +195,11 @@ const topologyRoots: ClickyTreeItem[] = [
       },
       {
         id: "staging-qa",
-        label: { kind: "text", text: "namespace / qa", plain: "namespace / qa" },
+        label: {
+          kind: "text",
+          text: "namespace / qa",
+          plain: "namespace / qa",
+        },
         children: [
           {
             id: "qa-payments",
@@ -166,17 +219,85 @@ const topologyRoots: ClickyTreeItem[] = [
           },
           {
             id: "qa-reports",
-            label: { kind: "text", text: "job / report-replay", plain: "job / report-replay" },
+            label: {
+              kind: "text",
+              text: "job / report-replay",
+              plain: "job / report-replay",
+            },
           },
           {
             id: "qa-smoke",
-            label: { kind: "text", text: "job / smoke-suite", plain: "job / smoke-suite" },
+            label: {
+              kind: "text",
+              text: "job / smoke-suite",
+              plain: "job / smoke-suite",
+            },
           },
         ],
       },
     ],
   },
 ];
+
+const markdownBlocksNode: ClickyNode = {
+  kind: "list",
+  unstyled: true,
+  items: [
+    {
+      kind: "heading",
+      level: 3,
+      content: {
+        kind: "text",
+        text: "Release Notes",
+        plain: "Release Notes",
+      },
+    },
+    {
+      kind: "blockquote",
+      content: {
+        kind: "text",
+        text: "Cutover starts after the replica lag clears.",
+        plain: "Cutover starts after the replica lag clears.",
+      },
+    },
+    {
+      kind: "admonition",
+      severity: "warning",
+      label: {
+        kind: "text",
+        text: "Manual approval required",
+        plain: "Manual approval required",
+      },
+      content: {
+        kind: "text",
+        text: "Finance must confirm the posted adjustment before export.",
+        plain: "Finance must confirm the posted adjustment before export.",
+      },
+    },
+    {
+      kind: "text",
+      text: "Cash balance reconciled",
+      plain: "Cash balance reconciled",
+      children: [
+        { kind: "footnote-ref", id: "cash-note", plain: "[^cash-note]" },
+      ],
+    },
+    {
+      kind: "footnotes",
+      items: [
+        {
+          kind: "footnote",
+          id: "cash-note",
+          content: {
+            kind: "text",
+            text: "Cash includes restricted deposits and call accounts.",
+            plain: "Cash includes restricted deposits and call accounts.",
+          },
+        },
+      ],
+    },
+  ],
+};
 
 const demo: ClickyDocument = {
   version: 1,
@@ -202,7 +323,12 @@ const demo: ClickyDocument = {
           columns: [
             { name: "name", label: "Name", grow: true },
             { name: "status", label: "Status", shrink: true },
-            { name: "restarts", label: "Restarts", align: "right", shrink: true },
+            {
+              name: "restarts",
+              label: "Restarts",
+              align: "right",
+              shrink: true,
+            },
           ],
           rows: [
             {
@@ -214,13 +340,20 @@ const demo: ClickyDocument = {
                   plain: "healthy",
                   style: { color: "#166534", bold: true },
                 },
-                restarts: { kind: "text", text: "0", plain: "0", style: { monospace: true } },
+                restarts: {
+                  kind: "text",
+                  text: "0",
+                  plain: "0",
+                  style: { monospace: true },
+                },
               },
               detail: {
                 kind: "code",
                 language: "yaml",
-                source: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api",
-                plain: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api",
+                source:
+                  "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api",
+                plain:
+                  "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api",
               },
             },
             {
@@ -232,11 +365,21 @@ const demo: ClickyDocument = {
                   plain: "degraded",
                   style: { color: "#b45309", bold: true },
                 },
-                restarts: { kind: "text", text: "3", plain: "3", style: { monospace: true } },
+                restarts: {
+                  kind: "text",
+                  text: "3",
+                  plain: "3",
+                  style: { monospace: true },
+                },
               },
             },
           ],
         },
+      },
+      {
+        name: "markdown_blocks",
+        label: "Markdown Blocks",
+        value: markdownBlocksNode,
       },
       {
         name: "topology",
@@ -261,7 +404,11 @@ const demo: ClickyDocument = {
               kind: "button",
               id: "restart-worker",
               payload: '{"service":"worker"}',
-              label: { kind: "text", text: "Restart Worker", plain: "Restart Worker" },
+              label: {
+                kind: "text",
+                text: "Restart Worker",
+                plain: "Restart Worker",
+              },
             },
           ],
         },
@@ -280,8 +427,8 @@ export function ClickyDemo() {
       <div className="space-y-density-4">
         <div className="space-y-density-2">
           <p className="text-sm text-muted-foreground">
-            This example renders a local fallback payload immediately, then refreshes from a fetched
-            URL using the remote Clicky mode.
+            This example renders a local fallback payload immediately, then
+            refreshes from a fetched URL using the remote Clicky mode.
           </p>
           <div className="rounded-md border border-border bg-background p-density-3">
             <Clicky
@@ -295,8 +442,8 @@ export function ClickyDemo() {
 
         <div className="space-y-density-2">
           <p className="text-sm text-muted-foreground">
-            This remote example uses `view={[]}` to suppress the mode switcher and only expose the
-            download action.
+            This remote example uses `view={[]}` to suppress the mode switcher
+            and only expose the download action.
           </p>
           <div className="rounded-md border border-border bg-background p-density-3">
             <Clicky
@@ -310,8 +457,8 @@ export function ClickyDemo() {
 
         <div className="space-y-density-2">
           <p className="text-sm text-muted-foreground">
-            This remote example keeps the rendered output fixed while the split download menu still
-            exposes every supported format.
+            This remote example keeps the rendered output fixed while the split
+            download menu still exposes every supported format.
           </p>
           <div className="rounded-md border border-border bg-background p-density-3">
             <Clicky

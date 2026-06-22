@@ -70,7 +70,11 @@ import { HoverCard } from "../overlay/HoverCard";
 import { Modal } from "../overlay/Modal";
 import { useEscapeLayer } from "../overlay/modalStack";
 import { TagActionsProvider, TagList } from "./cells/TagList";
-import { normalizeTags, type NormalizedTag, type TagsValue } from "./cells/tag-utils";
+import {
+  normalizeTags,
+  type NormalizedTag,
+  type TagsValue,
+} from "./cells/tag-utils";
 import { parseClickyData, type ParsedClicky } from "./clicky-parse";
 
 export type ClickyStyle = {
@@ -129,6 +133,12 @@ export type ClickyNode = {
     | "table"
     | "tree"
     | "code"
+    | "heading"
+    | "blockquote"
+    | "admonition"
+    | "footnote-ref"
+    | "footnote"
+    | "footnotes"
     | "collapsed"
     | "stacktrace"
     | "button"
@@ -154,6 +164,8 @@ export type ClickyNode = {
   roots?: ClickyTreeItem[];
   label?: ClickyNode;
   content?: ClickyNode;
+  level?: number;
+  severity?: string;
   href?: string;
   target?: ClickyLinkTarget;
   command?: string;
@@ -668,55 +680,55 @@ function ClickyRemoteRenderer({
   return (
     <div className={cn("space-y-density-3", className)}>
       {!tableHostsControls && (
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
-        {primaryViews.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Clicky view mode"
-            className="flex flex-wrap gap-1"
-          >
-            {primaryViews.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={activeView === mode}
-                onClick={() => setActiveView(mode)}
-                className={cn(
-                  "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  activeView === mode
-                    ? "border-foreground/20 bg-accent text-foreground"
-                    : "border-transparent text-muted-foreground hover:border-foreground/20 hover:text-foreground",
-                )}
-              >
-                {formatViewLabel(mode)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {overflowViews.length > 0 && (
-          <ClickyViewMenu
-            activeFormat={activeOverflowView}
-            formats={overflowViews}
-            onSelect={setActiveView}
-          />
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {shouldFetchRemoteView(activeView) && activeQuery.isFetching && (
-            <span className="text-xs text-muted-foreground">Refreshing…</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-density-3 py-density-2">
+          {primaryViews.length > 1 && (
+            <div
+              role="radiogroup"
+              aria-label="Clicky view mode"
+              className="flex flex-wrap gap-1"
+            >
+              {primaryViews.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={activeView === mode}
+                  onClick={() => setActiveView(mode)}
+                  className={cn(
+                    "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    activeView === mode
+                      ? "border-foreground/20 bg-accent text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-foreground/20 hover:text-foreground",
+                  )}
+                >
+                  {formatViewLabel(mode)}
+                </button>
+              ))}
+            </div>
           )}
 
-          {canDownload && (
-            <ClickyDownloadMenu
-              url={url}
-              formats={downloadFormats}
-              label={download?.label}
+          {overflowViews.length > 0 && (
+            <ClickyViewMenu
+              activeFormat={activeOverflowView}
+              formats={overflowViews}
+              onSelect={setActiveView}
             />
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            {shouldFetchRemoteView(activeView) && activeQuery.isFetching && (
+              <span className="text-xs text-muted-foreground">Refreshing…</span>
+            )}
+
+            {canDownload && (
+              <ClickyDownloadMenu
+                url={url}
+                formats={downloadFormats}
+                label={download?.label}
+              />
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {activeView === "pdf" ? (
@@ -1628,6 +1640,18 @@ function clickyNodeHasTable(node: ClickyNode | undefined): boolean {
   if (node.label && clickyNodeHasTable(node.label)) return true;
   if (node.content && clickyNodeHasTable(node.content)) return true;
   if (node.tooltip && clickyNodeHasTable(node.tooltip)) return true;
+  if (
+    node.columns?.some(
+      (column) => column.header && clickyNodeHasTable(column.header),
+    )
+  )
+    return true;
+  if (
+    node.rows?.some((row) =>
+      Object.values(row.cells).some((cell) => clickyNodeHasTable(cell)),
+    )
+  )
+    return true;
   if (node.rows?.some((row) => row.detail && clickyNodeHasTable(row.detail)))
     return true;
   return false;
@@ -1763,6 +1787,18 @@ function ClickyNodeRenderer({ node }: ClickyNodeViewProps) {
           highlightedHtml={node.highlightedHtml}
         />
       );
+    case "heading":
+      return <ClickyHeading node={node} />;
+    case "blockquote":
+      return <ClickyBlockquote node={node} />;
+    case "admonition":
+      return <ClickyAdmonition node={node} />;
+    case "footnote-ref":
+      return <ClickyFootnoteRef node={node} />;
+    case "footnote":
+      return <ClickyFootnote node={node} />;
+    case "footnotes":
+      return <ClickyFootnotes node={node} />;
     case "collapsed":
       return <ClickyCollapsed node={node} />;
     case "stacktrace":
@@ -2326,6 +2362,249 @@ function ClickyIconNode({ node }: { node: ClickyNode }) {
       )}
     </span>
   );
+}
+
+function ClickyHeading({ node }: { node: ClickyNode }) {
+  const level = clampHeadingLevel(node.level);
+  const content = node.content ?? clickyNodeFallbackText(node);
+  const inlineStyle = toInlineStyle(node.style, clickyNodeText(content));
+  const className = cn(
+    headingClassName(level),
+    "text-foreground",
+    node.style?.className,
+  );
+
+  switch (level) {
+    case 1:
+      return (
+        <h1 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h1>
+      );
+    case 2:
+      return (
+        <h2 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h2>
+      );
+    case 3:
+      return (
+        <h3 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h3>
+      );
+    case 4:
+      return (
+        <h4 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h4>
+      );
+    case 5:
+      return (
+        <h5 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h5>
+      );
+    default:
+      return (
+        <h6 className={className} style={inlineStyle}>
+          {content && <ClickyNodeRenderer node={content} />}
+        </h6>
+      );
+  }
+}
+
+function clampHeadingLevel(level: number | undefined) {
+  if (!Number.isFinite(level)) return 1;
+  return Math.min(6, Math.max(1, Math.trunc(level ?? 1)));
+}
+
+function headingClassName(level: number) {
+  switch (level) {
+    case 1:
+      return "text-2xl font-semibold leading-tight";
+    case 2:
+      return "text-xl font-semibold leading-tight";
+    case 3:
+      return "text-lg font-semibold leading-snug";
+    case 4:
+      return "text-base font-semibold leading-snug";
+    case 5:
+      return "text-sm font-semibold leading-snug";
+    default:
+      return "text-xs font-semibold uppercase leading-snug text-muted-foreground";
+  }
+}
+
+function ClickyBlockquote({ node }: { node: ClickyNode }) {
+  const content = node.content ?? clickyNodeFallbackText(node);
+  if (!content) return null;
+
+  return (
+    <blockquote className="border-l-4 border-border pl-density-3 text-sm leading-relaxed text-muted-foreground">
+      <ClickyNodeRenderer node={content} />
+    </blockquote>
+  );
+}
+
+function ClickyAdmonition({ node }: { node: ClickyNode }) {
+  const severity = normalizeAdmonitionSeverity(node.severity);
+  const title = node.label ?? {
+    kind: "text" as const,
+    text: prettifyName(severity),
+    plain: prettifyName(severity),
+  };
+  const tone = admonitionToneClassName(severity);
+
+  return (
+    <div
+      role={severity === "danger" || severity === "warning" ? "alert" : "note"}
+      data-severity={severity}
+      className={cn(
+        "rounded-md border px-density-3 py-density-2",
+        tone.container,
+      )}
+    >
+      <div className={cn("text-sm font-semibold", tone.title)}>
+        <ClickyNodeRenderer node={title} />
+      </div>
+      {node.content && (
+        <div className={cn("mt-1 text-sm leading-relaxed", tone.body)}>
+          <ClickyNodeRenderer node={node.content} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeAdmonitionSeverity(severity: string | undefined) {
+  const normalized = (severity ?? "note").trim().toLowerCase();
+  if (
+    normalized === "info" ||
+    normalized === "tip" ||
+    normalized === "warning" ||
+    normalized === "danger" ||
+    normalized === "note"
+  ) {
+    return normalized;
+  }
+  return "note";
+}
+
+function admonitionToneClassName(severity: string) {
+  switch (severity) {
+    case "info":
+      return {
+        container: "border-sky-500/30 bg-sky-500/5",
+        title: "text-sky-800 dark:text-sky-300",
+        body: "text-sky-950/80 dark:text-sky-100/80",
+      };
+    case "tip":
+      return {
+        container: "border-emerald-500/30 bg-emerald-500/5",
+        title: "text-emerald-800 dark:text-emerald-300",
+        body: "text-emerald-950/80 dark:text-emerald-100/80",
+      };
+    case "warning":
+      return {
+        container: "border-yellow-500/40 bg-yellow-500/10",
+        title: "text-yellow-800 dark:text-yellow-300",
+        body: "text-yellow-950/80 dark:text-yellow-100/80",
+      };
+    case "danger":
+      return {
+        container: "border-destructive/40 bg-destructive/10",
+        title: "text-destructive",
+        body: "text-destructive/90",
+      };
+    default:
+      return {
+        container: "border-border bg-muted/30",
+        title: "text-foreground",
+        body: "text-muted-foreground",
+      };
+  }
+}
+
+function ClickyFootnoteRef({ node }: { node: ClickyNode }) {
+  const id = normalizeFootnoteId(node.id);
+  if (!id) return null;
+
+  return (
+    <sup id={footnoteDomId("fnref", id)} className="align-super text-[0.75em]">
+      <a
+        href={`#${footnoteDomId("fn", id)}`}
+        aria-label={`Footnote ${id}`}
+        className="text-primary hover:underline"
+      >
+        {`[^${id}]`}
+      </a>
+    </sup>
+  );
+}
+
+function ClickyFootnote({ node }: { node: ClickyNode }) {
+  const id = normalizeFootnoteId(node.id);
+  if (!id) return null;
+
+  return (
+    <div id={footnoteDomId("fn", id)} className="text-sm text-muted-foreground">
+      <span className="mr-2 font-mono text-xs text-foreground">{`[^${id}]`}</span>
+      {node.content && <ClickyNodeRenderer node={node.content} />}
+      <FootnoteBackLink id={id} />
+    </div>
+  );
+}
+
+function ClickyFootnotes({ node }: { node: ClickyNode }) {
+  const items = (node.items ?? []).filter((item) =>
+    normalizeFootnoteId(item.id),
+  );
+  if (items.length === 0) return null;
+
+  return (
+    <section
+      aria-label="Footnotes"
+      className="border-t border-border pt-density-2 text-xs text-muted-foreground"
+    >
+      <ol className="ml-5 list-decimal space-y-1">
+        {items.map((item, index) => (
+          <li
+            key={`${item.id}-${index}`}
+            id={footnoteDomId("fn", item.id ?? "")}
+          >
+            {item.content && <ClickyNodeRenderer node={item.content} />}
+            <FootnoteBackLink id={item.id ?? ""} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function FootnoteBackLink({ id }: { id: string }) {
+  return (
+    <a
+      href={`#${footnoteDomId("fnref", id)}`}
+      aria-label={`Back to footnote reference ${id}`}
+      className="ml-2 text-primary hover:underline"
+    >
+      back
+    </a>
+  );
+}
+
+function normalizeFootnoteId(id: string | undefined) {
+  return (id ?? "").trim();
+}
+
+function footnoteDomId(prefix: "fn" | "fnref", id: string) {
+  return `${prefix}-${encodeURIComponent(id)}`;
+}
+
+function clickyNodeFallbackText(node: ClickyNode): ClickyNode | undefined {
+  const text = node.text ?? node.plain;
+  return text ? { kind: "text", text, plain: text } : undefined;
 }
 
 function ClickyList({ node }: { node: ClickyNode }) {
@@ -3236,6 +3515,30 @@ function isExecutionResponse(value: unknown): value is ExecutionResponse {
 
 function clickyNodeText(node: ClickyNode | null | undefined): string {
   if (!node) return "";
+  if (node.kind === "heading" || node.kind === "blockquote") {
+    return clickyNodeText(node.content) || node.plain || "";
+  }
+  if (node.kind === "admonition") {
+    return (
+      [clickyNodeText(node.label), clickyNodeText(node.content)]
+        .filter(Boolean)
+        .join(" ") ||
+      node.plain ||
+      ""
+    );
+  }
+  if (node.kind === "footnote-ref") {
+    return node.id ? `[^${node.id}]` : node.plain || "";
+  }
+  if (node.kind === "footnote")
+    return clickyNodeText(node.content) || node.plain || "";
+  if (node.kind === "footnotes") {
+    return (
+      (node.items ?? []).map((item) => clickyNodeText(item)).join(" ") ||
+      node.plain ||
+      ""
+    );
+  }
   if (node.plain) return node.plain;
   if (node.text) return node.text;
   if (node.kind === "html")
@@ -3272,6 +3575,8 @@ function isInlineNode(node: ClickyNode): boolean {
     node.kind === "link-command" ||
     node.kind === "icon" ||
     node.kind === "html" ||
+    node.kind === "footnote-ref" ||
+    node.kind === "badge" ||
     node.kind === "button" ||
     node.kind === "button-group"
   );

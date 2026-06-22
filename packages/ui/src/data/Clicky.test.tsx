@@ -113,6 +113,101 @@ describe("Clicky", () => {
     expect(comment.style.WebkitLineClamp).toBe("3");
   });
 
+  it("renders markdown-style block nodes natively", () => {
+    const document: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "list",
+        unstyled: true,
+        items: [
+          {
+            kind: "heading",
+            level: 3,
+            content: {
+              kind: "text",
+              text: "Accounting policy",
+              plain: "Accounting policy",
+            },
+          },
+          {
+            kind: "blockquote",
+            content: {
+              kind: "text",
+              text: "Revenue is recognized when control transfers.",
+              plain: "Revenue is recognized when control transfers.",
+            },
+          },
+          {
+            kind: "admonition",
+            severity: "warning",
+            label: {
+              kind: "text",
+              text: "Manual review",
+              plain: "Manual review",
+            },
+            content: {
+              kind: "text",
+              text: "Confirm the disclosure before publication.",
+              plain: "Confirm the disclosure before publication.",
+            },
+          },
+          {
+            kind: "text",
+            text: "Cash balance reconciled",
+            plain: "Cash balance reconciled",
+            children: [{ kind: "footnote-ref", id: "cash", plain: "[^cash]" }],
+          },
+          {
+            kind: "footnotes",
+            items: [
+              {
+                kind: "footnote",
+                id: "cash",
+                content: {
+                  kind: "text",
+                  text: "Cash includes restricted deposits.",
+                  plain: "Cash includes restricted deposits.",
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const { container } = render(<Clicky data={document} />);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: "Accounting policy",
+      }),
+    ).toBeInTheDocument();
+    const blockquote = container.querySelector("blockquote");
+    expect(blockquote).not.toBeNull();
+    expect(blockquote).toHaveTextContent(
+      "Revenue is recognized when control transfers.",
+    );
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByText("Manual review")).toBeInTheDocument();
+    expect(
+      within(alert).getByText("Confirm the disclosure before publication."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Footnote cash" })).toHaveAttribute(
+      "href",
+      "#fn-cash",
+    );
+    const footnotes = screen.getByRole("region", { name: "Footnotes" });
+    expect(
+      within(footnotes).getByText("Cash includes restricted deposits."),
+    ).toBeInTheDocument();
+    expect(
+      within(footnotes).getByRole("link", {
+        name: "Back to footnote reference cash",
+      }),
+    ).toHaveAttribute("href", "#fnref-cash");
+  });
+
   it("renders stacktrace nodes with source line gutters", () => {
     render(
       <Clicky
@@ -302,8 +397,12 @@ describe("Clicky", () => {
     );
 
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /date/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /time range filter/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /date/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /time range filter/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
     expect(screen.queryByText("No data")).not.toBeInTheDocument();
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
@@ -556,10 +655,12 @@ describe("Clicky", () => {
     // brings the view bar back so the user can switch away from JSON again.
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     fireEvent.click(
-      within(sectionGroup(screen.getByRole("menu", { name: /column menu/i }), "View")).getByRole(
-        "menuitem",
-        { name: /^JSON$/i },
-      ),
+      within(
+        sectionGroup(
+          screen.getByRole("menu", { name: /column menu/i }),
+          "View",
+        ),
+      ).getByRole("menuitem", { name: /^JSON$/i }),
     );
     expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
     expect(screen.getByText("service")).toBeInTheDocument();

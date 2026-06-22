@@ -1,4 +1,73 @@
-import type { ClickyDocument } from "./Clicky";
+import type { ClickyDocument, ClickyNode } from "./Clicky";
+
+export const clickyMarkdownBlocksNode: ClickyNode = {
+  kind: "list",
+  unstyled: true,
+  items: [
+    {
+      kind: "heading",
+      level: 3,
+      content: {
+        kind: "text",
+        text: "Release Notes",
+        plain: "Release Notes",
+      },
+    },
+    {
+      kind: "blockquote",
+      content: {
+        kind: "text",
+        text: "Cutover starts after the replica lag clears.",
+        plain: "Cutover starts after the replica lag clears.",
+      },
+    },
+    {
+      kind: "admonition",
+      severity: "warning",
+      label: {
+        kind: "text",
+        text: "Manual approval required",
+        plain: "Manual approval required",
+      },
+      content: {
+        kind: "text",
+        text: "Finance must confirm the posted adjustment before export.",
+        plain: "Finance must confirm the posted adjustment before export.",
+      },
+    },
+    {
+      kind: "text",
+      text: "Cash balance reconciled",
+      plain: "Cash balance reconciled",
+      children: [
+        {
+          kind: "footnote-ref",
+          id: "cash-note",
+          plain: "[^cash-note]",
+        },
+      ],
+    },
+    {
+      kind: "footnotes",
+      items: [
+        {
+          kind: "footnote",
+          id: "cash-note",
+          content: {
+            kind: "text",
+            text: "Cash includes restricted deposits and call accounts.",
+            plain: "Cash includes restricted deposits and call accounts.",
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const clickyMarkdownBlocksFixture: ClickyDocument = {
+  version: 1,
+  node: clickyMarkdownBlocksNode,
+};
 
 export const clickyFixture: ClickyDocument = {
   version: 1,
@@ -78,7 +147,12 @@ export const clickyFixture: ClickyDocument = {
                   plain: "healthy",
                   style: { color: "#166534", bold: true },
                 },
-                latency: { kind: "text", text: "42", plain: "42", style: { monospace: true } },
+                latency: {
+                  kind: "text",
+                  text: "42",
+                  plain: "42",
+                  style: { monospace: true },
+                },
               },
               detail: {
                 kind: "map",
@@ -86,7 +160,11 @@ export const clickyFixture: ClickyDocument = {
                   {
                     name: "owner",
                     label: "Owner",
-                    value: { kind: "text", text: "platform", plain: "platform" },
+                    value: {
+                      kind: "text",
+                      text: "platform",
+                      plain: "platform",
+                    },
                   },
                   {
                     name: "manifest",
@@ -94,8 +172,10 @@ export const clickyFixture: ClickyDocument = {
                     value: {
                       kind: "code",
                       language: "yaml",
-                      source: "apiVersion: v1\nkind: Service\nmetadata:\n  name: api",
-                      plain: "apiVersion: v1\nkind: Service\nmetadata:\n  name: api",
+                      source:
+                        "apiVersion: v1\nkind: Service\nmetadata:\n  name: api",
+                      plain:
+                        "apiVersion: v1\nkind: Service\nmetadata:\n  name: api",
                     },
                   },
                 ],
@@ -110,7 +190,12 @@ export const clickyFixture: ClickyDocument = {
                   plain: "degraded",
                   style: { color: "#b45309", bold: true },
                 },
-                latency: { kind: "text", text: "91", plain: "91", style: { monospace: true } },
+                latency: {
+                  kind: "text",
+                  text: "91",
+                  plain: "91",
+                  style: { monospace: true },
+                },
               },
             },
           ],
@@ -128,7 +213,9 @@ export const clickyFixture: ClickyDocument = {
                 kind: "text",
                 text: "cluster",
                 plain: "cluster",
-                children: [{ kind: "text", text: " / prod-eu", plain: " / prod-eu" }],
+                children: [
+                  { kind: "text", text: " / prod-eu", plain: " / prod-eu" },
+                ],
               },
               children: [
                 {
@@ -149,7 +236,11 @@ export const clickyFixture: ClickyDocument = {
         label: "Logs",
         value: {
           kind: "collapsed",
-          label: { kind: "text", text: "Show rollout notes", plain: "Show rollout notes" },
+          label: {
+            kind: "text",
+            text: "Show rollout notes",
+            plain: "Show rollout notes",
+          },
           content: {
             kind: "list",
             items: [
@@ -166,6 +257,11 @@ export const clickyFixture: ClickyDocument = {
             ],
           },
         },
+      },
+      {
+        name: "markdown_blocks",
+        label: "Markdown Blocks",
+        value: clickyMarkdownBlocksNode,
       },
       {
         name: "html_note",

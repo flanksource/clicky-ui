@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickyDocument } from "../data/Clicky";
 import type { ParameterValues } from "./formMetadata";
 import type { ExecutionResponse, OpenAPISpec } from "./types";
@@ -105,6 +105,10 @@ function renderPage(
 }
 
 describe("OperationCommandPage", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
   it.skip("renders Clicky responses when the endpoint returns Clicky JSON", async () => {
     const client = makeClient((params) =>
       clickyResponse(
@@ -310,6 +314,105 @@ describe("OperationCommandPage", () => {
     expect(await screen.findByLabelText("Date range filter")).toBeInTheDocument();
     expect(screen.queryByLabelText("Since")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
+  });
+
+  it("writes transaction lookup filter changes back to the route", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/commands/transactions?__entity=all&autoRun=1",
+    );
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "test", version: "1" },
+      paths: {
+        "/api/v1/transactions": {
+          get: {
+            operationId: "transaction_list",
+            summary: "List transactions",
+            tags: ["transaction"],
+            parameters: [
+              { name: "contact", in: "query", required: false },
+              { name: "account", in: "query", required: false },
+            ],
+            responses: {},
+          },
+        },
+      },
+    };
+    const executeMock = vi.fn(async () =>
+      clickyResponse({
+        version: 1,
+        node: {
+          kind: "table",
+          columns: [{ name: "reference", label: "Reference" }],
+          rows: [],
+        },
+      }),
+    );
+    const lookupMock = vi.fn(async () => ({
+      filters: {
+        contact: {
+          label: "Contact",
+          options: {
+            "contact-1": { kind: "text", text: "Acme Ltd", plain: "Acme Ltd" },
+          },
+        },
+        account: {
+          label: "Account",
+          options: {
+            "account-1": {
+              kind: "text",
+              text: "Operating Account",
+              plain: "Operating Account",
+            },
+          },
+        },
+      },
+    }));
+    const client: OperationsApiClient = {
+      getOpenAPISpec: async () => spec,
+      executeCommand: executeMock,
+      lookupFilters: lookupMock,
+    };
+
+    renderPage(client, { operationId: "transaction_list" });
+
+    await screen.findByRole("heading", { name: "List transactions" });
+    await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(1));
+
+    const contact = await screen.findByLabelText("Contact");
+    fireEvent.focus(contact);
+    fireEvent.change(contact, { target: { value: "acme" } });
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Acme Ltd" }));
+
+    const account = await screen.findByLabelText("Account");
+    fireEvent.focus(account);
+    fireEvent.change(account, { target: { value: "operating" } });
+    fireEvent.mouseDown(
+      screen.getByRole("option", { name: "Operating Account" }),
+    );
+
+    await waitFor(
+      () => {
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("__entity")).toBe("all");
+        expect(params.get("autoRun")).toBe("1");
+        expect(params.get("contact")).toBe("contact-1");
+        expect(params.get("account")).toBe("account-1");
+      },
+      { timeout: 2_000 },
+    );
+    await waitFor(
+      () =>
+        expect(executeMock).toHaveBeenLastCalledWith(
+          "/api/v1/transactions",
+          "get",
+          { contact: "contact-1", account: "account-1" },
+          { Accept: "application/clicky+json" },
+        ),
+      { timeout: 2_000 },
+    );
   });
 
   it("honors explicit autoRun false for GET operations", async () => {

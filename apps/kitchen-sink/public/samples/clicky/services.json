@@ -137,6 +137,73 @@
         }
       },
       {
+        "name": "markdown_blocks",
+        "label": "Markdown Blocks",
+        "value": {
+          "kind": "list",
+          "unstyled": true,
+          "items": [
+            {
+              "kind": "heading",
+              "level": 3,
+              "content": {
+                "kind": "text",
+                "text": "Release Notes",
+                "plain": "Release Notes"
+              }
+            },
+            {
+              "kind": "blockquote",
+              "content": {
+                "kind": "text",
+                "text": "Cutover starts after the replica lag clears.",
+                "plain": "Cutover starts after the replica lag clears."
+              }
+            },
+            {
+              "kind": "admonition",
+              "severity": "warning",
+              "label": {
+                "kind": "text",
+                "text": "Manual approval required",
+                "plain": "Manual approval required"
+              },
+              "content": {
+                "kind": "text",
+                "text": "Finance must confirm the posted adjustment before export.",
+                "plain": "Finance must confirm the posted adjustment before export."
+              }
+            },
+            {
+              "kind": "text",
+              "text": "Cash balance reconciled",
+              "plain": "Cash balance reconciled",
+              "children": [
+                {
+                  "kind": "footnote-ref",
+                  "id": "cash-note",
+                  "plain": "[^cash-note]"
+                }
+              ]
+            },
+            {
+              "kind": "footnotes",
+              "items": [
+                {
+                  "kind": "footnote",
+                  "id": "cash-note",
+                  "content": {
+                    "kind": "text",
+                    "text": "Cash includes restricted deposits and call accounts.",
+                    "plain": "Cash includes restricted deposits and call accounts."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
         "name": "actions",
         "label": "Actions",
         "value": {
