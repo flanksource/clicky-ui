@@ -1,0 +1,7 @@
+import{D as c}from"./Section-BpsSr-N0.js";import{U as d}from"./UiInbox-CJfy9-xQ.js";import"./iframe-B-R1GM9F.js";import"./preload-helper-B4w--iqy.js";import"./utils-BLSKlp9E.js";import"./Icon-GOgSuK4c.js";import"./UiChevronDown-7vVXchWm.js";import"./UiChevronRight-DlnTuw8_.js";const h={title:"Layout/DetailEmptyState",component:c,args:{icon:d,label:"Nothing selected",description:"Pick an item from the tree to see its details."},argTypes:{icon:{table:{disable:!0}}},parameters:{docs:{description:{component:"Centered empty-state block for detail panels. It accepts an optional icon, primary label, secondary description, and root class override."}}}},e={},t={args:{icon:void 0,label:"No details available",description:"The selected item does not expose additional metadata."}};var a,o,r;e.parameters={...e.parameters,docs:{...(a=e.parameters)==null?void 0:a.docs,source:{originalSource:"{}",...(r=(o=e.parameters)==null?void 0:o.docs)==null?void 0:r.source}}};var s,i,n;t.parameters={...t.parameters,docs:{...(s=t.parameters)==null?void 0:s.docs,source:{originalSource:`{
+  args: {
+    icon: undefined,
+    label: "No details available",
+    description: "The selected item does not expose additional metadata."
+  }
+}`,...(n=(i=t.parameters)==null?void 0:i.docs)==null?void 0:n.source}}};const x=["Default","WithoutIcon"];export{e as Default,t as WithoutIcon,x as __namedExportsOrder,h as default};
