@@ -1,0 +1,1 @@
+import{U as e,a as t}from"./UiTerminal-DvFH9yca.js";import{U as a}from"./UiMarkdown-BHAmt1tT.js";import{U as s}from"./UiGlobe-DqqIb5CN.js";import{U as i}from"./UiBeaker-DCdjO_ot.js";function u(r){switch(r){case"go test":case"ginkgo":return t;case"jest":case"vitest":return i;case"playwright":return s;case"fixture":return a;case"task":return e;default:return null}}export{u as f};
