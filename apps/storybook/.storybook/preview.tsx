@@ -1,5 +1,11 @@
 import { useEffect } from "react";
 import type { Preview } from "@storybook/react-vite";
+// Import the providers from source (not the built package) so the decorator's
+// ThemeProvider/DensityProvider share the exact module instance — and therefore
+// the React Context — that the story components consume (they import the same
+// hooks from "../hooks/..."). Importing from "@flanksource/clicky-ui" resolves to
+// dist/, a second instance, which makes useTheme/useDensity throw "must be used
+// inside <Provider>" inside the browser tests.
 import {
   ThemeProvider,
   DensityProvider,
@@ -7,7 +13,7 @@ import {
   useDensity,
   type Theme,
   type Density,
-} from "@flanksource/clicky-ui";
+} from "../../../packages/ui/src/hooks";
 import "@flanksource/clicky-ui/styles.css";
 import "./preview.css";
 
