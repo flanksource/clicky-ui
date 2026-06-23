@@ -47,7 +47,9 @@ export const Outline: Story = { args: { variant: "outline" } };
 
 export const SelectInteraction: Story = {
   play: async ({ args, canvasElement, step }) => {
-    const canvas = within(canvasElement);
+    // Query the whole document, not just the story canvas: the menu renders in a
+    // FloatingPortal at document.body, outside canvasElement.
+    const canvas = within(canvasElement.ownerDocument.body);
 
     await step("opening the menu and selecting YAML updates the format", async () => {
       await userEvent.click(canvas.getByRole("button", { name: "Choose format" }));

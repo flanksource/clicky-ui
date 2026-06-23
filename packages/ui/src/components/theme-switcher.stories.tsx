@@ -50,7 +50,9 @@ export const WithPreview: Story = {
 
 export const ChangesDataAttribute: Story = {
   play: async ({ canvasElement, step }) => {
-    const canvas = within(canvasElement);
+    // Query the whole document, not just the story canvas: the menu renders in a
+    // FloatingPortal at document.body, outside canvasElement.
+    const canvas = within(canvasElement.ownerDocument.body);
 
     await step("open menu and pick dark", async () => {
       await userEvent.click(canvas.getByRole("button", { name: /theme/i }));
@@ -68,7 +70,9 @@ export const ChangesDataAttribute: Story = {
 
 export const KeyboardSelection: Story = {
   play: async ({ canvasElement, step }) => {
-    const canvas = within(canvasElement);
+    // Query the whole document, not just the story canvas: the menu renders in a
+    // FloatingPortal at document.body, outside canvasElement.
+    const canvas = within(canvasElement.ownerDocument.body);
     const trigger = canvas.getByRole("button", { name: /theme/i });
 
     await step("open with Enter, navigate with arrows, select with Enter", async () => {

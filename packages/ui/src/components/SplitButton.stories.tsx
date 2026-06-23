@@ -50,7 +50,9 @@ export const Loading: Story = { args: { loading: true } };
 
 export const MenuInteraction: Story = {
   play: async ({ args, canvasElement, step }) => {
-    const canvas = within(canvasElement);
+    // Query the whole document, not just the story canvas: the menu renders in a
+    // FloatingPortal at document.body, outside canvasElement.
+    const canvas = within(canvasElement.ownerDocument.body);
 
     await step("primary click fires the primary handler", async () => {
       await userEvent.click(canvas.getByRole("button", { name: "Save" }));
