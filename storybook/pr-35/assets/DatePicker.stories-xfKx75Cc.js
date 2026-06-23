@@ -1,0 +1,9 @@
+import{j as r,r as D}from"./iframe-BbITQAD0.js";import{D as x}from"./DatePicker-sRC5_hq1.js";import"./preload-helper-C67fKNjI.js";import"./Icon-BV_HrUof.js";import"./utils-BLSKlp9E.js";import"./UiCalendar-Di_gX8EH.js";function v({value:o,...g}){const[s,f]=D.useState(o??"");return r.jsxs("div",{className:"max-w-xs space-y-3",children:[r.jsx(x,{...g,value:s,onChange:f}),r.jsxs("div",{className:"rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs",children:["value=",s||"empty"]})]})}const k={title:"Components/DatePicker",component:x,tags:["autodocs"],render:o=>r.jsx(v,{...o}),parameters:{docs:{description:{component:'Native `<input type="date">` with a hidden default indicator and a custom calendar button that calls `showPicker()`. Controlled via an ISO `YYYY-MM-DD` string. For a unified date/datetime API prefer `DateField`.'}}},argTypes:{value:{control:"text",description:"Controlled ISO date string (YYYY-MM-DD)."},openButtonLabel:{control:"text",description:"Accessible label for the calendar button."},disabled:{control:"boolean"},onChange:{control:!1}},args:{value:"2026-06-16",openButtonLabel:"Open date picker",disabled:!1}},e={},a={args:{value:""}},t={args:{disabled:!0}};var n,d,c;e.parameters={...e.parameters,docs:{...(n=e.parameters)==null?void 0:n.docs,source:{originalSource:"{}",...(c=(d=e.parameters)==null?void 0:d.docs)==null?void 0:c.source}}};var i,l,p;a.parameters={...a.parameters,docs:{...(i=a.parameters)==null?void 0:i.docs,source:{originalSource:`{
+  args: {
+    value: ""
+  }
+}`,...(p=(l=a.parameters)==null?void 0:l.docs)==null?void 0:p.source}}};var m,u,b;t.parameters={...t.parameters,docs:{...(m=t.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  args: {
+    disabled: true
+  }
+}`,...(b=(u=t.parameters)==null?void 0:u.docs)==null?void 0:b.source}}};const E=["Default","Empty","Disabled"];export{e as Default,t as Disabled,a as Empty,E as __namedExportsOrder,k as default};

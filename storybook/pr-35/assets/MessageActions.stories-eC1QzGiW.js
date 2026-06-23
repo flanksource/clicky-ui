@@ -1,0 +1,5 @@
+import{M as c}from"./MessageActions-lmxaxFiB.js";import"./iframe-BbITQAD0.js";import"./preload-helper-C67fKNjI.js";import"./utils-BLSKlp9E.js";import"./Icon-BV_HrUof.js";import"./UiCheck-Dc-rEWul.js";import"./UiCopy-B4oai1-v.js";import"./UiRefresh-DT0eMwWf.js";const{fn:p}=__STORYBOOK_MODULE_TEST__,y={title:"Chat/MessageActions",component:c,tags:["autodocs"],parameters:{docs:{description:{component:"Hover action row for an assistant message: copy its text (with a copied-confirmation) and, when `onRegenerate` is provided, re-generate it."}}},args:{text:"Found 2 pods in default: api-7c9 and worker-1f2.",onRegenerate:p()}},e={},o={args:{onRegenerate:void 0}};var r,t,a;e.parameters={...e.parameters,docs:{...(r=e.parameters)==null?void 0:r.docs,source:{originalSource:"{}",...(a=(t=e.parameters)==null?void 0:t.docs)==null?void 0:a.source}}};var s,n,i;o.parameters={...o.parameters,docs:{...(s=o.parameters)==null?void 0:s.docs,source:{originalSource:`{
+  args: {
+    onRegenerate: undefined
+  }
+}`,...(i=(n=o.parameters)==null?void 0:n.docs)==null?void 0:i.source}}};const R=["Default","CopyOnly"];export{o as CopyOnly,e as Default,R as __namedExportsOrder,y as default};
