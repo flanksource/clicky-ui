@@ -374,7 +374,7 @@ function resolvePathParams(
 ): { path: string; params: Record<string, string> } {
   const queryParams = { ...params };
   let resolvedPath = path;
-  const placeholders = [...path.matchAll(/\{([^}]+)\}/g)]
+  const placeholders = [...path.matchAll(/\{([^{}]+)\}/g)]
     .map((match) => match[1])
     .filter((name): name is string => Boolean(name));
   const argValues = parseArgsParam(params.args);

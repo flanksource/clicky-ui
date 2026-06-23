@@ -39,13 +39,16 @@ export function getClickyRowId(row: ClickyRow): string | undefined {
 // apiPathToRoutePath strips the /api/v1 prefix and turns `{param}` segments into
 // `:param`, mapping an OpenAPI path to the explorer's client-side route.
 export function apiPathToRoutePath(path: string): string {
-  const cliPath = path
+  // Split on "/" and drop empty segments to strip the leading /api/v1 prefix and
+  // any leading/trailing slashes without backtracking-prone regexes (the `[^{}]`
+  // class and segment split avoid the polynomial-ReDoS that `[^}]+` / `\/+$` had).
+  const segments = path
     .trim()
-    .replace(/^\/api\/v1\/?/, "")
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
-  if (!cliPath) return "/";
-  return `/${cliPath.replace(/\{([^}]+)\}/g, ":$1")}`;
+    .replace(/^\/api\/v1/, "")
+    .split("/")
+    .filter(Boolean);
+  if (segments.length === 0) return "/";
+  return `/${segments.join("/").replace(/\{([^{}]+)\}/g, ":$1")}`;
 }
 
 // hrefForOperation builds the client-side route for an operation, filling path

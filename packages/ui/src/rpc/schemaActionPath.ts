@@ -5,13 +5,13 @@
 // fetched from its collection endpoint (the connection/profile schema is keyed
 // there, not per id).
 export function collectionPath(path: string): string {
-  return path.replace(/\/\{[^}]+\}$/, "");
+  return path.replace(/\/\{[^{}]+\}$/, "");
 }
 
 // resolveActionPath fills {name} path parameters from the provided values,
 // leaving unmatched placeholders intact.
 export function resolveActionPath(path: string, values: Record<string, string>): string {
-  return path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+  return path.replace(/\{([^{}]+)\}/g, (_match, name: string) => {
     const v = values[name];
     return v != null && v !== "" ? encodeURIComponent(v) : `{${name}}`;
   });
