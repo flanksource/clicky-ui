@@ -199,13 +199,15 @@ const frameworkFor = (seed: number): string => FRAMEWORKS[seed % FRAMEWORKS.leng
 // Every leaf carries the same heavy payload shape as the LargePayloads story —
 // a deep object, the 500-row array under summary/rows, and the 800-line log —
 // so opening any leaf in the large tree exercises JsonView + LogViewer at scale.
-function largeLeafDetail(seed: number): Record<string, unknown> {
-  return {
-    summary: { total: 500, ok: 400, failed: 100, seed },
-    rows: wideArray,
-    graph: deepObject(5, 3, seed),
-  };
-}
+// Shared by reference across all ~1024 leaves (like `wideArray`/`hugeLog`): a
+// fresh per-leaf `deepObject(5, 3, seed)` allocated ~190MB at module load, which
+// OOM'd the memory-constrained CI vitest worker. One opened leaf renders one
+// detail, so a single shared payload preserves the stress without the bloat.
+const largeLeafDetail: Record<string, unknown> = {
+  summary: { total: 500, ok: 400, failed: 100 },
+  rows: wideArray,
+  graph: deepObject(5, 3, 7),
+};
 
 // Builds one subtree. Containers branch `breadth`-ways down to `depth`; leaves
 // carry a large payload + log so any opened leaf stresses the detail pane.
@@ -223,7 +225,7 @@ function bigSubtree(path: string, depth: number, breadth: number, seed: number):
       skipped,
       duration: ms(((seed * 17) % 800) + 5),
       stdout: hugeLog,
-      detail: largeLeafDetail(seed),
+      detail: largeLeafDetail,
     };
     if (failed) {
       leaf.message = `assertion failed in case ${path}`;
