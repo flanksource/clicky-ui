@@ -174,9 +174,9 @@ describe("TimeseriesCoreBars cell variant", () => {
     );
 
     expect(await screen.findByText("2.3 cores")).toBeInTheDocument();
-    const bars = container.querySelector("[data-core-density]");
-    expect(bars).toHaveAttribute("data-core-count", "8");
-    expect(bars).toHaveAttribute("data-core-density", "compact");
+    const bars = container.querySelector("[data-bar-density]");
+    expect(bars).toHaveAttribute("data-bar-count", "8");
+    expect(bars).toHaveAttribute("data-bar-density", "compact");
   });
 
   it("opens a hover card summarising current/min/max/avg/capacity over the window", async () => {

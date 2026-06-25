@@ -91,6 +91,7 @@ Legend: ✅ present · ❌ missing · ➖ covered by a family/combined demo or n
 | Markdown | ✅ | ✅ | — |
 | MethodBadge | ✅ | ❌ | P3 (demo) |
 | ProgressBar | ✅ | ✅ | — |
+| ProgressBars | ✅ | ✅ | done |
 | SignedDeltaBar | ✅ | ✅ | — |
 | SortableHeader | ✅ | ✅ | — |
 | TabButton | ✅ | ✅ | — |
@@ -175,6 +176,7 @@ Legend: ✅ present · ❌ missing · ➖ covered by a family/combined demo or n
 |---|---|---|---|
 | ChatWindows (family) | ✅ | ➖ | — |
 | ChatFab / ChatWindow / ChatWindowManager / ContextBadges / ThreadPicker / ToolPreferences | ❌ | ➖ | P3 |
+| SessionViewer | ✅ | ✅ | — |
 
 ## rpc/
 

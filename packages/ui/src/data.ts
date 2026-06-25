@@ -161,11 +161,21 @@ export {
   type TimeseriesGaugeVariant,
 } from "./data/TimeseriesGauge";
 export {
+  ProgressBars,
+  type ProgressBarsOrientation,
+  type ProgressBarsProps,
+  type ProgressBarsStats,
+  type ProgressBarsUnit,
+  type ProgressBarsVariant,
+} from "./data/ProgressBars";
+export {
+  deriveProgressBars,
+  type ProgressBarFill,
+  type ProgressBarsModel,
+} from "./data/ProgressBars.model";
+export {
   TimeseriesCoreBars,
-  type CoreBarsUnit,
-  type TimeseriesCoreBarsOrientation,
   type TimeseriesCoreBarsProps,
-  type TimeseriesCoreBarsVariant,
 } from "./data/TimeseriesCoreBars";
 export {
   GaugeHoverCard,
@@ -188,11 +198,6 @@ export {
   type WorkloadCardStatus,
   type WorkloadCardWorkload,
 } from "./data/WorkloadCard.model";
-export {
-  deriveCoreBars,
-  type CoreBar,
-  type CoreBarsModel,
-} from "./data/TimeseriesCoreBars.model";
 export {
   StatusRows,
   StackedStatusBar,

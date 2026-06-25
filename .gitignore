@@ -48,3 +48,4 @@ hack/
 .playwright-cli/
 .mcp.json
 .handoff/
+.grite/
