@@ -1,20 +1,11 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext } from "react";
 import type { LookupDescriptor, LookupFetcher } from "./json-schema-form-types";
 
 // FormLookupContext carries the host-provided LookupFetcher down to the
 // LookupControl rendered deep inside the form, so the form stays decoupled from
-// any specific RPC client. JsonSchemaForm provides it when given a lookupFetcher.
-const FormLookupContext = createContext<LookupFetcher | undefined>(undefined);
-
-export function FormLookupProvider({
-  fetcher,
-  children,
-}: {
-  fetcher?: LookupFetcher;
-  children: ReactNode;
-}) {
-  return <FormLookupContext.Provider value={fetcher}>{children}</FormLookupContext.Provider>;
-}
+// any specific RPC client. FormLookupProvider provides it when JsonSchemaForm is
+// given a lookupFetcher.
+export const FormLookupContext = createContext<LookupFetcher | undefined>(undefined);
 
 export function useLookupFetcher(): LookupFetcher | undefined {
   return useContext(FormLookupContext);

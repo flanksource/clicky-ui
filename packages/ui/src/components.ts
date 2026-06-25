@@ -112,11 +112,8 @@ export {
 } from "./components/icon-menu-picker";
 
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
-export {
-  FormLookupProvider,
-  useLookupFetcher,
-  resolveLookupScope,
-} from "./components/form-lookup-context";
+export { FormLookupProvider } from "./components/FormLookupProvider";
+export { useLookupFetcher, resolveLookupScope } from "./components/form-lookup-context";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
 export {

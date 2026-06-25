@@ -244,7 +244,7 @@ export function createOperationsApiClient(
       const upper = method.toUpperCase();
       const resolved = resolvePathParams(path, {});
       const queryParams = {
-        ...(extraParams ?? {}),
+        ...extraParams,
         __lookup: "filters",
         __lookup_filter: filterKey,
         __lookup_q: query,

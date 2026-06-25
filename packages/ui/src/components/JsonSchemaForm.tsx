@@ -4,7 +4,7 @@ import { Icon } from "../data/Icon";
 import { UiCheck, UiEllipsis } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-fields";
-import { FormLookupProvider } from "./form-lookup-context";
+import { FormLookupProvider } from "./FormLookupProvider";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";

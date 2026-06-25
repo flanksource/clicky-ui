@@ -2,21 +2,25 @@ import type { StaticIconComponent } from "../data/Icon";
 import {
   UiActivity,
   UiBoxes,
+  UiCommand,
   UiDatabase,
   UiGlobe,
   UiGraph,
   UiHardDrive,
+  UiSearch,
   UiServer,
   UiSqlDatabase,
+  UiSqlQuery,
   UiTable,
+  UiTerminal,
   UiWorkflow,
 } from "../icons";
 
 // SURFACE_ICONS maps the opaque icon-name strings the backend emits on each
 // surface (x-clicky.surfaces[].icon) to clicky-ui glyph components. The canonical
-// vocabulary (database/globe/graph/activity/table) is the contract with the
-// backend's icon emitter; aliases are accepted for convenience. Passing the
-// resolved component (not the string) to AppShell renders via <Icon icon=.../>
+// vocabulary (database/globe/graph/activity/table/command/query) is the contract
+// with the backend's icon emitter; aliases are accepted for convenience. Passing
+// the resolved component (not the string) to AppShell renders via <Icon icon=.../>
 // and never hits the string-name fallback-provider placeholder.
 const SURFACE_ICONS: Record<string, StaticIconComponent> = {
   database: UiDatabase,
@@ -34,6 +38,13 @@ const SURFACE_ICONS: Record<string, StaticIconComponent> = {
   boxes: UiBoxes,
   workflow: UiWorkflow,
   table: UiTable,
+  // cmd/query profiles (dynamic command-backed surfaces)
+  command: UiCommand,
+  cmd: UiCommand,
+  terminal: UiTerminal,
+  query: UiSqlQuery,
+  "sql-query": UiSqlQuery,
+  search: UiSearch,
 };
 
 // resolveSurfaceIcon returns the glyph component for a backend icon name, or
