@@ -1,0 +1,19 @@
+import{A as v}from"./AvatarBadge-Bss6cV66.js";import{U as b}from"./UiWarningTriangle-D2fuE8IQ.js";import{a as f}from"./UiCheck-BSaE0h4R.js";import"./iframe-DQ9XXhpn.js";import"./preload-helper-B2wK-Kjy.js";import"./Avatar-COlKbKmI.js";import"./utils-BLSKlp9E.js";import"./Icon-OSD6-FvK.js";const W={title:"Data/AvatarBadge",component:v,tags:["autodocs"],parameters:{docs:{description:{component:"A pill that pairs an `Avatar` with a label and an optional trailing status `Icon`, with an optional multi-line comment beneath. Used for assignee/owner chips and review rows."}}},argTypes:{alt:{control:"text"},label:{control:"text"},initials:{control:"text"},avatarKind:{control:"inline-radio",options:["user","bot","service"]},avatarVariant:{control:"inline-radio",options:["duotone","filled","outline"]},size:{control:"inline-radio",options:["sm","md","lg","xl"]},comment:{control:"text"}},args:{alt:"Ada Lovelace",label:"Ada Lovelace",avatarKind:"user",size:"lg"}},e={},a={args:{statusIcon:f,statusTone:"emerald",statusTitle:"Approved"}},t={args:{statusIcon:b,statusTone:"amber",comment:"Requested changes on the migration step before this can merge."}},r={args:{alt:"Grace Hopper",label:"Grace Hopper",initials:"GH"}};var o,s,n;e.parameters={...e.parameters,docs:{...(o=e.parameters)==null?void 0:o.docs,source:{originalSource:"{}",...(n=(s=e.parameters)==null?void 0:s.docs)==null?void 0:n.source}}};var i,c,l;a.parameters={...a.parameters,docs:{...(i=a.parameters)==null?void 0:i.docs,source:{originalSource:`{
+  args: {
+    statusIcon: UiCheckFilled,
+    statusTone: "emerald",
+    statusTitle: "Approved"
+  }
+}`,...(l=(c=a.parameters)==null?void 0:c.docs)==null?void 0:l.source}}};var m,p,d;t.parameters={...t.parameters,docs:{...(m=t.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  args: {
+    statusIcon: UiWarningTriangle,
+    statusTone: "amber",
+    comment: "Requested changes on the migration step before this can merge."
+  }
+}`,...(d=(p=t.parameters)==null?void 0:p.docs)==null?void 0:d.source}}};var u,g,h;r.parameters={...r.parameters,docs:{...(u=r.parameters)==null?void 0:u.docs,source:{originalSource:`{
+  args: {
+    alt: "Grace Hopper",
+    label: "Grace Hopper",
+    initials: "GH"
+  }
+}`,...(h=(g=r.parameters)==null?void 0:g.docs)==null?void 0:h.source}}};const w=["Default","WithStatus","WithComment","Initials"];export{e as Default,r as Initials,t as WithComment,a as WithStatus,w as __namedExportsOrder,W as default};
