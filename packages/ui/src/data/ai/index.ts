@@ -42,3 +42,37 @@ export {
   type ContextTypeConfig,
   type ContextTypeStyle,
 } from "./context";
+
+// AI coding-agent session viewer (captain pkg/ai/history transcripts).
+export {
+  SessionViewer,
+  type SessionViewerProps,
+  type SessionEntry,
+  type SessionEvent,
+  type SessionInput,
+  type SessionThemeOverride,
+} from "./SessionViewer";
+export {
+  getSessionAction,
+  normalizeSession,
+  splitMcpTool,
+  summarizeSession,
+  summarizeToolInput,
+  type SessionActionMeta,
+  type SessionEventKind,
+  type SessionToolUse,
+  type SessionMessage,
+  type SessionContent,
+  type SessionTone,
+} from "./SessionViewer.model";
+export {
+  CATEGORY_LABELS,
+  classifyCommand,
+  classifyToolCategory,
+  collectSessionFilters,
+  eventCategory,
+  isEventVisible,
+  type SessionCategory,
+  type SessionFilters,
+  type SessionVisibility,
+} from "./session-categories";

@@ -7,6 +7,7 @@ import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
+import { ProgressBarsDemo } from "./demos/ProgressBarsDemo";
 import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
@@ -48,6 +49,7 @@ import { EntityExplorerDemo } from "./demos/EntityExplorerDemo";
 import { SegmentedControlDemo } from "./demos/SegmentedControlDemo";
 import { SearchInputDemo } from "./demos/SearchInputDemo";
 import { TimelineDemo } from "./demos/TimelineDemo";
+import { SessionViewerDemo } from "./demos/SessionViewerDemo";
 import { ToastDemo } from "./demos/ToastDemo";
 import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
@@ -135,6 +137,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "ProgressBar",
         component: ProgressBarDemo,
         icon: UiLoader,
+      },
+      {
+        id: "progress-bars",
+        label: "ProgressBars",
+        component: ProgressBarsDemo,
+        icon: UiChartBar,
       },
       {
         id: "signed-delta-bar",
@@ -393,6 +401,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       },
       { id: "search-input", label: "SearchInput", component: SearchInputDemo },
       { id: "timeline", label: "Timeline", component: TimelineDemo },
+      { id: "session-viewer", label: "SessionViewer", component: SessionViewerDemo },
       { id: "toast", label: "Toast", component: ToastDemo },
       {
         id: "gavel-styling-comparison",
