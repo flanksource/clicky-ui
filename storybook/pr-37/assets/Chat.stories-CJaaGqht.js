@@ -1,0 +1,29 @@
+import{j as r}from"./iframe-BO3XiECZ.js";import{C as e}from"./Chat-BtxNMdZj.js";import{m as n,S as p,a as y,b as E,M as f}from"./Chat.fixtures-BmVP6U6L.js";import"./preload-helper-B2wK-Kjy.js";import"./Attachment-CxQlENwM.js";import"./utils-BLSKlp9E.js";import"./Icon-GruNqjyl.js";import"./button-D09c44qg.js";import"./index-1evVQkiP.js";import"./loading-DKpQqMGf.js";import"./UiFile-cnMbWtzA.js";import"./UiClose-C-MNSUX4.js";import"./UiAdd-B6Pi1ncb.js";import"./Conversation-x6Mah7WE.js";import"./Message-Dv05BmHl.js";import"./Markdown-CJqHE9j0.js";import"./ToolCall-BNlbtuCA.js";import"./CodeBlock-BHEAp_Sy.js";import"./JsonView-BjBUOmIJ.js";import"./code-highlight-BWXEN8UU.js";import"./types-CS5Tgc-R.js";import"./UiCircleX-GIsHmrSF.js";import"./UiCheck-ODqHhldT.js";import"./UiClock-BaSWU1WN.js";import"./UiCircleOutline-C58hwlV-.js";import"./UiWrench-CdlSyWfZ.js";import"./UiChevronDown-CmLEZyD7.js";import"./MessageActions-BNziwP74.js";import"./UiCopy-CbLhyTSt.js";import"./UiRefresh-xkaxisuK.js";import"./Reasoning-Bm0oDVkY.js";import"./UiBrain-CLd81Szs.js";import"./UiArrowDown-D-ObtSM6.js";import"./UiLoader-BoLdgWEt.js";import"./PromptInput-DGTsisk1.js";import"./UiStop-i0qH5iU5.js";import"./UiArrowUp-B4PHuTeq.js";import"./Suggestion-Bb2u9mI2.js";import"./ModelSelector-CcYRgOAu.js";import"./Combobox-BqRY8y8h.js";import"./index-D_v1HQsH.js";import"./index-OHfE5VLg.js";import"./json-schema-form-size-DYVq0lph.js";import"./modalStack-yDe9UqJq.js";import"./zIndex-CigQ76av.js";import"./index-Ch4PikV3.js";import"./ContextUsage-CFaBMmxD.js";import"./DropdownMenu-AoZVwYhh.js";import"./floating-ui.react-B_2LfBkg.js";const Tr={title:"Data/Chat",component:e,parameters:{layout:"fullscreen",docs:{description:{component:"Self-contained AI chat over the Vercel AI SDK v6 UI Message Stream protocol. Streams assistant markdown and renders clicky operation tool-calls (args → result). The footer toolbar has a strict model picker (with provider brand icons), a strict reasoning-effort picker, and a token/cost gauge that appears once the first reply lands. The backend owns model selection + tool execution; these stories drive a mock transport."}}}},o={render:()=>r.jsx("div",{className:"h-[600px] border border-border",children:r.jsx(e,{transport:n(),suggestions:["List all pods","Show failing checks",{label:"Restart api",prompt:"Restart the api service"}],emptyState:r.jsxs("div",{className:"space-y-1",children:[r.jsx("h3",{className:"font-medium text-sm",children:"Ask about your app"}),r.jsx("p",{className:"text-muted-foreground text-sm",children:"Type a question — the assistant can call your app's operations."})]})})})},t={render:()=>r.jsx("div",{className:"h-[600px] border border-border",children:r.jsx(e,{transport:n(200),initialMessages:p,placeholder:"Try: list pods"})})},a={render:()=>r.jsx("div",{className:"h-[600px] border border-border",children:r.jsx(e,{transport:n(),models:f,modelsApi:null,defaultModel:"anthropic/claude-sonnet-4-5",enableAttachments:!0,initialMessages:p})})},s={render:()=>r.jsx("div",{className:"h-[600px] border border-border",children:r.jsx(e,{transport:y(),initialMessages:p,placeholder:"Ask anything"})})},i={render:()=>r.jsx("div",{className:"h-[600px] border border-border",children:r.jsx(e,{transport:E(),initialMessages:p,toolApproval:"manual",placeholder:"Try: restart the api service"})})};var m,d,c;o.parameters={...o.parameters,docs:{...(m=o.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  render: () => <div className="h-[600px] border border-border">
+      <Chat transport={mockChatTransport()} suggestions={["List all pods", "Show failing checks", {
+      label: "Restart api",
+      prompt: "Restart the api service"
+    }]} emptyState={<div className="space-y-1">
+            <h3 className="font-medium text-sm">Ask about your app</h3>
+            <p className="text-muted-foreground text-sm">
+              Type a question — the assistant can call your app&apos;s operations.
+            </p>
+          </div>} />
+    </div>
+}`,...(c=(d=o.parameters)==null?void 0:d.docs)==null?void 0:c.source}}};var l,h,u;t.parameters={...t.parameters,docs:{...(l=t.parameters)==null?void 0:l.docs,source:{originalSource:`{
+  render: () => <div className="h-[600px] border border-border">
+      <Chat transport={mockChatTransport(200)} initialMessages={SAMPLE_TOOL_MESSAGES} placeholder="Try: list pods" />
+    </div>
+}`,...(u=(h=t.parameters)==null?void 0:h.docs)==null?void 0:u.source}}};var b,S,g;a.parameters={...a.parameters,docs:{...(b=a.parameters)==null?void 0:b.docs,source:{originalSource:`{
+  render: () => <div className="h-[600px] border border-border">
+      <Chat transport={mockChatTransport()} models={MOCK_MODELS} modelsApi={null} defaultModel="anthropic/claude-sonnet-4-5" enableAttachments initialMessages={SAMPLE_TOOL_MESSAGES} />
+    </div>
+}`,...(g=(S=a.parameters)==null?void 0:S.docs)==null?void 0:g.source}}};var x,v,M;s.parameters={...s.parameters,docs:{...(x=s.parameters)==null?void 0:x.docs,source:{originalSource:`{
+  render: () => <div className="h-[600px] border border-border">
+      <Chat transport={mockReasoningTransport()} initialMessages={SAMPLE_TOOL_MESSAGES} placeholder="Ask anything" />
+    </div>
+}`,...(M=(v=s.parameters)==null?void 0:v.docs)==null?void 0:M.source}}};var A,T,k;i.parameters={...i.parameters,docs:{...(A=i.parameters)==null?void 0:A.docs,source:{originalSource:`{
+  render: () => <div className="h-[600px] border border-border">
+      <Chat transport={mockApprovalTransport()} initialMessages={SAMPLE_TOOL_MESSAGES} toolApproval="manual" placeholder="Try: restart the api service" />
+    </div>
+}`,...(k=(T=i.parameters)==null?void 0:T.docs)==null?void 0:k.source}}};const kr=["Empty","Streaming","WithModelSelector","Reasoning","ToolApproval"];export{o as Empty,s as Reasoning,t as Streaming,i as ToolApproval,a as WithModelSelector,kr as __namedExportsOrder,Tr as default};
