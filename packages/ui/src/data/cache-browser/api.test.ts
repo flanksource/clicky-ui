@@ -49,8 +49,12 @@ describe("createCacheClient", () => {
     vi.stubGlobal("fetch", fetchMock);
     try {
       const client = createCacheClient({ baseUrl: "/api/v1" });
+      // The Error-instance form (not the string/RegExp form) is required: gavel's
+      // bundled vitest+chai mishandles `rejects.toThrow(string|RegExp)` (vitest #6618
+      // — chai's assertThrows treats the rejection value as a callable), yielding a
+      // spurious "indexOf of undefined". The instance form asserts the same message.
       await expect(client.key("missing")).rejects.toThrow(
-        "cache request failed: 404 cache: key not found",
+        new Error("cache request failed: 404 cache: key not found"),
       );
     } finally {
       vi.unstubAllGlobals();
