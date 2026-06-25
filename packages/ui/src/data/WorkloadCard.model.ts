@@ -1,6 +1,6 @@
 import type { BadgeTone } from "./Badge";
 import type { StaticIconComponent } from "./Icon";
-import type { TimeseriesCoreBarsOrientation } from "./TimeseriesCoreBars";
+import type { ProgressBarsOrientation } from "./ProgressBars";
 import type { GaugeSeries } from "./TimeseriesGauge";
 
 export type WorkloadCardKind =
@@ -50,7 +50,7 @@ export interface WorkloadCardResourceMetric {
 }
 
 export interface WorkloadCardCpuMetric extends WorkloadCardResourceMetric {
-  orientation?: TimeseriesCoreBarsOrientation;
+  orientation?: ProgressBarsOrientation;
   showValue?: boolean;
 }
 
