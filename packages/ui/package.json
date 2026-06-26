@@ -12,6 +12,8 @@
   },
   "files": [
     "dist",
+    "oxlint-plugins/**/*.js",
+    "oxlint-plugins/README.md",
     "README.md",
     "LICENSE",
     "NOTICE.md"
@@ -80,6 +82,7 @@
       "import": "./dist/ai.js",
       "require": "./dist/ai.cjs"
     },
+    "./oxlint-plugins": "./oxlint-plugins/clicky-ui.js",
     "./styles.css": "./dist/styles.css",
     "./tailwind-preset": {
       "types": "./dist/tailwind-preset.d.ts",

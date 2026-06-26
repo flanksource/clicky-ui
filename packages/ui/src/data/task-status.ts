@@ -1,3 +1,13 @@
+import {
+  UiCancel,
+  UiCircleOutline,
+  UiCircleX,
+  UiClock,
+  UiLoader,
+  UiPass,
+  UiWarningTriangle,
+} from "../icons";
+import type { StaticIconComponent } from "./Icon";
 import type { ProgressSegment } from "./ProgressBar";
 import type { TaskSnapshot } from "./TaskSnapshot";
 
@@ -18,18 +28,20 @@ const STATUS_COLORS: Record<string, string> = {
   SKIP: "text-gray-400",
 };
 
-const STATUS_ICONS: Record<string, string> = {
-  pending: "codicon:clock",
-  running: "svg-spinners:ring-resize",
-  success: "codicon:pass-filled",
-  PASS: "codicon:pass-filled",
-  completed: "codicon:pass-filled",
-  failed: "codicon:error",
-  FAIL: "codicon:error",
-  ERR: "codicon:error",
-  warning: "codicon:warning",
-  canceled: "codicon:circle-slash",
-  SKIP: "codicon:circle-slash",
+// Status → generated Ui* icon component. Rendered via <Icon icon={…}>; the
+// `running` glyph is spun with `animate-spin` at the call sites.
+const STATUS_ICONS: Record<string, StaticIconComponent> = {
+  pending: UiClock,
+  running: UiLoader,
+  success: UiPass,
+  PASS: UiPass,
+  completed: UiPass,
+  failed: UiCircleX,
+  FAIL: UiCircleX,
+  ERR: UiCircleX,
+  warning: UiWarningTriangle,
+  canceled: UiCancel,
+  SKIP: UiCancel,
 };
 
 const STATUS_BG: Record<string, string> = {
@@ -48,8 +60,8 @@ export function taskStatusColor(s: string): string {
   return STATUS_COLORS[s] ?? "text-gray-500";
 }
 
-export function taskStatusIcon(s: string): string {
-  return STATUS_ICONS[s] ?? "codicon:circle-outline";
+export function taskStatusIcon(s: string): StaticIconComponent {
+  return STATUS_ICONS[s] ?? UiCircleOutline;
 }
 
 export function taskStatusBg(s: string): string {

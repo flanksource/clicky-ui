@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
+import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { Timestamp } from "./cells/Timestamp";
 import { TaskProgress } from "./TaskProgress";
@@ -142,7 +143,10 @@ function RunRow({
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <iconify-icon icon={taskStatusIcon(run.status)} class={taskStatusColor(run.status)} />
+            <Icon
+              icon={taskStatusIcon(run.status)}
+              className={cn(taskStatusColor(run.status), run.status === "running" && "animate-spin")}
+            />
             <span className="truncate font-medium">{run.name}</span>
             {run.kind && (
               <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">

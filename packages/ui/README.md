@@ -118,6 +118,37 @@ Both hooks persist their choice to `localStorage` under `clicky-ui-theme` / `cli
 </script>
 ```
 
+## Lint rules
+
+The package ships opt-in [oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins.html)
+rules that keep consuming projects on clicky-ui's components, overlays, theming
+and icons instead of rebuilding them by hand. Enable them in your downstream
+`.oxlintrc.json`:
+
+```json
+{
+  "jsPlugins": [
+    {
+      "name": "clicky-ui",
+      "specifier": "@flanksource/clicky-ui/oxlint-plugins"
+    }
+  ],
+  "rules": {
+    "clicky-ui/prefer-clicky-components": "warn",
+    "clicky-ui/no-adhoc-overlay": "error",
+    "clicky-ui/prefer-tailwind-classes": "warn",
+    "clicky-ui/prefer-theme-tokens": "error",
+    "clicky-ui/prefer-clicky-icons": "warn"
+  }
+}
+```
+
+The rules flag rebuilt primitives (`<button>`, `<table>`, …), ad-hoc dialogs and
+arbitrary z-index, hand-rolled inline styles, hardcoded colors / raw theme
+storage access, and icons imported from unapproved libraries or faked with
+emoji. See [`oxlint-plugins/README.md`](./oxlint-plugins/README.md) for the full
+guide.
+
 ## License
 
 Apache-2.0

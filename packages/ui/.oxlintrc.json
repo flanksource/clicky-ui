@@ -12,7 +12,8 @@
     {
       "files": ["**/*.stories.tsx", "**/*.test.tsx", "**/*.test.ts"],
       "rules": {
-        "react/only-export-components": "off"
+        "react/only-export-components": "off",
+        "clicky-icons/no-iconify-names": "off"
       }
     }
   ],
