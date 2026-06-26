@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "../lib/utils";
+import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import type { LogEntry, TaskSnapshot } from "./TaskSnapshot";
 import {
@@ -15,17 +16,6 @@ import {
 // tasks: a segmented progress bar per group plus collapsible per-task rows with
 // status icon, duration, error, and expandable logs. Presentational only —
 // callers feed it snapshots from useTaskRun (SSE) or any other source.
-
-// Iconify web component, loaded by the host app (same as clicky's task UI). The
-// intrinsic element keeps TaskProgress free of clicky-ui's icon registry.
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      "iconify-icon": { icon: string; class?: string };
-    }
-  }
-}
 
 const MAX_COMPLETED = 5;
 const MAX_PENDING = 3;
@@ -104,7 +94,10 @@ function TaskGroupCard({
     <div className={cn("rounded-lg border bg-card", compact ? "p-3" : "p-4")}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-          <iconify-icon icon={taskStatusIcon(g.status)} class={taskStatusColor(g.status)} />
+          <Icon
+            icon={taskStatusIcon(g.status)}
+            className={cn(taskStatusColor(g.status), g.status === "running" && "animate-spin")}
+          />
           <span>{g.name}</span>
           {progress && <span className="text-xs text-muted-foreground">{progress}</span>}
           {g.kind && (
@@ -174,7 +167,10 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
       )}
       onClick={hasLogs ? () => setExpanded((v) => !v) : undefined}
     >
-      <iconify-icon icon={taskStatusIcon(t.status)} class={cn(taskStatusColor(t.status), "mt-0.5 text-lg")} />
+      <Icon
+        icon={taskStatusIcon(t.status)}
+        className={cn(taskStatusColor(t.status), "mt-0.5 text-lg", t.status === "running" && "animate-spin")}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
