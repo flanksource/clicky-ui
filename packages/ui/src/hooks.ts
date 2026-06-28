@@ -29,3 +29,11 @@ export {
   type UseTaskRunsResult,
   type TaskTransportOptions,
 } from "./hooks/use-task-run";
+export {
+  usePrompts,
+  answerPrompt,
+  type PromptSnapshot,
+  type PromptFilter,
+  type UsePromptsOptions,
+  type UsePromptsResult,
+} from "./hooks/use-prompts";
