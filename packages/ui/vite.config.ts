@@ -12,6 +12,8 @@ const entry = {
   index: resolve(__dirname, "src/index.ts"),
   utils: resolve(__dirname, "src/utils.ts"),
   hooks: resolve(__dirname, "src/hooks.ts"),
+  jotai: resolve(__dirname, "src/jotai.ts"),
+  "mdx-editor": resolve(__dirname, "src/mdx-editor.ts"),
   components: resolve(__dirname, "src/components.ts"),
   data: resolve(__dirname, "src/data.ts"),
   comments: resolve(__dirname, "src/comments.ts"),

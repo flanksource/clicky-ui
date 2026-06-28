@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { LabelIconSpec } from "../data/Icon";
 import type { FormSize } from "./json-schema-form-size";
 import type { SortMode } from "./json-schema-form-preferences";
+import type { MdxEditorPluginOptions } from "./mdx-editor-options";
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -58,6 +59,8 @@ export interface JsonSchemaProperty {
   // branches (each field carries its own order), unlike the object-level
   // `x-order` array.
   "x-clicky-order"?: number;
+  // Options passed to the MDXEditor-backed markdown field when `format: "md"`.
+  "x-md-editor"?: MdxEditorPluginOptions;
   // Consumer extension keys pass through untouched.
   [key: string]: unknown;
 }
@@ -117,6 +120,8 @@ export type FieldControlKind =
   // A multi-line text box (a long-form string). Resolved from `format: textarea`
   // or set by a consumer pre-extension.
   | "textarea"
+  // An MDXEditor-backed rich markdown editor. Resolved from `format: md`.
+  | "markdown"
   // A static, non-editable presentation element (a heading, a block of info
   // text, a horizontal divider, or an empty spacer) — carries no input. Used for
   // schema fields that label/structure a form rather than collect a value.
@@ -212,6 +217,10 @@ export interface FieldControl {
   // date — which JSON Schema format produced this control: "date" (date only)
   // or "date-time" (date + time).
   dateFormat?: "date" | "date-time";
+
+  // markdown — typed MDXEditor plugin/toolbar options, resolved from the
+  // schema's `x-md-editor` extension.
+  markdownOptions?: MdxEditorPluginOptions;
 
   // string-map
   valueSchema?: JsonSchemaProperty;

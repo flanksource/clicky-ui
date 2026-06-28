@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { clickyOperationsToTools, operationToTool } from "./clickyOperationsToTools";
+import {
+  clickyOperationsToTools,
+  operationToTool,
+} from "./clickyOperationsToTools";
 import type { OpenAPIOperation, ResolvedOperation } from "../../rpc/types";
 
 const listPods: OpenAPIOperation = {
@@ -51,7 +54,24 @@ const listOrders: OpenAPIOperation = {
   "x-clicky": { surface: "orders", verb: "list", scope: "collection" },
 };
 
-function resolve(op: OpenAPIOperation, method = "get", path = "/x"): ResolvedOperation {
+const groupedXeroAccounts: OpenAPIOperation = {
+  operationId: "xero_accounts_list",
+  summary: "List Xero accounts",
+  parameters: [],
+  responses: {},
+  "x-clicky": {
+    surface: "xero-accounts",
+    verb: "list",
+    scope: "collection",
+    group: "Xero Read",
+  },
+};
+
+function resolve(
+  op: OpenAPIOperation,
+  method = "get",
+  path = "/x",
+): ResolvedOperation {
   return { path, method, operation: op };
 }
 
@@ -64,7 +84,10 @@ describe("clickyOperationsToTools", () => {
       type: "string",
       description: "namespace to scope to",
     });
-    expect(tool.inputSchema?.properties.limit).toEqual({ type: "integer", default: 50 });
+    expect(tool.inputSchema?.properties.limit).toEqual({
+      type: "integer",
+      default: 50,
+    });
     expect(tool.inputSchema?.required).toEqual(["namespace"]);
   });
 
@@ -72,6 +95,161 @@ describe("clickyOperationsToTools", () => {
     const tool = operationToTool(listOrders);
     expect(tool?.label).toBe("List");
     expect(tool?.group).toBe("orders");
+  });
+
+  it("uses x-clicky group as the preference key and applies group defaults", () => {
+    const tool = operationToTool(groupedXeroAccounts);
+    expect(tool?.group).toBe("Xero Read");
+    expect(tool?.preferenceKey).toBe("Xero Read");
+    expect(tool?.defaultMode).toBe("disabled");
+  });
+
+  it("skips operations in the Disabled group", () => {
+    const disabled: OpenAPIOperation = {
+      operationId: "auth_status",
+      summary: "Auth status",
+      responses: {},
+      "x-clicky": { group: "Disabled" },
+    };
+    expect(operationToTool(disabled)).toBeNull();
+    expect(clickyOperationsToTools([resolve(disabled)])).toEqual([]);
+  });
+
+  it("skips cobra help and completion operations", () => {
+    const completion: OpenAPIOperation = {
+      operationId: "completion_bash",
+      summary: "Generate bash completion",
+      responses: {},
+    };
+    const helpByCommand: OpenAPIOperation = {
+      operationId: "accounts_help",
+      summary: "Help for accounts",
+      responses: {},
+      "x-clicky": {
+        command: "help/accounts",
+        verb: "action",
+        scope: "collection",
+      },
+    };
+    expect(operationToTool(completion)).toBeNull();
+    expect(
+      clickyOperationsToTools([
+        resolve(helpByCommand, "get", "/api/v1/help/accounts"),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("infers xero, accounting, comments, and admin group defaults for hand-written routes", () => {
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "providerAccountsList" },
+          "get",
+          "/api/v1/provider/accounts",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Xero Read",
+      preferenceKey: "Xero Read",
+      defaultMode: "disabled",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "providerAccountsCreate" },
+          "post",
+          "/api/v1/provider/accounts",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Xero Write",
+      preferenceKey: "Xero Write",
+      defaultMode: "disabled",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "accountMappingList" },
+          "get",
+          "/api/v1/accounts/mapping",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Accounting Read",
+      defaultMode: "enabled",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "accountMappingUpdate" },
+          "post",
+          "/api/v1/accounts/mapping",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Accounting Metadata Write",
+      defaultMode: "ask",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "transactionsCreate" },
+          "post",
+          "/api/v1/transactions",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Accounting Transaction Write",
+      defaultMode: "ask",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "commentsList" },
+          "get",
+          "/api/v1/comments",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Comments Read",
+      defaultMode: "enabled",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "commentsCreate" },
+          "post",
+          "/api/v1/comments",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Comments Write",
+      defaultMode: "ask",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "rulesDefinitionSave" },
+          "post",
+          "/api/v1/rules/definitions",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Admin Write",
+      defaultMode: "ask",
+    });
+    expect(
+      clickyOperationsToTools([
+        resolve(
+          { ...listPods, operationId: "rulesPreview" },
+          "post",
+          "/api/v1/rules/preview",
+        ),
+      ])[0],
+    ).toMatchObject({
+      group: "Admin Read",
+      defaultMode: "enabled",
+    });
   });
 
   it("labels from the summary and omits group when x-clicky is absent", () => {
@@ -87,7 +265,10 @@ describe("clickyOperationsToTools", () => {
 
   it("merges requestBody properties into the input schema", () => {
     const tool = operationToTool(createPod);
-    expect(tool?.inputSchema?.properties.name).toEqual({ type: "string", description: "pod name" });
+    expect(tool?.inputSchema?.properties.name).toEqual({
+      type: "string",
+      description: "pod name",
+    });
     expect(tool?.inputSchema?.properties.image).toEqual({ type: "string" });
   });
 

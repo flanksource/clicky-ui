@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
@@ -22,6 +22,11 @@ import {
   stackedRowGapClass,
   type FormSize,
 } from "./json-schema-form-size";
+
+const LazyMdxEditorField = lazy(async () => {
+  const mod = await import("./MdxEditorField");
+  return { default: mod.MdxEditorField };
+});
 
 // FieldsGrid is the container every group of field rows renders into — the
 // top-level form and each nested object/map. In inline mode it owns the single
@@ -572,6 +577,45 @@ export function TextareaControl({
         onChange={(e) => field.onChange(e.target.value)}
       />
     </FieldAdornmentWrapper>
+  );
+}
+
+export function MarkdownControl({
+  field,
+  fieldId,
+  readOnly,
+  size,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+}) {
+  const fallback = (
+    <textarea
+      id={fieldId}
+      data-jsf-input
+      rows={6}
+      className={cn(inputClass(size), "h-auto resize-y font-mono", field.prefix && "pl-8", field.suffix && "pr-8")}
+      value={toText(field.value)}
+      disabled={readOnly}
+      placeholder={defaultPlaceholder(field.schema)}
+      onChange={(e) => field.onChange(e.target.value)}
+    />
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <LazyMdxEditorField
+        id={fieldId}
+        value={toText(field.value)}
+        readOnly={readOnly}
+        size={size}
+        placeholder={defaultPlaceholder(field.schema)}
+        onChange={(next) => field.onChange(next)}
+        {...field.markdownOptions}
+      />
+    </Suspense>
   );
 }
 

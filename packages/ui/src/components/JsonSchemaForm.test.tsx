@@ -215,6 +215,28 @@ describe("JsonSchemaForm boolean fallback", () => {
   });
 });
 
+describe("JsonSchemaForm markdown format", () => {
+  it("renders format md as an editable markdown field and commits string changes", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            body: { type: "string", title: "Body", format: "md" },
+          },
+        }}
+        value={{ body: "# Hello" }}
+        onChange={onChange}
+      />,
+    );
+    const editor = screen.getByLabelText("Body");
+    expect(editor).toHaveValue("# Hello");
+    fireEvent.change(editor, { target: { value: "## Updated" } });
+    expect(onChange).toHaveBeenCalledWith({ body: "## Updated" });
+  });
+});
+
 describe("JsonSchemaForm enum custom value", () => {
   it("commits a custom value when allowCustomValue is set", () => {
     const onChange = vi.fn();

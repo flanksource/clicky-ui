@@ -62,6 +62,7 @@ const config: StorybookConfig = {
       "@flanksource/clicky-ui > @floating-ui/react",
       "@flanksource/clicky-ui > @tanstack/react-query",
       "@flanksource/clicky-ui > dompurify",
+      "@mdxeditor/editor",
       "@flanksource/clicky-ui > @flanksource/icons/mi",
       "@flanksource/clicky-ui > recharts",
       "@flanksource/clicky-ui > react-rnd",

@@ -177,6 +177,22 @@ describe("resolveControl", () => {
     expect(control("when", { type: "string", format: "date-time" }).dateFormat).toBe("date-time");
   });
 
+  it("infers a markdown control from format md and carries typed editor options", () => {
+    const c = control("body", {
+      type: "string",
+      format: "md",
+      "x-md-editor": { admonitions: true, diffMode: false, tables: true },
+    });
+    expect(c.kind).toBe("markdown");
+    expect(c.markdownOptions).toEqual({ admonitions: true, diffMode: false, tables: true });
+  });
+
+  it("ignores non-object markdown editor options", () => {
+    const c = control("body", { type: "string", format: "md", "x-md-editor": "rich" });
+    expect(c.kind).toBe("markdown");
+    expect(c.markdownOptions).toBeUndefined();
+  });
+
   it("does NOT infer a date control from the field name (domain-agnostic)", () => {
     // A property named "EffectiveDate" with no `format` stays a plain string —
     // date handling keys off the schema keyword, never the name.

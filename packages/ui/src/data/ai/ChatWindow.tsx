@@ -4,10 +4,17 @@ import { Button } from "../../components/button";
 import { Icon } from "../Icon";
 import { UiAdd, UiClose, UiFullscreen } from "../../icons";
 import { Chat, type ChatProps } from "../chat/Chat";
-import { useChatWindowManager, type ChatWindowState } from "./chat-window-context";
+import {
+  useChatWindowManager,
+  type ChatWindowState,
+} from "./chat-window-context";
 import { ThreadPicker, type ThreadSource } from "./ThreadPicker";
 import { ContextBadges } from "./ContextBadges";
-import { ToolPreferences, type ToolMeta, type ToolMode } from "./ToolPreferences";
+import {
+  ToolPreferences,
+  type ToolMeta,
+  type ToolMode,
+} from "./ToolPreferences";
 import type { ContextTypeConfig } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 
@@ -61,7 +68,8 @@ export function ChatWindow({
   defaultToolMode = "ask",
   headerExtras,
 }: ChatWindowProps) {
-  const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } = useChatWindowManager();
+  const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } =
+    useChatWindowManager();
   const [Rnd, setRnd] = useState<typeof import("react-rnd").Rnd | null>(null);
   const [toolPrefs, setToolPrefs] = useState<Record<string, ToolMode>>({});
 
@@ -74,8 +82,9 @@ export function ChatWindow({
       const next = { ...prev };
       let changed = false;
       for (const t of tools) {
-        if (next[t.name] === undefined) {
-          next[t.name] = defaultToolMode;
+        const key = t.preferenceKey ?? t.name;
+        if (next[key] === undefined) {
+          next[key] = t.defaultMode ?? defaultToolMode;
           changed = true;
         }
       }
@@ -95,7 +104,9 @@ export function ChatWindow({
 
   const removeContext = useCallback(
     (id: string) =>
-      updatePanel(panel.id, { contextItems: panel.contextItems.filter((c) => c.id !== id) }),
+      updatePanel(panel.id, {
+        contextItems: panel.contextItems.filter((c) => c.id !== id),
+      }),
     [updatePanel, panel.id, panel.contextItems],
   );
 
@@ -130,8 +141,19 @@ export function ChatWindow({
       )}
       <div className="flex-1" />
       {headerExtras}
-      {tools && <ToolPreferences tools={tools} value={toolPrefs} onChange={setToolPrefs} />}
-      <Button variant="ghost" size="icon" title="New window" onClick={() => openPanel()}>
+      {tools && (
+        <ToolPreferences
+          tools={tools}
+          value={toolPrefs}
+          onChange={setToolPrefs}
+        />
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        title="New window"
+        onClick={() => openPanel()}
+      >
         <Icon icon={UiAdd} className="size-4" />
       </Button>
       <Button
@@ -142,7 +164,12 @@ export function ChatWindow({
       >
         <Icon icon={UiFullscreen} className="size-4" />
       </Button>
-      <Button variant="ghost" size="icon" title="Close" onClick={() => closePanel(panel.id)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Close"
+        onClick={() => closePanel(panel.id)}
+      >
         <Icon icon={UiClose} className="size-4" />
       </Button>
     </div>
@@ -183,7 +210,13 @@ export function ChatWindow({
           style={
             panel.maximized
               ? { position: "relative", width: "100%", height: "100%" }
-              : { position: "absolute", left: panel.x, top: panel.y, width: panel.width, height: panel.height }
+              : {
+                  position: "absolute",
+                  left: panel.x,
+                  top: panel.y,
+                  width: panel.width,
+                  height: panel.height,
+                }
           }
         >
           {frame}
@@ -196,7 +229,12 @@ export function ChatWindow({
     <div className={outerClass} style={{ zIndex: panel.zIndex }}>
       <style>{MAXIMIZE_CSS}</style>
       <Rnd
-        default={{ x: panel.x, y: panel.y, width: panel.width, height: panel.height }}
+        default={{
+          x: panel.x,
+          y: panel.y,
+          width: panel.width,
+          height: panel.height,
+        }}
         style={{ pointerEvents: "auto" }}
         minWidth={360}
         minHeight={400}
@@ -207,7 +245,12 @@ export function ChatWindow({
         onDragStart={() => bringToFront(panel.id)}
         onDragStop={(_e, d) => updatePanel(panel.id, { x: d.x, y: d.y })}
         onResizeStop={(_e, _dir, ref, _delta, pos) =>
-          updatePanel(panel.id, { width: ref.offsetWidth, height: ref.offsetHeight, x: pos.x, y: pos.y })
+          updatePanel(panel.id, {
+            width: ref.offsetWidth,
+            height: ref.offsetHeight,
+            x: pos.x,
+            y: pos.y,
+          })
         }
       >
         {frame}

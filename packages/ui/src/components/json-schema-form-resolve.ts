@@ -6,6 +6,7 @@ import type {
   JsonSchemaProperty,
   LookupDescriptor,
 } from "./json-schema-form-types";
+import { isPlainObject } from "./json-schema-form-utils";
 
 // isOpenStringMap reports whether a property is an object whose entries are
 // described by a sub-schema in `additionalProperties` (a typed key/value map) or
@@ -137,6 +138,17 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   // A long-form string declares `format: textarea` to render a multi-line box.
   if (prop.format === "textarea" && schemaHasType(prop, "string")) {
     return { ...base, kind: "textarea" };
+  }
+  // A markdown string declares `format: md` to render the MDXEditor-backed
+  // editor. Plugin toggles live under `x-md-editor` so schema authors can keep
+  // the format signal standard-sized and the editor behavior explicit.
+  if (prop.format === "md" && schemaHasType(prop, "string")) {
+    const markdownOptions = prop["x-md-editor"];
+    return {
+      ...base,
+      kind: "markdown",
+      ...(isPlainObject(markdownOptions) ? { markdownOptions } : {}),
+    };
   }
   if (schemaHasType(prop, "boolean")) {
     return { ...base, kind: "boolean" };
