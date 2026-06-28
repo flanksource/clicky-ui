@@ -1,4 +1,11 @@
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { useEffect, type ReactNode } from "react";
@@ -6,7 +13,7 @@ import { ChatWindowManagerProvider } from "./ChatWindowManager";
 import { useChatWindowManager } from "./chat-window-context";
 import { ChatWindowLayer } from "./ChatWindow";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
-import type { ToolMeta } from "./ToolPreferences";
+import { ToolPreferences, type ToolMeta } from "./ToolPreferences";
 import { mockChatTransport } from "../chat/Chat.fixtures";
 
 const TOOLS: ToolMeta[] = [
@@ -72,8 +79,14 @@ function installMemoryStorage() {
     removeItem: (key) => values.delete(key),
     setItem: (key, value) => values.set(key, value),
   };
-  Object.defineProperty(window, "localStorage", { configurable: true, value: storage });
-  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
 }
 
 describe("ChatWindow tool approval default", () => {
@@ -88,12 +101,14 @@ describe("ChatWindow tool approval default", () => {
       },
     ];
 
-    expect(chatWindowRequestBody({
-      base: { model: "test" },
-      contextItems,
-      tools: TOOLS,
-      toolPrefs: { listPods: "enabled" },
-    })).toEqual({
+    expect(
+      chatWindowRequestBody({
+        base: { model: "test" },
+        contextItems,
+        tools: TOOLS,
+        toolPrefs: { listPods: "enabled" },
+      }),
+    ).toEqual({
       model: "test",
       context: "Context:\n[formula] Formula Playground (entity: Demo Co)\n\n",
       contextItems,
@@ -117,7 +132,9 @@ describe("ChatWindow tool approval default", () => {
     // react-rnd loads lazily; wait for it to settle so its post-load re-render
     // doesn't unmount (and close) the popover we open below.
     await screen.findByTestId("tool-preferences-btn");
-    await waitFor(() => expect(document.querySelector(".react-draggable")).not.toBeNull());
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
 
@@ -141,12 +158,127 @@ describe("ChatWindow tool approval default", () => {
     );
 
     await screen.findByTestId("tool-preferences-btn");
-    await waitFor(() => expect(document.querySelector(".react-draggable")).not.toBeNull());
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
 
     expect(await screen.findAllByText("Auto")).toHaveLength(TOOLS.length);
     expect(screen.queryByText("Ask")).toBeNull();
+  });
+
+  it("collapses tools by preference key and uses each group default", async () => {
+    const groupedTools: ToolMeta[] = [
+      {
+        name: "xero_accounts_list",
+        label: "List Xero accounts",
+        group: "Xero Read",
+        preferenceKey: "Xero Read",
+        defaultMode: "disabled",
+      },
+      {
+        name: "xero_contacts_list",
+        label: "List Xero contacts",
+        group: "Xero Read",
+        preferenceKey: "Xero Read",
+        defaultMode: "disabled",
+      },
+      {
+        name: "sync",
+        label: "Sync",
+        group: "Admin Write",
+        preferenceKey: "Admin Write",
+        defaultMode: "ask",
+      },
+    ];
+
+    render(
+      <ChatWindowManagerProvider storageId="approval-groups">
+        <OpenOnMount>
+          <ChatWindowLayer
+            threadsApi={null}
+            tools={groupedTools}
+            chat={{ modelsApi: null, transport: mockChatTransport() }}
+          />
+        </OpenOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByTestId("tool-preferences-btn");
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
+
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+
+    expect(await screen.findAllByText("Xero Read")).toHaveLength(2);
+    expect(screen.getAllByText("Admin Write")).toHaveLength(2);
+    expect(screen.queryByText("List Xero accounts")).toBeNull();
+    expect(screen.queryByText("List Xero contacts")).toBeNull();
+    expect(screen.getByText("Off")).toBeInTheDocument();
+    expect(screen.getByText("Ask")).toBeInTheDocument();
+  });
+
+  it("advanced tool preferences shows individual tools with description tooltips", async () => {
+    const groupedTools: ToolMeta[] = [
+      {
+        name: "xero_accounts_list",
+        label: "List Xero accounts",
+        group: "Xero Read",
+        preferenceKey: "Xero Read",
+        defaultMode: "disabled",
+        description: "List accounts from Xero",
+      },
+      {
+        name: "xero_contacts_list",
+        label: "List Xero contacts",
+        group: "Xero Read",
+        preferenceKey: "Xero Read",
+        defaultMode: "disabled",
+        description: "List contacts from Xero",
+      },
+      {
+        name: "sync_xero",
+        label: "Sync Xero",
+        group: "Admin Write",
+        preferenceKey: "Admin Write",
+        defaultMode: "ask",
+        description: "Synchronize Xero data",
+      },
+    ];
+    const onChange = vi.fn();
+
+    render(
+      <ToolPreferences
+        tools={groupedTools}
+        value={{ "Xero Read": "disabled" }}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+    fireEvent.click(await screen.findByText("Advanced"));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Advanced Tool Preferences",
+    });
+    expect(within(dialog).getByText("Admin Write")).toBeInTheDocument();
+    expect(within(dialog).getByText("Xero Read")).toBeInTheDocument();
+    expect(within(dialog).getByText("xero_accounts_list")).toBeInTheDocument();
+    expect(within(dialog).getByText("xero_contacts_list")).toBeInTheDocument();
+    expect(within(dialog).queryByText("List Xero accounts")).toBeNull();
+    expect(
+      screen.getByLabelText("Description for xero_accounts_list"),
+    ).toHaveAttribute("title", "List accounts from Xero");
+
+    const row = within(dialog).getByText("xero_accounts_list").closest("button");
+    expect(row?.className).toContain("h-9");
+    fireEvent.click(row!);
+    expect(onChange).toHaveBeenCalledWith({
+      "Xero Read": "disabled",
+      xero_accounts_list: "enabled",
+    });
   });
 
   it("passes panel initial prompts into the inner chat", async () => {
@@ -157,13 +289,18 @@ describe("ChatWindow tool approval default", () => {
         <OpenOnMount initialPrompt={{ id: 1, text: "Fix this formula" }}>
           <ChatWindowLayer
             threadsApi={null}
-            chat={{ modelsApi: null, transport: recordingTransport(sendMessages) }}
+            chat={{
+              modelsApi: null,
+              transport: recordingTransport(sendMessages),
+            }}
           />
         </OpenOnMount>
       </ChatWindowManagerProvider>,
     );
 
     await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
-    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain("Fix this formula");
+    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain(
+      "Fix this formula",
+    );
   });
 });

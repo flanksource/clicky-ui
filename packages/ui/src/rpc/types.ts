@@ -77,7 +77,9 @@ export interface OpenAPIParameter {
 /** Resolves the input placeholder for a parameter, drawing ONLY from explicit
  *  placeholder fields — never from `description` (help text). Returns undefined
  *  when no placeholder is declared so callers can apply their own fallback. */
-export function parameterPlaceholder(param: OpenAPIParameter): string | undefined {
+export function parameterPlaceholder(
+  param: OpenAPIParameter,
+): string | undefined {
   return param["x-clicky-placeholder"] ?? param.placeholder;
 }
 
@@ -140,9 +142,16 @@ export interface ClickyOperationMeta {
   idParam?: string;
   supportsLookup?: boolean;
   supportsFilterMode?: boolean;
+  group?: string;
 }
 
-export type OperationLookupFilterType = "bool" | "number" | "date" | "from" | "to" | "multi-filter";
+export type OperationLookupFilterType =
+  | "bool"
+  | "number"
+  | "date"
+  | "from"
+  | "to"
+  | "multi-filter";
 
 export interface OperationLookupFilter {
   label?: string;
@@ -154,7 +163,9 @@ export interface OperationLookupFilter {
   truncated?: boolean;
   /** True distinct count behind a truncated option set; drives "… and N more". */
   total?: number;
-  presets?: Array<{ label: string; from: string; to: string } | TimeRangePresetGroup>;
+  presets?: Array<
+    { label: string; from: string; to: string } | TimeRangePresetGroup
+  >;
   timeEnabled?: boolean;
   timeZone?: string;
   timeZones?: string[];
@@ -165,5 +176,8 @@ export interface OperationLookupResponse {
 }
 
 export function isPositionalParam(p: OpenAPIParameter): boolean {
-  return p.name === "args" || p.description?.toLowerCase().includes("positional argument") === true;
+  return (
+    p.name === "args" ||
+    p.description?.toLowerCase().includes("positional argument") === true
+  );
 }

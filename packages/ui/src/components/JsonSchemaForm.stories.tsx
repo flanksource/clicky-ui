@@ -326,6 +326,54 @@ export const PreferencesMenu: Story = {
   },
 };
 
+const markdownSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    summary: { type: "string", title: "Summary" },
+    body: {
+      type: "string",
+      format: "md",
+      title: "Body",
+      description: "Markdown source stored as a plain string.",
+      "x-md-editor": {
+        admonitions: true,
+        diffMode: false,
+        frontmatter: true,
+        tables: true,
+      },
+    },
+  },
+};
+
+export const MarkdownField: Story = {
+  args: {
+    schema: markdownSchema,
+    value: {
+      summary: "Quarterly notes",
+      body: [
+        "# Quarterly notes",
+        "",
+        ":::tip",
+        "Use `format: md` to get the MDXEditor field.",
+        ":::",
+        "",
+        "| Metric | Value |",
+        "| --- | ---: |",
+        "| Incidents | 3 |",
+      ].join("\n"),
+    },
+    title: "Report",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`format: md` renders the MDXEditor-backed markdown field. Common plugins are enabled by default and can be controlled with typed `x-md-editor` options such as `admonitions`, `frontmatter`, `tables`, and `diffMode`.",
+      },
+    },
+  },
+};
+
 export const ReadOnly: Story = {
   args: { readOnly: true },
   parameters: {

@@ -5,7 +5,7 @@
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgDir = resolve(here, "..");
@@ -14,9 +14,15 @@ const require = createRequire(import.meta.url);
 const v4Pkg = require.resolve("@tailwindcss/cli/package.json");
 const v4Bin = resolve(dirname(v4Pkg), "dist/index.mjs");
 
-const child = spawn(
-  process.execPath,
-  [v4Bin, "-i", "src/styles/full.css", "-o", "dist/styles.css", "--minify"],
-  { cwd: pkgDir, stdio: "inherit" },
-);
-child.on("exit", (code) => process.exit(code ?? 0));
+const builds = [
+  ["src/styles/full.css", "dist/styles.css"],
+  ["src/styles/mdx-editor.css", "dist/mdx-editor.css"],
+];
+
+for (const [input, output] of builds) {
+  const result = spawnSync(process.execPath, [v4Bin, "-i", input, "-o", output, "--minify"], {
+    cwd: pkgDir,
+    stdio: "inherit",
+  });
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}

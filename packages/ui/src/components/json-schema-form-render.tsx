@@ -10,6 +10,7 @@ import {
   FieldWrapper,
   LinkControl,
   LookupControl,
+  MarkdownControl,
   NumberControl,
   ObjectSection,
   ReadOnlyValue,
@@ -79,6 +80,8 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
       return <DateControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
     case "textarea":
       return <TextareaControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+    case "markdown":
+      return <MarkdownControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
     case "display":
       return <DisplayControl field={field} size={size} />;
     case "link":
@@ -104,6 +107,7 @@ function ownsReadOnlyRendering(kind: FieldControl["kind"]): boolean {
     kind === "object" ||
     kind === "string-map" ||
     kind === "textarea" ||
+    kind === "markdown" ||
     kind === "display" ||
     kind === "link"
   );

@@ -54,6 +54,17 @@ export function ClickyPanel() {
 
 `OperationCatalog` and `EntityExplorerApp` (both exported from `@flanksource/clicky-ui/rpc`) render an OpenAPI spec — fetched via an `OperationsApiClient` — as a navigable list of operations grouped by entity surface. They expect the spec to declare `x-clicky` surface metadata for the surfaces they should expose. See `apps/kitchen-sink/src/demos/OperationExplorerDemo.tsx` for a fake-client example.
 
+## Markdown editor field
+
+`JsonSchemaForm` fields with `format: md` — and the standalone `MdxEditorField` exported from `@flanksource/clicky-ui/mdx-editor` — render an [MDXEditor](https://mdxeditor.dev/)-backed rich-text field. Its base styles ship as a **separate** stylesheet so apps that don't use the field don't pay its weight (the editor's JavaScript is also loaded lazily, on first render). Import it once at the app root, in addition to `styles.css`:
+
+```tsx
+import "@flanksource/clicky-ui/styles.css";
+import "@flanksource/clicky-ui/mdx-editor.css"; // only if you render the markdown field
+```
+
+Without this import the field renders, but its toolbar and content are unstyled.
+
 ## Bundle size guidance
 
 Prefer subpath imports in production apps:

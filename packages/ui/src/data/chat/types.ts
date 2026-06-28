@@ -8,7 +8,14 @@ import type {
 } from "ai";
 import type { ReactNode } from "react";
 
-export type { UIMessage, ToolUIPart, DynamicToolUIPart, ChatStatus, ReasoningUIPart, FileUIPart };
+export type {
+  UIMessage,
+  ToolUIPart,
+  DynamicToolUIPart,
+  ChatStatus,
+  ReasoningUIPart,
+  FileUIPart,
+};
 
 /** A selectable chat model, as served by the backend's GET /api/chat/models.
  *  `configured` is false for catalogued models whose provider has no API key. */
@@ -63,7 +70,9 @@ export function suggestionPrompt(s: Suggestion): string {
 }
 
 /** Returns true for an assistant reasoning ("thinking") part. */
-export function isReasoningPart(part: { type: string }): part is ReasoningUIPart {
+export function isReasoningPart(part: {
+  type: string;
+}): part is ReasoningUIPart {
   return part.type === "reasoning";
 }
 
@@ -82,6 +91,8 @@ export type AnyToolPart = ToolUIPart | DynamicToolUIPart;
  *  derived from a clicky RPC operation (`description`/`inputSchema`). The Go
  *  backend owns execution; the client uses this only for display and to scope
  *  which tools a request may call (passed in the transport `body`). */
+export type ToolMode = "enabled" | "ask" | "disabled";
+
 export interface ToolMeta {
   /** Stable tool name sent to the model (the operation id). */
   name: string;
@@ -89,6 +100,11 @@ export interface ToolMeta {
   label: string;
   /** Bucket heading in the popover — the clicky surface for RPC operations. */
   group?: string;
+  /** Preference key sent to the backend. Defaults to `name`; group-backed
+   *  clicky tools set this to the backend tool group. */
+  preferenceKey?: string;
+  /** Initial preference mode when the chat window first sees this tool. */
+  defaultMode?: ToolMode;
   /** Description shown in tool pickers / tool-call headers. */
   description?: string;
   /** JSON-Schema for the tool's input, assembled from an operation's
@@ -110,7 +126,9 @@ export interface JSONSchemaProperty {
 }
 
 /** Returns true for a `dynamic-tool` part (clicky operations surface this way). */
-export function isDynamicToolPart(part: { type: string }): part is DynamicToolUIPart {
+export function isDynamicToolPart(part: {
+  type: string;
+}): part is DynamicToolUIPart {
   return part.type === "dynamic-tool";
 }
 

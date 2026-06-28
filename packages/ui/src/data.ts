@@ -236,6 +236,14 @@ export {
 } from "./data/task-status";
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
+export { PromptDialog, type PromptDialogProps } from "./data/PromptDialog";
+export { PromptBanner, type PromptBannerProps } from "./data/PromptBanner";
+export {
+  usePrompts,
+  answerPrompt,
+  type PromptSnapshot,
+  type PromptFilter,
+} from "./hooks/use-prompts";
 
 export { DiagnosticsTree, type DiagnosticsTreeProps } from "./data/diagnostics/DiagnosticsTree";
 export {
