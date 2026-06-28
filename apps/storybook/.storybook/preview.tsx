@@ -15,6 +15,10 @@ import {
   type Density,
 } from "../../../packages/ui/src/hooks";
 import "@flanksource/clicky-ui/styles.css";
+// The MDXEditor-backed markdown field (JsonSchemaForm `format: md`) needs the
+// editor's base CSS, shipped as a separate optional export so consumers who
+// don't use the field don't pay its weight. The catalog renders it, so load it.
+import "@flanksource/clicky-ui/mdx-editor.css";
 import "./preview.css";
 
 // react-rnd (used by ChatWindow's draggable frame) reads `process.env` in its
