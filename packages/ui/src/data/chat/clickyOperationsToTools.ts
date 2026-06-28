@@ -99,7 +99,7 @@ function commandStartsWithCobraBuiltin(raw: string | undefined): boolean {
   if (!raw) return false;
   const normalized = raw
     .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-    .replace(/[\/_.-]+/g, " ")
+    .replace(/[/_.-]+/g, " ")
     .trim()
     .toLowerCase();
   const first = normalized.split(/\s+/)[0];
