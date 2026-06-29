@@ -1,8 +1,0 @@
-import{C as c}from"./ContextUsage-2CWgzx_B.js";import"./iframe-Ck5OBNy_.js";import"./preload-helper-C4wV90-x.js";import"./utils-CR52uffu.js";import"./DropdownMenu-CCoepdY4.js";import"./floating-ui.react--Dqofk4r.js";import"./index-Dkbn_kvr.js";import"./index-BAA7PKOe.js";import"./button-xP_Jm0t5.js";import"./index-0zBpNI7D.js";import"./loading-D5ySMDtv.js";import"./Icon-BzT4mhZP.js";import"./modalStack-CJY7IwIQ.js";import"./zIndex-CigQ76av.js";import"./UiChevronDown-CirG0okf.js";const y={title:"Chat/ContextUsage",component:c,tags:["autodocs"],parameters:{docs:{description:{component:"A compact readout of context-window usage for the current conversation: tokens used of the model's window (with a fill bar), message count, model label, and optional running cost."}}},argTypes:{usedTokens:{control:"number"},maxTokens:{control:"number"},messageCount:{control:"number"},cost:{control:"number"},modelIcon:{control:!1}},args:{usedTokens:48200,maxTokens:2e5,messageCount:12,modelLabel:"Claude Sonnet 4.5",cost:.042}},o={},e={args:{usedTokens:188e3,maxTokens:2e5,messageCount:64,cost:.31}};var t,r,s;o.parameters={...o.parameters,docs:{...(t=o.parameters)==null?void 0:t.docs,source:{originalSource:"{}",...(s=(r=o.parameters)==null?void 0:r.docs)==null?void 0:s.source}}};var a,n,m;e.parameters={...e.parameters,docs:{...(a=e.parameters)==null?void 0:a.docs,source:{originalSource:`{
-  args: {
-    usedTokens: 188_000,
-    maxTokens: 200_000,
-    messageCount: 64,
-    cost: 0.31
-  }
-}`,...(m=(n=e.parameters)==null?void 0:n.docs)==null?void 0:m.source}}};const S=["Default","NearlyFull"];export{o as Default,e as NearlyFull,S as __namedExportsOrder,y as default};
