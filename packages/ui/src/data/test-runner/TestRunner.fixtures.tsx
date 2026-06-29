@@ -199,7 +199,7 @@ const frameworkFor = (seed: number): string => FRAMEWORKS[seed % FRAMEWORKS.leng
 // Every leaf carries the same heavy payload shape as the LargePayloads story —
 // a deep object, the 500-row array under summary/rows, and the 800-line log —
 // so opening any leaf in the large tree exercises JsonView + LogViewer at scale.
-// Shared by reference across all ~1024 leaves (like `wideArray`/`hugeLog`): a
+// Shared by reference across all ~256 leaves (like `wideArray`/`hugeLog`): a
 // fresh per-leaf `deepObject(5, 3, seed)` allocated ~190MB at module load, which
 // OOM'd the memory-constrained CI vitest worker. One opened leaf renders one
 // detail, so a single shared payload preserves the stress without the bloat.
@@ -250,13 +250,20 @@ function bigSubtree(path: string, depth: number, breadth: number, seed: number):
 }
 
 /**
- * A very large forest (4 roots × depth 4 × breadth 4 ≈ several hundred nodes)
- * whose every leaf carries the LargePayloads-sized detail (deep object +
- * 500-row array + 800-line log). Used for the dialog stress test: a long
- * scrolling tree on the left and very large detail payloads on the right.
+ * A large forest (4 roots × depth 3 × breadth 4 = 340 nodes / 256 leaves) whose
+ * every leaf carries the LargePayloads-sized detail (deep object + 500-row array
+ * + 800-line log). Used for the dialog stress test: a long scrolling tree on the
+ * left and very large detail payloads on the right.
+ *
+ * Depth is 3, not 4: at depth 4 (~1024 leaves) the jsdom unit test auto-expands
+ * the failing branches and renders the whole tree, which OOM'd CI's
+ * memory-constrained shared vitest worker (a STACK_TRACE_ERROR on the "very
+ * large tree" test) once this package's suite grew. 340 nodes still scrolls and
+ * stresses the detail panes while staying within the worker's budget; the
+ * browser story renders the same fixture without the jsdom memory ceiling.
  */
 export const largeTreeTests: Test[] = Array.from({ length: 4 }, (_, i) =>
-  bigSubtree(`${i}`, 4, 4, i + 1),
+  bigSubtree(`${i}`, 3, 4, i + 1),
 );
 
 /**
