@@ -98,7 +98,9 @@ export const MenuFiltersAndAlignment: Story = {
       await expect(within(list).getByText("Read file")).toBeInTheDocument();
       await userEvent.click(menu.getByRole("menuitemcheckbox", { name: "Explore" }));
       await expect(within(list).queryByText("Read file")).not.toBeInTheDocument();
-      await expect(within(list).getByText("Run command")).toBeInTheDocument();
+      await expect(
+        within(list).getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+      ).toBeInTheDocument();
     });
   },
 };
@@ -110,13 +112,17 @@ export const InteractsWithActions: Story = {
 
     await step("agent actions render with their labels", async () => {
       await expect(canvas.getByText("Read file")).toBeInTheDocument();
-      await expect(canvas.getByText("Run command")).toBeInTheDocument();
       await expect(canvas.getByText("iconify: search icons")).toBeInTheDocument();
+      // Shell rows show the bare command — no "Run command" prefix.
+      await expect(canvas.queryByText("Run command")).not.toBeInTheDocument();
+      await expect(
+        canvas.getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+      ).toBeInTheDocument();
     });
 
-    await step("expanding a tool call reveals its response", async () => {
+    await step("expanding a shell call reveals its response", async () => {
       await expect(canvas.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
-      await userEvent.click(canvas.getByRole("button", { name: /Run command/ }));
+      await userEvent.click(canvas.getByRole("button", { name: /pnpm --filter/ }));
       await expect(canvas.getByText(/Tests: 8 passed/)).toBeInTheDocument();
     });
 

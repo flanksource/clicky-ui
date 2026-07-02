@@ -8,9 +8,16 @@ describe("SessionViewer", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.getByText("Read file")).toBeInTheDocument();
     expect(screen.getByText("Grep")).toBeInTheDocument();
-    expect(screen.getByText("Run command")).toBeInTheDocument();
     expect(screen.getByText("packages/ui/src/data/Timeline.tsx")).toBeInTheDocument();
     expect(screen.getByText("iconify: search icons")).toBeInTheDocument();
+  });
+
+  it("renders a shell row as its command without the Run command label", () => {
+    render(<SessionViewer session={SAMPLE_SESSION} />);
+    expect(screen.queryByText("Run command")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+    ).toBeInTheDocument();
   });
 
   it("shows the summary header with the dominant model and action counts", () => {
@@ -31,11 +38,14 @@ describe("SessionViewer", () => {
     expect(screen.queryByText("Reasoning")).not.toBeInTheDocument();
   });
 
-  it("expands a tool call to reveal its response", () => {
+  it("expands a shell call to a bash-formatted command and its response", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Run command/ }));
+    fireEvent.click(screen.getByRole("button", { name: /pnpm --filter/ }));
     expect(screen.getByText(/Tests: 8 passed/)).toBeInTheDocument();
+    // The input renders as a bash code block, not the raw tool-input JSON.
+    expect(screen.getByText("bash")).toBeInTheDocument();
+    expect(screen.queryByText(/"command":/)).not.toBeInTheDocument();
   });
 
   it("renders an empty state when there is no activity", () => {
@@ -78,7 +88,9 @@ describe("SessionViewer", () => {
 
     expect(within(list()).queryByText("Read file")).not.toBeInTheDocument();
     expect(within(list()).queryByText("Grep")).not.toBeInTheDocument();
-    // A different category (Run command / Bash) is untouched.
-    expect(within(list()).getByText("Run command")).toBeInTheDocument();
+    // A different category (execute / Bash) is untouched.
+    expect(
+      within(list()).getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+    ).toBeInTheDocument();
   });
 });
