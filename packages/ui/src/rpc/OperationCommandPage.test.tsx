@@ -433,6 +433,67 @@ describe("OperationCommandPage", () => {
     );
   });
 
+  it("passes the submitted form values to onResult", async () => {
+    const operation = {
+      path: "/api/v1/ai/agent",
+      method: "post",
+      operation: {
+        operationId: "ai_agent",
+        summary: "Run agent",
+        tags: ["ai"],
+        parameters: [
+          { name: "prompt", in: "query", required: true },
+          {
+            name: "model",
+            in: "query",
+            required: false,
+            schema: { enum: ["claude-agent-sonnet", "codex-gpt-5-codex"] },
+          },
+        ],
+        responses: {},
+      },
+    };
+    const client = makeClient((params) =>
+      jsonResponse({ sessionId: "session-123", prompt: params.prompt }),
+    );
+    const onResult = vi.fn();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCommandPage
+          client={client}
+          operation={operation}
+          onResult={onResult}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole("heading", { name: "Run agent" });
+    fireEvent.change(screen.getByLabelText(/prompt/), {
+      target: { value: "fix the failing test" },
+    });
+    fireEvent.change(screen.getByLabelText(/model/), {
+      target: { value: "codex-gpt-5-codex" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+
+    await waitFor(() =>
+      expect(onResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parsed: {
+            sessionId: "session-123",
+            prompt: "fix the failing test",
+          },
+        }),
+        operation,
+        { prompt: "fix the failing test", model: "codex-gpt-5-codex" },
+      ),
+    );
+  });
+
   it("strips runner flags before executing", async () => {
     const client = makeClient((params) =>
       clickyResponse(

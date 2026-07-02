@@ -28,7 +28,8 @@ export const SAMPLE_SESSION: SessionEntry[] = [
     timestamp: "2026-06-25T10:00:06Z",
     tool_use: {
       tool: "Read",
-      input: { file_path: "packages/ui/src/data/Timeline.tsx" },
+      input: { file_path: "/repo/packages/ui/src/data/Timeline.tsx", limit: 40 },
+      cwd: "/repo",
       tool_use_id: "t1",
       source: "claude",
       model: "claude-opus-4-8",

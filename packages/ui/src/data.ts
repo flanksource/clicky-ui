@@ -81,9 +81,11 @@ export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
 export {
   SchemaViewer,
+  SchemaViewer as SchemaBrowser,
   SchemaViewerRow,
   SchemaFieldMetaPanel,
   type SchemaViewerProps,
+  type SchemaViewerProps as SchemaBrowserProps,
   type SchemaFieldMetaPanelProps,
 } from "./data/SchemaViewer";
 export {

@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { ModelSelector, EffortSelector } from "./ModelSelector";
+import type { ChatBudgetConfig } from "./types";
+import { BudgetSelector, EffortSelector, ModelSelector, ProviderSelector } from "./ModelSelector";
 import { MOCK_MODELS } from "./Chat.fixtures";
+import { UiRobotAi, UiSparkles } from "../../icons";
 
 function ModelSelectorControlled() {
   const [value, setValue] = useState(MOCK_MODELS[0]?.id);
@@ -27,6 +29,37 @@ function EffortSelectorControlled() {
   );
 }
 
+function ProviderSelectorControlled() {
+  const [value, setValue] = useState<"anthropic" | "openai">("anthropic");
+  return (
+    <div className="w-72 space-y-3">
+      <ProviderSelector
+        value={value}
+        onChange={setValue}
+        providers={[
+          { id: "anthropic", label: "Claude", provider: "anthropic", icon: UiSparkles },
+          { id: "openai", label: "OpenAI", provider: "openai", icon: UiRobotAi },
+        ]}
+      />
+      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+        provider={value}
+      </div>
+    </div>
+  );
+}
+
+function BudgetSelectorControlled() {
+  const [budget, setBudget] = useState<ChatBudgetConfig>({ cost: 2.5, maxTokens: 8_000 });
+  return (
+    <div className="w-96 space-y-3">
+      <BudgetSelector budget={budget} onBudgetChange={setBudget} />
+      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+        {JSON.stringify(budget)}
+      </div>
+    </div>
+  );
+}
+
 const meta = {
   title: "Chat/ModelSelector",
   component: ModelSelector,
@@ -35,7 +68,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Searchable model picker driven by the backend model menu, showing each provider's brand icon. Models whose provider is not configured are disabled (not hidden), so the menu shows what would be available with the right API key. `EffortSelector` is the companion reasoning-effort picker shown for reasoning-capable models.",
+          "Searchable model picker driven by the backend model menu, showing each provider's brand icon. Models whose provider is not configured are disabled (not hidden), so the menu shows what would be available with the right API key. `ProviderSelector`, `EffortSelector`, and `BudgetSelector` are companion controls for AI configuration surfaces.",
       },
     },
   },
@@ -49,4 +82,12 @@ export const Default: Story = {};
 
 export const Effort: Story = {
   render: () => <EffortSelectorControlled />,
+};
+
+export const Provider: Story = {
+  render: () => <ProviderSelectorControlled />,
+};
+
+export const Budget: Story = {
+  render: () => <BudgetSelectorControlled />,
 };

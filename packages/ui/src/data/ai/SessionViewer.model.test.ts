@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   getSessionAction,
   normalizeSession,
+  relativizePath,
   shellCommand,
   splitMcpTool,
   summarizeSession,
   summarizeToolInput,
+  toolInputParams,
   type SessionEntry,
 } from "./SessionViewer.model";
 import { SAMPLE_SESSION, SAMPLE_SESSION_JSONL } from "./SessionViewer.fixtures";
@@ -20,7 +22,7 @@ describe("normalizeSession", () => {
     expect(kinds.at(-1)).toBe("error");
   });
 
-  it("carries response, model and source from a consolidated tool_use row", () => {
+  it("carries response, model, source and cwd from a consolidated tool_use row", () => {
     const events = normalizeSession(SAMPLE_SESSION);
     const read = events.find((e) => e.tool === "Read");
     expect(read).toMatchObject({
@@ -28,8 +30,12 @@ describe("normalizeSession", () => {
       toolResponse: "export function Timeline() { /* … */ }",
       model: "claude-opus-4-8",
       source: "claude",
+      cwd: "/repo",
     });
-    expect(read?.toolInput).toEqual({ file_path: "packages/ui/src/data/Timeline.tsx" });
+    expect(read?.toolInput).toEqual({
+      file_path: "/repo/packages/ui/src/data/Timeline.tsx",
+      limit: 40,
+    });
   });
 
   it("turns an isApiErrorMessage entry into an error event with the HTTP status", () => {
@@ -58,7 +64,12 @@ describe("normalizeSession", () => {
 
 describe("getSessionAction", () => {
   it("maps a known tool to its icon, tone and label", () => {
-    expect(getSessionAction("Read")).toEqual({ icon: UiFileText, tone: "sky", label: "Read file" });
+    expect(getSessionAction("Read")).toEqual({
+      icon: UiFileText,
+      tone: "sky",
+      label: "Read file",
+      summaryOnly: true,
+    });
   });
 
   it("maps an MCP icon-server tool to the asset icon and a server-scoped label", () => {
@@ -108,6 +119,57 @@ describe("summarizeToolInput", () => {
 
   it("returns an empty string when there is no input", () => {
     expect(summarizeToolInput("Read", undefined)).toBe("");
+  });
+
+  it("relativizes file paths against the event cwd", () => {
+    expect(summarizeToolInput("Read", { file_path: "/repo/src/a.ts" }, "/repo")).toBe("src/a.ts");
+    expect(summarizeToolInput("Write", { file_path: "/elsewhere/a.ts" }, "/repo")).toBe(
+      "/elsewhere/a.ts",
+    );
+  });
+});
+
+describe("toolInputParams", () => {
+  it("flattens input entries into name/value pairs in insertion order", () => {
+    expect(toolInputParams("Grep", { pattern: "Foo", path: "src" })).toEqual([
+      { name: "pattern", value: "Foo" },
+      { name: "path", value: "src" },
+    ]);
+  });
+
+  it("excludes keys already rendered as the heading or inline command", () => {
+    expect(toolInputParams("Read", { file_path: "/repo/a.ts", limit: 40 })).toEqual([
+      { name: "limit", value: "40" },
+    ]);
+    expect(toolInputParams("Bash", { command: "ls", description: "List files" })).toEqual([
+      { name: "description", value: "List files" },
+    ]);
+  });
+
+  it("skips empty values and collapses multiline values to one truncated line", () => {
+    expect(toolInputParams("Edit", { file_path: "a.ts", old_string: "", new_string: "x\n  y" })).toEqual([
+      { name: "new_string", value: "x y" },
+    ]);
+    const long = "a".repeat(80);
+    expect(toolInputParams("Task", { prompt: long })).toEqual([
+      { name: "prompt", value: `${"a".repeat(60)}…` },
+    ]);
+  });
+
+  it("relativizes string values against the cwd and serializes non-strings", () => {
+    expect(toolInputParams("Grep", { path: "/repo/src", "-n": true }, "/repo")).toEqual([
+      { name: "path", value: "src" },
+      { name: "-n", value: "true" },
+    ]);
+  });
+});
+
+describe("relativizePath", () => {
+  it("strips the cwd prefix at a path-segment boundary only", () => {
+    expect(relativizePath("/repo/src/a.ts", "/repo")).toBe("src/a.ts");
+    expect(relativizePath("/repo/src/a.ts", "/repo/")).toBe("src/a.ts");
+    expect(relativizePath("/repository/src/a.ts", "/repo")).toBe("/repository/src/a.ts");
+    expect(relativizePath("/repo/src/a.ts", undefined)).toBe("/repo/src/a.ts");
   });
 });
 
