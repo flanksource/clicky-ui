@@ -4,6 +4,7 @@ import { Icon } from "../Icon";
 import { UiCode2, UiSearch, UiWrench } from "../../icons";
 import { SchemaViewer } from "../SchemaViewer";
 import type { ToolMeta } from "../chat/types";
+import { toolParentLabel } from "./tool-name";
 
 export type ToolSchemaBrowserProps = {
   tools: ToolMeta[];
@@ -53,7 +54,9 @@ export function ToolSchemaBrowser({ tools, className }: ToolSchemaBrowserProps) 
               <div className="sticky top-0 z-[1] border-b border-border bg-muted/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group}
               </div>
-              {groupTools.map((tool) => (
+              {groupTools.map((tool) => {
+                const parent = toolParentLabel(tool);
+                return (
                 <button
                   key={tool.name}
                   type="button"
@@ -65,14 +68,20 @@ export function ToolSchemaBrowser({ tools, className }: ToolSchemaBrowserProps) 
                   onClick={() => setSelected(tool.name)}
                 >
                   <Icon icon={UiWrench} className="size-3.5 text-muted-foreground" />
-                  <span className="min-w-0 truncate text-xs">{tool.label || tool.name}</span>
+                  <span className="min-w-0 truncate text-xs">
+                    {parent && (
+                      <span className="text-muted-foreground">{parent} </span>
+                    )}
+                    {tool.label || tool.name}
+                  </span>
                   {tool.server && (
                     <span className="max-w-20 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                       {tool.server}
                     </span>
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           ))}
           {filtered.length === 0 && (
