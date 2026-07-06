@@ -1,5 +1,16 @@
-import { Clicky, CodeBlock, type ClickyDocument, type ClickyNode } from "@flanksource/clicky-ui";
+import { Clicky, CodeBlock, CodeDiff, type ClickyDocument, type ClickyNode } from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
+
+// A before/after pair used to demonstrate the language-aware diff viewer under
+// the Preact runtime (kitchen-sink) — the same computed-diff path Storybook shows.
+const DIFF_BEFORE = `export function greet(name: string): string {
+  return "Hello, " + name;
+}`;
+
+const DIFF_AFTER = `export function greet(name: string, excited = false): string {
+  const suffix = excited ? "!" : ".";
+  return \`Hello, \${name}\${suffix}\`;
+}`;
 
 // Each entry mirrors what `clicky.CodeBlock(language, source)` produces on the
 // Go side: a node with kind="code", a `language` hint, and a `source` payload
@@ -161,6 +172,19 @@ export function CodeBlocksDemo() {
         }
       >
         <Clicky data={combinedDoc(samples.slice(4, 7))} />
+      </DemoSection>
+
+      <DemoSection
+        id="codeblocks-diff"
+        title="Language-aware diff"
+        description="CodeDiff computes an LCS line diff and syntax-highlights each side. Unified and split (side-by-side) layouts; add/remove tints follow the app theme."
+      >
+        <div className="space-y-density-3">
+          <div className="text-sm font-semibold text-foreground">Unified</div>
+          <CodeDiff language="typescript" original={DIFF_BEFORE} modified={DIFF_AFTER} />
+          <div className="text-sm font-semibold text-foreground">Split</div>
+          <CodeDiff language="typescript" view="split" original={DIFF_BEFORE} modified={DIFF_AFTER} />
+        </div>
       </DemoSection>
 
       {samples.map((sample) => (
