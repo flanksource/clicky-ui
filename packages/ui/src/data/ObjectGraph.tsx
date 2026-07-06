@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "../lib/utils";
 import { Tree } from "./Tree";
 
 // ObjectGraph renders a generic, type-agnostic expandable object/value
@@ -43,6 +44,14 @@ export type ObjectGraphProps<T extends ObjectGraphNode = ObjectGraphNode> = {
    * When omitted, only inline `children` are shown.
    */
   loadChildren?: (node: T) => Promise<T[]>;
+  /**
+   * Called when a node's label is clicked. This makes the label an actionable
+   * target (e.g. copy/drill its `path`) **without toggling expansion** — the
+   * chevron stays the only expand/collapse control. Omit for a static tree.
+   */
+  onNodeSelect?: (node: T) => void;
+  /** `id` of the currently-selected node; its label is highlighted. */
+  selectedId?: string;
 };
 
 export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
@@ -53,6 +62,8 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
   defaultOpenDepth = 2,
   renderLabel,
   loadChildren,
+  onNodeSelect,
+  selectedId,
 }: ObjectGraphProps<T>) {
   return (
     <Tree<T>
@@ -66,7 +77,15 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
       {...(loadChildren ? { loadChildren, hasMoreChildren: (n: T) => n.expandable === true } : {})}
       renderRow={({ node, loading, error }) => (
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 font-mono text-xs">
-          {renderLabel ? renderLabel(node) : <DefaultObjectLabel node={node} />}
+          {renderLabel ? (
+            renderLabel(node)
+          ) : (
+            <DefaultObjectLabel
+              node={node}
+              selected={selectedId != null && node.id === selectedId}
+              {...(onNodeSelect ? { onSelect: onNodeSelect } : {})}
+            />
+          )}
           {loading && <span className="shrink-0 text-muted-foreground">…</span>}
           {error != null && (
             <span className="break-all text-red-600">
@@ -79,10 +98,39 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
   );
 }
 
-function DefaultObjectLabel({ node }: { node: ObjectGraphNode }) {
+function DefaultObjectLabel<T extends ObjectGraphNode>({
+  node,
+  onSelect,
+  selected = false,
+}: {
+  node: T;
+  onSelect?: (node: T) => void;
+  selected?: boolean;
+}) {
+  const label = onSelect ? (
+    // A button so the label is a first-class click target; stopPropagation keeps
+    // the row's onClick (which toggles the node) from firing, so selecting a node
+    // never expands or collapses it.
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(node);
+      }}
+      title="Select this path"
+      className={cn(
+        "rounded px-0.5 text-left text-muted-foreground hover:text-foreground hover:underline",
+        selected && "bg-primary/15 text-foreground",
+      )}
+    >
+      {node.label}
+    </button>
+  ) : (
+    <span className="text-muted-foreground">{node.label}</span>
+  );
   return (
     <>
-      <span className="text-muted-foreground">{node.label}</span>
+      {label}
       {node.type && <span className="text-muted-foreground/60">@{node.type}</span>}
       {node.value != null ? (
         <span className="break-all text-foreground">{String(node.value)}</span>
