@@ -29,6 +29,14 @@ export type FilterPillProps = {
   title?: string;
   /** Places the tri-state toggle before or after the label. */
   togglePosition?: "left" | "right";
+  /**
+   * When false the tri-state switch renders without button semantics (an
+   * aria-hidden span, nothing focusable) for hosts that own focus and keyboard
+   * themselves — e.g. a combobox listbox option, where a nested focusable
+   * button would violate the option content model. The region click zones
+   * remain active. Defaults to true.
+   */
+  interactive?: boolean;
   /** Classes applied to the pill root. */
   className?: string;
 };
@@ -59,10 +67,12 @@ function TristateSwitch({
   mode,
   onChange,
   ariaLabel,
+  interactive = true,
 }: {
   mode: FilterMode;
   onChange: (next: FilterMode) => void;
   ariaLabel?: string;
+  interactive?: boolean;
 }) {
   const slot: SlotMode =
     mode === "exclude" ? "exclude" : mode === "include" ? "include" : "neutral";
@@ -88,23 +98,8 @@ function TristateSwitch({
     />
   );
 
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      onClick={(event) => {
-        // Keyboard activation (Enter/Space) lands here without a region —
-        // cycle, matching the middle-region rotation.
-        event.preventDefault();
-        event.stopPropagation();
-        onChange(nextTriStateMode(mode));
-      }}
-      className={cn(
-        "relative inline-flex h-5 w-[52px] shrink-0 overflow-hidden rounded-full transition-colors duration-200",
-        bg,
-      )}
-    >
+  const content = (
+    <>
       {region(mode === "exclude" ? "neutral" : "exclude", "exclude")}
       {region(nextTriStateMode(mode), "neutral")}
       {region(mode === "include" ? "neutral" : "include", "include")}
@@ -129,6 +124,39 @@ function TristateSwitch({
           />
         )}
       </span>
+    </>
+  );
+
+  const trackClasses = cn(
+    "relative inline-flex h-5 w-[52px] shrink-0 overflow-hidden rounded-full transition-colors duration-200",
+    bg,
+  );
+
+  // Non-interactive hosts (combobox listbox options) own focus and keyboard;
+  // the switch must not add a nested focusable button inside role="option".
+  if (!interactive) {
+    return (
+      <span aria-hidden className={trackClasses}>
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      onClick={(event) => {
+        // Keyboard activation (Enter/Space) lands here without a region —
+        // cycle, matching the middle-region rotation.
+        event.preventDefault();
+        event.stopPropagation();
+        onChange(nextTriStateMode(mode));
+      }}
+      className={trackClasses}
+    >
+      {content}
     </button>
   );
 }
@@ -143,6 +171,7 @@ export function FilterPill({
   onClick,
   title,
   togglePosition = "left",
+  interactive = true,
   className,
 }: FilterPillProps) {
   const triState = !!onModeChange;
@@ -170,6 +199,7 @@ export function FilterPill({
       <TristateSwitch
         mode={mode}
         onChange={onModeChange!}
+        interactive={interactive}
         {...(title ? { ariaLabel: title } : {})}
       />
     );

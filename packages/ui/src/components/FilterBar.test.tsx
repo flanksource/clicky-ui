@@ -125,7 +125,7 @@ describe("FilterBar", () => {
     });
     expect(onSearch).toHaveBeenCalledWith("api");
 
-    expect(screen.getByRole("button", { name: /status filter/i })).toHaveTextContent("Status +1");
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("+1");
 
     fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "platform" } });
     expect(screen.getByLabelText("Owner").closest("label")).toHaveAttribute(
@@ -199,7 +199,7 @@ describe("FilterBar", () => {
     );
 
     expect(screen.getByText("Search")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /status filter/i })).toHaveTextContent("Status +1");
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("+1");
     expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent("now-24h");
     expect(screen.getByRole("button", { name: /time range filter/i })).not.toHaveTextContent(
       "Time range",
@@ -320,7 +320,7 @@ describe("FilterBar", () => {
     expect(onGroupBy).toHaveBeenCalledWith(["type", "health"]);
   });
 
-  it("adds typeahead filtering for long tri-state option lists", () => {
+  it("filters tri-state options by typing into the combobox input", () => {
     render(
       <FilterBar
         filters={[
@@ -339,15 +339,42 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
-    expect(screen.getByLabelText("Filter Status options")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Filter Status options"), {
-      target: { value: "status 7" },
-    });
+    const input = screen.getByRole("combobox", { name: "Status" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "status 7" } });
 
     expect(screen.getByText("Status 7")).toBeInTheDocument();
     expect(screen.queryByText("Status 1")).not.toBeInTheDocument();
+  });
+
+  it("shows the placeholder and node-label text (not the raw value) for a multi filter", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "cost_center",
+            kind: "multi",
+            label: "Cost center",
+            value: {},
+            placeholder: "Any cost center",
+            options: [
+              { value: "ops", label: <span>Operations</span>, title: "Operations" },
+              { value: "admin", label: <span>Admin</span>, title: "Admin" },
+            ],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    const input = screen.getByRole("combobox", { name: "Cost center" });
+    expect(input).toHaveAttribute("placeholder", "Any cost center");
+
+    // The dropdown lists the human-readable labels, not the underlying codes.
+    fireEvent.focus(input);
+    expect(screen.getByRole("option", { name: "Operations" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "ops" })).not.toBeInTheDocument();
   });
 
   it("renders lookup-backed single and multi filters as option-restricted comboboxes", () => {
@@ -535,9 +562,9 @@ describe("FilterBar", () => {
       expect(row).toHaveClass("md:h-12");
     }
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /status filter/i }));
-    // The option list is portaled to the document body (floating-ui), so it lives
-    // outside the overflow dialog's DOM subtree — query the whole document.
+    fireEvent.focus(within(dialog).getByRole("combobox", { name: "Status" }));
+    // The option list is portaled to the document body, so it lives outside
+    // the overflow dialog's DOM subtree — query the whole document.
     expect(screen.getByText("Healthy")).toBeInTheDocument();
 
     width = 700;
@@ -779,11 +806,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Plan" }));
     // 250 total - 3 head = 247 more.
     expect(screen.getByText(/and 247 more/i)).toBeInTheDocument();
-    // The search box is forced visible for a truncated filter even with <8 options.
-    expect(screen.getByLabelText("Filter Plan options")).toBeInTheDocument();
   });
 
   it("replaces the head with onSearch matches and hides non-selected head items", async () => {
@@ -809,10 +834,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
-    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
-      target: { value: "plan-0225" },
-    });
+    const input = screen.getByRole("combobox", { name: "Plan" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "plan-0225" } });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
@@ -851,10 +875,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
-    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
-      target: { value: "plan-0225" },
-    });
+    const input = screen.getByRole("combobox", { name: "Plan" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "plan-0225" } });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
@@ -891,24 +914,25 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
-    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
-      target: { value: "plan-0225" },
-    });
+    const input = screen.getByRole("combobox", { name: "Plan" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "plan-0225" } });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Plan 0225$/ }));
-    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+    const match = screen.getByRole("option", { name: "Plan 0225" });
+    fireEvent.mouseDown(match);
+    fireEvent.click(match);
+    expect(screen.getByRole("option", { name: "Plan 0225, included" })).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(500);
     });
 
     expect(onChange).toHaveBeenCalledWith({ "plan-0225": "include" });
-    expect(screen.getByLabelText("Filter Plan options")).toHaveValue("plan-0225");
+    expect(input).toHaveValue("plan-0225");
     vi.useRealTimers();
   });
 
@@ -932,10 +956,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
-    fireEvent.change(screen.getByLabelText("Filter Plan options"), {
-      target: { value: "Plan 7" },
-    });
+    const input = screen.getByRole("combobox", { name: "Plan" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "Plan 7" } });
 
     expect(onSearch).not.toHaveBeenCalled();
     expect(screen.getByText("Plan 7")).toBeInTheDocument();
@@ -966,14 +989,14 @@ describe("FilterBar", () => {
 
     const { rerender } = render(<Fixture nonce={0} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /plan filter/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Plan" }));
     const includeRegion = document.querySelector(
       '[data-filter-option="plan-0000"] [data-tristate-region="include"]',
     );
     expect(includeRegion).toBeInstanceOf(HTMLElement);
     fireEvent.click(includeRegion as HTMLElement);
 
-    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+    expect(screen.getByRole("option", { name: "Plan 0000, included" })).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(250);
@@ -981,7 +1004,7 @@ describe("FilterBar", () => {
 
     rerender(<Fixture nonce={1} />);
 
-    expect(screen.getByRole("button", { name: /plan filter/i })).toHaveTextContent("Plan +1");
+    expect(screen.getByRole("option", { name: "Plan 0000, included" })).toBeInTheDocument();
     expect(onPlan).not.toHaveBeenCalled();
 
     act(() => {
@@ -990,6 +1013,79 @@ describe("FilterBar", () => {
 
     expect(onPlan).toHaveBeenCalledWith({ "plan-0000": "include" });
     vi.useRealTimers();
+  });
+
+  it("stages multi-filter toggles in the overflow dialog until Apply", async () => {
+    const onStatus = vi.fn();
+    const onApply = vi.fn();
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 220,
+      itemWidths: {
+        team: 100,
+        owner: 100,
+        status: 100,
+      },
+    });
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        onApply={onApply}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            onChange: onStatus,
+            options: [
+              { value: "healthy", label: "Healthy" },
+              { value: "degraded", label: "Degraded" },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    fireEvent.focus(within(dialog).getByRole("combobox", { name: "Status" }));
+
+    // Toggling an option in the portaled listbox stages the edit without
+    // dismissing the dialog or committing upstream.
+    const option = screen.getByRole("option", { name: "Healthy" });
+    fireEvent.mouseDown(option);
+    fireEvent.click(option);
+    expect(screen.getByRole("dialog", { name: /overflow filters/i })).toBeInTheDocument();
+    expect(onStatus).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^apply$/i }));
+    expect(onStatus).toHaveBeenCalledWith({ healthy: "include" });
+    expect(onApply).toHaveBeenCalledTimes(1);
+    measurement.mockRestore();
+  });
+
+  it("renders the multi combobox input at the bar's fixed sm size", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            onChange: vi.fn(),
+            options: [{ value: "healthy", label: "Healthy" }],
+          },
+        ]}
+      />,
+    );
+
+    const input = screen.getByRole("combobox", { name: "Status" });
+    expect(input.className).toContain("h-8");
+    expect(input.className).toContain("text-xs");
   });
 });
 
@@ -1057,6 +1153,30 @@ describe("FilterBar label icons", () => {
     // No visible "Product" text label inside the combobox control.
     const control = input.closest("[data-jsf-control]");
     expect(control?.textContent).not.toContain("Product");
+  });
+
+  it("shows a multi filter's icon instead of its text label, keeping the aria-label", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            icon: <span data-testid="status-icon">S</span>,
+            value: {},
+            options: [{ value: "healthy", label: "Healthy" }],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    const input = screen.getByLabelText("Status");
+    expect(input).toHaveAttribute("role", "combobox");
+    expect(screen.getByTestId("status-icon")).toBeInTheDocument();
+    const control = input.closest("[data-jsf-control]");
+    expect(control?.textContent).not.toContain("Status");
   });
 });
 
