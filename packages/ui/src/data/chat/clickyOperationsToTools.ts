@@ -1,4 +1,5 @@
 import type {
+  ClickySurface,
   OpenAPIOperation,
   OpenAPIParameter,
   OpenAPISchema,
@@ -7,6 +8,7 @@ import type {
 import type {
   ChatToolInputSchema,
   JSONSchemaProperty,
+  ToolAnnotations,
   ToolMeta,
   ToolMode,
 } from "./types";
@@ -14,16 +16,16 @@ import type {
 const DISABLED_TOOL_GROUP = "Disabled";
 
 const TOOL_GROUP_DEFAULTS: Record<string, ToolMode> = {
-  "Accounting Read": "enabled",
+  "Accounting Read": "on",
   "Accounting Transaction Write": "ask",
   "Accounting Metadata Write": "ask",
-  "Comments Read": "enabled",
+  "Comments Read": "on",
   "Comments Write": "ask",
-  "Xero Read": "disabled",
-  "Xero Write": "disabled",
-  "Takealot Read": "enabled",
-  "Takealot Write": "disabled",
-  "Admin Read": "enabled",
+  "Xero Read": "off",
+  "Xero Write": "off",
+  "Takealot Read": "on",
+  "Takealot Write": "off",
+  "Admin Read": "on",
   "Admin Write": "ask",
 };
 
@@ -35,10 +37,15 @@ const TOOL_GROUP_DEFAULTS: Record<string, ToolMode> = {
  *  `operationId` are skipped (a tool needs a stable name). */
 export function clickyOperationsToTools(
   operations: ResolvedOperation[],
+  surfaces?: ClickySurface[],
 ): ToolMeta[] {
+  const surfacesByKey = new Map<string, ClickySurface>();
+  for (const surface of surfaces ?? []) {
+    surfacesByKey.set(surface.key, surface);
+  }
   const tools: ToolMeta[] = [];
   for (const resolved of operations) {
-    const tool = operationToTool(resolved.operation, resolved);
+    const tool = operationToTool(resolved.operation, resolved, surfacesByKey);
     if (tool) {
       tools.push(tool);
     }
@@ -49,6 +56,7 @@ export function clickyOperationsToTools(
 export function operationToTool(
   operation: OpenAPIOperation,
   resolved?: Pick<ResolvedOperation, "path" | "method">,
+  surfacesByKey?: Map<string, ClickySurface>,
 ): ToolMeta | null {
   if (!operation.operationId) {
     return null;
@@ -57,22 +65,112 @@ export function operationToTool(
     return null;
   }
   const meta = operation["x-clicky"];
+  const hints = meta?.toolHints;
   const group = operationToolGroup(operation, resolved);
   if (group === DISABLED_TOOL_GROUP) {
     return null;
   }
+  const surface = meta?.surface ? surfacesByKey?.get(meta.surface) : undefined;
+  const parent = hints?.parent || surface?.title || surface?.entity;
+  const icon = hints?.icon || surface?.icon;
+  const defaultPermission =
+    hints?.defaultPermission ??
+    (group ? toolDefaultPermission(group) : undefined);
   const description = operation.description ?? operation.summary;
   return {
     name: operation.operationId,
     label: toolLabel(operation),
     ...(group
-      ? { group, preferenceKey: group, defaultMode: toolDefaultMode(group) }
+      ? { group, preferenceKey: group }
       : meta?.surface
         ? { group: meta.surface }
         : {}),
+    ...(defaultPermission ? { defaultPermission } : {}),
+    ...(parent ? { parent } : {}),
+    ...(surface?.entity ? { entity: surface.entity } : {}),
+    ...(icon ? { icon } : {}),
     ...(description ? { description } : {}),
+    ...(resolved?.method ? { method: resolved.method.toUpperCase() } : {}),
+    ...(resolved?.path ? { path: resolved.path } : {}),
+    strict: hints?.strict ?? true,
+    annotations: toolAnnotations(operation, resolved, group, description),
     inputSchema: buildInputSchema(operation),
   };
+}
+
+function toolAnnotations(
+  operation: OpenAPIOperation,
+  resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
+  group: string | undefined,
+  description: string | undefined,
+): ToolAnnotations {
+  const hints = operation["x-clicky"]?.toolHints;
+  const method = resolved?.method?.toUpperCase() ?? "";
+  const annotations: ToolAnnotations = {};
+  const title =
+    hints?.title ??
+    operation.summary ??
+    operation["x-clicky"]?.actionName ??
+    description;
+  if (title) annotations.title = title;
+  if (hints?.readOnlyHint !== undefined) {
+    annotations.readOnlyHint = hints.readOnlyHint;
+  } else if (isReadOnlyTool(operation, resolved, group)) {
+    annotations.readOnlyHint = true;
+  }
+  if (hints?.idempotentHint !== undefined) {
+    annotations.idempotentHint = hints.idempotentHint;
+  } else if (isIdempotentMethod(method)) {
+    annotations.idempotentHint = true;
+  }
+  if (hints?.destructiveHint !== undefined) {
+    annotations.destructiveHint = hints.destructiveHint;
+  } else if (isDestructiveTool(operation, resolved, group)) {
+    annotations.destructiveHint = true;
+  }
+  if (hints?.openWorldHint !== undefined) {
+    annotations.openWorldHint = hints.openWorldHint;
+  }
+  return annotations;
+}
+
+function isReadOnlyTool(
+  operation: OpenAPIOperation,
+  resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
+  group: string | undefined,
+): boolean {
+  const method = resolved?.method?.toUpperCase() ?? "";
+  return (
+    method === "GET" ||
+    Boolean(group?.toLowerCase().includes(" read")) ||
+    isReadLikeOperation(operation.operationId ?? "")
+  );
+}
+
+function isIdempotentMethod(method: string): boolean {
+  return (
+    method === "GET" ||
+    method === "HEAD" ||
+    method === "OPTIONS" ||
+    method === "PUT" ||
+    method === "DELETE"
+  );
+}
+
+function isDestructiveTool(
+  operation: OpenAPIOperation,
+  resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
+  group: string | undefined,
+): boolean {
+  const method = resolved?.method?.toUpperCase() ?? "";
+  if (method === "DELETE") return true;
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS")
+    return false;
+  const text =
+    `${group ?? ""} ${resolved?.path ?? ""} ${operation.operationId ?? ""}`.toLowerCase();
+  return /\b(write|delete|remove|destroy|void|sync|create|update|patch|post)\b/.test(
+    text,
+  );
 }
 
 function operationToolGroup(
@@ -80,6 +178,7 @@ function operationToolGroup(
   resolved?: Pick<ResolvedOperation, "path" | "method">,
 ): string | undefined {
   const meta = operation["x-clicky"];
+  if (meta?.toolHints?.group) return meta.toolHints.group;
   if (meta?.group) return meta.group;
   return inferToolGroup(operation, resolved);
 }
@@ -113,7 +212,9 @@ function pathContainsCobraBuiltin(path: string | undefined): boolean {
     .filter(Boolean)
     .map((part) => part.toLowerCase());
   const commandParts =
-    parts[0] === "api" && /^v\d+$/.test(parts[1] ?? "") ? parts.slice(2) : parts;
+    parts[0] === "api" && /^v\d+$/.test(parts[1] ?? "")
+      ? parts.slice(2)
+      : parts;
   const first = commandParts[0];
   return first === "completion" || first === "help";
 }
@@ -187,7 +288,7 @@ function isReadLikeOperation(operationId: string): boolean {
   );
 }
 
-function toolDefaultMode(group: string): ToolMode {
+function toolDefaultPermission(group: string): ToolMode {
   return TOOL_GROUP_DEFAULTS[group] ?? "ask";
 }
 
@@ -231,7 +332,7 @@ function buildInputSchema(operation: OpenAPIOperation): ChatToolInputSchema {
     }
   }
 
-  return { type: "object", properties, required };
+  return { type: "object", properties, required, additionalProperties: false };
 }
 
 function parameterToProperty(param: OpenAPIParameter): JSONSchemaProperty {
@@ -261,7 +362,9 @@ function schemaToProperty(
   return prop;
 }
 
-function jsonSchemaType(type: string | undefined): NonNullable<JSONSchemaProperty["type"]> {
+function jsonSchemaType(
+  type: string | undefined,
+): NonNullable<JSONSchemaProperty["type"]> {
   switch (type) {
     case "object":
     case "array":
