@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import type { Preview } from "@storybook/react-vite";
 // Import the providers from source (not the built package) so the decorator's
 // ThemeProvider/DensityProvider share the exact module instance — and therefore
@@ -14,6 +14,12 @@ import {
   type Theme,
   type Density,
 } from "../../../packages/ui/src/hooks";
+// Same source-instance rule as the hooks above: register through the source
+// icon-fallback singleton so the story components' <Icon> (which reads the same
+// module) resolves runtime names.
+import { setFallbackIconProvider } from "../../../packages/ui/src/data/icon-fallback";
+import { providerIcon } from "../../../packages/ui/src/data/chat/provider-icons";
+import * as UiIcons from "../../../packages/ui/src/icons";
 import "@flanksource/clicky-ui/styles.css";
 // The MDXEditor-backed markdown field (JsonSchemaForm `format: md`) needs the
 // editor's base CSS, shipped as a separate optional export so consumers who
@@ -32,6 +38,26 @@ function GlobalSync({ theme, density }: { theme: Theme; density: Density }) {
   useEffect(() => setDensity(density), [density, setDensity]);
   return null;
 }
+
+// Resolve runtime icon names (`<Icon name>`, `x-enum-icons`, `x-input-*-icon`) to
+// the generated `Ui*` glyphs so schema-driven stories show real icons instead of
+// the dashed "?" placeholder. kebab-case name → `Ui<PascalCase>`.
+const UI_ICONS = UiIcons as unknown as Record<string, ComponentType<{ className?: string }>>;
+function pascalCase(name: string): string {
+  return name
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+setFallbackIconProvider(({ name, className }) => {
+  if (!name) return null;
+  // First the generated Ui* set, then AI provider brand marks (anthropic/openai/…)
+  // so a schema's x-enum-icons can label model options by provider.
+  const Glyph = UI_ICONS[`Ui${pascalCase(name)}`] ?? providerIcon(name);
+  if (!Glyph) return null;
+  return <Glyph {...(className ? { className } : {})} />;
+});
 
 const preview: Preview = {
   tags: ["autodocs"],
