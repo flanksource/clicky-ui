@@ -1,0 +1,1662 @@
+{
+  "backends": [
+    {
+      "authEnvVars": ["ANTHROPIC_API_KEY"],
+      "authenticated": false,
+      "backend": "anthropic",
+      "kind": "api",
+      "models": [
+        "claude-fable-5",
+        "claude-opus-4-8",
+        "claude-sonnet-5",
+        "claude-haiku-4-5"
+      ],
+      "ready": false
+    },
+    {
+      "authEnvVars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "authenticated": false,
+      "backend": "gemini",
+      "kind": "api",
+      "models": ["gemini-2.5-pro", "gemini-3.0-pro", "gemini-3.5-flash"],
+      "ready": false
+    },
+    {
+      "authEnvVars": ["OPENAI_API_KEY"],
+      "authenticated": false,
+      "backend": "openai",
+      "kind": "api",
+      "models": ["gpt-5.5", "gpt-5.4-mini"],
+      "ready": false
+    },
+    {
+      "authEnvVars": ["DEEPSEEK_API_KEY"],
+      "authenticated": false,
+      "backend": "deepseek",
+      "kind": "api",
+      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "ready": false
+    },
+    {
+      "authEnvVars": ["ANTHROPIC_API_KEY"],
+      "authenticated": true,
+      "backend": "claude-cli",
+      "binary": "/Users/moshe/.local/bin/claude",
+      "kind": "cli",
+      "models": [
+        "claude-agent-sonnet",
+        "claude-agent-opus",
+        "claude-agent-haiku"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": ["ANTHROPIC_API_KEY"],
+      "authenticated": true,
+      "backend": "claude-agent",
+      "binary": "/Users/moshe/.local/bin/claude",
+      "kind": "cli",
+      "models": [
+        "claude-agent-sonnet",
+        "claude-agent-opus",
+        "claude-agent-haiku"
+      ],
+      "ready": true
+    },
+    {
+      "args": {
+        "properties": {
+          "addDir": {
+            "description": "Extra directories tools may access",
+            "items": {
+              "type": "string"
+            },
+            "title": "Additional Dirs",
+            "type": "array",
+            "x-clicky-order": 2
+          },
+          "agent": {
+            "description": "Agent for the current session",
+            "title": "Agent",
+            "type": "string",
+            "x-clicky-order": 10
+          },
+          "appendSystemPrompt": {
+            "description": "Append to the default system prompt",
+            "title": "Append System Prompt",
+            "type": "string",
+            "x-clicky-order": 7
+          },
+          "betas": {
+            "description": "Beta headers to include in API requests",
+            "items": {
+              "type": "string"
+            },
+            "title": "Beta Headers",
+            "type": "array",
+            "x-clicky-order": 8
+          },
+          "excludeDynamicSystemPromptSections": {
+            "description": "Move per-machine sections to the first user message for prompt-cache reuse",
+            "title": "Exclude Dynamic Sections",
+            "type": "boolean",
+            "x-clicky-order": 9
+          },
+          "mcpConfig": {
+            "description": "Load MCP servers from JSON files or strings",
+            "items": {
+              "type": "string"
+            },
+            "title": "MCP Config",
+            "type": "array",
+            "x-clicky-order": 3
+          },
+          "safeMode": {
+            "description": "Start with all customizations disabled",
+            "title": "Safe Mode",
+            "type": "boolean",
+            "x-clicky-order": 11
+          },
+          "settings": {
+            "description": "Path to a settings JSON file or a JSON string",
+            "title": "Settings File/JSON",
+            "type": "string",
+            "x-clicky-order": 5
+          },
+          "strictMcpConfig": {
+            "description": "Only use MCP servers from --mcp-config",
+            "title": "Strict MCP Config",
+            "type": "boolean",
+            "x-clicky-order": 4
+          },
+          "systemPrompt": {
+            "description": "Replace the default system prompt",
+            "title": "System Prompt",
+            "type": "string",
+            "x-clicky-order": 6
+          },
+          "tools": {
+            "description": "Restrict the built-in tool set (e.g. Bash Edit Read)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Built-in Tools",
+            "type": "array",
+            "x-clicky-order": 1
+          }
+        },
+        "type": "object"
+      },
+      "authenticated": true,
+      "backend": "claude-cmux",
+      "binary": "/Users/moshe/.local/bin/claude",
+      "kind": "cli",
+      "models": [
+        "claude-agent-sonnet",
+        "claude-agent-opus",
+        "claude-agent-haiku"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": ["OPENAI_API_KEY"],
+      "authenticated": true,
+      "backend": "codex-cli",
+      "binary": "/Users/moshe/Library/pnpm/codex",
+      "kind": "cli",
+      "models": ["gpt-5-codex"],
+      "ready": true
+    },
+    {
+      "args": {
+        "properties": {
+          "addDir": {
+            "description": "Extra writable directories",
+            "items": {
+              "type": "string"
+            },
+            "title": "Additional Dirs",
+            "type": "array",
+            "x-clicky-order": 5
+          },
+          "askForApproval": {
+            "default": "on-request",
+            "description": "When codex asks for human approval before running a command",
+            "enum": ["untrusted", "on-failure", "on-request", "never"],
+            "title": "Approval Policy",
+            "type": "string",
+            "x-clicky-order": 2,
+            "x-enum-display": "radio",
+            "x-enum-labels": {
+              "never": "Never",
+              "on-failure": "On failure (deprecated)",
+              "on-request": "On request",
+              "untrusted": "Untrusted only"
+            }
+          },
+          "config": {
+            "description": "Override config values as key=value",
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Overrides",
+            "type": "array",
+            "x-clicky-order": 3
+          },
+          "disable": {
+            "description": "Disable named features",
+            "items": {
+              "type": "string"
+            },
+            "title": "Disable Features",
+            "type": "array",
+            "x-clicky-order": 7
+          },
+          "enable": {
+            "description": "Enable named features",
+            "items": {
+              "type": "string"
+            },
+            "title": "Enable Features",
+            "type": "array",
+            "x-clicky-order": 6
+          },
+          "image": {
+            "description": "Image files to attach to the initial prompt",
+            "items": {
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "array",
+            "x-clicky-order": 11
+          },
+          "oss": {
+            "description": "Use an open-source model provider",
+            "title": "OSS Provider",
+            "type": "boolean",
+            "x-clicky-order": 10
+          },
+          "profile": {
+            "description": "Config profile to layer on the base config",
+            "title": "Profile",
+            "type": "string",
+            "x-clicky-order": 4
+          },
+          "sandbox": {
+            "default": "read-only",
+            "description": "Sandbox policy for model-run shell commands",
+            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "title": "Sandbox",
+            "type": "string",
+            "x-clicky-order": 1,
+            "x-enum-display": "radio",
+            "x-enum-labels": {
+              "danger-full-access": "Danger: full access",
+              "read-only": "Read-only",
+              "workspace-write": "Workspace write"
+            }
+          },
+          "search": {
+            "description": "Enable live web search",
+            "title": "Web Search",
+            "type": "boolean",
+            "x-clicky-order": 9
+          },
+          "strictConfig": {
+            "description": "Error on unrecognized config fields",
+            "title": "Strict Config",
+            "type": "boolean",
+            "x-clicky-order": 8
+          }
+        },
+        "type": "object"
+      },
+      "authenticated": true,
+      "backend": "codex-cmux",
+      "binary": "/Users/moshe/Library/pnpm/codex",
+      "kind": "cli",
+      "models": ["gpt-5-codex"],
+      "ready": true
+    },
+    {
+      "authEnvVars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "authenticated": true,
+      "backend": "gemini-cli",
+      "binary": "/Users/moshe/Library/pnpm/gemini",
+      "kind": "cli",
+      "ready": true
+    }
+  ],
+  "examples": {
+    "spec": {
+      "backend": "claude-cmux",
+      "budget": {
+        "cost": 0.5,
+        "maxTokens": 8000,
+        "maxTurns": 6,
+        "timeout": "30m"
+      },
+      "cliArgs": {
+        "addDir": ["packages/ui"],
+        "mcpConfig": ["./mcp.json"]
+      },
+      "effort": "medium",
+      "memory": {
+        "skills": [".agents/skills/example-skill"],
+        "skipHooks": true
+      },
+      "model": "claude-sonnet-5",
+      "noCache": true,
+      "permissions": {
+        "mcp": {
+          "filesystem": "enabled",
+          "gavel": "disabled"
+        },
+        "mode": "acceptEdits",
+        "plugins": {
+          ".claude/plugins/example": "disabled"
+        },
+        "presets": ["edit"],
+        "skills": {
+          ".agents/skills/example-skill": "enabled"
+        },
+        "tools": {
+          "Bash": "deny",
+          "Edit": "ask",
+          "Read": "allow"
+        }
+      },
+      "prompt": {
+        "appendSystem": "Prefer existing clicky-ui primitives.",
+        "system": "Answer with direct implementation guidance.",
+        "user": "Update the prompt runtime editor and keep the payload compact."
+      },
+      "setup": {
+        "baseDir": ".shell",
+        "cwd": ".",
+        "dotenv": [".env", ".env.local"],
+        "envVars": [
+          {
+            "name": "CAPTAIN_RUNTIME",
+            "value": "storybook"
+          },
+          {
+            "name": "GAVEL_PROFILE",
+            "value": "local"
+          }
+        ]
+      },
+      "temperature": 0.2
+    }
+  },
+  "models": [
+    {
+      "backend": "anthropic",
+      "id": "claude-fable-5",
+      "ready": false
+    },
+    {
+      "backend": "anthropic",
+      "id": "claude-opus-4-8",
+      "ready": false
+    },
+    {
+      "backend": "anthropic",
+      "id": "claude-sonnet-5",
+      "ready": false
+    },
+    {
+      "backend": "anthropic",
+      "id": "claude-haiku-4-5",
+      "ready": false
+    },
+    {
+      "backend": "gemini",
+      "id": "gemini-2.5-pro",
+      "ready": false
+    },
+    {
+      "backend": "gemini",
+      "id": "gemini-3.0-pro",
+      "ready": false
+    },
+    {
+      "backend": "gemini",
+      "id": "gemini-3.5-flash",
+      "ready": false
+    },
+    {
+      "backend": "openai",
+      "id": "gpt-5.5",
+      "ready": false
+    },
+    {
+      "backend": "openai",
+      "id": "gpt-5.4-mini",
+      "ready": false
+    },
+    {
+      "backend": "deepseek",
+      "id": "deepseek-chat",
+      "ready": false
+    },
+    {
+      "backend": "deepseek",
+      "id": "deepseek-reasoner",
+      "ready": false
+    },
+    {
+      "backend": "claude-cli",
+      "id": "claude-agent-sonnet",
+      "ready": true
+    },
+    {
+      "backend": "claude-cli",
+      "id": "claude-agent-opus",
+      "ready": true
+    },
+    {
+      "backend": "claude-cli",
+      "id": "claude-agent-haiku",
+      "ready": true
+    },
+    {
+      "backend": "claude-agent",
+      "id": "claude-agent-sonnet",
+      "ready": true
+    },
+    {
+      "backend": "claude-agent",
+      "id": "claude-agent-opus",
+      "ready": true
+    },
+    {
+      "backend": "claude-agent",
+      "id": "claude-agent-haiku",
+      "ready": true
+    },
+    {
+      "backend": "claude-cmux",
+      "id": "claude-agent-sonnet",
+      "ready": true
+    },
+    {
+      "backend": "claude-cmux",
+      "id": "claude-agent-opus",
+      "ready": true
+    },
+    {
+      "backend": "claude-cmux",
+      "id": "claude-agent-haiku",
+      "ready": true
+    },
+    {
+      "backend": "codex-cli",
+      "id": "gpt-5-codex",
+      "ready": true
+    },
+    {
+      "backend": "codex-cmux",
+      "id": "gpt-5-codex",
+      "ready": true
+    }
+  ],
+  "prompt": {
+    "$defs": {
+      "Prompt": {
+        "additionalProperties": false,
+        "properties": {
+          "appendSystem": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "schemaJSON": true,
+          "schemaStrictness": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "required": ["user"],
+        "type": "object"
+      }
+    },
+    "$id": "https://github.com/flanksource/captain/pkg/api/prompt",
+    "$ref": "#/$defs/Prompt",
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+  },
+  "promptAction": {
+    "properties": {
+      "APIKey": {
+        "type": "string"
+      },
+      "AllowedTools": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "AppendSystem": {
+        "type": "string"
+      },
+      "Backend": {
+        "type": "string"
+      },
+      "Bare": {
+        "type": "boolean"
+      },
+      "Budget": {
+        "type": "string"
+      },
+      "DisallowedTools": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "Edit": {
+        "type": "boolean"
+      },
+      "Effort": {
+        "type": "string"
+      },
+      "Fallback": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "MaxTokens": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "MaxTurns": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "Model": {
+        "type": "string"
+      },
+      "MultiModels": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "NoCache": {
+        "type": "boolean"
+      },
+      "NoHooks": {
+        "type": "boolean"
+      },
+      "NoMCP": {
+        "type": "boolean"
+      },
+      "NoMemory": {
+        "type": "boolean"
+      },
+      "NoProject": {
+        "type": "boolean"
+      },
+      "NoSkills": {
+        "type": "boolean"
+      },
+      "NoStream": {
+        "type": "boolean"
+      },
+      "NoUser": {
+        "type": "boolean"
+      },
+      "PermissionMode": {
+        "type": "string"
+      },
+      "Prompt": {
+        "type": "string"
+      },
+      "Resume": {
+        "type": "string"
+      },
+      "SkillDirs": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "System": {
+        "type": "string"
+      },
+      "Temperature": {
+        "type": "string"
+      },
+      "Timeout": {
+        "type": "string"
+      },
+      "Var": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "Vars": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "Model",
+      "Backend",
+      "APIKey",
+      "NoCache",
+      "Budget",
+      "MaxTokens",
+      "Temperature",
+      "Effort",
+      "MaxTurns",
+      "Resume",
+      "Edit",
+      "PermissionMode",
+      "NoMCP",
+      "NoHooks",
+      "NoSkills",
+      "NoUser",
+      "NoProject",
+      "NoMemory",
+      "Bare",
+      "Prompt",
+      "System",
+      "AppendSystem",
+      "Vars",
+      "Timeout",
+      "NoStream"
+    ],
+    "type": "object"
+  },
+  "schemaVersion": 2,
+  "source": "captain prompt --schema",
+  "spec": {
+    "$defs": {
+      "AWSConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "accessKey": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "assumeRole": {
+            "type": "string"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "secretKey": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "sessionToken": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "skipTLSVerify": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "AzureConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "clientID": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "clientSecret": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "tenantID": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Budget": {
+        "additionalProperties": false,
+        "properties": {
+          "cost": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "maxTokens": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxTurns": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "timeout": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CNRMConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "clusterResource": {
+            "type": "string"
+          },
+          "clusterResourceNamespace": {
+            "type": "string"
+          },
+          "gke": {
+            "$ref": "#/$defs/GKEConnection"
+          }
+        },
+        "type": "object"
+      },
+      "Checkout": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "dirty": {
+            "$ref": "#/$defs/Dirty"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "worktree": {
+            "$ref": "#/$defs/Worktree"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigMapKeySelector": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Dirty": {
+        "additionalProperties": false,
+        "properties": {
+          "since": {
+            "type": "string"
+          },
+          "stash": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EKSConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "accessKey": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "assumeRole": {
+            "type": "string"
+          },
+          "cluster": {
+            "type": "string"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "secretKey": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "sessionToken": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "skipTLSVerify": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "EnvVar": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "valueFrom": {
+            "$ref": "#/$defs/EnvVarSource"
+          }
+        },
+        "type": "object"
+      },
+      "EnvVarSource": {
+        "additionalProperties": false,
+        "properties": {
+          "configMapKeyRef": {
+            "$ref": "#/$defs/ConfigMapKeySelector"
+          },
+          "helmRef": {
+            "$ref": "#/$defs/HelmRefKeySelector"
+          },
+          "secretKeyRef": {
+            "$ref": "#/$defs/SecretKeySelector"
+          },
+          "serviceAccount": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExecConnections": {
+        "additionalProperties": false,
+        "properties": {
+          "aws": {
+            "$ref": "#/$defs/AWSConnection"
+          },
+          "azure": {
+            "$ref": "#/$defs/AzureConnection"
+          },
+          "eksPodIdentity": {
+            "type": "boolean"
+          },
+          "fromConfigItem": {
+            "type": "string"
+          },
+          "gcp": {
+            "$ref": "#/$defs/GCPConnection"
+          },
+          "kubernetes": {
+            "$ref": "#/$defs/KubernetesConnection"
+          },
+          "serviceAccount": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GCPConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "type": "string"
+          },
+          "credentials": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "skipTLSVerify": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GKEConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "cluster": {
+            "type": "string"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "credentials": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "projectID": {
+            "type": "string"
+          },
+          "skipTLSVerify": {
+            "type": "boolean"
+          },
+          "zone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HelmRefKeySelector": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "KubernetesConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "cnrm": {
+            "$ref": "#/$defs/CNRMConnection"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "eks": {
+            "$ref": "#/$defs/EKSConnection"
+          },
+          "gke": {
+            "$ref": "#/$defs/GKEConnection"
+          },
+          "kubeconfig": {
+            "$ref": "#/$defs/EnvVar"
+          }
+        },
+        "type": "object"
+      },
+      "MCP": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "Memory": {
+        "additionalProperties": false,
+        "properties": {
+          "bare": {
+            "type": "boolean"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "skipHooks": {
+            "type": "boolean"
+          },
+          "skipMemory": {
+            "type": "boolean"
+          },
+          "skipProject": {
+            "type": "boolean"
+          },
+          "skipSkills": {
+            "type": "boolean"
+          },
+          "skipUser": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "Model": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "effort": {
+            "enum": ["", "low", "medium", "high", "xhigh"],
+            "type": "string"
+          },
+          "fallbacks": {
+            "items": {
+              "$ref": "#/$defs/Model"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "noCache": {
+            "type": "boolean"
+          },
+          "temperature": {
+            "type": "number"
+          }
+        },
+        "required": ["model"],
+        "type": "object"
+      },
+      "Permissions": {
+        "additionalProperties": false,
+        "properties": {
+          "mcp": {
+            "$ref": "#/$defs/MCP"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "plugins": {
+            "$ref": "#/$defs/ResourcePolicies"
+          },
+          "presets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "skills": {
+            "$ref": "#/$defs/ResourcePolicies"
+          },
+          "tools": {
+            "$ref": "#/$defs/Tools"
+          }
+        },
+        "type": "object"
+      },
+      "PostRun": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "type": "boolean"
+          },
+          "commitMessage": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "keepWorktree": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "Prompt": {
+        "additionalProperties": false,
+        "properties": {
+          "appendSystem": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "schemaJSON": true,
+          "schemaStrictness": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "required": ["user"],
+        "type": "object"
+      },
+      "ResourcePolicies": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "SecretKeySelector": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Setup": {
+        "additionalProperties": false,
+        "properties": {
+          "baseDir": {
+            "type": "string"
+          },
+          "checkout": {
+            "$ref": "#/$defs/Checkout"
+          },
+          "connections": {
+            "$ref": "#/$defs/ExecConnections"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "dotenv": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "envVars": {
+            "items": {
+              "$ref": "#/$defs/EnvVar"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Spec": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "budget": {
+            "$ref": "#/$defs/Budget"
+          },
+          "cliArgs": {
+            "type": "object"
+          },
+          "effort": {
+            "enum": ["", "low", "medium", "high", "xhigh"],
+            "type": "string"
+          },
+          "fallbacks": {
+            "items": {
+              "$ref": "#/$defs/Model"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "memory": {
+            "$ref": "#/$defs/Memory"
+          },
+          "model": {
+            "type": "string"
+          },
+          "noCache": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "$ref": "#/$defs/Permissions"
+          },
+          "prompt": {
+            "$ref": "#/$defs/Prompt"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "setup": {
+            "$ref": "#/$defs/Setup"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "workflow": {
+            "$ref": "#/$defs/Workflow"
+          }
+        },
+        "required": ["model"],
+        "type": "object"
+      },
+      "Tools": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "Verify": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fixture": {
+            "type": "string"
+          },
+          "maxIterations": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "scope": {
+            "enum": ["", "all", "changed"],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Workflow": {
+        "additionalProperties": false,
+        "properties": {
+          "postRun": {
+            "$ref": "#/$defs/PostRun"
+          },
+          "verify": {
+            "$ref": "#/$defs/Verify"
+          }
+        },
+        "type": "object"
+      },
+      "Worktree": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "type": "string"
+          },
+          "keep": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "claudeCmuxArgs": {
+        "properties": {
+          "addDir": {
+            "description": "Extra directories tools may access",
+            "items": {
+              "type": "string"
+            },
+            "title": "Additional Dirs",
+            "type": "array",
+            "x-clicky-order": 2
+          },
+          "agent": {
+            "description": "Agent for the current session",
+            "title": "Agent",
+            "type": "string",
+            "x-clicky-order": 10
+          },
+          "appendSystemPrompt": {
+            "description": "Append to the default system prompt",
+            "title": "Append System Prompt",
+            "type": "string",
+            "x-clicky-order": 7
+          },
+          "betas": {
+            "description": "Beta headers to include in API requests",
+            "items": {
+              "type": "string"
+            },
+            "title": "Beta Headers",
+            "type": "array",
+            "x-clicky-order": 8
+          },
+          "excludeDynamicSystemPromptSections": {
+            "description": "Move per-machine sections to the first user message for prompt-cache reuse",
+            "title": "Exclude Dynamic Sections",
+            "type": "boolean",
+            "x-clicky-order": 9
+          },
+          "mcpConfig": {
+            "description": "Load MCP servers from JSON files or strings",
+            "items": {
+              "type": "string"
+            },
+            "title": "MCP Config",
+            "type": "array",
+            "x-clicky-order": 3
+          },
+          "safeMode": {
+            "description": "Start with all customizations disabled",
+            "title": "Safe Mode",
+            "type": "boolean",
+            "x-clicky-order": 11
+          },
+          "settings": {
+            "description": "Path to a settings JSON file or a JSON string",
+            "title": "Settings File/JSON",
+            "type": "string",
+            "x-clicky-order": 5
+          },
+          "strictMcpConfig": {
+            "description": "Only use MCP servers from --mcp-config",
+            "title": "Strict MCP Config",
+            "type": "boolean",
+            "x-clicky-order": 4
+          },
+          "systemPrompt": {
+            "description": "Replace the default system prompt",
+            "title": "System Prompt",
+            "type": "string",
+            "x-clicky-order": 6
+          },
+          "tools": {
+            "description": "Restrict the built-in tool set (e.g. Bash Edit Read)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Built-in Tools",
+            "type": "array",
+            "x-clicky-order": 1
+          }
+        },
+        "type": "object"
+      },
+      "codexCmuxArgs": {
+        "properties": {
+          "addDir": {
+            "description": "Extra writable directories",
+            "items": {
+              "type": "string"
+            },
+            "title": "Additional Dirs",
+            "type": "array",
+            "x-clicky-order": 5
+          },
+          "askForApproval": {
+            "default": "on-request",
+            "description": "When codex asks for human approval before running a command",
+            "enum": ["untrusted", "on-failure", "on-request", "never"],
+            "title": "Approval Policy",
+            "type": "string",
+            "x-clicky-order": 2,
+            "x-enum-display": "radio",
+            "x-enum-labels": {
+              "never": "Never",
+              "on-failure": "On failure (deprecated)",
+              "on-request": "On request",
+              "untrusted": "Untrusted only"
+            }
+          },
+          "config": {
+            "description": "Override config values as key=value",
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Overrides",
+            "type": "array",
+            "x-clicky-order": 3
+          },
+          "disable": {
+            "description": "Disable named features",
+            "items": {
+              "type": "string"
+            },
+            "title": "Disable Features",
+            "type": "array",
+            "x-clicky-order": 7
+          },
+          "enable": {
+            "description": "Enable named features",
+            "items": {
+              "type": "string"
+            },
+            "title": "Enable Features",
+            "type": "array",
+            "x-clicky-order": 6
+          },
+          "image": {
+            "description": "Image files to attach to the initial prompt",
+            "items": {
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "array",
+            "x-clicky-order": 11
+          },
+          "oss": {
+            "description": "Use an open-source model provider",
+            "title": "OSS Provider",
+            "type": "boolean",
+            "x-clicky-order": 10
+          },
+          "profile": {
+            "description": "Config profile to layer on the base config",
+            "title": "Profile",
+            "type": "string",
+            "x-clicky-order": 4
+          },
+          "sandbox": {
+            "default": "read-only",
+            "description": "Sandbox policy for model-run shell commands",
+            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "title": "Sandbox",
+            "type": "string",
+            "x-clicky-order": 1,
+            "x-enum-display": "radio",
+            "x-enum-labels": {
+              "danger-full-access": "Danger: full access",
+              "read-only": "Read-only",
+              "workspace-write": "Workspace write"
+            }
+          },
+          "search": {
+            "description": "Enable live web search",
+            "title": "Web Search",
+            "type": "boolean",
+            "x-clicky-order": 9
+          },
+          "strictConfig": {
+            "description": "Error on unrecognized config fields",
+            "title": "Strict Config",
+            "type": "boolean",
+            "x-clicky-order": 8
+          }
+        },
+        "type": "object"
+      }
+    },
+    "$id": "https://github.com/flanksource/captain/pkg/api/spec",
+    "$ref": "#/$defs/Spec",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "anthropic"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "claude-fable-5",
+                "claude-opus-4-8",
+                "claude-sonnet-5",
+                "claude-haiku-4-5"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "gemini"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": ["gemini-2.5-pro", "gemini-3.0-pro", "gemini-3.5-flash"]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "openai"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": ["gpt-5.5", "gpt-5.4-mini"]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "deepseek"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": ["deepseek-chat", "deepseek-reasoner"]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "claude-cli"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "claude-agent-sonnet",
+                "claude-agent-opus",
+                "claude-agent-haiku"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "claude-agent"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "claude-agent-sonnet",
+                "claude-agent-opus",
+                "claude-agent-haiku"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "claude-cmux"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": {
+              "$ref": "#/$defs/claudeCmuxArgs"
+            },
+            "model": {
+              "enum": [
+                "claude-agent-sonnet",
+                "claude-agent-opus",
+                "claude-agent-haiku"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "codex-cli"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": ["gpt-5-codex"]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "codex-cmux"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": {
+              "$ref": "#/$defs/codexCmuxArgs"
+            },
+            "model": {
+              "enum": ["gpt-5-codex"]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "gemini-cli"
+            }
+          },
+          "required": ["backend"]
+        },
+        "then": {
+          "properties": {
+            "cliArgs": false
+          }
+        }
+      }
+    ]
+  }
+}

@@ -93,6 +93,9 @@ catalogs:
     vitest:
       specifier: ^3.0.5
       version: 3.2.4
+    yaml:
+      specifier: ^2.8.3
+      version: 2.8.3
 
 importers:
 
@@ -280,6 +283,9 @@ importers:
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.1
+      yaml:
+        specifier: 'catalog:'
+        version: 2.8.3
     devDependencies:
       '@ai-sdk/react':
         specifier: 'catalog:'
@@ -10297,8 +10303,7 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.8.3:
-    optional: true
+  yaml@2.8.3: {}
 
   yjs@13.6.31:
     dependencies:
