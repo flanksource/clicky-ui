@@ -65,6 +65,7 @@ beforeEach(() => installMemoryStorage());
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.unstubAllGlobals();
 });
 
 function installMemoryStorage() {
@@ -106,13 +107,13 @@ describe("ChatWindow tool approval default", () => {
         base: { model: "test" },
         contextItems,
         tools: TOOLS,
-        toolPrefs: { listPods: "enabled" },
+        toolPrefs: { listPods: "on" },
       }),
     ).toEqual({
       model: "test",
       context: "Context:\n[formula] Formula Playground (entity: Demo Co)\n\n",
       contextItems,
-      toolPreferences: { listPods: "enabled" },
+      toolPreferences: { listPods: "on" },
     });
   });
 
@@ -152,7 +153,7 @@ describe("ChatWindow tool approval default", () => {
           <ChatWindowLayer
             threadsApi={null}
             tools={TOOLS}
-            defaultToolMode="enabled"
+            defaultToolMode="auto"
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenOnMount>
@@ -179,21 +180,21 @@ describe("ChatWindow tool approval default", () => {
         label: "List Xero accounts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultMode: "disabled",
+        defaultPermission: "off",
       },
       {
         name: "xero_contacts_list",
         label: "List Xero contacts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultMode: "disabled",
+        defaultPermission: "off",
       },
       {
         name: "sync",
         label: "Sync",
         group: "Admin Write",
         preferenceKey: "Admin Write",
-        defaultMode: "ask",
+        defaultPermission: "ask",
       },
     ];
 
@@ -225,18 +226,21 @@ describe("ChatWindow tool approval default", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse Xero Read" }));
     expect(screen.queryByText("List Xero accounts")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Toggle Xero Read group" }));
-    expect(screen.getAllByText("Auto").length).toBeGreaterThan(0);
+    const groupToggle = screen.getByRole("button", {
+      name: "Toggle Xero Read group",
+    });
+    fireEvent.click(within(groupToggle).getByText("Off"));
+    expect(screen.getAllByText("On").length).toBeGreaterThan(0);
   });
 
-  it("advanced tool preferences toggles individual tools and groups", async () => {
+  it("advanced permissions tab uses the same click-toggle tool list as the dropdown", async () => {
     const groupedTools: ToolMeta[] = [
       {
         name: "xero_accounts_list",
         label: "List Xero accounts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultMode: "disabled",
+        defaultPermission: "off",
         description: "List accounts from Xero",
       },
       {
@@ -244,7 +248,7 @@ describe("ChatWindow tool approval default", () => {
         label: "List Xero contacts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultMode: "disabled",
+        defaultPermission: "off",
         description: "List contacts from Xero",
       },
       {
@@ -252,7 +256,7 @@ describe("ChatWindow tool approval default", () => {
         label: "Sync Xero",
         group: "Admin Write",
         preferenceKey: "Admin Write",
-        defaultMode: "ask",
+        defaultPermission: "ask",
         description: "Synchronize Xero data",
       },
     ];
@@ -261,7 +265,7 @@ describe("ChatWindow tool approval default", () => {
     render(
       <ToolPreferences
         tools={groupedTools}
-        value={{ xero_accounts_list: "disabled", xero_contacts_list: "disabled" }}
+        value={{ xero_accounts_list: "off", xero_contacts_list: "off" }}
         onChange={onChange}
       />,
     );
@@ -272,25 +276,36 @@ describe("ChatWindow tool approval default", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Advanced Chat Settings",
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /permissions/i }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /permissions/i }),
+    );
     expect(within(dialog).getByText("Admin Write")).toBeInTheDocument();
     expect(within(dialog).getByText("Xero Read")).toBeInTheDocument();
     expect(within(dialog).getByText("List Xero accounts")).toBeInTheDocument();
     expect(within(dialog).getByText("List Xero contacts")).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Description for List Xero accounts"),
-    ).toHaveAttribute("title", "List accounts from Xero");
+      within(dialog).queryByLabelText("Info for List Xero accounts"),
+    ).toBeNull();
+    expect(
+      within(dialog).queryByRole("radiogroup", {
+        name: "List Xero accounts policy",
+      }),
+    ).toBeNull();
 
-    fireEvent.click(within(dialog).getByText("List Xero accounts"));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /List Xero accounts/ }),
+    );
     expect(onChange).toHaveBeenCalledWith({
-      xero_accounts_list: "enabled",
-      xero_contacts_list: "disabled",
+      xero_accounts_list: "on",
+      xero_contacts_list: "off",
     });
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Toggle Xero Read group" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Toggle Xero Read group" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
-      xero_accounts_list: "enabled",
-      xero_contacts_list: "enabled",
+      xero_accounts_list: "on",
+      xero_contacts_list: "on",
     });
   });
 
@@ -316,9 +331,15 @@ describe("ChatWindow tool approval default", () => {
     const select = within(dialog).getByRole("combobox", {
       name: "Permission mode",
     });
-    expect(within(select).getByRole("option", { name: "Default" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Accept edits" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Bypass" })).toBeInTheDocument();
+    expect(
+      within(select).getByRole("option", { name: "Default" }),
+    ).toBeInTheDocument();
+    expect(
+      within(select).getByRole("option", { name: "Accept edits" }),
+    ).toBeInTheDocument();
+    expect(
+      within(select).getByRole("option", { name: "Bypass" }),
+    ).toBeInTheDocument();
 
     fireEvent.change(select, { target: { value: "bypassPermissions" } });
     expect(onPermissionModeChange).toHaveBeenCalledWith("bypassPermissions");
@@ -356,13 +377,91 @@ describe("ChatWindow tool approval default", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /browser/i }));
 
     await waitFor(() =>
-      expect(within(dialog).getAllByText("search_docs").length).toBeGreaterThan(0),
+      expect(within(dialog).getAllByText("search_docs").length).toBeGreaterThan(
+        0,
+      ),
     );
-    expect(within(dialog).getAllByText("Search docs").length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText("Search docs").length).toBeGreaterThan(
+      0,
+    );
     expect(within(dialog).getByText("Hints")).toBeInTheDocument();
-    expect(within(dialog).getByText("Quote exact phrases for narrower results.")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Quote exact phrases for narrower results."),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText("query")).toBeInTheDocument();
     expect(within(dialog).getByText("Search query")).toBeInTheDocument();
+  });
+
+  it("normalizes fetched catalog strictness and annotations for the tool browser", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              tools: [
+                {
+                  name: "backend_search",
+                  label: "Backend search",
+                  parent: "Knowledge",
+                  entity: "docs",
+                  strict: true,
+                  annotations: {
+                    title: "Backend search title",
+                    readOnlyHint: true,
+                    idempotentHint: true,
+                  },
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      query: { type: "string", description: "Backend query" },
+                    },
+                    additionalProperties: false,
+                  },
+                },
+              ],
+            }),
+        }),
+      ),
+    );
+
+    render(
+      <ChatWindowManagerProvider storageId="fetched-tools">
+        <OpenOnMount>
+          <ChatWindowLayer
+            threadsApi={null}
+            chat={{ modelsApi: null, transport: mockChatTransport() }}
+          />
+        </OpenOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByTestId("tool-preferences-btn");
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
+
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+    fireEvent.click(await screen.findByText("Advanced"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Advanced Chat Settings",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /browser/i }));
+
+    await waitFor(() =>
+      expect(
+        within(dialog).getAllByText("backend_search").length,
+      ).toBeGreaterThan(0),
+    );
+    expect(within(dialog).getAllByText("Knowledge").length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText("readOnlyHint").length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      within(dialog).getAllByText("idempotentHint").length,
+    ).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText("Strict").length).toBeGreaterThan(0);
   });
 
   it("passes panel initial prompts into the inner chat", async () => {

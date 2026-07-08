@@ -18,13 +18,21 @@ import { CATEGORY_LABELS, type SessionCategory, type SessionFilters } from "./se
 
 export type SessionThemeOverride = "light" | "dark";
 
-const DENSITY_OPTIONS: Array<{ value: Density; icon: StaticIconComponent; label: string }> = [
+interface SegmentedOption<T> {
+  value: T | undefined;
+  icon: StaticIconComponent;
+  label: string;
+}
+
+const DENSITY_OPTIONS: Array<SegmentedOption<Density>> = [
+  { value: undefined, icon: UiResizeVertical, label: "Use page density" },
   { value: "compact", icon: UiRows, label: "Compact" },
   { value: "comfortable", icon: UiListFlat, label: "Comfortable" },
   { value: "spacious", icon: UiListDashes, label: "Spacious" },
 ];
 
-const THEME_OPTIONS: Array<{ value: SessionThemeOverride; icon: StaticIconComponent; label: string }> = [
+const THEME_OPTIONS: Array<SegmentedOption<SessionThemeOverride>> = [
+  { value: undefined, icon: UiDesktop, label: "Use page theme" },
   { value: "light", icon: UiSun, label: "Light" },
   { value: "dark", icon: UiMoon, label: "Dark" },
 ];
@@ -46,9 +54,9 @@ export interface SessionViewerMenuProps {
   hasThinking: boolean;
 }
 
-/** The SessionViewer's "3-dot" menu: a density override (matching DataTable's
- *  pattern) plus visibility toggles for the captain category / tool / source
- *  facets present in the session. */
+/** The SessionViewer's "3-dot" menu: density and theme overrides as one-line
+ *  segmented icon rows, plus visibility toggles for the captain category /
+ *  tool / source facets present in the session. */
 export function SessionViewerMenu({
   density,
   onDensityChange,
@@ -74,44 +82,22 @@ export function SessionViewerMenu({
       align="right"
       title="Session options"
       menuLabel="Session options"
-      menuClassName="min-w-[14rem] max-h-[70vh] overflow-auto px-1"
+      menuClassName="min-w-[12rem] max-h-[70vh] overflow-auto px-1"
     >
       {() => (
         <div className="text-popover-foreground">
-          <MenuHeading>Density</MenuHeading>
-          <RadioRow
-            icon={UiResizeVertical}
-            label="Use page density"
-            active={density === undefined}
-            onSelect={() => onDensityChange(undefined)}
+          <SegmentedRow
+            label="Density"
+            options={DENSITY_OPTIONS}
+            value={density}
+            onChange={onDensityChange}
           />
-          {DENSITY_OPTIONS.map((option) => (
-            <RadioRow
-              key={option.value}
-              icon={option.icon}
-              label={option.label}
-              active={density === option.value}
-              onSelect={() => onDensityChange(option.value)}
-            />
-          ))}
-
-          <Section heading="Theme">
-            <RadioRow
-              icon={UiDesktop}
-              label="Use page theme"
-              active={theme === undefined}
-              onSelect={() => onThemeChange(undefined)}
-            />
-            {THEME_OPTIONS.map((option) => (
-              <RadioRow
-                key={option.value}
-                icon={option.icon}
-                label={option.label}
-                active={theme === option.value}
-                onSelect={() => onThemeChange(option.value)}
-              />
-            ))}
-          </Section>
+          <SegmentedRow
+            label="Theme"
+            options={THEME_OPTIONS}
+            value={theme}
+            onChange={onThemeChange}
+          />
 
           {filters.categories.length > 0 && (
             <Section heading="Categories">
@@ -153,7 +139,7 @@ export function SessionViewerMenu({
           )}
 
           {hasThinking && (
-            <Section heading="Other">
+            <Section>
               <CheckRow label="Reasoning" checked={showThinking} onToggle={onToggleThinking} />
             </Section>
           )}
@@ -163,51 +149,64 @@ export function SessionViewerMenu({
   );
 }
 
-function MenuHeading({ children }: { children: ReactNode }) {
-  return <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{children}</div>;
+// One line per setting: a dim label on the left, a bordered segmented group of
+// icon-only radio buttons on the right. Labels ride on aria-label/title so
+// menuitemradio queries (and tooltips) still see "Compact", "Dark", etc.
+function SegmentedRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<SegmentedOption<T>>;
+  value: T | undefined;
+  onChange: (value: T | undefined) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-2 py-1">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+        {options.map((option) => {
+          const active = value === option.value;
+          return (
+            <button
+              key={option.label}
+              type="button"
+              role="menuitemradio"
+              aria-checked={active}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded transition-colors focus:outline-none",
+                active
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground focus:text-foreground",
+              )}
+            >
+              <Icon icon={option.icon} className="text-xs" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
-function Section({ heading, children }: { heading: string; children: ReactNode }) {
+function Section({ heading, children }: { heading?: string; children: ReactNode }) {
   return (
-    <div className="mt-1 border-t border-border pt-1">
-      <MenuHeading>{heading}</MenuHeading>
+    <div className="mt-1 border-t border-border pt-0.5">
+      {heading && (
+        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">{heading}</div>
+      )}
       {children}
     </div>
   );
 }
 
 const ROW_CLASS =
-  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none";
-
-function RadioRow({
-  icon,
-  label,
-  active,
-  onSelect,
-}: {
-  icon: StaticIconComponent;
-  label: string;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={active}
-      className={cn(ROW_CLASS, active && "text-foreground")}
-      onClick={onSelect}
-    >
-      <Icon icon={icon} className="text-sm text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {active ? (
-        <Icon icon={UiCheck} className="text-sm text-foreground" />
-      ) : (
-        <span className="inline-block h-4 w-4" aria-hidden />
-      )}
-    </button>
-  );
-}
+  "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none";
 
 function CheckRow({
   label,
@@ -229,11 +228,11 @@ function CheckRow({
       <span
         aria-hidden
         className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border",
           checked ? "border-primary bg-primary text-primary-foreground" : "border-input",
         )}
       >
-        {checked && <Icon icon={UiCheck} className="text-[0.7rem]" />}
+        {checked && <Icon icon={UiCheck} className="text-[0.6rem]" />}
       </span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
