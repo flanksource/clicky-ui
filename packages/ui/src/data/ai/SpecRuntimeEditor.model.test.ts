@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildAISpecRuntimePayload } from "./SpecRuntimeEditor.model";
+import {
+  SPEC_PERMISSION_MODES,
+  buildAISpecRuntimePayload,
+} from "./SpecRuntimeEditor.model";
 
 describe("buildAISpecRuntimePayload", () => {
   it("compacts empty fields while preserving nested api spec values", () => {
@@ -11,6 +14,17 @@ describe("buildAISpecRuntimePayload", () => {
         temperature: 0,
         effort: "medium",
         noCache: true,
+        fallbacks: [
+          {
+            model: " gpt-5-codex ",
+            backend: " codex-cli ",
+            temperature: 0,
+            effort: " low ",
+            noCache: true,
+          },
+          { model: " " },
+        ],
+        sessionId: " sess-1 ",
         budget: {
           cost: 0.25,
           maxTokens: 4000,
@@ -19,7 +33,9 @@ describe("buildAISpecRuntimePayload", () => {
         },
         prompt: {
           system: "Be precise",
-          metadata: { owner: "captain" },
+          schemaJSON:
+            '{"type":"object","properties":{"ok":{"type":"boolean"}}}',
+          schemaStrictness: "retry",
         },
         permissions: {
           mode: "acceptEdits",
@@ -81,6 +97,16 @@ describe("buildAISpecRuntimePayload", () => {
         temperature: 0,
         effort: "medium",
         noCache: true,
+        fallbacks: [
+          {
+            model: "gpt-5-codex",
+            backend: "codex-cli",
+            temperature: 0,
+            effort: "low",
+            noCache: true,
+          },
+        ],
+        sessionId: "sess-1",
         budget: {
           cost: 0.25,
           maxTokens: 4000,
@@ -89,7 +115,11 @@ describe("buildAISpecRuntimePayload", () => {
         },
         prompt: {
           system: "Be precise",
-          metadata: { owner: "captain" },
+          schemaJSON: {
+            type: "object",
+            properties: { ok: { type: "boolean" } },
+          },
+          schemaStrictness: "retry",
         },
         permissions: {
           mode: "acceptEdits",
@@ -211,6 +241,38 @@ describe("buildAISpecRuntimePayload", () => {
     });
   });
 
+  it("does not emit legacy skipSkills memory flags", () => {
+    expect(
+      buildAISpecRuntimePayload({
+        memory: {
+          skipSkills: true,
+          skipHooks: true,
+        },
+      }),
+    ).toEqual({
+      spec: {
+        memory: {
+          skipHooks: true,
+        },
+      },
+    });
+  });
+
+  it("passes cliArgs through and drops empty maps", () => {
+    const cliArgs = { sandbox: "workspace-write", config: ["a=b"] };
+    expect(buildAISpecRuntimePayload({ cliArgs })).toEqual({
+      spec: { cliArgs },
+    });
+    expect(buildAISpecRuntimePayload({ cliArgs: {} })).toEqual({});
+  });
+
+  it("emits the dontAsk permission mode", () => {
+    expect(SPEC_PERMISSION_MODES).toContain("dontAsk");
+    expect(
+      buildAISpecRuntimePayload({ permissions: { mode: "dontAsk" } }),
+    ).toEqual({ spec: { permissions: { mode: "dontAsk" } } });
+  });
+
   it("omits empty setup and local workflow sections", () => {
     expect(
       buildAISpecRuntimePayload({
@@ -223,19 +285,92 @@ describe("buildAISpecRuntimePayload", () => {
             mode: "none",
             depth: 0,
             worktree: { mode: "none", keep: false },
-            dirty: { stash: "none", staged: false },
+            dirty: { stash: "none" },
           },
         },
         workflow: {
-          verify: { commands: [""], scope: "", maxIterations: 0, gavel: false },
-          finalize: {
+          verify: { fixture: "", scope: "", maxIterations: 0 },
+          postRun: {
             commit: false,
             commitMessage: "",
             dryRun: false,
-            keepWorktree: false,
           },
         },
       }),
     ).toEqual({});
+  });
+
+  it("emits the verify and postRun workflow into the spec", () => {
+    expect(
+      buildAISpecRuntimePayload({
+        workflow: {
+          verify: {
+            fixture: " ## Acceptance\n- works ",
+            scope: "changed",
+            maxIterations: 2.9,
+          },
+          postRun: {
+            commit: true,
+            commitMessage: " Apply AI changes ",
+            dryRun: false,
+          },
+        },
+      }),
+    ).toEqual({
+      spec: {
+        workflow: {
+          verify: {
+            fixture: "## Acceptance\n- works",
+            scope: "changed",
+            maxIterations: 2,
+          },
+          postRun: {
+            commit: true,
+            commitMessage: "Apply AI changes",
+          },
+        },
+      },
+    });
+  });
+
+  it("drops fields that are not owned by the editor surface", () => {
+    expect(
+      buildAISpecRuntimePayload({
+        prompt: {
+          user: "hi",
+          source: "demo.prompt",
+          metadata: { owner: "captain" },
+        },
+        setup: {
+          checkout: {
+            dirty: {
+              stash: "all",
+              staged: true,
+              unstaged: true,
+              untracked: true,
+            },
+          },
+        },
+        workflow: {
+          verify: {
+            commands: ["pnpm test"],
+            fixture: "- [ ] passes",
+          },
+          postRun: {
+            commit: true,
+            keepWorktree: true,
+          },
+        },
+      } as any),
+    ).toEqual({
+      spec: {
+        prompt: { user: "hi" },
+        setup: { checkout: { dirty: { stash: "all" } } },
+        workflow: {
+          verify: { fixture: "- [ ] passes" },
+          postRun: { commit: true },
+        },
+      },
+    });
   });
 });
