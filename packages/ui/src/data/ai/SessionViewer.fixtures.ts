@@ -82,8 +82,11 @@ export const SAMPLE_SESSION: SessionEntry[] = [
     timestamp: "2026-06-25T10:00:40Z",
     tool_use: {
       tool: "Write",
-      input: { file_path: "packages/ui/src/data/ai/SessionViewer.tsx" },
-      response: "File created (220 lines)",
+      input: {
+        file_path: "packages/ui/src/data/ai/SessionViewer.tsx",
+        content: "export function SessionViewer() {\n  return <ol />;\n}",
+      },
+      response: "File created (3 lines)",
     },
   },
   {
