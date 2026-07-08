@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
+import { useResolvedTheme, type ResolvedTheme } from "../hooks/use-theme";
+import { CodeBlockActions } from "./code-block-actions";
 import { CodeDiff } from "./CodeDiff";
 import { JsonView } from "./JsonView";
 import { highlightCode } from "./code-highlight";
@@ -18,6 +20,12 @@ export type CodeBlockProps = {
   jsonDefaultOpenDepth?: number | undefined;
   /** Render only the code — no border, background, or language header. */
   bare?: boolean | undefined;
+  /** Show a copy-to-clipboard button in the header (ignored when `bare`). */
+  copyable?: boolean | undefined;
+  /** Show a download button in the header (ignored when `bare`). */
+  downloadable?: boolean | undefined;
+  /** Show a per-block light/dark theme toggle in the header (ignored when `bare`). */
+  themeToggle?: boolean | undefined;
   /** Render a language-aware diff instead of highlighting `source`. */
   diff?: { original: string; modified: string } | { unified: string } | undefined;
   /** Diff layout when `diff` is set. Defaults to `unified`. */
@@ -31,6 +39,9 @@ export function CodeBlock({
   className,
   jsonDefaultOpenDepth = 2,
   bare = false,
+  copyable = false,
+  downloadable = false,
+  themeToggle = false,
   diff,
   diffView,
 }: CodeBlockProps) {
@@ -40,6 +51,11 @@ export function CodeBlock({
     () => (language === "json" ? tryParseJson(source) : JSON_PARSE_FAILED),
     [language, source],
   );
+  // The block follows the global app theme by default; a per-block override
+  // (set by the header toggle) wins over it and re-highlights just this block.
+  const globalTheme = useResolvedTheme();
+  const [themeOverride, setThemeOverride] = useState<ResolvedTheme | null>(null);
+  const effectiveTheme = themeOverride ?? globalTheme;
   const [shikiHtml, setShikiHtml] = useState<string | null>(null);
   const wantsClientHighlight = !chromaHtml && !!language && !!source;
 
@@ -50,14 +66,31 @@ export function CodeBlock({
     }
 
     let cancelled = false;
-    highlightCode(source, { lang: language }).then((out) => {
+    const theme = effectiveTheme === "dark" ? "github-dark" : "github-light";
+    highlightCode(source, { lang: language, theme }).then((out) => {
       if (!cancelled) setShikiHtml(out);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [wantsClientHighlight, language, source]);
+  }, [wantsClientHighlight, language, source, effectiveTheme]);
+
+  const headerActions = (
+    <CodeBlockActions
+      source={source}
+      language={languageProp}
+      copyable={copyable}
+      downloadable={downloadable}
+      theme={effectiveTheme}
+      {...(themeToggle
+        ? { onToggleTheme: () => setThemeOverride(effectiveTheme === "dark" ? "light" : "dark") }
+        : {})}
+    />
+  );
+  // Re-scope theme tokens (shell background/border/label) to the override so an
+  // overridden block stays visually coherent with its re-highlighted code.
+  const overrideAttrs = themeOverride ? { "data-theme": themeOverride } : {};
 
   if (diff) {
     return (
@@ -75,10 +108,11 @@ export function CodeBlock({
     const tree = <JsonView data={parsedJson} defaultOpenDepth={jsonDefaultOpenDepth} />;
     if (bare) return <div className={cn("overflow-auto text-xs", className)}>{tree}</div>;
     return (
-      <div className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}>
-        <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-          json
-        </div>
+      <div
+        className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}
+        {...overrideAttrs}
+      >
+        <CodeBlockHeader label="json" actions={headerActions} />
         <div className="overflow-auto p-3 text-xs">{tree}</div>
       </div>
     );
@@ -128,11 +162,21 @@ export function CodeBlock({
 
   if (bare) return body;
   return (
-    <div className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}>
-      <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-        {languageProp || "text"}
-      </div>
+    <div
+      className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}
+      {...overrideAttrs}
+    >
+      <CodeBlockHeader label={languageProp || "text"} actions={headerActions} />
       {body}
+    </div>
+  );
+}
+
+function CodeBlockHeader({ label, actions }: { label: string; actions: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      {actions}
     </div>
   );
 }
