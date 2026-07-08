@@ -4,6 +4,7 @@ import { LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
+import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
 import { GridControl } from "./json-schema-form-grid";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption, FormLayout } from "./json-schema-form-types";
@@ -39,20 +40,48 @@ const LazyMdxEditorField = lazy(async () => {
 // whole declaration and collapses every row to a stacked-looking column. The
 // template is an inline style because Tailwind can't interpolate runtime widths.)
 // Stacked mode is a plain single-column grid.
-export function FieldsGrid({ layout, size, children }: { layout: FormLayout; size: FormSize; children: ReactNode }) {
+export function FieldsGrid({
+  layout,
+  size,
+  columns,
+  className,
+  children,
+}: {
+  layout: FormLayout;
+  size: FormSize;
+  // Object-level `x-columns`: split a stacked object into N equal columns. Fields
+  // span one column unless they set `x-col-span`. Ignored in inline mode (which
+  // owns its own 2-track label/value layout).
+  columns?: number;
+  // Object-level `x-classes`: extra classes merged onto the grid container
+  // (e.g. `gap-2`, padding). Applied last so a standard utility wins over the
+  // defaults via tailwind-merge.
+  className?: string;
+  children: ReactNode;
+}) {
   if (layout.mode === "inline") {
     const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
     const valueMaxWidth = layout.valueMaxWidth ?? "600px";
     return (
       <div
-        className={cn("grid", inlineRowGapClass[size])}
+        className={cn("grid", inlineRowGapClass[size], className)}
         style={{ gridTemplateColumns: `fit-content(${labelMaxWidth}) minmax(0, ${valueMaxWidth})` }}
       >
         {children}
       </div>
     );
   }
-  return <div className={cn("grid", stackedRowGapClass[size])}>{children}</div>;
+  if (columns && columns > 1) {
+    return (
+      <div
+        className={cn("grid gap-x-3", stackedRowGapClass[size], className)}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      >
+        {children}
+      </div>
+    );
+  }
+  return <div className={cn("grid", stackedRowGapClass[size], className)}>{children}</div>;
 }
 
 // FieldWrapper lays out a single label + value (+ helper/error). In inline mode
@@ -100,7 +129,10 @@ export function FieldWrapper({
 
 export function FieldLabel({ field, fieldId, size }: { field: FieldControl; fieldId: string; size: FormSize }) {
   return (
-    <label htmlFor={fieldId} className={cn("flex min-w-0 items-center gap-2 font-medium", labelSizeClass[size])}>
+    <label
+      htmlFor={fieldId}
+      className={cn("flex min-w-0 items-center gap-2 font-medium", labelSizeClass[size], field.labelClassName)}
+    >
       <LabelIcon icon={field.labelIcon} className="shrink-0 text-[15px] text-muted-foreground" />
       <span className="truncate" title={field.label !== field.key ? field.key : undefined}>
         {field.label}
@@ -139,18 +171,18 @@ export function ObjectSection({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("col-span-full flex flex-col", fieldInnerGapClass[size])}>
-      <div className={cn("flex items-center gap-2 border-b border-border pb-1 font-semibold", labelSizeClass[size])}>
-        <LabelIcon icon={labelIcon} className="text-[15px] text-muted-foreground" />
-        <span>{label}</span>
-        {required && <span className="text-destructive">*</span>}
+    <div className={cn("col-span-full flex min-w-0 max-w-full flex-col", fieldInnerGapClass[size])}>
+      <div className={cn("flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold", labelSizeClass[size])}>
+        <LabelIcon icon={labelIcon} className="shrink-0 text-[15px] text-muted-foreground" />
+        <span className="min-w-0 truncate">{label}</span>
+        {required && <span className="shrink-0 text-destructive">*</span>}
         {badge && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             {badge}
           </span>
         )}
       </div>
-      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
+      {helper && <p className="min-w-0 break-words text-xs text-muted-foreground">{helper}</p>}
       {children}
     </div>
   );
@@ -217,7 +249,7 @@ export function StringControl({
         id={fieldId}
         type="text"
         data-jsf-input
-        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8")}
+        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
@@ -238,9 +270,17 @@ export function NumberControl({
   readOnly: boolean;
   size: FormSize;
 }) {
-  // type="text" (not number) so non-numeric values a consumer permits — e.g.
-  // template tokens — are not silently dropped by the browser.
+  // A bounded number can opt into a single-thumb progress slider.
+  if (field.schema["x-number-display"] === "slider" && typeof field.schema.maximum === "number") {
+    return <NumberSliderControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+  }
+  // Default type="text" (not number) so non-numeric values a consumer permits —
+  // e.g. template tokens — are not silently dropped by the browser. A schema that
+  // declares `multipleOf` opts into a real `<input type="number">` (native step,
+  // spin buttons, min/max), matching a hand-built numeric field.
   const coerce = field.coerceNumber !== false;
+  const step = typeof field.schema.multipleOf === "number" ? field.schema.multipleOf : undefined;
+  const native = step !== undefined;
   // A static unit (e.g. "%") rides the right edge of the input as a display-only
   // suffix; a consumer-set `suffix` (e.g. an insert-snippet button) wins if both
   // are present (number insert triggers mount on the left as `prefix`).
@@ -251,10 +291,17 @@ export function NumberControl({
     <FieldAdornmentWrapper prefix={field.prefix} suffix={suffix}>
       <input
         id={fieldId}
-        type="text"
+        type={native ? "number" : "text"}
         inputMode="decimal"
+        {...(native
+          ? {
+              step,
+              ...(typeof field.schema.minimum === "number" ? { min: field.schema.minimum } : {}),
+              ...(typeof field.schema.maximum === "number" ? { max: field.schema.maximum } : {}),
+            }
+          : {})}
         data-jsf-input
-        className={cn(inputClass(size), field.prefix && "pl-8", suffix && "pr-8")}
+        className={cn(inputClass(size), field.prefix && "pl-8", suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
@@ -279,6 +326,61 @@ export function NumberControl({
         }}
       />
     </FieldAdornmentWrapper>
+  );
+}
+
+// A single-thumb range input styled with a progress-filled track. The input sits
+// above the track/fill divs; only its thumb is painted.
+const SLIDER_INPUT_CLASS =
+  "absolute inset-0 h-6 w-full cursor-pointer appearance-none bg-transparent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:-mt-[5px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-background/80 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-track]:h-1 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:shadow-sm";
+
+// NumberSliderControl renders a bounded number (`x-number-display: "slider"`) as
+// a single-thumb slider whose fill grows with the value, with the live value
+// shown to the right.
+export function NumberSliderControl({
+  field,
+  fieldId,
+  readOnly,
+  size,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+}) {
+  const min = typeof field.schema.minimum === "number" ? field.schema.minimum : 0;
+  const max = typeof field.schema.maximum === "number" ? field.schema.maximum : 100;
+  const step = typeof field.schema.multipleOf === "number" ? field.schema.multipleOf : 1;
+  const raw = typeof field.value === "number" ? field.value : Number(toText(field.value));
+  const hasValue = Number.isFinite(raw);
+  const value = hasValue ? Math.min(max, Math.max(min, raw)) : min;
+  const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-6 min-w-0 flex-1">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border" />
+        <div
+          className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary/70"
+          style={{ width: `${percent}%` }}
+        />
+        <input
+          id={fieldId}
+          data-jsf-input
+          type="range"
+          aria-label={field.label}
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          disabled={readOnly}
+          className={cn(SLIDER_INPUT_CLASS, field.inputClassName)}
+          onChange={(event) => field.onChange(Number(event.target.value))}
+        />
+      </div>
+      <span className={cn("w-16 shrink-0 text-right tabular-nums", labelSizeClass[size])}>
+        {hasValue ? value.toLocaleString() : "—"}
+      </span>
+    </div>
   );
 }
 
@@ -377,6 +479,11 @@ export function EnumControl({
       <RadioGroupControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} />
     );
   }
+  if (field.display === "segmented") {
+    return (
+      <SegmentedEnumControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} />
+    );
+  }
   return (
     <Combobox
       id={fieldId}
@@ -388,8 +495,62 @@ export function EnumControl({
       onChange={(v) => field.onChange(v)}
       prefix={field.prefix}
       suffix={field.suffix}
+      {...(field.inputClassName ? { className: field.inputClassName } : {})}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
+  );
+}
+
+// The FormSize scale is wider than SegmentedControl's; map the extremes down.
+const SEGMENTED_SIZE: Record<FormSize, SegmentedSize> = {
+  xs: "sm",
+  sm: "sm",
+  md: "md",
+  lg: "lg",
+  xl: "lg",
+};
+
+// SegmentedEnumControl renders an enum (x-enum-display: "segmented") with the
+// shared SegmentedControl. Icons come from x-enum-icons, descriptions from
+// x-enum-descriptions (which promote it to the large card layout). The wrapper
+// carries the field id + data-jsf-input so the JSF field contract holds.
+function SegmentedEnumControl({
+  field,
+  fieldId,
+  readOnly,
+  options,
+  value,
+  size,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  options: FieldOption[];
+  value: string;
+  size: FormSize;
+}) {
+  const hasDescription = options.some((opt) => opt.description);
+  const segSize: SegmentedSize = hasDescription ? "lg" : SEGMENTED_SIZE[size];
+  return (
+    <div id={fieldId} data-jsf-input className={cn(field.inputClassName)}>
+      <SegmentedControl
+        aria-label={field.label}
+        value={value}
+        onChange={(next) => field.onChange(next)}
+        size={segSize}
+        wrap
+        options={options.map((opt) => ({
+          id: opt.value,
+          label: opt.label,
+          // x-enum-icons resolves to a runtime name string; SegmentedControl
+          // renders that via <Icon name>. Non-string (pre-extension) icons are
+          // dropped here since the segmented option type only takes name/component.
+          ...(typeof opt.icon === "string" ? { icon: opt.icon } : {}),
+          ...(opt.description ? { description: opt.description } : {}),
+          ...(readOnly ? { disabled: true } : {}),
+        }))}
+      />
+    </div>
   );
 }
 
@@ -502,7 +663,10 @@ function RadioGroupControl({
       aria-label={field.label}
       id={fieldId}
       data-jsf-input
-      className="inline-flex flex-wrap items-center gap-1 rounded-md border border-input bg-background p-0.5"
+      className={cn(
+        "inline-flex flex-wrap items-center gap-1 rounded-md border border-input bg-background p-0.5",
+        field.inputClassName,
+      )}
     >
       {options.map((opt) => {
         const checked = opt.value === value;
@@ -570,7 +734,13 @@ export function TextareaControl({
         id={fieldId}
         data-jsf-input
         rows={4}
-        className={cn(inputClass(size), "h-auto min-h-[5rem] resize-y", field.prefix && "pl-8", field.suffix && "pr-8")}
+        className={cn(
+          inputClass(size),
+          "h-auto min-h-[5rem] resize-y",
+          field.prefix && "pl-8",
+          field.suffix && "pr-8",
+          field.inputClassName,
+        )}
         value={text}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}

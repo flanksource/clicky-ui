@@ -1,4 +1,6 @@
+import { createElement, type ReactNode } from "react";
 import type {
+  ArrayDisplay,
   EnumDisplay,
   FieldControl,
   FieldOption,
@@ -6,6 +8,7 @@ import type {
   JsonSchemaProperty,
   LookupDescriptor,
 } from "./json-schema-form-types";
+import { LabelIcon } from "../data/Icon";
 import { isPlainObject } from "./json-schema-form-utils";
 
 // isOpenStringMap reports whether a property is an object whose entries are
@@ -36,14 +39,17 @@ function schemaHasType(prop: JsonSchemaProperty, type: string): boolean {
 function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
   const labels = prop["x-enum-labels"];
   const icons = prop["x-enum-icons"];
+  const descriptions = prop["x-enum-descriptions"];
   return (prop.enum ?? []).map((v) => {
     const value = String(v);
     const desc = labels?.[value];
     const icon = icons?.[value];
+    const description = descriptions?.[value];
     return {
       value,
       label: typeof desc === "string" && desc && desc !== value ? `${desc} (${value})` : value,
       ...(typeof icon === "string" && icon ? { icon } : {}),
+      ...(typeof description === "string" && description ? { description } : {}),
     };
   });
 }
@@ -53,9 +59,39 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
 // Returns undefined to keep the combobox default.
 function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
   const d = prop["x-enum-display"];
-  if (d === "combobox" || d === "radio" || d === "grid") return d;
+  if (d === "combobox" || d === "radio" || d === "grid" || d === "segmented") return d;
   const icons = prop["x-enum-icons"];
   if (icons && Object.keys(icons).length > 0) return "grid";
+  return undefined;
+}
+
+function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
+  return prop["x-array-display"] === "filter-pills" ? "filter-pills" : undefined;
+}
+
+function schemaHelper(prop: JsonSchemaProperty): string | undefined {
+  const description = typeof prop.description === "string" ? prop.description.trim() : "";
+  const help = prop["x-help"];
+  const helpBody =
+    isPlainObject(help) && typeof help.body === "string" ? help.body.trim() : "";
+
+  if (description && helpBody && helpBody !== description) {
+    return `${description} ${helpBody}`;
+  }
+  return description || helpBody || undefined;
+}
+
+// adornmentNode builds a prefix/suffix node from the x-input-*[-icon] extensions:
+// a runtime icon name wins, else static text. Returns undefined when neither set.
+function adornmentNode(iconName: unknown, text: unknown): ReactNode {
+  if (typeof iconName === "string" && iconName) {
+    // Match the library's InputField field-icon convention (16px, muted/70) so a
+    // schema-driven field lines up with a hand-built one.
+    return createElement(LabelIcon, { icon: iconName, className: "size-4 text-muted-foreground/70" });
+  }
+  if (typeof text === "string" && text) {
+    return createElement("span", { className: "text-sm text-muted-foreground" }, text);
+  }
   return undefined;
 }
 
@@ -97,9 +133,26 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   const { key, prop, required, value, onChange } = args;
   const labelIcon = prop["x-icon"];
   const xLayout = prop["x-layout"];
-  const layout =
+  const explicitLayout =
     xLayout === "inline" || xLayout === "stack" || xLayout === "table" ? xLayout : undefined;
+  // `x-label-position` is a friendlier alias over the same per-field layout knob:
+  // "top" stacks the label above the value; "left" forces inline. `x-layout` wins.
+  const labelPosition = prop["x-label-position"];
+  const layout =
+    explicitLayout ??
+    (labelPosition === "top" ? "stack" : labelPosition === "left" ? "inline" : undefined);
+  const prefix = adornmentNode(prop["x-input-prefix-icon"], prop["x-input-prefix"]);
+  const suffix = adornmentNode(prop["x-input-suffix-icon"], prop["x-input-suffix"]);
+  const labelClassName =
+    typeof prop["x-label-classes"] === "string" ? prop["x-label-classes"] : undefined;
+  const inputClassName =
+    typeof prop["x-input-classes"] === "string" ? prop["x-input-classes"] : undefined;
+  const colSpan =
+    typeof prop["x-col-span"] === "number" && Number.isFinite(prop["x-col-span"])
+      ? prop["x-col-span"]
+      : undefined;
   const keyOptions = keyOptionsFor(prop);
+  const helper = schemaHelper(prop);
   const base: FieldControl = {
     key,
     kind: "string",
@@ -110,7 +163,14 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     onChange,
     ...(prop.readOnly === true ? { readOnly: true } : {}),
     ...(typeof prop.description === "string" ? { description: prop.description } : {}),
+    ...(helper ? { helper } : {}),
     ...(labelIcon != null && labelIcon !== "" ? { labelIcon: labelIcon as FieldControl["labelIcon"] } : {}),
+    ...(layout ? { layout } : {}),
+    ...(prefix ? { prefix } : {}),
+    ...(suffix ? { suffix } : {}),
+    ...(labelClassName ? { labelClassName } : {}),
+    ...(inputClassName ? { inputClassName } : {}),
+    ...(colSpan != null ? { colSpan } : {}),
   };
 
   // An `x-clicky-lookup` field is an async entity-reference picker: options load
@@ -164,10 +224,16 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     };
   }
   if (schemaHasType(prop, "array")) {
+    const display = arrayDisplay(prop);
+    const itemSchema = prop.items;
     return {
       ...base,
       kind: "array",
-      ...(prop.items ? { itemSchema: prop.items } : {}),
+      ...(itemSchema ? { itemSchema } : {}),
+      ...(display ? { arrayDisplay: display } : {}),
+      ...(display && itemSchema && Array.isArray(itemSchema.enum)
+        ? { options: enumOptions(itemSchema) }
+        : {}),
       ...(layout ? { layout } : {}),
     };
   }
@@ -198,14 +264,18 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   }
   // A structured object: fixed `properties`, not an open map. Renders as a
   // nested sub-form (labels, required, if/then) — recursed into by the renderer.
-  if (schemaHasType(prop, "object") && prop.properties) {
-    return {
-      ...base,
-      kind: "object",
-      objectProperties: prop.properties,
-      ...(prop.required ? { objectRequired: prop.required } : {}),
-      ...(layout ? { layout } : {}),
-    };
+  if (schemaHasType(prop, "object")) {
+    const valueObject = isPlainObject(value) ? value : {};
+    const objectFields = effectiveProperties(prop as JsonSchemaObject, valueObject);
+    if (Object.keys(objectFields.properties).length > 0 || prop.properties) {
+      return {
+        ...base,
+        kind: "object",
+        objectProperties: objectFields.properties,
+        ...(objectFields.required.length > 0 ? { objectRequired: objectFields.required } : {}),
+        ...(layout ? { layout } : {}),
+      };
+    }
   }
   // A bare object with neither properties nor an additionalProperties schema:
   // treat as an open string map unless explicitly closed.
