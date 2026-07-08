@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FixtureEditor } from "./FixtureEditor";
 import { FixtureFenceCodeBlockEditor } from "./FixtureFenceCodeBlockEditor";
@@ -15,6 +16,9 @@ const specRuntimeCalls = vi.hoisted(() => ({
     value: Record<string, unknown>;
     onChange: (value: Record<string, unknown>) => void;
     sections?: readonly string[];
+    showHeader?: boolean;
+    beforeSections?: ReactNode;
+    defaultCollapsedSections?: readonly string[];
   }>,
 }));
 
@@ -37,10 +41,14 @@ vi.mock("../ai/SpecRuntimeEditor", () => ({
     value: Record<string, unknown>;
     onChange: (value: Record<string, unknown>) => void;
     sections?: readonly string[];
+    showHeader?: boolean;
+    beforeSections?: ReactNode;
+    defaultCollapsedSections?: readonly string[];
   }) => {
     specRuntimeCalls.props.push(props);
     return (
       <div data-testid="spec-runtime-editor">
+        {props.beforeSections}
         <span>{String(props.value.model ?? "")}</span>
         <button
           type="button"
@@ -50,6 +58,10 @@ vi.mock("../ai/SpecRuntimeEditor", () => ({
               temperature: 0.2,
               budget: { maxTokens: 8000 },
               noCache: true,
+              prompt: { user: "Review the diff" },
+              setup: {
+                envVars: [{ name: "CAPTAIN_MODE", value: "verify" }],
+              },
             })
           }
         >
@@ -335,13 +347,15 @@ describe("FixtureEditor", () => {
     );
   });
 
-  it("edits ai and verify frontmatter in a dialog", async () => {
+  it("edits ai frontmatter without owning verify scoring", async () => {
     const changes: string[] = [];
     const value = [
       "---",
       "ai:",
       "  model: claude-code-sonnet",
       "  maxConcurrent: 4",
+      "env:",
+      "  EXISTING: keep",
       "verify:",
       "  threshold: 80",
       "---",
@@ -361,15 +375,18 @@ describe("FixtureEditor", () => {
     expect(
       await screen.findByRole("dialog", { name: "Fixture frontmatter" }),
     ).toBeInTheDocument();
-    expect(specRuntimeCalls.props.at(-1)?.sections).toEqual(["model"]);
+    expect(specRuntimeCalls.props.at(-1)?.sections).toEqual([
+      "model",
+      "prompt",
+    ]);
+    expect(specRuntimeCalls.props.at(-1)?.showHeader).toBe(false);
     expect(screen.getByTestId("spec-runtime-editor")).toHaveTextContent(
       "claude-code-sonnet",
     );
+    expect(screen.queryByText("Verify scoring")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Threshold")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Set runtime" }));
-    fireEvent.change(screen.getByLabelText("Threshold"), {
-      target: { value: "90" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Save frontmatter" }));
 
     const next = changes.at(-1) ?? "";
@@ -377,9 +394,62 @@ describe("FixtureEditor", () => {
     expect(next).toContain("  model: gpt-5\n");
     expect(next).toContain("  maxTokens: 8000\n");
     expect(next).toContain("  maxConcurrent: 4\n");
+    expect(next).toContain("  prompt:\n");
+    expect(next).toContain("    user: Review the diff\n");
+    expect(next).toContain("env:\n");
+    expect(next).toContain("  CAPTAIN_MODE: verify\n");
     expect(next).toContain("verify:\n");
-    expect(next).toContain("  threshold: 90\n");
+    expect(next).toContain("  threshold: 80\n");
     expect(next.endsWith("# Verify")).toBe(true);
+  });
+
+  it("constrains verification fixture frontmatter to prompt, environment, and optional model override", async () => {
+    const changes: string[] = [];
+    const value = ["---", "ai:", "  model: claude-code-sonnet", "---", "# Verify"].join("\n");
+
+    render(
+      <FixtureEditor
+        value={value}
+        schemas={schemas}
+        frontmatterEditor={{ mode: "verification" }}
+        onChange={(next) => changes.push(next)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Frontmatter" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Fixture frontmatter" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Verification model" }),
+    ).toBeInTheDocument();
+    expect(specRuntimeCalls.props.at(-1)?.sections).toEqual([
+      "model",
+      "prompt",
+      "environment",
+    ]);
+    expect(specRuntimeCalls.props.at(-1)?.defaultCollapsedSections).toEqual([
+      "environment",
+    ]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Use same model" }));
+    expect(specRuntimeCalls.props.at(-1)?.sections).toEqual([
+      "prompt",
+      "environment",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Set runtime" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save frontmatter" }));
+
+    const next = changes.at(-1) ?? "";
+    expect(next).not.toContain("model: gpt-5");
+    expect(next).not.toContain("maxTokens:");
+    expect(next).toContain("  prompt:\n");
+    expect(next).toContain("    user: Review the diff\n");
+    expect(next).toContain("env:\n");
+    expect(next).toContain("  CAPTAIN_MODE: verify\n");
+    expect(next).not.toContain("verify:\n");
   });
 
   it("marks editable controls read-only when requested", () => {

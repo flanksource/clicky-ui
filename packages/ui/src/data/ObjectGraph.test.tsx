@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 
 describe("ObjectGraph", () => {
@@ -34,5 +34,40 @@ describe("ObjectGraph", () => {
       />,
     );
     expect(screen.getByText("custom:bean")).toBeTruthy();
+  });
+
+  it("renders the label as a plain span (not a button) when onNodeSelect is omitted", () => {
+    render(<ObjectGraph roots={[{ id: "r", label: "bean" }]} />);
+    expect(screen.queryByRole("button", { name: "bean" })).toBeNull();
+    expect(screen.getByText("bean")).toBeTruthy();
+  });
+
+  it("calls onNodeSelect with the clicked node without loading its lazy children", () => {
+    const onNodeSelect = vi.fn();
+    const loadChildren = vi.fn(async () => []);
+    const child: ObjectGraphNode = { id: "r.cycle", label: "cycle", expandable: true };
+    render(
+      <ObjectGraph
+        roots={[{ id: "r", label: "bean", children: [child] }]}
+        onNodeSelect={onNodeSelect}
+        loadChildren={loadChildren}
+      />,
+    );
+    // Click the child's label button — selecting must not toggle/expand it.
+    fireEvent.click(screen.getByRole("button", { name: "cycle" }));
+    expect(onNodeSelect).toHaveBeenCalledTimes(1);
+    expect(onNodeSelect).toHaveBeenCalledWith(child);
+    expect(loadChildren).not.toHaveBeenCalled();
+  });
+
+  it("highlights the label whose id matches selectedId", () => {
+    render(
+      <ObjectGraph
+        roots={[{ id: "r", label: "bean" }]}
+        onNodeSelect={() => {}}
+        selectedId="r"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "bean" }).className).toContain("bg-primary/15");
   });
 });

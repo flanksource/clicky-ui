@@ -1228,7 +1228,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   return (
     <DensityValueProvider density={densityOverride ?? "comfortable"}>
       <div
-        className={cn("flex min-h-0 min-w-0 flex-col gap-3", className)}
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-3", className)}
         data-density={densityOverride}
       >
         {showFilterBar && (
@@ -1261,8 +1261,8 @@ function DataTableInner<T extends Record<string, unknown>>({
 
         <div
           className={cn(
-            "max-w-full overflow-auto overscroll-x-contain rounded-md border border-border",
-            scrollContainerClassName ?? "min-h-0 flex-1",
+            "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border",
+            scrollContainerClassName,
           )}
           aria-busy={loading || undefined}
         >
@@ -1500,7 +1500,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             loadingMessage={loadingMessage}
           />
         ) : (
-          <div className="px-1 text-xs text-muted-foreground">
+          <div className="shrink-0 px-1 text-xs text-muted-foreground">
             {loading
               ? loadingMessage
               : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`}
@@ -1612,7 +1612,7 @@ function DataTablePaginationFooter({
       : `${visibleRowCount} row${visibleRowCount === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex min-h-9 flex-col items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="flex min-h-9 shrink-0 flex-col items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div aria-live="polite">{loading ? loadingMessage : rangeLabel}</div>
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <label className="flex items-center gap-1.5">
