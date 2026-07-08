@@ -57,7 +57,7 @@ export const DateTimePicker = forwardRef<HTMLInputElement, DateTimePickerProps>(
           type="text"
           value={value}
           className={cn(
-            "h-8 w-full rounded-md border border-input bg-background px-2 pr-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            "h-control-h w-full rounded-md border border-input bg-background px-control-px pr-8 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
             prefix && "pl-8",
             inputClassName,
           )}

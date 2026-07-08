@@ -20,6 +20,20 @@ const loadResources = (kind: SecretKind) => Promise.resolve(RESOURCES[kind]);
 const loadKeyPreview = () => Promise.resolve(PREVIEWS);
 
 describe("SecretKeySelector", () => {
+  it("uses the shared density-height segmented source control", () => {
+    render(
+      <SecretKeySelector
+        value={{ kind: "value", value: "" }}
+        onChange={vi.fn()}
+        loadResources={loadResources}
+        loadKeyPreview={loadKeyPreview}
+      />,
+    );
+    expect(screen.getByRole("radiogroup", { name: "Secret value source" })).toHaveClass(
+      "h-control-h",
+    );
+  });
+
   it("lists the secret's keys with their masked preview as the label", async () => {
     render(
       <SecretKeySelector
@@ -49,8 +63,8 @@ describe("SecretKeySelector", () => {
     );
     // Let the initial async loads settle before interacting, so the toggle's
     // state update isn't racing the effect resolution.
-    await waitFor(() => expect(screen.getByRole("button", { name: /Secret/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /ConfigMap/ }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: /Secret/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("radio", { name: /ConfigMap/ }));
     expect(onChange).toHaveBeenCalledWith({ kind: "configmap", name: "", key: "" });
   });
 
@@ -76,16 +90,16 @@ describe("SecretKeySelector literal value", () => {
   it("offers the Value toggle by default", () => {
     render(
       <SecretKeySelector
-        value={{ kind: "secret", name: "db", key: "" }}
+        value={{ kind: "value", value: "" }}
         onChange={vi.fn()}
         loadResources={loadResources}
         loadKeyPreview={loadKeyPreview}
       />,
     );
-    expect(screen.getByRole("button", { name: /Value/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Value/ })).toBeInTheDocument();
   });
 
-  it("hides the Value toggle when allowLiteral is false", () => {
+  it("hides the Value toggle when allowLiteral is false", async () => {
     render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "" }}
@@ -95,7 +109,8 @@ describe("SecretKeySelector literal value", () => {
         loadKeyPreview={loadKeyPreview}
       />,
     );
-    expect(screen.queryByRole("button", { name: /Value/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByRole("combobox")).toHaveLength(2));
+    expect(screen.queryByRole("radio", { name: /Value/ })).not.toBeInTheDocument();
   });
 
   it("switches to literal mode and emits a value-kind value", async () => {
@@ -109,8 +124,8 @@ describe("SecretKeySelector literal value", () => {
         loadKeyPreview={loadKeyPreview}
       />,
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Value/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /^Value/ }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: /^Value/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("radio", { name: /^Value/ }));
     expect(onChange).toHaveBeenCalledWith({ kind: "value", value: "" });
   });
 
