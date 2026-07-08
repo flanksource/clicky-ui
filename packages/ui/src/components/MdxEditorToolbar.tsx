@@ -8,7 +8,11 @@ function isEnabled<T extends object>(value: boolean | T | undefined, defaultValu
 }
 
 function diffViewOptions(diffMode: MdxEditorPluginOptions["diffMode"]): ViewMode[] | undefined {
-  return diffMode ? ["rich-text", "source", "diff"] : undefined;
+  if (!diffMode) return undefined;
+  if (typeof diffMode === "object" && diffMode.viewModes?.length) {
+    return [...diffMode.viewModes];
+  }
+  return ["rich-text", "source", "diff"];
 }
 
 export function MdxEditorToolbar({

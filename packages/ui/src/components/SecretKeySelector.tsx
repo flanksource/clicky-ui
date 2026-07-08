@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { K8SSecret, K8SConfigmap } from "@flanksource/icons/mi";
+import { type StaticIconComponent } from "../data/Icon";
 import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
 import { Combobox, type ComboboxOption } from "./Combobox";
+import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 
 // SecretKeySelector picks a Secret or ConfigMap and one of its keys, with a
 // mid-masked preview of every key's value so the operator can tell which key
@@ -140,33 +142,29 @@ export function SecretKeySelector({
     selectedName ? onChange({ kind: refKind, name: selectedName, key }) : undefined;
   const setLiteral = (v: string) => onChange({ kind: "value", value: v });
 
-  const sources: SecretValueSource[] = allowLiteral
-    ? ["secret", "configmap", "value"]
-    : ["secret", "configmap"];
+  const sourceOptions = useMemo<SegmentedOption<SecretValueSource>[]>(
+    () => {
+      const sources: SecretValueSource[] = allowLiteral
+        ? ["secret", "configmap", "value"]
+        : ["secret", "configmap"];
+      return sources.map((k) => ({
+        id: k,
+        label: SOURCE_LABEL[k],
+        icon: SOURCE_ICON[k],
+      }));
+    },
+    [allowLiteral],
+  );
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className="flex shrink-0 overflow-hidden rounded border border-border text-xs">
-        {sources.map((k) => {
-          const Glyph = SOURCE_ICON[k];
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSource(k)}
-              className={cn(
-                "flex items-center gap-1 whitespace-nowrap px-2 py-1",
-                source === k
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent",
-              )}
-            >
-              <Glyph className="h-3.5 w-3.5" />
-              {SOURCE_LABEL[k]}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedControl
+        aria-label="Secret value source"
+        value={source}
+        onChange={setSource}
+        options={sourceOptions}
+        className="shrink-0"
+      />
       {isLiteral ? (
         <input
           type="text"
@@ -211,7 +209,7 @@ export function SecretKeySelector({
 // Icons share a className-only call shape; the flanksource FCs carry extra
 // static metadata that doesn't unify with ComponentType, so type the slot as a
 // plain render function instead.
-const SOURCE_ICON: Record<SecretValueSource, (p: { className?: string }) => ReactNode> = {
+const SOURCE_ICON: Record<SecretValueSource, StaticIconComponent> = {
   secret: K8SSecret,
   configmap: K8SConfigmap,
   value: UiEdit,

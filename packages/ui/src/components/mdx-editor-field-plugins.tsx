@@ -1,5 +1,9 @@
 import { createElement } from "react";
-import type { MdxEditorDiffModeOptions, MdxEditorPluginOptions } from "./mdx-editor-options";
+import type {
+  MdxEditorCodeBlockEditorDescriptor,
+  MdxEditorDiffModeOptions,
+  MdxEditorPluginOptions,
+} from "./mdx-editor-options";
 import { MdxEditorToolbar } from "./MdxEditorToolbar";
 
 type MdxEditorModule = typeof import("@mdxeditor/editor");
@@ -43,6 +47,37 @@ function createToolbar(mdx: MdxEditorModule, options: MdxEditorPluginOptions) {
   return () => createElement(MdxEditorToolbar, { mdx, options });
 }
 
+function codeBlockEditorDescriptors(
+  mdx: MdxEditorModule,
+  descriptors: readonly MdxEditorCodeBlockEditorDescriptor[] | undefined,
+) {
+  if (!descriptors?.length) return undefined;
+
+  return descriptors.map((descriptor) => ({
+    priority: descriptor.priority,
+    match: descriptor.match,
+    Editor: (props: {
+      code: string;
+      language: string;
+      meta: string;
+      nodeKey: string;
+      focusEmitter: {
+        subscribe: (callback: () => void) => void;
+      };
+    }) => {
+      const context = mdx.useCodeBlockEditorContext();
+      return createElement(descriptor.Editor, {
+        ...props,
+        context: {
+          setCode: context.setCode,
+          setLanguage: context.setLanguage,
+          setMeta: context.setMeta,
+        },
+      });
+    },
+  }));
+}
+
 export function createMdxEditorPlugins(
   mdx: MdxEditorModule,
   options: MdxEditorPluginOptions = {},
@@ -78,11 +113,17 @@ export function createMdxEditorPlugins(
   if (isEnabled(options.thematicBreak)) plugins.push(mdx.thematicBreakPlugin());
   if (isEnabled(options.codeBlocks)) {
     const codeBlocks = optionObject(options.codeBlocks);
-    plugins.push(
-      mdx.codeBlockPlugin({
-        defaultCodeBlockLanguage: codeBlocks?.defaultLanguage ?? "txt",
-      }),
+    const codeBlockPluginOptions: Parameters<MdxEditorModule["codeBlockPlugin"]>[0] = {
+      defaultCodeBlockLanguage: codeBlocks?.defaultLanguage ?? "txt",
+    };
+    const descriptors = codeBlockEditorDescriptors(
+      mdx,
+      codeBlocks?.editorDescriptors,
     );
+    if (descriptors) {
+      codeBlockPluginOptions.codeBlockEditorDescriptors = descriptors;
+    }
+    plugins.push(mdx.codeBlockPlugin(codeBlockPluginOptions));
     if (isEnabled(options.codeMirror)) {
       const codeMirror = optionObject(options.codeMirror);
       plugins.push(

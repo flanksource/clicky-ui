@@ -6,7 +6,9 @@ describe("SearchInput", () => {
   it("emits typed input via onChange", () => {
     const onChange = vi.fn();
     render(<SearchInput value="" onChange={onChange} />);
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "faro" } });
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "faro" },
+    });
     expect(onChange).toHaveBeenCalledExactlyOnceWith("faro");
   });
 
@@ -22,7 +24,9 @@ describe("SearchInput", () => {
 
   it("invokes onShortcut on ⌘K / Ctrl+K", () => {
     const onShortcut = vi.fn();
-    render(<SearchInput value="" onChange={() => {}} onShortcut={onShortcut} />);
+    render(
+      <SearchInput value="" onChange={() => {}} onShortcut={onShortcut} />,
+    );
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(onShortcut).toHaveBeenCalledOnce();
   });

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
+import { FilterPill } from "../data/FilterPill";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiClose, UiCheck } from "../icons";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
@@ -35,6 +36,8 @@ export type ComboboxOption = {
    * the order provided). Options without a `group` render no header.
    */
   group?: string;
+  /** Browser tooltip on the option row (for truncated or explanatory labels). */
+  title?: string;
 };
 
 type ComboboxBaseProps = {
@@ -92,10 +95,13 @@ type ComboboxBaseProps = {
   suffix?: ReactNode;
   /** Leading in-field adornment, rendered at the left edge of the input. */
   prefix?: ReactNode;
+  /** Non-interactive content pinned below the option rows (e.g. "… and N more"). */
+  footer?: ReactNode;
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {
   multiple?: false;
+  tristate?: false;
   /** Controlled selected value. */
   value: string;
   /** Called when the selected value changes (from list or freeform input). */
@@ -104,13 +110,30 @@ export type ComboboxSingleProps = ComboboxBaseProps & {
 
 export type ComboboxMultiProps = ComboboxBaseProps & {
   multiple: true;
+  tristate?: false;
   /** Controlled selected values. */
   value: string[];
   /** Called with the complete next value array after each toggle. */
   onChange: (value: string[]) => void;
 };
 
-export type ComboboxProps = ComboboxSingleProps | ComboboxMultiProps;
+export type ComboboxTriStateMode = "include" | "exclude";
+
+export type ComboboxTriStateProps = ComboboxBaseProps & {
+  multiple: true;
+  /**
+   * Tri-state selection: each option cycles unset → include → exclude. Rows
+   * render the FilterPill switch; the option itself stays the only focusable
+   * surface (keyboard cycles via Enter on the highlighted row).
+   */
+  tristate: true;
+  /** Controlled option modes; unset options are absent from the record. */
+  value: Record<string, ComboboxTriStateMode>;
+  /** Called with the complete next record after each transition. */
+  onChange: (value: Record<string, ComboboxTriStateMode>) => void;
+};
+
+export type ComboboxProps = ComboboxSingleProps | ComboboxMultiProps | ComboboxTriStateProps;
 
 export function Combobox(props: ComboboxProps) {
   const {
@@ -130,17 +153,25 @@ export function Combobox(props: ComboboxProps) {
     onKeyDown: onKeyDownProp,
     suffix,
     prefix,
+    footer,
   } = props;
   const multiple = props.multiple === true;
-  const selectedValues = useMemo<string[]>(
-    () => (multiple ? props.value : props.value ? [props.value] : []),
-    [multiple, props.value],
+  const tristate = props.multiple === true && props.tristate === true;
+  const modes = useMemo<Record<string, ComboboxTriStateMode>>(
+    () => (props.multiple === true && props.tristate === true ? props.value : {}),
+    [props.multiple, props.tristate, props.value],
   );
+  const selectedValues = useMemo<string[]>(() => {
+    if (props.multiple === true && props.tristate === true) return Object.keys(props.value);
+    if (props.multiple === true) return props.value;
+    return props.value ? [props.value] : [];
+  }, [props.multiple, props.tristate, props.value]);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const floatingZ = useFloatingZIndex();
   // Fixed-position coordinates for the portaled listbox, measured from the
@@ -162,12 +193,27 @@ export function Combobox(props: ComboboxProps) {
   // dropdown shows every option rather than only the selected one.
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(-1);
+  // Measured pixel width of the rendered inline label. Drives the input's left
+  // padding so typed text clears the label exactly, for any glyph set (a linear
+  // per-character estimate undershoots wide uppercase letters like W/M). 0 until
+  // measured (initial paint / no-layout env like jsdom), where a per-character
+  // estimate stands in.
+  const [labelWidth, setLabelWidth] = useState(0);
 
   const isSelected = (optValue: string) => selectedValues.includes(optValue);
 
   // Closed-state input text. Single: the selected option's label (or its raw
-  // value as a fallback). Multi: a summary mirroring MultiSelect.
+  // value as a fallback). Multi: a summary mirroring MultiSelect. Tristate:
+  // "+N -M" include/exclude counts (the field name lives in the inline label).
   const closedLabel = useMemo(() => {
+    if (tristate) {
+      const values = Object.values(modes);
+      const includes = values.filter((mode) => mode === "include").length;
+      const excludes = values.length - includes;
+      return [includes > 0 && `+${includes}`, excludes > 0 && `-${excludes}`]
+        .filter(Boolean)
+        .join(" ");
+    }
     if (multiple) {
       const labels = options
         .filter((o) => selectedValues.includes(o.value))
@@ -178,7 +224,23 @@ export function Combobox(props: ComboboxProps) {
     }
     const single = selectedValues[0] ?? "";
     return options.find((o) => o.value === single)?.label ?? single;
-  }, [multiple, options, selectedValues]);
+  }, [tristate, modes, multiple, options, selectedValues]);
+
+  // Single-select: the currently-selected option, so the closed trigger can echo
+  // its icon (mirrors closedLabel's lookup above). An out-of-enum/custom value
+  // finds nothing → no icon. Multi/tristate skip it (one icon means nothing for
+  // several selections).
+  const selectedOption = multiple
+    ? undefined
+    : options.find((o) => o.value === selectedValues[0]);
+  // An explicit `prefix` wins; otherwise fall back to the selected option's icon
+  // so an icon'd picker reads the same open or closed. LabelIcon renders null for
+  // an absent spec, sizes a runtime-name string, and passes a node through as-is.
+  const effectivePrefix =
+    prefix ??
+    (selectedOption?.icon != null ? (
+      <LabelIcon icon={selectedOption.icon} className="size-4" />
+    ) : null);
 
   // While open the input mirrors the query; while closed it shows the
   // committed selection's label/summary.
@@ -207,9 +269,29 @@ export function Combobox(props: ComboboxProps) {
     return () => clearTimeout(handle);
   }, [onSearch, open, query]);
 
+  const trimmedQuery = query.trim();
+  // Tristate freeform entry: a typed value matching no option gets an "Add"
+  // row appended to the keyboard-navigation universe (multi/tristate never
+  // commit freeform text through commitAndClose).
+  const customEntry = useMemo<ComboboxOption | null>(() => {
+    if (!tristate || !allowCustomValue || !trimmedQuery) return null;
+    const exists = filtered.some((o) => o.value === trimmedQuery);
+    return exists ? null : { value: trimmedQuery, label: trimmedQuery };
+  }, [tristate, allowCustomValue, trimmedQuery, filtered]);
+  const navOptions = useMemo(
+    () => (customEntry ? [...filtered, customEntry] : filtered),
+    [filtered, customEntry],
+  );
+
+  // Reset the highlight when the user types, but not when the option list
+  // merely re-arrives (e.g. a background server-search response) — that would
+  // yank the highlight mid-keyboard-navigation. A shrunken list clamps it.
   useEffect(() => {
     setHighlighted(-1);
-  }, [filtered.length]);
+  }, [query]);
+  useEffect(() => {
+    if (highlighted >= navOptions.length) setHighlighted(-1);
+  }, [highlighted, navOptions.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -231,6 +313,17 @@ export function Combobox(props: ComboboxProps) {
       document.removeEventListener("focusin", onAway);
     };
   });
+
+  // Measure the inline label so the input reserves exactly its width (see
+  // labelPadding). Re-runs whenever the label content changes.
+  useLayoutEffect(() => {
+    if (label == null) {
+      setLabelWidth(0);
+      return;
+    }
+    const el = labelRef.current;
+    if (el) setLabelWidth(el.offsetWidth);
+  }, [label]);
 
   // Position the portaled listbox with fixed coordinates measured from the
   // input row, so it escapes any overflow-hidden / scroll ancestor (e.g. a
@@ -275,14 +368,37 @@ export function Combobox(props: ComboboxProps) {
   }, [open]);
 
   function emit(next: string[]) {
-    if (multiple) {
+    if (props.multiple === true && props.tristate !== true) {
       props.onChange(next);
-    } else {
+    } else if (props.multiple !== true) {
       props.onChange(next[0] ?? "");
     }
   }
 
+  function emitModes(next: Record<string, ComboboxTriStateMode>) {
+    if (props.multiple === true && props.tristate === true) props.onChange(next);
+  }
+
+  function setMode(value: string, mode: string) {
+    const next = { ...modes };
+    if (mode === "include" || mode === "exclude") next[value] = mode;
+    else delete next[value];
+    emitModes(next);
+  }
+
+  function cycleOption(value: string) {
+    const current = modes[value];
+    setMode(
+      value,
+      current === undefined ? "include" : current === "include" ? "exclude" : "neutral",
+    );
+  }
+
   function openMenu() {
+    // Only reset on the closed → open transition: a re-entrant focus while the
+    // menu is open (e.g. refocusing the input after a multi toggle) must not
+    // wipe the query the user is filtering with.
+    if (open) return;
     setQuery("");
     setHighlighted(-1);
     setOpen(true);
@@ -302,12 +418,18 @@ export function Combobox(props: ComboboxProps) {
   }
 
   function selectOption(opt: ComboboxOption) {
+    // Multi and tristate keep the typed query so several matches from one
+    // search can be toggled without the result list resetting between clicks.
+    if (tristate) {
+      cycleOption(opt.value);
+      inputRef.current?.focus();
+      return;
+    }
     if (multiple) {
       const next = isSelected(opt.value)
         ? selectedValues.filter((v) => v !== opt.value)
         : [...selectedValues, opt.value];
       emit(next);
-      setQuery("");
       setHighlighted(-1);
       inputRef.current?.focus();
       return;
@@ -320,7 +442,10 @@ export function Combobox(props: ComboboxProps) {
   }
 
   function clear() {
-    if (selectedValues.length > 0) emit([]);
+    if (selectedValues.length > 0) {
+      if (tristate) emitModes({});
+      else emit([]);
+    }
     setQuery("");
     setHighlighted(-1);
     inputRef.current?.focus();
@@ -332,7 +457,7 @@ export function Combobox(props: ComboboxProps) {
     // Query option rows by role rather than child index — interleaved group
     // header rows are direct children too, so children[index] would be offset.
     const item = list.querySelectorAll<HTMLElement>('[role="option"]')[index];
-    item?.scrollIntoView({ block: "nearest" });
+    item?.scrollIntoView?.({ block: "nearest" });
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -342,19 +467,24 @@ export function Combobox(props: ComboboxProps) {
         openMenu();
         return;
       }
-      const next = highlighted < filtered.length - 1 ? highlighted + 1 : 0;
+      const next = highlighted < navOptions.length - 1 ? highlighted + 1 : 0;
       setHighlighted(next);
       scrollToHighlighted(next);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (!open) return;
-      const next = highlighted > 0 ? highlighted - 1 : filtered.length - 1;
+      const next = highlighted > 0 ? highlighted - 1 : navOptions.length - 1;
       setHighlighted(next);
       scrollToHighlighted(next);
     } else if (e.key === "Enter") {
-      if (open && highlighted >= 0 && filtered[highlighted] && !filtered[highlighted].disabled) {
+      if (
+        open &&
+        highlighted >= 0 &&
+        navOptions[highlighted] &&
+        !navOptions[highlighted].disabled
+      ) {
         e.preventDefault();
-        selectOption(filtered[highlighted]);
+        selectOption(navOptions[highlighted]);
         return;
       }
       commitAndClose();
@@ -379,7 +509,10 @@ export function Combobox(props: ComboboxProps) {
     <div ref={rootRef} className={cn("relative", className)}>
       <div ref={anchorRef} data-jsf-control className="relative flex items-center">
         {label != null && (
-          <span className="pointer-events-none absolute left-2 z-10 whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground text-[10px]">
+          <span
+            ref={labelRef}
+            className="pointer-events-none absolute left-2 z-10 whitespace-nowrap font-medium uppercase tracking-wide text-muted-foreground text-[10px]"
+          >
             {label}
           </span>
         )}
@@ -412,16 +545,16 @@ export function Combobox(props: ComboboxProps) {
           className={cn(
             "w-full rounded-md border border-input bg-background text-foreground",
             size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
-            prefix && "pl-8",
+            effectivePrefix && "pl-8",
             suffix ? (showClear ? "pr-[5.5rem]" : "pr-14") : showClear ? "pr-14" : "pr-8",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",
             invalid && "border-destructive focus-visible:ring-destructive",
           )}
-          style={label != null ? labelPadding(label) : undefined}
+          style={label != null ? labelPadding(label, labelWidth) : undefined}
         />
-        {prefix && (
-          <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>
+        {effectivePrefix && (
+          <div className="absolute inset-y-0 left-1.5 flex items-center">{effectivePrefix}</div>
         )}
         {suffix && (
           <div className={cn("absolute flex h-full items-center", showClear ? "right-[3.75rem]" : "right-7")}>
@@ -495,6 +628,7 @@ export function Combobox(props: ComboboxProps) {
           )}
           {filtered.map((opt, i) => {
             const selected = isSelected(opt.value);
+            const mode = tristate ? modes[opt.value] : undefined;
             // A header renders above the first option of each group. Derived
             // from the surviving (filtered) options, so an empty group emits no
             // header. The option keeps `i` (its index in `filtered`) for
@@ -514,30 +648,81 @@ export function Combobox(props: ComboboxProps) {
                 <div
                   id={listId ? `${listId}-${i}` : undefined}
                   role="option"
-                  aria-selected={selected}
+                  aria-selected={tristate ? mode != null : selected}
                   aria-disabled={opt.disabled}
+                  // The mode is part of the accessible name because the switch
+                  // inside the row is aria-hidden (nothing focusable may live
+                  // inside an option under aria-activedescendant).
+                  {...(mode != null
+                    ? { "aria-label": `${opt.label}, ${mode === "include" ? "included" : "excluded"}` }
+                    : {})}
+                  {...(opt.title !== undefined ? { title: opt.title } : {})}
+                  {...(tristate ? { "data-filter-option": opt.value } : {})}
+                  // Tristate rows must not act on mousedown: the FilterPill
+                  // region zones act on click, and a mousedown-time cycle would
+                  // stack a second transition under a region click. Mousedown
+                  // only keeps focus in the input; click (outside a region,
+                  // which stops propagation) cycles.
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    if (!opt.disabled) selectOption(opt);
+                    if (!tristate && !opt.disabled) selectOption(opt);
                   }}
+                  {...(tristate
+                    ? { onClick: () => { if (!opt.disabled) selectOption(opt); } }
+                    : {})}
                   onMouseEnter={() => setHighlighted(i)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
                     i === highlighted && "bg-accent",
-                    selected && "font-medium",
+                    selected && !tristate && "font-medium",
                     opt.disabled && "cursor-not-allowed opacity-50",
                   )}
                 >
-                  <Icon
-                    icon={UiCheck}
-                    className={cn("text-xs shrink-0", selected ? "opacity-100" : "opacity-0")}
-                  />
-                  <LabelIcon icon={opt.icon} className="text-sm text-muted-foreground" />
-                  <span className="min-w-0 truncate">{opt.label}</span>
+                  {tristate ? (
+                    <FilterPill
+                      mode={mode ?? "neutral"}
+                      togglePosition="right"
+                      interactive={false}
+                      label={opt.label}
+                      onModeChange={(next) => setMode(opt.value, next)}
+                      className="w-full justify-between"
+                    />
+                  ) : (
+                    <>
+                      <Icon
+                        icon={UiCheck}
+                        className={cn("text-xs shrink-0", selected ? "opacity-100" : "opacity-0")}
+                      />
+                      <LabelIcon icon={opt.icon} className="text-sm text-muted-foreground" />
+                      <span className="min-w-0 truncate">{opt.label}</span>
+                    </>
+                  )}
                 </div>
               </Fragment>
             );
           })}
+          {customEntry && (
+            <div
+              id={listId ? `${listId}-${filtered.length}` : undefined}
+              role="option"
+              aria-selected={false}
+              data-filter-add-custom={customEntry.value}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => selectOption(customEntry)}
+              onMouseEnter={() => setHighlighted(filtered.length)}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary",
+                highlighted === filtered.length && "bg-accent",
+              )}
+            >
+              Add "{customEntry.value}"
+            </div>
+          )}
+          {footer != null && (
+            <div className="select-none px-2 py-1.5 text-[11px] text-muted-foreground">
+              {footer}
+            </div>
+          )}
         </div>,
           document.body,
         )}
@@ -545,13 +730,17 @@ export function Combobox(props: ComboboxProps) {
   );
 }
 
-// Reserve room on the left of the input for the inline label so typed text
-// does not overlap it. Node labels (an icon from comboboxLabelProps) are
-// compact, so reserve a fixed icon-sized inset; text labels scale with their
-// character count at roughly 0.6rem per character plus padding.
-function labelPadding(label: ReactNode) {
+// Reserve room on the left of the input for the inline label so typed text does
+// not overlap it. Prefer the measured label width (`measuredWidth` px, from the
+// layout effect): the label sits at the `left-2` (0.5rem) inset, so text must
+// start past 0.5rem + width, plus a 0.25rem gap. A per-character estimate stands
+// in only until the label is measured (initial paint) or where there is no
+// layout (jsdom) — it undershoots wide uppercase glyphs, which is why the
+// measured path is authoritative.
+function labelPadding(label: ReactNode, measuredWidth: number) {
+  if (measuredWidth > 0) return { paddingLeft: `calc(${measuredWidth}px + 0.75rem)` };
   if (typeof label !== "string") return { paddingLeft: "1.75rem" };
-  return { paddingLeft: `${Math.min(label.length * 0.62 + 0.75, 9)}rem` };
+  return { paddingLeft: `${Math.min(label.length * 0.48 + 0.75, 7)}rem` };
 }
 
 // withSelectedOptions returns the option list plus any selected value that isn't

@@ -1,8 +1,8 @@
 {
   "savedAt": "2026-04-26T12:00:33.336Z",
-  "total": 295,
-  "bothChosen": 277,
-  "anyChosen": 293,
+  "total": 306,
+  "bothChosen": 288,
+  "anyChosen": 304,
   "rows": [
     {
       "consumerName": "chevron-down",
@@ -43,6 +43,14 @@
       "outline": "ph:dots-three-light",
       "filled": "ph:dots-three-fill",
       "note": ""
+    },
+    {
+      "consumerName": "ellipsis-bold",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:dots-three-bold",
+      "filled": "skip",
+      "note": "Heavier 3-dot menu trigger (borderless)."
     },
     {
       "consumerName": "collapse-all",
@@ -293,6 +301,54 @@
       "note": ""
     },
     {
+      "consumerName": "currency-dollar",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:currency-dollar-light",
+      "filled": "ph:currency-dollar-fill",
+      "note": "Runtime spec editor budget adornment"
+    },
+    {
+      "consumerName": "coins",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:coins-light",
+      "filled": "ph:coins-fill",
+      "note": "Runtime spec editor token budget adornment"
+    },
+    {
+      "consumerName": "repeat",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:repeat-light",
+      "filled": "ph:repeat-fill",
+      "note": "Runtime spec editor iteration adornment"
+    },
+    {
+      "consumerName": "timer",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:timer-light",
+      "filled": "ph:timer-fill",
+      "note": "Runtime spec editor timeout adornment"
+    },
+    {
+      "consumerName": "stack",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:stack-light",
+      "filled": "ph:stack-fill",
+      "note": "Runtime spec editor depth/configmap adornment"
+    },
+    {
+      "consumerName": "thermometer",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:thermometer-simple-light",
+      "filled": "ph:thermometer-simple-fill",
+      "note": "Runtime spec editor temperature adornment"
+    },
+    {
       "consumerName": "layers",
       "group": "ui-controls",
       "status": "NEW",
@@ -325,6 +381,14 @@
       "note": ""
     },
     {
+      "consumerName": "plugs-connected",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:plugs-connected-light",
+      "filled": "ph:plugs-connected-fill",
+      "note": "Runtime spec editor MCP permission group"
+    },
+    {
       "consumerName": "scale",
       "group": "ui-controls",
       "status": "NEW",
@@ -347,6 +411,14 @@
       "outline": "lucide:user-cog",
       "filled": "skip",
       "note": ""
+    },
+    {
+      "consumerName": "gear-six",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:gear-six-light",
+      "filled": "ph:gear-six-fill",
+      "note": "Runtime spec editor system prompt adornment"
     },
     {
       "consumerName": "x -> close",
@@ -1941,6 +2013,14 @@
       "note": ""
     },
     {
+      "consumerName": "file-plus",
+      "group": "files-code",
+      "status": "NEW",
+      "outline": "ph:file-plus-light",
+      "filled": "ph:file-plus-fill",
+      "note": "Runtime spec editor write permission adornment"
+    },
+    {
       "consumerName": "file-code",
       "group": "files-code",
       "status": "NEW",
@@ -2085,6 +2165,14 @@
       "note": ""
     },
     {
+      "consumerName": "git-commit",
+      "group": "git-source-control",
+      "status": "NEW",
+      "outline": "ph:git-commit-light",
+      "filled": "ph:git-commit-fill",
+      "note": "Runtime spec editor commit message adornment"
+    },
+    {
       "consumerName": "git-pull-request -> git-pr",
       "group": "git-source-control",
       "status": "ALIAS",
@@ -2115,6 +2203,14 @@
       "outline": "ph:terminal-window-light",
       "filled": "ph:terminal-window-fill",
       "note": ""
+    },
+    {
+      "consumerName": "gavel",
+      "group": "dev-tools",
+      "status": "NEW",
+      "outline": "ph:gavel-light",
+      "filled": "ph:gavel-fill",
+      "note": "Runtime spec editor gavel permission adornment"
     },
     {
       "consumerName": "command",

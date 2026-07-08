@@ -1,20 +1,21 @@
-import { useEffect, useRef, type InputHTMLAttributes } from "react";
-import { cn } from "../lib/utils";
+import type { ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { UiSearch } from "../icons";
+import { cn } from "../lib/utils";
+import { InputField, type InputFieldInputProps } from "./InputField";
 
-type NativeInputProps = Omit<
-  InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange" | "size"
->;
-
-export type SearchInputProps = NativeInputProps & {
+export type SearchInputProps = Omit<
+  InputFieldInputProps,
+  "onChange" | "prefix" | "type" | "value"
+> & {
   /** Controlled query value. */
   value: string;
   /** Called with the next query string. */
   onChange: (value: string) => void;
   /** Placeholder text. */
   placeholder?: string;
+  /** Leading adornment. Defaults to the search icon. */
+  prefix?: ReactNode | undefined;
   /**
    * Keyboard-shortcut hint rendered as a trailing `<kbd>` (Gavel's `⌘K`).
    * Pass `null` to hide it. Defaults to `⌘K`.
@@ -41,53 +42,25 @@ export function SearchInput({
   placeholder = "Search…",
   shortcut = "⌘K",
   onShortcut,
+  prefix,
   className,
   ...rest
 }: SearchInputProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // Match cmd/ctrl + the shortcut's trailing key (e.g. "k" from "⌘K").
-  const shortcutKey = shortcut ? shortcut.slice(-1).toLowerCase() : "k";
-
-  useEffect(() => {
-    if (!onShortcut) return;
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === shortcutKey) {
-        e.preventDefault();
-        onShortcut();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onShortcut, shortcutKey]);
-
   return (
-    <div
-      className={cn(
-        "flex items-center gap-density-2 rounded-md border border-border bg-secondary px-density-3",
-        "h-control-h focus-within:ring-2 focus-within:ring-ring",
-        className,
-      )}
-    >
-      <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
-      <input
-        ref={inputRef}
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={cn(
-          "min-w-0 flex-1 border-none bg-transparent text-sm text-foreground outline-none",
-          "placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:appearance-none",
-        )}
-        {...rest}
-      />
-      {shortcut && (
-        <kbd className="shrink-0 rounded border border-border px-1 font-mono text-[10px] text-muted-foreground">
-          {shortcut}
-        </kbd>
-      )}
-    </div>
+    <InputField
+      type="search"
+      value={value}
+      onChange={(next) => onChange(next)}
+      placeholder={placeholder}
+      shortcut={shortcut}
+      onShortcut={onShortcut}
+      prefix={
+        prefix ?? (
+          <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
+        )
+      }
+      className={cn("bg-secondary px-density-3", className)}
+      {...rest}
+    />
   );
 }
