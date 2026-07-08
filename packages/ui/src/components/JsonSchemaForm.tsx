@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiCheck, UiEllipsis } from "../icons";
+import { UiCheck, UiClose, UiEllipsisBold, UiSearch } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-fields";
 import { FormLookupProvider } from "./FormLookupProvider";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
+import { normalizeColumns } from "./json-schema-form-utils";
 import {
   DEFAULT_FORM_SIZE,
   fieldInnerGapClass,
@@ -79,6 +80,9 @@ export function JsonSchemaForm({
   const [prefs, setPrefs] = useState<FormPreferences>(() =>
     showPreferencesMenu && persistPreferences ? readPreferences(preferencesStorageKey) : {},
   );
+  // The field filter is transient view state (a "find" over the fields), never
+  // persisted — reopening the form should never start with fields hidden.
+  const [fieldFilter, setFieldFilter] = useState("");
 
   const effectiveSize = prefs.size ?? size;
   const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode);
@@ -102,6 +106,7 @@ export function JsonSchemaForm({
     depth: 0,
     render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
+    ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
   };
   // A bundled schema (components under `$defs`, referenced by local `#/$defs`
   // pointers) is resolved once into a self-contained tree the renderer walks
@@ -113,6 +118,11 @@ export function JsonSchemaForm({
     typeof resolvedSchema["x-discriminator"] === "string" ? resolvedSchema["x-discriminator"] : undefined;
   const inPickerPhase = discKey != null && (value[discKey] == null || value[discKey] === "");
 
+  const objectRows = discKey
+    ? null
+    : renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
+  const noMatches = objectRows != null && objectRows.length === 0 && fieldFilter.trim() !== "";
+
   return (
     <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
     <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
@@ -121,13 +131,22 @@ export function JsonSchemaForm({
           size={effectiveSize}
           layoutMode={resolvedLayout.mode}
           sortMode={effectiveSortMode}
+          fieldFilter={fieldFilter}
+          onFilterChange={setFieldFilter}
           onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
           onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
           onSelectSort={(next) => applyPrefs({ ...prefs, sortMode: next })}
         />
       )}
       {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
-      <FieldsGrid layout={resolvedLayout} size={effectiveSize}>
+      <FieldsGrid
+        layout={resolvedLayout}
+        size={effectiveSize}
+        columns={normalizeColumns(resolvedSchema["x-columns"])}
+        {...(typeof resolvedSchema["x-classes"] === "string"
+          ? { className: resolvedSchema["x-classes"] }
+          : {})}
+      >
         {discKey ? (
           <DiscriminatedForm
             schema={resolvedSchema}
@@ -137,9 +156,14 @@ export function JsonSchemaForm({
             discKey={discKey}
           />
         ) : (
-          renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined)
+          objectRows
         )}
       </FieldsGrid>
+      {noMatches && (
+        <p className={cn("text-muted-foreground", labelSizeClass[effectiveSize])}>
+          No fields match “{fieldFilter.trim()}”.
+        </p>
+      )}
     </div>
     </FormLookupProvider>
   );
@@ -165,12 +189,15 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 ];
 
 // PreferencesMenu is the compact top-right ellipsis menu controlling this form's
-// size and layout mode. Selecting an item fires the matching callback and closes
-// the menu; the parent decides whether to persist.
+// size, layout, sort, and a live field filter. Selecting an option fires the
+// matching callback and closes the menu; typing in the filter updates fields
+// live without closing. The parent decides whether to persist.
 function PreferencesMenu({
   size,
   layoutMode,
   sortMode,
+  fieldFilter,
+  onFilterChange,
   onSelectSize,
   onSelectLayout,
   onSelectSort,
@@ -178,10 +205,13 @@ function PreferencesMenu({
   size: FormSize;
   layoutMode: LayoutMode;
   sortMode: SortMode;
+  fieldFilter: string;
+  onFilterChange: (value: string) => void;
   onSelectSize: (size: FormSize) => void;
   onSelectLayout: (mode: LayoutMode) => void;
   onSelectSort: (mode: SortMode) => void;
 }) {
+  const filterActive = fieldFilter.trim() !== "";
   return (
     <DropdownMenu
       align="right"
@@ -192,14 +222,46 @@ function PreferencesMenu({
           type="button"
           aria-label="Form display options"
           aria-haspopup="menu"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(
+            "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            filterActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
+          )}
         >
-          <Icon icon={UiEllipsis} className="text-sm" />
+          <Icon icon={UiEllipsisBold} className="text-lg" />
         </button>
       }
     >
       {(closeMenu) => (
         <>
+          <div className="px-2 pb-1.5 pt-1">
+            <div className="relative">
+              <Icon
+                icon={UiSearch}
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
+              />
+              <input
+                type="text"
+                aria-label="Filter fields"
+                placeholder="Filter fields…"
+                value={fieldFilter}
+                onChange={(e) => onFilterChange(e.target.value)}
+                // Keep arrow/space/enter keys inside the input instead of driving
+                // the menu's list navigation or closing it.
+                onKeyDown={(e) => e.stopPropagation()}
+                className="w-full rounded-md border border-input bg-background py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {filterActive && (
+                <button
+                  type="button"
+                  aria-label="Clear filter"
+                  onClick={() => onFilterChange("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  <Icon icon={UiClose} className="text-xs" />
+                </button>
+              )}
+            </div>
+          </div>
           <PreferenceSection title="Size" />
           {SIZE_OPTIONS.map((opt) => (
             <PreferenceItem

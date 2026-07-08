@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 import type { JsonSchemaObject } from "./json-schema-form-types";
 
@@ -96,6 +96,49 @@ describe("JsonSchemaForm size", () => {
     const xl = rowGap("xl");
     expect(lg).toContain("gap-4");
     expect(xl).toContain("gap-4");
+  });
+
+  it("sizes array action buttons from the form size", () => {
+    const arraySchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        ports: { type: "array", items: { type: "number" } },
+      },
+    };
+    render(
+      <JsonSchemaForm
+        schema={arraySchema}
+        value={{ ports: [8080] }}
+        onChange={vi.fn()}
+        size="lg"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Remove item 1" }).className).toContain("h-10");
+    expect(screen.getByRole("button", { name: "Add item" }).className).toContain("h-10");
+  });
+
+  it("sizes string-map action buttons from the form size", () => {
+    const mapSchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        labels: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+      },
+    };
+    render(
+      <JsonSchemaForm
+        schema={mapSchema}
+        value={{ labels: { env: "prod" } }}
+        onChange={vi.fn()}
+        size="xs"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Remove env" }).className).toContain("h-7");
+    expect(screen.getByRole("button", { name: "Add field" }).className).toContain("h-7");
   });
 });
 

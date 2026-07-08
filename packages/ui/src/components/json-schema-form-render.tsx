@@ -24,11 +24,15 @@ import type {
   FieldArgs,
   FieldControl,
   JsonSchemaObject,
+  JsonSchemaProperty,
   RenderApi,
   RenderContext,
 } from "./json-schema-form-types";
 import {
   fieldInputId,
+  matchesFieldFilter,
+  normalizeColSpan,
+  normalizeColumns,
   orderByClickyOrder,
   orderByPriority,
   orderByXOrder,
@@ -246,12 +250,22 @@ export function renderObjectFields(
   // Per-property `x-clicky-order` wins (composes across merged branches); the
   // object-level `x-order` array is the fallback; document order otherwise.
   const ordered = orderByClickyOrder(orderByXOrder(Object.entries(properties), schema["x-order"]));
-  const entries =
+  const sorted =
     ctx.sortMode === "required-first"
       ? orderRequiredFirst(ordered, required)
       : ctx.sortMode === "priority"
         ? orderByPriority(ordered, required, value)
         : ordered;
+  // The field filter narrows only the outermost object level (depth 0); nested
+  // object subtrees render in full so a matched parent keeps all its children.
+  const entries =
+    ctx.depth === 0 && ctx.fieldFilter
+      ? sorted.filter(([key, prop]) => matchesFieldFilter(key, prop, ctx.fieldFilter!))
+      : sorted;
+  // Object-level `x-columns` lays the fields out in a multi-column stacked grid;
+  // each field spans `x-col-span` columns (object sections/table arrays span the
+  // full row). Only takes effect in stacked mode — inline owns its 2-track grid.
+  const columns = ctx.layout.mode === "inline" ? 1 : normalizeColumns(schema["x-columns"]);
   return entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
     const row = renderFieldRow(
@@ -264,11 +278,30 @@ export function renderObjectFields(
       },
       ctx,
     );
+    if (!row) return [];
+    if (columns > 1) {
+      const span = rendersFullWidth(prop) ? columns : normalizeColSpan(prop["x-col-span"], columns);
+      return [
+        <div key={key} style={{ gridColumn: `span ${span} / span ${span}` }}>
+          {row}
+        </div>,
+      ];
+    }
     // `contents` keeps the keyed wrapper out of the box tree so the row's own
     // node (a subgrid FieldWrapper or a full-width ObjectSection) is a direct
     // child of the FieldsGrid and snaps to its label/value tracks.
-    return row ? [<div key={key} className="contents">{row}</div>] : [];
+    return [<div key={key} className="contents">{row}</div>];
   });
+}
+
+// rendersFullWidth reports whether a property renders as a full-width block
+// (a structured object → ObjectSection, or an `x-layout: "table"` array/map) so
+// a multi-column grid gives it the whole row instead of a single column.
+function rendersFullWidth(prop: JsonSchemaProperty): boolean {
+  const type = prop.type;
+  const isObject = type === "object" || (Array.isArray(type) && type.includes("object"));
+  if (isObject && prop.properties) return true;
+  return prop["x-layout"] === "table";
 }
 
 // renderApi is the RenderContext injection bundle: the root form stores it on

@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 import type {
   FieldControl,
@@ -49,6 +49,35 @@ describe("JsonSchemaForm extension pipeline", () => {
     expect(screen.getByText("Name")).not.toHaveAttribute("title");
   });
 
+  it("renders schema descriptions and x-help as inline helper text", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            cwd: {
+              type: "string",
+              title: "Working directory",
+              description: "Default working directory.",
+              "x-help": {
+                source: "fixtures --help",
+                section: "CWD resolution",
+                body: "Relative paths resolve from the fixture file.",
+              },
+            },
+          },
+        }}
+        value={{ cwd: "" }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Default working directory. Relative paths resolve from the fixture file.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("reflects a pre-extension that sets a badge", () => {
     const badge: PreExtension = (field) => ({ ...field, badge: "AsCode" });
     render(<JsonSchemaForm schema={schema} value={{ Name: "x", secret: "y" }} onChange={vi.fn()} pre={[badge]} />);
@@ -78,6 +107,50 @@ describe("JsonSchemaForm extension pipeline", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "insert Name" }));
     expect(onChange).toHaveBeenCalledWith({ Name: "{{token}}" });
+  });
+
+  it("keeps object-section post-extension output from widening the form", () => {
+    const longPrompt = "Review user-visible functionality removed by this diff. ".repeat(20).trim();
+    const promptPost: PostExtension = (field, nodes) =>
+      field.key === "removedPrompt"
+        ? {
+            label: nodes.label,
+            value: (
+              <div className="w-full min-w-0 max-w-full overflow-hidden">
+                <button
+                  type="button"
+                  className="flex h-9 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden"
+                >
+                  <span className="min-w-0 max-w-[40%] flex-none truncate">claude-sonnet-with-long-name</span>
+                  <span className="min-w-0 basis-0 flex-1 truncate">{longPrompt}</span>
+                </button>
+              </div>
+            ),
+          }
+        : nodes;
+
+    const { container } = render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            removedPrompt: {
+              type: "object",
+              title: "Functionality removed prompt",
+              description: "Override the built-in prompt.",
+              properties: {},
+            },
+          },
+        }}
+        value={{ removedPrompt: {} }}
+        onChange={vi.fn()}
+        post={[promptPost]}
+      />,
+    );
+
+    const section = screen.getByText("Functionality removed prompt").closest(".col-span-full");
+    expect(section).toHaveClass("min-w-0", "max-w-full");
+    expect(container.querySelector(".basis-0.flex-1.truncate")).toHaveTextContent(longPrompt);
   });
 
   it("passes the form's root value to a post-extension so it can read sibling fields", () => {
@@ -439,6 +512,41 @@ describe("JsonSchemaForm nested object", () => {
     // No bordered sub-form box (the previous nesting affordance).
     expect(container.querySelector(".rounded-md.border.border-input.p-2")).toBeNull();
   });
+
+  it("renders allOf-composed object fields as a structured form, not a string map", () => {
+    const policySchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        shape: {
+          type: "object",
+          allOf: [
+            {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                PayoutBankName: { type: "string", title: "Payout bank name" },
+                RiskRating: { type: "string", enum: ["Low", "High"] },
+              },
+              required: ["RiskRating"],
+            },
+          ],
+          unevaluatedProperties: false,
+        },
+      },
+    } as JsonSchemaObject;
+
+    render(
+      <JsonSchemaForm
+        schema={policySchema}
+        value={{ shape: { PayoutBankName: "Standard Bank", RiskRating: "Low" } }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Payout bank name")).toBeInTheDocument();
+    expect(screen.getByText("RiskRating")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add field/i })).not.toBeInTheDocument();
+  });
 });
 
 describe("JsonSchemaForm deep recursion", () => {
@@ -541,6 +649,45 @@ describe("JsonSchemaForm array item kinds", () => {
     );
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
+  });
+
+  it("renders requested enum arrays as filter pills with empty array meaning all selected", () => {
+    const onChange = vi.fn();
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        framework: {
+          type: "array",
+          title: "Framework",
+          "x-array-display": "filter-pills",
+          items: { type: "string", enum: ["go test", "vitest"] },
+        },
+      },
+    };
+    const { rerender } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ framework: [] }}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /go test/i })).toHaveClass("bg-primary/10");
+    expect(screen.getByRole("button", { name: /vitest/i })).toHaveClass("bg-primary/10");
+
+    fireEvent.click(screen.getByRole("button", { name: /vitest/i }));
+    expect(onChange).toHaveBeenLastCalledWith({ framework: ["go test"] });
+
+    rerender(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ framework: ["go test"] }}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /vitest/i }));
+    expect(onChange).toHaveBeenLastCalledWith({ framework: [] });
   });
 });
 
@@ -1072,6 +1219,94 @@ describe("JsonSchemaForm preferences menu", () => {
     );
     expect(firstInput(container).className).toContain("h-10");
   });
+
+  const multi: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      firstName: { type: "string", title: "First Name" },
+      lastName: { type: "string", title: "Last Name" },
+      email: { type: "string", title: "Email" },
+    },
+  };
+
+  it("filters displayed fields by the text typed into the menu", () => {
+    render(<JsonSchemaForm schema={multi} value={{}} onChange={vi.fn()} persistPreferences={false} />);
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "name" } });
+    expect(screen.getByText("First Name")).toBeInTheDocument();
+    expect(screen.getByText("Last Name")).toBeInTheDocument();
+    expect(screen.queryByText("Email")).not.toBeInTheDocument();
+  });
+
+  it("matches on the property key when a field has no title", () => {
+    const keyed: JsonSchemaObject = {
+      type: "object",
+      properties: { alpha: { type: "string" }, beta: { type: "string" } },
+    };
+    render(<JsonSchemaForm schema={keyed} value={{}} onChange={vi.fn()} persistPreferences={false} />);
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "alph" } });
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.queryByText("beta")).not.toBeInTheDocument();
+  });
+
+  it("shows a no-match message when the filter excludes every field", () => {
+    render(<JsonSchemaForm schema={multi} value={{}} onChange={vi.fn()} persistPreferences={false} />);
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "zzz" } });
+    expect(screen.queryByText("First Name")).not.toBeInTheDocument();
+    expect(screen.getByText(/No fields match/)).toBeInTheDocument();
+  });
+
+  it("restores hidden fields when the filter is cleared", () => {
+    render(<JsonSchemaForm schema={multi} value={{}} onChange={vi.fn()} persistPreferences={false} />);
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "email" } });
+    expect(screen.queryByText("First Name")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Clear filter"));
+    expect(screen.getByText("First Name")).toBeInTheDocument();
+  });
+
+  it("marks the trigger active while a filter is applied and is never persisted", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(
+      <JsonSchemaForm
+        schema={multi}
+        value={{}}
+        onChange={vi.fn()}
+        preferencesStorageKey={KEY}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Form display options" });
+    expect(trigger.className).not.toContain("text-primary");
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "name" } });
+    expect(trigger.className).toContain("text-primary");
+    expect(setItem).not.toHaveBeenCalledWith(KEY, expect.stringContaining("fieldFilter"));
+  });
+
+  it("filters only top-level fields, leaving nested object children intact", () => {
+    const nested: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        profile: {
+          type: "object",
+          title: "Profile",
+          properties: { nickname: { type: "string", title: "Nickname" } },
+        },
+        email: { type: "string", title: "Email" },
+      },
+    };
+    render(
+      <JsonSchemaForm schema={nested} value={{ profile: {} }} onChange={vi.fn()} persistPreferences={false} />,
+    );
+    openMenu();
+    fireEvent.change(screen.getByLabelText("Filter fields"), { target: { value: "profile" } });
+    expect(screen.getByText("Profile")).toBeInTheDocument();
+    // The matched parent keeps its child even though the child does not match.
+    expect(screen.getByText("Nickname")).toBeInTheDocument();
+    expect(screen.queryByText("Email")).not.toBeInTheDocument();
+  });
 });
 
 describe("JsonSchemaForm x-order", () => {
@@ -1246,5 +1481,289 @@ describe("JsonSchemaForm x-clicky-order", () => {
       .getAllByText(/^(Alpha|Zeta|Mid|Tail)$/)
       .map((n) => n.textContent);
     expect(order).toEqual(["Zeta", "Mid", "Alpha", "Tail"]);
+  });
+});
+
+describe("JsonSchemaForm presentation extensions", () => {
+  it("renders x-enum-display: segmented as a radiogroup and commits a selection", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        mode: {
+          type: "string",
+          title: "Mode",
+          enum: ["auto", "manual"],
+          "x-enum-display": "segmented",
+        },
+      },
+    };
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ mode: "auto" }}
+        onChange={onChange}
+        showPreferencesMenu={false}
+      />,
+    );
+    const group = screen.getByRole("radiogroup", { name: "Mode" });
+    expect(within(group).getByRole("radio", { name: "auto" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    fireEvent.click(within(group).getByRole("radio", { name: "manual" }));
+    expect(onChange).toHaveBeenCalledWith({ mode: "manual" });
+  });
+
+  it("renders x-input-suffix-icon in the input adornment wrapper and reserves padding", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        token: { type: "string", title: "Token", "x-input-suffix-icon": "check" },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ token: "" }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(container.querySelector("[data-jsf-control]")).not.toBeNull();
+    expect(container.querySelector("input[data-jsf-input]")).toHaveClass("pr-8");
+    // The adornment icon is sized to size-4 to match the library's InputField icon.
+    expect(container.querySelector("[data-jsf-control] .size-4")).not.toBeNull();
+  });
+
+  it("applies object-level x-classes to the fields grid container", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      "x-columns": 2,
+      "x-classes": "gap-2 marker-section-classes",
+      properties: {
+        a: { type: "string", title: "A" },
+        b: { type: "string", title: "B" },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{}}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    const grid = container.querySelector(".marker-section-classes");
+    expect(grid).not.toBeNull();
+    expect(grid).toHaveClass("grid");
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" });
+  });
+
+  it("renders a native number input (step/min/max) when the schema declares multipleOf", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        cost: { type: "number", title: "Cost", minimum: 0, maximum: 5, multipleOf: 0.01 },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ cost: 0.5 }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    const input = container.querySelector("input[data-jsf-input]");
+    expect(input).toHaveAttribute("type", "number");
+    expect(input).toHaveAttribute("step", "0.01");
+    expect(input).toHaveAttribute("min", "0");
+    expect(input).toHaveAttribute("max", "5");
+    expect(input).toHaveValue(0.5);
+  });
+
+  it("renders a bounded number as a progress slider with x-number-display: slider", () => {
+    const onChange = vi.fn();
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        tokens: {
+          type: "integer",
+          title: "Tokens",
+          minimum: 0,
+          maximum: 64000,
+          multipleOf: 1,
+          "x-number-display": "slider",
+        },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ tokens: 8000 }}
+        onChange={onChange}
+        showPreferencesMenu={false}
+      />,
+    );
+    const slider = container.querySelector("input[data-jsf-input]");
+    expect(slider).toHaveAttribute("type", "range");
+    expect(slider).toHaveAttribute("min", "0");
+    expect(slider).toHaveAttribute("max", "64000");
+    expect(slider).toHaveAttribute("step", "1");
+    expect(slider).toHaveValue("8000");
+    // The live value is shown alongside the track (locale-formatted).
+    expect(screen.getByText(/8[,.\s]?000/)).toBeInTheDocument();
+    fireEvent.change(slider!, { target: { value: "12000" } });
+    expect(onChange).toHaveBeenCalledWith({ tokens: 12000 });
+  });
+
+  it("falls back to a numeric input when x-number-display: slider lacks a maximum", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        tokens: { type: "integer", title: "Tokens", multipleOf: 1, "x-number-display": "slider" },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ tokens: 8000 }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    // No maximum → not a range slider; the native number input (multipleOf) stands.
+    expect(container.querySelector("input[data-jsf-input]")).toHaveAttribute("type", "number");
+  });
+
+  it("keeps a number field as a token-friendly text input without multipleOf", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { amount: { type: "number", title: "Amount" } },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ amount: 3 }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(container.querySelector("input[data-jsf-input]")).toHaveAttribute("type", "text");
+  });
+
+  it("merges x-label-classes / x-input-classes onto the label and input", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          title: "Name",
+          "x-label-classes": "text-primary",
+          "x-input-classes": "font-mono",
+        },
+      },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ name: "" }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.getByText("Name").closest("label")).toHaveClass("text-primary");
+    expect(container.querySelector("input[data-jsf-input]")).toHaveClass("font-mono");
+  });
+
+  it("lays fields out in a grid, honouring x-columns and per-field x-col-span", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      "x-columns": 3,
+      properties: {
+        model: { type: "string", title: "Model", "x-col-span": 2 },
+        effort: { type: "string", title: "Effort" },
+      },
+    };
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{}}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.getByText("Model").closest('[style*="grid-column"]')).toHaveStyle({
+      gridColumn: "span 2 / span 2",
+    });
+    expect(screen.getByText("Effort").closest('[style*="grid-column"]')).toHaveStyle({
+      gridColumn: "span 1 / span 1",
+    });
+  });
+
+  it("keeps a 4-across span-3 row on one line in a 12-column grid (x-columns is not capped below 12)", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      "x-columns": 12,
+      properties: {
+        cost: { type: "number", title: "Cost", "x-col-span": 3 },
+        tokens: { type: "integer", title: "Tokens", "x-col-span": 3 },
+        turns: { type: "integer", title: "Turns", "x-col-span": 3 },
+        timeout: { type: "string", title: "Timeout", "x-col-span": 3 },
+      },
+    };
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{}}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    // 4 fields × span-3 == 12 tracks == one row.
+    for (const label of ["Cost", "Tokens", "Turns", "Timeout"]) {
+      expect(screen.getByText(label).closest('[style*="grid-column"]')).toHaveStyle({
+        gridColumn: "span 3 / span 3",
+      });
+    }
+  });
+
+  it("shows/hides conditional fields via an if/then const discriminator", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        backend: {
+          type: "string",
+          title: "Backend",
+          enum: ["claude", "codex"],
+        },
+      },
+      allOf: [
+        {
+          if: { properties: { backend: { const: "codex" } } },
+          // eslint-disable-next-line unicorn/no-thenable -- JSON Schema conditional keyword, not a Promise thenable
+          then: { properties: { sandbox: { type: "string", title: "Sandbox" } } },
+        },
+      ],
+    };
+    const { rerender } = render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ backend: "claude" }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.queryByText("Sandbox")).not.toBeInTheDocument();
+    rerender(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ backend: "codex" }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.getByText("Sandbox")).toBeInTheDocument();
   });
 });
