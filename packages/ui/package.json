@@ -110,6 +110,7 @@
     "build": "pnpm run build:icons && vite build && vite build --mode cjs && node scripts/build-styles.mjs",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
+    "build:storybook-schemas": "tsx scripts/build-storybook-schemas.ts",
     "test": "pnpm run build:icons && vitest run",
     "lint": "oxlint -c .oxlintrc.json src --deny-warnings",
     "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run lint"
@@ -124,7 +125,8 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.7",
     "jotai": "catalog:",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@ai-sdk/react": "catalog:",

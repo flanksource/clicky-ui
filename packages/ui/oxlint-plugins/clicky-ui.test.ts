@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error -- plain JS oxlint plugin, no type declarations
 import { clickyReplacementFor } from "./clicky-ui-prefer-components.js";
 // @ts-expect-error -- plain JS oxlint plugin, no type declarations
-import { isArbitraryZIndexClass, isDialogRole } from "./clicky-ui-no-adhoc-overlay.js";
+import { isDialogRole } from "./clicky-ui-no-adhoc-overlay.js";
+import {
+  isArbitraryZIndexClass,
+  isDirectZIndexValue,
+  isRawZIndexImport,
+  // @ts-expect-error -- plain JS oxlint plugin, no type declarations
+} from "./clicky-ui-no-direct-z-index.js";
 // @ts-expect-error -- plain JS oxlint plugin, no type declarations
 import { isHandrolledStyleValue } from "./clicky-ui-prefer-tailwind.js";
 import {
@@ -52,12 +58,67 @@ describe("isArbitraryZIndexClass", () => {
     },
   );
 
-  it.each(["z-50", "z-10", "zebra", "z-[999]extra", "text-[#fff]", ""])(
+  it.each(["z-50", "z-10", "z-[1]", "z-[30]", "zebra", "z-[999]extra", "text-[#fff]", ""])(
     "does not flag %s",
     (token) => {
       expect(isArbitraryZIndexClass(token)).toBe(false);
     },
   );
+});
+
+describe("isRawZIndexImport", () => {
+  it.each([
+    ["@flanksource/clicky-ui", "zIndex", "zIndex"],
+    ["../overlay/zIndex", "zIndex", "zIndex"],
+    ["./zIndex", "zIndex", "overlayZ"],
+  ])("flags raw zIndex import from %s", (source, importedName, localName) => {
+    expect(isRawZIndexImport(source, importedName, localName)).toBe(true);
+  });
+
+  it.each([
+    ["@flanksource/clicky-ui", "Modal", "Modal"],
+    ["../overlay/modalStack", "useFloatingZIndex", "useFloatingZIndex"],
+    ["./zIndex", "zIndexScale", "zIndexScale"],
+    ["./layers", "zIndex", "zIndex"],
+    [undefined, "zIndex", "zIndex"],
+  ])("does not flag %s import %s", (source, importedName, localName) => {
+    expect(isRawZIndexImport(source, importedName, localName)).toBe(false);
+  });
+});
+
+describe("isDirectZIndexValue", () => {
+  it.each([
+    [{ type: "Literal", value: 9999 }],
+    [{ type: "Literal", value: "9999" }],
+    [{ type: "Identifier", name: "templatePickerZIndex" }],
+    [
+      {
+        type: "MemberExpression",
+        computed: false,
+        object: { type: "Identifier", name: "zIndex" },
+        property: { type: "Identifier", name: "popover" },
+      },
+    ],
+  ])("flags direct z-index AST value %#", (node) => {
+    expect(isDirectZIndexValue(node)).toBe(true);
+  });
+
+  it.each([
+    [{ type: "Identifier", name: "floatingZ" }],
+    [{ type: "Identifier", name: "floatingZIndex" }],
+    [
+      {
+        type: "MemberExpression",
+        computed: false,
+        object: { type: "Identifier", name: "popup" },
+        property: { type: "Identifier", name: "floatingZ" },
+      },
+    ],
+    [{ type: "CallExpression" }],
+    [undefined],
+  ])("allows non-direct or floating-hook z-index AST value %#", (node) => {
+    expect(isDirectZIndexValue(node)).toBe(false);
+  });
 });
 
 describe("isDialogRole", () => {
@@ -220,6 +281,7 @@ describe("plugin", () => {
     expect(plugin.meta.name).toBe("clicky-ui");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-adhoc-overlay",
+      "no-direct-z-index",
       "prefer-clicky-components",
       "prefer-clicky-icons",
       "prefer-tailwind-classes",

@@ -37,6 +37,7 @@ Add the plugin and the rules you want to the downstream `.oxlintrc.json`:
   "rules": {
     "clicky-ui/prefer-clicky-components": "warn",
     "clicky-ui/no-adhoc-overlay": "error",
+    "clicky-ui/no-direct-z-index": "error",
     "clicky-ui/prefer-tailwind-classes": "warn",
     "clicky-ui/prefer-theme-tokens": "error",
     "clicky-ui/prefer-clicky-icons": "warn"
@@ -83,7 +84,8 @@ severity (`"warn"` / `"error"`) per rule. If your script uses
 | Rule                                 | Flags                                                                                                                                                                                                                                  | Use instead                                                                                   |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `clicky-ui/prefer-clicky-components` | Native `<button>`, `<select>`, `<table>`, `<dialog>` that re-implement a shipped component                                                                                                                                             | `Button`/`IconButton`, `Select`/`Combobox`, `DataTable`, `Modal`                              |
-| `clicky-ui/no-adhoc-overlay`         | `role="dialog"`/`"alertdialog"`, arbitrary `z-[N]` classes, `style={{ zIndex: N }}`                                                                                                                                                    | `Modal`, `DropdownMenu`, `Toast`, and the `zIndex` scale                                      |
+| `clicky-ui/no-adhoc-overlay`         | `role="dialog"`/`"alertdialog"`                                                                                                                                                                                                        | `Modal`                                                                                       |
+| `clicky-ui/no-direct-z-index`        | Overlay-scale arbitrary `z-[N]` classes, dynamic arbitrary z-index classes, raw `zIndex` imports, and `style={{ zIndex: ... }}` values that do not come from `useFloatingZIndex`                                                       | `Modal`, `DropdownMenu`, `Toast`, or `useFloatingZIndex` for floating overlay internals       |
 | `clicky-ui/prefer-tailwind-classes`  | Inline `style` with **static** spacing/layout/typography values (`padding`, `margin`, `gap`, `display`, `fontWeight`, …)                                                                                                               | Tailwind utilities + density utilities (`p-density-4`, `gap-density-2`)                       |
 | `clicky-ui/prefer-theme-tokens`      | Hardcoded colors (`text-[#fff]`, `style={{ color: "#fff" }}`) and hand-reading the `clicky-ui-theme`/`clicky-ui-density` storage keys                                                                                                  | Semantic tokens (`text-foreground`, `bg-background`, …) and the `useTheme`/`useDensity` hooks |
 | `clicky-ui/prefer-clicky-icons`      | Icon imports from third-party libraries (lucide, react-icons, heroicons, MUI, phosphor, tabler, font-awesome, …), emoji used as icons, and raw iconify name strings (`codicon:clock`, `lucide:activity`, …) passed as a value/argument | `@flanksource/clicky-ui/icons` (`Ui*`), `@flanksource/icons/mi`, or `@iconify/react`          |
@@ -104,15 +106,12 @@ import { Button } from "@flanksource/clicky-ui/components";
 
 ### `no-adhoc-overlay`
 
-Overlays must share clicky-ui's centralized z-index scale (`overlay/zIndex.ts`)
-so a dropdown opened inside a modal can't render behind it. Arbitrary `z-[N]`
-Tailwind classes are doubly bad: a consumer's Tailwind build only emits the
-arbitrary classes it can scan from the published dist, so a fresh `z-[N]` may
-compile to nothing.
+Dialogs must go through `Modal` so focus handling, Escape handling and modal
+stacking are owned by clicky-ui.
 
 ```tsx
 // ✗ flagged
-<div role="dialog" className="z-[9999]">
+<div role="dialog">
   …
 </div>;
 
@@ -121,6 +120,30 @@ import { Modal } from "@flanksource/clicky-ui/components";
 <Modal open={open} onClose={close}>
   …
 </Modal>;
+```
+
+### `no-direct-z-index`
+
+Floating content must use clicky-ui's overlay stack so a dropdown opened inside
+a modal can't render behind it. Overlay-scale arbitrary `z-[N]` Tailwind classes
+are doubly bad: a consumer's Tailwind build only emits the arbitrary classes it
+can scan from the published dist, so a fresh global stack value may compile to
+nothing. Small local offsets such as `z-[1]` are allowed for isolated stacking
+contexts like timeline markers.
+
+```tsx
+// ✗ flagged
+<div className="z-[9999]" />;
+<div style={{ zIndex: 9999 }} />;
+<div style={{ zIndex: zIndex.popover }} />;
+
+// ✓
+import { DropdownMenu } from "@flanksource/clicky-ui/components";
+<DropdownMenu trigger={<button type="button">Open</button>}>{() => <>…</>}</DropdownMenu>;
+
+// ✓ for clicky-ui overlay internals
+const floatingZ = useFloatingZIndex();
+<div style={{ zIndex: floatingZ }} />;
 ```
 
 ### `prefer-tailwind-classes`
