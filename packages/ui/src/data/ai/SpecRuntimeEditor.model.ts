@@ -35,12 +35,24 @@ export type SpecStashMode = (typeof SPEC_STASH_MODES)[number];
 export const SPEC_VERIFY_SCOPES = ["all", "changed"] as const;
 export type SpecVerifyScope = (typeof SPEC_VERIFY_SCOPES)[number];
 
+export const SPEC_SCHEMA_STRICTNESS = ["warning", "error", "retry"] as const;
+export type SpecSchemaStrictness = (typeof SPEC_SCHEMA_STRICTNESS)[number];
+
 export type AISpecRuntimePrompt = {
   user?: string;
   system?: string;
   appendSystem?: string;
-  source?: string;
-  metadata?: Record<string, string>;
+  schemaJSON?: unknown;
+  schemaStrictness?: SpecSchemaStrictness | "";
+};
+
+export type AISpecRuntimeModelFallback = {
+  model?: string;
+  id?: string;
+  backend?: string;
+  temperature?: number;
+  effort?: string;
+  noCache?: boolean;
 };
 
 export type AISpecRuntimeMemory = {
@@ -109,11 +121,13 @@ export type AISpecRuntimeSpec = {
   temperature?: number;
   effort?: string;
   noCache?: boolean;
+  fallbacks?: AISpecRuntimeModelFallback[];
   prompt?: AISpecRuntimePrompt;
   budget?: AISpecRuntimeBudget;
   memory?: AISpecRuntimeMemory;
   permissions?: AISpecRuntimePermissions;
   setup?: AISpecRuntimeSetup;
+  workflow?: AISpecRuntimeWorkflow;
   sessionId?: string;
   /** Extra cmux CLI args (api.Spec.cliArgs), keyed by option json name. */
   cliArgs?: Record<string, unknown>;
@@ -153,45 +167,32 @@ export type AISpecRuntimeSetup = {
     };
     dirty?: {
       stash?: SpecStashMode | "";
-      staged?: boolean;
-      unstaged?: boolean;
-      untracked?: boolean;
       since?: string;
     };
   };
 };
 
 export type AISpecRuntimeVerify = {
-  commands?: string[];
   fixture?: string;
   scope?: SpecVerifyScope | "";
   maxIterations?: number;
 };
 
-export type AISpecRuntimeFinalize = {
+export type AISpecRuntimePostRun = {
   commit?: boolean;
   commitMessage?: string;
   dryRun?: boolean;
 };
 
-export type AISpecRuntimeLocalWorkflow = {
-  verify?: {
-    commands?: string[];
-    fixture?: string;
-    scope?: SpecVerifyScope | "";
-    maxIterations?: number;
-  };
-  finalize?: {
-    commit?: boolean;
-    commitMessage?: string;
-    dryRun?: boolean;
-    keepWorktree?: boolean;
-  };
+// Mirrors captain's api.Workflow (verify + postRun) so the SpecRuntimeEditor's
+// Verify/Commit sections round-trip through the spec frontmatter. Unlike the
+// prior client-only shape, this is part of the compacted spec.
+export type AISpecRuntimeWorkflow = {
+  verify?: AISpecRuntimeVerify;
+  postRun?: AISpecRuntimePostRun;
 };
 
-export type AISpecRuntimeValue = AISpecRuntimeSpec & {
-  workflow?: AISpecRuntimeLocalWorkflow;
-};
+export type AISpecRuntimeValue = AISpecRuntimeSpec;
 
 export type AISpecRuntimePayload = {
   spec?: AISpecRuntimeSpec;
@@ -223,6 +224,8 @@ export function compactAISpecRuntime(
   const effort = cleanString(value.effort);
   if (effort) spec.effort = effort;
   if (value.noCache) spec.noCache = true;
+  const fallbacks = compactFallbacks(value.fallbacks);
+  if (fallbacks) spec.fallbacks = fallbacks;
 
   const prompt = compactPrompt(value.prompt);
   if (prompt) spec.prompt = prompt;
@@ -237,8 +240,58 @@ export function compactAISpecRuntime(
   if (permissions) spec.permissions = permissions;
   const setup = compactSetup(value.setup);
   if (setup) spec.setup = setup;
+  const workflow = compactWorkflow(value.workflow);
+  if (workflow) spec.workflow = workflow;
+  const sessionId = cleanString(value.sessionId);
+  if (sessionId) spec.sessionId = sessionId;
   if (value.cliArgs && hasKeys(value.cliArgs)) spec.cliArgs = value.cliArgs;
   return spec;
+}
+
+function compactWorkflow(
+  value: AISpecRuntimeWorkflow | undefined,
+): AISpecRuntimeWorkflow | undefined {
+  if (!value) return undefined;
+  const workflow: AISpecRuntimeWorkflow = {};
+  const verify = compactVerify(value.verify);
+  if (verify) workflow.verify = verify;
+  const postRun = compactPostRun(value.postRun);
+  if (postRun) workflow.postRun = postRun;
+  return hasKeys(workflow) ? workflow : undefined;
+}
+
+function compactVerify(
+  value: AISpecRuntimeVerify | undefined,
+): AISpecRuntimeVerify | undefined {
+  if (!value) return undefined;
+  const verify: AISpecRuntimeVerify = {};
+  const fixture = cleanString(value.fixture);
+  if (fixture) verify.fixture = fixture;
+  if (value.scope === "all" || value.scope === "changed")
+    verify.scope = value.scope;
+  if (
+    value.maxIterations != null &&
+    Number.isFinite(value.maxIterations) &&
+    value.maxIterations > 0
+  ) {
+    verify.maxIterations = Math.trunc(value.maxIterations);
+  }
+  return hasKeys(verify) ? verify : undefined;
+}
+
+// PostRun booleans compact to present-when-true: an unchecked commit/dryRun is
+// pruned to absent, which downstream reads as "off" (matching Go's omitempty on
+// api.PostRun, where false is unrepresentable on the wire).
+function compactPostRun(
+  value: AISpecRuntimePostRun | undefined,
+): AISpecRuntimePostRun | undefined {
+  if (!value) return undefined;
+  const postRun: AISpecRuntimePostRun = {};
+  if (value.commit) postRun.commit = true;
+  const commitMessage = cleanString(value.commitMessage);
+  if (commitMessage) postRun.commitMessage = commitMessage;
+  if (value.dryRun) postRun.dryRun = true;
+  return hasKeys(postRun) ? postRun : undefined;
 }
 
 function compactPrompt(
@@ -252,11 +305,40 @@ function compactPrompt(
   if (system) prompt.system = system;
   const appendSystem = cleanString(value.appendSystem);
   if (appendSystem) prompt.appendSystem = appendSystem;
-  const source = cleanString(value.source);
-  if (source) prompt.source = source;
-  const metadata = compactRecord(value.metadata);
-  if (metadata) prompt.metadata = metadata;
+  const schemaJSON = compactJSONValue(value.schemaJSON);
+  if (schemaJSON !== undefined) prompt.schemaJSON = schemaJSON;
+  if (
+    value.schemaStrictness === "warning" ||
+    value.schemaStrictness === "error" ||
+    value.schemaStrictness === "retry"
+  ) {
+    prompt.schemaStrictness = value.schemaStrictness;
+  }
   return hasKeys(prompt) ? prompt : undefined;
+}
+
+function compactFallbacks(
+  value: AISpecRuntimeModelFallback[] | undefined,
+): AISpecRuntimeModelFallback[] | undefined {
+  if (!value) return undefined;
+  const out: AISpecRuntimeModelFallback[] = [];
+  for (const item of value) {
+    const model = cleanString(item.model);
+    if (!model) continue;
+    const fallback: AISpecRuntimeModelFallback = { model };
+    const id = cleanString(item.id);
+    if (id) fallback.id = id;
+    const backend = cleanString(item.backend);
+    if (backend) fallback.backend = backend;
+    if (item.temperature != null && Number.isFinite(item.temperature)) {
+      fallback.temperature = item.temperature;
+    }
+    const effort = cleanString(item.effort);
+    if (effort) fallback.effort = effort;
+    if (item.noCache) fallback.noCache = true;
+    out.push(fallback);
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 function compactBudget(
@@ -443,9 +525,6 @@ function compactSetupCheckout(
   ) {
     dirty.stash = stash;
   }
-  if (value.dirty?.staged) dirty.staged = true;
-  if (value.dirty?.unstaged) dirty.unstaged = true;
-  if (value.dirty?.untracked) dirty.untracked = true;
   const since = cleanString(value.dirty?.since);
   if (since) dirty.since = since;
   if (hasKeys(dirty)) checkout.dirty = dirty;
@@ -554,15 +633,18 @@ export function normalizeMCPPermissions(
   return out;
 }
 
-function compactRecord(value: Record<string, string> | undefined) {
-  if (!value) return undefined;
-  const out: Record<string, string> = {};
-  for (const [rawKey, rawValue] of Object.entries(value)) {
-    const key = rawKey.trim();
-    if (!key) continue;
-    out[key] = rawValue;
+function compactJSONValue(value: unknown) {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
   }
-  return hasKeys(out) ? out : undefined;
+  return value;
 }
 
 function compactList(value: string[] | undefined) {
