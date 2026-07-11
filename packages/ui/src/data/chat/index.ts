@@ -21,7 +21,14 @@ export {
   type BudgetSelectorProps,
 } from "./ModelSelector";
 export { providerIcon, type ProviderGlyph } from "./provider-icons";
-export { ContextUsage, type ContextUsageProps } from "./ContextUsage";
+export {
+  ContextMeter,
+  type ContextMeterProps,
+  type ContextMeterMode,
+  type ContextMeterTokens,
+  type ContextMeterCost,
+  type ContextMeterBudget,
+} from "./ContextMeter";
 export {
   AttachmentButton,
   type AttachmentButtonProps,
