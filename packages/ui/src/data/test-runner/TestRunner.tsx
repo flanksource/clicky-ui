@@ -4,7 +4,7 @@ import { SplitPane } from "../../layout/SplitPane";
 import { cn } from "../../lib/utils";
 import { UiBeaker } from "../../icons";
 import type { RunMeta, SnapshotStatus, Test } from "./types";
-import { collectFrameworks, sumNonTaskTests, type StatusCounts } from "./status";
+import { aggregateStatusCounts, collectFrameworks } from "./status";
 import { type TestFilters } from "./filterState";
 import {
   createTestRunnerRegistry,
@@ -57,23 +57,19 @@ export type TestRunnerProps = {
   showSummary?: boolean;
   /** Extra header content (e.g. export/download controls owned by the host). */
   headerSlot?: ReactNode;
+  /**
+   * Suppresses the entire built-in header bar (title, summary, filter row).
+   * Defaults to false; pass true when a host renders its own combined header
+   * (e.g. a dialog header that already embeds `TestRunSummary` and filters) so
+   * the runner doesn't render a second bordered bar underneath it.
+   */
+  hideHeader?: boolean;
   /** Initial left-pane width percentage. */
   defaultSplit?: number;
   startTime?: number | null;
   endTime?: number | null;
   className?: string;
 };
-
-function counts(tests: Test[]): StatusCounts {
-  return tests.reduce(
-    (acc, t) => {
-      const s = sumNonTaskTests(t);
-      (Object.keys(acc) as (keyof StatusCounts)[]).forEach((k) => (acc[k] += s[k]));
-      return acc;
-    },
-    { total: 0, passed: 0, failed: 0, warned: 0, skipped: 0, pending: 0, running: 0, timedout: 0 },
-  );
-}
 
 function toRegistry(
   adapters: TestNodeAdapter[] | TestNodeAdapterRegistry | undefined,
@@ -110,6 +106,7 @@ export function TestRunner({
   title,
   showSummary = true,
   headerSlot,
+  hideHeader = false,
   defaultSplit = 45,
   startTime,
   endTime,
@@ -159,50 +156,52 @@ export function TestRunner({
   );
 
   const frameworks = useMemo(() => collectFrameworks(tests), [tests]);
-  const filterCounts = useMemo(() => counts(tests), [tests]);
+  const filterCounts = useMemo(() => aggregateStatusCounts(tests), [tests]);
   const hasContent = tests.length > 0;
 
   return (
     <TestRunnerProvider value={ctx}>
       <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
-        <div className="border-b border-border bg-card px-density-4 py-density-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {title === undefined ? (
-                <h1 className="inline-flex items-center gap-1.5 text-lg font-bold">
-                  <Icon icon={UiBeaker} className="text-primary" />
-                  Test Results
-                </h1>
-              ) : (
-                title
-              )}
-              {statusText && <span className="text-sm text-muted-foreground">{statusText}</span>}
+        {!hideHeader && (
+          <div className="border-b border-border bg-card px-density-4 py-density-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {title === undefined ? (
+                  <h1 className="inline-flex items-center gap-1.5 text-lg font-bold">
+                    <Icon icon={UiBeaker} className="text-primary" />
+                    Test Results
+                  </h1>
+                ) : (
+                  title
+                )}
+                {statusText && <span className="text-sm text-muted-foreground">{statusText}</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                {headerSlot}
+                {showSummary && (
+                  <TestRunSummary
+                    tests={tests}
+                    startTime={startTime}
+                    endTime={endTime}
+                    done={done}
+                    now={now}
+                    runMeta={runMeta}
+                  />
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              {headerSlot}
-              {showSummary && (
-                <TestRunSummary
-                  tests={tests}
-                  startTime={startTime}
-                  endTime={endTime}
-                  done={done}
-                  now={now}
-                  runMeta={runMeta}
+            {hasContent && (
+              <div className="mt-2">
+                <TestFilterBar
+                  filters={filters}
+                  onChange={onFiltersChange}
+                  counts={filterCounts}
+                  frameworks={frameworks}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
-          {hasContent && (
-            <div className="mt-2">
-              <TestFilterBar
-                filters={filters}
-                onChange={onFiltersChange}
-                counts={filterCounts}
-                frameworks={frameworks}
-              />
-            </div>
-          )}
-        </div>
+        )}
 
         <SplitPane
           className="min-h-0 flex-1"

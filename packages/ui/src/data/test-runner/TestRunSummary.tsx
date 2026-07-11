@@ -3,7 +3,7 @@ import { ProgressBar, type ProgressSegment } from "../ProgressBar";
 import { cn } from "../../lib/utils";
 import { UiCheck, UiClock, UiLoader } from "../../icons";
 import type { RunMeta, Test } from "./types";
-import { sumNonTaskTests, type StatusCounts } from "./status";
+import { aggregateStatusCounts } from "./status";
 
 export type TestRunSummaryProps = {
   tests: Test[];
@@ -24,17 +24,6 @@ export type TestRunSummaryProps = {
   className?: string | undefined;
 };
 
-function totals(tests: Test[]): StatusCounts {
-  return tests.reduce(
-    (acc, t) => {
-      const s = sumNonTaskTests(t);
-      (Object.keys(acc) as (keyof StatusCounts)[]).forEach((k) => (acc[k] += s[k]));
-      return acc;
-    },
-    { total: 0, passed: 0, failed: 0, warned: 0, skipped: 0, pending: 0, running: 0, timedout: 0 },
-  );
-}
-
 function pct(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
@@ -53,7 +42,7 @@ export function TestRunSummary({
   compact = false,
   className,
 }: TestRunSummaryProps) {
-  const t = totals(tests);
+  const t = aggregateStatusCounts(tests);
   const clock = now ?? 0;
   const end = done && endTime ? endTime : clock;
   const elapsed = startTime && end >= startTime ? `${((end - startTime) / 1000).toFixed(1)}s` : "";
