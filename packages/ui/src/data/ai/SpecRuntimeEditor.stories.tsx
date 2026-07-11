@@ -458,13 +458,7 @@ const MODEL_SECTION_SCHEMA: JsonSchemaObject = {
     effort: {
       type: "string",
       title: "Effort",
-      enum: [
-        "No reasoning",
-        "Low reasoning",
-        "Medium reasoning",
-        "High reasoning",
-        "Xhigh reasoning",
-      ],
+      enum: ["None", "Low", "Medium", "High", "Xhigh"],
       "x-col-span": 4,
       "x-label-classes": SCHEMA_LABEL,
     },
@@ -555,7 +549,7 @@ function ModelSectionParityStory() {
   const [schemaValue, setSchemaValue] = useState<Record<string, unknown>>({
     mode: "CLI",
     model: "Claude Sonnet 4.5",
-    effort: "Medium reasoning",
+    effort: "Medium",
     temperature: 0.2,
     cost: 0.5,
     maxTokens: 8000,

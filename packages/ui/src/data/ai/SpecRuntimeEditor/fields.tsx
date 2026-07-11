@@ -64,22 +64,34 @@ export function SpecSelect({
   value,
   onChange,
   ariaLabel,
+  icon,
   children,
 }: {
   value: string;
   onChange: (value: string) => void;
   ariaLabel?: string | undefined;
+  icon?: StaticIconComponent | undefined;
   children: ReactNode;
 }) {
-  return (
+  const select = (
     <select
       aria-label={ariaLabel}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className={controlClassName}
+      className={cn(controlClassName, icon && "pl-8")}
     >
       {children}
     </select>
+  );
+  if (!icon) return select;
+  return (
+    <div className="relative">
+      <Icon
+        icon={icon}
+        className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
+      />
+      {select}
+    </div>
   );
 }
 

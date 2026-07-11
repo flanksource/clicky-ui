@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ChatModel } from "../chat/types";
 import {
+  SPEC_RUNTIME_FAMILIES,
   modelBelongsToFamily,
   modelsForFamily,
+  selectionForBackend,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -69,5 +71,12 @@ describe("runtime model filtering", () => {
     expect(
       modelBelongsToFamily("gpt-codex-agent", models, claudeFamily, "claude-agent"),
     ).toBe(false);
+  });
+
+  it("includes codex-agent in the default runtime family catalog", () => {
+    expect(selectionForBackend(SPEC_RUNTIME_FAMILIES, "codex-agent")).toEqual({
+      family: "codex",
+      mode: "agent",
+    });
   });
 });
