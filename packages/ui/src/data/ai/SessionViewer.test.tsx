@@ -12,6 +12,28 @@ const assistantLog = (count: number): SessionEntry[] =>
   }));
 
 describe("SessionViewer", () => {
+  it("renders system instructions as an expandable System row, not a user message", () => {
+    const { container } = render(
+      <SessionViewer
+        showHeader={false}
+        session={{
+          messages: [
+            {
+              id: "system",
+              role: "system",
+              parts: [{ type: "text", text: "# AGENTS.md instructions\nAlways run focused tests." }],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(container.querySelector('[data-event-kind="system"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-event-kind="user"]')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /System/ }));
+    expect(screen.getByText(/Always run focused tests/)).toBeInTheDocument();
+  });
+
   it("renders agent action labels and input summaries from the session", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.getByText("Grep")).toBeInTheDocument();
@@ -46,6 +68,86 @@ describe("SessionViewer", () => {
     const readRow = rows.find((li) => li.textContent?.includes("Timeline.tsx"));
     expect(readRow?.textContent).toContain("limit: 40");
     expect(readRow?.textContent).not.toContain("file_path:");
+  });
+
+  it("renders AskUserQuestion rows as readable questions with options and answers", () => {
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={[
+          {
+            type: "assistant",
+            uuid: "ask-1",
+            tool_use: {
+              tool: "AskUserQuestion",
+              input: {
+                questions: [
+                  {
+                    id: "scope",
+                    header: "Scope",
+                    question: "Which scope should the rule use?",
+                    options: [
+                      { label: "Project", description: "Current workspace" },
+                      { label: "Global" },
+                    ],
+                  },
+                ],
+              },
+              response: "Scope: Project",
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Ask user")).toBeInTheDocument();
+    expect(screen.getByText("Scope")).toBeInTheDocument();
+    expect(screen.getByText("Which scope should the rule use?")).toBeInTheDocument();
+    expect(screen.getByText("Project")).toBeInTheDocument();
+    expect(screen.getByText("Current workspace")).toBeInTheDocument();
+    expect(screen.getByText("Answer")).toBeInTheDocument();
+    expect(screen.getByText("Scope: Project")).toBeInTheDocument();
+  });
+
+  it("shows approval status badges directly on tool rows", () => {
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={{
+          messages: [
+            {
+              id: "m1",
+              role: "assistant",
+              parts: [
+                {
+                  type: "dynamic-tool",
+                  toolName: "Bash",
+                  state: "approval-requested",
+                  input: { command: "npm test" },
+                  approval: { id: "approval-1" },
+                },
+              ],
+            },
+            {
+              id: "m2",
+              role: "assistant",
+              parts: [
+                {
+                  type: "dynamic-tool",
+                  toolName: "WebFetch",
+                  state: "approval-responded",
+                  input: { url: "https://example.com" },
+                  approval: { id: "approval-2", approved: false, reason: "not needed" },
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Awaiting approval")).toBeInTheDocument();
+    expect(screen.getByText("Denied: not needed")).toBeInTheDocument();
   });
 
   it("shows a +/- diff stat on write rows and a line diff on expand", () => {
@@ -109,9 +211,22 @@ describe("SessionViewer", () => {
     expect(screen.getByText("1 mcp")).toBeInTheDocument();
     expect(screen.getByText("1 agent")).toBeInTheDocument();
     expect(screen.getByText("1 skill")).toBeInTheDocument();
-    expect(screen.getByText("ctx 99% free (2k/1.0M)")).toBeInTheDocument();
-    expect(screen.getByText("budget $1.25/$5")).toBeInTheDocument();
+    // The context window renders as an interactive meter (bar + hover popover);
+    // budget and token detail ride in the popover.
+    expect(screen.getByLabelText("Context 1% used")).toBeInTheDocument();
     expect(screen.getByText("1 event")).toBeInTheDocument();
+  });
+
+  it("shows a budget text badge only when there is no context to attach it to", () => {
+    render(
+      <SessionViewer
+        session={{
+          messages: [{ id: "m1", role: "assistant", parts: [{ type: "text", text: "done" }] }],
+          budget: { used: 1.25, total: 5, remaining: 3.75 },
+        }}
+      />,
+    );
+    expect(screen.getByText("budget $1.25/$5")).toBeInTheDocument();
   });
 
   it("renders a terminal API error entry", () => {
