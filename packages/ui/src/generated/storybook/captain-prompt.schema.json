@@ -1,65 +1,510 @@
 {
   "backends": [
     {
-      "authEnvVars": ["ANTHROPIC_API_KEY"],
-      "authenticated": false,
+      "authEnvVars": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "authenticated": true,
       "backend": "anthropic",
       "kind": "api",
+      "modelDetails": [
+        {
+          "id": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "backend": "anthropic",
+          "releaseDate": "2026-06-29",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-fable-5",
+          "label": "Claude Fable 5",
+          "backend": "anthropic",
+          "releaseDate": "2026-06-07"
+        },
+        {
+          "id": "claude-opus-4-8",
+          "label": "Claude Opus 4.8",
+          "backend": "anthropic",
+          "releaseDate": "2026-05-28",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-4-7",
+          "label": "Claude Opus 4.7",
+          "backend": "anthropic",
+          "releaseDate": "2026-04-14"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "backend": "anthropic",
+          "releaseDate": "2026-02-17"
+        },
+        {
+          "id": "claude-opus-4-6",
+          "label": "Claude Opus 4.6",
+          "backend": "anthropic",
+          "releaseDate": "2026-02-04"
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5",
+          "backend": "anthropic",
+          "releaseDate": "2025-10-15"
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "label": "Claude Sonnet 4.5",
+          "backend": "anthropic",
+          "releaseDate": "2025-09-29"
+        }
+      ],
       "models": [
+        "claude-sonnet-5",
         "claude-fable-5",
         "claude-opus-4-8",
-        "claude-sonnet-5",
-        "claude-haiku-4-5"
-      ],
-      "ready": false
-    },
-    {
-      "authEnvVars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-      "authenticated": false,
-      "backend": "gemini",
-      "kind": "api",
-      "models": ["gemini-2.5-pro", "gemini-3.0-pro", "gemini-3.5-flash"],
-      "ready": false
-    },
-    {
-      "authEnvVars": ["OPENAI_API_KEY"],
-      "authenticated": false,
-      "backend": "openai",
-      "kind": "api",
-      "models": ["gpt-5.5", "gpt-5.4-mini"],
-      "ready": false
-    },
-    {
-      "authEnvVars": ["DEEPSEEK_API_KEY"],
-      "authenticated": false,
-      "backend": "deepseek",
-      "kind": "api",
-      "models": ["deepseek-chat", "deepseek-reasoner"],
-      "ready": false
-    },
-    {
-      "authEnvVars": ["ANTHROPIC_API_KEY"],
-      "authenticated": true,
-      "backend": "claude-cli",
-      "binary": "/Users/moshe/.local/bin/claude",
-      "kind": "cli",
-      "models": [
-        "claude-agent-sonnet",
-        "claude-agent-opus",
-        "claude-agent-haiku"
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-opus-4-6",
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250929"
       ],
       "ready": true
     },
     {
-      "authEnvVars": ["ANTHROPIC_API_KEY"],
+      "authEnvVars": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "gemini",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "backend": "gemini",
+          "releaseDate": "2026-05-19",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "backend": "gemini",
+          "releaseDate": "2025-06-17"
+        },
+        {
+          "id": "veo-3.1-lite-generate-preview",
+          "label": "veo-3.1-lite-generate-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "veo-3.1-generate-preview",
+          "label": "veo-3.1-generate-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "veo-3.1-fast-generate-preview",
+          "label": "veo-3.1-fast-generate-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "nano-banana-pro-preview",
+          "label": "nano-banana-pro-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "lyria-3-pro-preview",
+          "label": "lyria-3-pro-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "lyria-3-clip-preview",
+          "label": "lyria-3-clip-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "label": "gemini-3-flash-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "backend": "gemini",
+          "releaseDate": "2025-06-17"
+        },
+        {
+          "id": "gemma-4-31b-it",
+          "label": "gemma-4-31b-it",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemma-4-26b-a4b-it",
+          "label": "gemma-4-26b-a4b-it",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-robotics-er-1.6-preview",
+          "label": "gemini-robotics-er-1.6-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-robotics-er-1.5-preview",
+          "label": "gemini-robotics-er-1.5-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-pro-latest",
+          "label": "gemini-pro-latest",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-omni-flash-preview",
+          "label": "gemini-omni-flash-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-flash-lite-latest",
+          "label": "gemini-flash-lite-latest",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-embedding-2-preview",
+          "label": "gemini-embedding-2-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-embedding-2",
+          "label": "gemini-embedding-2",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-embedding-001",
+          "label": "gemini-embedding-001",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-3.1-pro-preview-customtools",
+          "label": "gemini-3.1-pro-preview-customtools",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-3.1-flash-lite-preview",
+          "label": "gemini-3.1-flash-lite-preview",
+          "backend": "gemini"
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "label": "gemini-3.1-flash-lite",
+          "backend": "gemini"
+        },
+        {
+          "id": "deep-research-pro-preview-12-2025",
+          "label": "deep-research-pro-preview-12-2025",
+          "backend": "gemini"
+        },
+        {
+          "id": "deep-research-preview-04-2026",
+          "label": "deep-research-preview-04-2026",
+          "backend": "gemini"
+        },
+        {
+          "id": "deep-research-max-preview-04-2026",
+          "label": "deep-research-max-preview-04-2026",
+          "backend": "gemini"
+        },
+        {
+          "id": "aqa",
+          "label": "aqa",
+          "backend": "gemini"
+        },
+        {
+          "id": "antigravity-preview-05-2026",
+          "label": "antigravity-preview-05-2026",
+          "backend": "gemini"
+        }
+      ],
+      "models": [
+        "gemini-3.5-flash",
+        "gemini-2.5-pro",
+        "veo-3.1-lite-generate-preview",
+        "veo-3.1-generate-preview",
+        "veo-3.1-fast-generate-preview",
+        "nano-banana-pro-preview",
+        "lyria-3-pro-preview",
+        "lyria-3-clip-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+        "gemini-robotics-er-1.6-preview",
+        "gemini-robotics-er-1.5-preview",
+        "gemini-pro-latest",
+        "gemini-omni-flash-preview",
+        "gemini-flash-lite-latest",
+        "gemini-embedding-2-preview",
+        "gemini-embedding-2",
+        "gemini-embedding-001",
+        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-lite",
+        "deep-research-pro-preview-12-2025",
+        "deep-research-preview-04-2026",
+        "deep-research-max-preview-04-2026",
+        "aqa",
+        "antigravity-preview-05-2026"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "OPENAI_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "openai",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "backend": "openai",
+          "releaseDate": "2026-04-23",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        {
+          "id": "gpt-5.4",
+          "label": "gpt-5.4",
+          "backend": "openai",
+          "releaseDate": "2026-03-05"
+        },
+        {
+          "id": "gpt-5.2",
+          "label": "gpt-5.2",
+          "backend": "openai",
+          "releaseDate": "2025-12-09"
+        }
+      ],
+      "models": [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.2"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "deepseek",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro",
+          "backend": "deepseek",
+          "releaseDate": "2026-04-24"
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash",
+          "backend": "deepseek",
+          "releaseDate": "2026-04-24"
+        }
+      ],
+      "models": [
+        "deepseek-v4-pro",
+        "deepseek-v4-flash"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "claude-cli",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
+      "kind": "cli",
+      "modelDetails": [
+        {
+          "id": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "backend": "claude-cli",
+          "releaseDate": "2026-06-29",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-fable-5",
+          "label": "Claude Fable 5",
+          "backend": "claude-cli",
+          "releaseDate": "2026-06-07"
+        },
+        {
+          "id": "claude-opus-4-8",
+          "label": "Claude Opus 4.8",
+          "backend": "claude-cli",
+          "releaseDate": "2026-05-28",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-4-7",
+          "label": "Claude Opus 4.7",
+          "backend": "claude-cli",
+          "releaseDate": "2026-04-14"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "backend": "claude-cli",
+          "releaseDate": "2026-02-17"
+        },
+        {
+          "id": "claude-opus-4-6",
+          "label": "Claude Opus 4.6",
+          "backend": "claude-cli",
+          "releaseDate": "2026-02-04"
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5",
+          "backend": "claude-cli",
+          "releaseDate": "2025-10-15"
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "label": "Claude Sonnet 4.5",
+          "backend": "claude-cli",
+          "releaseDate": "2025-09-29"
+        }
+      ],
+      "models": [
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-opus-4-6",
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250929"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "ANTHROPIC_API_KEY"
+      ],
       "authenticated": true,
       "backend": "claude-agent",
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
       "kind": "cli",
+      "modelDetails": [
+        {
+          "id": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "backend": "claude-agent",
+          "releaseDate": "2026-06-29",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-fable-5",
+          "label": "Claude Fable 5",
+          "backend": "claude-agent",
+          "releaseDate": "2026-06-07"
+        },
+        {
+          "id": "claude-opus-4-8",
+          "label": "Claude Opus 4.8",
+          "backend": "claude-agent",
+          "releaseDate": "2026-05-28",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-4-7",
+          "label": "Claude Opus 4.7",
+          "backend": "claude-agent",
+          "releaseDate": "2026-04-14"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "backend": "claude-agent",
+          "releaseDate": "2026-02-17"
+        },
+        {
+          "id": "claude-opus-4-6",
+          "label": "Claude Opus 4.6",
+          "backend": "claude-agent",
+          "releaseDate": "2026-02-04"
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5",
+          "backend": "claude-agent",
+          "releaseDate": "2025-10-15"
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "label": "Claude Sonnet 4.5",
+          "backend": "claude-agent",
+          "releaseDate": "2025-09-29"
+        }
+      ],
       "models": [
-        "claude-agent-sonnet",
-        "claude-agent-opus",
-        "claude-agent-haiku"
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-opus-4-6",
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250929"
       ],
       "ready": true
     },
@@ -149,22 +594,164 @@
       },
       "authenticated": true,
       "backend": "claude-cmux",
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
       "kind": "cli",
+      "modelDetails": [
+        {
+          "id": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-06-29",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-fable-5",
+          "label": "Claude Fable 5",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-06-07"
+        },
+        {
+          "id": "claude-opus-4-8",
+          "label": "Claude Opus 4.8",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-05-28",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-4-7",
+          "label": "Claude Opus 4.7",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-04-14"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-02-17"
+        },
+        {
+          "id": "claude-opus-4-6",
+          "label": "Claude Opus 4.6",
+          "backend": "claude-cmux",
+          "releaseDate": "2026-02-04"
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5",
+          "backend": "claude-cmux",
+          "releaseDate": "2025-10-15"
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "label": "Claude Sonnet 4.5",
+          "backend": "claude-cmux",
+          "releaseDate": "2025-09-29"
+        }
+      ],
       "models": [
-        "claude-agent-sonnet",
-        "claude-agent-opus",
-        "claude-agent-haiku"
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-opus-4-6",
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250929"
       ],
       "ready": true
     },
     {
-      "authEnvVars": ["OPENAI_API_KEY"],
+      "authEnvVars": [
+        "OPENAI_API_KEY"
+      ],
       "authenticated": true,
       "backend": "codex-cli",
       "binary": "/Users/moshe/Library/pnpm/codex",
       "kind": "cli",
-      "models": ["gpt-5-codex"],
+      "modelDetails": [
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "backend": "codex-cli",
+          "releaseDate": "2026-04-23",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        {
+          "id": "gpt-5.4",
+          "label": "gpt-5.4",
+          "backend": "codex-cli",
+          "releaseDate": "2026-03-05"
+        },
+        {
+          "id": "gpt-5.2",
+          "label": "gpt-5.2",
+          "backend": "codex-cli",
+          "releaseDate": "2025-12-09"
+        }
+      ],
+      "models": [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.2"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "OPENAI_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "codex-agent",
+      "binary": "/Users/moshe/Library/pnpm/codex",
+      "kind": "cli",
+      "modelDetails": [
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "backend": "codex-agent",
+          "releaseDate": "2026-04-23",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        {
+          "id": "gpt-5.4",
+          "label": "gpt-5.4",
+          "backend": "codex-agent",
+          "releaseDate": "2026-03-05"
+        },
+        {
+          "id": "gpt-5.2",
+          "label": "gpt-5.2",
+          "backend": "codex-agent",
+          "releaseDate": "2025-12-09"
+        }
+      ],
+      "models": [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.2"
+      ],
       "ready": true
     },
     {
@@ -182,7 +769,12 @@
           "askForApproval": {
             "default": "on-request",
             "description": "When codex asks for human approval before running a command",
-            "enum": ["untrusted", "on-failure", "on-request", "never"],
+            "enum": [
+              "untrusted",
+              "on-failure",
+              "on-request",
+              "never"
+            ],
             "title": "Approval Policy",
             "type": "string",
             "x-clicky-order": 2,
@@ -245,7 +837,11 @@
           "sandbox": {
             "default": "read-only",
             "description": "Sandbox policy for model-run shell commands",
-            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "enum": [
+              "read-only",
+              "workspace-write",
+              "danger-full-access"
+            ],
             "title": "Sandbox",
             "type": "string",
             "x-clicky-order": 1,
@@ -275,15 +871,228 @@
       "backend": "codex-cmux",
       "binary": "/Users/moshe/Library/pnpm/codex",
       "kind": "cli",
-      "models": ["gpt-5-codex"],
+      "modelDetails": [
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "backend": "codex-cmux",
+          "releaseDate": "2026-04-23",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        {
+          "id": "gpt-5.4",
+          "label": "gpt-5.4",
+          "backend": "codex-cmux",
+          "releaseDate": "2026-03-05"
+        },
+        {
+          "id": "gpt-5.2",
+          "label": "gpt-5.2",
+          "backend": "codex-cmux",
+          "releaseDate": "2025-12-09"
+        }
+      ],
+      "models": [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.2"
+      ],
       "ready": true
     },
     {
-      "authEnvVars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "authEnvVars": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ],
       "authenticated": true,
       "backend": "gemini-cli",
       "binary": "/Users/moshe/Library/pnpm/gemini",
       "kind": "cli",
+      "modelDetails": [
+        {
+          "id": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "backend": "gemini-cli",
+          "releaseDate": "2026-05-19",
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "backend": "gemini-cli",
+          "releaseDate": "2025-06-17"
+        },
+        {
+          "id": "veo-3.1-lite-generate-preview",
+          "label": "veo-3.1-lite-generate-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "veo-3.1-generate-preview",
+          "label": "veo-3.1-generate-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "veo-3.1-fast-generate-preview",
+          "label": "veo-3.1-fast-generate-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "nano-banana-pro-preview",
+          "label": "nano-banana-pro-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "lyria-3-pro-preview",
+          "label": "lyria-3-pro-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "lyria-3-clip-preview",
+          "label": "lyria-3-clip-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "label": "gemini-3-flash-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "backend": "gemini-cli",
+          "releaseDate": "2025-06-17"
+        },
+        {
+          "id": "gemma-4-31b-it",
+          "label": "gemma-4-31b-it",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemma-4-26b-a4b-it",
+          "label": "gemma-4-26b-a4b-it",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-robotics-er-1.6-preview",
+          "label": "gemini-robotics-er-1.6-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-robotics-er-1.5-preview",
+          "label": "gemini-robotics-er-1.5-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-pro-latest",
+          "label": "gemini-pro-latest",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-omni-flash-preview",
+          "label": "gemini-omni-flash-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-flash-lite-latest",
+          "label": "gemini-flash-lite-latest",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-embedding-2-preview",
+          "label": "gemini-embedding-2-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-embedding-2",
+          "label": "gemini-embedding-2",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-embedding-001",
+          "label": "gemini-embedding-001",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-3.1-pro-preview-customtools",
+          "label": "gemini-3.1-pro-preview-customtools",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-3.1-flash-lite-preview",
+          "label": "gemini-3.1-flash-lite-preview",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "label": "gemini-3.1-flash-lite",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "deep-research-pro-preview-12-2025",
+          "label": "deep-research-pro-preview-12-2025",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "deep-research-preview-04-2026",
+          "label": "deep-research-preview-04-2026",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "deep-research-max-preview-04-2026",
+          "label": "deep-research-max-preview-04-2026",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "aqa",
+          "label": "aqa",
+          "backend": "gemini-cli"
+        },
+        {
+          "id": "antigravity-preview-05-2026",
+          "label": "antigravity-preview-05-2026",
+          "backend": "gemini-cli"
+        }
+      ],
+      "models": [
+        "gemini-3.5-flash",
+        "gemini-2.5-pro",
+        "veo-3.1-lite-generate-preview",
+        "veo-3.1-generate-preview",
+        "veo-3.1-fast-generate-preview",
+        "nano-banana-pro-preview",
+        "lyria-3-pro-preview",
+        "lyria-3-clip-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+        "gemini-robotics-er-1.6-preview",
+        "gemini-robotics-er-1.5-preview",
+        "gemini-pro-latest",
+        "gemini-omni-flash-preview",
+        "gemini-flash-lite-latest",
+        "gemini-embedding-2-preview",
+        "gemini-embedding-2",
+        "gemini-embedding-001",
+        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-lite",
+        "deep-research-pro-preview-12-2025",
+        "deep-research-preview-04-2026",
+        "deep-research-max-preview-04-2026",
+        "aqa",
+        "antigravity-preview-05-2026"
+      ],
       "ready": true
     }
   ],
@@ -297,12 +1106,18 @@
         "timeout": "30m"
       },
       "cliArgs": {
-        "addDir": ["packages/ui"],
-        "mcpConfig": ["./mcp.json"]
+        "addDir": [
+          "packages/ui"
+        ],
+        "mcpConfig": [
+          "./mcp.json"
+        ]
       },
       "effort": "medium",
       "memory": {
-        "skills": [".agents/skills/example-skill"],
+        "skills": [
+          ".agents/skills/example-skill"
+        ],
         "skipHooks": true
       },
       "model": "claude-sonnet-5",
@@ -316,7 +1131,9 @@
         "plugins": {
           ".claude/plugins/example": "disabled"
         },
-        "presets": ["edit"],
+        "presets": [
+          "edit"
+        ],
         "skills": {
           ".agents/skills/example-skill": "enabled"
         },
@@ -334,7 +1151,10 @@
       "setup": {
         "baseDir": ".shell",
         "cwd": ".",
-        "dotenv": [".env", ".env.local"],
+        "dotenv": [
+          ".env",
+          ".env.local"
+        ],
         "envVars": [
           {
             "name": "CAPTAIN_RUNTIME",
@@ -352,113 +1172,722 @@
   "models": [
     {
       "backend": "anthropic",
-      "id": "claude-fable-5",
-      "ready": false
-    },
-    {
-      "backend": "anthropic",
-      "id": "claude-opus-4-8",
-      "ready": false
-    },
-    {
-      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
       "id": "claude-sonnet-5",
-      "ready": false
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
     },
     {
       "backend": "anthropic",
-      "id": "claude-haiku-4-5",
-      "ready": false
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-8",
+      "label": "Claude Opus 4.8",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-7",
+      "label": "Claude Opus 4.7",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-6",
+      "label": "Claude Opus 4.6",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-haiku-4-5-20251001",
+      "label": "Claude Haiku 4.5",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "anthropic",
+      "backends": [
+        "anthropic"
+      ],
+      "configured": true,
+      "id": "claude-sonnet-4-5-20250929",
+      "label": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "gemini",
-      "id": "gemini-2.5-pro",
-      "ready": false
-    },
-    {
-      "backend": "gemini",
-      "id": "gemini-3.0-pro",
-      "ready": false
-    },
-    {
-      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
       "id": "gemini-3.5-flash",
-      "ready": false
+      "label": "Gemini 3.5 Flash",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-2.5-pro",
+      "label": "Gemini 2.5 Pro",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "veo-3.1-lite-generate-preview",
+      "label": "veo-3.1-lite-generate-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "veo-3.1-generate-preview",
+      "label": "veo-3.1-generate-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "veo-3.1-fast-generate-preview",
+      "label": "veo-3.1-fast-generate-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "nano-banana-pro-preview",
+      "label": "nano-banana-pro-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "lyria-3-pro-preview",
+      "label": "lyria-3-pro-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "lyria-3-clip-preview",
+      "label": "lyria-3-clip-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-3-flash-preview",
+      "label": "gemini-3-flash-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-2.5-flash",
+      "label": "Gemini 2.5 Flash",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemma-4-31b-it",
+      "label": "gemma-4-31b-it",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemma-4-26b-a4b-it",
+      "label": "gemma-4-26b-a4b-it",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-robotics-er-1.6-preview",
+      "label": "gemini-robotics-er-1.6-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-robotics-er-1.5-preview",
+      "label": "gemini-robotics-er-1.5-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-pro-latest",
+      "label": "gemini-pro-latest",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-omni-flash-preview",
+      "label": "gemini-omni-flash-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-flash-lite-latest",
+      "label": "gemini-flash-lite-latest",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-embedding-2-preview",
+      "label": "gemini-embedding-2-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-embedding-2",
+      "label": "gemini-embedding-2",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-embedding-001",
+      "label": "gemini-embedding-001",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-3.1-pro-preview-customtools",
+      "label": "gemini-3.1-pro-preview-customtools",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-3.1-flash-lite-preview",
+      "label": "gemini-3.1-flash-lite-preview",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "gemini-3.1-flash-lite",
+      "label": "gemini-3.1-flash-lite",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "deep-research-pro-preview-12-2025",
+      "label": "deep-research-pro-preview-12-2025",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "deep-research-preview-04-2026",
+      "label": "deep-research-preview-04-2026",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "deep-research-max-preview-04-2026",
+      "label": "deep-research-max-preview-04-2026",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "aqa",
+      "label": "aqa",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
+    },
+    {
+      "backend": "gemini",
+      "backends": [
+        "gemini",
+        "gemini-cli"
+      ],
+      "configured": true,
+      "id": "antigravity-preview-05-2026",
+      "label": "antigravity-preview-05-2026",
+      "provider": "googleai",
+      "ready": true,
+      "reasoning": false
     },
     {
       "backend": "openai",
+      "backends": [
+        "openai"
+      ],
+      "configured": true,
       "id": "gpt-5.5",
-      "ready": false
+      "label": "GPT-5.5",
+      "provider": "openai",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
     },
     {
       "backend": "openai",
-      "id": "gpt-5.4-mini",
-      "ready": false
+      "backends": [
+        "openai"
+      ],
+      "configured": true,
+      "id": "gpt-5.4",
+      "label": "gpt-5.4",
+      "provider": "openai",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "openai",
+      "backends": [
+        "openai"
+      ],
+      "configured": true,
+      "id": "gpt-5.2",
+      "label": "gpt-5.2",
+      "provider": "openai",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "deepseek",
-      "id": "deepseek-chat",
-      "ready": false
+      "backends": [
+        "deepseek"
+      ],
+      "configured": true,
+      "id": "deepseek-v4-pro",
+      "label": "DeepSeek V4 Pro",
+      "provider": "deepseek",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "deepseek",
-      "id": "deepseek-reasoner",
-      "ready": false
+      "backends": [
+        "deepseek"
+      ],
+      "configured": true,
+      "id": "deepseek-v4-flash",
+      "label": "DeepSeek V4 Flash",
+      "provider": "deepseek",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "claude-cli",
-      "id": "claude-agent-sonnet",
-      "ready": true
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
     },
     {
       "backend": "claude-cli",
-      "id": "claude-agent-opus",
-      "ready": true
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "claude-cli",
-      "id": "claude-agent-haiku",
-      "ready": true
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-8",
+      "label": "Claude Opus 4.8",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
     },
     {
-      "backend": "claude-agent",
-      "id": "claude-agent-sonnet",
-      "ready": true
+      "backend": "claude-cli",
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-7",
+      "label": "Claude Opus 4.7",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
-      "backend": "claude-agent",
-      "id": "claude-agent-opus",
-      "ready": true
+      "backend": "claude-cli",
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
-      "backend": "claude-agent",
-      "id": "claude-agent-haiku",
-      "ready": true
+      "backend": "claude-cli",
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-6",
+      "label": "Claude Opus 4.6",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
-      "backend": "claude-cmux",
-      "id": "claude-agent-sonnet",
-      "ready": true
+      "backend": "claude-cli",
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-haiku-4-5-20251001",
+      "label": "Claude Haiku 4.5",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
-      "backend": "claude-cmux",
-      "id": "claude-agent-opus",
-      "ready": true
-    },
-    {
-      "backend": "claude-cmux",
-      "id": "claude-agent-haiku",
-      "ready": true
+      "backend": "claude-cli",
+      "backends": [
+        "claude-cli",
+        "claude-agent",
+        "claude-cmux"
+      ],
+      "configured": true,
+      "id": "claude-sonnet-4-5-20250929",
+      "label": "Claude Sonnet 4.5",
+      "provider": "claude-agent",
+      "ready": true,
+      "reasoning": true
     },
     {
       "backend": "codex-cli",
-      "id": "gpt-5-codex",
-      "ready": true
+      "backends": [
+        "codex-cli",
+        "codex-agent",
+        "codex-cmux"
+      ],
+      "configured": true,
+      "id": "gpt-5.5",
+      "label": "GPT-5.5",
+      "provider": "codex-cli",
+      "ready": true,
+      "reasoning": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
     },
     {
-      "backend": "codex-cmux",
-      "id": "gpt-5-codex",
-      "ready": true
+      "backend": "codex-cli",
+      "backends": [
+        "codex-cli",
+        "codex-agent",
+        "codex-cmux"
+      ],
+      "configured": true,
+      "id": "gpt-5.4",
+      "label": "gpt-5.4",
+      "provider": "codex-cli",
+      "ready": true,
+      "reasoning": true
+    },
+    {
+      "backend": "codex-cli",
+      "backends": [
+        "codex-cli",
+        "codex-agent",
+        "codex-cmux"
+      ],
+      "configured": true,
+      "id": "gpt-5.2",
+      "label": "gpt-5.2",
+      "provider": "codex-cli",
+      "ready": true,
+      "reasoning": true
     }
   ],
   "prompt": {
@@ -489,7 +1918,9 @@
             "type": "string"
           }
         },
-        "required": ["user"],
+        "required": [
+          "user"
+        ],
         "type": "object"
       }
     },
@@ -1004,7 +2435,15 @@
             "type": "string"
           },
           "effort": {
-            "enum": ["", "low", "medium", "high", "xhigh"],
+            "enum": [
+              "",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
             "type": "string"
           },
           "fallbacks": {
@@ -1026,7 +2465,9 @@
             "type": "number"
           }
         },
-        "required": ["model"],
+        "required": [
+          "model"
+        ],
         "type": "object"
       },
       "Permissions": {
@@ -1100,7 +2541,9 @@
             "type": "string"
           }
         },
-        "required": ["user"],
+        "required": [
+          "user"
+        ],
         "type": "object"
       },
       "ResourcePolicies": {
@@ -1164,7 +2607,15 @@
             "type": "object"
           },
           "effort": {
-            "enum": ["", "low", "medium", "high", "xhigh"],
+            "enum": [
+              "",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
             "type": "string"
           },
           "fallbacks": {
@@ -1204,7 +2655,9 @@
             "$ref": "#/$defs/Workflow"
           }
         },
-        "required": ["model"],
+        "required": [
+          "model"
+        ],
         "type": "object"
       },
       "Tools": {
@@ -1229,7 +2682,11 @@
             "type": "integer"
           },
           "scope": {
-            "enum": ["", "all", "changed"],
+            "enum": [
+              "",
+              "all",
+              "changed"
+            ],
             "type": "string"
           }
         },
@@ -1365,7 +2822,12 @@
           "askForApproval": {
             "default": "on-request",
             "description": "When codex asks for human approval before running a command",
-            "enum": ["untrusted", "on-failure", "on-request", "never"],
+            "enum": [
+              "untrusted",
+              "on-failure",
+              "on-request",
+              "never"
+            ],
             "title": "Approval Policy",
             "type": "string",
             "x-clicky-order": 2,
@@ -1428,7 +2890,11 @@
           "sandbox": {
             "default": "read-only",
             "description": "Sandbox policy for model-run shell commands",
-            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "enum": [
+              "read-only",
+              "workspace-write",
+              "danger-full-access"
+            ],
             "title": "Sandbox",
             "type": "string",
             "x-clicky-order": 1,
@@ -1466,17 +2932,203 @@
               "const": "anthropic"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-fable-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-8"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-7"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-haiku-4-5-20251001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-5-20250929"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
               "enum": [
+                "claude-sonnet-5",
                 "claude-fable-5",
                 "claude-opus-4-8",
-                "claude-sonnet-5",
-                "claude-haiku-4-5"
+                "claude-opus-4-7",
+                "claude-sonnet-4-6",
+                "claude-opus-4-6",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929"
               ]
             }
           }
@@ -1489,13 +3141,637 @@
               "const": "gemini"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-pro"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-lite-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-fast-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "nano-banana-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-clip-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-31b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-26b-a4b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.6-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.5-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-pro-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-omni-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-flash-lite-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-pro-preview-customtools"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-pro-preview-12-2025"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-max-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "aqa"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "antigravity-preview-05-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
-              "enum": ["gemini-2.5-pro", "gemini-3.0-pro", "gemini-3.5-flash"]
+              "enum": [
+                "gemini-3.5-flash",
+                "gemini-2.5-pro",
+                "veo-3.1-lite-generate-preview",
+                "veo-3.1-generate-preview",
+                "veo-3.1-fast-generate-preview",
+                "nano-banana-pro-preview",
+                "lyria-3-pro-preview",
+                "lyria-3-clip-preview",
+                "gemini-3-flash-preview",
+                "gemini-2.5-flash",
+                "gemma-4-31b-it",
+                "gemma-4-26b-a4b-it",
+                "gemini-robotics-er-1.6-preview",
+                "gemini-robotics-er-1.5-preview",
+                "gemini-pro-latest",
+                "gemini-omni-flash-preview",
+                "gemini-flash-lite-latest",
+                "gemini-embedding-2-preview",
+                "gemini-embedding-2",
+                "gemini-embedding-001",
+                "gemini-3.1-pro-preview-customtools",
+                "gemini-3.1-flash-lite-preview",
+                "gemini-3.1-flash-lite",
+                "deep-research-pro-preview-12-2025",
+                "deep-research-preview-04-2026",
+                "deep-research-max-preview-04-2026",
+                "aqa",
+                "antigravity-preview-05-2026"
+              ]
             }
           }
         }
@@ -1507,13 +3783,88 @@
               "const": "openai"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.4"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
-              "enum": ["gpt-5.5", "gpt-5.4-mini"]
+              "enum": [
+                "gpt-5.5",
+                "gpt-5.4",
+                "gpt-5.2"
+              ]
             }
           }
         }
@@ -1525,13 +3876,62 @@
               "const": "deepseek"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deepseek-v4-pro"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deepseek-v4-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
-              "enum": ["deepseek-chat", "deepseek-reasoner"]
+              "enum": [
+                "deepseek-v4-pro",
+                "deepseek-v4-flash"
+              ]
             }
           }
         }
@@ -1543,16 +3943,203 @@
               "const": "claude-cli"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-fable-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-8"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-7"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-haiku-4-5-20251001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-5-20250929"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
               "enum": [
-                "claude-agent-sonnet",
-                "claude-agent-opus",
-                "claude-agent-haiku"
+                "claude-sonnet-5",
+                "claude-fable-5",
+                "claude-opus-4-8",
+                "claude-opus-4-7",
+                "claude-sonnet-4-6",
+                "claude-opus-4-6",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929"
               ]
             }
           }
@@ -1565,16 +4152,203 @@
               "const": "claude-agent"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-fable-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-8"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-7"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-haiku-4-5-20251001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-5-20250929"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
               "enum": [
-                "claude-agent-sonnet",
-                "claude-agent-opus",
-                "claude-agent-haiku"
+                "claude-sonnet-5",
+                "claude-fable-5",
+                "claude-opus-4-8",
+                "claude-opus-4-7",
+                "claude-sonnet-4-6",
+                "claude-opus-4-6",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929"
               ]
             }
           }
@@ -1587,18 +4361,205 @@
               "const": "claude-cmux"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-fable-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-8"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-7"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-haiku-4-5-20251001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-5-20250929"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": {
               "$ref": "#/$defs/claudeCmuxArgs"
             },
             "model": {
               "enum": [
-                "claude-agent-sonnet",
-                "claude-agent-opus",
-                "claude-agent-haiku"
+                "claude-sonnet-5",
+                "claude-fable-5",
+                "claude-opus-4-8",
+                "claude-opus-4-7",
+                "claude-sonnet-4-6",
+                "claude-opus-4-6",
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-5-20250929"
               ]
             }
           }
@@ -1611,13 +4572,181 @@
               "const": "codex-cli"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.4"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false,
             "model": {
-              "enum": ["gpt-5-codex"]
+              "enum": [
+                "gpt-5.5",
+                "gpt-5.4",
+                "gpt-5.2"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "backend": {
+              "const": "codex-agent"
+            }
+          },
+          "required": [
+            "backend"
+          ]
+        },
+        "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.4"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "gpt-5.5",
+                "gpt-5.4",
+                "gpt-5.2"
+              ]
             }
           }
         }
@@ -1629,15 +4758,90 @@
               "const": "codex-cmux"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.4"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": {
               "$ref": "#/$defs/codexCmuxArgs"
             },
             "model": {
-              "enum": ["gpt-5-codex"]
+              "enum": [
+                "gpt-5.5",
+                "gpt-5.4",
+                "gpt-5.2"
+              ]
             }
           }
         }
@@ -1649,11 +4853,638 @@
               "const": "gemini-cli"
             }
           },
-          "required": ["backend"]
+          "required": [
+            "backend"
+          ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-pro"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-lite-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-fast-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "nano-banana-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-clip-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-31b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-26b-a4b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.6-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.5-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-pro-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-omni-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-flash-lite-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-pro-preview-customtools"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-pro-preview-12-2025"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-max-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "aqa"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "antigravity-preview-05-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
-            "cliArgs": false
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "gemini-3.5-flash",
+                "gemini-2.5-pro",
+                "veo-3.1-lite-generate-preview",
+                "veo-3.1-generate-preview",
+                "veo-3.1-fast-generate-preview",
+                "nano-banana-pro-preview",
+                "lyria-3-pro-preview",
+                "lyria-3-clip-preview",
+                "gemini-3-flash-preview",
+                "gemini-2.5-flash",
+                "gemma-4-31b-it",
+                "gemma-4-26b-a4b-it",
+                "gemini-robotics-er-1.6-preview",
+                "gemini-robotics-er-1.5-preview",
+                "gemini-pro-latest",
+                "gemini-omni-flash-preview",
+                "gemini-flash-lite-latest",
+                "gemini-embedding-2-preview",
+                "gemini-embedding-2",
+                "gemini-embedding-001",
+                "gemini-3.1-pro-preview-customtools",
+                "gemini-3.1-flash-lite-preview",
+                "gemini-3.1-flash-lite",
+                "deep-research-pro-preview-12-2025",
+                "deep-research-preview-04-2026",
+                "deep-research-max-preview-04-2026",
+                "aqa",
+                "antigravity-preview-05-2026"
+              ]
+            }
           }
         }
       }
