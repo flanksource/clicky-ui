@@ -2,7 +2,7 @@ import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
 import { UiAdd, UiRemove } from "../../icons";
 import { frameworkIcon } from "./frameworkIcon";
-import { formatCount, type StatusCounts } from "./status";
+import { formatCount, STATUS_LABELS, type StatusCounts } from "./status";
 import { cycleFilterState, type FilterMode, type TestFilters } from "./filterState";
 
 export type TestFilterBarProps = {
@@ -15,15 +15,21 @@ export type TestFilterBarProps = {
 
 type StatusDef = { key: keyof StatusCounts; label: string; badge: string };
 
-const STATUS_DEFS: StatusDef[] = [
-  { key: "failed", label: "Failed", badge: "bg-red-500" },
-  { key: "warned", label: "Warned", badge: "bg-amber-400" },
-  { key: "timedout", label: "Timed out", badge: "bg-amber-500" },
-  { key: "passed", label: "Passed", badge: "bg-green-500" },
-  { key: "skipped", label: "Skipped", badge: "bg-yellow-400" },
-  { key: "running", label: "Running", badge: "bg-blue-500" },
-  { key: "pending", label: "Queued", badge: "bg-muted-foreground" },
-];
+const STATUS_BADGES: Record<keyof StatusCounts, string> = {
+  failed: "bg-red-500",
+  warned: "bg-amber-400",
+  timedout: "bg-amber-500",
+  passed: "bg-green-500",
+  skipped: "bg-yellow-400",
+  running: "bg-blue-500",
+  pending: "bg-muted-foreground",
+  total: "bg-muted-foreground",
+};
+
+const STATUS_DEFS: StatusDef[] = STATUS_LABELS.map((d) => ({
+  ...d,
+  badge: STATUS_BADGES[d.key],
+}));
 
 function pillClass(mode: FilterMode | undefined): string {
   if (mode === "include") return "bg-accent border-border font-medium text-foreground";
