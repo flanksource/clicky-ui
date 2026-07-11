@@ -1,7 +1,9 @@
 {
   "fences": {
     "ai": {
-      "aliases": ["prompt"],
+      "aliases": [
+        "prompt"
+      ],
       "help": {
         "body": "Reviewer instructions for AI verification. GitHub task-list items become scored acceptance criteria.",
         "section": "AI verification fixtures",
@@ -76,7 +78,9 @@
           },
           "count": {
             "description": "Expected result count.",
-            "examples": [1],
+            "examples": [
+              1
+            ],
             "minimum": 0,
             "multipleOf": 1,
             "title": "Count",
@@ -89,7 +93,9 @@
           },
           "error": {
             "description": "Expected non-zero failure text in stderr.",
-            "examples": ["permission denied"],
+            "examples": [
+              "permission denied"
+            ],
             "title": "Error",
             "type": "string",
             "x-help": {
@@ -100,7 +106,10 @@
           },
           "exitCode": {
             "description": "Expected process exit code. Use `-` in table fixtures to skip exit-code checking.",
-            "examples": [0, 1],
+            "examples": [
+              0,
+              1
+            ],
             "minimum": 0,
             "multipleOf": 1,
             "title": "Exit code",
@@ -113,7 +122,10 @@
           },
           "format": {
             "description": "Optional output format hint, commonly json or yaml.",
-            "examples": ["json", "yaml"],
+            "examples": [
+              "json",
+              "yaml"
+            ],
             "title": "Format",
             "type": "string",
             "x-help": {
@@ -124,7 +136,9 @@
           },
           "output": {
             "description": "Expected output substring in stdout or stderr.",
-            "examples": ["success"],
+            "examples": [
+              "success"
+            ],
             "title": "Output",
             "type": "string",
             "x-help": {
@@ -156,7 +170,9 @@
           },
           "stdout": {
             "description": "Expected stdout content or @golden file reference.",
-            "examples": ["@testdata/output.txt"],
+            "examples": [
+              "@testdata/output.txt"
+            ],
             "title": "Stdout",
             "type": "string",
             "x-help": {
@@ -167,7 +183,10 @@
           },
           "timeout": {
             "description": "Maximum execution time for this command.",
-            "examples": ["30s", "2m"],
+            "examples": [
+              "30s",
+              "2m"
+            ],
             "format": "duration",
             "title": "Timeout",
             "type": "string",
@@ -200,7 +219,9 @@
       }
     },
     "lint": {
-      "aliases": ["yaml lint"],
+      "aliases": [
+        "yaml lint"
+      ],
       "help": {
         "body": "Runs `gavel lint` from a markdown fence; each violation becomes a child node.",
         "section": "Test / lint steps",
@@ -257,7 +278,14 @@
           },
           "files": {
             "description": "Target paths to lint, or a frontmatter glob that replicates fixture tests per matched file.",
-            "examples": [["cmd/gavel/fixtures.go"], ["**/*.go"]],
+            "examples": [
+              [
+                "cmd/gavel/fixtures.go"
+              ],
+              [
+                "**/*.go"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -285,6 +313,7 @@
                 "ruff",
                 "eslint",
                 "oxlint",
+                "react-doctor",
                 "pyright",
                 "tsc",
                 "markdownlint",
@@ -333,7 +362,11 @@
           "timeout": {
             "default": "5m",
             "description": "Timeout per linter (e.g. 5m, 30s)",
-            "examples": ["30s", "2m", "5m"],
+            "examples": [
+              "30s",
+              "2m",
+              "5m"
+            ],
             "format": "duration",
             "title": "Timeout",
             "type": "string",
@@ -373,7 +406,9 @@
       }
     },
     "test": {
-      "aliases": ["yaml test"],
+      "aliases": [
+        "yaml test"
+      ],
       "help": {
         "body": "Runs `gavel test` from a markdown fence; each test becomes a child node.",
         "section": "Test / lint steps",
@@ -467,7 +502,13 @@
           "framework": {
             "description": "Restrict test discovery to selected frameworks. Leave empty to enable every detected framework.",
             "items": {
-              "enum": ["go test", "ginkgo", "jest", "vitest", "playwright"],
+              "enum": [
+                "go test",
+                "ginkgo",
+                "jest",
+                "vitest",
+                "playwright"
+              ],
               "type": "string"
             },
             "title": "Framework",
@@ -495,7 +536,14 @@
           },
           "paths": {
             "description": "Package paths to test. Empty means discover all packages, matching the `gavel test` CLI positional arguments.",
-            "examples": [["./testrunner/..."], ["./cmd/gavel"]],
+            "examples": [
+              [
+                "./testrunner/..."
+              ],
+              [
+                "./cmd/gavel"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -544,7 +592,11 @@
           "show-stderr": {
             "default": "OnFailure",
             "description": "",
-            "enum": ["Never", "OnFailure", "Always"],
+            "enum": [
+              "Never",
+              "OnFailure",
+              "Always"
+            ],
             "title": "Show Stderr",
             "type": "string",
             "x-help": {
@@ -556,7 +608,11 @@
           "show-stdout": {
             "default": "OnFailure",
             "description": "",
-            "enum": ["Never", "OnFailure", "Always"],
+            "enum": [
+              "Never",
+              "OnFailure",
+              "Always"
+            ],
             "title": "Show Stdout",
             "type": "string",
             "x-help": {
@@ -584,7 +640,11 @@
           "test-timeout": {
             "default": "5m0s",
             "description": "Per-test-package subprocess deadline. Applies to each go test / ginkgo / vitest invocation.",
-            "examples": ["30s", "2m", "5m"],
+            "examples": [
+              "30s",
+              "2m",
+              "5m"
+            ],
             "format": "duration",
             "title": "Test Timeout",
             "type": "string",
@@ -597,7 +657,11 @@
           "timeout": {
             "default": "10m0s",
             "description": "Global wall-clock deadline for the entire test+lint run. On timeout, diagnostics are captured and every subprocess is killed.",
-            "examples": ["30s", "2m", "5m"],
+            "examples": [
+              "30s",
+              "2m",
+              "5m"
+            ],
             "format": "duration",
             "title": "Timeout",
             "type": "string",
@@ -659,7 +723,9 @@
         "properties": {
           "cacheTTL": {
             "description": "Cache duration for AI calls.",
-            "examples": ["10m"],
+            "examples": [
+              "10m"
+            ],
             "title": "Cache TTL",
             "type": "string",
             "x-help": {
@@ -670,7 +736,9 @@
           },
           "maxConcurrent": {
             "description": "Maximum concurrent AI checks.",
-            "examples": [4],
+            "examples": [
+              4
+            ],
             "minimum": 1,
             "multipleOf": 1,
             "title": "Max concurrent",
@@ -683,7 +751,9 @@
           },
           "maxTokens": {
             "description": "Maximum response tokens.",
-            "examples": [10000],
+            "examples": [
+              10000
+            ],
             "minimum": 0,
             "multipleOf": 1,
             "title": "Max tokens",
@@ -696,7 +766,9 @@
           },
           "model": {
             "description": "Agent model name, falling back to the default model when unset.",
-            "examples": ["claude-code-sonnet"],
+            "examples": [
+              "claude-code-sonnet"
+            ],
             "title": "Model",
             "type": "string",
             "x-help": {
@@ -717,7 +789,9 @@
           },
           "temperature": {
             "description": "Sampling temperature.",
-            "examples": [0],
+            "examples": [
+              0
+            ],
             "maximum": 2,
             "minimum": 0,
             "title": "Temperature",
@@ -738,7 +812,10 @@
       },
       "arch": {
         "description": "Architecture constraint, e.g. amd64.",
-        "examples": ["amd64", "arm64"],
+        "examples": [
+          "amd64",
+          "arm64"
+        ],
         "title": "Arch",
         "type": "string",
         "x-help": {
@@ -749,7 +826,12 @@
       },
       "args": {
         "description": "Default arguments for exec.",
-        "examples": [["--file", "$file"]],
+        "examples": [
+          [
+            "--file",
+            "$file"
+          ]
+        ],
         "items": {
           "type": "string"
         },
@@ -763,7 +845,9 @@
       },
       "build": {
         "description": "Shell command run once before all tests.",
-        "examples": ["go build -o $workDir/myapp"],
+        "examples": [
+          "go build -o $workDir/myapp"
+        ],
         "title": "Build",
         "type": "string",
         "x-help": {
@@ -774,7 +858,12 @@
       },
       "codeBlocks": {
         "description": "Executable code fence languages.",
-        "examples": [["bash", "python"]],
+        "examples": [
+          [
+            "bash",
+            "python"
+          ]
+        ],
         "items": {
           "type": "string"
         },
@@ -788,7 +877,10 @@
       },
       "cwd": {
         "description": "Default working directory, resolved relative to the fixture file.",
-        "examples": ["$GIT_ROOT_DIR/testdata", "./testdir"],
+        "examples": [
+          "$GIT_ROOT_DIR/testdata",
+          "./testdir"
+        ],
         "title": "Working directory",
         "type": "string",
         "x-help": {
@@ -799,7 +891,9 @@
       },
       "daemon": {
         "description": "Background command run before tests and stopped afterwards.",
-        "examples": ["go run ./server --port {{.port}}"],
+        "examples": [
+          "go run ./server --port {{.port}}"
+        ],
         "title": "Daemon",
         "type": "string",
         "x-help": {
@@ -823,7 +917,10 @@
       },
       "exec": {
         "description": "Default executable for command/table fixtures.",
-        "examples": ["./myapp", "$executablePath"],
+        "examples": [
+          "./myapp",
+          "$executablePath"
+        ],
         "title": "Executable",
         "type": "string",
         "x-help": {
@@ -834,7 +931,9 @@
       },
       "files": {
         "description": "Glob pattern: replicate tests per matching file.",
-        "examples": ["**/*.go"],
+        "examples": [
+          "**/*.go"
+        ],
         "title": "Files",
         "type": "string",
         "x-help": {
@@ -845,7 +944,10 @@
       },
       "os": {
         "description": "OS constraint, e.g. linux or !darwin.",
-        "examples": ["linux", "!darwin"],
+        "examples": [
+          "linux",
+          "!darwin"
+        ],
         "title": "OS",
         "type": "string",
         "x-help": {
@@ -856,7 +958,9 @@
       },
       "skip": {
         "description": "Bash command; exit 0 skips the fixture.",
-        "examples": ["! command -v docker"],
+        "examples": [
+          "! command -v docker"
+        ],
         "title": "Skip",
         "type": "string",
         "x-help": {
@@ -867,8 +971,12 @@
       },
       "terminal": {
         "description": "Terminal mode. `pty` uses a pseudo-terminal and merges stdout/stderr.",
-        "enum": ["pty"],
-        "examples": ["pty"],
+        "enum": [
+          "pty"
+        ],
+        "examples": [
+          "pty"
+        ],
         "title": "Terminal",
         "type": "string",
         "x-help": {
@@ -879,7 +987,9 @@
       },
       "timeout": {
         "description": "Total timeout for fixture execution.",
-        "examples": ["30s"],
+        "examples": [
+          "30s"
+        ],
         "title": "Timeout",
         "type": "string",
         "x-help": {
@@ -894,7 +1004,11 @@
         "properties": {
           "disabled": {
             "description": "Check IDs to disable for this fixture.",
-            "examples": [["style"]],
+            "examples": [
+              [
+                "style"
+              ]
+            ],
             "items": {
               "type": "string"
             },
@@ -908,8 +1022,14 @@
           },
           "scope": {
             "description": "Review scope, defaulting to the working-tree diff.",
-            "enum": ["diff", "all", "changed"],
-            "examples": ["diff"],
+            "enum": [
+              "diff",
+              "all",
+              "changed"
+            ],
+            "examples": [
+              "diff"
+            ],
             "title": "Scope",
             "type": "string",
             "x-help": {
@@ -920,7 +1040,9 @@
           },
           "threshold": {
             "description": "Minimum passing score, defaulting to 80.",
-            "examples": [80],
+            "examples": [
+              80
+            ],
             "maximum": 100,
             "minimum": 0,
             "multipleOf": 1,
@@ -995,7 +1117,9 @@
       },
       {
         "body": "Each row defines a test. Unrecognized columns become template variables and CEL properties.",
-        "examples": ["| Name | CLI | Args | Exit Code | CEL |"],
+        "examples": [
+          "| Name | CLI | Args | Exit Code | CEL |"
+        ],
         "title": "Markdown tables"
       },
       {
@@ -1025,7 +1149,9 @@
       },
       {
         "body": "Executable code fences include bash, sh, shell, python, javascript, typescript, powershell, and go.",
-        "examples": ["```bash exitCode=1 timeout=30\nexit 1\n```"],
+        "examples": [
+          "```bash exitCode=1 timeout=30\nexit 1\n```"
+        ],
         "title": "Supported languages"
       },
       {
