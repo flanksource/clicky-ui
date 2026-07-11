@@ -30,6 +30,20 @@ export interface ToolParam {
   value: string;
 }
 
+export interface SessionQuestionOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+export interface SessionQuestion {
+  id: string;
+  text: string;
+  context?: string;
+  multiSelect?: boolean;
+  options: SessionQuestionOption[];
+}
+
 // Keys already rendered elsewhere in the row — the file-path heading, the
 // inline shell command, or the diff — so they don't repeat as inline params.
 const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
@@ -39,6 +53,7 @@ const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
   Edit: ["file_path", "notebook_path", "path", "old_string", "new_string"],
   MultiEdit: ["file_path", "notebook_path", "path", "edits"],
   NotebookEdit: ["file_path", "notebook_path", "path"],
+  AskUserQuestion: ["questions", "question", "prompt", "text", "header", "context", "description", "options"],
 };
 
 /** Flatten a tool's input into JetBrains-style `name: value` inline params:
@@ -221,12 +236,99 @@ export function summarizeToolInput(
     case "browser_navigate":
       return str("url");
     case "AskUserQuestion": {
-      const questions = input["questions"];
-      return Array.isArray(questions) ? `${questions.length} questions` : "";
+      const questions = questionsFromToolInput(input);
+      const rawQuestions = input["questions"];
+      if (questions.length > 1) return `${questions.length} questions`;
+      if (questions[0]?.text) return truncate(questions[0].text, 80);
+      if (Array.isArray(rawQuestions) && rawQuestions.length > 0) return `${rawQuestions.length} questions`;
+      return "";
     }
     case "ExitPlanMode":
       return str("planFilePath");
     default:
       return "";
   }
+}
+
+export function questionsFromToolInput(input?: Record<string, unknown>): SessionQuestion[] {
+  if (!input) return [];
+  const rawQuestions = input.questions;
+  if (Array.isArray(rawQuestions)) {
+    return rawQuestions
+      .map((question, index) => questionFromValue(question, index))
+      .filter((question): question is SessionQuestion => question !== null);
+  }
+
+  const text = stringField(input, "question") || stringField(input, "prompt") || stringField(input, "text");
+  if (!text) return [];
+  return [{
+    id: stringField(input, "id") || "1",
+    text,
+    ...optionalContext(input),
+    multiSelect: booleanField(input, "multiSelect") || booleanField(input, "multi_select"),
+    options: optionList(input.options),
+  }];
+}
+
+function questionFromValue(value: unknown, index: number): SessionQuestion | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? { id: String(index + 1), text, options: [] } : null;
+  }
+  if (!isRecord(value)) return null;
+  const text =
+    stringField(value, "question") ||
+    stringField(value, "text") ||
+    stringField(value, "prompt") ||
+    stringField(value, "label");
+  if (!text) return null;
+  return {
+    id: stringField(value, "id") || String(index + 1),
+    text,
+    ...optionalContext(value),
+    multiSelect: booleanField(value, "multiSelect") || booleanField(value, "multi_select"),
+    options: optionList(value.options),
+  };
+}
+
+function optionList(value: unknown): SessionQuestionOption[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((option, index) => {
+    if (typeof option === "string") {
+      const label = option.trim();
+      return label ? [{ value: label, label }] : [];
+    }
+    if (!isRecord(option)) return [];
+    const label =
+      stringField(option, "label") ||
+      stringField(option, "value") ||
+      stringField(option, "id") ||
+      stringField(option, "description");
+    if (!label) return [];
+    const value = stringField(option, "value") || stringField(option, "id") || label;
+    const description = stringField(option, "description");
+    return [{
+      value: value || String(index + 1),
+      label,
+      ...(description && description !== label ? { description } : {}),
+    }];
+  });
+}
+
+function optionalContext(input: Record<string, unknown>): Pick<SessionQuestion, "context"> {
+  const context = stringField(input, "header") || stringField(input, "context") || stringField(input, "description");
+  return context ? { context } : {};
+}
+
+function stringField(input: Record<string, unknown>, key: string): string {
+  const value = input[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function booleanField(input: Record<string, unknown>, key: string): boolean {
+  return input[key] === true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }

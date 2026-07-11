@@ -1,3 +1,21 @@
+import type { StaticIconComponent } from "../Icon";
+import {
+  UiBeaker,
+  UiBox,
+  UiBoxes,
+  UiCloudDownload,
+  UiEye,
+  UiGitBranch,
+  UiPackage,
+  UiPencilSimpleLine,
+  UiPlayCircle,
+  UiQuestion,
+  UiSearch,
+  UiShieldCheck,
+  UiStrategy,
+  UiTrash,
+  UiWrench,
+} from "../../icons";
 import { getSessionAction, type SessionEvent } from "./SessionViewer.model";
 
 // ── Captain category taxonomy ───────────────────────────────────────────────
@@ -40,6 +58,27 @@ export const CATEGORY_LABELS: Record<SessionCategory, string> = {
   clarify: "Clarify",
   read: "Read",
   other: "Other",
+};
+
+// Per-category glyph, following the "Agent Action Icons" workflow palette — run
+// plays, plan strategizes, verify-adjacent categories (test/lint) carry their
+// own marks so the filter menu reads at a glance.
+export const CATEGORY_ICONS: Record<SessionCategory, StaticIconComponent> = {
+  build: UiPackage,
+  test: UiBeaker,
+  install: UiCloudDownload,
+  explore: UiSearch,
+  lint: UiShieldCheck,
+  cleanup: UiTrash,
+  git: UiGitBranch,
+  docker: UiBox,
+  k8s: UiBoxes,
+  run: UiPlayCircle,
+  plan: UiStrategy,
+  edit: UiPencilSimpleLine,
+  clarify: UiQuestion,
+  read: UiEye,
+  other: UiWrench,
 };
 
 const CATEGORY_PRIORITY: Record<SessionCategory, number> = {
