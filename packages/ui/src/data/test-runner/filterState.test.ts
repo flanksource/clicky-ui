@@ -3,7 +3,9 @@ import {
   cycleFilterState,
   decodeFilterState,
   encodeFilterState,
+  filterStateToRecord,
   matchesFilterState,
+  recordToFilterState,
 } from "./filterState";
 
 describe("cycleFilterState", () => {
@@ -60,5 +62,24 @@ describe("encode/decode round-trip", () => {
     expect(decoded.get("passed")).toBe("include");
     expect(decoded.get("failed")).toBe("exclude");
     expect(encodeFilterState(decoded)).toEqual(["!failed", "passed", "skipped"]);
+  });
+});
+
+describe("filterStateToRecord / recordToFilterState round-trip", () => {
+  it("round-trips a Map with both include and exclude entries", () => {
+    const original = new Map<string, "include" | "exclude">([
+      ["passed", "include"],
+      ["failed", "exclude"],
+    ]);
+    const record = filterStateToRecord(original);
+    expect(record).toEqual({ passed: "include", failed: "exclude" });
+    const roundTripped = recordToFilterState(record);
+    expect(roundTripped).toEqual(original);
+  });
+
+  it("round-trips an empty Map to an empty record and back", () => {
+    const empty = new Map<string, "include" | "exclude">();
+    expect(filterStateToRecord(empty)).toEqual({});
+    expect(recordToFilterState({})).toEqual(empty);
   });
 });

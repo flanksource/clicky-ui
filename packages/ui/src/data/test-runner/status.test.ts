@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateStatusCounts,
   collapseSingleChildChains,
   collectFrameworks,
   filterTests,
@@ -8,6 +9,7 @@ import {
   hasFailed,
   hasPending,
   humanizeName,
+  STATUS_LABELS,
   statusIconFor,
   statusToneFor,
   sum,
@@ -187,6 +189,37 @@ describe("collapseSingleChildChains", () => {
       children: [leaf("only", { failed: true })],
     };
     expect(collapseSingleChildChains([tree])[0].name).toBe("outer");
+  });
+});
+
+describe("aggregateStatusCounts", () => {
+  it("rolls up non-task status counts across the whole forest", () => {
+    expect(aggregateStatusCounts(suite)).toMatchObject({
+      total: 4,
+      passed: 1,
+      failed: 1,
+      running: 1,
+      timedout: 1,
+    });
+  });
+
+  it("excludes task-framework nodes, matching sumNonTaskTests per root", () => {
+    const tree: Test = {
+      name: "root",
+      framework: "task",
+      children: [leaf("real", { passed: true, framework: "go test" })],
+    };
+    expect(aggregateStatusCounts([tree])).toMatchObject({ total: 1, passed: 1 });
+  });
+});
+
+describe("STATUS_LABELS", () => {
+  it("lists every renderable status key exactly once", () => {
+    const keys = STATUS_LABELS.map((d) => d.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(
+      expect.arrayContaining(["failed", "warned", "timedout", "passed", "skipped", "running", "pending"]),
+    );
   });
 });
 

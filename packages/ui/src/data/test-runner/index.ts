@@ -32,6 +32,8 @@ export {
   type TestStatus,
   sum,
   sumNonTaskTests,
+  aggregateStatusCounts,
+  STATUS_LABELS,
   hasFailed,
   hasPending,
   testStatus,
@@ -59,6 +61,8 @@ export {
   encodeFilterState,
   cycleFilterState,
   matchesFilterState,
+  filterStateToRecord,
+  recordToFilterState,
 } from "./filterState";
 
 export type {
