@@ -48,6 +48,24 @@ export function cycleFilterState<T extends string = string>(
   return next;
 }
 
+// filterStateToRecord / recordToFilterState bridge this package's Map-based
+// FilterState to the Record<string, FilterBarMultiFilterMode> shape the
+// components/filter-bar-multi TriStateMultiSelect expects. FilterMode and
+// FilterBarMultiFilterMode are both independently-defined "include" | "exclude"
+// unions — structurally identical today, but a future addition to either would
+// silently type-check against the other since neither references the other.
+export function filterStateToRecord<T extends string = string>(
+  state: FilterState<T>,
+): Record<string, FilterMode> {
+  return Object.fromEntries(state);
+}
+
+export function recordToFilterState<T extends string = string>(
+  record: Record<string, FilterMode>,
+): FilterState<T> {
+  return new Map(Object.entries(record)) as FilterState<T>;
+}
+
 export function matchesFilterState<T extends string = string>(
   value: T | null | undefined,
   state: FilterState<T>,

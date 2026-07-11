@@ -92,6 +92,26 @@ export function sum(t: Test): StatusCounts {
   return r;
 }
 
+/** Roll up a forest's non-task status counts. Shared by `TestRunner`'s filter
+ *  bar and `TestRunSummary`'s chips so both read the same tally. */
+export function aggregateStatusCounts(tests: Test[]): StatusCounts {
+  const r = emptyCounts();
+  for (const t of tests) addCounts(r, sumNonTaskTests(t));
+  return r;
+}
+
+/** Ordered status key → label list, driving both the filter bar's pills and a
+ *  host's status filter option list, so the seven rows aren't hand-duplicated. */
+export const STATUS_LABELS: { key: keyof StatusCounts; label: string }[] = [
+  { key: "failed", label: "Failed" },
+  { key: "warned", label: "Warned" },
+  { key: "timedout", label: "Timed out" },
+  { key: "passed", label: "Passed" },
+  { key: "skipped", label: "Skipped" },
+  { key: "running", label: "Running" },
+  { key: "pending", label: "Queued" },
+];
+
 /** Like {@link sum} but excludes `task`-framework pseudo-nodes from the tally. */
 export function sumNonTaskTests(t: Test): StatusCounts {
   if (t.framework === "task") {
