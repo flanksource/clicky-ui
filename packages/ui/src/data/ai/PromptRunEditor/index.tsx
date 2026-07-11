@@ -103,6 +103,10 @@ export function PromptRunEditor({
   const selection = selectionForBackend(families, value.backend);
   const family = familyById(families, selection.family);
   const familyModels = modelsForFamily(models, family, value.backend);
+  const selectedModel = models.find((m) => m.id === value.model);
+  // Hide effort for a model that does not reason; default to showing it when the
+  // selection is unknown (a family alias or a not-yet-loaded catalog).
+  const showEffort = !selectedModel || selectedModel.reasoning;
 
   return (
     <div className={cn("grid gap-density-4", className)}>
@@ -140,15 +144,17 @@ export function PromptRunEditor({
               )}
             </div>
           </SpecField>
-          <SpecField label="Effort">
-            <EffortSelector
-              efforts={reasoningEfforts}
-              value={value.effort ?? ""}
-              onChange={(effort) => onChange(withRoot(value, { effort }))}
-              size="md"
-              className="w-full"
-            />
-          </SpecField>
+          {showEffort && (
+            <SpecField label="Effort">
+              <EffortSelector
+                efforts={reasoningEfforts}
+                value={value.effort ?? ""}
+                onChange={(effort) => onChange(withRoot(value, { effort }))}
+                size="md"
+                className="w-full"
+              />
+            </SpecField>
+          )}
         </div>
         {children}
         <div>
@@ -196,7 +202,7 @@ export function PromptRunEditor({
         <SpecRuntimeEditor
           value={value}
           onChange={onChange}
-          models={familyModels}
+          models={models}
           families={families}
           tools={tools}
           {...(permissionCatalog ? { permissionCatalog } : {})}
