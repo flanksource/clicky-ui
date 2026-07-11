@@ -12,7 +12,7 @@ import { PromptInput } from "./PromptInput";
 import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
 import { providerIcon } from "./provider-icons";
-import { ContextUsage } from "./ContextUsage";
+import { ContextMeter } from "./ContextMeter";
 import type {
   ChatBudgetConfig,
   ChatModel,
@@ -254,12 +254,14 @@ export function Chat({
       {usage && usage.maxTokens > 0 && (
         <>
           <div className="flex-1" />
-          <ContextUsage
+          <ContextMeter
+            mode="gauge"
+            usedPercent={Math.round((usage.usedTokens / usage.maxTokens) * 100)}
             usedTokens={usage.usedTokens}
-            maxTokens={usage.maxTokens}
+            windowTokens={usage.maxTokens}
             {...(usage.messageCount != null ? { messageCount: usage.messageCount } : {})}
-            {...(usage.cost != null ? { cost: usage.cost } : {})}
-            {...(usage.modelLabel ? { modelLabel: usage.modelLabel } : {})}
+            {...(usage.cost != null ? { cost: { total: usage.cost } } : {})}
+            {...(usage.modelLabel ? { model: usage.modelLabel } : {})}
             {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
           />
         </>
