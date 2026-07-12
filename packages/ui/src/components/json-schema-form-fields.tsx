@@ -194,14 +194,15 @@ export function ObjectSection({
 // editable controls so layout and queries stay uniform.
 export function ReadOnlyValue({ field, fieldId, size }: { field: FieldControl; fieldId: string; size: FormSize }) {
   const text = toText(field.value);
-  const display = field.kind === "date" && text ? formatDateTimeRelative(text) : text;
+  const secret = field.schema.format === "password";
+  const display = secret && text ? "••••••••" : field.kind === "date" && text ? formatDateTimeRelative(text) : text;
   return (
     <span
       id={fieldId}
       data-jsf-input
       data-jsf-readonly
       className={cn("flex items-center text-foreground", controlHeightClass[size], labelSizeClass[size])}
-      title={text || undefined}
+      title={secret ? undefined : text || undefined}
     >
       {display || <span className="text-muted-foreground">—</span>}
     </span>
@@ -247,7 +248,10 @@ export function StringControl({
     <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
       <input
         id={fieldId}
-        type="text"
+        // format:"password" masks secret material (API keys, client secrets);
+        // autoComplete new-password stops browsers from offering saved logins.
+        type={field.schema.format === "password" ? "password" : "text"}
+        autoComplete={field.schema.format === "password" ? "new-password" : undefined}
         data-jsf-input
         className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
