@@ -1,10 +1,13 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiComment } from "../icons";
 import { CommentThread } from "./CommentThread";
 import { CommentThreadList } from "./CommentThreadList";
-import { useCommentContextOptional, type CommentContextValue } from "./comment-context";
+import {
+  useCommentContextOptional,
+  type CommentContextValue,
+} from "./comment-context";
 import {
   buildThreadListHandlers,
   getRoots,
@@ -23,6 +26,8 @@ export type CommentSidePanelProps = {
   /** Fallback label formatter for anchors without an explicit label. */
   formatAnchorLabel?: (anchor: CommentAnchor) => string;
   compact?: boolean;
+  /** Position the focused thread beside its registered content anchor. */
+  focusedAlignment?: "flow" | "anchor";
   className?: string;
 };
 
@@ -130,6 +135,31 @@ function AllComments({
   }, [ctx]);
   const handlers = buildThreadListHandlers(ordered, ctx.config, ctx.callbacks);
 
+  function activateThread(
+    event: MouseEvent<HTMLDivElement>,
+    anchor: CommentAnchor,
+  ) {
+    const target = event.target as Element;
+    if (
+      target.closest(
+        'button, a, input, textarea, select, [contenteditable="true"]',
+      )
+    )
+      return;
+    const roleButton = target.closest('[role="button"]');
+    if (roleButton && roleButton !== target.closest("[data-comment-kind]"))
+      return;
+    if (anchor !== DOCUMENT_ANCHOR) {
+      const found = ctx.scrollToAnchor(anchor, {
+        behavior: "smooth",
+        block: "start",
+        offset: 12,
+      });
+      if (!found) return;
+    }
+    ctx.focusAnchor(anchor);
+  }
+
   if (ordered.length === 0) {
     return (
       <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -147,14 +177,23 @@ function AllComments({
         comments={ordered}
         config={ctx.config}
         compact
-        renderRootMeta={(c) => (
-          <LocationMeta label={label(c.anchor ?? DOCUMENT_ANCHOR)} />
-        )}
+        renderRootMeta={(c) => {
+          const anchor = c.anchor ?? DOCUMENT_ANCHOR;
+          const available =
+            anchor === DOCUMENT_ANCHOR || ctx.getAnchorTop(anchor) != null;
+          return (
+            <LocationMeta
+              label={`${label(anchor)}${available ? "" : " · Unavailable"}`}
+            />
+          );
+        }}
         getThreadProps={(c) => ({
           "data-testid": "comment-feed-item",
           onMouseEnter: () =>
             ctx.setHighlightAnchor(c.anchor ?? DOCUMENT_ANCHOR),
           onMouseLeave: () => ctx.setHighlightAnchor(null),
+          onClick: (event) =>
+            activateThread(event, c.anchor ?? DOCUMENT_ANCHOR),
         })}
         {...handlers}
       />
@@ -176,6 +215,7 @@ function FocusedComments({
   const comments = ctx.comments.filter(
     (c) => (c.anchor ?? DOCUMENT_ANCHOR) === anchor,
   );
+  const hasComments = comments.length > 0;
   return (
     <div className="space-y-3" data-comment-anchor={anchor}>
       <LocationMeta
@@ -190,7 +230,11 @@ function FocusedComments({
         config={ctx.config}
         anchor={anchor}
         compact={compact ?? false}
-        autoFocusComposer
+        autoFocusComposer={!hasComments}
+        defaultExpandedRoots={hasComments}
+        composerPlaceholder={
+          hasComments ? "Add another top-level comment…" : "Add a comment…"
+        }
         {...ctx.callbacks}
       />
     </div>
@@ -205,6 +249,47 @@ function FocusedComments({
 export function CommentSidePanel(props: CommentSidePanelProps) {
   const ctx = useCommentContextOptional();
   const label = useAnchorLabel(props);
+  const railRef = useRef<HTMLElement>(null);
+  const focusedRef = useRef<HTMLDivElement>(null);
+  const [focusedOffset, setFocusedOffset] = useState<number | null>(null);
+  const focusedAnchor = ctx?.railMode === "focused" ? ctx.focusedAnchor : null;
+
+  useEffect(() => {
+    if (!ctx || props.focusedAlignment !== "anchor" || !focusedAnchor) {
+      setFocusedOffset(null);
+      return;
+    }
+    const content = ctx.contentRef.current;
+    const rail = railRef.current;
+    const focused = focusedRef.current;
+    if (!content || !rail || !focused) return;
+
+    const update = () => {
+      const anchorTop = ctx.getAnchorTop(focusedAnchor);
+      if (anchorTop == null) {
+        setFocusedOffset(null);
+        return;
+      }
+      const desiredTop = anchorTop + content.getBoundingClientRect().top;
+      const currentOffset = Number.parseFloat(focused.style.top) || 0;
+      const nextOffset =
+        currentOffset + desiredTop - focused.getBoundingClientRect().top;
+      setFocusedOffset(Math.max(0, nextOffset));
+    };
+    update();
+    content.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(content);
+    observer?.observe(rail);
+    return () => {
+      content.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      observer?.disconnect();
+    };
+  }, [ctx, focusedAnchor, props.focusedAlignment]);
+
   if (!ctx) return null;
 
   const total = Object.values(ctx.commentCounts).reduce((a, b) => a + b, 0);
@@ -212,8 +297,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
 
   return (
     <aside
+      ref={railRef}
       data-testid="comment-side-panel"
-      className={cn("w-[320px] space-y-3", props.className)}
+      className={cn("relative w-[320px] space-y-3", props.className)}
     >
       {ctx.railMode === "all" ? (
         <>
@@ -232,7 +318,12 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           <AllComments ctx={ctx} label={label} />
         </>
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
-        <>
+        <div
+          ref={focusedRef}
+          data-testid="comment-focused-rail"
+          className="relative space-y-3"
+          style={focusedOffset == null ? undefined : { top: focusedOffset }}
+        >
           <div className="flex items-center gap-2">
             {total > 0 && (
               <RailToggle
@@ -256,7 +347,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}
           />
-        </>
+        </div>
       ) : (
         <RailToggle onClick={ctx.openCommentList} testId="comment-open-all">
           Open comments ({total})
