@@ -1,98 +1,141 @@
-import { useEffect, useMemo, useState } from "react";
-import { K8SSecret, K8SConfigmap } from "@flanksource/icons/mi";
+import { createElement, useEffect, useMemo, useState } from "react";
+import {
+  K8SSecret,
+  K8SConfigmap,
+  Helm,
+  K8SServiceaccount,
+  Vault,
+} from "@flanksource/icons/mi";
 import { type StaticIconComponent } from "../data/Icon";
 import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
 import { Combobox, type ComboboxOption } from "./Combobox";
-import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 
-// SecretKeySelector picks a Secret or ConfigMap and one of its keys, with a
-// mid-masked preview of every key's value so the operator can tell which key
-// holds the host vs the db vs a password. It also offers a "Value" mode (on by
-// default; opt out with `allowLiteral={false}`) for typing a static inline
-// string. It is presentational: it fetches nothing — the consumer supplies
-// async `loadResources` / `loadKeyPreview` getters. It emits a discriminated
-// value the consumer lowers into whatever reference shape it needs.
+// SecretKeySelector picks how a credential is sourced and lowers the choice into
+// a single reference string the consumer persists. It supports Kubernetes
+// Secrets and ConfigMaps (name + key), Helm release values (name + jsonpath
+// key), a service-account token (name only), a 1Password reference
+// (op://vault/item/field), and a static inline "Value". It is presentational:
+// it fetches nothing — the consumer supplies async `loadResources` /
+// `loadKeyPreview` (for keyed kinds) and optional `loadServiceAccounts` getters.
 
-export type SecretKind = "secret" | "configmap";
+/** Kinds that reference a named resource plus one of its keys. */
+export type SecretKind = "secret" | "configmap" | "helm";
 
-/** Toggle options: the two resource kinds plus the inline-literal mode. */
-export type SecretValueSource = SecretKind | "value";
+/** Every source the picker can emit, including the non-keyed ones. */
+export type SecretValueSource = SecretKind | "serviceaccount" | "onepassword" | "value";
 
 /** One key's mid-masked preview. `value` is already masked by the consumer. */
 export type KeyPreview = { key: string; value: string };
 
 /**
- * The selector's value: either a {kind,name,key} reference into a Secret /
- * ConfigMap, or a static inline literal ({kind:"value", value}).
+ * The selector's value: a {kind,name,key} reference into a Secret / ConfigMap /
+ * Helm release, a service-account token by name, a 1Password op:// reference, or
+ * a static inline literal.
  */
 export type SecretKeyValue =
   | { kind: SecretKind; name: string; key: string }
+  | { kind: "serviceaccount"; name: string }
+  | { kind: "onepassword"; ref: string }
   | { kind: "value"; value: string };
 
-/** A named secret/configmap and its data key names (values never returned). */
+/** A named secret/configmap/helm-release and its data key names (values never returned). */
 export type SecretResource = { name: string; keys?: string[] };
 
 export type SecretKeySelectorProps = {
   value: SecretKeyValue | undefined;
   onChange: (next: SecretKeyValue | undefined) => void;
-  /** Loads the named kind's resources (name + data key names). */
+  /** Loads the named keyed kind's resources (name + data key names). */
   loadResources: (kind: SecretKind) => Promise<SecretResource[]>;
-  /** Loads mid-masked previews for the named resource's keys. */
+  /** Loads mid-masked previews for the named keyed resource's keys. */
   loadKeyPreview: (kind: SecretKind, name: string) => Promise<KeyPreview[]>;
   /**
-   * Offer a third "Value" toggle for typing a static inline literal. Enabled by
-   * default; pass `false` to restrict the selector to Secret/ConfigMap
-   * references only.
+   * Loads the service-account names (no keys) for the "serviceaccount" source.
+   * When omitted, that source's name field accepts freeform entry only.
+   */
+  loadServiceAccounts?: () => Promise<SecretResource[]>;
+  /**
+   * The sources offered in the picker, in order. Defaults to
+   * `["secret", "configmap", "value"]` (or drops "value" when `allowLiteral` is
+   * false). Pass an explicit list to offer helm / serviceaccount / onepassword.
+   */
+  sources?: SecretValueSource[];
+  /**
+   * Shorthand honoured only when `sources` is not supplied: `false` drops the
+   * inline "Value" source, leaving Secret/ConfigMap. Ignored when `sources` is
+   * given.
    */
   allowLiteral?: boolean;
   /**
-   * When true, a chosen secret/configmap name absent from the loaded resources,
-   * or a key absent from the chosen resource's keys, is flagged invalid (once
-   * the respective load settles). The reference doesn't exist in the namespace.
-   * The literal "Value" mode is never strict-flagged.
+   * When true, a chosen name absent from the loaded resources, or a key absent
+   * from the chosen keyed resource's keys, is flagged invalid (once the load
+   * settles). The onepassword and literal sources are never strict-flagged.
    */
   strict?: boolean;
   className?: string;
 };
+
+const DEFAULT_SOURCES: SecretValueSource[] = ["secret", "configmap", "value"];
 
 export function SecretKeySelector({
   value,
   onChange,
   loadResources,
   loadKeyPreview,
+  loadServiceAccounts,
+  sources,
   allowLiteral = true,
   strict = false,
   className,
 }: SecretKeySelectorProps) {
-  const source: SecretValueSource = value?.kind ?? "secret";
+  const sourceList = useMemo<SecretValueSource[]>(
+    () => sources ?? (allowLiteral ? DEFAULT_SOURCES : ["secret", "configmap"]),
+    [sources, allowLiteral],
+  );
+
+  const source: SecretValueSource = value?.kind ?? sourceList[0] ?? "secret";
+  const isKeyed = source === "secret" || source === "configmap" || source === "helm";
+  const isServiceAccount = source === "serviceaccount";
+  const isOnePassword = source === "onepassword";
   const isLiteral = source === "value";
-  // A literal value carries no resource kind; the loaders default to "secret".
-  const refKind: SecretKind = isLiteral ? "secret" : source;
-  const selectedName = value && value.kind !== "value" ? value.name : "";
-  const selectedKey = value && value.kind !== "value" ? value.key : "";
+  // A keyed source's refKind drives the loaders; other sources default to "secret".
+  const refKind: SecretKind = isKeyed ? (source as SecretKind) : "secret";
+
+  const selectedName =
+    value && (value.kind === "serviceaccount" || isRefKind(value)) ? value.name : "";
+  const selectedKey = value && isRefKind(value) ? value.key : "";
   const literalValue = value && value.kind === "value" ? value.value : "";
+  const opRef = value && value.kind === "onepassword" ? value.ref : "";
 
   const [resources, setResources] = useState<SecretResource[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [previews, setPreviews] = useState<KeyPreview[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  // Load the name list for keyed kinds (secret/configmap/helm) and, when a
+  // loader is supplied, for the serviceaccount source. Other sources list nothing.
   useEffect(() => {
-    // Literal mode references no resource, so skip the list fetch entirely.
-    if (isLiteral) return;
+    const loader = isKeyed
+      ? () => loadResources(refKind)
+      : isServiceAccount && loadServiceAccounts
+        ? loadServiceAccounts
+        : null;
+    if (!loader) {
+      setResources([]);
+      return;
+    }
     let cancelled = false;
     setResourcesLoading(true);
-    loadResources(refKind)
+    loader()
       .then((res) => !cancelled && setResources(res))
       .finally(() => !cancelled && setResourcesLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [loadResources, refKind, isLiteral]);
+  }, [loadResources, loadServiceAccounts, refKind, isKeyed, isServiceAccount]);
 
   useEffect(() => {
-    if (!selectedName) {
+    if (!isKeyed || !selectedName) {
       setPreviews([]);
       return;
     }
@@ -105,7 +148,7 @@ export function SecretKeySelector({
     return () => {
       cancelled = true;
     };
-  }, [loadKeyPreview, refKind, selectedName]);
+  }, [loadKeyPreview, refKind, selectedName, isKeyed]);
 
   const nameOptions = useMemo<ComboboxOption[]>(
     () => resources.map((r) => ({ value: r.name, label: r.name })),
@@ -122,63 +165,94 @@ export function SecretKeySelector({
 
   // Strict validity: the name is invalid when it names no loaded resource; the
   // key is invalid when, with a resolved resource, it isn't one of that
-  // resource's keys. The key list comes from the resource list (not previews),
-  // so both are gated on resourcesLoading only.
-  const nameInvalid = strict && !!selectedName && !resourcesLoading && !selectedResource;
+  // resource's keys. Only names from a listed source are checked (a
+  // serviceaccount source with no loader lists nothing, so it never flags).
+  const listsNames = isKeyed || (isServiceAccount && !!loadServiceAccounts);
+  const nameInvalid = strict && listsNames && !!selectedName && !resourcesLoading && !selectedResource;
   const keyInvalid =
     strict &&
+    isKeyed &&
     !!selectedKey &&
     !!selectedResource &&
     !resourcesLoading &&
     !(selectedResource.keys ?? []).includes(selectedKey);
 
-  // Switching source resets the selection: a resource kind clears name+key; the
-  // literal mode seeds an empty string (so onChange emits a value-kind value).
-  const setSource = (next: SecretValueSource) =>
-    onChange(next === "value" ? { kind: "value", value: "" } : { kind: next, name: "", key: "" });
-  const setName = (name: string) =>
-    onChange(name ? { kind: refKind, name, key: selectedKey } : undefined);
+  const setSource = (next: SecretValueSource) => {
+    switch (next) {
+      case "value":
+        return onChange({ kind: "value", value: "" });
+      case "onepassword":
+        return onChange({ kind: "onepassword", ref: "" });
+      case "serviceaccount":
+        return onChange({ kind: "serviceaccount", name: "" });
+      default:
+        return onChange({ kind: next, name: "", key: "" });
+    }
+  };
+  const setName = (name: string) => {
+    if (isServiceAccount) return onChange(name ? { kind: "serviceaccount", name } : undefined);
+    return onChange(name ? { kind: refKind, name, key: selectedKey } : undefined);
+  };
   const setKey = (key: string) =>
     selectedName ? onChange({ kind: refKind, name: selectedName, key }) : undefined;
   const setLiteral = (v: string) => onChange({ kind: "value", value: v });
+  const setOpRef = (v: string) => onChange({ kind: "onepassword", ref: v });
 
-  const sourceOptions = useMemo<SegmentedOption<SecretValueSource>[]>(
-    () => {
-      const sources: SecretValueSource[] = allowLiteral
-        ? ["secret", "configmap", "value"]
-        : ["secret", "configmap"];
-      return sources.map((k) => ({
-        id: k,
+  const sourceOptions = useMemo<ComboboxOption[]>(
+    () =>
+      sourceList.map((k) => ({
+        value: k,
         label: SOURCE_LABEL[k],
-        icon: SOURCE_ICON[k],
-      }));
-    },
-    [allowLiteral],
+        icon: createElement(SOURCE_ICON[k], { className: "size-4" }),
+      })),
+    [sourceList],
   );
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <SegmentedControl
-        aria-label="Secret value source"
-        value={source}
-        onChange={setSource}
-        options={sourceOptions}
-        className="shrink-0"
-      />
-      {isLiteral ? (
-        <input
-          type="text"
-          value={literalValue}
-          onChange={(e) => setLiteral(e.target.value)}
-          placeholder="Static value…"
-          className={cn(
-            "h-control-h min-w-0 flex-1 rounded border border-input bg-background px-control-px text-sm",
-            "outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          )}
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <div className="w-[9.5rem] shrink-0">
+        <Combobox
+          ariaLabel="Secret value source"
+          options={sourceOptions}
+          value={source}
+          onChange={(next) => setSource(next as SecretValueSource)}
+          allowCustomValue={false}
+          required
         />
+      </div>
+      {isLiteral ? (
+        <TextField
+          value={literalValue}
+          onChange={setLiteral}
+          placeholder="Static value…"
+          ariaLabel="Static value"
+        />
+      ) : isOnePassword ? (
+        <TextField
+          value={opRef}
+          onChange={setOpRef}
+          placeholder="op://vault/item/field"
+          ariaLabel="1Password reference"
+          mono
+        />
+      ) : isServiceAccount ? (
+        <div className="min-w-0 flex-[1_1_16rem]" data-slot="secret-serviceaccount-field">
+          <Combobox
+            options={nameOptions}
+            value={selectedName}
+            onChange={setName}
+            allowCustomValue
+            loading={resourcesLoading}
+            invalid={nameInvalid}
+            placeholder="Service account…"
+          />
+        </div>
       ) : (
-        <>
-          <div className="w-44 shrink-0">
+        <div
+          className="grid min-w-0 flex-[1_1_18rem] grid-cols-[minmax(8rem,11rem)_minmax(8rem,1fr)] items-center gap-2"
+          data-slot="secret-reference-fields"
+        >
+          <div className="min-w-0">
             <Combobox
               options={nameOptions}
               value={selectedName}
@@ -189,7 +263,7 @@ export function SecretKeySelector({
               placeholder={`Select ${refKind}…`}
             />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <Combobox
               options={keyOptions}
               value={selectedKey}
@@ -197,27 +271,78 @@ export function SecretKeySelector({
               allowCustomValue
               loading={previewLoading}
               invalid={keyInvalid}
-              placeholder={selectedName ? "Key…" : "—"}
+              placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
 }
 
-// Icons share a className-only call shape; the flanksource FCs carry extra
-// static metadata that doesn't unify with ComponentType, so type the slot as a
-// plain render function instead.
+// TextField is the shared single-input surface for the literal and 1Password
+// sources (no resource list backs either).
+function TextField({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+  mono,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="min-w-0 flex-[1_1_16rem]" data-slot="secret-value-fields">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className={cn(
+          "h-control-h w-full min-w-0 rounded border border-input bg-background px-control-px text-sm",
+          "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          mono && "font-mono",
+        )}
+      />
+    </div>
+  );
+}
+
+// isRefKind narrows to the keyed variants that carry both a name and a key.
+function isRefKind(
+  v: SecretKeyValue,
+): v is { kind: SecretKind; name: string; key: string } {
+  return v.kind === "secret" || v.kind === "configmap" || v.kind === "helm";
+}
+
+// keyPlaceholder hints the key field: helm keys are jsonpath expressions into
+// the merged release values, the others are literal data keys.
+function keyPlaceholder(kind: SecretKind): string {
+  return kind === "helm" ? "jsonpath…" : "Key…";
+}
+
+// Each source's leading glyph. The flanksource FCs carry static metadata that
+// doesn't unify with ComponentType, so type the slot as a plain render function.
 const SOURCE_ICON: Record<SecretValueSource, StaticIconComponent> = {
   secret: K8SSecret,
   configmap: K8SConfigmap,
+  helm: Helm,
+  serviceaccount: K8SServiceaccount,
+  onepassword: Vault,
   value: UiEdit,
 };
 
 const SOURCE_LABEL: Record<SecretValueSource, string> = {
   secret: "Secret",
   configmap: "ConfigMap",
+  helm: "Helm",
+  serviceaccount: "Service Account",
+  onepassword: "1Password",
   value: "Value",
 };
 
