@@ -173,6 +173,17 @@ export type {
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {
+  Workspace,
+  type WorkspaceProps,
+  type WorkspaceSlots,
+  type WorkspaceLayoutDefaults,
+  type WorkspaceLayoutState,
+  type WorkspacePaneLocation,
+  type WorkspacePaneSlots,
+  type WorkspacePaneSpec,
+  type WorkspaceSideLocation,
+} from "./layout/Workspace";
+export {
   AppShell,
   type AppShellProps,
   type AppShellNavItem,

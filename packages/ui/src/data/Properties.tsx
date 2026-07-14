@@ -37,7 +37,7 @@ export type PropertiesItem<V = unknown> = {
   renderChildren?: () => ReactNode;
 };
 
-export type PropertiesDensity = "comfortable" | "compact";
+export type PropertiesDensity = "comfortable" | "compact" | "spacious";
 
 export type PropertiesProps<V = unknown> = {
   /** Property rows to render. Hidden items are filtered out. */
@@ -81,6 +81,12 @@ const DENSITY_CLASSES: Record<
     label: "font-mono text-[11px] text-muted-foreground",
     value: "text-xs text-foreground",
     gridCols: "grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)]",
+  },
+  spacious: {
+    row: "px-density-4 py-density-3",
+    label: "text-sm font-medium text-muted-foreground",
+    value: "text-base text-foreground",
+    gridCols: "grid-cols-[minmax(12rem,20rem)_minmax(0,1fr)]",
   },
 };
 
