@@ -1,0 +1,31 @@
+import{O as v}from"./OperationActionDialog-D8EO2v3n.js";import"./iframe-eDlYjoH5.js";import"./preload-helper-CLp6iKya.js";import"./button-TkF7cYFQ.js";import"./utils-CR52uffu.js";import"./index-0zBpNI7D.js";import"./loading-D50h1WC6.js";import"./Icon-BHMfoUD6.js";import"./Modal-C7_T2hSV.js";import"./index-OymLTcEH.js";import"./index-DByclPvL.js";import"./modalStack-XGqVo3yi.js";import"./zIndex-CigQ76av.js";import"./CommandForm-BYDTtKhG.js";import"./types-BHfRQr8X.js";import"./command-form-utils-C0Xv-EwX.js";import"./CommandOutput-vDFUDTNY.js";import"./DataTable-CmD421NL.js";import"./SortableHeader-y_FDOYYP.js";import"./router-D2rjODDU.js";import"./FilterBar-BGQaRVE1.js";import"./floating-ui.react-B6g9v0n-.js";import"./FilterPill-BUeMmy_c.js";import"./Combobox-95MPZkxJ.js";import"./json-schema-form-size-DYVq0lph.js";import"./timestamp-format-DJzkpO9P.js";import"./DateTimePicker-CBRVsMuf.js";import"./MultiSelect-BbwKyMc5.js";import"./RangeSlider-ZbGTaZhQ.js";import"./TimeRange-D8yGc_jl.js";import"./select-B_TZkcmm.js";import"./Timestamp-C_d1Xnoa.js";import"./TagList-DxY9gb9L.js";import"./Badge-CfUkefEX.js";import"./HoverCard-DhkzU_5g.js";import"./Properties-N_dNnOpV.js";import"./IconButton-BrbW5ptJ.js";import"./DropdownMenu-B_V_iUpj.js";import"./DropdownMenuSubmenu-CNeXOTcm.js";import"./StatusDot-CTLJuC1-.js";import"./Clicky-Cp9xzbOQ.js";import"./suspense-Cf4ZH86R.js";import"./useQuery-tgYnNjFI.js";import"./FilterForm-DpJVMpYN.js";import"./Tree-DSjLbUrT.js";import"./TreeNode-DK_NfVsW.js";import"./ObjectGraph-NV5p49bu.js";import"./ExecutionTree-Cj7Zofrd.js";import"./CodeBlock-BkWjGt69.js";import"./CodeDiff-dhIRU4w9.js";import"./SegmentedControl-QQ5h10-L.js";import"./code-highlight-DmoBPuv7.js";import"./JsonView-CFHjkB2F.js";import"./RenderedStackTrace-CscZ5Wcu.js";import"./InlineError-CAAE_S-3.js";const A={path:"/api/v1/services/{name}/restart",method:"post",operation:{operationId:"restartService",summary:"Restart service",description:"Trigger a graceful restart of the named service. Useful for picking up rotated config.",tags:["services"],parameters:[{name:"name",in:"path",required:!0,description:"Service identifier",schema:{type:"string"}},{name:"force",in:"query",description:"Skip the graceful drain step",schema:{type:"boolean",default:!1}}],responses:{202:{description:"Accepted"}}}},E={path:"/api/v1/widgets/{id}",method:"delete",operation:{operationId:"deleteWidget",summary:"Delete widget",description:"Permanently remove a widget. This is irreversible.",tags:["widgets"],parameters:[{name:"id",in:"path",required:!0,description:"Widget id",schema:{type:"string"}}],responses:{204:{description:"Deleted"}}}},f={path:"/api/v1/clusters/{cluster}/nodes",method:"post",operation:{operationId:"provisionNode",summary:"Provision node",description:"Provision a new node in the cluster. Many parameters cover sizing, networking, and lifecycle.",tags:["clusters"],parameters:[{name:"cluster",in:"path",required:!0,description:"Cluster id",schema:{type:"string"}},{name:"name",in:"query",required:!0,description:"Node name",schema:{type:"string"}},{name:"instanceType",in:"query",description:"EC2 instance type",schema:{type:"string",default:"m6i.large"}},{name:"region",in:"query",description:"AWS region",schema:{type:"string",enum:["us-east-1","us-west-2","eu-west-1"]}},{name:"az",in:"query",description:"Availability zone",schema:{type:"string"}},{name:"diskGb",in:"query",description:"Root disk size in GB",schema:{type:"integer",default:100}},{name:"memoryGb",in:"query",description:"Memory in GB",schema:{type:"integer"}},{name:"vcpus",in:"query",description:"Virtual CPUs",schema:{type:"integer"}},{name:"spot",in:"query",description:"Use spot instances",schema:{type:"boolean",default:!1}},{name:"labels",in:"query",description:"Repeatable key=value labels",schema:{type:"array"}},{name:"taints",in:"query",description:"Repeatable taints",schema:{type:"array"}},{name:"ami",in:"query",description:"Custom AMI id",schema:{type:"string"}},{name:"subnet",in:"query",description:"Subnet id",schema:{type:"string"}},{name:"ttl",in:"query",description:"Auto-terminate after duration (e.g. 24h)",schema:{type:"string"}}],responses:{202:{description:"Accepted"}}}},r={async getOpenAPISpec(){return{openapi:"3.0.0",info:{title:"demo",version:"0"},paths:{}}},async executeCommand(y,h,n){await new Promise(b=>setTimeout(b,600));const o=`${h.toUpperCase()} ${y} ${JSON.stringify(n)}`;return{success:!0,message:"Command accepted",stdout:`Pretending to run:
+  ${o}
+
+Result: ok`,exit_code:0,cli:o,contentType:"text/plain",input:{args:[],flags:n}}}},Te={title:"Clicky-RPC/OperationActionDialog",component:v,parameters:{docs:{description:{component:"Modal launcher used by clicky-rpc surfaces to execute an OpenAPI operation. These stories use a stubbed client that fakes a 600ms round-trip and returns a plain-text result."}}}},e={args:{operation:A,client:r,initialValues:{name:"billing-api"},label:"Restart billing-api"}},t={args:{operation:E,client:r,initialValues:{id:"wgt_42"},label:"Delete wgt_42"}},i={args:{operation:f,client:r,initialValues:{cluster:"prod-eu"},label:"Provision node"}};var s,a,p;e.parameters={...e.parameters,docs:{...(s=e.parameters)==null?void 0:s.docs,source:{originalSource:`{
+  args: {
+    operation: RESTART_OPERATION,
+    client: FAKE_CLIENT,
+    initialValues: {
+      name: "billing-api"
+    },
+    label: "Restart billing-api"
+  }
+}`,...(p=(a=e.parameters)==null?void 0:a.docs)==null?void 0:p.source}}};var m,c,d;t.parameters={...t.parameters,docs:{...(m=t.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  args: {
+    operation: DELETE_OPERATION,
+    client: FAKE_CLIENT,
+    initialValues: {
+      id: "wgt_42"
+    },
+    label: "Delete wgt_42"
+  }
+}`,...(d=(c=t.parameters)==null?void 0:c.docs)==null?void 0:d.source}}};var l,u,g;i.parameters={...i.parameters,docs:{...(l=i.parameters)==null?void 0:l.docs,source:{originalSource:`{
+  args: {
+    operation: PROVISION_OPERATION,
+    client: FAKE_CLIENT,
+    initialValues: {
+      cluster: "prod-eu"
+    },
+    label: "Provision node"
+  }
+}`,...(g=(u=i.parameters)==null?void 0:u.docs)==null?void 0:g.source}}};const Ie=["ServiceAction","Destructive","ManyFields"];export{t as Destructive,i as ManyFields,e as ServiceAction,Ie as __namedExportsOrder,Te as default};
