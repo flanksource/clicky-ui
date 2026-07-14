@@ -1,0 +1,20 @@
+{
+  "name": "docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run generate:api && astro dev",
+    "build": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter storybook exec storybook build --disable-telemetry && pnpm run build:site && node scripts/copy-storybook.mjs",
+    "build:site": "pnpm run generate:api && astro build",
+    "preview": "astro preview",
+    "generate:api": "node scripts/generate-component-api.mjs"
+  },
+  "devDependencies": {
+    "@astrojs/starlight": "^0.36.0",
+    "astro": "^5.13.0",
+    "prettier": "catalog:",
+    "react-docgen-typescript": "^2.4.0",
+    "typescript": "catalog:"
+  }
+}
