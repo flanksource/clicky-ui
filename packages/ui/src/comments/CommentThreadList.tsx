@@ -1,4 +1,4 @@
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Button } from "../components/button";
 import { CommentCard } from "./CommentCard";
@@ -9,6 +9,8 @@ export type CommentThreadListProps = {
   comments: Comment[];
   config: CommentConfig;
   compact?: boolean;
+  /** Expand root comments immediately, exposing actions such as Reply. */
+  defaultExpandedRoots?: boolean;
   /** Extra content rendered above each root card (e.g. an anchor label). */
   renderRootMeta?: (comment: Comment) => ReactNode;
   /** Props merged onto each thread wrapper (e.g. for scroll anchoring). */
@@ -30,16 +32,26 @@ function ReplyInput({
   onCancel: () => void;
 }) {
   const [body, setBody] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   async function send() {
-    if (!body.trim()) return;
-    await onSubmit(body.trim());
-    setBody("");
+    if (!body.trim() || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await onSubmit(body.trim());
+      setBody("");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
   return (
-    <div className="ml-6 flex gap-1.5 py-1">
+    <div className="ml-6 flex gap-1.5 py-1" aria-busy={submitting}>
       <input
         autoFocus
         value={body}
+        disabled={submitting}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -55,7 +67,7 @@ function ReplyInput({
       <Button
         size="sm"
         className="h-7 text-xs"
-        disabled={!body.trim()}
+        disabled={submitting || !body.trim()}
         onClick={() => void send()}
       >
         Send
@@ -73,6 +85,7 @@ export function CommentThreadList({
   comments,
   config,
   compact = false,
+  defaultExpandedRoots = false,
   renderRootMeta,
   getThreadProps,
   renderBody,
@@ -119,6 +132,7 @@ export function CommentThreadList({
               comment={root}
               config={config}
               compact={compact}
+              defaultExpanded={defaultExpandedRoots}
               {...(renderBody ? { renderBody } : {})}
               {...cardHandlers(root.id)}
               {...(onReply ? { onReply: () => setReplyingTo(root.id) } : {})}

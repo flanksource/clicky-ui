@@ -19,6 +19,10 @@ export type CommentThreadProps = CommentCallbacks & {
   compact?: boolean;
   /** Auto-open and focus the composer on mount. */
   autoFocusComposer?: boolean;
+  /** Expand root comments immediately, exposing actions such as Reply. */
+  defaultExpandedRoots?: boolean;
+  /** Label for creating a separate root comment. */
+  composerPlaceholder?: string;
   /** Hide the composer (read-only thread). */
   hideComposer?: boolean;
   renderRootMeta?: (comment: Comment) => ReactNode;
@@ -37,6 +41,8 @@ export function CommentThread({
   anchor,
   compact = false,
   autoFocusComposer = false,
+  defaultExpandedRoots = false,
+  composerPlaceholder,
   hideComposer = false,
   renderRootMeta,
   renderBody,
@@ -61,6 +67,7 @@ export function CommentThread({
         comments={comments}
         config={config}
         compact={compact}
+        defaultExpandedRoots={defaultExpandedRoots}
         {...(renderRootMeta ? { renderRootMeta } : {})}
         {...(renderBody ? { renderBody } : {})}
         {...listHandlers}
@@ -71,6 +78,7 @@ export function CommentThread({
             config={config}
             anchor={anchor ?? null}
             autoFocus={autoFocusComposer}
+            {...(composerPlaceholder ? { placeholder: composerPlaceholder } : {})}
             onCreate={onCreate}
             {...(onMention ? { onMention } : {})}
           />

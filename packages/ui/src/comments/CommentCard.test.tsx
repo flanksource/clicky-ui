@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CommentCard } from "./CommentCard";
 import {
@@ -21,11 +21,10 @@ describe("CommentCard", () => {
   it("expands from the collapsed preview on click", () => {
     render(<CommentCard comment={root} config={config} />);
     fireEvent.click(screen.getByTestId("comment-card"));
-    // The expanded header shows the full status label, not just the chip.
-    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Ada")).toBeInTheDocument();
   });
 
-  it("invokes onUpdateStatus from the actions menu", () => {
+  it("resolves an open root from the visible check action", () => {
     const onUpdateStatus = vi.fn();
     render(
       <CommentCard
@@ -35,9 +34,52 @@ describe("CommentCard", () => {
         onUpdateStatus={onUpdateStatus}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Resolved/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
+  });
+
+  it("shows a status update error when resolving fails", async () => {
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
+        defaultExpanded
+        onUpdateStatus={vi.fn().mockRejectedValue(new Error("resolve failed"))}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Couldn't update comment: resolve failed",
+      ),
+    );
+  });
+
+  it("keeps non-resolve statuses and delete in the actions menu", async () => {
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
+        defaultExpanded
+        onUpdateStatus={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("menuitem", { name: /In progress/ }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("menuitem", { name: /Resolved/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Delete" }),
+    ).toBeInTheDocument();
   });
 
   it("invokes onDelete from the actions menu", () => {

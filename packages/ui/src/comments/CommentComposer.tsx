@@ -125,6 +125,8 @@ export function CommentComposer({
   const [open, setOpen] = useState(!collapsible || autoFocus);
   const [body, setBody] = useState("");
   const [facets, setFacets] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const mentionsRef = useRef<Map<string, CommentMention>>(new Map());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -146,19 +148,26 @@ export function CommentComposer({
 
   async function submit() {
     const text = body.trim();
-    if (!text) return;
+    if (!text || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     const mentions = [...mentionsRef.current.values()].filter((m) =>
       body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
     );
-    await onCreate?.({
-      body: text,
-      anchor: anchor ?? null,
-      ...(Object.keys(facets).length > 0 ? { facets } : {}),
-      ...(mentions.length > 0 ? { mentions } : {}),
-    });
-    for (const mention of mentions) onMention?.(mention, { body: text });
-    reset();
-    if (collapsible) setOpen(false);
+    try {
+      await onCreate?.({
+        body: text,
+        anchor: anchor ?? null,
+        ...(Object.keys(facets).length > 0 ? { facets } : {}),
+        ...(mentions.length > 0 ? { mentions } : {}),
+      });
+      for (const mention of mentions) onMention?.(mention, { body: text });
+      reset();
+      if (collapsible) setOpen(false);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   if (!open && body.trim().length === 0) {
@@ -176,6 +185,7 @@ export function CommentComposer({
   return (
     <div
       data-testid="comment-compose-box"
+      aria-busy={submitting}
       className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md"
     >
       <MentionTextarea
@@ -221,7 +231,7 @@ export function CommentComposer({
           data-testid="comment-compose-send"
           aria-label="Post comment"
           onClick={() => void submit()}
-          disabled={!body.trim()}
+          disabled={submitting || !body.trim()}
           className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
         >
           <Icon icon={UiArrowUp} className="text-xs" />
