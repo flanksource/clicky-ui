@@ -189,6 +189,38 @@
       "note": "Clicky UI compatibility: step-over/debug frame state"
     },
     {
+      "consumerName": "debug-continue",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "codicon:debug-continue",
+      "filled": "skip",
+      "note": "Clicky UI compatibility: continue debugger execution"
+    },
+    {
+      "consumerName": "debug-step-into",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "codicon:debug-step-into",
+      "filled": "skip",
+      "note": "Clicky UI compatibility: step into debugger execution"
+    },
+    {
+      "consumerName": "debug-step-out",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "codicon:debug-step-out",
+      "filled": "skip",
+      "note": "Clicky UI compatibility: step out of debugger source"
+    },
+    {
+      "consumerName": "debug-stop",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "codicon:debug-stop",
+      "filled": "skip",
+      "note": "Clicky UI compatibility: stop debugger execution"
+    },
+    {
       "consumerName": "play-circle",
       "group": "ui-controls",
       "status": "NEW",
