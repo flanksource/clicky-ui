@@ -170,6 +170,34 @@ describe("JsonSchemaForm extension pipeline", () => {
     expect(seen.at(-1)).toEqual({ namespace: "prod", url: "" });
   });
 
+  it("lets a post-extension replace the form root value", () => {
+    const onChange = vi.fn();
+    const replaceRoot: PostExtension = (field, nodes, ctx) =>
+      field.key === "url"
+        ? {
+            ...nodes,
+            value: (
+              <button
+                type="button"
+                onClick={() => ctx?.onRootChange?.({ namespace: "prod", url: "/sample" })}
+              >
+                apply sample
+              </button>
+            ),
+          }
+        : nodes;
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { namespace: { type: "string" }, url: { type: "string" } } }}
+        value={{ namespace: "prod", url: "" }}
+        onChange={onChange}
+        post={[replaceRoot]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "apply sample" }));
+    expect(onChange).toHaveBeenCalledWith({ namespace: "prod", url: "/sample" });
+  });
+
   it("passes the form's root value to a pre-extension", () => {
     const seen: Array<Record<string, unknown> | undefined> = [];
     const readRoot: PreExtension = (field, ctx) => {
@@ -185,6 +213,42 @@ describe("JsonSchemaForm extension pipeline", () => {
       />,
     );
     expect(seen.at(-1)).toEqual({ namespace: "staging", url: "x" });
+  });
+});
+
+describe("JsonSchemaForm defaults", () => {
+  it("selects and commits a nested segmented discriminator default", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            authentication: {
+              type: "object",
+              properties: {
+                authType: {
+                  type: "string",
+                  title: "Authentication type",
+                  enum: ["none", "basic"],
+                  default: "none",
+                  "x-enum-display": "segmented",
+                  "x-enum-labels": { none: "None", basic: "Basic" },
+                },
+              },
+              required: ["authType"],
+            },
+          },
+        }}
+        value={{}}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /None/ })).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith({
+      authentication: { authType: "none" },
+    });
   });
 });
 

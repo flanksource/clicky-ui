@@ -26,7 +26,10 @@ const MENU_MAX_HEIGHT_PX = 256;
 
 export type ComboboxOption = {
   value: string;
+  /** Full label used for searching and in the open option menu. */
   label: string;
+  /** Optional compact label used only while this option is selected and closed. */
+  selectedLabel?: string;
   disabled?: boolean;
   /** Leading glyph for the option: a runtime icon name or a rendered node. */
   icon?: LabelIconSpec;
@@ -217,13 +220,14 @@ export function Combobox(props: ComboboxProps) {
     if (multiple) {
       const labels = options
         .filter((o) => selectedValues.includes(o.value))
-        .map((o) => o.label);
+        .map((o) => o.selectedLabel ?? o.label);
       if (labels.length === 0) return "";
       if (labels.length <= 2) return labels.join(", ");
       return `${labels.length} selected`;
     }
     const single = selectedValues[0] ?? "";
-    return options.find((o) => o.value === single)?.label ?? single;
+    const selected = options.find((o) => o.value === single);
+    return selected?.selectedLabel ?? selected?.label ?? single;
   }, [tristate, modes, multiple, options, selectedValues]);
 
   // Single-select: the currently-selected option, so the closed trigger can echo
