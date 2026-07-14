@@ -4,15 +4,21 @@ import type {
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
-import { DataTable, type DataTableColumn, type DataTablePagination } from "../data/DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTablePagination,
+} from "../data/DataTable";
 import {
   Clicky,
   type ClickyCommandRuntime,
+  type ClickyDownloadOptions,
   type ClickyDocument,
   type ClickyNode,
   type ClickyTableRowClick,
   type ClickyTableRowHref,
   type ClickyTableRowPredicate,
+  type ClickyTableRowSelection,
 } from "../data/Clicky";
 import { parseClickyData } from "../data/clicky-parse";
 import { JsonView } from "../data/JsonView";
@@ -35,6 +41,8 @@ export type CommandOutputProps = {
   timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
   pagination?: DataTablePagination;
+  rowSelection?: ClickyTableRowSelection;
+  download?: ClickyDownloadOptions;
 };
 
 type LoadingResultRow = {
@@ -67,6 +75,8 @@ export function CommandOutput({
   timeRange,
   externalFilters,
   pagination,
+  rowSelection,
+  download,
 }: CommandOutputProps) {
   const text = response?.stdout || response?.output || "";
   const ct = response?.contentType || "application/json";
@@ -100,6 +110,8 @@ export function CommandOutput({
         {...(timeRange ? { timeRange } : {})}
         {...(externalFilters ? { externalFilters } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(rowSelection ? { rowSelection } : {})}
+        {...(download ? { download } : {})}
       />
     );
   } else if (loading) {
@@ -108,53 +120,57 @@ export function CommandOutput({
     output = <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
   }
 
-  const pending = loading && response ? (
-    <div
-      role="status"
-      className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground"
-    >
-      {loadingMessage}
-    </div>
-  ) : null;
-
-  const content = bare || !response ? (
-    <div className="space-y-2">
-      {pending}
-      {output}
-    </div>
-  ) : (
-    <div className="space-y-3">
-      {pending}
-      <div className="flex items-center gap-2">
-        <span
-          className={
-            response.success
-              ? "rounded-md border px-2 py-0.5 text-xs"
-              : "rounded-md bg-destructive px-2 py-0.5 text-xs text-destructive-foreground"
-          }
-        >
-          {response.success ? "Success" : "Failed"}
-        </span>
-        <span className="rounded-md border px-2 py-0.5 font-mono text-xs">
-          exit {response.exit_code}
-        </span>
-        {ct !== "application/json" && (
-          <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
-            {ct.split(";")[0]}
-          </span>
-        )}
-        {response.error && <span className="text-sm text-destructive">{response.error}</span>}
+  const pending =
+    loading && response ? (
+      <div
+        role="status"
+        className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground"
+      >
+        {loadingMessage}
       </div>
+    ) : null;
 
-      {response.cli && (
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
-          $ {response.cli}
-        </pre>
-      )}
+  const content =
+    bare || !response ? (
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {pending}
+        {output}
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {pending}
+        <div className="flex items-center gap-2">
+          <span
+            className={
+              response.success
+                ? "rounded-md border px-2 py-0.5 text-xs"
+                : "rounded-md bg-destructive px-2 py-0.5 text-xs text-destructive-foreground"
+            }
+          >
+            {response.success ? "Success" : "Failed"}
+          </span>
+          <span className="rounded-md border px-2 py-0.5 font-mono text-xs">
+            exit {response.exit_code}
+          </span>
+          {ct !== "application/json" && (
+            <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+              {ct.split(";")[0]}
+            </span>
+          )}
+          {response.error && (
+            <span className="text-sm text-destructive">{response.error}</span>
+          )}
+        </div>
 
-      {output}
-    </div>
-  );
+        {response.cli && (
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
+            $ {response.cli}
+          </pre>
+        )}
+
+        {output}
+      </div>
+    );
 
   if (ariaLabel || className) {
     return (
@@ -162,7 +178,7 @@ export function CommandOutput({
         role={ariaLabel ? "region" : undefined}
         aria-label={ariaLabel}
         aria-busy={loading || undefined}
-        className={cn("mt-3", className)}
+        className={cn("mt-3 flex min-h-0 flex-col", className)}
       >
         {content}
       </div>
@@ -187,6 +203,8 @@ function OutputBody({
   timeRange,
   externalFilters,
   pagination,
+  rowSelection,
+  download,
 }: {
   text: string;
   parsed: unknown;
@@ -202,6 +220,8 @@ function OutputBody({
   timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
   pagination?: DataTablePagination;
+  rowSelection?: ClickyTableRowSelection;
+  download?: ClickyDownloadOptions;
 }) {
   const ct = (contentType.split(";")[0] ?? "").trim();
 
@@ -213,7 +233,8 @@ function OutputBody({
     typeof parsed === "string" || (parsed != null && typeof parsed === "object")
       ? (parsed as ClickyNode | ClickyDocument)
       : text;
-  const parsedClicky = clickyPayload === "" ? null : parseClickyData(clickyPayload);
+  const parsedClicky =
+    clickyPayload === "" ? null : parseClickyData(clickyPayload);
 
   if (
     parsedClicky?.ok ||
@@ -236,10 +257,17 @@ function OutputBody({
         {...(timeRange ? { timeRange } : {})}
         {...(externalFilters ? { externalFilters } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(rowSelection ? { rowSelection } : {})}
+        {...(download ? { download } : {})}
+        className="flex min-h-0 flex-1 flex-col"
       />
     );
 
-    const detailOutput = <div className="detail-output">{clicky}</div>;
+    const detailOutput = (
+      <div className="detail-output flex min-h-0 flex-1 flex-col">
+        {clicky}
+      </div>
+    );
     if (bare) return detailOutput;
 
     return (
@@ -267,7 +295,11 @@ function OutputBody({
         defaultValue="preview"
         tabs={[
           { value: "preview", label: "Preview", content: iframe },
-          { value: "source", label: "Source", content: <TextOutput text={text} /> },
+          {
+            value: "source",
+            label: "Source",
+            content: <TextOutput text={text} />,
+          },
         ]}
       />
     );
@@ -338,7 +370,10 @@ function PdfOutput({ blob }: { blob: Blob }) {
 function JsonViewer({ data }: { data: unknown }) {
   return (
     <div className="overflow-auto rounded-md bg-muted p-4 font-mono text-xs">
-      <JsonView data={data as object | unknown[]} defaultOpenDepth={Number.MAX_SAFE_INTEGER} />
+      <JsonView
+        data={data as object | unknown[]}
+        defaultOpenDepth={Number.MAX_SAFE_INTEGER}
+      />
     </div>
   );
 }

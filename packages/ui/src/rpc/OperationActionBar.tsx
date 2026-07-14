@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
 import type { ClickyCommandRuntime } from "../data/Clicky";
@@ -6,7 +7,11 @@ import { MethodBadge } from "../data/MethodBadge";
 import { Modal } from "../overlay/Modal";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
-import { SchemaActionForm, type FormActionsRenderer } from "./SchemaActionForm";
+import {
+  SchemaActionForm,
+  type FormActionsRenderer,
+  type SchemaActionFormSlots,
+} from "./SchemaActionForm";
 import { getOperationClickyMeta, surfaceActionLabel } from "./clickyMetadata";
 import { packParameterValues } from "./formMetadata";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
@@ -36,6 +41,8 @@ export type OperationActionBarProps = {
   formPre?: PreExtension[];
   formPost?: PostExtension[];
   formActions?: FormActionsRenderer;
+  // Optional labels keyed by x-clicky verb/actionName for this surface.
+  actionLabels?: Record<string, string>;
   // Layout placement only — the bar's own styling stays consistent across pages.
   className?: string;
 };
@@ -56,8 +63,10 @@ export function OperationActionBar({
   formPre,
   formPost,
   formActions,
+  actionLabels,
   className,
 }: OperationActionBarProps) {
+  const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
   const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
   const [actionError, setActionError] = useState("");
@@ -70,6 +79,20 @@ export function OperationActionBar({
     setActiveAction(op);
     setActionResult(null);
     setActionError("");
+  }
+
+  function actionLabel(op: ResolvedOperation): string {
+    const meta = getOperationClickyMeta(op);
+    const key = meta?.actionName?.trim() || meta?.verb?.trim();
+    return (key ? actionLabels?.[key] : undefined) ?? surfaceActionLabel(op);
+  }
+
+  async function refreshDiscovery() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["openapi-spec"] }),
+      queryClient.invalidateQueries({ queryKey: ["logs-entity-names"] }),
+    ]);
+    await onExecuted?.();
   }
 
   async function executeAction(values: Record<string, string>) {
@@ -85,7 +108,7 @@ export function OperationActionBar({
         { Accept: "application/json+clicky" },
       );
       setActionResult(response);
-      await onExecuted?.();
+      if (!response.error) await refreshDiscovery();
     } catch (err) {
       setActionResult(null);
       setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
@@ -99,7 +122,7 @@ export function OperationActionBar({
       {actions.length > 0 && (
         <div className={cn("flex flex-wrap gap-2", className)}>
           {actions.map((op) => {
-            const label = surfaceActionLabel(op);
+            const label = actionLabel(op);
             const summary = op.operation.summary || op.operation.description;
             const tooltip = summary && summary !== label ? `${label} — ${summary}` : label;
             return (
@@ -118,67 +141,72 @@ export function OperationActionBar({
         </div>
       )}
 
-      <Modal
-        open={activeAction != null}
-        onClose={() => setActiveAction(null)}
-        title={
-          activeAction
-            ? surfaceActionLabel(activeAction)
-            : "Action"
-        }
-        size="lg"
-      >
-        {activeAction && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <MethodBadge method={activeAction.method} />
-              <code className="rounded-md bg-muted px-2 py-1 text-sm">
-                {activeAction.path}
-              </code>
-            </div>
-            <SchemaActionForm
+      {activeAction && (
+        <SchemaActionForm
+          client={client}
+          action={activeAction}
+          lockedValues={lockedValues}
+          submitLabel={actionLabel(activeAction)}
+          {...(initialValue ? { initialValue } : {})}
+          {...(formPre ? { formPre } : {})}
+          {...(formPost ? { formPost } : {})}
+          {...(formActions ? { footerActions: formActions } : {})}
+          renderLayout={(slots) => renderActionDialog(slots)}
+          onSuccess={() => {
+            setActiveAction(null);
+            void refreshDiscovery();
+          }}
+          fallback={
+            <FilterForm
               client={client}
-              action={activeAction}
+              path={activeAction.path}
+              method={activeAction.method}
+              parameters={activeAction.operation.parameters ?? []}
               lockedValues={lockedValues}
-              submitLabel={surfaceActionLabel(activeAction)}
-              {...(initialValue ? { initialValue } : {})}
-              {...(formPre ? { formPre } : {})}
-              {...(formPost ? { formPost } : {})}
-              {...(formActions ? { footerActions: formActions } : {})}
-              onSuccess={() => {
-                setActiveAction(null);
-                void onExecuted?.();
-              }}
-              fallback={
-                <FilterForm
-                  client={client}
-                  path={activeAction.path}
-                  method={activeAction.method}
-                  parameters={activeAction.operation.parameters ?? []}
-                  lockedValues={lockedValues}
-                  enableLookup={Boolean(activeMeta?.supportsLookup)}
-                  submitLabel="Execute request"
-                  submittingLabel="Executing…"
-                  isSubmitting={isExecutingAction}
-                  onSubmit={executeAction}
-                  {...(hideLockedInForm ? { hideLocked: true } : {})}
-                />
-              }
+              enableLookup={Boolean(activeMeta?.supportsLookup)}
+              submitLabel="Execute request"
+              submittingLabel="Executing…"
+              isSubmitting={isExecutingAction}
+              onSubmit={executeAction}
+              {...(hideLockedInForm ? { hideLocked: true } : {})}
             />
-            {actionError ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                {actionError}
-              </div>
-            ) : actionResult ? (
-              <ExecutionResult
-                response={actionResult}
-                className="mt-0"
-                {...(commandRuntime ? { commandRuntime } : {})}
-              />
-            ) : null}
-          </div>
-        )}
-      </Modal>
+          }
+        />
+      )}
     </>
   );
+
+  function renderActionDialog({ body, footer }: SchemaActionFormSlots) {
+    if (!activeAction) return null;
+    return (
+      <Modal
+        open
+        onClose={() => setActiveAction(null)}
+        title={actionLabel(activeAction)}
+        size="lg"
+        {...(footer ? { footer } : {})}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <MethodBadge method={activeAction.method} />
+            <code className="rounded-md bg-muted px-2 py-1 text-sm">
+              {activeAction.path}
+            </code>
+          </div>
+          {body}
+          {actionError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {actionError}
+            </div>
+          ) : actionResult ? (
+            <ExecutionResult
+              response={actionResult}
+              className="mt-0"
+              {...(commandRuntime ? { commandRuntime } : {})}
+            />
+          ) : null}
+        </div>
+      </Modal>
+    );
+  }
 }

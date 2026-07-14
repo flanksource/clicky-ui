@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationCatalog } from "./OperationCatalog";
@@ -251,7 +251,7 @@ const renderFakeLink: RenderLink = ({ to, className, children, title, key }) => 
   </a>
 );
 
-function renderCatalog(client: OperationsApiClient) {
+function renderCatalog(client: OperationsApiClient, actionLabels?: Record<string, string>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -267,12 +267,32 @@ function renderCatalog(client: OperationsApiClient) {
         surfaceKey="widgets"
         client={client}
         renderLink={renderFakeLink}
+        {...(actionLabels ? { actionLabels } : {})}
       />
     </QueryClientProvider>,
   );
 }
 
 describe("OperationCatalog", () => {
+  it("bounds the result pipeline so table rows scroll between the header and pager", async () => {
+    renderCatalog(makeClient());
+
+    const region = await screen.findByRole("region", { name: "Widgets results" });
+    const catalog = document.querySelector('[data-slot="operation-catalog"]');
+    const results = document.querySelector('[data-slot="operation-catalog-results"]');
+
+    expect(catalog).toHaveClass("h-full", "min-h-0", "flex-col");
+    expect(results).toHaveClass("min-h-0", "flex-1");
+    expect(region).toHaveClass("h-full", "min-h-0", "flex-col");
+    await waitFor(() =>
+      expect(document.querySelector(".detail-output")).toHaveClass(
+        "min-h-0",
+        "flex-1",
+        "flex-col",
+      ),
+    );
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -319,6 +339,60 @@ describe("OperationCatalog", () => {
     expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+  });
+
+  it("uses host-provided surface action labels", async () => {
+    const client = makeClient();
+    renderCatalog(client, { create: "Add Widget" });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Add Widget" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
+  });
+
+  it("places schema action controls in the modal footer", async () => {
+    const client = makeClient();
+    client.getSchema = vi.fn(async () => ({ type: "object", properties: {} }));
+    client.submitForm = vi.fn();
+    renderCatalog(client);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create" }));
+    await waitFor(() => expect(document.querySelector('[data-slot="modal-footer"]')).not.toBeNull());
+    const footer = document.querySelector('[data-slot="modal-footer"]');
+    const body = document.querySelector('[data-slot="modal-body"]');
+    const submit = within(footer as HTMLElement).getByRole("button", { name: "Create" });
+    expect(body).not.toContainElement(submit);
+    expect(footer).toContainElement(submit);
+  });
+
+  it("invalidates discovery queries after a successful mutation", async () => {
+    const client = makeClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCatalog
+          definition={{ key: "widgets", title: "Widgets", description: "All widgets" }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          renderLink={renderFakeLink}
+          actionLabels={{ create: "Add Widget" }}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add Widget" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Execute request" }));
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["openapi-spec"] });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["logs-entity-names"] });
+    });
   });
 
   it("lets a resultRenderer replace the default result surface, receiving the response", async () => {

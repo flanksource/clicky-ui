@@ -5,7 +5,10 @@ import type {
   FilterBarSearchProps,
 } from "../components/FilterBar";
 import type { DataTablePagination } from "../data/DataTable";
-import type { ClickyCommandRuntime } from "../data/Clicky";
+import type {
+  ClickyCommandRuntime,
+  ClickyDownloadOptions,
+} from "../data/Clicky";
 import { ExecutionResult } from "./ExecutionResult";
 import { useRowDetailNavigation } from "./rowNavigation";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
@@ -46,6 +49,7 @@ export type OperationResultViewProps = {
   detailOperation?: ResolvedOperation | undefined;
   filterConfig?: OperationResultFilterConfig;
   pagination?: DataTablePagination;
+  download?: ClickyDownloadOptions;
 };
 
 // OperationResultView is the single result surface rendered by both the entity
@@ -64,6 +68,7 @@ export function OperationResultView({
   detailOperation,
   filterConfig,
   pagination,
+  download,
 }: OperationResultViewProps) {
   const rowNav = useRowDetailNavigation(detailOperation);
   const filters = filterConfig?.filters;
@@ -90,6 +95,7 @@ export function OperationResultView({
         ? { timeRange: filterConfig.timeRange }
         : {})}
       {...(pagination ? { pagination } : {})}
+      {...(download ? { download } : {})}
     />
   );
 }
