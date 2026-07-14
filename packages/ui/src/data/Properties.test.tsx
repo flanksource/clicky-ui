@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Properties, type PropertiesItem } from "./Properties";
 import { UiChevronRight, UiCopy } from "../icons";
 
@@ -11,7 +11,15 @@ const items: Row[] = [
   { key: "container", value: "policy-api" },
 ];
 
+function namespaceRow(): HTMLElement {
+  const row = screen.getByText("Namespace").closest(".grid");
+  if (!row) throw new Error("namespace property row not found");
+  return row as HTMLElement;
+}
+
 describe("Properties", () => {
+  beforeEach(() => localStorage.clear());
+
   it("renders one row per visible item with default label formatting", () => {
     render(<Properties items={items} />);
 
@@ -19,6 +27,55 @@ describe("Properties", () => {
     expect(screen.getByText("Pod")).toBeInTheDocument();
     expect(screen.getByText("Container")).toBeInTheDocument();
     expect(screen.getByText("claims-demo")).toBeInTheDocument();
+  });
+
+  it("uses the spacious row and label layout", () => {
+    render(<Properties items={items} density="spacious" />);
+
+    const row = namespaceRow();
+    expect(row).toHaveClass("px-density-4", "py-density-3");
+    expect(row).toHaveStyle({
+      gridTemplateColumns: "minmax(12rem, 20rem) minmax(0, 1fr)",
+    });
+    expect(row?.querySelector("dt")).toHaveClass("text-sm");
+  });
+
+  it("changes density from the properties menu without persisting when keyRef is absent", () => {
+    render(<Properties items={items} density="spacious" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Properties options" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Compact" }));
+
+    expect(namespaceRow()).toHaveClass("px-density-2", "py-density-1.5");
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("restores density persisted by clicky-ui when keyRef is provided", () => {
+    const { unmount } = render(
+      <Properties
+        items={items}
+        density="spacious"
+        keyRef="runtime-settings:tenant-x"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Properties options" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Compact" }));
+    expect(
+      localStorage.getItem(
+        "clicky-ui-properties:runtime-settings:tenant-x:density",
+      ),
+    ).toBe("compact");
+
+    unmount();
+    render(
+      <Properties
+        items={items}
+        density="spacious"
+        keyRef="runtime-settings:tenant-x"
+      />,
+    );
+    expect(namespaceRow()).toHaveClass("px-density-2", "py-density-1.5");
   });
 
   it("omits hidden items", () => {
@@ -51,6 +108,17 @@ describe("Properties", () => {
       "demo",
       expect.objectContaining({ key: "namespace" }),
     );
+  });
+
+  it("lets custom values fill the available value column", () => {
+    render(
+      <Properties
+        items={[{ key: "enabled", value: "true" }]}
+        renderValue={() => <div data-testid="custom-value">value</div>}
+      />,
+    );
+
+    expect(screen.getByTestId("custom-value").parentElement).toHaveClass("flex-1");
   });
 
   it("invokes suffix action onClick with (key, value, item)", () => {

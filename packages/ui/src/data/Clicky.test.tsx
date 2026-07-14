@@ -383,6 +383,184 @@ describe("Clicky", () => {
     expect(screen.getByText("api")).toBeInTheDocument();
   });
 
+  it("renders and filters structured key-value columns without losing duplicate keys", async () => {
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        autoFilter: true,
+        columns: [
+          { name: "service", label: "Service" },
+          { name: "labels", label: "Labels", type: "key_values" },
+        ],
+        rows: [
+          {
+            cells: {
+              service: { kind: "text", text: "api", plain: "api" },
+              labels: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "env",
+                    value: { kind: "text", text: "prod", plain: "prod" },
+                  },
+                  {
+                    name: "env",
+                    value: { kind: "text", text: "blue", plain: "blue" },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            cells: {
+              service: { kind: "text", text: "worker", plain: "worker" },
+              labels: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "env",
+                    value: { kind: "text", text: "staging", plain: "staging" },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} />);
+
+    expect(screen.getAllByText("env")).toHaveLength(3);
+    expect(screen.getByText("blue")).toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("combobox", { name: "Labels" }));
+    const prodFilter = document.querySelector(
+      '[data-filter-option="env=prod"]',
+    );
+    if (!prodFilter) throw new Error("Expected env=prod filter option");
+    fireEvent.click(prodFilter);
+
+    await waitFor(() =>
+      expect(screen.queryByText("worker")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("api")).toBeInTheDocument();
+  });
+
+  it("renders a single-table map as a bare table with no label or border wrapper", () => {
+    const doc: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "map",
+        fields: [
+          {
+            name: "data",
+            label: "Data",
+            value: {
+              kind: "table",
+              columns: [{ name: "service", label: "Service" }],
+              rows: [
+                {
+                  cells: {
+                    service: { kind: "text", text: "api", plain: "api" },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    const { container } = render(<Clicky data={doc} />);
+    // The table renders directly, exactly like a bare table node…
+    expect(screen.getByText("api")).toBeInTheDocument();
+    // …with the field label and the ClickyMap section/border wrapper dropped.
+    expect(screen.queryByText("Data")).not.toBeInTheDocument();
+    expect(container.querySelector("section")).toBeNull();
+  });
+
+  it("keeps the non-fill layout for a multi-field map", () => {
+    const doc: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "map",
+        fields: [
+          {
+            name: "first",
+            label: "First",
+            value: {
+              kind: "table",
+              columns: [{ name: "a", label: "A" }],
+              rows: [{ cells: { a: { kind: "text", text: "1", plain: "1" } } }],
+            },
+          },
+          {
+            name: "second",
+            label: "Second",
+            value: {
+              kind: "table",
+              columns: [{ name: "b", label: "B" }],
+              rows: [{ cells: { b: { kind: "text", text: "2", plain: "2" } } }],
+            },
+          },
+        ],
+      },
+    };
+    const { container } = render(<Clicky data={doc} />);
+    const section = container.querySelector("section");
+    if (!section) throw new Error("expected a section wrapper");
+    expect(section.className).toContain("space-y-2");
+    expect(section.className).not.toContain("flex-1");
+  });
+
+  it("makes a Clicky-rendered table fill a bounded flex parent (flex-1 on the table root)", () => {
+    const doc: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "service", label: "Service" }],
+        rows: [
+          { cells: { service: { kind: "text", text: "api", plain: "api" } } },
+        ],
+      },
+    };
+    const { container } = render(<Clicky data={doc} />);
+    const root = container.querySelector("[data-theme]");
+    if (!root) throw new Error("expected the DataTable theme root");
+    expect(root.className).toContain("flex-1");
+    expect(root.className).toContain("min-h-0");
+  });
+
+  it("renders typed JSON cells as collapsed expandable trees", () => {
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "metadata", label: "Metadata", type: "json" }],
+        rows: [
+          {
+            cells: {
+              metadata: {
+                kind: "code",
+                language: "json",
+                source: `{"enabled":true,"nested":{"retries":3}}`,
+                plain: `{"enabled":true,"nested":{"retries":3}}`,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    render(<Clicky data={clickyDocument} />);
+
+    const collapsed = screen.getByText(/2 keys/);
+    expect(screen.queryByText("enabled")).not.toBeInTheDocument();
+    fireEvent.click(collapsed);
+    expect(screen.getByText("enabled")).toBeInTheDocument();
+    expect(screen.getByText("nested")).toBeInTheDocument();
+  });
+
   it("keeps table controls visible for empty clicky tables", () => {
     const clickyDocument: ClickyDocument = {
       version: 1,
@@ -780,6 +958,79 @@ describe("Clicky", () => {
     expect(downloadFrame.src).toContain("/api/v1/accounts?limit=5&format=pdf");
     expect(downloadFrame.src).toContain("filename=accounts.pdf");
     expect(downloadFrame.src).toContain("_download=");
+
+    fetchSpy.mockRestore();
+  });
+
+  it("separates current-page and all-row endpoint exports", async () => {
+    const tableDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "id", label: "ID" }],
+        rows: [{ cells: { id: { kind: "text", text: "1", plain: "1" } } }],
+      },
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(tableDocument), {
+        status: 200,
+        headers: { "Content-Type": "application/json+clicky" },
+      }),
+    );
+
+    render(
+      <Clicky
+        url="/api/v1/accounts?limit=25&offset=50&region=EU"
+        data={tableDocument}
+        download={{
+          formats: ["json", "ndjson", "excel", "pdf"],
+          scopes: ["page", "all"],
+          allRowsMode: "streaming",
+          formatMaxRows: { pdf: 1000 },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    let menu = screen.getByRole("menu", { name: /column menu/i });
+    const pageGroup = sectionGroup(menu, "Download current page");
+    const allGroup = sectionGroup(menu, "Download all rows");
+    expect(
+      within(pageGroup).getByRole("menuitem", { name: /^NDJSON$/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(allGroup).getAllByText("Streams rows as they are read"),
+    ).toHaveLength(3);
+    expect(
+      within(allGroup).getByText("Limited to 1,000 rows"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(allGroup).getByRole("menuitem", { name: /^JSON/i }));
+    let frame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    let downloaded = new URL(frame.src);
+    expect(downloaded.searchParams.get("scope")).toBe("all");
+    expect(downloaded.searchParams.get("region")).toBe("EU");
+    expect(downloaded.searchParams.has("limit")).toBe(false);
+    expect(downloaded.searchParams.has("offset")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    menu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(
+      within(sectionGroup(menu, "Download current page")).getByRole(
+        "menuitem",
+        { name: /^Excel/i },
+      ),
+    );
+    frame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    downloaded = new URL(frame.src);
+    expect(downloaded.searchParams.get("scope")).toBe("page");
+    expect(downloaded.searchParams.get("limit")).toBe("25");
+    expect(downloaded.searchParams.get("offset")).toBe("50");
+    expect(downloaded.searchParams.get("format")).toBe("excel");
 
     fetchSpy.mockRestore();
   });
