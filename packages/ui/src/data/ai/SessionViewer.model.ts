@@ -145,6 +145,10 @@ export interface SessionEvent {
   agentId?: string;
   toolState?: string;
   approval?: SessionUIPart["approval"];
+  pending?: boolean;
+  toolCallId?: string;
+  approvalId?: string;
+  sessionId?: string;
   raw?: unknown;
   errorType?: string;
   errorStatus?: number;
@@ -201,6 +205,10 @@ function toolEvent(
     agentId?: string;
     toolState?: string;
     approval?: SessionUIPart["approval"];
+    pending?: boolean;
+    toolCallId?: string;
+    approvalId?: string;
+    sessionId?: string;
     raw?: unknown;
   } = {},
 ): SessionEvent {
@@ -219,6 +227,10 @@ function toolEvent(
     ...(meta.agentId ? { agentId: meta.agentId } : {}),
     ...(meta.toolState ? { toolState: meta.toolState } : {}),
     ...(meta.approval ? { approval: meta.approval } : {}),
+    pending: meta.pending ?? false,
+    ...(meta.toolCallId ? { toolCallId: meta.toolCallId } : {}),
+    ...(meta.approvalId ? { approvalId: meta.approvalId } : {}),
+    ...(meta.sessionId ? { sessionId: meta.sessionId } : {}),
     ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
   };
 }
@@ -232,7 +244,10 @@ function blockEvent(
 ): SessionEvent | null {
   if (block.type === "tool_use" || (block.name && block.input)) {
     if (!block.name) return null;
-    return toolEvent(id, block.name, block.input, undefined, timestamp, cwd ? { cwd } : {});
+    return toolEvent(id, block.name, block.input, undefined, timestamp, {
+      ...(cwd ? { cwd } : {}),
+      ...(block.id ? { toolCallId: block.id } : {}),
+    });
   }
   if (block.type === "thinking" || block.thinking) {
     const text = block.thinking ?? block.text;
@@ -285,6 +300,8 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
           ...(tu.reasoning_effort ? { reasoningEffort: tu.reasoning_effort } : {}),
           ...(tu.source ? { source: tu.source } : {}),
           ...(cwd ? { cwd } : {}),
+          ...(tu.tool_use_id ? { toolCallId: tu.tool_use_id } : {}),
+          ...(tu.session_id ? { sessionId: tu.session_id } : {}),
           raw: entry,
         }),
       );
@@ -374,10 +391,12 @@ function partEvent(
     source?: string;
     turnId?: string;
     agentId?: string;
+    sessionId?: string;
     raw?: unknown;
   },
 ): SessionEvent | null {
   if (isUnifiedToolPart(part)) {
+    const pending = pendingFromPart(part);
     return toolEvent(id, part.toolName as string, asRecord(part.input), outputToText(part.output), meta.timestamp, {
       ...(meta.model ? { model: meta.model } : {}),
       ...(meta.reasoningEffort ? { reasoningEffort: meta.reasoningEffort } : {}),
@@ -385,8 +404,12 @@ function partEvent(
       ...(meta.cwd ? { cwd: meta.cwd } : {}),
       ...(meta.turnId ? { turnId: meta.turnId } : {}),
       ...(meta.agentId ? { agentId: meta.agentId } : {}),
+      ...(meta.sessionId ? { sessionId: meta.sessionId } : {}),
       ...(part.state ? { toolState: part.state } : {}),
       ...(part.approval ? { approval: part.approval } : {}),
+      pending,
+      ...(part.toolCallId ? { toolCallId: part.toolCallId } : {}),
+      ...(part.approval?.id ? { approvalId: part.approval.id } : {}),
       ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
     });
   }
@@ -419,6 +442,12 @@ function partEvent(
   return null; // file / unknown parts have no row representation
 }
 
+function pendingFromPart(part: SessionUIPart): boolean {
+  if (part.approval?.approved !== undefined) return false;
+  if (["approval-responded", "output-available", "output-denied"].includes(part.state ?? "")) return false;
+  return part.pending === true || part.approval?.pending === true || part.state === "approval-requested";
+}
+
 /** Flatten unified session messages into ordered SessionEvent rows. */
 export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] {
   const events: SessionEvent[] = [];
@@ -448,6 +477,7 @@ export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] 
       ...(prov?.source ? { source: prov.source } : {}),
       ...(msg.turnId ? { turnId: msg.turnId } : {}),
       ...(prov?.agentId ? { agentId: prov.agentId } : {}),
+      ...(prov?.sessionId ? { sessionId: prov.sessionId } : {}),
       ...(msg.raw !== undefined ? { raw: msg.raw } : {}),
     };
     msg.parts.forEach((part, i) => {
@@ -536,6 +566,7 @@ const ACTIONS: Record<string, SessionActionMeta> = {
   browser_console_messages: { icon: UiScroll, tone: "slate", label: "Console" },
   browser_network_requests: { icon: UiShare, tone: "emerald", label: "Network" },
   browser_wait_for: { icon: UiHourglass, tone: "amber", label: "Wait" },
+  Wait: { icon: UiHourglass, tone: "amber", label: "Wait" },
   browser_close: { icon: UiClose, tone: "rose", label: "Close browser" },
 };
 

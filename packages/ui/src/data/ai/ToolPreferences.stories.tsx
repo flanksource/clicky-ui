@@ -324,16 +324,18 @@ type Story = StoryObj<typeof meta>;
 export const Dropdown: Story = {
   render: () => <ToolPreferencesStory />,
   play: async ({ canvasElement, step }) => {
-    await step("opens the grouped dropdown", async () => {
+    await step("opens the grouped dropdown collapsed by default", async () => {
       const { menu } = await openPreferencesMenu(canvasElement);
       const menuView = within(menu);
 
       await expect(menuView.getByText("Tool Preferences")).toBeInTheDocument();
       await expect(menuView.getByText("Admin Write")).toBeInTheDocument();
-      await expect(menuView.getAllByText("Knowledge").length).toBeGreaterThan(
-        0,
-      );
       await expect(menuView.getByText("Xero")).toBeInTheDocument();
+      // Groups start collapsed — tool rows are hidden until the group is expanded.
+      await expect(menuView.queryByText("List Xero accounts")).toBeNull();
+      await userEvent.click(
+        menuView.getByRole("button", { name: "Expand Xero" }),
+      );
       await expect(
         menuView.getByText("List Xero accounts"),
       ).toBeInTheDocument();
@@ -341,11 +343,6 @@ export const Dropdown: Story = {
         menuView.getByRole("button", { name: "Collapse Xero" }),
       );
       await expect(menuView.queryByText("List Xero accounts")).toBeNull();
-      await userEvent.click(
-        menuView.getByRole("button", { name: "Toggle Xero group" }),
-      );
-      await expect(menuView.getAllByText("On").length).toBeGreaterThan(0);
-      await expect(menuView.getAllByText("Ask").length).toBeGreaterThan(0);
     });
   },
 };
@@ -380,7 +377,7 @@ export const AdvancedConfig: Story = {
 export const AdvancedPermissions: Story = {
   render: () => <ToolPreferencesStory />,
   play: async ({ canvasElement, step }) => {
-    await step("opens grouped permissions", async () => {
+    await step("opens grouped permissions, collapsed by default", async () => {
       const { dialogView } = await openAdvancedDialog(canvasElement);
 
       await userEvent.click(
@@ -388,6 +385,10 @@ export const AdvancedPermissions: Story = {
       );
       await expect(dialogView.getByText("Admin Write")).toBeInTheDocument();
       await expect(dialogView.getByText("Xero")).toBeInTheDocument();
+      await expect(dialogView.queryByText("List Xero accounts")).toBeNull();
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Expand Xero" }),
+      );
       await expect(
         dialogView.getByText("List Xero accounts"),
       ).toBeInTheDocument();
@@ -398,10 +399,164 @@ export const AdvancedPermissions: Story = {
         dialogView.getByRole("button", { name: "Collapse Xero" }),
       );
       await expect(dialogView.queryByText("List Xero accounts")).toBeNull();
+    });
+  },
+};
+
+// Reproduces the real clicky shape the webapp produces: bare verb labels
+// ("Get"/"List"/"Patch") that collide within a single permission tier and are
+// only distinguishable by their parent surface (entity).
+const NESTED_TOOLS: ToolMeta[] = [
+  {
+    name: "accounts_get",
+    label: "Get",
+    group: "Accounting Read",
+    preferenceKey: "Accounting Read",
+    parent: "Accounts",
+    entity: "accounts",
+    defaultPermission: "on",
+    method: "GET",
+    path: "/api/v1/accounts/{id}",
+  },
+  {
+    name: "accounts_list",
+    label: "List",
+    group: "Accounting Read",
+    preferenceKey: "Accounting Read",
+    parent: "Accounts",
+    entity: "accounts",
+    defaultPermission: "on",
+    method: "GET",
+    path: "/api/v1/accounts",
+  },
+  {
+    name: "contacts_get",
+    label: "Get",
+    group: "Accounting Read",
+    preferenceKey: "Accounting Read",
+    parent: "Contacts",
+    entity: "contacts",
+    defaultPermission: "on",
+    method: "GET",
+    path: "/api/v1/contacts/{id}",
+  },
+  {
+    name: "contacts_list",
+    label: "List",
+    group: "Accounting Read",
+    preferenceKey: "Accounting Read",
+    parent: "Contacts",
+    entity: "contacts",
+    defaultPermission: "on",
+    method: "GET",
+    path: "/api/v1/contacts",
+  },
+  {
+    name: "companies_patch",
+    label: "Patch",
+    group: "Accounting Metadata Write",
+    preferenceKey: "Accounting Metadata Write",
+    parent: "Companies",
+    entity: "companies",
+    defaultPermission: "ask",
+    method: "PATCH",
+    path: "/api/v1/companies/{id}",
+  },
+];
+
+function NestedToolsStory() {
+  const [prefs, setPrefs] = useState<Record<string, ToolMode>>({});
+  return (
+    <div className="min-h-[20rem] w-[42rem] max-w-[calc(100vw-2rem)] bg-background p-4 text-foreground">
+      <div className="flex items-center justify-end border-b border-border pb-3">
+        <ToolPreferences tools={NESTED_TOOLS} value={prefs} onChange={setPrefs} />
+      </div>
+      <pre data-testid="nested-prefs" className="pt-4 text-xs">
+        {JSON.stringify(prefs)}
+      </pre>
+    </div>
+  );
+}
+
+function readNestedPrefs(canvasElement: HTMLElement): Record<string, ToolMode> {
+  const raw = within(canvasElement).getByTestId("nested-prefs").textContent;
+  return raw ? (JSON.parse(raw) as Record<string, ToolMode>) : {};
+}
+
+const dialog = () =>
+  within(document.body).findByRole("dialog", {
+    name: "Advanced Chat Settings",
+  });
+
+export const NestedPermissions: Story = {
+  render: () => <NestedToolsStory />,
+  play: async ({ canvasElement, step }) => {
+    await step("starts collapsed; expanding reveals entity sub-headers", async () => {
+      const { dialogView } = await openAdvancedDialog(canvasElement);
       await userEvent.click(
-        dialogView.getByRole("button", { name: "Toggle Xero group" }),
+        dialogView.getByRole("button", { name: /permissions/i }),
       );
-      await expect(dialogView.getAllByText("On").length).toBeGreaterThan(0);
+
+      // Group headers show, but entity sub-headers and rows stay hidden.
+      await expect(dialogView.getByText("Accounting Read")).toBeInTheDocument();
+      await expect(dialogView.queryByText("Accounts")).toBeNull();
+
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Expand Accounting Read" }),
+      );
+      // Entity sub-headers appear; their colliding verbs are still collapsed.
+      await expect(dialogView.getByText("Accounts")).toBeInTheDocument();
+      await expect(dialogView.getByText("Contacts")).toBeInTheDocument();
+      await expect(dialogView.queryByText("Get")).toBeNull();
+    });
+
+    await step("expanding an entity disambiguates its colliding verbs", async () => {
+      const dialogView = within(await dialog());
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Expand Accounts" }),
+      );
+      // Only Accounts' verbs so far — Contacts stays collapsed.
+      await expect(dialogView.getAllByText("Get")).toHaveLength(1);
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Expand Contacts" }),
+      );
+      // The two "Get"/"List" verbs now coexist, each under its own entity.
+      await expect(dialogView.getAllByText("Get")).toHaveLength(2);
+      await expect(dialogView.getAllByText("List")).toHaveLength(2);
+    });
+
+    await step("differing member modes surface as Mixed", async () => {
+      const dialogView = within(await dialog());
+      // Flip a single Accounts tool so Accounts (and thus the group) disagree.
+      await userEvent.click(dialogView.getByTitle("accounts_get"));
+      const prefs = readNestedPrefs(canvasElement);
+      expect(prefs.accounts_get).toBe("auto");
+      expect(prefs.accounts_list).toBeUndefined();
+      expect(prefs.contacts_get).toBeUndefined();
+      // Mixed shows on the Accounts sub-header AND the Accounting Read group.
+      await expect(dialogView.getAllByText("Mixed")).toHaveLength(2);
+    });
+
+    await step("a parent chevron collapses only its own rows", async () => {
+      const dialogView = within(await dialog());
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Collapse Accounts" }),
+      );
+      await expect(dialogView.queryByTitle("accounts_get")).toBeNull();
+      await expect(dialogView.getByTitle("contacts_get")).toBeInTheDocument();
+    });
+
+    await step("group header cycles every tool in the tier", async () => {
+      const dialogView = within(await dialog());
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Toggle Accounting Read group" }),
+      );
+      const prefs = readNestedPrefs(canvasElement);
+      // Most-restrictive member ("auto") advances to "ask" for all four tools.
+      expect(prefs.accounts_get).toBe("ask");
+      expect(prefs.accounts_list).toBe("ask");
+      expect(prefs.contacts_get).toBe("ask");
+      expect(prefs.contacts_list).toBe("ask");
     });
   },
 };
