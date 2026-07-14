@@ -29,6 +29,7 @@ export {
   type DataTableColumnKind,
   type DataTableMenuAction,
   type DataTableProps,
+  type DataTableRowSelection,
   type StatusOptions,
   type TagsOptions,
   type TimestampOptions,
@@ -231,6 +232,7 @@ export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline
 export * from "./data/git";
 export * from "./data/test-runner";
 export * from "./data/cache-browser";
+export * from "./data/query-browser";
 export {
   type LogEntry,
   type TaskSnapshot,

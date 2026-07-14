@@ -271,10 +271,12 @@ export function TagList({
 
 export function TagPropertiesList({
   tags,
-  rowClassName = "grid-cols-[minmax(4rem,8rem)_minmax(0,1fr)]",
+  rowClassName,
+  gridTemplateColumns = "minmax(4rem, 8rem) minmax(0, 1fr)",
 }: {
   tags: NormalizedTag[];
   rowClassName?: string;
+  gridTemplateColumns?: string;
 }) {
   const tagActions = useTagActions();
   const items = useMemo<PropertiesItem<NormalizedTag>[]>(
@@ -287,7 +289,8 @@ export function TagPropertiesList({
       items={items}
       density="compact"
       className="border-0 bg-transparent"
-      rowClassName={rowClassName}
+      {...(rowClassName ? { rowClassName } : {})}
+      gridTemplateColumns={gridTemplateColumns}
       renderLabel={(_key, tag) =>
         tag.key ? (
           <span className="font-mono">{tag.key}</span>
@@ -323,4 +326,3 @@ export function TagPropertiesList({
     />
   );
 }
-

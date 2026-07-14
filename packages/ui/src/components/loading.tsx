@@ -106,6 +106,31 @@ LoadingDots.displayName = "LoadingDots";
  * The `inline` variant is not a container, so a `responsive` request there
  * renders at `sm`.
  */
+/**
+ * A thin indeterminate loading bar meant to ride the top edge of a `relative`
+ * container (it positions itself `absolute inset-x-0 top-0`). Non-blocking: it
+ * overlays the container's top border so existing content stays visible while a
+ * refetch or navigation is in flight, instead of a spinner that hides the view.
+ * Pass `className` to tune corners/offset (e.g. `rounded-t-md` inside a rounded
+ * card). Purely decorative — announce busy state with `aria-busy` on the host.
+ */
+export const LoadingBar = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-primary/20",
+        className,
+      )}
+      {...props}
+    >
+      <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+    </div>
+  ),
+);
+LoadingBar.displayName = "LoadingBar";
+
 export const Loading = forwardRef<HTMLDivElement, LoadingProps>(
   ({ size = "responsive", variant = "inline", label, className, ...props }, ref) => {
     const effectiveSize =
