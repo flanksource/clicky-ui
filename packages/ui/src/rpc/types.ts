@@ -37,6 +37,10 @@ export interface OpenAPISchema {
   enum?: unknown[];
   description?: string;
   properties?: Record<string, OpenAPISchema>;
+  items?: OpenAPISchema;
+  oneOf?: OpenAPISchema[];
+  additionalProperties?: OpenAPISchema | boolean;
+  nullable?: boolean;
 }
 
 // ClickyParameterRole tells the UI which widget owns a parameter:
@@ -144,6 +148,14 @@ export interface ClickyOperationMeta {
   supportsFilterMode?: boolean;
   group?: string;
   toolHints?: ClickyToolHints;
+  export?: ClickyExportMeta;
+}
+
+export interface ClickyExportMeta {
+  formats?: string[];
+  scopes?: Array<"page" | "all">;
+  allRowsMode?: "streaming" | "buffered";
+  formatMaxRows?: Record<string, number>;
 }
 
 export interface ClickyToolHints {
