@@ -28,6 +28,12 @@ export interface ChatModel {
   provider: string;
   label: string;
   reasoning: boolean;
+  /** True when backend metadata is authoritative, including explicit unsupported values. */
+  capabilitiesKnown?: boolean;
+  /** Ordered reasoning-effort tiers accepted by this exact model. */
+  supportedEfforts?: string[];
+  /** Backend-recommended effort used when the current selection is invalid. */
+  defaultEffort?: string;
   /** Whether the model honours the temperature sampling control. */
   temperature?: boolean;
   configured?: boolean;

@@ -1,3 +1,7 @@
+import {
+  parseSecretRef,
+  serializeSecretRef,
+} from "../../../components/SecretKeySelector.model";
 import type { SecretKeyValue } from "../../../components/SecretKeySelector";
 import type { AISpecRuntimeEnvVar } from "../SpecRuntimeEditor.model";
 
@@ -7,17 +11,7 @@ export function secretValueFromEnvVar(
   value: AISpecRuntimeEnvVar,
 ): SecretKeyValue | undefined {
   if (typeof value.valueFrom === "string") {
-    const valueFrom = value.valueFrom.trim();
-    for (const kind of ["secret", "configmap"] as const) {
-      const prefix = `${kind}://`;
-      if (valueFrom.startsWith(prefix)) {
-        const [name = "", key = ""] = valueFrom
-          .slice(prefix.length)
-          .split("/", 2);
-        return { kind, name, key };
-      }
-    }
-    return { kind: "value", value: valueFrom };
+    return parseSecretRef(value.valueFrom.trim());
   }
   if (value.valueFrom?.secretKeyRef) {
     return {
@@ -45,31 +39,21 @@ export function envVarFromSecretValue(
   if (next?.kind === "value") {
     updated.value = next.value;
   } else if (next) {
-    updated.valueFrom = `${next.kind}://${next.name}/${next.key}`;
+    updated.valueFrom = serializeSecretRef(next);
   }
   return updated;
 }
 
 // Bridges a plain string field (e.g. a checkout connection) onto the
-// SecretKeySelector value shape: a "secret://name/key" / "configmap://name/key"
-// reference parses into a resource ref, anything else stays a literal value, so
-// a bare connection name ("github") round-trips unchanged.
+// SecretKeySelector value shape: a reference (secret://, configmap://, helm://,
+// serviceaccount://, op://) parses into its ref shape, anything else stays a
+// literal value, so a bare connection name ("github") round-trips unchanged.
 export function secretValueFromString(
   value: string | undefined,
 ): SecretKeyValue | undefined {
-  const trimmed = value?.trim() ?? "";
-  for (const kind of ["secret", "configmap"] as const) {
-    const prefix = `${kind}://`;
-    if (trimmed.startsWith(prefix)) {
-      const [name = "", key = ""] = trimmed.slice(prefix.length).split("/", 2);
-      return { kind, name, key };
-    }
-  }
-  return trimmed ? { kind: "value", value: trimmed } : undefined;
+  return parseSecretRef(value?.trim() ?? "");
 }
 
 export function stringFromSecretValue(next: SecretKeyValue | undefined): string {
-  if (!next) return "";
-  if (next.kind === "value") return next.value;
-  return `${next.kind}://${next.name}/${next.key}`;
+  return serializeSecretRef(next);
 }

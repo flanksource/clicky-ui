@@ -10,9 +10,14 @@ import {
   normalizeSession,
   summarizeSession,
   type SessionMetadataSummary,
+  type SessionEvent,
   type SessionInput,
 } from "./SessionViewer.model";
-import { SessionRow } from "./SessionViewer.rows";
+import {
+  collapseWaitRuns,
+  isSessionEventGroup,
+} from "./SessionViewer.grouping";
+import { SessionRow, WaitGroupRow } from "./SessionViewer.rows";
 import { ContextMeter } from "../chat/ContextMeter";
 import { providerIcon } from "../chat/provider-icons";
 import { costTotal, tokenTotal } from "./session-cost";
@@ -31,6 +36,21 @@ export type {
   SessionActionMeta,
 } from "./SessionViewer.model";
 export type { SessionThemeOverride } from "./SessionViewerMenu";
+
+export interface SessionPendingTool {
+  tool: string;
+  input?: Record<string, unknown>;
+  toolCallId?: string;
+  approvalId?: string;
+  sessionId?: string;
+}
+
+export interface SessionToolDecision {
+  event: SessionEvent;
+  allow: boolean;
+  message?: string;
+  answers?: Record<string, string | string[]>;
+}
 
 export interface SessionViewerProps {
   /** A captain session: parsed `SessionEntry[]` or raw log text (JSON / JSONL). */
@@ -67,6 +87,8 @@ export interface SessionViewerProps {
   showRowMetadata?: boolean;
   /** Show a per-row raw JSON payload expander when available. Defaults to false. */
   showRaw?: boolean;
+  pendingTools?: readonly SessionPendingTool[];
+  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
 }
 
 function toggleInSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -102,8 +124,14 @@ export function SessionViewer({
   batchSize = 40,
   showRowMetadata = false,
   showRaw = false,
+  pendingTools = [],
+  onPendingToolDecision,
 }: SessionViewerProps) {
-  const allEvents = useMemo(() => normalizeSession(session), [session]);
+  const allEvents = useMemo(
+    () => mergePendingTools(normalizeSession(session), pendingTools),
+    [session, pendingTools],
+  );
+  const displayItems = useMemo(() => collapseWaitRuns(allEvents), [allEvents]);
   const metadata = useMemo(() => getSessionMetadata(session), [session]);
 
   const pageDensity = useDensityValue();
@@ -122,13 +150,15 @@ export function SessionViewer({
   const hasThinking = useMemo(() => allEvents.some((e) => e.kind === "thinking"), [allEvents]);
 
   const visibility = { hiddenCategories, hiddenTools, hiddenSources, showThinking: effectiveShowThinking };
-  const events = allEvents.filter((event) => isEventVisible(event, visibility));
+  const items = displayItems.filter((item) =>
+    isEventVisible(isSessionEventGroup(item) ? item.representative : item, visibility),
+  );
 
   // Reset the window when the underlying session changes, not on filter toggles —
   // so hiding a category doesn't yank the reader back to the bottom.
   const resetKey = `${allEvents.length}:${allEvents[0]?.id ?? ""}`;
   const { scrollRef, contentRef, startIndex } = useSessionScroll({
-    total: events.length,
+    total: items.length,
     enabled: scrollable,
     windowSize,
     batchSize,
@@ -180,7 +210,7 @@ export function SessionViewer({
   const inlineMenu = menu && !menuContainer;
 
   const list =
-    events.length === 0 ? (
+    items.length === 0 ? (
       <div className="rounded-md border border-dashed border-border p-density-4 text-center text-sm text-muted-foreground">
         All actions are hidden by the active filters.
       </div>
@@ -188,16 +218,30 @@ export function SessionViewer({
       // In scrollable mode only the newest `startIndex..` slice is mounted; `last`
       // is measured against the full length so the timeline connector stays right.
       <ol className="relative">
-        {events.slice(startIndex).map((event, index) => (
-          <SessionRow
-            key={event.id}
-            event={event}
-            last={startIndex + index === events.length - 1}
-            defaultExpanded={defaultExpanded}
-            showRowMetadata={showRowMetadata}
-            showRaw={showRaw}
-          />
-        ))}
+        {items.slice(startIndex).map((item, index) => {
+          const last = startIndex + index === items.length - 1;
+          return isSessionEventGroup(item) ? (
+            <WaitGroupRow
+              key={item.id}
+              group={item}
+              last={last}
+              defaultExpanded={defaultExpanded}
+              showRowMetadata={showRowMetadata}
+              showRaw={showRaw}
+              onPendingToolDecision={onPendingToolDecision}
+            />
+          ) : (
+            <SessionRow
+              key={item.id}
+              event={item}
+              last={last}
+              defaultExpanded={defaultExpanded}
+              showRowMetadata={showRowMetadata}
+              showRaw={showRaw}
+              onPendingToolDecision={onPendingToolDecision}
+            />
+          );
+        })}
       </ol>
     );
 
@@ -241,6 +285,44 @@ export function SessionViewer({
       </DensityValueProvider>
     </div>
   );
+}
+
+function mergePendingTools(
+  events: SessionEvent[],
+  pendingTools: readonly SessionPendingTool[],
+): SessionEvent[] {
+  const merged = [...events];
+  for (const [index, pending] of pendingTools.entries()) {
+    const matches = merged.filter((event) =>
+      event.kind === "tool" && (
+        (pending.toolCallId && event.toolCallId === pending.toolCallId) ||
+        (pending.approvalId && event.approvalId === pending.approvalId) ||
+        (pending.sessionId && event.sessionId === pending.sessionId && event.tool === pending.tool)
+      ),
+    );
+    const match = matches.length === 1 ? matches[0] : undefined;
+    if (match) {
+      Object.assign(match, {
+        pending: true,
+        toolInput: pending.input ?? match.toolInput,
+        toolCallId: pending.toolCallId ?? match.toolCallId,
+        approvalId: pending.approvalId ?? match.approvalId,
+        sessionId: pending.sessionId ?? match.sessionId,
+      });
+    } else {
+      merged.push({
+        id: `pending-${pending.approvalId ?? pending.toolCallId ?? `${pending.tool}-${index}`}`,
+        kind: "tool",
+        tool: pending.tool,
+        ...(pending.input ? { toolInput: pending.input } : {}),
+        ...(pending.toolCallId ? { toolCallId: pending.toolCallId } : {}),
+        ...(pending.approvalId ? { approvalId: pending.approvalId } : {}),
+        ...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
+        pending: true,
+      });
+    }
+  }
+  return merged;
 }
 
 function SessionMetadataBadges({ metadata }: { metadata: SessionMetadataSummary }) {

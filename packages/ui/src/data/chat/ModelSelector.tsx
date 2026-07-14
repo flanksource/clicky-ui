@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import { Combobox } from "../../components/Combobox";
 import type { FormSize } from "../../components/json-schema-form-size";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import { Icon, type StaticIconComponent } from "../Icon";
+import type { StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
 import { effortLevelColor, effortLevelIcon } from "./effort-icons";
 import { providerIcon } from "./provider-icons";
@@ -62,6 +62,13 @@ export type EffortSelectorProps = {
 /** Reasoning-effort picker, shown only for reasoning-capable models. The empty
  *  value means "no extended thinking". Strict: only the listed options commit. */
 export function EffortSelector({ efforts, value, onChange, className, size = "sm" }: EffortSelectorProps) {
+  const supportedEfforts = efforts.filter(Boolean);
+  const selectedEffort = value && supportedEfforts.includes(value) ? value : "";
+  const selectedGlyph = selectedEffort ? effortLevelIcon(selectedEffort) : undefined;
+  const selectedColor = selectedEffort ? effortLevelColor(selectedEffort) : undefined;
+  const selectedIcon = selectedGlyph
+    ? createElement(selectedGlyph, { className: cn("size-4", selectedColor) })
+    : undefined;
   return (
     <Combobox
       ariaLabel="Reasoning effort"
@@ -71,20 +78,50 @@ export function EffortSelector({ efforts, value, onChange, className, size = "sm
       required
       size={size}
       className={cn("w-36", className)}
+      {...(selectedIcon ? { prefix: selectedIcon } : {})}
       options={[
         { value: "", label: "None" },
-        ...efforts.map((e) => {
-          const glyph = effortLevelIcon(e);
-          const color = effortLevelColor(e);
-          return {
-            value: e,
-            label: `${e[0]?.toUpperCase()}${e.slice(1)}`,
-            ...(glyph ? { icon: <Icon icon={glyph} className={cn("size-4", color)} /> } : {}),
-          };
-        }),
+        ...supportedEfforts.map((effort) => ({
+          value: effort,
+          label: fullEffortLabel(effort),
+          selectedLabel: shortEffortLabel(effort),
+        })),
       ]}
     />
   );
+}
+
+function fullEffortLabel(value: string): string {
+  switch (value.trim().toLowerCase()) {
+    case "xhigh":
+      return "Extra high";
+    case "max":
+      return "Maximum";
+    default:
+      return titleCaseEffort(value);
+  }
+}
+
+function shortEffortLabel(value: string): string {
+  switch (value.trim().toLowerCase()) {
+    case "minimal":
+      return "Min";
+    case "medium":
+      return "Med";
+    case "xhigh":
+      return "XHigh";
+    case "adaptive":
+      return "Auto";
+    case "max":
+      return "Max";
+    default:
+      return titleCaseEffort(value);
+  }
+}
+
+function titleCaseEffort(value: string): string {
+  const effort = value.trim();
+  return `${effort[0]?.toUpperCase() ?? ""}${effort.slice(1)}`;
 }
 
 export type ProviderSelectorOption<T extends string = string> = {

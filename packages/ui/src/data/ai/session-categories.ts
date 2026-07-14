@@ -296,6 +296,7 @@ export interface SessionVisibility {
  *  tool, category and source; reasoning by `showThinking`; everything else
  *  (user/assistant/error) is always shown. */
 export function isEventVisible(event: SessionEvent, v: SessionVisibility): boolean {
+  if (event.pending) return true;
   if (event.kind === "thinking") return v.showThinking;
   if (event.kind !== "tool") return true;
   const tool = event.tool ?? "";

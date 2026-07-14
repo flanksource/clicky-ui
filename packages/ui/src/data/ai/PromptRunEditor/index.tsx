@@ -8,6 +8,10 @@ import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
 import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
 import type { ChatModel, ToolMeta } from "../../chat/types";
+import {
+  effortOptionsForModel,
+  reconcileModelCapabilities,
+} from "../model-capabilities";
 import { RuntimeModePicker } from "../RuntimeModePicker";
 import {
   SPEC_RUNTIME_FAMILIES,
@@ -24,7 +28,11 @@ import type {
   SpecRuntimeSecretSelectorConfig,
   SpecSectionId,
 } from "../SpecRuntimeEditor/types";
-import { withOptionalRoot, withPrompt, withRoot } from "../SpecRuntimeEditor/update";
+import {
+  withOptionalRoot,
+  withPrompt,
+  withRoot,
+} from "../SpecRuntimeEditor/update";
 import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeValue,
@@ -42,6 +50,8 @@ export type PromptRunEditorProps = {
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   cliOptions?: SpecRuntimeCLIOptions | undefined;
   reasoningEfforts?: string[] | undefined;
+  /** Host-provided replacement for the inline Runtime controls. */
+  runtimeControls?: ReactNode | undefined;
 
   /** Schema-driven variables form; omit to render a raw-JSON editor. */
   variablesSchema?: JsonSchemaObject | undefined;
@@ -84,6 +94,7 @@ export function PromptRunEditor({
   secretSelector,
   cliOptions,
   reasoningEfforts = REASONING_EFFORTS,
+  runtimeControls,
   variablesSchema,
   variables,
   onVariablesChange,
@@ -106,56 +117,76 @@ export function PromptRunEditor({
   const selectedModel = models.find((m) => m.id === value.model);
   // Hide effort for a model that does not reason; default to showing it when the
   // selection is unknown (a family alias or a not-yet-loaded catalog).
-  const showEffort = !selectedModel || selectedModel.reasoning;
+  const modelEfforts = effortOptionsForModel(selectedModel, reasoningEfforts);
+  const showEffort = modelEfforts.length > 0;
 
   return (
     <div className={cn("grid gap-density-4", className)}>
       {header}
 
       <Block title="Runtime">
-        <RuntimeModePicker value={value} onChange={onChange} families={families} models={models} />
-        <div className="grid gap-density-2 sm:grid-cols-2">
-          <SpecField label="Model">
-            <div className="flex min-w-0 items-center gap-density-2">
-              {familyModels.length > 0 ? (
-                <ModelSelector
-                  models={familyModels}
-                  value={value.model}
-                  onChange={(model) => onChange(withRoot(value, { model }))}
-                  size="md"
-                  className="w-full"
-                />
-              ) : (
-                <SpecInput
-                  value={value.model}
-                  onChange={(model) => onChange(withRoot(value, { model }))}
-                  placeholder="frontmatter/default"
-                  mono
-                />
-              )}
-              {value.model && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onChange(withOptionalRoot(value, "model", undefined))}
-                >
-                  Default
-                </Button>
+        {runtimeControls ?? (
+          <>
+            <RuntimeModePicker
+              value={value}
+              onChange={onChange}
+              families={families}
+              models={models}
+            />
+            <div className="grid gap-density-2 sm:grid-cols-2">
+              <SpecField label="Model">
+                <div className="flex min-w-0 items-center gap-density-2">
+                  {familyModels.length > 0 ? (
+                    <ModelSelector
+                      models={familyModels}
+                      value={value.model}
+                      onChange={(model) =>
+                        onChange(
+                          reconcileModelCapabilities(
+                            value,
+                            models.find((item) => item.id === model),
+                            reasoningEfforts,
+                          ),
+                        )
+                      }
+                      size="md"
+                      className="w-full"
+                    />
+                  ) : (
+                    <SpecInput
+                      value={value.model}
+                      onChange={(model) => onChange(withRoot(value, { model }))}
+                      placeholder="frontmatter/default"
+                      mono
+                    />
+                  )}
+                  {value.model && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        onChange(withOptionalRoot(value, "model", undefined))
+                      }
+                    >
+                      Default
+                    </Button>
+                  )}
+                </div>
+              </SpecField>
+              {showEffort && (
+                <SpecField label="Effort">
+                  <EffortSelector
+                    efforts={modelEfforts}
+                    value={value.effort ?? ""}
+                    onChange={(effort) => onChange(withRoot(value, { effort }))}
+                    size="md"
+                    className="w-full"
+                  />
+                </SpecField>
               )}
             </div>
-          </SpecField>
-          {showEffort && (
-            <SpecField label="Effort">
-              <EffortSelector
-                efforts={reasoningEfforts}
-                value={value.effort ?? ""}
-                onChange={(effort) => onChange(withRoot(value, { effort }))}
-                size="md"
-                className="w-full"
-              />
-            </SpecField>
-          )}
-        </div>
+          </>
+        )}
         {children}
         <div>
           <Button size="sm" variant="outline" onClick={() => setSpecOpen(true)}>
@@ -171,7 +202,9 @@ export function PromptRunEditor({
             {...(variablesSchema ? { schema: variablesSchema } : {})}
             value={variables ?? {}}
             onChange={onVariablesChange}
-            {...(onVariablesValidityChange ? { onValidityChange: onVariablesValidityChange } : {})}
+            {...(onVariablesValidityChange
+              ? { onValidityChange: onVariablesValidityChange }
+              : {})}
           />
         </Block>
       )}
@@ -180,7 +213,9 @@ export function PromptRunEditor({
         {promptEditor ?? (
           <textarea
             value={value.prompt?.user ?? ""}
-            onChange={(event) => onChange(withPrompt(value, { user: event.target.value }))}
+            onChange={(event) =>
+              onChange(withPrompt(value, { user: event.target.value }))
+            }
             spellCheck={false}
             placeholder={promptPlaceholder}
             aria-label={promptLabel}
