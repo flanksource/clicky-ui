@@ -1,0 +1,76 @@
+html[data-has-sidebar] {
+  --sl-content-width: 64rem;
+}
+
+.component-demo-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.component-demo {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.75rem;
+  background: var(--sl-color-bg-nav);
+}
+
+.component-demo iframe {
+  display: block;
+  width: 100%;
+  min-height: 24rem;
+  border: 0;
+  background: white;
+}
+
+.component-demo figcaption {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--sl-color-hairline);
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+}
+
+.api-props-table-wrap {
+  overflow-x: auto;
+}
+
+.api-props-table {
+  width: 100%;
+}
+
+.api-props-table th,
+.api-props-table td {
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.api-props-table .api-prop-name,
+.api-props-table .api-prop-name code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.api-required-marker {
+  margin-inline-start: 0.2rem;
+  color: var(--sl-color-red);
+  font-weight: 700;
+}
+
+.api-type {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.api-type-function {
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 50rem) {
+  .component-demo iframe {
+    min-height: 20rem;
+  }
+}
