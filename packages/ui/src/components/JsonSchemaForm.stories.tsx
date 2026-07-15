@@ -45,6 +45,112 @@ const scalarSchema: JsonSchemaObject = {
   },
 };
 
+// A captain-style "runtime mode" schema that drives the whole panel from JSON
+// alone, exercising the presentation extensions: a segmented picker with icons
+// (`x-enum-display: "segmented"` + `x-enum-icons`), descriptive cards
+// (`x-enum-descriptions`), a multi-column row (`x-columns` + `x-col-span`), an
+// input icon (`x-input-prefix-icon`), and an if/then discriminator that swaps
+// the permission fields by backend (Claude `--permission-mode` vs Codex
+// `--sandbox` + `--ask-for-approval`). No app concepts live in the library.
+//
+// `then` below is the JSON Schema 2020-12 conditional keyword, not a Promise
+// thenable, so unicorn/no-thenable is a false positive on these schema literals.
+/* eslint-disable unicorn/no-thenable */
+const runtimeModeSchema: JsonSchemaObject = {
+  type: "object",
+  "x-columns": 2,
+  properties: {
+    backend: {
+      type: "string",
+      title: "Runtime",
+      enum: ["claude", "codex"],
+      "x-enum-labels": { claude: "Claude", codex: "Codex" },
+      "x-enum-icons": { claude: "robot-ai", codex: "columns" },
+      "x-enum-display": "segmented",
+      "x-col-span": 2,
+    },
+    model: { type: "string", title: "Model", "x-input-prefix-icon": "sparkles" },
+    temperature: { type: "number", title: "Temperature", minimum: 0, maximum: 2 },
+  },
+  allOf: [
+    {
+      if: { properties: { backend: { const: "claude" } } },
+      then: {
+        properties: {
+          permissionMode: {
+            type: "string",
+            title: "Permission mode",
+            enum: ["default", "acceptEdits", "plan", "bypassPermissions"],
+            "x-enum-labels": {
+              default: "Default",
+              acceptEdits: "Accept edits",
+              plan: "Plan",
+              bypassPermissions: "Bypass",
+            },
+            "x-enum-icons": {
+              default: "shield",
+              acceptEdits: "edit",
+              plan: "list-dashes",
+              bypassPermissions: "lock-open",
+            },
+            "x-enum-descriptions": {
+              default: "Prompt for dangerous operations.",
+              acceptEdits: "Auto-accept file edits.",
+              plan: "Planning only — no tool execution.",
+              bypassPermissions: "Skip permission checks.",
+            },
+            "x-enum-display": "segmented",
+            "x-col-span": 2,
+          },
+        },
+      },
+    },
+    {
+      if: { properties: { backend: { const: "codex" } } },
+      then: {
+        properties: {
+          sandbox: {
+            type: "string",
+            title: "Sandbox",
+            enum: ["read-only", "workspace-write", "danger-full-access"],
+            "x-enum-labels": {
+              "read-only": "Read only",
+              "workspace-write": "Workspace write",
+              "danger-full-access": "Full access",
+            },
+            "x-enum-icons": {
+              "read-only": "eye",
+              "workspace-write": "folder",
+              "danger-full-access": "warning-triangle",
+            },
+            "x-enum-descriptions": {
+              "read-only": "No writes; commands are sandboxed.",
+              "workspace-write": "Writes limited to the workspace.",
+              "danger-full-access": "Unrestricted host access.",
+            },
+            "x-enum-display": "segmented",
+            "x-col-span": 2,
+          },
+          askForApproval: {
+            type: "string",
+            title: "Approval",
+            enum: ["untrusted", "on-failure", "on-request", "never"],
+            "x-enum-labels": {
+              untrusted: "Untrusted",
+              "on-failure": "On failure",
+              "on-request": "On request",
+              never: "Never",
+            },
+            "x-enum-display": "segmented",
+            "x-col-span": 2,
+          },
+        },
+      },
+    },
+  ],
+};
+/* eslint-enable unicorn/no-thenable */
+
 const meta = {
   title: "Components/JsonSchemaForm",
   component: JsonSchemaForm,
@@ -228,6 +334,22 @@ export const Default: Story = {
   },
 };
 
+export const PresentationExtensions: Story = {
+  args: {
+    schema: runtimeModeSchema,
+    value: { backend: "claude", model: "claude-sonnet-4-6", temperature: 0.2, permissionMode: "acceptEdits" },
+    showPreferencesMenu: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A consumer-authored 'runtime mode' panel driven entirely by JSON schema. It uses the presentation extensions — `x-enum-display: \"segmented\"` with `x-enum-icons` / `x-enum-descriptions` for the mode cards, `x-columns` + `x-col-span` for the Model/Temperature row, `x-input-prefix-icon` on Model, and an `if/then` const discriminator that swaps the permission fields when you toggle Runtime between Claude and Codex. No domain concepts live in the component.",
+      },
+    },
+  },
+};
+
 export const Empty: Story = {
   args: { value: {} },
   parameters: {
@@ -320,9 +442,24 @@ export const PreferencesMenu: Story = {
     docs: {
       description: {
         story:
-          "Every form shows a top-right three-dot menu (enabled by default) for picking the **Size** (`xs`–`xl`) and **Layout** (stacked / inline). Selections apply immediately and — with `persistPreferences` (default) — persist to localStorage under `preferencesStorageKey`, so they survive a remount and are shared across forms using the same key. The menu only changes this form's appearance; it never touches global page density or the field values. Pass `showPreferencesMenu={false}` to hide it, or `persistPreferences={false}` to keep changes in-memory only.",
+          "Every form shows a top-right three-dot menu (enabled by default). It carries a live **Filter fields** box (case-insensitive match on each field's label and key) that narrows the top-level fields as you type, plus options for **Size** (`xs`–`xl`), **Layout** (stacked / inline), and **Sort**. The trigger turns primary while a filter is active. Filtering is transient (never persisted); the other selections apply immediately and — with `persistPreferences` (default) — persist to localStorage under `preferencesStorageKey`, so they survive a remount and are shared across forms using the same key. The menu only changes this form's appearance; it never touches global page density or the field values. Pass `showPreferencesMenu={false}` to hide it, or `persistPreferences={false}` to keep changes in-memory only.",
       },
     },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    await step("Filter the fields down to Role via the menu", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Form display options" }));
+      const filter = await body.findByLabelText("Filter fields");
+      await userEvent.type(filter, "role");
+      await waitFor(() => expect(canvas.getByText("Role")).toBeInTheDocument());
+      expect(canvas.queryByText("Full name")).not.toBeInTheDocument();
+    });
+    await step("Clearing the filter restores every field", async () => {
+      await userEvent.click(body.getByRole("button", { name: "Clear filter" }));
+      await waitFor(() => expect(canvas.getByText("Full name")).toBeInTheDocument());
+    });
   },
 };
 

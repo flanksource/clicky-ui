@@ -1,16 +1,11 @@
 import {
-  cloneElement,
-  isValidElement,
   useCallback,
-  createContext,
   useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type ReactElement,
   type ReactNode,
   type Ref,
   type RefObject,
@@ -30,8 +25,28 @@ import {
   useRole,
   type Placement,
 } from "@floating-ui/react";
-import { FilterPill, type FilterMode } from "../data/FilterPill";
+import { FilterPill } from "../data/FilterPill";
+import { FILTER_INPUT_DEBOUNCE_MS, FilterBarContext } from "./filter-bar-context";
+import {
+  comboboxLabelProps,
+  lookupFieldWidthClass,
+  multiSelectOptionText,
+  nextFilterMode,
+  sizedIcon,
+  summarizeMultiFilter,
+  updateMultiFilterValue,
+  useDebouncedMultiDraft,
+  type FilterBarMultiFilterMode,
+} from "./filter-bar-field-utils";
+import {
+  MultiFilterField,
+  MultiFilterPanel,
+  type FilterBarMultiFilter,
+} from "./filter-bar-multi";
 import { clearFilterBarFilter, isFilterBarFilterActive } from "./filter-bar-utils";
+
+export { TriStateMultiSelect, type TriStateMultiSelectProps } from "./filter-bar-multi";
+export type { FilterBarMultiFilter, FilterBarMultiFilterMode };
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
@@ -44,17 +59,8 @@ import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { TimeRange, type TimeRangePresetGroup } from "./TimeRange";
 
-const FILTER_INPUT_DEBOUNCE_MS = 500;
 const FILTER_BAR_GAP_PX = 8;
 const FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX = 44;
-
-// When `autoSubmit` is false, debounced fields forward their draft value
-// immediately (no timer) so the consumer can accumulate state locally and
-// fire one request when Apply is clicked. When true (default) fields debounce
-// upstream, matching the live-filter behaviour used in trace/log UIs.
-const FilterBarContext = createContext<{ autoSubmit: boolean }>({
-  autoSubmit: true,
-});
 
 export type FilterBarSearchProps = {
   /** Controlled search text. */
@@ -148,47 +154,6 @@ export type FilterBarLookupMultiFilter = {
   onSearch?: (query: string) => void;
   /** Shows a loading indicator while a search is in flight. */
   loading?: boolean;
-  disabled?: boolean;
-  className?: string;
-};
-
-export type FilterBarMultiFilterMode = Extract<FilterMode, "include" | "exclude">;
-
-export type FilterBarMultiFilter = {
-  key: string;
-  /** Renders include/exclude chips for each option. */
-  kind: "multi";
-  label: string;
-  /** Leading glyph shown before the label: a runtime icon name or a node. */
-  icon?: LabelIconSpec;
-  description?: string;
-  /** Map of option value to include/exclude state. */
-  value: Record<string, FilterBarMultiFilterMode>;
-  /** Available chip options. When `truncated`, this is only the head set. */
-  options: MultiSelectOption[];
-  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
-  /**
-   * True when more options exist than are in `options` (the option set was
-   * capped server-side). Renders an "… and N more" hint and, with `onSearch`,
-   * lets the user search the full set.
-   */
-  truncated?: boolean;
-  /** True distinct count behind a truncated option set; drives the "N more" label. */
-  total?: number;
-  /**
-   * Optional async fetch invoked (debounced) as the user types in the option
-   * search box. Returns the options matching the query, which are merged into
-   * the displayed list so values beyond the head become selectable. When
-   * absent, the search box filters the static `options` client-side only.
-   */
-  onSearch?: (query: string) => Promise<MultiSelectOption[]> | void;
-  /**
-   * Lets the user commit a value absent from `options` (a free-typed name or a
-   * `*` wildcard). The option search box stays visible and an "Add" row appears
-   * when the query matches no listed option; committed customs pin to the top so
-   * they stay toggleable. Use for MatchItem-style filters (table/login patterns).
-   */
-  allowCustomValue?: boolean;
   disabled?: boolean;
   className?: string;
 };
@@ -969,6 +934,7 @@ function LookupFilterValueControl({ filter }: { filter: FilterBarLookupFilter })
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       className="w-full"
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
@@ -985,6 +951,7 @@ function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMult
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       className="w-full"
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
@@ -1009,6 +976,7 @@ function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       className="w-full"
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
@@ -1091,6 +1059,7 @@ function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: 
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
@@ -1190,44 +1159,6 @@ function FilterFieldLabel({ icon, label }: { icon?: LabelIconSpec; label: string
   );
 }
 
-// sizedIcon constrains a filter icon to `px`. A node icon (e.g. a lucide
-// component, which otherwise renders at its own default 24px) is cloned with an
-// explicit inline width/height — done in clicky-ui via a real style so it never
-// depends on a Tailwind arbitrary class being generated in the consumer's build.
-// A string (runtime/iconify) icon is returned as-is and sized by the wrapper's
-// font-size. An existing inline size on the node wins (consumer override).
-function sizedIcon(icon: LabelIconSpec | undefined, px: number): LabelIconSpec | undefined {
-  if (!isValidElement(icon)) return icon;
-  const el = icon as ReactElement<{ style?: CSSProperties }>;
-  return cloneElement(el, {
-    style: { width: `${px}px`, height: `${px}px`, ...el.props.style },
-  });
-}
-
-// comboboxLabelProps maps a filter to the Combobox `label`/`ariaLabel`: when the
-// filter carries an `icon`, the icon replaces the inline text label (with the
-// field name kept as tooltip + accessible name); otherwise the text label shows.
-// clicky-ui owns the size (10px default) — the consumer supplies only the icon
-// and its colour.
-function comboboxLabelProps(filter: { icon?: LabelIconSpec; label: string }): {
-  label: ReactNode;
-  ariaLabel?: string;
-} {
-  if (filter.icon == null) return { label: filter.label };
-  return {
-    label: (
-      <span title={filter.label} className="inline-flex items-center text-[10px]">
-        <LabelIcon icon={sizedIcon(filter.icon, 10)} className="normal-case" />
-      </span>
-    ),
-    ariaLabel: filter.label,
-  };
-}
-
-function lookupFieldWidthClass(grow: boolean) {
-  return grow ? "min-w-[12rem] max-w-[18rem] flex-1" : "min-w-[11rem] max-w-[15rem] shrink-0";
-}
-
 function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; grow: boolean }) {
   const [draft, setDraft] = useDebouncedTextDraft(filter.value, filter.onChange);
 
@@ -1282,6 +1213,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
@@ -1304,6 +1236,7 @@ function LookupMultiFilterField({
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      size="sm"
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
       {...(filter.onSearch !== undefined ? { onSearch: filter.onSearch } : {})}
@@ -1566,414 +1499,6 @@ function NumberFilterPanel({
   );
 }
 
-const MULTI_FILTER_OPTION_ROW_HEIGHT = 30;
-const MULTI_FILTER_OPTION_LIST_HEIGHT = 288;
-const MULTI_FILTER_OPTION_OVERSCAN = 6;
-
-function MultiFilterField({ filter, grow }: { filter: FilterBarMultiFilter; grow: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [optionQuery, setOptionQuery] = useState("");
-  const [optionScrollTop, setOptionScrollTop] = useState(0);
-  // Options fetched via onSearch for the current query. While a query is active
-  // these replace the head (plus already-toggled head items); empty otherwise.
-  const [searchOptions, setSearchOptions] = useState<MultiSelectOption[]>([]);
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
-
-  const popup = useAnchoredPopup(open, setOpen);
-
-  // Debounced server-side search. Runs only when onSearch is provided; clears
-  // results for an empty query so the view reverts to the head set.
-  const onSearch = filter.onSearch;
-  useEffect(() => {
-    if (!onSearch) return;
-    const query = optionQuery.trim();
-    if (!query) {
-      setSearchOptions([]);
-      return;
-    }
-    let cancelled = false;
-    const handle = setTimeout(() => {
-      Promise.resolve(onSearch(query))
-        .then((opts) => {
-          if (!cancelled && Array.isArray(opts)) setSearchOptions(opts);
-        })
-        .catch(() => {
-          if (!cancelled) setSearchOptions([]);
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(handle);
-    };
-  }, [onSearch, optionQuery]);
-
-  const summary = summarizeMultiFilter(filter.label, draft);
-  // allowCustomValue: any toggled value absent from `options` (a free-typed name
-  // or a `*` wildcard) is synthesised as a pinned option so it renders and stays
-  // toggleable across reopens.
-  const allowCustomValue = Boolean(filter.allowCustomValue);
-  const baseOptions = useMemo(() => {
-    if (!allowCustomValue) return filter.options;
-    const known = new Set(filter.options.map((o) => o.value));
-    const pinned = Object.keys(draft)
-      .filter((v) => !known.has(v))
-      .map((v) => ({ value: v, label: v }));
-    return mergeMultiSelectOptions(pinned, filter.options);
-  }, [allowCustomValue, filter.options, draft]);
-  // Truncated, async-searchable, or custom-value filters always expose the search
-  // box; small static lists only get it past a threshold (original behaviour).
-  const showOptionFilter =
-    filter.truncated || Boolean(onSearch) || allowCustomValue || filter.options.length > 7;
-  const visibleOptions = useMemo(() => {
-    const query = optionQuery.trim();
-    // No query → the base set (options + pinned customs), as supplied.
-    if (!query) return baseOptions;
-    // Server search active → the matches REPLACE the head, but any head option
-    // the user has already toggled (include/exclude) stays pinned so their
-    // selection remains visible and changeable. Selected first, then matches.
-    if (onSearch) {
-      const selectedHead = baseOptions.filter((o) => draft[o.value] !== undefined);
-      return mergeMultiSelectOptions(selectedHead, searchOptions);
-    }
-    // No server search (static/AsCode list) → client-side substring filter.
-    const lowered = query.toLowerCase();
-    return baseOptions.filter((option) =>
-      multiSelectOptionText(option).toLowerCase().includes(lowered),
-    );
-  }, [baseOptions, searchOptions, optionQuery, onSearch, draft]);
-  useEffect(() => {
-    setOptionScrollTop(0);
-  }, [optionQuery]);
-  const optionWindow = useMemo(() => {
-    const visibleRows = Math.ceil(MULTI_FILTER_OPTION_LIST_HEIGHT / MULTI_FILTER_OPTION_ROW_HEIGHT);
-    const start = Math.max(
-      0,
-      Math.floor(optionScrollTop / MULTI_FILTER_OPTION_ROW_HEIGHT) - MULTI_FILTER_OPTION_OVERSCAN,
-    );
-    const end = Math.min(
-      visibleOptions.length,
-      start + visibleRows + MULTI_FILTER_OPTION_OVERSCAN * 2,
-    );
-    return {
-      options: visibleOptions.slice(start, end),
-      totalHeight: visibleOptions.length * MULTI_FILTER_OPTION_ROW_HEIGHT,
-      top: start * MULTI_FILTER_OPTION_ROW_HEIGHT,
-    };
-  }, [optionScrollTop, visibleOptions]);
-  // canAddCustom: offer an "Add" row when the typed query names no listed option.
-  const trimmedQuery = optionQuery.trim();
-  const canAddCustom =
-    allowCustomValue &&
-    trimmedQuery !== "" &&
-    !visibleOptions.some((o) => o.value === trimmedQuery);
-  const addCustom = () => {
-    setDraft(updateMultiFilterValue(draft, trimmedQuery, "include"));
-    setOptionQuery("");
-  };
-  const moreCount =
-    filter.truncated && filter.total ? Math.max(filter.total - filter.options.length, 0) : 0;
-
-  return (
-    <div
-      title={filter.description}
-      className={cn(
-        "inline-flex min-w-0",
-        grow ? "min-w-[8rem] max-w-[12rem] flex-1" : "shrink-0",
-        filter.disabled && "opacity-60",
-        filter.className,
-      )}
-    >
-      <Button
-        ref={popup.refs.setReference as Ref<HTMLButtonElement>}
-        type="button"
-        variant="outline"
-        size="sm"
-        aria-label={`${filter.label} filter`}
-        disabled={filter.disabled}
-        className={cn(
-          "min-w-0 gap-2 font-normal",
-          grow ? "w-full max-w-[12rem] justify-between" : "w-auto max-w-[8.5rem] px-2.5",
-          summary === filter.label && "text-muted-foreground",
-        )}
-        {...popup.getReferenceProps()}
-      >
-        <LabelIcon icon={filter.icon} className="text-[14px] text-muted-foreground" />
-        <span className="truncate">{summary}</span>
-        <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
-      </Button>
-
-      {open && (
-        <FloatingPortal>
-          <FloatingFocusManager context={popup.context} modal={false}>
-            <div
-              ref={popup.refs.setFloating}
-              role="dialog"
-              aria-label={filter.label}
-              style={{ ...popup.floatingStyles, zIndex: popup.floatingZ }}
-              className="min-w-[18rem] max-w-[22rem] rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
-              {...popup.getFloatingProps()}
-            >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {filter.label}
-            </div>
-            <button
-              type="button"
-              className="text-[10px] text-primary disabled:text-muted-foreground"
-              onClick={() => setDraft({})}
-              disabled={Object.keys(draft).length === 0}
-            >
-              Clear all
-            </button>
-          </div>
-
-          {showOptionFilter && (
-            <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-              <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
-              <input
-                type="search"
-                aria-label={`Filter ${filter.label} options`}
-                className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder={`Filter ${filter.label.toLowerCase()}`}
-                value={optionQuery}
-                onChange={(event) => setOptionQuery(event.target.value)}
-              />
-            </div>
-          )}
-
-          <div
-            className="max-h-72 overflow-auto"
-            onScroll={(event) => setOptionScrollTop(event.currentTarget.scrollTop)}
-          >
-            <div className="relative" style={{ height: optionWindow.totalHeight }}>
-              <div style={{ transform: `translateY(${optionWindow.top}px)` }}>
-                {optionWindow.options.map((option) => {
-                  const mode = draft[option.value] ?? "neutral";
-                  const title = option.title ?? multiSelectOptionText(option);
-
-                  return (
-                    <div
-                      key={option.value}
-                      role="button"
-                      tabIndex={0}
-                      data-filter-option={option.value}
-                      className="box-border flex items-center rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-                      style={{ height: MULTI_FILTER_OPTION_ROW_HEIGHT }}
-                      onClick={() =>
-                        setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setDraft(
-                            updateMultiFilterValue(draft, option.value, nextFilterMode(mode)),
-                          );
-                        }
-                      }}
-                    >
-                      <FilterPill
-                        className="w-full justify-between"
-                        label={option.label}
-                        mode={mode}
-                        title={title}
-                        togglePosition="right"
-                        onModeChange={(next) =>
-                          setDraft(updateMultiFilterValue(draft, option.value, next))
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            {canAddCustom && (
-              <div
-                role="button"
-                tabIndex={0}
-                data-filter-add-custom={trimmedQuery}
-                className="rounded-md px-2 py-1 text-sm text-primary hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-                onClick={addCustom}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    addCustom();
-                  }
-                }}
-              >
-                Add “{trimmedQuery}”
-              </div>
-            )}
-            {visibleOptions.length === 0 && !canAddCustom && (
-              <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
-            )}
-          </div>
-
-          {moreCount > 0 && !optionQuery.trim() && (
-            <div className="mt-2 px-1.5 text-[11px] text-muted-foreground">
-              … and {moreCount.toLocaleString()} more
-              {onSearch ? " — type to search all" : ""}
-            </div>
-          )}
-            </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </div>
-  );
-}
-
-export type TriStateMultiSelectProps = {
-  /** Trigger label and popover heading. */
-  label: string;
-  /** Map of option value → include/exclude. Neutral options are absent. */
-  value: Record<string, FilterBarMultiFilterMode>;
-  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void;
-  /** Chip options. When `truncated`, this is only the head set. */
-  options: MultiSelectOption[];
-  icon?: LabelIconSpec;
-  description?: string;
-  truncated?: boolean;
-  total?: number;
-  onSearch?: (query: string) => Promise<MultiSelectOption[]> | void;
-  /** Allow committing free-typed / `*`-wildcard values absent from `options`. */
-  allowCustomValue?: boolean;
-  disabled?: boolean;
-  className?: string;
-  /** Fill the available width (form field) vs. shrink to content. Default true. */
-  grow?: boolean;
-};
-
-// TriStateMultiSelect is the standalone include/exclude/neutral multi-select used
-// by FilterBar's "multi" kind, exposed for hand-written forms. It renders a
-// popover of FilterPill chips that cycle neutral → include → exclude. It commits
-// changes immediately (autoSubmit:false) since a controlled form owns the value.
-export function TriStateMultiSelect({ grow = true, ...rest }: TriStateMultiSelectProps) {
-  const filter: FilterBarMultiFilter = { key: rest.label, kind: "multi", ...rest };
-  return (
-    <FilterBarContext.Provider value={{ autoSubmit: false }}>
-      <MultiFilterField filter={filter} grow={grow} />
-    </FilterBarContext.Provider>
-  );
-}
-
-// mergeMultiSelectOptions concatenates two option lists, deduping by value with
-// the first list (the head) taking precedence on ordering and label.
-function mergeMultiSelectOptions(
-  head: MultiSelectOption[],
-  extra: MultiSelectOption[],
-): MultiSelectOption[] {
-  if (extra.length === 0) return head;
-  const seen = new Set(head.map((o) => o.value));
-  const merged = [...head];
-  for (const option of extra) {
-    if (!seen.has(option.value)) {
-      seen.add(option.value);
-      merged.push(option);
-    }
-  }
-  return merged;
-}
-
-function MultiFilterPanel({
-  filter,
-  chrome = "full",
-}: {
-  filter: FilterBarMultiFilter;
-  chrome?: FilterBarFilterPanelChrome;
-}) {
-  const [optionQuery, setOptionQuery] = useState("");
-  const [draft, setDraft] = useDebouncedMultiDraft(filter.value, filter.onChange);
-  const showOptionFilter = filter.options.length > 7;
-  const embedded = chrome === "embedded";
-  const visibleOptions = useMemo(() => {
-    const query = optionQuery.trim().toLowerCase();
-    if (!query) return filter.options;
-    return filter.options.filter((option) =>
-      multiSelectOptionText(option).toLowerCase().includes(query),
-    );
-  }, [filter.options, optionQuery]);
-
-  return (
-    <div
-      data-filter-panel-chrome={chrome}
-      className={cn(
-        "min-w-[18rem] max-w-[22rem] text-popover-foreground",
-        embedded
-          ? "p-0"
-          : "rounded-md border border-border bg-popover p-2 shadow-sm shadow-black/5",
-      )}
-    >
-      {!embedded && (
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {filter.label}
-          </div>
-          <button
-            type="button"
-            className="text-[10px] text-primary disabled:text-muted-foreground"
-            onClick={() => setDraft({})}
-            disabled={Object.keys(draft).length === 0}
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {showOptionFilter && (
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
-          <input
-            type="search"
-            aria-label={`Filter ${filter.label} options`}
-            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder={`Filter ${filter.label.toLowerCase()}`}
-            value={optionQuery}
-            onChange={(event) => setOptionQuery(event.target.value)}
-          />
-        </div>
-      )}
-
-      <div className="max-h-72 space-y-0.5 overflow-auto">
-        {visibleOptions.map((option) => {
-          const mode = draft[option.value] ?? "neutral";
-          const title = option.title ?? multiSelectOptionText(option);
-
-          return (
-            <div
-              key={option.value}
-              role="button"
-              tabIndex={0}
-              data-filter-option={option.value}
-              className="rounded-md px-1.5 py-0.5 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-              onClick={() =>
-                setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)))
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setDraft(updateMultiFilterValue(draft, option.value, nextFilterMode(mode)));
-                }
-              }}
-            >
-              <FilterPill
-                className="w-full justify-between"
-                label={option.label}
-                mode={mode}
-                title={title}
-                togglePosition="right"
-                onModeChange={(next) => setDraft(updateMultiFilterValue(draft, option.value, next))}
-              />
-            </div>
-          );
-        })}
-        {visibleOptions.length === 0 && (
-          <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function NestedMultiFilterPanel({
   filter,
   chrome = "full",
@@ -2153,11 +1678,6 @@ function NestedMultiFilterPanel({
       )}
     </div>
   );
-}
-
-function multiSelectOptionText(option: MultiSelectOption) {
-  const label = typeof option.label === "string" ? option.label : "";
-  return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
 }
 
 function NestedMultiFilterField({
@@ -2516,86 +2036,6 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function summarizeMultiFilter(
-  label: string,
-  value: Record<string, FilterBarMultiFilterMode>,
-): string {
-  const includeCount = Object.values(value).filter((mode) => mode === "include").length;
-  const excludeCount = Object.values(value).filter((mode) => mode === "exclude").length;
-
-  if (includeCount === 0 && excludeCount === 0) {
-    return label;
-  }
-
-  const counts = [
-    includeCount > 0 ? `+${includeCount}` : null,
-    excludeCount > 0 ? `-${excludeCount}` : null,
-  ].filter(Boolean);
-
-  return `${label} ${counts.join(" ")}`;
-}
-
-function useDebouncedMultiDraft(
-  value: Record<string, FilterBarMultiFilterMode>,
-  onChange: (value: Record<string, FilterBarMultiFilterMode>) => void,
-) {
-  const { autoSubmit } = useContext(FilterBarContext);
-  const [draft, setDraft] = useState(value);
-  const latestOnChange = useRef(onChange);
-  const latestValue = useRef(value);
-  const valueKey = multiFilterValueKey(value);
-
-  useEffect(() => {
-    latestOnChange.current = onChange;
-  }, [onChange]);
-
-  useEffect(() => {
-    if (!sameMultiFilterValue(latestValue.current, value)) {
-      latestValue.current = value;
-      setDraft(value);
-      return;
-    }
-    latestValue.current = value;
-  }, [valueKey, value]);
-
-  useEffect(() => {
-    if (sameMultiFilterValue(draft, value)) return;
-
-    if (!autoSubmit) {
-      latestOnChange.current(draft);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      latestOnChange.current(draft);
-    }, FILTER_INPUT_DEBOUNCE_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [autoSubmit, draft, valueKey]);
-
-  return [draft, setDraft] as const;
-}
-
-function multiFilterValueKey(value: Record<string, FilterBarMultiFilterMode>): string {
-  return Object.keys(value)
-    .sort()
-    .map((key) => `${key}:${value[key]}`)
-    .join("\u0000");
-}
-
-function sameMultiFilterValue(
-  a: Record<string, FilterBarMultiFilterMode>,
-  b: Record<string, FilterBarMultiFilterMode>,
-) {
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) return false;
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) return false;
-  }
-  return true;
-}
-
 function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {
   const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
@@ -2780,31 +2220,6 @@ function formatRawNumber(value: number) {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
 }
 
-function updateMultiFilterValue(
-  current: Record<string, FilterBarMultiFilterMode>,
-  optionValue: string,
-  nextMode: FilterMode,
-): Record<string, FilterBarMultiFilterMode> {
-  const next = { ...current };
-
-  if (nextMode === "neutral") {
-    delete next[optionValue];
-    return next;
-  }
-
-  if (nextMode === "include" || nextMode === "exclude") {
-    next[optionValue] = nextMode;
-  }
-
-  return next;
-}
-
-function nextFilterMode(mode: FilterMode): FilterMode {
-  if (mode === "include") return "exclude";
-  if (mode === "exclude") return "neutral";
-  return "include";
-}
-
 type FilterBarValue =
   | string
   | string[]
@@ -2956,7 +2371,10 @@ function sumFilterWidths(widths: number[]) {
 
 function estimateFilterWidth(filter: FilterBarFilter) {
   if (filter.kind === "boolean") return Math.max(88, filter.label.length * 8 + 40);
-  if (filter.kind === "multi" || filter.kind === "nested-multi") return 136;
+  // Multi renders as a combobox field (min-w-[11rem] ≈ 176px); nested keeps
+  // its compact trigger button.
+  if (filter.kind === "multi") return 176;
+  if (filter.kind === "nested-multi") return 136;
   if (filter.kind === "number") return 152;
   return Math.max(144, filter.label.length * 8 + 96);
 }

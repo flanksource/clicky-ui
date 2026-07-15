@@ -1,9 +1,17 @@
 import { type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
+import { FilterPill } from "../data/FilterPill";
 import { UiAdd, UiChevronDown, UiChevronUp, UiClose, UiTrash } from "../icons";
 import { Button } from "./button";
-import { controlMinHeightClass, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
+import {
+  controlHeightClass,
+  controlMinHeightClass,
+  fieldInnerGapClass,
+  inputSizeClass,
+  labelSizeClass,
+  type FormSize,
+} from "./json-schema-form-size";
 import { isScalarStringItems } from "./json-schema-form-resolve";
 import {
   defaultPlaceholder,
@@ -32,6 +40,9 @@ export function ArrayControl({
   // and item inputs disabled (a child the schema marks readOnly still renders as
   // a value span).
   const readOnly = ctx.readOnly || field.readOnly === true;
+  if (field.arrayDisplay === "filter-pills" && enumItemOptions(field).length > 0) {
+    return <FilterPillArray field={field} fieldId={fieldId} readOnly={readOnly} size={ctx.size} />;
+  }
   if (isScalarStringItems(field.itemSchema)) {
     return <TagArray field={field} fieldId={fieldId} readOnly={readOnly} size={ctx.size} />;
   }
@@ -67,6 +78,7 @@ export function ArrayControl({
               onDown={i < items.length - 1 ? () => field.onChange(moveItem(items, i, i + 1)) : undefined}
               onRemove={() => field.onChange(removeIndex(items, i))}
               index={i}
+              size={ctx.size}
             />
           )}
         </div>
@@ -75,14 +87,87 @@ export function ArrayControl({
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="gap-1.5"
+          className={cn("gap-1.5", inputSizeClass[ctx.size])}
           onClick={() => field.onChange([...items, seedFromSchema(itemSchema)])}
         >
           <Icon icon={UiAdd} className="text-sm" />
           Add item
         </Button>
       )}
+    </div>
+  );
+}
+
+function enumItemOptions(field: FieldControl): Array<{ value: string; label: string }> {
+  const rawOptions =
+    field.options ??
+    (Array.isArray(field.itemSchema?.enum)
+      ? field.itemSchema.enum.map((value) => ({ value: String(value), label: String(value) }))
+      : []);
+  const seen = new Set<string>();
+  return rawOptions.flatMap((option) => {
+    if (seen.has(option.value)) return [];
+    seen.add(option.value);
+    return [{ value: option.value, label: option.label }];
+  });
+}
+
+function FilterPillArray({
+  field,
+  fieldId,
+  readOnly,
+  size,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+}) {
+  const options = enumItemOptions(field);
+  const validValues = new Set(options.map((option) => option.value));
+  const explicitValues = toStringArray(field.value).filter((value) => validValues.has(value));
+  const implicitAll = explicitValues.length === 0;
+  const selected = new Set(implicitAll ? options.map((option) => option.value) : explicitValues);
+
+  function commit(nextSelected: Set<string>) {
+    const next = options
+      .map((option) => option.value)
+      .filter((value) => nextSelected.has(value));
+    field.onChange(next.length === options.length ? [] : next);
+  }
+
+  function toggle(value: string) {
+    if (readOnly) return;
+    const next = new Set(selected);
+    if (next.has(value)) {
+      next.delete(value);
+    } else {
+      next.add(value);
+    }
+    commit(next);
+  }
+
+  return (
+    <div
+      id={fieldId}
+      data-jsf-input
+      role="group"
+      aria-label={field.label}
+      className={cn(
+        "flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1 shadow-sm",
+        controlMinHeightClass[size],
+      )}
+    >
+      {options.map((option) => (
+        <FilterPill
+          key={option.value}
+          label={option.label}
+          mode={selected.has(option.value) ? "active" : "neutral"}
+          title={implicitAll ? `${option.label} enabled by default` : option.label}
+          {...(!readOnly ? { onClick: () => toggle(option.value) } : {})}
+          className="max-w-full"
+        />
+      ))}
     </div>
   );
 }
@@ -151,7 +236,10 @@ function TableArray({
                   <button
                     type="button"
                     aria-label={`Remove item ${i + 1}`}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className={cn(
+                      "inline-flex aspect-square items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
+                      controlHeightClass[ctx.size],
+                    )}
                     onClick={() => field.onChange(removeIndex(items, i))}
                   >
                     <Icon icon={UiTrash} className="text-sm" />
@@ -167,8 +255,7 @@ function TableArray({
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="gap-1.5"
+            className={cn("gap-1.5", inputSizeClass[ctx.size])}
             onClick={() => field.onChange([...items, seedFromSchema(itemSchema)])}
           >
             <Icon icon={UiAdd} className="text-sm" />
@@ -185,19 +272,26 @@ function ItemControls({
   onDown,
   onRemove,
   index,
+  size,
 }: {
   onUp: (() => void) | undefined;
   onDown: (() => void) | undefined;
   onRemove: () => void;
   index: number;
+  size: FormSize;
 }) {
+  const actionClassName = cn(
+    "inline-flex aspect-square items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30",
+    controlHeightClass[size],
+  );
+
   return (
     <div className="flex items-center gap-1">
       <button
         type="button"
         aria-label={`Move item ${index + 1} up`}
         disabled={!onUp}
-        className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30"
+        className={actionClassName}
         onClick={onUp}
       >
         <Icon icon={UiChevronUp} className="text-sm" />
@@ -206,7 +300,7 @@ function ItemControls({
         type="button"
         aria-label={`Move item ${index + 1} down`}
         disabled={!onDown}
-        className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30"
+        className={actionClassName}
         onClick={onDown}
       >
         <Icon icon={UiChevronDown} className="text-sm" />
@@ -214,7 +308,7 @@ function ItemControls({
       <button
         type="button"
         aria-label={`Remove item ${index + 1}`}
-        className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        className={actionClassName}
         onClick={onRemove}
       >
         <Icon icon={UiTrash} className="text-sm" />

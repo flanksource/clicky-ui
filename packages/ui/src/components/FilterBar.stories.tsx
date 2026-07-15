@@ -174,11 +174,11 @@ const meta = {
     docs: {
       description: {
         component: [
-          "Responsive filter toolbar for search, typed filters, include/exclude chips, lookup fields, and date/time ranges.",
+          "Responsive filter toolbar for search, typed filters, tri-state include/exclude comboboxes, lookup fields, and date/time ranges.",
           "",
           "**Composition**",
           "- `search` renders the leading search input.",
-          "- `filters` is an array of typed descriptors — `text`, `number`, `multi` (include/exclude chips), `lookup`, and `lookup-multi` — each fully controlled via its own `value`/`onChange`.",
+          "- `filters` is an array of typed descriptors — `text`, `number`, `multi` (a tristate combobox whose options cycle include/exclude), `lookup`, and `lookup-multi` — each fully controlled via its own `value`/`onChange`.",
           "- `timeRange`/`dateRange` add range pickers; `leading`/`trailing`/`children` inject custom content.",
           "",
           "**Submit modes**",
