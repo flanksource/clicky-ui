@@ -384,7 +384,10 @@ export type PreExtension = (
 export type PostExtension = (
   field: FieldControl,
   nodes: { label: ReactNode; value: ReactNode },
-  ctx?: { rootValue?: Record<string, unknown> },
+  ctx?: {
+    rootValue?: Record<string, unknown>;
+    onRootChange?: (next: Record<string, unknown>) => void;
+  },
 ) => { label: ReactNode; value: ReactNode };
 
 // FieldArgs is the raw input for rendering one field: the property key/schema,
@@ -444,6 +447,9 @@ export interface RenderContext {
   // The form's top-level value, threaded unchanged through every depth so a
   // widget can read sibling fields (e.g. a selected namespace).
   rootValue?: Record<string, unknown>;
+  // Commits a replacement top-level value. Consumer extensions use this to
+  // atomically update sibling fields from a composite editor.
+  onRootChange?: (next: Record<string, unknown>) => void;
   depth: number;
   // The recursion entry points (see RenderApi).
   render: RenderApi;

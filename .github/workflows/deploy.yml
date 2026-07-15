@@ -37,27 +37,19 @@ jobs:
         run: pnpm --filter storybook exec storybook build --disable-telemetry --output-dir storybook-static
         env:
           STORYBOOK_BASE_PATH: /storybook/
+      - name: Build documentation
+        run: pnpm --filter docs run build:site
       - name: Build kitchen-sink
         run: pnpm --filter kitchen-sink exec vite build --base /kitchen-sink/
 
       - name: Assemble pages bundle
         run: |
           mkdir -p pages-bundle
+          cp -r apps/docs/dist/. pages-bundle/
           cp -r apps/storybook/storybook-static pages-bundle/storybook
           cp -r apps/kitchen-sink/dist pages-bundle/kitchen-sink
           cp demo.html pages-bundle/demo.html
           echo "clicky-ui.flanksource.com" > pages-bundle/CNAME
-          cat > pages-bundle/index.html <<'HTML'
-          <!doctype html>
-          <meta charset="utf-8" />
-          <title>Clicky UI previews</title>
-          <h1>Clicky UI previews</h1>
-          <ul>
-            <li><a href="demo.html">Live JSON demo</a> (paste a Clicky document, see it rendered)</li>
-            <li><a href="storybook/">Storybook</a></li>
-            <li><a href="kitchen-sink/">Kitchen Sink</a></li>
-          </ul>
-          HTML
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

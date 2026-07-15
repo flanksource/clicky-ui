@@ -151,7 +151,10 @@ function buildField(
     ? { ...ctx, layout: { ...ctx.layout, mode: overrideMode } }
     : ctx;
   let value: ReactNode = renderValueControl(field, valueCtx);
-  const postCtx = ctx.rootValue ? { rootValue: ctx.rootValue } : {};
+  const postCtx = {
+    ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
+    ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
+  };
   for (const ext of ctx.post) {
     const next = ext(field, { label, value }, postCtx);
     label = next.label;
