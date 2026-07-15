@@ -770,6 +770,61 @@ function QuestionCard({ question, index }: { question: SessionQuestion; index: n
   );
 }
 
+function QuestionToolBody({ event, visual }: { event: SessionEvent; visual: EventVisual }) {
+  const questions = questionsFromToolInput(event.toolInput);
+  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
+
+  return (
+    <div className="not-prose">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
+        <ApprovalBadge event={event} />
+        {summary && questions.length !== 1 && (
+          <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span>
+        )}
+      </div>
+      <div className="mt-1.5 space-y-1.5">
+        {questions.length > 0 ? (
+          questions.map((question, index) => (
+            <QuestionCard key={`${question.id}-${index}`} question={question} index={index} />
+          ))
+        ) : event.toolInput ? (
+          <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
+        ) : null}
+        {event.toolResponse !== undefined && (
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium uppercase text-muted-foreground">Answer</div>
+            <ResponseBlock response={event.toolResponse} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuestionCard({ question, index }: { question: SessionQuestion; index: number }) {
+  const label = question.context || (question.id ? `Question ${question.id}` : `Question ${index + 1}`);
+  return (
+    <div className="rounded-md border border-sky-500/20 bg-sky-500/5 px-density-3 py-density-2">
+      <div className="text-[11px] font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">{question.text}</div>
+      {question.options.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {question.options.map((option) => (
+            <span
+              key={option.value}
+              className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
+            >
+              <span className="font-medium text-foreground">{option.label}</span>
+              {option.description && <span className="ml-1">{option.description}</span>}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // A single truncating line of `name: value` hints — the container clips with an
 // ellipsis instead of wrapping, and each value is already truncated by the model.
 function InlineParams({ params }: { params: ToolParam[] }) {
