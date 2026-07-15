@@ -13,6 +13,14 @@ export {
   type BadgeVariant,
 } from "./data/Badge";
 export { CodeBlock, type CodeBlockProps } from "./data/CodeBlock";
+export { CodeDiff, type CodeDiffProps, type CodeDiffView } from "./data/CodeDiff";
+export {
+  computeLineDiff,
+  parseUnifiedDiff,
+  type DiffHunk,
+  type DiffLine,
+  type DiffLineType,
+} from "./data/code-diff";
 export { inferColumns } from "./data/data-table-utils";
 export {
   DataTable,
@@ -119,6 +127,7 @@ export { normalizeLogsTableRows } from "./data/logs-normalize";
 export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MarkdownEditor, type MarkdownEditorProps } from "./data/MarkdownEditor";
+export * from "./data/FixtureEditor";
 export {
   buildMarkdownPreviewUrl,
   clickyFormatForMarkdownPreview,
@@ -219,6 +228,7 @@ export { ExecutionTree, type ExecutionNode, type ExecutionTreeProps } from "./da
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
+export * from "./data/git";
 export * from "./data/test-runner";
 export * from "./data/cache-browser";
 export {

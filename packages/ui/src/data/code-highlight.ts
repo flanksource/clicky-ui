@@ -88,6 +88,17 @@ export type HighlightOptions = {
   transformers?: ShikiTransformer[];
 };
 
+// Derive a highlighter language hint from a file path's extension (e.g.
+// "src/app.tsx" → "tsx"). Returns undefined for extensionless paths and dotfiles;
+// `resolveLang` then maps aliases and drops anything unsupported.
+export function languageFromPath(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  const basename = path.slice(path.lastIndexOf("/") + 1);
+  const dot = basename.lastIndexOf(".");
+  if (dot <= 0) return undefined;
+  return basename.slice(dot + 1).toLowerCase();
+}
+
 function resolveLang(input: string): SupportedLang | null {
   const lang = input.toLowerCase();
   if ((SUPPORTED_LANGS as readonly string[]).includes(lang)) return lang as SupportedLang;
@@ -120,6 +131,40 @@ export async function highlightCode(
       theme: resolveTheme(opts.theme),
       ...(opts.transformers ? { transformers: opts.transformers } : {}),
     });
+  } catch {
+    return null;
+  }
+}
+
+// A single highlighted token: its text, an optional hex `color`, and Shiki's
+// `fontStyle` bitmask (1=italic, 2=bold, 4=underline).
+export type HighlightedToken = { content: string; color?: string; fontStyle?: number };
+export type HighlightedLine = HighlightedToken[];
+
+// Tokenize `source` into per-line themed tokens for `CodeDiff`, which paints its
+// own diff gutters/rows rather than embedding Shiki's `<pre>` HTML. Returns null
+// on empty source, an unsupported language, or a highlighter failure — the caller
+// then renders plain text (same graceful degradation as `highlightCode`).
+export async function highlightToLines(
+  source: string,
+  opts: HighlightOptions,
+): Promise<HighlightedLine[] | null> {
+  if (!source || !opts.lang) return null;
+  const lang = resolveLang(opts.lang);
+  if (!lang) return null;
+  try {
+    const highlighter = await loadHighlighter();
+    const { tokens } = highlighter.codeToTokens(source, {
+      lang,
+      theme: resolveTheme(opts.theme),
+    });
+    return tokens.map((line) =>
+      line.map((token) => ({
+        content: token.content,
+        ...(token.color ? { color: token.color } : {}),
+        ...(token.fontStyle ? { fontStyle: token.fontStyle } : {}),
+      })),
+    );
   } catch {
     return null;
   }

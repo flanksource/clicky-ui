@@ -1,0 +1,338 @@
+import { useState, type ReactNode } from "react";
+import { cn } from "../../lib/utils";
+import { Icon, type StaticIconComponent } from "../Icon";
+import { CodeBlock } from "../CodeBlock";
+import { CodeDiff } from "../CodeDiff";
+import {
+  UiBrain,
+  UiChevronDown,
+  UiSparkles,
+  UiUserCircle,
+  UiWarningTriangle,
+} from "../../icons";
+import {
+  getSessionAction,
+  type SessionEvent,
+  type SessionTone,
+} from "./SessionViewer.model";
+import {
+  shellCommand,
+  summarizeToolInput,
+  toolDiff,
+  toolInputParams,
+  type ToolDiff,
+  type ToolParam,
+} from "./SessionViewer.input";
+
+// Disc colors per tone. The dark variants key off a `[data-theme="dark"]`
+// ancestor (the document attribute set by ThemeProvider, or the component-level
+// override painted on this viewer's root) rather than Tailwind's `dark:` —
+// which this library compiles to `prefers-color-scheme` and so would ignore the
+// `data-theme` attribute. Written as literal class strings so Tailwind scans them.
+const DISC_TONE: Record<SessionTone, string> = {
+  sky: "bg-sky-100 text-sky-700 [[data-theme=dark]_&]:bg-sky-500/15 [[data-theme=dark]_&]:text-sky-300",
+  amber: "bg-amber-100 text-amber-700 [[data-theme=dark]_&]:bg-amber-500/15 [[data-theme=dark]_&]:text-amber-300",
+  violet: "bg-violet-100 text-violet-700 [[data-theme=dark]_&]:bg-violet-500/15 [[data-theme=dark]_&]:text-violet-300",
+  emerald: "bg-emerald-100 text-emerald-700 [[data-theme=dark]_&]:bg-emerald-500/15 [[data-theme=dark]_&]:text-emerald-300",
+  rose: "bg-rose-100 text-rose-700 [[data-theme=dark]_&]:bg-rose-500/15 [[data-theme=dark]_&]:text-rose-300",
+  indigo: "bg-indigo-100 text-indigo-700 [[data-theme=dark]_&]:bg-indigo-500/15 [[data-theme=dark]_&]:text-indigo-300",
+  fuchsia: "bg-fuchsia-100 text-fuchsia-700 [[data-theme=dark]_&]:bg-fuchsia-500/15 [[data-theme=dark]_&]:text-fuchsia-300",
+  pink: "bg-pink-100 text-pink-700 [[data-theme=dark]_&]:bg-pink-500/15 [[data-theme=dark]_&]:text-pink-300",
+  slate: "bg-muted text-muted-foreground",
+};
+
+export function SessionRow({
+  event,
+  last,
+  defaultExpanded,
+}: {
+  event: SessionEvent;
+  last: boolean;
+  defaultExpanded: boolean;
+}) {
+  if (event.kind === "user") return <UserRow event={event} />;
+
+  const visual = eventVisual(event);
+  return (
+    <li data-event-kind={event.kind} className="relative flex gap-density-3 pb-density-4 last:pb-0">
+      {!last && <span aria-hidden className="absolute bottom-0 left-[10px] top-[22px] w-px bg-border" />}
+      <span
+        className={cn(
+          "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
+          DISC_TONE[visual.tone],
+        )}
+      >
+        <Icon icon={visual.icon} className="h-3 w-3" />
+      </span>
+      <div className="min-w-0 flex-1 pt-px">
+        <EventBody event={event} visual={visual} defaultExpanded={defaultExpanded} />
+      </div>
+    </li>
+  );
+}
+
+// User prompts and selections sit on the right, like a chat composer turn.
+function UserRow({ event }: { event: SessionEvent }) {
+  return (
+    <li data-event-kind="user" className="relative flex justify-end pb-density-4 last:pb-0">
+      <div className="flex max-w-[85%] items-start gap-density-3">
+        <div className="min-w-0">
+          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">You</div>
+          <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right leading-relaxed text-accent-foreground">
+            {event.text}
+          </div>
+        </div>
+        <span
+          className={cn(
+            "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
+            DISC_TONE.slate,
+          )}
+        >
+          <Icon icon={UiUserCircle} className="h-3 w-3" />
+        </span>
+      </div>
+    </li>
+  );
+}
+
+interface EventVisual {
+  icon: StaticIconComponent;
+  tone: SessionTone;
+  label: string;
+  summaryOnly: boolean;
+}
+
+function eventVisual(event: SessionEvent): EventVisual {
+  switch (event.kind) {
+    case "tool": {
+      const action = getSessionAction(event.tool ?? "");
+      return {
+        icon: action.icon,
+        tone: action.tone,
+        label: action.label,
+        summaryOnly: action.summaryOnly ?? false,
+      };
+    }
+    case "user":
+      return { icon: UiUserCircle, tone: "slate", label: "User", summaryOnly: false };
+    case "assistant":
+      return { icon: UiSparkles, tone: "indigo", label: "Assistant", summaryOnly: false };
+    case "thinking":
+      return { icon: UiBrain, tone: "slate", label: "Thinking", summaryOnly: false };
+    case "error":
+      return { icon: UiWarningTriangle, tone: "rose", label: "Error", summaryOnly: false };
+  }
+}
+
+function EventBody({
+  event,
+  visual,
+  defaultExpanded,
+}: {
+  event: SessionEvent;
+  visual: EventVisual;
+  defaultExpanded: boolean;
+}) {
+  if (event.kind === "tool") return <ToolBody event={event} visual={visual} defaultExpanded={defaultExpanded} />;
+  if (event.kind === "thinking") return <ThinkingBody event={event} />;
+  if (event.kind === "error") return <ErrorBody event={event} />;
+  return <MessageBody event={event} />;
+}
+
+function ToolBody({
+  event,
+  visual,
+  defaultExpanded,
+}: {
+  event: SessionEvent;
+  visual: EventVisual;
+  defaultExpanded: boolean;
+}) {
+  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
+  const command = shellCommand(event.tool ?? "", event.toolInput);
+  const [open, setOpen] = useState(defaultExpanded);
+
+  // Shell rows inline the full command as a bash block — no "Run command"
+  // label, no tool-input JSON. Only the response stays behind the chevron.
+  if (command !== undefined) {
+    return (
+      <div className="not-prose">
+        <div className="flex items-start gap-1.5">
+          <div className="min-w-0 flex-1">
+            <CodeBlock bare language="bash" source={command} />
+          </div>
+          {event.toolResponse !== undefined && (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label="Toggle response"
+              onClick={() => setOpen((value) => !value)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Icon
+                icon={UiChevronDown}
+                className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")}
+              />
+            </button>
+          )}
+        </div>
+        {open && event.toolResponse !== undefined && (
+          <div className="mt-1.5">
+            <ResponseBlock response={event.toolResponse} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
+  const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
+  const diff = toolDiff(event.tool ?? "", event.toolInput);
+  // summaryOnly rows (file ops) read as their path alone — the icon carries the
+  // verb. Remaining input keys follow as JetBrains-style inline param hints;
+  // write-type rows carry a +/- diff stat.
+  const header = (
+    <>
+      {visual.summaryOnly && summary ? (
+        <span className="min-w-0 truncate font-mono text-xs text-foreground">{summary}</span>
+      ) : (
+        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
+      )}
+      {diff && (
+        <span className="shrink-0 font-mono text-xs">
+          {diff.added > 0 && (
+            <span className="text-emerald-600 [[data-theme=dark]_&]:text-emerald-400">
+              +{diff.added}
+            </span>
+          )}
+          {diff.removed > 0 && (
+            <span className="ml-1 text-rose-600 [[data-theme=dark]_&]:text-rose-400">
+              -{diff.removed}
+            </span>
+          )}
+        </span>
+      )}
+      {params.length > 0 && <InlineParams params={params} />}
+    </>
+  );
+
+  return (
+    <div className="not-prose">
+      {hasDetail ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
+        >
+          {header}
+          <Icon
+            icon={UiChevronDown}
+            className={cn("ml-auto size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          />
+        </button>
+      ) : (
+        <div className="flex items-center gap-1.5">{header}</div>
+      )}
+
+      {open && hasDetail && (
+        <div className="mt-1.5 space-y-1.5">
+          {diff ? (
+            <DiffBlock diff={diff} />
+          ) : (
+            event.toolInput !== undefined && (
+              <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
+            )
+          )}
+          {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A single truncating line of `name: value` hints — the container clips with an
+// ellipsis instead of wrapping, and each value is already truncated by the model.
+function InlineParams({ params }: { params: ToolParam[] }) {
+  return (
+    <span className="min-w-0 flex-1 truncate font-mono text-xs">
+      {params.map((param) => (
+        <span key={param.name} className="[&:not(:first-child)]:ml-2">
+          <span className="text-muted-foreground/70">{param.name}: </span>
+          <span className="text-muted-foreground">{param.value}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Language-aware line diff for write-type tools: each edit renders as a
+// `CodeDiff` (real LCS + Shiki highlighting) with git-style add/remove gutters
+// whose tints track the theme tokens.
+function DiffBlock({ diff }: { diff: ToolDiff }) {
+  return (
+    <div className="space-y-1.5">
+      {diff.segments.map((segment, index) => (
+        <CodeDiff
+          key={index}
+          bare
+          showLineNumbers={false}
+          original={segment.original}
+          modified={segment.modified}
+          {...(diff.language ? { language: diff.language } : {})}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ResponseBlock({ response }: { response: string }) {
+  const trimmed = response.trim();
+  const isJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  return <DetailBlock language={isJson ? "json" : "text"} source={response} />;
+}
+
+function DetailBlock({ language, source }: { language: string; source: string }): ReactNode {
+  return (
+    <div className="overflow-x-auto text-xs">
+      <CodeBlock bare language={language} source={source} />
+    </div>
+  );
+}
+
+function MessageBody({ event }: { event: SessionEvent }) {
+  return (
+    <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">{event.text}</div>
+  );
+}
+
+// Reasoning shows its text directly — truncated to one line, click to expand.
+function ThinkingBody({ event }: { event: SessionEvent }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="not-prose">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-start gap-1.5 text-left text-xs italic leading-relaxed text-muted-foreground hover:text-foreground"
+      >
+        <span className={cn("min-w-0 flex-1", open ? "whitespace-pre-wrap break-words" : "truncate")}>
+          {event.text}
+        </span>
+        <Icon
+          icon={UiChevronDown}
+          className={cn("mt-0.5 size-3 shrink-0 transition-transform", open && "rotate-180")}
+        />
+      </button>
+    </div>
+  );
+}
+
+function ErrorBody({ event }: { event: SessionEvent }) {
+  return (
+    <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
+      {event.text}
+    </div>
+  );
+}

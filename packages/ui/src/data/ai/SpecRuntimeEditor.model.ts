@@ -5,6 +5,7 @@ export const SPEC_PERMISSION_MODES = [
   "acceptEdits",
   "auto",
   "bypassPermissions",
+  "dontAsk",
   "plan",
 ] as const;
 
@@ -114,6 +115,8 @@ export type AISpecRuntimeSpec = {
   permissions?: AISpecRuntimePermissions;
   setup?: AISpecRuntimeSetup;
   sessionId?: string;
+  /** Extra cmux CLI args (api.Spec.cliArgs), keyed by option json name. */
+  cliArgs?: Record<string, unknown>;
 };
 
 export type AISpecRuntimeEnvVarSource = {
@@ -160,9 +163,9 @@ export type AISpecRuntimeSetup = {
 
 export type AISpecRuntimeVerify = {
   commands?: string[];
+  fixture?: string;
   scope?: SpecVerifyScope | "";
   maxIterations?: number;
-  gavel?: boolean;
 };
 
 export type AISpecRuntimeFinalize = {
@@ -174,9 +177,9 @@ export type AISpecRuntimeFinalize = {
 export type AISpecRuntimeLocalWorkflow = {
   verify?: {
     commands?: string[];
+    fixture?: string;
     scope?: SpecVerifyScope | "";
     maxIterations?: number;
-    gavel?: boolean;
   };
   finalize?: {
     commit?: boolean;
@@ -227,10 +230,14 @@ export function compactAISpecRuntime(
   if (budget) spec.budget = budget;
   const memory = compactMemory(value.memory);
   if (memory) spec.memory = memory;
-  const permissions = compactPermissions(value.permissions, value.memory?.skills);
+  const permissions = compactPermissions(
+    value.permissions,
+    value.memory?.skills,
+  );
   if (permissions) spec.permissions = permissions;
   const setup = compactSetup(value.setup);
   if (setup) spec.setup = setup;
+  if (value.cliArgs && hasKeys(value.cliArgs)) spec.cliArgs = value.cliArgs;
   return spec;
 }
 
@@ -286,7 +293,6 @@ function compactMemory(
   const memory: AISpecRuntimeMemory = {};
   if (value.skipProject) memory.skipProject = true;
   if (value.skipUser) memory.skipUser = true;
-  if (value.skipSkills) memory.skipSkills = true;
   if (value.skipHooks) memory.skipHooks = true;
   if (value.skipMemory) memory.skipMemory = true;
   if (value.bare) memory.bare = true;
@@ -375,7 +381,8 @@ function compactStructuredEnvVarSource(
   const source: AISpecRuntimeEnvVarSource = {};
   const secretName = cleanString(value.secretKeyRef?.name);
   const secretKey = cleanString(value.secretKeyRef?.key);
-  if (secretName && secretKey) source.secretKeyRef = { name: secretName, key: secretKey };
+  if (secretName && secretKey)
+    source.secretKeyRef = { name: secretName, key: secretKey };
   const configMapName = cleanString(value.configMapKeyRef?.name);
   const configMapKey = cleanString(value.configMapKeyRef?.key);
   if (configMapName && configMapKey) {
@@ -394,7 +401,8 @@ function compactSetupCheckout(
 ): NonNullable<AISpecRuntimeSetup["checkout"]> | undefined {
   if (!value) return undefined;
   const checkout: NonNullable<AISpecRuntimeSetup["checkout"]> = {};
-  if (value.mode === "remote" || value.mode === "local") checkout.mode = value.mode;
+  if (value.mode === "remote" || value.mode === "local")
+    checkout.mode = value.mode;
   const url = cleanString(value.url);
   if (url) checkout.url = url;
   const path = cleanString(value.path);
@@ -470,7 +478,9 @@ function compactMCPPermissions(
     if (!key) continue;
     if (key === "servers") {
       const servers = Array.isArray(rawValue)
-        ? compactList(rawValue.filter((item): item is string => typeof item === "string"))
+        ? compactList(
+            rawValue.filter((item): item is string => typeof item === "string"),
+          )
         : undefined;
       if (servers) out.servers = servers;
       continue;
