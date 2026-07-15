@@ -132,7 +132,7 @@
       ],
       "authenticated": true,
       "backend": "claude-agent",
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
       "kind": "cli",
       "modelDetails": [
         {
@@ -297,7 +297,7 @@
       },
       "authenticated": true,
       "backend": "claude-cmux",
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
       "kind": "cli",
       "modelDetails": [
         {
@@ -2139,6 +2139,186 @@
           ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-fable-5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-8"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-7"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-opus-4-6"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-haiku-4-5-20251001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "claude-sonnet-4-5-20250929"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false
           }
@@ -2156,6 +2336,599 @@
           ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-pro"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-lite-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "veo-3.1-fast-generate-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "nano-banana-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-pro-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "lyria-3-clip-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-2.5-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-31b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemma-4-26b-a4b-it"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.6-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-robotics-er-1.5-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-pro-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-omni-flash-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-flash-lite-latest"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-embedding-001"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-pro-preview-customtools"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite-preview"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.1-flash-lite"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-pro-preview-12-2025"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deep-research-max-preview-04-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "aqa"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "antigravity-preview-05-2026"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false
           }
@@ -2173,6 +2946,75 @@
           ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.5"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.4"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.2"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false
           }
@@ -2190,6 +3032,50 @@
           ]
         },
         "then": {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deepseek-v4-pro"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "deepseek-v4-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            }
+          ],
           "properties": {
             "cliArgs": false
           }
