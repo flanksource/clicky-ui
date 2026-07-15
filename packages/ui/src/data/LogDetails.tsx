@@ -12,7 +12,7 @@ import { UiChevronDown, UiChevronRight, UiCopy, UiZoomIn, UiZoomOut } from "../i
 const TAGS_PATH = "details.tags";
 
 // Key column shrinks to its content (no min/fixed width), never wider than 30ch.
-const DETAIL_ROW_CLASS = "grid-cols-[fit-content(30ch)_minmax(0,1fr)]";
+const DETAIL_GRID_TEMPLATE = "fit-content(30ch) minmax(0, 1fr)";
 
 /**
  * Maps a top-level detail field path (`details.<columnKey>`) to its column key.
@@ -141,7 +141,7 @@ export function LogDetails({
           isTags ? (
             <TagPropertiesList
               tags={normalizeTags(entryValue as string[])}
-              rowClassName={DETAIL_ROW_CLASS}
+              gridTemplateColumns={DETAIL_GRID_TEMPLATE}
             />
           ) : (
             <Properties
@@ -151,7 +151,7 @@ export function LogDetails({
               renderValue={renderValue}
               prefixActions={prefixActions}
               suffixActions={suffixActions}
-              rowClassName={DETAIL_ROW_CLASS}
+              gridTemplateColumns={DETAIL_GRID_TEMPLATE}
               className="mt-density-1"
             />
           ),
@@ -166,7 +166,7 @@ export function LogDetails({
       renderValue={renderValue}
       prefixActions={prefixActions}
       suffixActions={suffixActions}
-      rowClassName={DETAIL_ROW_CLASS}
+      gridTemplateColumns={DETAIL_GRID_TEMPLATE}
     />
   );
 

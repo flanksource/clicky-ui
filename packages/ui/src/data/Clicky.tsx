@@ -37,6 +37,7 @@ import {
   type DataTableColumn,
   type DataTableMenuAction,
   type DataTablePagination,
+  type DataTableRowSelection,
 } from "./DataTable";
 import type {
   FilterBarFilter,
@@ -63,6 +64,7 @@ import {
   UiTable,
 } from "../icons";
 import { CodeBlock } from "./CodeBlock";
+import { JsonView } from "./JsonView";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";
 import { StackTrace } from "./diagnostics/RenderedStackTrace";
 import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
@@ -103,6 +105,7 @@ export type ClickyField = {
 export type ClickyColumn = {
   name: string;
   label?: string;
+  type?: string;
   header?: ClickyNode;
   align?: "left" | "right" | "center";
   sortable?: boolean;
@@ -266,7 +269,8 @@ export type ClickyOverflowViewFormat =
   (typeof CLICKY_OVERFLOW_VIEW_FORMATS)[number];
 export type ClickyRemoteFormat =
   | ClickyPrimaryViewFormat
-  | ClickyOverflowViewFormat;
+  | ClickyOverflowViewFormat
+  | "ndjson";
 
 export type ClickyViewOptions = Partial<Record<ClickyRemoteFormat, boolean>>;
 
@@ -277,7 +281,17 @@ export type ClickyDownloadOptions = {
   all?: boolean;
   /** Override the download menu label. */
   label?: string;
+  /** Formats advertised by the endpoint. Defaults to Clicky's legacy set. */
+  formats?: ClickyRemoteFormat[];
+  /** Result ranges advertised by the endpoint. Legacy endpoints omit this. */
+  scopes?: ClickyDownloadScope[];
+  /** Whether all-row export streams or uses a compatibility buffer. */
+  allRowsMode?: "streaming" | "buffered";
+  /** Per-format server row caps, for example `{ pdf: 1000 }`. */
+  formatMaxRows?: Partial<Record<ClickyRemoteFormat, number>>;
 };
+
+export type ClickyDownloadScope = "page" | "all";
 
 export type ClickyProps = {
   /** Clicky document, node, or JSON string to render. */
@@ -308,6 +322,8 @@ export type ClickyProps = {
   timeRange?: FilterBarRangeProps;
   /** Pagination footer configuration for the first embedded table. */
   pagination?: DataTablePagination;
+  /** Controlled multi-row selection for the first embedded table. */
+  rowSelection?: ClickyTableRowSelection;
 };
 
 export type ClickyNodeViewProps = {
@@ -336,8 +352,15 @@ export type ClickyTableProps = {
   externalFilters?: FilterBarFilter[] | undefined;
   /** Pagination footer configuration. */
   pagination?: DataTablePagination | undefined;
+  /** Controlled multi-row selection. */
+  rowSelection?: ClickyTableRowSelection | undefined;
   /** Extra actions rendered in the table menu. */
   menuActions?: DataTableMenuAction[] | undefined;
+};
+
+export type ClickyTableRowSelection = DataTableRowSelection<ClickyRow> & {
+  /** Stable Clicky row id used by the controlled selection. */
+  getRowId: (row: ClickyRow, index: number) => string;
 };
 
 type ClickyRemoteResponse =
@@ -366,6 +389,7 @@ type ClickyRuntimeContextValue = {
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
@@ -417,6 +441,7 @@ export function Clicky(props: ClickyProps) {
         ? { tableExternalFilters: props.externalFilters }
         : {})}
       {...(props.pagination ? { tablePagination: props.pagination } : {})}
+      {...(props.rowSelection ? { tableRowSelection: props.rowSelection } : {})}
       {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
     >
       {props.url ? (
@@ -448,6 +473,7 @@ function ClickyRuntimeProvider({
   tableTimeRange,
   tableExternalFilters,
   tablePagination,
+  tableRowSelection,
   tableMenuActions,
   children,
 }: {
@@ -459,6 +485,7 @@ function ClickyRuntimeProvider({
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   children: ReactNode;
 }) {
@@ -471,6 +498,7 @@ function ClickyRuntimeProvider({
       tableTimeRange ||
       tableExternalFilters ||
       tablePagination ||
+      tableRowSelection ||
       tableMenuActions;
     return (
       <ClickyRuntimeContext.Provider
@@ -485,6 +513,7 @@ function ClickyRuntimeProvider({
                 tableTimeRange,
                 tableExternalFilters,
                 tablePagination,
+                tableRowSelection,
                 tableMenuActions,
               }
             : clickyRuntimeContextDefault
@@ -505,6 +534,7 @@ function ClickyRuntimeProvider({
       {...(tableTimeRange ? { tableTimeRange } : {})}
       {...(tableExternalFilters ? { tableExternalFilters } : {})}
       {...(tablePagination ? { tablePagination } : {})}
+      {...(tableRowSelection ? { tableRowSelection } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
     >
       {children}
@@ -521,6 +551,7 @@ function ClickyCommandRuntimeProvider({
   tableTimeRange,
   tableExternalFilters,
   tablePagination,
+  tableRowSelection,
   tableMenuActions,
   children,
 }: {
@@ -532,6 +563,7 @@ function ClickyCommandRuntimeProvider({
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   children: ReactNode;
 }) {
@@ -546,6 +578,7 @@ function ClickyCommandRuntimeProvider({
       tableTimeRange,
       tableExternalFilters,
       tablePagination,
+      tableRowSelection,
       tableMenuActions,
       operations,
       operationsLoading: isLoading,
@@ -561,6 +594,7 @@ function ClickyCommandRuntimeProvider({
       tableTimeRange,
       tableExternalFilters,
       tablePagination,
+      tableRowSelection,
       tableMenuActions,
     ],
   );
@@ -731,7 +765,7 @@ function ClickyRemoteRenderer({
               <ClickyDownloadMenu
                 url={url}
                 formats={downloadFormats}
-                label={download?.label}
+                download={download}
               />
             )}
           </div>
@@ -773,7 +807,10 @@ function ClickyRemoteRenderer({
             <ClickyRuntimeContext.Provider
               value={{ ...runtime, tableMenuActions: combinedTableActions }}
             >
-              <ClickyContent data={effectiveClickyData} />
+              <ClickyContent
+                data={effectiveClickyData}
+                className="flex min-h-0 flex-1 flex-col"
+              />
             </ClickyRuntimeContext.Provider>
           </>
         )
@@ -818,7 +855,10 @@ function ClickyRemoteRenderer({
           tone="destructive"
         />
       ) : (
-        <ClickyRemotePreview format={activeView} response={activeQuery.data} />
+        <ClickyRemotePreview
+          format={activeView as ClickyOverflowViewFormat}
+          response={activeQuery.data}
+        />
       )}
     </div>
   );
@@ -914,17 +954,21 @@ function ClickyViewMenu({
 function ClickyDownloadMenu({
   url,
   formats,
-  label,
+  download,
 }: {
   url: string;
   formats: ClickyRemoteFormat[];
-  label?: string | undefined;
+  download?: ClickyDownloadOptions | undefined;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const primaryFormat: ClickyRemoteFormat = "json";
+  const primaryFormat: ClickyRemoteFormat = formats.includes("json")
+    ? "json"
+    : formats[0]!;
   const primaryMeta = getRemoteFormatMeta(primaryFormat);
+  const scopes = getDownloadScopes(download);
+  const primaryScope = scopes[0];
 
   useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
 
@@ -934,13 +978,20 @@ function ClickyDownloadMenu({
         <button
           type="button"
           aria-label={
-            label
-              ? `Download ${primaryMeta.label} ${label}`
+            download?.label
+              ? `Download ${primaryMeta.label} ${download.label}`
               : `Download ${primaryMeta.label}`
           }
           className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() =>
-            triggerDownload(buildDownloadUrl(url, primaryFormat, label))
+            triggerDownload(
+              buildDownloadUrl(
+                url,
+                primaryFormat,
+                download?.label,
+                primaryScope,
+              ),
+            )
           }
         >
           <Icon icon={UiCloudDownload} className="text-sm" />
@@ -964,34 +1015,58 @@ function ClickyDownloadMenu({
           role="menu"
           className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
         >
-          {formats.map((format) => {
-            const meta = getRemoteFormatMeta(format);
-            return (
-              <button
-                key={format}
-                type="button"
-                role="menuitem"
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-                )}
-                onClick={() => {
-                  triggerDownload(buildDownloadUrl(url, format, label));
-                  setOpen(false);
-                }}
-              >
-                <Icon
-                  icon={meta.icon}
-                  className={cn(
-                    "shrink-0 text-sm",
-                    meta.iconClassName ?? "text-muted-foreground",
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="font-medium">{meta.label}</span>
-                </span>
-              </button>
-            );
-          })}
+          {scopes.map((scope, scopeIndex) => (
+            <div
+              key={scope ?? "legacy"}
+              className={cn(
+                scopeIndex > 0 && "mt-1 border-t border-border pt-1",
+              )}
+            >
+              {scope && (
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  {downloadSection(scope)}
+                </div>
+              )}
+              {formats.map((format) => {
+                const meta = getRemoteFormatMeta(format);
+                const description = downloadDescription(
+                  format,
+                  scope,
+                  download,
+                );
+                return (
+                  <button
+                    key={`${scope ?? "legacy"}-${format}`}
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
+                    onClick={() => {
+                      triggerDownload(
+                        buildDownloadUrl(url, format, download?.label, scope),
+                      );
+                      setOpen(false);
+                    }}
+                  >
+                    <Icon
+                      icon={meta.icon}
+                      className={cn(
+                        "mt-0.5 shrink-0 text-sm",
+                        meta.iconClassName ?? "text-muted-foreground",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium">{meta.label}</span>
+                      {description && (
+                        <span className="block text-xs text-muted-foreground">
+                          {description}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1349,7 +1424,37 @@ function getDownloadFormats({
     return [];
   }
 
-  return [...CLICKY_DOWNLOAD_FORMATS];
+  return download?.formats?.length
+    ? [...download.formats]
+    : [...CLICKY_DOWNLOAD_FORMATS];
+}
+
+function getDownloadScopes(
+  download?: ClickyDownloadOptions,
+): Array<ClickyDownloadScope | undefined> {
+  return download?.scopes?.length ? download.scopes : [undefined];
+}
+
+function downloadSection(scope: ClickyDownloadScope) {
+  return scope === "all" ? "Download all rows" : "Download current page";
+}
+
+function downloadDescription(
+  format: ClickyRemoteFormat,
+  scope: ClickyDownloadScope | undefined,
+  download?: ClickyDownloadOptions,
+) {
+  const maxRows = download?.formatMaxRows?.[format];
+  if (maxRows) {
+    return `Limited to ${maxRows.toLocaleString()} rows`;
+  }
+  if (scope === "all" && download?.allRowsMode === "buffered") {
+    return "Compatibility mode buffers the complete result";
+  }
+  if (scope === "all" && download?.allRowsMode === "streaming") {
+    return "Streams rows as they are read";
+  }
+  return undefined;
 }
 
 function getDownloadMenuActions({
@@ -1362,17 +1467,23 @@ function getDownloadMenuActions({
   const formats = getDownloadFormats({ url, download });
   if (!url || formats.length === 0) return [];
 
-  return formats.map((format) => {
-    const meta = getRemoteFormatMeta(format);
-    return {
-      id: `download-${format}`,
-      label: meta.label,
-      icon: meta.icon,
-      ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
-      onSelect: () =>
-        triggerDownload(buildDownloadUrl(url, format, download?.label)),
-    };
-  });
+  return getDownloadScopes(download).flatMap((scope) =>
+    formats.map((format) => {
+      const meta = getRemoteFormatMeta(format);
+      return {
+        id: `download-${scope ?? "legacy"}-${format}`,
+        label: meta.label,
+        description: downloadDescription(format, scope, download),
+        icon: meta.icon,
+        ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
+        ...(scope ? { section: downloadSection(scope) } : {}),
+        onSelect: () =>
+          triggerDownload(
+            buildDownloadUrl(url, format, download?.label, scope),
+          ),
+      };
+    }),
+  );
 }
 
 function getRemoteFormatMeta(format: ClickyRemoteFormat): {
@@ -1397,6 +1508,13 @@ function getRemoteFormatMeta(format: ClickyRemoteFormat): {
         description: "Plain JSON for inspecting the raw response body",
         icon: UiJson,
         accept: "application/json, text/plain;q=0.8,*/*;q=0.7",
+      };
+    case "ndjson":
+      return {
+        label: "NDJSON",
+        description: "Newline-delimited JSON for streaming data pipelines",
+        icon: UiJson,
+        accept: "application/x-ndjson, application/ndjson;q=0.9,*/*;q=0.7",
       };
     case "pdf":
       return {
@@ -1486,6 +1604,7 @@ function buildDownloadUrl(
   url: string,
   format: ClickyRemoteFormat,
   label?: string | undefined,
+  scope?: ClickyDownloadScope | undefined,
 ) {
   const formatted = buildFormatUrl(url, format);
   const base =
@@ -1493,6 +1612,14 @@ function buildDownloadUrl(
   const resolved = new URL(formatted, base);
   resolved.searchParams.set("filename", downloadFilename(url, format, label));
   resolved.searchParams.set("_download", Date.now().toString());
+  if (scope) {
+    resolved.searchParams.set("scope", scope);
+  }
+  if (scope === "all") {
+    resolved.searchParams.delete("limit");
+    resolved.searchParams.delete("offset");
+    resolved.searchParams.delete("page");
+  }
 
   if (isAbsoluteUrl(formatted)) {
     return resolved.toString();
@@ -1537,6 +1664,8 @@ function downloadExtension(format: ClickyRemoteFormat) {
       return ".clicky.json";
     case "json":
       return ".json";
+    case "ndjson":
+      return ".ndjson";
     case "pdf":
       return ".pdf";
     case "html":
@@ -2687,6 +2816,19 @@ function ClickyMap({ node }: { node: ClickyNode }) {
   const inlineFields = fields.filter((field) => isInlineNode(field.value));
   const blockFields = fields.filter((field) => !isInlineNode(field.value));
 
+  // A map that is nothing but a wrapper around one table renders the table
+  // directly — no field label, no bordered box — so it behaves exactly like a
+  // bare table node (same fill/scroll, e.g. inside a scrollBody=false modal).
+  // Multi-field maps keep the labelled/bordered section layout below.
+  const unwrapsSingleTable =
+    inlineFields.length === 0 &&
+    blockFields.length === 1 &&
+    blockFields[0]?.value.kind === "table";
+
+  if (unwrapsSingleTable) {
+    return <ClickyNodeRenderer node={blockFields[0]!.value} />;
+  }
+
   return (
     <div className="space-y-density-4">
       {inlineFields.length > 0 && (
@@ -2750,6 +2892,7 @@ export function ClickyTable({
   timeRange,
   externalFilters,
   pagination,
+  rowSelection,
   menuActions,
 }: ClickyTableProps) {
   const runtime = useContext(ClickyRuntimeContext);
@@ -2761,6 +2904,7 @@ export function ClickyTable({
   const effectiveExternalFilters =
     externalFilters ?? runtime.tableExternalFilters;
   const effectivePagination = pagination ?? runtime.tablePagination;
+  const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
 
   if (columns.length === 0) {
@@ -2773,6 +2917,8 @@ export function ClickyTable({
 
   const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => {
     const tagColumn = isClickyTagColumn(column);
+    const keyValueColumn = isClickyKeyValueColumn(column);
+    const jsonColumn = column.type === "json";
     const base: DataTableColumn<ClickyRow> = {
       key: `cells.${column.name}`,
       label: column.header ? (
@@ -2788,6 +2934,25 @@ export function ClickyTable({
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
       ...(column.shrink !== undefined ? { shrink: column.shrink } : {}),
     };
+
+    if (keyValueColumn) {
+      return {
+        ...base,
+        kind: "tags",
+        render: (value) => <ClickyKeyValueCell node={value as ClickyNode} />,
+        sortValue: (value) => clickyKeyValueText(value as ClickyNode),
+        filterValue: (value) => clickyKeyValueTokens(value as ClickyNode),
+      };
+    }
+
+    if (jsonColumn) {
+      return {
+        ...base,
+        render: (value) => <ClickyJSONCell node={value as ClickyNode} />,
+        sortValue: (value) => clickyJSONText(value as ClickyNode),
+        filterValue: (value) => clickyJSONText(value as ClickyNode),
+      };
+    }
 
     if (tagColumn) {
       return {
@@ -2816,8 +2981,12 @@ export function ClickyTable({
   const defaultSortColumn =
     columns.find((column) => column.sortable !== false) ?? columns[0];
 
+  // Fill a bounded flex-column parent (e.g. a scrollBody=false modal) so the
+  // table's own scroll region scrolls rather than the whole dialog; `flex-1` is
+  // inert in an unbounded/block parent, so page-level tables size to content.
   return (
     <DataTable<ClickyRow>
+      className="min-h-0 flex-1"
       data={rows}
       columns={tableColumns}
       {...(autoFilter !== undefined ? { autoFilter } : {})}
@@ -2830,11 +2999,15 @@ export function ClickyTable({
           }
         : {})}
       getRowId={(row, index) =>
+        effectiveRowSelection?.getRowId(row, index) ??
         `${index}-${columns
           .map((column) => clickyNodeText(row.cells[column.name]))
           .filter(Boolean)
           .join("|")}`
       }
+      {...(effectiveRowSelection
+        ? { rowSelection: effectiveRowSelection }
+        : {})}
       {...(rowClick ? { onRowClick: rowClick } : {})}
       {...(rowHref ? { getRowHref: rowHref } : {})}
       {...(rowClick && (rowClickable || rowHref)
@@ -2889,6 +3062,13 @@ function shouldRenderRowsAsCollapsedStructs(
   rows: ClickyRow[],
 ) {
   if (rows.length === 0) return false;
+  if (
+    columns.some(
+      (column) => isClickyKeyValueColumn(column) || column.type === "json",
+    )
+  ) {
+    return false;
+  }
 
   return rows.every((row) => {
     const cells = columns
@@ -2906,6 +3086,173 @@ function isClickyTagColumn(column: ClickyColumn) {
 
   const normalized = column.name.toLowerCase();
   return /(^|[._-])(tags?|labels?|annotations?)$/.test(normalized);
+}
+
+function isClickyKeyValueColumn(column: ClickyColumn) {
+  return column.type === "key_value" || column.type === "key_values";
+}
+
+type ClickyKeyValuePair = {
+  key: string;
+  value: ClickyNode;
+};
+
+function ClickyKeyValueCell({ node }: { node: ClickyNode | undefined }) {
+  const pairs = clickyNodeKeyValues(node);
+  if (pairs.length === 0) {
+    const fallback = clickyNodeText(node).trim();
+    return fallback ? (
+      <span className="text-sm text-foreground">{fallback}</span>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
+  }
+
+  return (
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs">
+      {pairs.map((pair, index) => (
+        <Fragment key={`${pair.key}-${index}`}>
+          <dt className="font-medium text-muted-foreground">{pair.key}</dt>
+          <dd className="min-w-0 break-words text-foreground">
+            <ClickyNodeRenderer node={pair.value} />
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
+}
+
+function ClickyJSONCell({ node }: { node: ClickyNode | undefined }) {
+  const value = clickyNodeJSONValue(node);
+  return (
+    <div
+      className="max-h-40 min-w-40 max-w-xl overflow-auto text-xs"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <JsonView data={value} defaultOpenDepth={0} />
+    </div>
+  );
+}
+
+function clickyNodeKeyValues(
+  node: ClickyNode | undefined,
+): ClickyKeyValuePair[] {
+  if (!node) return [];
+  if (node.kind === "map") return clickyFieldsToKeyValues(node.fields ?? []);
+  if (node.kind === "list") {
+    return (node.items ?? []).flatMap((item) => clickyNodeKeyValues(item));
+  }
+
+  const source = node.kind === "code" ? node.source : (node.text ?? node.plain);
+  if (!source) return [];
+  try {
+    return unknownToKeyValues(JSON.parse(source) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+function clickyFieldsToKeyValues(fields: ClickyField[]): ClickyKeyValuePair[] {
+  const keyField = fields.find((field) => /^(key|name)$/i.test(field.name));
+  const valueField = fields.find((field) => /^value$/i.test(field.name));
+  if (keyField && valueField) {
+    const key = clickyNodeText(keyField.value).trim();
+    if (key) return [{ key, value: valueField.value }];
+  }
+  return fields.map((field) => ({
+    key: field.label || field.name,
+    value: field.value,
+  }));
+}
+
+function unknownToKeyValues(value: unknown): ClickyKeyValuePair[] {
+  if (Array.isArray(value)) return value.flatMap(unknownToKeyValues);
+  if (!value || typeof value !== "object") return [];
+
+  const object = value as Record<string, unknown>;
+  const keyName = Object.keys(object).find((key) => /^(key|name)$/i.test(key));
+  const valueName = Object.keys(object).find((key) => /^value$/i.test(key));
+  if (keyName && valueName && typeof object[keyName] === "string") {
+    return [
+      {
+        key: object[keyName],
+        value: unknownToClickyNode(object[valueName]),
+      },
+    ];
+  }
+
+  return Object.keys(object)
+    .sort((left, right) => left.localeCompare(right))
+    .map((key) => ({ key, value: unknownToClickyNode(object[key]) }));
+}
+
+function unknownToClickyNode(value: unknown): ClickyNode {
+  if (Array.isArray(value)) {
+    return {
+      kind: "list",
+      plain: JSON.stringify(value),
+      items: value.map(unknownToClickyNode),
+    };
+  }
+  if (value && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return {
+      kind: "map",
+      plain: JSON.stringify(value),
+      fields: Object.keys(object)
+        .sort((left, right) => left.localeCompare(right))
+        .map((key) => ({ name: key, value: unknownToClickyNode(object[key]) })),
+    };
+  }
+  const text = value === null ? "null" : String(value ?? "");
+  return { kind: "text", text, plain: text };
+}
+
+function clickyKeyValueTokens(node: ClickyNode | undefined) {
+  return clickyNodeKeyValues(node)
+    .map((pair) => `${pair.key}=${clickyNodeCanonicalText(pair.value)}`)
+    .filter((token) => !token.endsWith("="));
+}
+
+function clickyKeyValueText(node: ClickyNode | undefined) {
+  return clickyKeyValueTokens(node).join(", ");
+}
+
+function clickyNodeCanonicalText(node: ClickyNode | undefined) {
+  const text = clickyNodeText(node).trim();
+  if (text) return text;
+  const value = clickyNodeJSONValue(node);
+  return value === undefined ? "" : JSON.stringify(value);
+}
+
+function clickyNodeJSONValue(node: ClickyNode | undefined): unknown {
+  if (!node) return undefined;
+  if (node.kind === "map") {
+    return Object.fromEntries(
+      (node.fields ?? []).map((field) => [
+        field.name,
+        clickyNodeJSONValue(field.value),
+      ]),
+    );
+  }
+  if (node.kind === "list") {
+    return (node.items ?? []).map(clickyNodeJSONValue);
+  }
+  const source =
+    node.kind === "code"
+      ? (node.source ?? node.plain)
+      : (node.text ?? node.plain);
+  if (source === undefined) return clickyNodeText(node);
+  try {
+    return JSON.parse(source) as unknown;
+  } catch {
+    return source;
+  }
+}
+
+function clickyJSONText(node: ClickyNode | undefined) {
+  const value = clickyNodeJSONValue(node);
+  return value === undefined ? "" : JSON.stringify(value);
 }
 
 function clickyNodeTags(

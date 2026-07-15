@@ -3,12 +3,17 @@ import {
   autoUpdate,
   flip,
   FloatingFocusManager,
+  FloatingList,
+  FloatingNode,
   FloatingPortal,
+  FloatingTree,
   offset,
   shift,
   useClick,
   useDismiss,
   useFloating,
+  useFloatingNodeId,
+  useFloatingTree,
   useInteractions,
   useListNavigation,
   useRole,
@@ -17,19 +22,35 @@ import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown } from "../icons";
+import { MENU_POPOVER_CLASS, MenuContext } from "./dropdownMenuContext";
+import { MenuItemList } from "./DropdownMenuSubmenu";
 import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 
 export type DropdownMenuItem = {
   /** Visible label. */
   label: ReactNode;
-  /** Called when the item is chosen. */
+  /** Called when the item is chosen. Ignored when the item has `children`. */
   onSelect: () => void;
   /** Iconify name or imported icon component rendered before the label. */
   icon?: string | StaticIconComponent;
+  /** CSS colour applied to this item's icon (the glyph fills `currentColor`). */
+  iconColor?: string;
+  /**
+   * Section header. A non-interactive header renders above the first item of
+   * each contiguous group — provide items pre-sorted by `group`. Items without
+   * a `group` render no header.
+   */
+  group?: string;
   /** Browser tooltip for the item. */
   title?: string;
   /** Disable selection. */
   disabled?: boolean;
+  /**
+   * Nested submenu items. When present the item becomes a submenu trigger: it
+   * opens a flyout of `children` (recursively) on hover / click / ArrowRight
+   * instead of firing `onSelect`.
+   */
+  children?: DropdownMenuItem[];
 };
 
 export type DropdownMenuProps = {
@@ -67,7 +88,20 @@ export type DropdownMenuProps = {
   menuClassName?: string;
 };
 
-export function DropdownMenu({
+/**
+ * A trigger + floating menu. Flat `items` render as a single list; an item with
+ * `children` opens a flyout submenu. The FloatingTree lets every level cooperate
+ * on focus and dismissal, so selecting any leaf closes the whole menu.
+ */
+export function DropdownMenu(props: DropdownMenuProps) {
+  return (
+    <FloatingTree>
+      <DropdownMenuRoot {...props} />
+    </FloatingTree>
+  );
+}
+
+function DropdownMenuRoot({
   label,
   icon,
   hideChevron = false,
@@ -88,7 +122,9 @@ export function DropdownMenu({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const floatingZ = useFloatingZIndex();
-  const listRef = useRef<(HTMLElement | null)[]>([]);
+  const tree = useFloatingTree();
+  const nodeId = useFloatingNodeId();
+  const elementsRef = useRef<Array<HTMLElement | null>>([]);
 
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
@@ -97,6 +133,8 @@ export function DropdownMenu({
   }, [open]);
 
   const { refs, floatingStyles, context } = useFloating<HTMLDivElement>({
+    // nodeId is always defined inside the FloatingTree; guard for the type only.
+    ...(nodeId ? { nodeId } : {}),
     open,
     onOpenChange: setOpen,
     // bottom-end / bottom-start reproduce the previous right/left alignment.
@@ -118,7 +156,7 @@ export function DropdownMenu({
   const dismiss = useDismiss(context, { escapeKey: false });
   const role = useRole(context, { role: "menu" });
   const listNav = useListNavigation(context, {
-    listRef,
+    listRef: elementsRef,
     activeIndex,
     onNavigate: setActiveIndex,
     loop: true,
@@ -137,95 +175,84 @@ export function DropdownMenu({
   };
   useEscapeLayer(open, closeMenu);
 
+  // Selecting any leaf (at any depth) emits a tree-wide "click"; the root closes
+  // and restores focus to the trigger.
+  const closeMenuRef = useRef(closeMenu);
+  closeMenuRef.current = closeMenu;
+  useEffect(() => {
+    if (!tree) return;
+    const onTreeClick = () => closeMenuRef.current();
+    tree.events.on("click", onTreeClick);
+    return () => tree.events.off("click", onTreeClick);
+  }, [tree]);
+
   return (
-    <div className={cn("relative inline-flex", className)}>
-      {trigger ? (
-        <span
-          ref={refs.setReference}
-          className="inline-flex"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          {...getReferenceProps()}
-        >
-          {trigger}
-        </span>
-      ) : (
-        <Button
-          ref={refs.setReference as React.Ref<HTMLButtonElement>}
-          variant={variant}
-          size={size}
-          title={title}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          {...getReferenceProps()}
-        >
-          {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
-          {label}
-          {!hideChevron && <Icon icon={UiChevronDown} />}
-        </Button>
-      )}
-      {open && (
-        <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false}>
-            <div
-              ref={refs.setFloating}
-              role="menu"
-              aria-label={menuLabel}
-              style={{ ...floatingStyles, zIndex: floatingZ }}
-              className={cn(
-                "min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md",
-                menuClassName,
-              )}
-              {...getFloatingProps()}
-            >
-              {header != null && (
-                <div className="border-b border-border px-3 py-1.5">{header}</div>
-              )}
-              {children
-                ? children(closeMenu)
-                : items?.map((item, i) => (
-                    <button
-                      key={i}
-                      ref={(node) => {
-                        listRef.current[i] = node;
-                      }}
-                      type="button"
-                      role="menuitem"
-                      tabIndex={i === activeIndex ? 0 : -1}
-                      disabled={item.disabled}
-                      title={item.title}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-                      {...getItemProps({
-                        onClick: () => {
-                          item.onSelect();
-                          closeMenu();
-                        },
-                        onKeyDown: (event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            item.onSelect();
-                            closeMenu();
-                          }
-                        },
-                      })}
-                    >
-                      {item.icon && (
-                        <Icon
-                          {...(typeof item.icon === "string"
-                            ? { name: item.icon }
-                            : { icon: item.icon })}
-                        />
-                      )}
-                      {item.label}
-                    </button>
-                  ))}
-              {footer != null && (
-                <div className="border-t border-border px-3 py-1.5">{footer}</div>
-              )}
-            </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </div>
+    <FloatingNode id={nodeId}>
+      <div className={cn("relative inline-flex", className)}>
+        {trigger ? (
+          <span
+            ref={refs.setReference}
+            className="inline-flex"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            {...getReferenceProps()}
+          >
+            {trigger}
+          </span>
+        ) : (
+          <Button
+            ref={refs.setReference as React.Ref<HTMLButtonElement>}
+            variant={variant}
+            size={size}
+            title={title}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            {...getReferenceProps()}
+          >
+            {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
+            {label}
+            {!hideChevron && <Icon icon={UiChevronDown} />}
+          </Button>
+        )}
+        {open && (
+          <FloatingPortal>
+            <FloatingFocusManager context={context} modal={false}>
+              <div
+                ref={refs.setFloating}
+                role="menu"
+                aria-label={menuLabel}
+                style={{ ...floatingStyles, zIndex: floatingZ }}
+                className={cn(MENU_POPOVER_CLASS, menuClassName)}
+                {...getFloatingProps()}
+              >
+                {header != null && (
+                  <div className="border-b border-border px-3 py-1.5">{header}</div>
+                )}
+                {children ? (
+                  children(closeMenu)
+                ) : (
+                  <MenuContext.Provider
+                    value={{
+                      getItemProps,
+                      activeIndex,
+                      setActiveIndex,
+                      setHasFocusInside: () => {},
+                      isOpen: open,
+                    }}
+                  >
+                    <FloatingList elementsRef={elementsRef}>
+                      <MenuItemList items={items ?? []} />
+                    </FloatingList>
+                  </MenuContext.Provider>
+                )}
+                {footer != null && (
+                  <div className="border-t border-border px-3 py-1.5">{footer}</div>
+                )}
+              </div>
+            </FloatingFocusManager>
+          </FloatingPortal>
+        )}
+      </div>
+    </FloatingNode>
   );
 }

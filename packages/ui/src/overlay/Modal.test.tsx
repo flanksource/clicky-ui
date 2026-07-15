@@ -32,6 +32,31 @@ describe("Modal", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
+  it("scrolls the body by default but lets a child own the scroll when scrollBody is false", () => {
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+    const body = () =>
+      document.querySelector("[data-slot='modal-body']") as HTMLElement;
+    expect(body().className).toContain("overflow-auto");
+    expect(body().className).not.toContain("overflow-hidden");
+
+    rerender(
+      <Modal open onClose={() => {}} title="Detail" scrollBody={false}>
+        <p>body</p>
+      </Modal>,
+    );
+    // The body no longer scrolls itself; it becomes a non-scrolling flex column
+    // so a fill-height child (e.g. a DataTable) owns the scroll.
+    expect(body().className).toContain("overflow-hidden");
+    expect(body().className).not.toContain("overflow-auto");
+    expect(body().className).toContain("flex");
+    expect(body().className).toContain("flex-col");
+    expect(body().className).toContain("min-h-0");
+  });
+
   it("renders a subtitle beneath the title without displacing the close button", () => {
     render(
       <Modal open onClose={() => {}} title="Detail" subtitle={<nav>tab switcher</nav>}>

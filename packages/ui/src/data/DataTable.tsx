@@ -15,6 +15,8 @@ import { type Density } from "../hooks/use-density";
 import { DensityValueProvider } from "../hooks/density-provider";
 import { useResolvedTheme, type Theme } from "../hooks/use-theme";
 import { cn } from "../lib/utils";
+import { LoadingBar } from "../components/loading";
+import { useRouter } from "../rpc/router";
 import { Modal, type ModalSize } from "../overlay/Modal";
 import { useEscapeLayer } from "../overlay/modalStack";
 import {
@@ -275,6 +277,19 @@ export type DataTableMenuAction = {
   onSelect: () => void;
 };
 
+export type DataTableRowSelection<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  /** Controlled set of selected row ids, resolved through `getRowId`. */
+  selectedRowIds: readonly string[];
+  /** Called with the next ids and the matching rows currently loaded. */
+  onSelectionChange: (selectedRowIds: string[], selectedRows: T[]) => void;
+  /** Optional predicate for rows that cannot be selected. */
+  isRowSelectable?: (row: T) => boolean;
+  /** Toggle selection when the user clicks anywhere on a selectable row. */
+  toggleOnRowClick?: boolean;
+};
+
 type DataTableInnerProps<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
@@ -361,6 +376,8 @@ type DataTableInnerProps<
   pagination?: DataTablePagination;
   /** Stable row id extractor. Defaults to the row index. */
   getRowId?: (row: T, index: number) => string;
+  /** Controlled checkbox selection for entity/bulk-action tables. */
+  rowSelection?: DataTableRowSelection<T>;
   /** Called when a clickable row is selected. */
   onRowClick?: (row: T) => void;
   /** Predicate controlling whether a row is clickable. */
@@ -477,6 +494,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   externalFilters,
   pagination,
   getRowId,
+  rowSelection,
   onRowClick,
   isRowClickable,
   getRowHref,
@@ -922,7 +940,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     filterBarProps?.dateRange,
   );
   const autoTimeRange = useMemo<FilterBarRangeProps | null>(() => {
-    if (!autoFilter || !timeRangeColumn) return null;
+    if (!timeRangeColumn) return null;
     const next: FilterBarRangeProps = {
       from: timeRangeFilter.from,
       to: timeRangeFilter.to,
@@ -943,10 +961,11 @@ function DataTableInner<T extends Record<string, unknown>>({
       next.timeZones = timeRangeColumn.timestamp.timeZones;
     }
     return next;
-  }, [autoFilter, timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
+  }, [timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
   const showFilterBar =
     (autoFilter &&
-      (showGlobalFilter || nativeFilters.length > 0 || !!autoTimeRange)) ||
+      (showGlobalFilter || nativeFilters.length > 0)) ||
+    !!autoTimeRange ||
     !!externalSearch ||
     !!externalTimeRange ||
     (externalFilters && externalFilters.length > 0) ||
@@ -966,7 +985,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   ) : (
     filterBarProps?.trailing
   );
-  const showHeaderFilterControls = autoFilter && showHeaderFilters;
+  const showHeaderFilterControls =
+    showHeaderFilters && (autoFilter || !!autoTimeRange);
 
   const filteredRows = useMemo(() => {
     const globalNeedle = effectiveGlobalFilter.trim().toLowerCase();
@@ -1082,6 +1102,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     [effectiveColumns],
   );
 
+  const { renderLink } = useRouter();
+
   const { sorted, sort, toggle } = useSort(filteredRows, {
     defaultDir: defaultSort?.dir ?? "asc",
     manual: manualSort,
@@ -1107,6 +1129,73 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   const visibleSorted = revealEnabled ? sorted.slice(0, visibleCount) : sorted;
   const hasMoreRows = revealEnabled && visibleCount < sorted.length;
+  const selectedRowIDs = useMemo(
+    () => new Set(rowSelection?.selectedRowIds ?? []),
+    [rowSelection?.selectedRowIds],
+  );
+  const selectableVisibleRows = useMemo(
+    () =>
+      visibleSorted.filter(
+        (record) => rowSelection?.isRowSelectable?.(record.row) ?? true,
+      ),
+    [rowSelection, visibleSorted],
+  );
+  const selectedVisibleCount = selectableVisibleRows.filter((record) =>
+    selectedRowIDs.has(record.id),
+  ).length;
+  const allVisibleSelected =
+    selectableVisibleRows.length > 0 &&
+    selectedVisibleCount === selectableVisibleRows.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected;
+    }
+  }, [someVisibleSelected]);
+
+  const notifySelection = useCallback(
+    (nextIDs: Set<string>) => {
+      if (!rowSelection) return;
+      rowSelection.onSelectionChange(
+        Array.from(nextIDs),
+        rows
+          .filter((record) => nextIDs.has(record.id))
+          .map((record) => record.row),
+      );
+    },
+    [rowSelection, rows],
+  );
+
+  const toggleRowSelection = useCallback(
+    (record: InternalRow<T>) => {
+      if (!rowSelection) return;
+      if (rowSelection.isRowSelectable?.(record.row) === false) return;
+      const next = new Set(selectedRowIDs);
+      if (next.has(record.id)) next.delete(record.id);
+      else next.add(record.id);
+      notifySelection(next);
+    },
+    [notifySelection, rowSelection, selectedRowIDs],
+  );
+
+  const toggleVisibleSelection = useCallback(() => {
+    if (!rowSelection) return;
+    const next = new Set(selectedRowIDs);
+    if (allVisibleSelected) {
+      for (const record of selectableVisibleRows) next.delete(record.id);
+    } else {
+      for (const record of selectableVisibleRows) next.add(record.id);
+    }
+    notifySelection(next);
+  }, [
+    allVisibleSelected,
+    notifySelection,
+    rowSelection,
+    selectableVisibleRows,
+    selectedRowIDs,
+  ]);
 
   const revealSentinelRef = useCallback(
     (node: HTMLTableRowElement | null) => {
@@ -1259,15 +1348,20 @@ function DataTableInner<T extends Record<string, unknown>>({
           />
         )}
 
-        <div
-          className={cn(
-            "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border",
-            scrollContainerClassName,
-          )}
-          aria-busy={loading || undefined}
-        >
-          <table className="w-max min-w-full table-auto text-left text-sm">
+        <div className="relative flex min-h-0 max-w-full flex-1 flex-col">
+          {loading ? (
+            <LoadingBar data-testid="data-table-loading-bar" className="rounded-t-md" />
+          ) : null}
+          <div
+            className={cn(
+              "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border",
+              scrollContainerClassName,
+            )}
+            aria-busy={loading || undefined}
+          >
+            <table className="w-max min-w-full table-auto text-left text-sm">
             <colgroup>
+              {rowSelection ? <col className="w-10" /> : null}
               {visibleColumns.map((column) => (
                 <col
                   key={column.key}
@@ -1278,6 +1372,24 @@ function DataTableInner<T extends Record<string, unknown>>({
             </colgroup>
             <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
               <tr className="border-b border-border text-xs text-muted-foreground">
+                {rowSelection ? (
+                  <th
+                    className={cn(
+                      "w-10 text-center",
+                      DATA_TABLE_HEADER_DENSITY_CLASS,
+                    )}
+                  >
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      aria-label="Select all visible rows"
+                      checked={allVisibleSelected}
+                      disabled={selectableVisibleRows.length === 0}
+                      onChange={toggleVisibleSelection}
+                      className="size-3.5 rounded border-border accent-primary"
+                    />
+                  </th>
+                ) : null}
                 {visibleColumns.map((column) => (
                   <th
                     key={column.key}
@@ -1366,11 +1478,12 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && visibleSorted.length === 0 ? (
                 <DataTableLoadingRows
                   columns={visibleColumns}
                   rowCount={loadingRowCount}
                   message={loadingMessage}
+                  selection={!!rowSelection}
                 />
               ) : (
                 visibleSorted.map((record) => {
@@ -1387,16 +1500,26 @@ function DataTableInner<T extends Record<string, unknown>>({
                   const opensDialog = expandable && detailStyle === "dialog";
                   const rowClickEnabled =
                     isRowClickable?.(record.row) ?? !!onRowClick;
-                  const clickable = !!href || rowClickEnabled || expandable;
+                  const rowSelectable =
+                    rowSelection?.isRowSelectable?.(record.row) ?? true;
+                  const selectionClickEnabled =
+                    !!rowSelection?.toggleOnRowClick && rowSelectable;
+                  const clickable =
+                    !!href ||
+                    rowClickEnabled ||
+                    expandable ||
+                    selectionClickEnabled;
 
                   return (
                     <Fragment key={record.id}>
                       <tr
                         className={cn(
-                          "border-b border-border/60 align-top",
+                          "relative border-b border-border/60 align-top",
                           clickable && "cursor-pointer hover:bg-accent/40",
+                          selectedRowIDs.has(record.id) && "bg-accent/50",
                         )}
                         onClick={() => {
+                          if (selectionClickEnabled) toggleRowSelection(record);
                           if (expandsInline) {
                             setExpandedRows((current) => ({
                               ...current,
@@ -1411,6 +1534,26 @@ function DataTableInner<T extends Record<string, unknown>>({
                           }
                         }}
                       >
+                        {rowSelection ? (
+                          <td
+                            className={cn(
+                              // relative z-10 keeps the checkbox above the row's
+                              // stretched-link overlay so it stays clickable.
+                              "relative z-10 w-10 text-center",
+                              DATA_TABLE_CELL_DENSITY_CLASS,
+                            )}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              aria-label={`Select row ${record.id}`}
+                              checked={selectedRowIDs.has(record.id)}
+                              disabled={!rowSelectable}
+                              onChange={() => toggleRowSelection(record)}
+                              className="size-3.5 rounded border-border accent-primary"
+                            />
+                          </td>
+                        ) : null}
                         {visibleColumns.map((column, index) => {
                           const rawValue = resolveColumnValue(
                             record.row,
@@ -1450,13 +1593,18 @@ function DataTableInner<T extends Record<string, unknown>>({
                                   ? { width: columnWidths[column.key] }
                                   : {})}
                               >
-                                {href && index === 0 ? (
-                                  <a href={href} className="hover:underline">
-                                    {content}
-                                  </a>
-                                ) : (
-                                  content
-                                )}
+                                {href && index === 0
+                                  ? // One real <a href> per row whose ::after
+                                    // overlay stretches across the whole (relative)
+                                    // row: right/middle-click give native "open in
+                                    // new tab", plain left-click routes client-side.
+                                    renderLink({
+                                      to: href,
+                                      className:
+                                        "hover:underline after:absolute after:inset-0 after:content-['']",
+                                      children: content,
+                                    })
+                                  : content}
                               </CellContent>
                             </td>
                           );
@@ -1465,7 +1613,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                       {expandsInline && expanded && expandedContent && (
                         <tr>
                           <td
-                            colSpan={visibleColumns.length}
+                            colSpan={
+                              visibleColumns.length + (rowSelection ? 1 : 0)
+                            }
                             className="bg-muted/40 p-density-3"
                           >
                             <div className="rounded-md border border-border bg-background p-density-3">
@@ -1481,7 +1631,7 @@ function DataTableInner<T extends Record<string, unknown>>({
               {hasMoreRows && (
                 <tr ref={revealSentinelRef} aria-hidden>
                   <td
-                    colSpan={visibleColumns.length}
+                    colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
                     className="p-density-2 text-center text-xs text-muted-foreground"
                   >
                     Loading more…
@@ -1489,7 +1639,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
 
         {pagination ? (
@@ -1612,9 +1763,9 @@ function DataTablePaginationFooter({
       : `${visibleRowCount} row${visibleRowCount === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex min-h-9 shrink-0 flex-col items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="flex min-h-9 shrink-0 flex-row items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div aria-live="polite">{loading ? loadingMessage : rangeLabel}</div>
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap  items-center gap-2 sm:gap-3">
         <label className="flex items-center gap-1.5">
           <span>Rows per page</span>
           <select
@@ -1662,13 +1813,15 @@ function DataTableLoadingRows<T extends Record<string, unknown>>({
   columns,
   rowCount,
   message,
+  selection,
 }: {
   columns: DataTableColumn<T>[];
   rowCount: number;
   message: ReactNode;
+  selection: boolean;
 }) {
   const safeRowCount = Math.max(1, rowCount);
-  const safeColumnCount = Math.max(1, columns.length);
+  const safeColumnCount = Math.max(1, columns.length + (selection ? 1 : 0));
 
   return (
     <>
@@ -1691,6 +1844,11 @@ function DataTableLoadingRows<T extends Record<string, unknown>>({
       </tr>
       {Array.from({ length: safeRowCount }).map((_, rowIndex) => (
         <tr key={rowIndex} className="border-b border-border/60">
+          {selection ? (
+            <td className={cn("w-10", DATA_TABLE_CELL_DENSITY_CLASS)}>
+              <span className="mx-auto block size-3.5 animate-pulse rounded bg-muted" />
+            </td>
+          ) : null}
           {columns.map((column, columnIndex) => (
             <td
               key={column.key}

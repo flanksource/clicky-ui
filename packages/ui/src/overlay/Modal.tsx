@@ -57,6 +57,13 @@ export type ModalProps = {
   headerSlot?: ReactNode;
   /** Footer content pinned below the scrollable body. */
   footer?: ReactNode;
+  /**
+   * Whether the body scrolls its overflow. Default `true`. Set `false` when the
+   * body owns a single fill-height child that scrolls internally (e.g. a
+   * DataTable with a sticky header): the body becomes a non-scrolling flex
+   * column, so only that child's own scroll region moves.
+   */
+  scrollBody?: boolean;
   /** Modal body content. */
   children: ReactNode;
 };
@@ -91,6 +98,7 @@ export function Modal({
   className,
   headerSlot,
   footer,
+  scrollBody = true,
   children,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -210,11 +218,19 @@ export function Modal({
             {subtitle ? <div className="mt-density-2">{subtitle}</div> : null}
           </div>
         )}
-        <div className="flex-1 overflow-auto px-density-4 py-density-3">
+        <div
+          data-slot="modal-body"
+          className={cn(
+            "flex-1 px-density-4 py-density-3",
+            scrollBody
+              ? "overflow-auto"
+              : "flex min-h-0 flex-col overflow-hidden",
+          )}
+        >
           {children}
         </div>
         {footer && (
-          <div className="px-density-4 py-density-3 border-t border-border">
+          <div data-slot="modal-footer" className="px-density-4 py-density-3 border-t border-border">
             {footer}
           </div>
         )}

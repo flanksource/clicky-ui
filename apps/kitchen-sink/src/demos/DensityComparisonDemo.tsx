@@ -146,14 +146,9 @@ export function DensityComparisonDemo() {
         </Group>
 
         <Group title="Properties">
-          {/* Properties has its own 2-step density scale (no "spacious"); the
-              data-density wrapper still scales its CSS spacing for that column. */}
           <Triptych>
             {(density) => (
-              <Properties
-                density={density === "compact" ? "compact" : "comfortable"}
-                items={PROPERTY_ITEMS}
-              />
+              <Properties density={density} items={PROPERTY_ITEMS} />
             )}
           </Triptych>
         </Group>

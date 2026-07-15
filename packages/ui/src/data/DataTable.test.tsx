@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
+import { RouterProvider } from "../rpc/RouterProvider";
+import type { RouterAdapter } from "../rpc/router";
 
 type ServiceRow = {
   service: string;
@@ -104,6 +106,37 @@ describe("DataTable", () => {
 
     expect(table.getAllByRole("row")[1]).toHaveTextContent("worker");
     expect(table.getAllByRole("row")[2]).toHaveTextContent("cron");
+  });
+
+  it("supports controlled multi-row selection on entity tables", () => {
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: [],
+          onSelectionChange,
+          isRowSelectable: (row) => row.service !== "worker",
+          toggleOnRowClick: true,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("checkbox", { name: "Select row worker" }),
+    ).toBeDisabled();
+    fireEvent.click(screen.getByText("api"));
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["api"], [rows[0]]);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all visible rows" }),
+    );
+    expect(onSelectionChange).toHaveBeenLastCalledWith(
+      ["api", "cron"],
+      [rows[0], rows[2]],
+    );
   });
 
   it("reports controlled manual sort without reordering the current page", () => {
@@ -289,6 +322,66 @@ describe("DataTable", () => {
       "true",
     );
     expect(screen.getAllByRole("row")).toHaveLength(5);
+  });
+
+  it("keeps rows visible with a top-border loading bar while refetching", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        loading
+        loadingMessage="Refreshing…"
+      />,
+    );
+
+    // Existing rows stay rendered instead of being swapped for skeleton rows.
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    // The indeterminate bar rides the table's top border.
+    expect(screen.getByTestId("data-table-loading-bar")).toBeInTheDocument();
+    // No skeleton block means the message shows only once — in the footer, not
+    // repeated in the table body.
+    expect(screen.getAllByText("Refreshing…")).toHaveLength(1);
+  });
+
+  it("renders each row as a real stretched anchor and routes plain clicks client-side", () => {
+    const navigate = vi.fn();
+    const adapter: RouterAdapter = {
+      pathname: "/",
+      navigate,
+      renderLink: ({ to, className, children }) => (
+        <a
+          href={to}
+          className={className}
+          onClick={(event) => {
+            event.preventDefault();
+            navigate(to);
+          }}
+        >
+          {children}
+        </a>
+      ),
+    };
+
+    render(
+      <RouterProvider adapter={adapter}>
+        <DataTable
+          data={rows}
+          columns={columns}
+          getRowHref={(row) => `/services/${row.service}`}
+        />
+      </RouterProvider>,
+    );
+
+    // A real <a href> — so right-click / middle-click "open in new tab" works.
+    const link = screen.getByRole("link", { name: "api" });
+    expect(link).toHaveAttribute("href", "/services/api");
+    // Its ::after overlay stretches the clickable area across the whole row.
+    expect(link).toHaveClass("after:inset-0");
+
+    // A plain left-click routes client-side (no hard navigation).
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith("/services/api");
   });
 
   it("generates multi-select and text filters automatically", () => {
@@ -1058,7 +1151,7 @@ describe("DataTable", () => {
     vi.useRealTimers();
   });
 
-  it("auto-mounts a Time range picker for kind:'timestamp' columns and filters by range", () => {
+  it("auto-mounts a Time range picker for kind:'timestamp' columns without enabling generated filters", () => {
     type LogRow = { ts: string; service: string };
     const data: LogRow[] = [
       { ts: "2026-04-15T12:00:00Z", service: "api" },
@@ -1075,7 +1168,7 @@ describe("DataTable", () => {
       { key: "service", label: "Service" },
     ];
 
-    render(<DataTable data={data} columns={cols} autoFilter />);
+    render(<DataTable data={data} columns={cols} />);
 
     expect(
       screen.getByRole("button", { name: /time range filter/i }),

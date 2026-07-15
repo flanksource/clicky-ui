@@ -11,6 +11,7 @@ import type {
   FilterBarFilter,
   FilterBarMultiFilterMode,
 } from "../components/FilterBar";
+import { Modal } from "../overlay/Modal";
 import {
   DataTable,
   type DataTableColumn,
@@ -734,6 +735,169 @@ function FilterDescriptionsShowcase() {
   );
 }
 
+type PersonRow = {
+  id: string;
+  name: string;
+  email: string;
+  team: string;
+  role: string;
+  status: string;
+};
+
+const FIRST_NAMES = [
+  "Ada", "Grace", "Alan", "Linus", "Katherine", "Edsger",
+  "Barbara", "Dennis", "Margaret", "Ken", "Radia", "Donald",
+];
+const LAST_NAMES = [
+  "Lovelace", "Hopper", "Turing", "Torvalds", "Johnson", "Dijkstra",
+  "Liskov", "Ritchie", "Hamilton", "Thompson", "Perlman", "Knuth",
+];
+const TEAMS = ["Platform", "Finance", "Data", "Growth", "Identity", "Support"];
+const ROLES = ["Admin", "Editor", "Viewer"];
+const PERSON_STATUSES = ["active", "invited", "disabled"];
+
+// 120 deterministic rows so the pagination footer has real pages to move through.
+const people: PersonRow[] = Array.from({ length: 120 }, (_, index) => {
+  const first = FIRST_NAMES[index % FIRST_NAMES.length];
+  const last = LAST_NAMES[(index * 7) % LAST_NAMES.length];
+  return {
+    id: `person-${index + 1}`,
+    name: `${first} ${last}`,
+    email: `${first}.${last}${index + 1}`.toLowerCase() + "@example.com",
+    team: TEAMS[index % TEAMS.length],
+    role: ROLES[index % ROLES.length],
+    status: PERSON_STATUSES[index % PERSON_STATUSES.length],
+  };
+});
+
+const peopleColumns: DataTableColumn<PersonRow>[] = [
+  { key: "name", label: "Name", grow: true },
+  { key: "email", label: "Email", grow: true },
+  { key: "team", label: "Team", shrink: true },
+  { key: "role", label: "Role", shrink: true },
+  {
+    key: "status",
+    label: "Status",
+    kind: "status",
+    shrink: true,
+    status: { showLabel: true },
+  },
+];
+
+// The DataTable never slices or reorders server-paginated data, so the story
+// owns sorting over the full set before it hands the current page to the table.
+function sortPeople(
+  data: PersonRow[],
+  sort: { key: string; dir: "asc" | "desc" } | null,
+): PersonRow[] {
+  if (!sort) return data;
+  const factor = sort.dir === "asc" ? 1 : -1;
+  const key = sort.key as keyof PersonRow;
+  return [...data].sort(
+    (left, right) => factor * String(left[key]).localeCompare(String(right[key])),
+  );
+}
+
+function DialogTableShowcase() {
+  const [open, setOpen] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>({
+    key: "name",
+    dir: "asc",
+  });
+  // Keyed by row id so a selection made on page 1 survives paging to page 3.
+  const [selected, setSelected] = useState<Record<string, PersonRow>>({});
+
+  const sorted = sortPeople(people, sort);
+  const pageRows = sorted.slice(page * pageSize, page * pageSize + pageSize);
+  const selectedCount = Object.keys(selected).length;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+        onClick={() => setOpen(true)}
+      >
+        Add people
+      </button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Add people"
+        size="xl"
+        expandable
+        // Body owns no scroll — only the table's row region moves, so the sticky
+        // header, filter bar, and pagination footer stay pinned.
+        scrollBody={false}
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">
+              {selectedCount === 0
+                ? "Select one or more people from the table."
+                : `${selectedCount} selected`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-border px-3 py-1 text-sm disabled:opacity-50"
+                onClick={() => setSelected({})}
+                disabled={selectedCount === 0}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
+                onClick={() => setOpen(false)}
+                disabled={selectedCount === 0}
+              >
+                {selectedCount > 0 ? `Add ${selectedCount}` : "Add"}
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <DataTable
+          // Fill the scrollBody=false modal body so only the rows scroll.
+          className="min-h-0 flex-1"
+          data={pageRows}
+          columns={peopleColumns}
+          getRowId={(row) => row.id}
+          sort={sort}
+          onSortChange={setSort}
+          manualSort
+          columnResizeStorageKey="clicky-ui-story-data-table-dialog"
+          rowSelection={{
+            selectedRowIds: Object.keys(selected),
+            toggleOnRowClick: true,
+            onSelectionChange: (nextIds, nextRows) => {
+              const rowById = new Map(nextRows.map((row) => [row.id, row]));
+              setSelected(
+                Object.fromEntries(
+                  nextIds.map((id) => [id, rowById.get(id) ?? selected[id]]),
+                ),
+              );
+            },
+          }}
+          pagination={{
+            page,
+            pageSize,
+            total: people.length,
+            pageSizeOptions: [10, 25, 50],
+            onPageChange: setPage,
+            onPageSizeChange: (size) => {
+              setPage(0);
+              setPageSize(size);
+            },
+          }}
+        />
+      </Modal>
+    </>
+  );
+}
+
 const meta = {
   title: "Data/DataTable",
   component: DataTable,
@@ -811,6 +975,23 @@ export const StatusDots: Story = {
 
 export const RowDetailDialog: Story = {
   render: () => <RowDetailDialogShowcase />,
+};
+
+export const InDialogWithPagingAndSelection: Story = {
+  render: () => <DialogTableShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "A DataTable hosted inside a `Modal` with server-style pagination and controlled multi-row selection — the pattern behind the chat \"Add context\" picker.",
+          "",
+          "- **Only the rows scroll.** The dialog sets `scrollBody={false}`, so the modal body is a non-scrolling flex column and the table's own row region owns the scroll. The sticky header, filter/search bar, pagination footer, and the selection action bar all stay pinned.",
+          "- **Selection persists across pages.** It is keyed by `getRowId`, so a row checked on page 1 stays checked after paging to page 3; the footer shows the running count and the primary action is disabled until at least one row is selected.",
+          "- **Pagination is server-shaped.** The DataTable never slices `data`, so the story sorts and slices the current page itself and reports the true `total` for \"Page X of Y\".",
+        ].join("\n"),
+      },
+    },
+  },
 };
 
 export const FilterDescriptions: Story = {

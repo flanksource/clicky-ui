@@ -82,6 +82,16 @@
       "import": "./dist/rpc.js",
       "require": "./dist/rpc.cjs"
     },
+    "./monaco": {
+      "types": "./dist/monaco.d.ts",
+      "import": "./dist/monaco.js",
+      "require": "./dist/monaco.cjs"
+    },
+    "./monaco/schema": {
+      "types": "./dist/monaco-schema.d.ts",
+      "import": "./dist/monaco-schema.js",
+      "require": "./dist/monaco-schema.cjs"
+    },
     "./chat": {
       "types": "./dist/chat.d.ts",
       "import": "./dist/chat.js",
@@ -116,8 +126,15 @@
     "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run lint"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "catalog:",
+    "@codemirror/commands": "catalog:",
+    "@codemirror/lang-json": "catalog:",
+    "@codemirror/lang-sql": "catalog:",
+    "@codemirror/state": "catalog:",
+    "@codemirror/view": "catalog:",
     "@flanksource/icons": "1.0.60",
     "@floating-ui/react": "catalog:",
+    "@monaco-editor/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-query": "^5.66.8",
@@ -125,6 +142,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.11",
     "jotai": "catalog:",
+    "monaco-yaml": "catalog:",
     "tailwind-merge": "^2.6.0",
     "yaml": "catalog:"
   },
@@ -140,6 +158,7 @@
     "@types/react-dom": "^18.3.1",
     "ai": "catalog:",
     "jsdom": "^26.0.0",
+    "monaco-editor": "catalog:",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-rnd": "^10.5.3",
@@ -163,6 +182,7 @@
     "marked": "^15.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
+    "monaco-editor": ">=0.48 <1",
     "react-rnd": "^10.5.0",
     "recharts": "^3.0.0",
     "shiki": "^1.24.0",
