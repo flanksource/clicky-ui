@@ -213,6 +213,26 @@ export const AskUserQuestion: Story = {
   },
 };
 
+export const PendingQuestionControls: Story = {
+  args: {
+    session: [],
+    showHeader: false,
+    pendingTools: [{
+      tool: "AskUserQuestion",
+      toolCallId: "ask-pending-1",
+      input: (QUESTION_SESSION.messages[1].parts[0] as { input: Record<string, unknown> }).input,
+    }],
+    onPendingToolDecision: async () => {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Send answer" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    await expect(canvas.getAllByRole("radio")).toHaveLength(2);
+    await expect(canvas.getAllByRole("checkbox")).toHaveLength(3);
+  },
+};
+
 export const ApprovalStatuses: Story = {
   args: {
     session: APPROVAL_STATUS_SESSION,

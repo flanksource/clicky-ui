@@ -17,6 +17,7 @@ export {
   ChatWindow,
   ChatWindowLayer,
   type ChatWindowProps,
+  type ChatContextPickerRenderProps,
 } from "./ChatWindow";
 export { ChatFab, type ChatFabProps } from "./ChatFab";
 export {
@@ -110,6 +111,11 @@ export {
 } from "./PromptPicker";
 export { PromptRunEditor, type PromptRunEditorProps } from "./PromptRunEditor";
 export {
+  effortOptionsForModel,
+  reconcileModelCapabilities,
+  type ModelRuntimeSelection,
+} from "./model-capabilities";
+export {
   RuntimeModePicker,
   type RuntimeModePickerProps,
 } from "./RuntimeModePicker";
@@ -147,6 +153,8 @@ export {
 export {
   SessionViewer,
   type SessionViewerProps,
+  type SessionPendingTool,
+  type SessionToolDecision,
   type SessionEntry,
   type SessionEvent,
   type SessionInput,

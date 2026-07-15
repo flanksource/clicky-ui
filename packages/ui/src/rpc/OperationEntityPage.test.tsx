@@ -340,4 +340,38 @@ describe("OperationEntityPage", () => {
       screen.queryByRole("button", { name: "Restart a widget" }),
     ).not.toBeInTheDocument();
   });
+
+  it("lets a host replace the loaded body while retaining entity actions", async () => {
+    const executeMock = vi.fn(async (path: string, method: string) => {
+      if (path === "/api/v1/widgets/{id}" && method === "get") {
+        return jsonResponse({ id: "one", type: "database" });
+      }
+      return jsonResponse([]);
+    });
+    const client: OperationsApiClient = {
+      getOpenAPISpec: async () => makeSurfaceSpec(),
+      executeCommand: executeMock,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationEntityPage
+          id="one"
+          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          entityDetailBodyRenderer={({ id, surfaceKey }) => (
+            <div data-testid="custom-detail">Browser for {surfaceKey}/{id}</div>
+          )}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByTestId("custom-detail")).toHaveTextContent("Browser for widgets/one");
+    expect(screen.getByRole("button", { name: "Restart" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Entity detail" })).not.toBeInTheDocument();
+  });
 });

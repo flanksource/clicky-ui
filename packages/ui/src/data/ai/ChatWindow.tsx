@@ -28,7 +28,7 @@ import {
   type ToolMeta,
   type ToolMode,
 } from "./ToolPreferences";
-import type { ContextTypeConfig } from "./context";
+import type { ChatContextItem, ContextTypeConfig } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 
 export type ChatWindowProps = {
@@ -57,6 +57,14 @@ export type ChatWindowProps = {
   toolsApi?: string | null;
   /** Extra controls rendered in the header, e.g. a <ContextMeter mode="gauge"/> gauge. */
   headerExtras?: ReactNode;
+  /** Optional app-owned entity/document picker rendered beside context badges. */
+  renderContextPicker?: (props: ChatContextPickerRenderProps) => ReactNode;
+};
+
+export type ChatContextPickerRenderProps = {
+  items: ChatContextItem[];
+  onAdd: (item: ChatContextItem) => void;
+  onAddMany: (items: ChatContextItem[]) => void;
 };
 
 type StoredChatPreferences = {
@@ -95,6 +103,7 @@ export function ChatWindow({
   defaultToolMode = "ask",
   toolsApi = "/api/chat/tools",
   headerExtras,
+  renderContextPicker,
 }: ChatWindowProps) {
   const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } =
     useChatWindowManager();
@@ -267,6 +276,26 @@ export function ChatWindow({
     [updatePanel, panel.id, panel.contextItems],
   );
 
+  const addContextItems = useCallback(
+    (items: ChatContextItem[]) =>
+      updatePanel(panel.id, {
+        contextItems: [
+          ...panel.contextItems,
+          ...items.filter(
+            (item, index) =>
+              !panel.contextItems.some((existing) => existing.id === item.id) &&
+              items.findIndex((candidate) => candidate.id === item.id) ===
+                index,
+          ),
+        ],
+      }),
+    [panel.contextItems, panel.id, updatePanel],
+  );
+  const addContext = useCallback(
+    (item: ChatContextItem) => addContextItems([item]),
+    [addContextItems],
+  );
+
   const mergedBody = chatWindowRequestBody({
     base: chat?.body,
     contextItems: panel.contextItems,
@@ -377,11 +406,21 @@ export function ChatWindow({
   const frame = (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
       {header}
-      <ContextBadges
-        items={panel.contextItems}
-        onRemove={removeContext}
-        {...(contextTypeConfig ? { typeConfig: contextTypeConfig } : {})}
-      />
+      {(renderContextPicker || panel.contextItems.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2 py-1.5">
+          {renderContextPicker?.({
+            items: panel.contextItems,
+            onAdd: addContext,
+            onAddMany: addContextItems,
+          })}
+          <ContextBadges
+            items={panel.contextItems}
+            onRemove={removeContext}
+            className="px-0 py-0"
+            {...(contextTypeConfig ? { typeConfig: contextTypeConfig } : {})}
+          />
+        </div>
+      )}
       <div className="min-h-0 flex-1">
         <Chat
           {...chat}

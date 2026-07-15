@@ -37,6 +37,7 @@ export interface SessionUIPart {
   input?: unknown;
   output?: unknown;
   approval?: SessionApproval;
+  pending?: boolean;
 }
 
 /** One message in a session (AI SDK v6 UIMessage + provenance). */
@@ -51,6 +52,7 @@ export interface SessionUIMessage {
 
 export interface SessionApproval {
   id: string;
+  pending?: boolean;
   approved?: boolean;
   reason?: string;
 }
