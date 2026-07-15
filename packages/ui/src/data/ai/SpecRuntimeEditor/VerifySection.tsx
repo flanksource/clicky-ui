@@ -1,13 +1,16 @@
 import { SegmentedControl } from "../../../components/SegmentedControl";
-import { UiGitCommit, UiPlay, UiRepeat } from "../../../icons";
+import { UiRepeat } from "../../../icons";
 import { FixtureEditor } from "../../FixtureEditor";
+import type { ChatModel } from "../../chat/types";
+import type { SpecRuntimeFamily } from "../runtime-mode";
 import {
   SPEC_VERIFY_SCOPES,
   type AISpecRuntimeValue,
   type SpecVerifyScope,
 } from "../SpecRuntimeEditor.model";
-import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
-import { withFinalize, withVerify } from "./update";
+import { NumberField, SpecField } from "./fields";
+import type { SpecRuntimeSecretSelectorConfig } from "./types";
+import { withVerify } from "./update";
 
 const SCOPE_OPTIONS: Array<{ id: SpecVerifyScope; label: string }> =
   SPEC_VERIFY_SCOPES.map((scope) => ({
@@ -18,9 +21,15 @@ const SCOPE_OPTIONS: Array<{ id: SpecVerifyScope; label: string }> =
 export function VerifySection({
   value,
   onChange,
+  models,
+  families,
+  secretSelector,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
+  models?: ChatModel[] | undefined;
+  families?: SpecRuntimeFamily[] | undefined;
+  secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
 }) {
   return (
     <div className="grid gap-density-3">
@@ -30,6 +39,12 @@ export function VerifySection({
           onChange={(fixture) => onChange(withVerify(value, { fixture }))}
           size="sm"
           placeholder="Write the verify fixture markdown..."
+          frontmatterEditor={{
+            mode: "verification",
+            models,
+            families,
+            secretSelector,
+          }}
         />
       </SpecField>
       <div className="flex flex-wrap items-end gap-density-3">
@@ -55,30 +70,6 @@ export function VerifySection({
             integer
           />
         </div>
-      </div>
-      <div className="grid gap-density-2 md:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(0,1fr)]">
-        <CheckboxField
-          label="Commit"
-          checked={value.workflow?.finalize?.commit}
-          onChange={(commit) => onChange(withFinalize(value, { commit }))}
-          icon={UiGitCommit}
-        />
-        <CheckboxField
-          label="Dry run"
-          checked={value.workflow?.finalize?.dryRun}
-          onChange={(dryRun) => onChange(withFinalize(value, { dryRun }))}
-          icon={UiPlay}
-        />
-        <SpecField label="Commit message">
-          <SpecInput
-            value={value.workflow?.finalize?.commitMessage}
-            onChange={(commitMessage) =>
-              onChange(withFinalize(value, { commitMessage }))
-            }
-            placeholder="Apply AI changes"
-            icon={UiGitCommit}
-          />
-        </SpecField>
       </div>
     </div>
   );
