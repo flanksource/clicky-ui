@@ -29,6 +29,8 @@ export interface ChatModel {
   label: string;
   reasoning: boolean;
   configured?: boolean;
+  /** Concrete runtime backends that advertised this model. Empty/omitted means provider-wide. */
+  backends?: string[];
   /** Max context tokens — the denominator for a usage gauge. */
   contextWindow?: number;
 }
@@ -137,12 +139,14 @@ export const CLAUDE_PERMISSION_MODE_OPTIONS: ClaudePermissionModeOption[] = [
   {
     value: "default",
     label: "Default",
-    description: "Prompt for dangerous operations using standard Claude behavior.",
+    description:
+      "Prompt for dangerous operations using standard Claude behavior.",
   },
   {
     value: "auto",
     label: "Auto",
-    description: "Use Claude's classifier to approve or deny permission prompts.",
+    description:
+      "Use Claude's classifier to approve or deny permission prompts.",
   },
   {
     value: "acceptEdits",
@@ -162,7 +166,8 @@ export const CLAUDE_PERMISSION_MODE_OPTIONS: ClaudePermissionModeOption[] = [
   {
     value: "bypassPermissions",
     label: "Bypass",
-    description: "Bypass permission checks when explicitly allowed by the host.",
+    description:
+      "Bypass permission checks when explicitly allowed by the host.",
   },
 ];
 
@@ -171,7 +176,16 @@ export const CLAUDE_PERMISSION_MODE_OPTIONS: ClaudePermissionModeOption[] = [
  *  derived from a clicky RPC operation (`description`/`inputSchema`). The Go
  *  backend owns execution; the client uses this only for display and to scope
  *  which tools a request may call (passed in the transport `body`). */
-export type ToolMode = "enabled" | "ask" | "disabled";
+export type ToolMode = "on" | "ask" | "off" | "auto";
+
+export interface ToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  [key: string]: unknown;
+}
 
 export interface ToolMeta {
   /** Stable tool name sent to the model (the operation id). */
@@ -180,11 +194,20 @@ export interface ToolMeta {
   label: string;
   /** Bucket heading in the popover — the clicky surface for RPC operations. */
   group?: string;
+  /** Display title of the tool's parent surface/entity (e.g. "Xero Accounts").
+   *  Used to nest tools under their entity within a group, and as the
+   *  disambiguating prefix in flat lists so sibling verbs ("List", "Get") stay
+   *  distinguishable. Resolved from the operation's `x-clicky.surface`. */
+  parent?: string;
+  /** Raw entity name of the tool's surface (e.g. "accounts"), when known. */
+  entity?: string;
   /** Preference key sent to the backend. Defaults to `name`; group-backed
    *  clicky tools set this to the backend tool group. */
   preferenceKey?: string;
-  /** Initial preference mode when the chat window first sees this tool. */
-  defaultMode?: ToolMode;
+  /** Initial backend-owned permission when the chat window first sees this tool. */
+  defaultPermission?: ToolMode;
+  /** Opaque icon name emitted by the backend, resolved by the host UI. */
+  icon?: string;
   /** Description shown in tool pickers / tool-call headers. */
   description?: string;
   /** Short usage hints shown in the tool browser. */
@@ -195,6 +218,10 @@ export interface ToolMeta {
   path?: string;
   operationName?: string;
   title?: string;
+  /** Whether the runtime should treat the tool input schema as strict/closed. */
+  strict?: boolean;
+  /** Runtime tool annotations/hints, e.g. MCP/Genkit well-known hints. */
+  annotations?: ToolAnnotations;
   /** JSON-Schema for the tool's input, assembled from an operation's
    *  parameters + request body. Omitted for hand-authored tools. */
   inputSchema?: ChatToolInputSchema;

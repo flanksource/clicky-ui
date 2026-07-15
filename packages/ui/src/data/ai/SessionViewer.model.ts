@@ -1,14 +1,24 @@
 import type { StaticIconComponent } from "../Icon";
+import type {
+  SessionBudget,
+  SessionCapabilities,
+  SessionContext,
+  SessionMetadataEvent,
+  SessionTurn,
+  SessionUIMessage,
+  SessionUIPart,
+  UnifiedSessionInput,
+} from "./SessionViewer.unified";
 import {
   UiCamera,
   UiClose,
   UiCloudDownload,
   UiCode2,
   UiCommand,
+  UiDiff,
   UiEdit,
   UiEye,
   UiFileSearch,
-  UiFileText,
   UiGlobe,
   UiHourglass,
   UiImage,
@@ -19,7 +29,6 @@ import {
   UiPuzzle,
   UiQuestion,
   UiRobotAi,
-  UiSave,
   UiSearch,
   UiSelect,
   UiSparkles,
@@ -78,8 +87,20 @@ export interface SessionEntry {
   error?: string;
 }
 
-/** Either a parsed list of entries or the raw log text (JSON array or JSONL). */
-export type SessionInput = string | SessionEntry[];
+/**
+ * A session to render: the unified `SessionUIMessage[]` (preferred — what
+ * `GET /api/captain/sessions/{id}` serves), a legacy `SessionEntry[]` log, or
+ * raw log text (JSON array or JSONL).
+ */
+export type SessionInput = string | SessionEntry[] | SessionUIMessage[] | UnifiedSessionInput;
+
+export interface SessionMetadataSummary {
+  turns?: SessionTurn[];
+  capabilities?: SessionCapabilities;
+  budget?: SessionBudget;
+  context?: SessionContext;
+  events?: SessionMetadataEvent[];
+}
 
 // ── Normalized events ───────────────────────────────────────────────────────
 // The raw schema interleaves consolidated `tool_use` rows with `message`
@@ -103,11 +124,16 @@ export interface SessionEvent {
   model?: string;
   reasoningEffort?: string;
   source?: string;
+  turnId?: string;
+  agentId?: string;
+  toolState?: string;
+  approval?: SessionUIPart["approval"];
+  raw?: unknown;
   errorType?: string;
   errorStatus?: number;
 }
 
-function truncate(text: string, max: number): string {
+export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
@@ -116,7 +142,7 @@ function truncate(text: string, max: number): string {
 // falls back to JSONL (one object per line). The whole-document parse error is
 // caught only to attempt the JSONL fallback — a genuinely malformed JSONL line
 // throws loudly rather than being silently dropped.
-function parseEntries(input: SessionInput): SessionEntry[] {
+function parseEntries(input: string | SessionEntry[]): SessionEntry[] {
   if (Array.isArray(input)) return input;
   const text = input.trim();
   if (!text) return [];
@@ -149,7 +175,17 @@ function toolEvent(
   input: Record<string, unknown> | undefined,
   response: string | undefined,
   timestamp: string | undefined,
-  meta: { model?: string; reasoningEffort?: string; source?: string; cwd?: string } = {},
+  meta: {
+    model?: string;
+    reasoningEffort?: string;
+    source?: string;
+    cwd?: string;
+    turnId?: string;
+    agentId?: string;
+    toolState?: string;
+    approval?: SessionUIPart["approval"];
+    raw?: unknown;
+  } = {},
 ): SessionEvent {
   return {
     id,
@@ -162,6 +198,11 @@ function toolEvent(
     ...(meta.reasoningEffort ? { reasoningEffort: meta.reasoningEffort } : {}),
     ...(meta.source ? { source: meta.source } : {}),
     ...(meta.cwd ? { cwd: meta.cwd } : {}),
+    ...(meta.turnId ? { turnId: meta.turnId } : {}),
+    ...(meta.agentId ? { agentId: meta.agentId } : {}),
+    ...(meta.toolState ? { toolState: meta.toolState } : {}),
+    ...(meta.approval ? { approval: meta.approval } : {}),
+    ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
   };
 }
 
@@ -191,9 +232,16 @@ function blockEvent(
   return null;
 }
 
-/** Flatten a captain session (entries or raw log text) into ordered events. */
+/** Flatten a captain session (unified messages, entries, or raw log text) into
+ *  ordered events. Unified `SessionUIMessage[]` is detected by its `parts`. */
 export function normalizeSession(input: SessionInput): SessionEvent[] {
-  const entries = parseEntries(input);
+  if (looksLikeUnifiedSession(input)) {
+    return normalizeMessages(input.messages ?? []);
+  }
+  if (Array.isArray(input) && looksLikeUnifiedMessages(input)) {
+    return normalizeMessages(input);
+  }
+  const entries = parseEntries(input as string | SessionEntry[]);
   const events: SessionEvent[] = [];
   entries.forEach((entry, seq) => {
     const baseId = entry.uuid ?? `e${seq}`;
@@ -206,6 +254,7 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
         ...(entry.error ? { errorType: entry.error } : {}),
         ...(entry.apiErrorStatus ? { errorStatus: entry.apiErrorStatus } : {}),
         ...(entry.timestamp ? { timestamp: entry.timestamp } : {}),
+        raw: entry,
       });
       return;
     }
@@ -219,6 +268,7 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
           ...(tu.reasoning_effort ? { reasoningEffort: tu.reasoning_effort } : {}),
           ...(tu.source ? { source: tu.source } : {}),
           ...(cwd ? { cwd } : {}),
+          raw: entry,
         }),
       );
       return;
@@ -233,9 +283,157 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
   return events;
 }
 
+export function getSessionMetadata(input: SessionInput): SessionMetadataSummary | undefined {
+  if (!looksLikeUnifiedSession(input)) return undefined;
+  const metadata: SessionMetadataSummary = {
+    ...(input.turns ? { turns: input.turns } : {}),
+    ...(input.capabilities ? { capabilities: input.capabilities } : {}),
+    ...(input.budget ? { budget: input.budget } : {}),
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.events ? { events: input.events } : {}),
+  };
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
 function errorMessage(entry: SessionEntry): string {
   const status = entry.apiErrorStatus ? ` (HTTP ${entry.apiErrorStatus})` : "";
   return `${entry.error ?? "API error"}${status}`;
+}
+
+// ── Unified message normalization ───────────────────────────────────────────
+// Projects the canonical SessionUIMessage[] (captain pkg/session) into the same
+// SessionEvent rows, so the viewer renders the unified model and the legacy
+// SessionEntry log identically.
+
+/** A unified message array is told apart from a SessionEntry log by its
+ *  per-message `parts` array (a SessionEntry carries `message`/`tool_use`). */
+function looksLikeUnifiedMessages(arr: SessionEntry[] | SessionUIMessage[]): arr is SessionUIMessage[] {
+  const first: unknown = arr[0];
+  return typeof first === "object" && first !== null && Array.isArray((first as SessionUIMessage).parts);
+}
+
+function looksLikeUnifiedSession(input: SessionInput): input is UnifiedSessionInput {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    ("messages" in input ||
+      "turns" in input ||
+      "capabilities" in input ||
+      "budget" in input ||
+      "context" in input)
+  );
+}
+
+function isUnifiedToolPart(part: SessionUIPart): boolean {
+  return Boolean(part.toolName) && (part.type === "dynamic-tool" || part.type.startsWith("tool-"));
+}
+
+/** Render a tool part's already-parsed JSON output as text. */
+function outputToText(output: unknown): string | undefined {
+  if (output == null) return undefined;
+  return typeof output === "string" ? output : JSON.stringify(output);
+}
+
+function asRecord(input: unknown): Record<string, unknown> | undefined {
+  return typeof input === "object" && input !== null && !Array.isArray(input)
+    ? (input as Record<string, unknown>)
+    : undefined;
+}
+
+function partEvent(
+  part: SessionUIPart,
+  role: "user" | "assistant",
+  id: string,
+  meta: {
+    timestamp?: string;
+    cwd?: string;
+    model?: string;
+    reasoningEffort?: string;
+    source?: string;
+    turnId?: string;
+    agentId?: string;
+    raw?: unknown;
+  },
+): SessionEvent | null {
+  if (isUnifiedToolPart(part)) {
+    return toolEvent(id, part.toolName as string, asRecord(part.input), outputToText(part.output), meta.timestamp, {
+      ...(meta.model ? { model: meta.model } : {}),
+      ...(meta.reasoningEffort ? { reasoningEffort: meta.reasoningEffort } : {}),
+      ...(meta.source ? { source: meta.source } : {}),
+      ...(meta.cwd ? { cwd: meta.cwd } : {}),
+      ...(meta.turnId ? { turnId: meta.turnId } : {}),
+      ...(meta.agentId ? { agentId: meta.agentId } : {}),
+      ...(part.state ? { toolState: part.state } : {}),
+      ...(part.approval ? { approval: part.approval } : {}),
+      ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+    });
+  }
+  if (part.type === "reasoning") {
+    return part.text
+      ? {
+          id,
+          kind: "thinking",
+          text: part.text,
+          ...(meta.timestamp ? { timestamp: meta.timestamp } : {}),
+          ...(meta.turnId ? { turnId: meta.turnId } : {}),
+          ...(meta.agentId ? { agentId: meta.agentId } : {}),
+          ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+        }
+      : null;
+  }
+  if (part.type === "text") {
+    return part.text
+      ? {
+          id,
+          kind: role,
+          text: part.text,
+          ...(meta.timestamp ? { timestamp: meta.timestamp } : {}),
+          ...(meta.turnId ? { turnId: meta.turnId } : {}),
+          ...(meta.agentId ? { agentId: meta.agentId } : {}),
+          ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+        }
+      : null;
+  }
+  return null; // file / unknown parts have no row representation
+}
+
+/** Flatten unified session messages into ordered SessionEvent rows. */
+export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] {
+  const events: SessionEvent[] = [];
+  messages.forEach((msg, seq) => {
+    const prov = msg.provenance;
+    const baseId = msg.id ?? prov?.uuid ?? `m${seq}`;
+    if (prov?.apiErrorStatus) {
+      events.push({
+        id: `${baseId}-err`,
+        kind: "error",
+        text: `API error (HTTP ${prov.apiErrorStatus})`,
+        errorStatus: prov.apiErrorStatus,
+        ...(prov.timestamp ? { timestamp: prov.timestamp } : {}),
+        ...(msg.turnId ? { turnId: msg.turnId } : {}),
+        ...(prov.agentId ? { agentId: prov.agentId } : {}),
+        ...(msg.raw !== undefined ? { raw: msg.raw } : {}),
+      });
+      return;
+    }
+    const role: "user" | "assistant" = msg.role === "user" ? "user" : "assistant";
+    const meta = {
+      ...(prov?.timestamp ? { timestamp: prov.timestamp } : {}),
+      ...(prov?.cwd ? { cwd: prov.cwd } : {}),
+      ...(prov?.model ? { model: prov.model } : {}),
+      ...(prov?.reasoningEffort ? { reasoningEffort: prov.reasoningEffort } : {}),
+      ...(prov?.source ? { source: prov.source } : {}),
+      ...(msg.turnId ? { turnId: msg.turnId } : {}),
+      ...(prov?.agentId ? { agentId: prov.agentId } : {}),
+      ...(msg.raw !== undefined ? { raw: msg.raw } : {}),
+    };
+    msg.parts.forEach((part, i) => {
+      const ev = partEvent(part, role, `${baseId}-${i}`, meta);
+      if (ev) events.push(ev);
+    });
+  });
+  return events;
 }
 
 // ── Action icon registry ────────────────────────────────────────────────────
@@ -267,9 +465,10 @@ export interface SessionActionMeta {
 }
 
 const ACTIONS: Record<string, SessionActionMeta> = {
-  // File operations
-  Read: { icon: UiFileText, tone: "sky", label: "Read file", summaryOnly: true },
-  Write: { icon: UiSave, tone: "amber", label: "Write file", summaryOnly: true },
+  // File operations. Read (eye) and Write (diff) are deliberately far apart
+  // visually — write-type rows also carry a +/- diff stat.
+  Read: { icon: UiEye, tone: "sky", label: "Read file", summaryOnly: true },
+  Write: { icon: UiDiff, tone: "amber", label: "Write file", summaryOnly: true },
   Edit: { icon: UiEdit, tone: "violet", label: "Edit file", summaryOnly: true },
   MultiEdit: { icon: UiLayers, tone: "violet", label: "Multi-edit", summaryOnly: true },
   NotebookEdit: { icon: UiEdit, tone: "violet", label: "Edit notebook", summaryOnly: true },
@@ -345,129 +544,6 @@ export function getSessionAction(tool: string): SessionActionMeta {
   }
 
   return { icon: UiWrench, tone: "slate", label: tool };
-}
-
-/** The raw shell command of a shell-execution tool call, if present. Shell rows
- *  render this inline as a bash code block instead of the generic label +
- *  tool-input JSON. */
-export function shellCommand(tool: string, input?: Record<string, unknown>): string | undefined {
-  if (tool !== "Bash") return undefined;
-  const command = input?.["command"];
-  return typeof command === "string" && command ? command : undefined;
-}
-
-/** Strip the event's working directory from an absolute file path. */
-export function relativizePath(path: string, cwd?: string): string {
-  if (!cwd) return path;
-  const base = cwd.replace(/\/+$/, "");
-  return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
-}
-
-export interface ToolParam {
-  name: string;
-  value: string;
-}
-
-// Keys already rendered elsewhere in the row — the file-path heading or the
-// inline shell command — so they don't repeat as inline params.
-const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
-  Bash: ["command"],
-  Read: ["file_path", "notebook_path", "path"],
-  Write: ["file_path", "notebook_path", "path"],
-  Edit: ["file_path", "notebook_path", "path"],
-  MultiEdit: ["file_path", "notebook_path", "path"],
-  NotebookEdit: ["file_path", "notebook_path", "path"],
-};
-
-/** Flatten a tool's input into JetBrains-style `name: value` inline params:
- *  single-line values, cwd-relativized and truncated so the row never wraps. */
-export function toolInputParams(
-  tool: string,
-  input?: Record<string, unknown>,
-  cwd?: string,
-): ToolParam[] {
-  const consumed = CONSUMED_INPUT_KEYS[tool] ?? [];
-  return Object.entries(input ?? {})
-    .filter(
-      ([name, value]) =>
-        !consumed.includes(name) && value !== undefined && value !== null && value !== "",
-    )
-    .map(([name, value]) => ({ name, value: paramValue(value, cwd) }));
-}
-
-function paramValue(value: unknown, cwd?: string): string {
-  const text = typeof value === "string" ? relativizePath(value, cwd) : JSON.stringify(value);
-  return truncate(text.replace(/\s+/g, " ").trim(), 60);
-}
-
-// summarizeToolInput condenses a tool's input into a one-line preview, ported
-// from captain's history.FormatToolUseSummary so the viewer reads like the CLI.
-export function summarizeToolInput(
-  tool: string,
-  input?: Record<string, unknown>,
-  cwd?: string,
-): string {
-  if (!input) return "";
-  const str = (key: string): string => (typeof input[key] === "string" ? (input[key] as string) : "");
-  const first = (...keys: string[]): string => {
-    for (const key of keys) {
-      const value = str(key);
-      if (value) return value;
-    }
-    return "";
-  };
-
-  const mcp = splitMcpTool(tool);
-  if (mcp) {
-    const arg = first("url", "sql", "query", "element", "method");
-    return arg ? truncate(arg, 80) : "";
-  }
-
-  switch (tool) {
-    case "Bash":
-    case "browser_type":
-      return truncate(str("command") || str("text"), 80);
-    case "Read":
-    case "Write":
-    case "Edit":
-    case "MultiEdit":
-    case "NotebookEdit":
-      return relativizePath(first("file_path", "notebook_path", "path"), cwd);
-    case "Grep":
-      return [str("pattern"), str("path")].filter(Boolean).join(" ");
-    case "Glob":
-      return str("pattern");
-    case "Task":
-    case "Agent":
-      return truncate(first("description", "prompt"), 80);
-    case "Skill":
-      return first("skill", "command", "name");
-    case "TaskCreate":
-      return truncate(first("subject", "description"), 80);
-    case "TaskUpdate": {
-      const id = first("taskId", "task_id", "id");
-      const status = str("status");
-      return status ? `${id} ${status}`.trim() : id;
-    }
-    case "TaskGet":
-    case "TaskOutput":
-    case "TaskStop":
-      return first("task_id", "taskId", "id");
-    case "ToolSearch":
-    case "WebSearch":
-      return truncate(str("query"), 80);
-    case "WebFetch":
-    case "browser_navigate":
-      return str("url");
-    case "AskUserQuestion": {
-      const questions = input["questions"];
-      return Array.isArray(questions) ? `${questions.length} questions` : "";
-    }
-    case "ExitPlanMode":
-      return str("planFilePath");
-    default:
-      return "";
-  }
 }
 
 /** Count tool-call events, the dominant model, and totals for the header. */

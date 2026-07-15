@@ -16,7 +16,10 @@ export function relativizePath(path: string, cwd?: string): string {
 /** The raw shell command of a shell-execution tool call, if present. Shell rows
  *  render this inline as a bash code block instead of the generic label +
  *  tool-input JSON. */
-export function shellCommand(tool: string, input?: Record<string, unknown>): string | undefined {
+export function shellCommand(
+  tool: string,
+  input?: Record<string, unknown>,
+): string | undefined {
   if (tool !== "Bash") return undefined;
   const command = input?.["command"];
   return typeof command === "string" && command ? command : undefined;
@@ -49,13 +52,19 @@ export function toolInputParams(
   return Object.entries(input ?? {})
     .filter(
       ([name, value]) =>
-        !consumed.includes(name) && value !== undefined && value !== null && value !== "",
+        !consumed.includes(name) &&
+        value !== undefined &&
+        value !== null &&
+        value !== "",
     )
     .map(([name, value]) => ({ name, value: paramValue(value, cwd) }));
 }
 
 function paramValue(value: unknown, cwd?: string): string {
-  const text = typeof value === "string" ? relativizePath(value, cwd) : JSON.stringify(value);
+  const text =
+    typeof value === "string"
+      ? relativizePath(value, cwd)
+      : JSON.stringify(value);
   return truncate(text.replace(/\s+/g, " ").trim(), 60);
 }
 
@@ -76,7 +85,10 @@ export interface ToolDiff {
 
 // Added/removed line counts from a real LCS diff — context lines don't count,
 // so a no-op edit reports 0/0 (and yields no diff).
-function diffCounts(segments: DiffSegment[]): { added: number; removed: number } {
+function diffCounts(segments: DiffSegment[]): {
+  added: number;
+  removed: number;
+} {
   let added = 0;
   let removed = 0;
   for (const { original, modified } of segments) {
@@ -92,7 +104,10 @@ function diffCounts(segments: DiffSegment[]): { added: number; removed: number }
 
 /** The content change of a file-writing tool call as before/after segments —
  *  Write is one all-additions segment; Edit/MultiEdit pair old and new text. */
-export function toolDiff(tool: string, input?: Record<string, unknown>): ToolDiff | undefined {
+export function toolDiff(
+  tool: string,
+  input?: Record<string, unknown>,
+): ToolDiff | undefined {
   if (!input) return undefined;
   const str = (key: string): string =>
     typeof input[key] === "string" ? (input[key] as string) : "";
@@ -102,7 +117,9 @@ export function toolDiff(tool: string, input?: Record<string, unknown>): ToolDif
   const counts = diffCounts(segments);
   if (counts.added === 0 && counts.removed === 0) return undefined;
 
-  const language = languageFromPath(str("file_path") || str("notebook_path") || str("path"));
+  const language = languageFromPath(
+    str("file_path") || str("notebook_path") || str("path"),
+  );
   return { ...counts, segments, ...(language ? { language } : {}) };
 }
 
@@ -124,10 +141,19 @@ function toolDiffSegments(
     const edits = input["edits"];
     if (!Array.isArray(edits)) return undefined;
     return edits
-      .filter((edit): edit is Record<string, unknown> => typeof edit === "object" && edit !== null)
+      .filter(
+        (edit): edit is Record<string, unknown> =>
+          typeof edit === "object" && edit !== null,
+      )
       .map((edit) => ({
-        original: typeof edit["old_string"] === "string" ? (edit["old_string"] as string) : "",
-        modified: typeof edit["new_string"] === "string" ? (edit["new_string"] as string) : "",
+        original:
+          typeof edit["old_string"] === "string"
+            ? (edit["old_string"] as string)
+            : "",
+        modified:
+          typeof edit["new_string"] === "string"
+            ? (edit["new_string"] as string)
+            : "",
       }))
       .filter((segment) => segment.original !== "" || segment.modified !== "");
   }
@@ -142,7 +168,8 @@ export function summarizeToolInput(
   cwd?: string,
 ): string {
   if (!input) return "";
-  const str = (key: string): string => (typeof input[key] === "string" ? (input[key] as string) : "");
+  const str = (key: string): string =>
+    typeof input[key] === "string" ? (input[key] as string) : "";
   const first = (...keys: string[]): string => {
     for (const key of keys) {
       const value = str(key);
@@ -160,7 +187,7 @@ export function summarizeToolInput(
   switch (tool) {
     case "Bash":
     case "browser_type":
-      return truncate(str("command") || str("text"), 80);
+      return str("command") || str("text");
     case "Read":
     case "Write":
     case "Edit":
@@ -173,11 +200,11 @@ export function summarizeToolInput(
       return str("pattern");
     case "Task":
     case "Agent":
-      return truncate(first("description", "prompt"), 80);
+      return first("description", "prompt");
     case "Skill":
       return first("skill", "command", "name");
     case "TaskCreate":
-      return truncate(first("subject", "description"), 80);
+      return first("subject", "description");
     case "TaskUpdate": {
       const id = first("taskId", "task_id", "id");
       const status = str("status");
@@ -189,7 +216,7 @@ export function summarizeToolInput(
       return first("task_id", "taskId", "id");
     case "ToolSearch":
     case "WebSearch":
-      return truncate(str("query"), 80);
+      return str("query");
     case "WebFetch":
     case "browser_navigate":
       return str("url");

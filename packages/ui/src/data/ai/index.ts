@@ -36,6 +36,7 @@ export {
   type CompactToolPreferencesListProps,
   type ToolPreferencesProps,
   type ClaudePermissionMode,
+  type ToolAnnotations,
   type ToolMeta,
   type ToolMode,
 } from "./ToolPreferences";
@@ -55,18 +56,23 @@ export {
   type SpecRuntimeSecretSelectorConfig,
   type AISpecRuntimeValue,
 } from "./SpecRuntimeEditor";
+export type { SpecSectionId } from "./SpecRuntimeEditor/types";
 export {
   buildAISpecRuntimePayload,
   compactAISpecRuntime,
   SPEC_CHECKOUT_MODES,
   SPEC_PERMISSION_MODES,
+  SPEC_SCHEMA_STRICTNESS,
   SPEC_STASH_MODES,
   SPEC_VERIFY_SCOPES,
   SPEC_WORKTREE_MODES,
   type AISpecRuntimeBudget,
   type AISpecRuntimeEnvVar,
   type AISpecRuntimeEnvVarSource,
-  type AISpecRuntimeLocalWorkflow,
+  type AISpecRuntimeModelFallback,
+  type AISpecRuntimePostRun,
+  type AISpecRuntimeVerify,
+  type AISpecRuntimeWorkflow,
   type AISpecRuntimeMemory,
   type AISpecRuntimeMCPPermissions,
   type AISpecRuntimePermissionCatalog,
@@ -81,6 +87,7 @@ export {
   type SpecCheckoutMode,
   type SpecPermissionMode,
   type SpecResourceMode,
+  type SpecSchemaStrictness,
   type SpecStashMode,
   type SpecToolPolicy,
   type SpecVerifyScope,
@@ -89,6 +96,35 @@ export {
   normalizeResourcePolicies,
   normalizeToolPolicies,
 } from "./SpecRuntimeEditor.model";
+export {
+  PromptPickerField,
+  SpecEditorDialog,
+  promptPreviewText,
+  promptRuntimeValueToPayload,
+  specToPromptRuntimeValue,
+  type PromptPickerFieldProps,
+  type PromptPickerValue,
+  type PromptSpecDetail,
+  type PromptSpecSavePayload,
+  type SpecEditorDialogProps,
+} from "./PromptPicker";
+export { PromptRunEditor, type PromptRunEditorProps } from "./PromptRunEditor";
+export {
+  RuntimeModePicker,
+  type RuntimeModePickerProps,
+} from "./RuntimeModePicker";
+export {
+  SPEC_RUNTIME_FAMILIES,
+  backendForFamilyMode,
+  familyById,
+  familyForBackend,
+  labelForBackend,
+  modelBelongsToFamily,
+  modelsForFamily,
+  selectionForBackend,
+  type SpecRuntimeFamily,
+  type SpecRuntimeModeOption,
+} from "./runtime-mode";
 export { ContextUsage, type ContextUsageProps } from "../chat/ContextUsage";
 
 export {
@@ -110,6 +146,12 @@ export {
   type SessionThemeOverride,
 } from "./SessionViewer";
 export {
+  SessionInspector,
+  type SessionInspectorProps,
+  type SessionInspectorTab,
+} from "./SessionInspector";
+export {
+  getSessionMetadata,
   getSessionAction,
   normalizeSession,
   normalizeMessages,
@@ -117,6 +159,7 @@ export {
   summarizeSession,
   type SessionActionMeta,
   type SessionEventKind,
+  type SessionMetadataSummary,
   type SessionToolUse,
   type SessionMessage,
   type SessionContent,
@@ -126,6 +169,24 @@ export {
   type SessionUIMessage,
   type SessionUIPart,
   type SessionProvenance,
+  type SessionAgent,
+  type SessionApproval,
+  type SessionApprovalStats,
+  type SessionBudget,
+  type SessionCapabilities,
+  type SessionChangedFiles,
+  type SessionCost,
+  type SessionContext,
+  type SessionDenial,
+  type SessionGitState,
+  type SessionHealth,
+  type SessionLiveProcess,
+  type SessionMetadataEvent,
+  type SessionPlan,
+  type SessionPlanEvent,
+  type SessionTurn,
+  type SessionUsage,
+  type UnifiedSessionInput,
 } from "./SessionViewer.unified";
 export {
   summarizeToolInput,

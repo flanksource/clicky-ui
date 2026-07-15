@@ -31,12 +31,17 @@ import {
 // `data-theme` attribute. Written as literal class strings so Tailwind scans them.
 const DISC_TONE: Record<SessionTone, string> = {
   sky: "bg-sky-100 text-sky-700 [[data-theme=dark]_&]:bg-sky-500/15 [[data-theme=dark]_&]:text-sky-300",
-  amber: "bg-amber-100 text-amber-700 [[data-theme=dark]_&]:bg-amber-500/15 [[data-theme=dark]_&]:text-amber-300",
-  violet: "bg-violet-100 text-violet-700 [[data-theme=dark]_&]:bg-violet-500/15 [[data-theme=dark]_&]:text-violet-300",
-  emerald: "bg-emerald-100 text-emerald-700 [[data-theme=dark]_&]:bg-emerald-500/15 [[data-theme=dark]_&]:text-emerald-300",
+  amber:
+    "bg-amber-100 text-amber-700 [[data-theme=dark]_&]:bg-amber-500/15 [[data-theme=dark]_&]:text-amber-300",
+  violet:
+    "bg-violet-100 text-violet-700 [[data-theme=dark]_&]:bg-violet-500/15 [[data-theme=dark]_&]:text-violet-300",
+  emerald:
+    "bg-emerald-100 text-emerald-700 [[data-theme=dark]_&]:bg-emerald-500/15 [[data-theme=dark]_&]:text-emerald-300",
   rose: "bg-rose-100 text-rose-700 [[data-theme=dark]_&]:bg-rose-500/15 [[data-theme=dark]_&]:text-rose-300",
-  indigo: "bg-indigo-100 text-indigo-700 [[data-theme=dark]_&]:bg-indigo-500/15 [[data-theme=dark]_&]:text-indigo-300",
-  fuchsia: "bg-fuchsia-100 text-fuchsia-700 [[data-theme=dark]_&]:bg-fuchsia-500/15 [[data-theme=dark]_&]:text-fuchsia-300",
+  indigo:
+    "bg-indigo-100 text-indigo-700 [[data-theme=dark]_&]:bg-indigo-500/15 [[data-theme=dark]_&]:text-indigo-300",
+  fuchsia:
+    "bg-fuchsia-100 text-fuchsia-700 [[data-theme=dark]_&]:bg-fuchsia-500/15 [[data-theme=dark]_&]:text-fuchsia-300",
   pink: "bg-pink-100 text-pink-700 [[data-theme=dark]_&]:bg-pink-500/15 [[data-theme=dark]_&]:text-pink-300",
   slate: "bg-muted text-muted-foreground",
 };
@@ -45,17 +50,30 @@ export function SessionRow({
   event,
   last,
   defaultExpanded,
+  showRowMetadata = false,
+  showRaw = false,
 }: {
   event: SessionEvent;
   last: boolean;
   defaultExpanded: boolean;
+  showRowMetadata?: boolean;
+  showRaw?: boolean;
 }) {
-  if (event.kind === "user") return <UserRow event={event} />;
+  if (event.kind === "user")
+    return <UserRow event={event} showRowMetadata={showRowMetadata} showRaw={showRaw} />;
 
   const visual = eventVisual(event);
   return (
-    <li data-event-kind={event.kind} className="relative flex gap-density-3 pb-density-4 last:pb-0">
-      {!last && <span aria-hidden className="absolute bottom-0 left-[10px] top-[22px] w-px bg-border" />}
+    <li
+      data-event-kind={event.kind}
+      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+    >
+      {!last && (
+        <span
+          aria-hidden
+          className="absolute bottom-0 left-[10px] top-[22px] w-px bg-border"
+        />
+      )}
       <span
         className={cn(
           "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
@@ -65,22 +83,43 @@ export function SessionRow({
         <Icon icon={visual.icon} className="h-3 w-3" />
       </span>
       <div className="min-w-0 flex-1 pt-px">
-        <EventBody event={event} visual={visual} defaultExpanded={defaultExpanded} />
+        <EventBody
+          event={event}
+          visual={visual}
+          defaultExpanded={defaultExpanded}
+        />
+        {showRowMetadata && <EventMetadata event={event} />}
+        {showRaw && event.raw !== undefined && <RawEventBlock raw={event.raw} />}
       </div>
     </li>
   );
 }
 
 // User prompts and selections sit on the right, like a chat composer turn.
-function UserRow({ event }: { event: SessionEvent }) {
+function UserRow({
+  event,
+  showRowMetadata,
+  showRaw,
+}: {
+  event: SessionEvent;
+  showRowMetadata: boolean;
+  showRaw: boolean;
+}) {
   return (
-    <li data-event-kind="user" className="relative flex justify-end pb-density-4 last:pb-0">
+    <li
+      data-event-kind="user"
+      className="relative flex justify-end pb-density-4 last:pb-0"
+    >
       <div className="flex max-w-[85%] items-start gap-density-3">
         <div className="min-w-0">
-          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">You</div>
+          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
+            You
+          </div>
           <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right leading-relaxed text-accent-foreground">
             {event.text}
           </div>
+          {showRowMetadata && <EventMetadata event={event} align="right" />}
+          {showRaw && event.raw !== undefined && <RawEventBlock raw={event.raw} align="right" />}
         </div>
         <span
           className={cn(
@@ -93,6 +132,85 @@ function UserRow({ event }: { event: SessionEvent }) {
       </div>
     </li>
   );
+}
+
+function EventMetadata({
+  event,
+  align = "left",
+}: {
+  event: SessionEvent;
+  align?: "left" | "right";
+}) {
+  const parts = [
+    event.timestamp ? formatEventTime(event.timestamp) : "",
+    event.source,
+    event.model,
+    event.reasoningEffort,
+    event.turnId ? `turn ${event.turnId}` : "",
+    event.agentId ? `agent ${event.agentId}` : "",
+    event.toolState,
+    approvalLabel(event),
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return (
+    <div
+      className={cn(
+        "mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground",
+        align === "right" && "justify-end text-right",
+      )}
+    >
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`} className="min-w-0 truncate">
+          {part}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function approvalLabel(event: SessionEvent) {
+  if (event.approval?.approved === true) return "approved";
+  if (event.approval?.approved === false) {
+    return event.approval.reason ? `denied: ${event.approval.reason}` : "denied";
+  }
+  if (event.approval) return "approval pending";
+  if (event.toolState === "output-denied") return "denied";
+  return "";
+}
+
+function formatEventTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function RawEventBlock({ raw, align = "left" }: { raw: unknown; align?: "left" | "right" }) {
+  const source = rawToSource(raw);
+  return (
+    <details className={cn("mt-1.5 text-left", align === "right" && "ml-auto max-w-full")}>
+      <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+        Raw
+      </summary>
+      <div className="mt-1">
+        <CodeBlock language="json" source={source} jsonDefaultOpenDepth={1} />
+      </div>
+    </details>
+  );
+}
+
+function rawToSource(raw: unknown) {
+  if (typeof raw === "string") {
+    try {
+      return JSON.stringify(JSON.parse(raw), null, 2);
+    } catch {
+      return raw;
+    }
+  }
+  try {
+    return JSON.stringify(raw, null, 2);
+  } catch {
+    return String(raw);
+  }
 }
 
 interface EventVisual {
@@ -114,13 +232,33 @@ function eventVisual(event: SessionEvent): EventVisual {
       };
     }
     case "user":
-      return { icon: UiUserCircle, tone: "slate", label: "User", summaryOnly: false };
+      return {
+        icon: UiUserCircle,
+        tone: "slate",
+        label: "User",
+        summaryOnly: false,
+      };
     case "assistant":
-      return { icon: UiSparkles, tone: "indigo", label: "Assistant", summaryOnly: false };
+      return {
+        icon: UiSparkles,
+        tone: "indigo",
+        label: "Assistant",
+        summaryOnly: false,
+      };
     case "thinking":
-      return { icon: UiBrain, tone: "slate", label: "Thinking", summaryOnly: false };
+      return {
+        icon: UiBrain,
+        tone: "slate",
+        label: "Thinking",
+        summaryOnly: false,
+      };
     case "error":
-      return { icon: UiWarningTriangle, tone: "rose", label: "Error", summaryOnly: false };
+      return {
+        icon: UiWarningTriangle,
+        tone: "rose",
+        label: "Error",
+        summaryOnly: false,
+      };
   }
 }
 
@@ -133,7 +271,14 @@ function EventBody({
   visual: EventVisual;
   defaultExpanded: boolean;
 }) {
-  if (event.kind === "tool") return <ToolBody event={event} visual={visual} defaultExpanded={defaultExpanded} />;
+  if (event.kind === "tool")
+    return (
+      <ToolBody
+        event={event}
+        visual={visual}
+        defaultExpanded={defaultExpanded}
+      />
+    );
   if (event.kind === "thinking") return <ThinkingBody event={event} />;
   if (event.kind === "error") return <ErrorBody event={event} />;
   return <MessageBody event={event} />;
@@ -148,7 +293,11 @@ function ToolBody({
   visual: EventVisual;
   defaultExpanded: boolean;
 }) {
-  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
+  const summary = summarizeToolInput(
+    event.tool ?? "",
+    event.toolInput,
+    event.cwd,
+  );
   const command = shellCommand(event.tool ?? "", event.toolInput);
   const [open, setOpen] = useState(defaultExpanded);
 
@@ -171,7 +320,10 @@ function ToolBody({
             >
               <Icon
                 icon={UiChevronDown}
-                className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")}
+                className={cn(
+                  "size-3 shrink-0 transition-transform",
+                  open && "rotate-180",
+                )}
               />
             </button>
           )}
@@ -185,7 +337,8 @@ function ToolBody({
     );
   }
 
-  const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
+  const hasDetail =
+    event.toolInput !== undefined || event.toolResponse !== undefined;
   const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
   const diff = toolDiff(event.tool ?? "", event.toolInput);
   // summaryOnly rows (file ops) read as their path alone — the icon carries the
@@ -194,9 +347,13 @@ function ToolBody({
   const header = (
     <>
       {visual.summaryOnly && summary ? (
-        <span className="min-w-0 truncate font-mono text-xs text-foreground">{summary}</span>
+        <span className="min-w-0 truncate font-mono text-xs text-foreground ">
+          {summary}
+        </span>
       ) : (
-        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
+        <span className="shrink-0 font-medium text-foreground">
+          {visual.label}
+        </span>
       )}
       {diff && (
         <span className="shrink-0 font-mono text-xs">
@@ -228,7 +385,10 @@ function ToolBody({
           {header}
           <Icon
             icon={UiChevronDown}
-            className={cn("ml-auto size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+            className={cn(
+              "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
           />
         </button>
       ) : (
@@ -241,10 +401,15 @@ function ToolBody({
             <DiffBlock diff={diff} />
           ) : (
             event.toolInput !== undefined && (
-              <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
+              <DetailBlock
+                language="json"
+                source={JSON.stringify(event.toolInput, null, 2)}
+              />
             )
           )}
-          {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
+          {event.toolResponse !== undefined && (
+            <ResponseBlock response={event.toolResponse} />
+          )}
         </div>
       )}
     </div>
@@ -292,7 +457,13 @@ function ResponseBlock({ response }: { response: string }) {
   return <DetailBlock language={isJson ? "json" : "text"} source={response} />;
 }
 
-function DetailBlock({ language, source }: { language: string; source: string }): ReactNode {
+function DetailBlock({
+  language,
+  source,
+}: {
+  language: string;
+  source: string;
+}): ReactNode {
   return (
     <div className="overflow-x-auto text-xs">
       <CodeBlock bare language={language} source={source} />
@@ -302,7 +473,9 @@ function DetailBlock({ language, source }: { language: string; source: string })
 
 function MessageBody({ event }: { event: SessionEvent }) {
   return (
-    <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">{event.text}</div>
+    <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">
+      {event.text}
+    </div>
   );
 }
 
@@ -317,12 +490,20 @@ function ThinkingBody({ event }: { event: SessionEvent }) {
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-start gap-1.5 text-left text-xs italic leading-relaxed text-muted-foreground hover:text-foreground"
       >
-        <span className={cn("min-w-0 flex-1", open ? "whitespace-pre-wrap break-words" : "truncate")}>
+        <span
+          className={cn(
+            "min-w-0 flex-1",
+            open ? "whitespace-pre-wrap break-words" : "truncate",
+          )}
+        >
           {event.text}
         </span>
         <Icon
           icon={UiChevronDown}
-          className={cn("mt-0.5 size-3 shrink-0 transition-transform", open && "rotate-180")}
+          className={cn(
+            "mt-0.5 size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
         />
       </button>
     </div>

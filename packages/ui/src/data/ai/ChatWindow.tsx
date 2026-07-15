@@ -49,7 +49,7 @@ export type ChatWindowProps = {
   contextTypeConfig?: ContextTypeConfig;
   /** When provided, a tool-preferences popover is shown and forwarded as
    *  `body.toolPreferences`. Tools default to "ask" (approval required); the
-   *  user can switch any tool to Auto/Off from the popover. */
+   *  user can switch any tool to On/Auto/Off from the popover. */
   tools?: ToolMeta[];
   /** Initial mode assigned to tools when they first load. Defaults to "ask". */
   defaultToolMode?: ToolMode;
@@ -99,11 +99,20 @@ export function ChatWindow({
   const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } =
     useChatWindowManager();
   const [Rnd, setRnd] = useState<ComponentType<RndProps> | null>(null);
-  const [storedPrefs] = useState<StoredChatPreferences>(() => loadChatPreferences());
-  const initialModel = panel.initialModel ?? chat?.model ?? chat?.defaultModel ?? storedPrefs.model;
+  const [storedPrefs] = useState<StoredChatPreferences>(() =>
+    loadChatPreferences(),
+  );
+  const initialModel =
+    panel.initialModel ??
+    chat?.model ??
+    chat?.defaultModel ??
+    storedPrefs.model;
   const [model, setModel] = useState<string | undefined>(initialModel);
   const [reasoningEffort, setReasoningEffort] = useState(
-    chat?.reasoningEffort ?? chat?.defaultReasoningEffort ?? storedPrefs.reasoningEffort ?? "",
+    chat?.reasoningEffort ??
+      chat?.defaultReasoningEffort ??
+      storedPrefs.reasoningEffort ??
+      "",
   );
   const [temperature, setTemperature] = useState<number | undefined>(
     chat?.temperature ?? storedPrefs.temperature,
@@ -118,13 +127,16 @@ export function ChatWindow({
   const [toolPrefs, setToolPrefs] = useState<Record<string, ToolMode>>(
     storedPrefs.toolPrefs ?? {},
   );
-  const [fetchedTools, setFetchedTools] = useState<ToolMeta[] | undefined>(undefined);
+  const [fetchedTools, setFetchedTools] = useState<ToolMeta[] | undefined>(
+    undefined,
+  );
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
   const [fetchedModels, setFetchedModels] = useState<ChatModel[]>([]);
 
   const resolvedTools = tools ?? fetchedTools ?? EMPTY_TOOLS;
-  const modelsApi = chat?.modelsApi === undefined ? "/api/chat/models" : chat.modelsApi;
+  const modelsApi =
+    chat?.modelsApi === undefined ? "/api/chat/models" : chat.modelsApi;
   const resolvedModels = chat?.models ?? fetchedModels;
 
   useEffect(() => {
@@ -137,7 +149,8 @@ export function ChatWindow({
   }, [chat?.defaultModel, chat?.model, panel.initialModel]);
 
   useEffect(() => {
-    if (chat?.reasoningEffort !== undefined) setReasoningEffort(chat.reasoningEffort);
+    if (chat?.reasoningEffort !== undefined)
+      setReasoningEffort(chat.reasoningEffort);
   }, [chat?.reasoningEffort]);
 
   useEffect(() => {
@@ -149,7 +162,8 @@ export function ChatWindow({
   }, [chat?.budget]);
 
   useEffect(() => {
-    if (chat?.permissionMode !== undefined) setPermissionMode(chat.permissionMode);
+    if (chat?.permissionMode !== undefined)
+      setPermissionMode(chat.permissionMode);
   }, [chat?.permissionMode]);
 
   useEffect(() => {
@@ -162,7 +176,9 @@ export function ChatWindow({
     setToolsLoading(true);
     setToolsError(null);
     fetch(toolsApi)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`tools ${r.status}`))))
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(`tools ${r.status}`)),
+      )
       .then((data) => {
         if (!active) return;
         setFetchedTools(normalizeToolCatalog(data));
@@ -183,13 +199,20 @@ export function ChatWindow({
     if (chat?.models || !modelsApi) return;
     let active = true;
     fetch(modelsApi)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`models ${r.status}`))))
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(`models ${r.status}`)),
+      )
       .then((data: ChatModel[]) => {
         if (!active) return;
         setFetchedModels(data);
-        setModel((current) => current ?? data.find((item) => item.configured !== false)?.id);
+        setModel(
+          (current) =>
+            current ?? data.find((item) => item.configured !== false)?.id,
+        );
       })
-      .catch((err) => console.warn("clicky-ui: failed to load chat models", err));
+      .catch((err) =>
+        console.warn("clicky-ui: failed to load chat models", err),
+      );
     return () => {
       active = false;
     };
@@ -200,15 +223,16 @@ export function ChatWindow({
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(temperature !== undefined ? { temperature } : {}),
-      ...(budget.cost !== undefined || budget.maxTokens !== undefined ? { budget } : {}),
+      ...(budget.cost !== undefined || budget.maxTokens !== undefined
+        ? { budget }
+        : {}),
       permissionMode,
       toolPrefs,
     });
   }, [budget, model, permissionMode, reasoningEffort, temperature, toolPrefs]);
 
-  // Tools default to "ask" (human-in-the-loop approval) on chat windows. Seed
-  // any tool the user hasn't configured yet; existing choices are preserved.
-  // Handles tools that load asynchronously after mount.
+  // Seed any tool the user hasn't configured yet from the backend default
+  // permission; existing choices are preserved. Handles async catalog loads.
   useEffect(() => {
     if (!resolvedTools.length) return;
     setToolPrefs((prev) => {
@@ -217,7 +241,7 @@ export function ChatWindow({
       for (const t of resolvedTools) {
         const key = t.name;
         if (next[key] === undefined) {
-          next[key] = t.defaultMode ?? defaultToolMode;
+          next[key] = t.defaultPermission ?? defaultToolMode;
           changed = true;
         }
       }
@@ -361,7 +385,9 @@ export function ChatWindow({
       <div className="min-h-0 flex-1">
         <Chat
           {...chat}
-          {...(resolvedModels.length ? { models: resolvedModels, modelsApi: null } : {})}
+          {...(resolvedModels.length
+            ? { models: resolvedModels, modelsApi: null }
+            : {})}
           {...(defaultModel ? { defaultModel } : {})}
           {...(model ? { model } : {})}
           reasoningEffort={reasoningEffort}
@@ -450,7 +476,13 @@ function loadChatPreferences(): StoredChatPreferences {
     const raw = window.localStorage.getItem(CHAT_PREFS_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as StoredChatPreferences;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (!parsed || typeof parsed !== "object") return {};
+    const { toolPrefs: rawToolPrefs, ...rest } = parsed;
+    const toolPrefs = normalizeToolPreferences(rawToolPrefs);
+    return {
+      ...rest,
+      ...(toolPrefs ? { toolPrefs } : {}),
+    };
   } catch {
     return {};
   }
@@ -468,7 +500,9 @@ function saveChatPreferences(prefs: StoredChatPreferences) {
 function normalizeToolCatalog(data: unknown): ToolMeta[] {
   const tools = Array.isArray(data)
     ? data
-    : data && typeof data === "object" && Array.isArray((data as { tools?: unknown }).tools)
+    : data &&
+        typeof data === "object" &&
+        Array.isArray((data as { tools?: unknown }).tools)
       ? (data as { tools: unknown[] }).tools
       : [];
   return tools.flatMap((tool) => normalizeToolMeta(tool));
@@ -484,9 +518,14 @@ function normalizeToolMeta(tool: unknown): ToolMeta[] {
     stringValue(item.title) ??
     stringValue(item.operationName) ??
     name;
-  const defaultMode = normalizeToolModeValue(item.defaultMode);
+  const defaultPermission = normalizeToolModeValue(
+    item.defaultPermission ?? item.defaultMode,
+  );
   const group = stringValue(item.group);
+  const parent = stringValue(item.parent);
+  const entity = stringValue(item.entity);
   const preferenceKey = stringValue(item.preferenceKey);
+  const icon = stringValue(item.icon);
   const description = stringValue(item.description);
   const hints = stringArrayValue(item.hints);
   const source = stringValue(item.source);
@@ -495,25 +534,34 @@ function normalizeToolMeta(tool: unknown): ToolMeta[] {
   const path = stringValue(item.path);
   const operationName = stringValue(item.operationName);
   const title = stringValue(item.title);
+  const strict = booleanValue(item.strict);
+  const annotations = annotationsValue(item.annotations);
   const inputSchema = schemaValue(item.inputSchema);
   const outputSchema = schemaValue(item.outputSchema);
-  return [{
-    name,
-    label,
-    ...(group ? { group } : {}),
-    ...(preferenceKey ? { preferenceKey } : {}),
-    ...(defaultMode ? { defaultMode } : {}),
-    ...(description ? { description } : {}),
-    ...(hints ? { hints } : {}),
-    ...(source ? { source } : {}),
-    ...(server ? { server } : {}),
-    ...(method ? { method } : {}),
-    ...(path ? { path } : {}),
-    ...(operationName ? { operationName } : {}),
-    ...(title ? { title } : {}),
-    ...(inputSchema ? { inputSchema } : {}),
-    ...(outputSchema ? { outputSchema } : {}),
-  }];
+  return [
+    {
+      name,
+      label,
+      ...(group ? { group } : {}),
+      ...(parent ? { parent } : {}),
+      ...(entity ? { entity } : {}),
+      ...(preferenceKey ? { preferenceKey } : {}),
+      ...(defaultPermission ? { defaultPermission } : {}),
+      ...(icon ? { icon } : {}),
+      ...(description ? { description } : {}),
+      ...(hints ? { hints } : {}),
+      ...(source ? { source } : {}),
+      ...(server ? { server } : {}),
+      ...(method ? { method } : {}),
+      ...(path ? { path } : {}),
+      ...(operationName ? { operationName } : {}),
+      ...(title ? { title } : {}),
+      ...(strict !== undefined ? { strict } : {}),
+      ...(annotations ? { annotations } : {}),
+      ...(inputSchema ? { inputSchema } : {}),
+      ...(outputSchema ? { outputSchema } : {}),
+    },
+  ];
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -523,22 +571,57 @@ function stringValue(value: unknown): string | undefined {
 function stringArrayValue(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const values = value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0,
   );
   return values.length > 0 ? values : undefined;
 }
 
 function schemaValue(value: unknown): ToolMeta["inputSchema"] | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
   return value as ToolMeta["inputSchema"];
 }
 
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function annotationsValue(value: unknown): ToolMeta["annotations"] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
+  return value as ToolMeta["annotations"];
+}
+
+function normalizeToolPreferences(
+  value: unknown,
+): Record<string, ToolMode> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
+  const prefs: Record<string, ToolMode> = {};
+  for (const [key, rawMode] of Object.entries(value)) {
+    const mode = normalizeToolModeValue(rawMode);
+    if (key && mode) prefs[key] = mode;
+  }
+  return Object.keys(prefs).length ? prefs : undefined;
+}
+
 function normalizeToolModeValue(value: unknown): ToolMode | undefined {
-  return value === "enabled" ||
-    value === "ask" ||
-    value === "disabled"
-    ? value
-    : undefined;
+  if (typeof value !== "string") return undefined;
+  switch (value.trim().toLowerCase()) {
+    case "on":
+    case "enabled":
+      return "on";
+    case "ask":
+      return "ask";
+    case "off":
+    case "disabled":
+      return "off";
+    case "auto":
+      return "auto";
+    default:
+      return undefined;
+  }
 }
 
 /** Renders every open window for the current {@link useChatWindowManager}.
