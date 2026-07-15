@@ -18,11 +18,13 @@ function Harness({
   adapters,
   title,
   showSummary,
+  hideHeader,
 }: {
   tests?: Test[];
   adapters?: ReturnType<typeof createTestRunnerRegistry>;
   title?: ReactNode;
   showSummary?: boolean;
+  hideHeader?: boolean;
 }) {
   const [selected, setSelected] = useState<Test | null>(null);
   const [filters, setFilters] = useState<TestFilters>(emptyTestFilters());
@@ -44,6 +46,7 @@ function Harness({
       {...(adapters ? { adapters } : {})}
       {...(title !== undefined ? { title } : {})}
       {...(showSummary !== undefined ? { showSummary } : {})}
+      {...(hideHeader !== undefined ? { hideHeader } : {})}
     />
   );
 }
@@ -162,6 +165,22 @@ describe("TestRunner", () => {
     render(<Harness title={<span>My Run</span>} />);
     expect(screen.getByText("My Run")).toBeInTheDocument();
     expect(screen.queryByText("Test Results")).not.toBeInTheDocument();
+  });
+
+  it("renders no header bar at all when hideHeader is set", () => {
+    render(<Harness hideHeader />);
+    // No title, no summary, no filter pills — a host renders its own combined
+    // header instead (e.g. a dialog embedding TestRunSummary + filters itself).
+    expect(screen.queryByText("Test Results")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ tests/)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Failed/)).not.toBeInTheDocument();
+    // The tree/detail split still renders underneath.
+    expect(tree()).toBeInTheDocument();
+  });
+
+  it("renders the header bar by default when hideHeader is omitted", () => {
+    render(<Harness />);
+    expect(screen.getByText("Test Results")).toBeInTheDocument();
   });
 
   it("renders the host-controlled tab and reports clicks via onTabChange", () => {
