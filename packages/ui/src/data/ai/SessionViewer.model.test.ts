@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSessionAction,
   normalizeSession,
+  shellCommand,
   splitMcpTool,
   summarizeSession,
   summarizeToolInput,
@@ -107,6 +108,18 @@ describe("summarizeToolInput", () => {
 
   it("returns an empty string when there is no input", () => {
     expect(summarizeToolInput("Read", undefined)).toBe("");
+  });
+});
+
+describe("shellCommand", () => {
+  it("returns the full command for a Bash tool call", () => {
+    expect(shellCommand("Bash", { command: "pnpm run build" })).toBe("pnpm run build");
+  });
+
+  it("returns undefined for non-shell tools and missing commands", () => {
+    expect(shellCommand("Read", { file_path: "src/a.ts" })).toBeUndefined();
+    expect(shellCommand("Bash", {})).toBeUndefined();
+    expect(shellCommand("Bash", undefined)).toBeUndefined();
   });
 });
 
