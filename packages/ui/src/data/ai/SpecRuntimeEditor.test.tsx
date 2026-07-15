@@ -6,6 +6,7 @@ import type {
   SecretKind,
   SecretResource,
 } from "../../components/SecretKeySelector";
+import type { ChatModel } from "../chat/types";
 import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { SPEC_PERMISSION_PRESET_STORAGE_KEY } from "./SpecRuntimeEditor/presets";
@@ -21,9 +22,33 @@ const loadResources = (kind: SecretKind) => Promise.resolve(RESOURCES[kind]);
 const loadKeyPreview = () => Promise.resolve(PREVIEWS);
 
 const SAMPLE_TOOLS = [
-  { name: "Read", label: "Read", group: "Files", defaultMode: "enabled" },
-  { name: "Write", label: "Write", group: "Files", defaultMode: "ask" },
-  { name: "Bash", label: "Bash", group: "Shell", defaultMode: "ask" },
+  { name: "Read", label: "Read", group: "Files", defaultPermission: "auto" },
+  { name: "Write", label: "Write", group: "Files", defaultPermission: "ask" },
+  { name: "Bash", label: "Bash", group: "Shell", defaultPermission: "ask" },
+];
+
+const SAMPLE_MODELS: ChatModel[] = [
+  {
+    id: "openai/gpt-4o",
+    provider: "openai",
+    label: "GPT-4o",
+    reasoning: false,
+    configured: true,
+  },
+  {
+    id: "openai/o4-mini",
+    provider: "openai",
+    label: "o4-mini",
+    reasoning: true,
+    configured: true,
+  },
+  {
+    id: "anthropic/claude-sonnet-4-5",
+    provider: "anthropic",
+    label: "Claude Sonnet 4.5",
+    reasoning: true,
+    configured: true,
+  },
 ];
 
 function policyRadio(tool: string, mode: string) {
@@ -35,6 +60,14 @@ function policyRadio(tool: string, mode: string) {
 function openPermissionsAdvanced() {
   fireEvent.click(
     within(screen.getByLabelText("Permissions")).getByRole("button", {
+      name: /Advanced/,
+    }),
+  );
+}
+
+function openModelAdvanced() {
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Model" })).getByRole("button", {
       name: /Advanced/,
     }),
   );
@@ -65,6 +98,7 @@ describe("SpecRuntimeEditor", () => {
       "Permissions",
       "Environment",
       "Verify",
+      "Commit",
     ]) {
       expect(screen.getByRole("region", { name: label })).toBeInTheDocument();
     }
@@ -77,6 +111,7 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByText("Environment variables")).toBeInTheDocument();
     expect(screen.getByText("Git checkout")).toBeInTheDocument();
     expect(screen.getByText("Verify fixture")).toBeInTheDocument();
+    expect(screen.getByText("Commit message")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Static value…"), {
       target: { value: "changed" },
@@ -151,16 +186,20 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByLabelText("Since")).toHaveValue("");
   });
 
-  it("does not render prompt source and metadata controls", () => {
+  it("moves prompt schema into advanced without source and metadata controls", () => {
     render(
       <SpecRuntimeEditor
-        value={{
-          prompt: {
-            user: "hi",
-            source: "demo.prompt",
-            metadata: { owner: "captain" },
-          },
-        }}
+        value={
+          {
+            prompt: {
+              user: "hi",
+              schemaJSON: { type: "object" },
+              schemaStrictness: "retry",
+              source: "demo.prompt",
+              metadata: { owner: "captain" },
+            },
+          } as any
+        }
         onChange={() => {}}
       />,
     );
@@ -169,8 +208,86 @@ describe("SpecRuntimeEditor", () => {
     expect(within(prompt).queryByText("Source")).not.toBeInTheDocument();
     expect(within(prompt).queryByText("Metadata")).not.toBeInTheDocument();
     expect(
-      within(prompt).queryByRole("button", { name: /Advanced/ }),
+      within(prompt).queryByText("Prompt schema JSON"),
     ).not.toBeInTheDocument();
+
+    fireEvent.click(within(prompt).getByRole("button", { name: /Advanced/ }));
+
+    expect(within(prompt).getByLabelText("Prompt schema JSON")).toHaveValue(
+      '{\n  "type": "object"\n}',
+    );
+    expect(
+      within(prompt).getByRole("radiogroup", { name: "Schema strictness" }),
+    ).toBeInTheDocument();
+    expect(
+      within(prompt).getByRole("radio", { name: "Retry" }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("renders fallback models as rows and opens the add picker", async () => {
+    function Host() {
+      const [value, setValue] = useState<AISpecRuntimeValue>({
+        backend: "openai",
+        fallbacks: [{ model: "openai/gpt-4o", effort: "low" }],
+      });
+      return (
+        <SpecRuntimeEditor
+          value={value}
+          onChange={setValue}
+          models={SAMPLE_MODELS}
+          sections={["model"]}
+        />
+      );
+    }
+
+    render(<Host />);
+
+    const modelSection = screen.getByRole("region", { name: "Model" });
+    openModelAdvanced();
+
+    expect(within(modelSection).getByText("GPT-4o")).toBeInTheDocument();
+    expect(within(modelSection).getByText("Low")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(modelSection).getByRole("button", { name: "Remove GPT-4o" }),
+    );
+    expect(within(modelSection).queryByText("GPT-4o")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(modelSection).getByRole("button", { name: /^Add$/ }),
+    );
+
+    const picker = within(modelSection).getByRole("group", {
+      name: "Fallback model picker",
+    });
+    expect(
+      within(picker).getByRole("radiogroup", { name: "Runtime mode" }),
+    ).toBeInTheDocument();
+    expect(
+      within(picker).getByRole("combobox", { name: "Model" }),
+    ).toBeInTheDocument();
+    expect(
+      within(picker).getByRole("combobox", { name: "Reasoning effort" }),
+    ).toBeInTheDocument();
+    expect(within(picker).getByLabelText("Temperature")).toBeInTheDocument();
+
+    fireEvent.click(within(picker).getByRole("combobox", { name: "Model" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "o4-mini" }));
+    fireEvent.click(
+      within(picker).getByRole("combobox", { name: "Reasoning effort" }),
+    );
+    fireEvent.mouseDown(
+      await screen.findByRole("option", { name: "High reasoning" }),
+    );
+    fireEvent.change(within(picker).getByLabelText("Temperature"), {
+      target: { value: "0.7" },
+    });
+    fireEvent.click(
+      within(picker).getByRole("button", { name: "Add fallback" }),
+    );
+
+    expect(within(modelSection).getByText("o4-mini")).toBeInTheDocument();
+    expect(within(modelSection).getByText("High")).toBeInTheDocument();
   });
 
   it("renders grouped permission rows with segmented policies and bulk group controls", () => {
@@ -405,7 +522,7 @@ describe("SpecRuntimeEditor", () => {
   it("selects the agent runtime through the model mode picker", () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "cli",
+        backend: "claude-cli",
       });
       return <SpecRuntimeEditor value={value} onChange={setValue} />;
     }
@@ -417,8 +534,8 @@ describe("SpecRuntimeEditor", () => {
       "aria-checked",
       "true",
     );
-    fireEvent.click(within(modes).getByRole("radio", { name: "SDK" }));
-    expect(within(modes).getByRole("radio", { name: "SDK" })).toHaveAttribute(
+    fireEvent.click(within(modes).getByTitle("Claude Agent SDK"));
+    expect(within(modes).getByTitle("Claude Agent SDK")).toHaveAttribute(
       "aria-checked",
       "true",
     );
