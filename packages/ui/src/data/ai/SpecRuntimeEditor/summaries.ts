@@ -109,11 +109,11 @@ export function summarizeTarget(value: AISpecRuntimeValue): string | undefined {
   const checkout = value.setup?.checkout;
   const source = checkout?.url?.trim() || checkout?.path?.trim();
   if (!source) return undefined;
-  const repo = source
-    .replace(/\/+$/, "")
-    .split("/")
-    .pop()
-    ?.replace(/\.git$/, "");
+  // Split-and-filter instead of `.replace(/\/+$/, "")`: the trailing-slash
+  // strip was a polynomial (ReDoS) match on many-`/` inputs. Empty segments
+  // from trailing/duplicate slashes are dropped, so the last one is the repo.
+  const segments = source.split("/").filter(Boolean);
+  const repo = segments[segments.length - 1]?.replace(/\.git$/, "");
   if (!repo) return undefined;
   const ref = checkout?.ref?.trim();
   return ref ? `${repo} · ${ref}` : repo;

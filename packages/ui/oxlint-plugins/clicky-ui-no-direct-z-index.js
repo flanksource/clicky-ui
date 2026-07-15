@@ -14,13 +14,16 @@ import {
 // `z-[999]`, `hover:z-[999]`, `md:z-[var(--x)]` — overlay-scale or dynamic
 // arbitrary Tailwind z-index values. Tiny local offsets (`z-[1]`) are allowed
 // because they stay inside an isolated stacking context.
-const ARBITRARY_Z_CLASS = /(?:^|:)z-\[([^\]]+)\]$/;
+// Anchored to the final `:`-delimited variant segment; matching the whole token
+// with `(?:^|:)` was polynomial (ReDoS) on unclosed `z-[` repetitions.
+const ARBITRARY_Z_CLASS = /^z-\[([^\]]+)\]$/;
 const FLOATING_Z_NAMES = new Set(["floatingZ", "floatingZIndex"]);
 
 /** True for an overlay-scale/dynamic arbitrary `z-[…]` token (variants allowed). */
 export function isArbitraryZIndexClass(token) {
   if (typeof token !== "string") return false;
-  const match = token.match(ARBITRARY_Z_CLASS);
+  const segment = token.slice(token.lastIndexOf(":") + 1);
+  const match = ARBITRARY_Z_CLASS.exec(segment);
   if (!match) return false;
   const value = match[1]?.trim();
   const numeric = Number(value);
