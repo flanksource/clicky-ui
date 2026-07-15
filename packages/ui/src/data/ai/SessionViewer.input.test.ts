@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  questionsFromToolInput,
   relativizePath,
   shellCommand,
   summarizeToolInput,
@@ -34,6 +35,66 @@ describe("summarizeToolInput", () => {
     expect(summarizeToolInput("Write", { file_path: "/elsewhere/a.ts" }, "/repo")).toBe(
       "/elsewhere/a.ts",
     );
+  });
+});
+
+describe("questionsFromToolInput", () => {
+  it("normalizes multi-question payloads with option descriptions", () => {
+    expect(questionsFromToolInput({
+      questions: [
+        {
+          id: "scope",
+          header: "Scope",
+          question: "Which scope should the rule use?",
+          options: [
+            { label: "Project", description: "Current workspace" },
+            { label: "Global" },
+          ],
+        },
+        {
+          id: "checks",
+          question: "Which checks?",
+          multiSelect: true,
+          options: ["Lint", "Tests"],
+        },
+      ],
+    })).toEqual([
+      {
+        id: "scope",
+        text: "Which scope should the rule use?",
+        context: "Scope",
+        multiSelect: false,
+        options: [
+          { value: "Project", label: "Project", description: "Current workspace" },
+          { value: "Global", label: "Global" },
+        ],
+      },
+      {
+        id: "checks",
+        text: "Which checks?",
+        multiSelect: true,
+        options: [
+          { value: "Lint", label: "Lint" },
+          { value: "Tests", label: "Tests" },
+        ],
+      },
+    ]);
+  });
+
+  it("normalizes single-question fallback fields", () => {
+    expect(questionsFromToolInput({
+      question: "Run the migration?",
+      header: "Database",
+      options: [{ value: "yes", label: "Yes" }],
+    })).toEqual([
+      {
+        id: "1",
+        text: "Run the migration?",
+        context: "Database",
+        multiSelect: false,
+        options: [{ value: "yes", label: "Yes" }],
+      },
+    ]);
   });
 });
 

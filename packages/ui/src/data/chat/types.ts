@@ -28,6 +28,8 @@ export interface ChatModel {
   provider: string;
   label: string;
   reasoning: boolean;
+  /** Whether the model honours the temperature sampling control. */
+  temperature?: boolean;
   configured?: boolean;
   /** Concrete runtime backends that advertised this model. Empty/omitted means provider-wide. */
   backends?: string[];

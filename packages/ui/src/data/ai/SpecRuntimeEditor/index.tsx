@@ -72,7 +72,7 @@ export type SpecRuntimeEditorProps = {
 };
 
 const ADVANCED_HINTS: Partial<Record<SpecSectionId, string>> = {
-  model: "caching",
+  model: "fallbacks, session, caching",
   prompt: "schema",
   permissions: "full permission tree",
   environment: "dotenv files",

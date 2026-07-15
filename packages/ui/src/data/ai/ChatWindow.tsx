@@ -55,7 +55,7 @@ export type ChatWindowProps = {
   defaultToolMode?: ToolMode;
   /** Backend tool catalog endpoint. Defaults to "/api/chat/tools"; null disables fetching. */
   toolsApi?: string | null;
-  /** Extra controls rendered in the header, e.g. a <ContextUsage/> gauge. */
+  /** Extra controls rendered in the header, e.g. a <ContextMeter mode="gauge"/> gauge. */
   headerExtras?: ReactNode;
 };
 

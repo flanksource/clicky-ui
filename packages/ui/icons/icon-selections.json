@@ -2563,6 +2563,294 @@
       "outline": "ph:users-three-light",
       "filled": "ph:users-three-fill",
       "note": "User group / multi-person glyph. Receives sub-icon composites (UsersPlus, UsersMinus, UsersCheck)."
+    },
+    {
+      "consumerName": "strategy",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:strategy-light",
+      "filled": "ph:strategy-fill",
+      "note": "Agent workflow: plan phase (draft the approach before touching the workspace)."
+    },
+    {
+      "consumerName": "battery-vertical-empty",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-vertical-empty-light",
+      "filled": "ph:battery-vertical-empty-fill",
+      "note": "Effort level: minimal (fast path, little deliberation)."
+    },
+    {
+      "consumerName": "battery-vertical-low",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-vertical-low-light",
+      "filled": "ph:battery-vertical-low-fill",
+      "note": "Effort level: low."
+    },
+    {
+      "consumerName": "battery-vertical-medium",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-vertical-medium-light",
+      "filled": "ph:battery-vertical-medium-fill",
+      "note": "Effort level: medium (the default)."
+    },
+    {
+      "consumerName": "battery-vertical-high",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-vertical-high-light",
+      "filled": "ph:battery-vertical-high-fill",
+      "note": "Effort level: high."
+    },
+    {
+      "consumerName": "battery-vertical-full",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-vertical-full-light",
+      "filled": "ph:battery-vertical-full-fill",
+      "note": "Effort level: max (extended, exhaustive thinking)."
+    },
+    {
+      "consumerName": "battery-charging-vertical",
+      "group": "ai-ml",
+      "status": "NEW",
+      "outline": "ph:battery-charging-vertical-light",
+      "filled": "ph:battery-charging-vertical-fill",
+      "note": "Effort level: adaptive (scales the budget per step)."
+    },
+    {
+      "consumerName": "hand-palm",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:hand-palm-light",
+      "filled": "ph:hand-palm-fill",
+      "note": "Permission mode: ask (prompt for approval before each action)."
+    },
+    {
+      "consumerName": "pause-circle",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:pause-circle-light",
+      "filled": "ph:pause-circle-fill",
+      "note": "Permission mode: plan (read-only; research and propose)."
+    },
+    {
+      "consumerName": "fast-forward-circle",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:fast-forward-circle-light",
+      "filled": "ph:fast-forward-circle-fill",
+      "note": "Permission mode: auto (run without prompting)."
+    },
+    {
+      "consumerName": "shield-slash",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:shield-slash-light",
+      "filled": "ph:shield-slash-fill",
+      "note": "Permission mode: off (bypass all permission checks)."
+    },
+    {
+      "consumerName": "chat-dots",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:chat-dots-light",
+      "filled": "ph:chat-dots-fill",
+      "note": "Approval state: awaiting input (paused, blocked on a human response)."
+    },
+    {
+      "consumerName": "arrow-fat-up",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:arrow-fat-up-light",
+      "filled": "ph:arrow-fat-up-fill",
+      "note": "Approval state: escalate (raise to a higher approver)."
+    },
+    {
+      "consumerName": "asterisk",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:asterisk-light",
+      "filled": "ph:asterisk-fill",
+      "note": "Search & navigation: glob (match file paths by pattern)."
+    },
+    {
+      "consumerName": "prohibit",
+      "group": "runtime-process",
+      "status": "NEW",
+      "outline": "ph:prohibit-light",
+      "filled": "ph:prohibit-fill",
+      "note": "Execution: kill shell / stop task (terminate a process)."
+    },
+    {
+      "consumerName": "list-checks",
+      "group": "trees-lists-tables",
+      "status": "NEW",
+      "outline": "ph:list-checks-light",
+      "filled": "ph:list-checks-fill",
+      "note": "Agents & planning: update todos (write or revise the task list)."
+    },
+    {
+      "consumerName": "compass",
+      "group": "navigation",
+      "status": "NEW",
+      "outline": "ph:compass-light",
+      "filled": "ph:compass-fill",
+      "note": "Browser automation: navigate (point the browser at a URL)."
+    },
+    {
+      "consumerName": "cursor-click",
+      "group": "navigation",
+      "status": "NEW",
+      "outline": "ph:cursor-click-light",
+      "filled": "ph:cursor-click-fill",
+      "note": "Browser automation: click an element."
+    },
+    {
+      "consumerName": "cursor-text",
+      "group": "navigation",
+      "status": "NEW",
+      "outline": "ph:cursor-text-light",
+      "filled": "ph:cursor-text-fill",
+      "note": "Browser automation: triple-click to select a block."
+    },
+    {
+      "consumerName": "keyboard",
+      "group": "dev-tools",
+      "status": "NEW",
+      "outline": "ph:keyboard-light",
+      "filled": "ph:keyboard-fill",
+      "note": "Browser automation: type text into a field."
+    },
+    {
+      "consumerName": "scan",
+      "group": "dev-tools",
+      "status": "NEW",
+      "outline": "ph:scan-light",
+      "filled": "ph:scan-fill",
+      "note": "Browser automation: snapshot the accessibility tree."
+    },
+    {
+      "consumerName": "scroll",
+      "group": "dev-tools",
+      "status": "NEW",
+      "outline": "ph:scroll-light",
+      "filled": "ph:scroll-fill",
+      "note": "Browser automation: read console messages."
+    },
+    {
+      "consumerName": "palette",
+      "group": "media",
+      "status": "NEW",
+      "outline": "ph:palette-light",
+      "filled": "ph:palette-fill",
+      "note": "MCP asset tools: iconography provider."
+    },
+    {
+      "consumerName": "atom",
+      "group": "media",
+      "status": "NEW",
+      "outline": "ph:atom-light",
+      "filled": "ph:atom-fill",
+      "note": "MCP asset tools: React Icons library."
+    },
+    {
+      "consumerName": "pencil-simple-line",
+      "group": "forms-editing",
+      "status": "NEW",
+      "outline": "ph:pencil-simple-line-light",
+      "filled": "ph:pencil-simple-line-fill",
+      "note": "File operations: edit file (replace a string in place)."
+    },
+    {
+      "consumerName": "logo-openai",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:openai",
+      "filled": "skip",
+      "note": "Model vendor mark: OpenAI (GPT family / Codex). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-anthropic",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:anthropic",
+      "filled": "skip",
+      "note": "Model vendor mark: Anthropic. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-claude",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:claude",
+      "filled": "skip",
+      "note": "Model vendor mark: Claude model family. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-gemini",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:googlegemini",
+      "filled": "skip",
+      "note": "Model vendor mark: Google Gemini. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-google",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:google",
+      "filled": "skip",
+      "note": "Model vendor mark: Google. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-deepseek",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:deepseek",
+      "filled": "skip",
+      "note": "Model vendor mark: DeepSeek. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-mistral",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:mistralai",
+      "filled": "skip",
+      "note": "Model vendor mark: Mistral AI. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-meta",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:meta",
+      "filled": "skip",
+      "note": "Model vendor mark: Meta Llama. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-ollama",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:ollama",
+      "filled": "skip",
+      "note": "Model vendor mark: Ollama (local models). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-perplexity",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:perplexity",
+      "filled": "skip",
+      "note": "Model vendor mark: Perplexity. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-huggingface",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:huggingface",
+      "filled": "skip",
+      "note": "Model vendor mark: Hugging Face. Simple Icons, currentColor."
     }
   ]
 }

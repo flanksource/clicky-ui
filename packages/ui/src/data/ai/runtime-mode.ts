@@ -44,6 +44,7 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
     label: "Codex",
     provider: "codex-cli",
     modes: [
+      { id: "agent", label: "Agent", backend: "codex-agent", icon: UiRobotAi, title: "Codex agent" },
       { id: "cli", label: "CLI", backend: "codex-cli", icon: UiTerminal, title: "Codex CLI" },
       { id: "cmux", label: "cmux", backend: "codex-cmux", icon: UiColumns, title: "Codex multiplexer" },
     ],

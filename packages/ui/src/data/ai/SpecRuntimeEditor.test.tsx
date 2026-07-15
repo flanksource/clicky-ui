@@ -224,7 +224,7 @@ describe("SpecRuntimeEditor", () => {
     ).toHaveAttribute("aria-checked", "true");
   });
 
-  it("renders fallback models as rows and opens the add picker", async () => {
+  it("renders fallback models as rows with expandable inline editors", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
         backend: "openai",
@@ -245,8 +245,49 @@ describe("SpecRuntimeEditor", () => {
     const modelSection = screen.getByRole("region", { name: "Model" });
     openModelAdvanced();
 
+    expect(
+      within(modelSection).getByRole("button", {
+        name: /Advanced · fallbacks, session, caching/,
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(modelSection).getByText("Fallback models"),
+    ).toBeInTheDocument();
+    expect(
+      within(modelSection).getByPlaceholderText("session UUID"),
+    ).toBeInTheDocument();
+    expect(
+      within(modelSection).getByText("Disable prompt caching"),
+    ).toBeInTheDocument();
+    expect(
+      within(modelSection)
+        .getByPlaceholderText("session UUID")
+        .closest('[class~="md:grid-cols-2"]'),
+    ).toBeNull();
+
     expect(within(modelSection).getByText("GPT-4o")).toBeInTheDocument();
     expect(within(modelSection).getByText("Low")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(modelSection).getByRole("button", {
+        name: "Edit fallback GPT-4o",
+      }),
+    );
+    expect(
+      within(modelSection).getByRole("group", {
+        name: "Fallback model picker",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(modelSection).getByRole("button", {
+        name: "Edit fallback GPT-4o",
+      }),
+    );
+    expect(
+      within(modelSection).queryByRole("group", {
+        name: "Fallback model picker",
+      }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       within(modelSection).getByRole("button", { name: "Remove GPT-4o" }),
@@ -260,6 +301,10 @@ describe("SpecRuntimeEditor", () => {
     const picker = within(modelSection).getByRole("group", {
       name: "Fallback model picker",
     });
+    expect(within(modelSection).getByText("Select model")).toBeInTheDocument();
+    expect(
+      within(modelSection).queryByRole("button", { name: "Add fallback" }),
+    ).not.toBeInTheDocument();
     expect(
       within(picker).getByRole("radiogroup", { name: "Runtime mode" }),
     ).toBeInTheDocument();
@@ -273,21 +318,30 @@ describe("SpecRuntimeEditor", () => {
 
     fireEvent.click(within(picker).getByRole("combobox", { name: "Model" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "o4-mini" }));
-    fireEvent.click(
-      within(picker).getByRole("combobox", { name: "Reasoning effort" }),
-    );
-    fireEvent.mouseDown(
-      await screen.findByRole("option", { name: "High reasoning" }),
-    );
-    fireEvent.change(within(picker).getByLabelText("Temperature"), {
-      target: { value: "0.7" },
+    expect(
+      await within(modelSection).findByText("o4-mini"),
+    ).toBeInTheDocument();
+
+    const updatedPicker = within(modelSection).getByRole("group", {
+      name: "Fallback model picker",
     });
     fireEvent.click(
-      within(picker).getByRole("button", { name: "Add fallback" }),
+      within(updatedPicker).getByRole("combobox", { name: "Reasoning effort" }),
     );
+    fireEvent.mouseDown(
+      await screen.findByRole("option", { name: "High" }),
+    );
+    fireEvent.change(within(updatedPicker).getByLabelText("Temperature"), {
+      target: { value: "0.7" },
+    });
 
     expect(within(modelSection).getByText("o4-mini")).toBeInTheDocument();
     expect(within(modelSection).getByText("High")).toBeInTheDocument();
+    expect(
+      within(modelSection).getByRole("button", {
+        name: "Remove o4-mini",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("renders grouped permission rows with segmented policies and bulk group controls", () => {

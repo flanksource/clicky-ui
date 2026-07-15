@@ -7,7 +7,7 @@ import {
   type SessionEntry,
 } from "./SessionViewer.model";
 import { SAMPLE_SESSION, SAMPLE_SESSION_JSONL } from "./SessionViewer.fixtures";
-import { UiEye, UiImage, UiWrench } from "../../icons";
+import { UiAsterisk, UiEye, UiPalette, UiProhibit, UiStrategy, UiWrench } from "../../icons";
 
 describe("normalizeSession", () => {
   it("flattens entries into ordered events, splitting message content blocks", () => {
@@ -16,6 +16,18 @@ describe("normalizeSession", () => {
     // user text, then a1's thinking + assistant text, then the tool rows, then the error.
     expect(kinds.slice(0, 4)).toEqual(["user", "thinking", "assistant", "tool"]);
     expect(kinds.at(-1)).toBe("error");
+  });
+
+  it("preserves system roles instead of presenting them as assistant messages", () => {
+    const events = normalizeSession({
+      messages: [
+        { id: "system", role: "system", parts: [{ type: "text", text: "# AGENTS.md instructions" }] },
+        { id: "user", role: "user", parts: [{ type: "text", text: "Fix the parser" }] },
+      ],
+    });
+
+    expect(events.map((event) => event.kind)).toEqual(["system", "user"]);
+    expect(summarizeSession(events).messageCount).toBe(2);
   });
 
   it("carries response, model, source and cwd from a consolidated tool_use row", () => {
@@ -68,11 +80,25 @@ describe("getSessionAction", () => {
     });
   });
 
-  it("maps an MCP icon-server tool to the asset icon and a server-scoped label", () => {
+  it("maps an MCP icon-server tool to the palette icon and a server-scoped label", () => {
     const action = getSessionAction("mcp__iconify__search_icons");
-    expect(action.icon).toBe(UiImage);
+    expect(action.icon).toBe(UiPalette);
     expect(action.tone).toBe("pink");
     expect(action.label).toBe("iconify: search icons");
+  });
+
+  it("adopts the design glyphs for search and destructive tools", () => {
+    expect(getSessionAction("Glob").icon).toBe(UiAsterisk);
+    expect(getSessionAction("KillShell").icon).toBe(UiProhibit);
+    expect(getSessionAction("TaskStop").icon).toBe(UiProhibit);
+  });
+
+  it("renders extracted assistant plans as planning actions", () => {
+    expect(getSessionAction("Plan")).toEqual({
+      icon: UiStrategy,
+      tone: "sky",
+      label: "Plan",
+    });
   });
 
   it("falls back to the wrench for an unknown tool", () => {

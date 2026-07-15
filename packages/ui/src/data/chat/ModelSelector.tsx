@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { Combobox } from "../../components/Combobox";
 import type { FormSize } from "../../components/json-schema-form-size";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import type { StaticIconComponent } from "../Icon";
+import { Icon, type StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
+import { effortLevelColor, effortLevelIcon } from "./effort-icons";
 import { providerIcon } from "./provider-icons";
 import type { ChatBudgetConfig, ChatModel } from "./types";
 
@@ -71,8 +72,16 @@ export function EffortSelector({ efforts, value, onChange, className, size = "sm
       size={size}
       className={cn("w-36", className)}
       options={[
-        { value: "", label: "No reasoning" },
-        ...efforts.map((e) => ({ value: e, label: `${e[0]?.toUpperCase()}${e.slice(1)} reasoning` })),
+        { value: "", label: "None" },
+        ...efforts.map((e) => {
+          const glyph = effortLevelIcon(e);
+          const color = effortLevelColor(e);
+          return {
+            value: e,
+            label: `${e[0]?.toUpperCase()}${e.slice(1)}`,
+            ...(glyph ? { icon: <Icon icon={glyph} className={cn("size-4", color)} /> } : {}),
+          };
+        }),
       ]}
     />
   );

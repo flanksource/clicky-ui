@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { SessionViewer } from "./SessionViewer";
 import { SAMPLE_SESSION } from "./SessionViewer.fixtures";
+import type { UnifiedSessionInput } from "./SessionViewer.unified";
 
 const meta = {
   title: "AI/SessionViewer",
@@ -34,6 +35,143 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const QUESTION_SESSION = {
+  id: "question-session",
+  source: "codex",
+  provider: "codex",
+  model: "gpt-5-codex",
+  messages: [
+    {
+      id: "q-user",
+      role: "user",
+      parts: [{ type: "text", text: "Generate the migration and ask before touching production settings." }],
+    },
+    {
+      id: "q-ask",
+      role: "assistant",
+      parts: [{
+        type: "dynamic-tool",
+        toolName: "AskUserQuestion",
+        state: "approval-requested",
+        input: {
+          questions: [
+            {
+              id: "scope",
+              header: "Scope",
+              question: "Which deployment scope should this migration target?",
+              options: [
+                { label: "Project", description: "Only the current workspace and test database." },
+                { label: "Global", description: "Every configured workspace that uses this template." },
+              ],
+            },
+            {
+              id: "checks",
+              header: "Checks",
+              question: "Which verification steps should run before applying it?",
+              multiSelect: true,
+              options: ["Typecheck", "Unit tests", "Preview SQL"],
+            },
+          ],
+        },
+        approval: { id: "approval-question-1" },
+      }],
+      provenance: {
+        timestamp: "2026-07-09T09:00:00Z",
+        cwd: "/repo",
+        model: "gpt-5-codex",
+        source: "codex",
+      },
+    },
+    {
+      id: "q-answer",
+      role: "assistant",
+      parts: [{
+        type: "dynamic-tool",
+        toolName: "AskUserQuestion",
+        state: "output-available",
+        input: {
+          questions: [{
+            id: "scope",
+            header: "Scope",
+            question: "Which deployment scope should this migration target?",
+            options: [
+              { label: "Project", description: "Only the current workspace and test database." },
+              { label: "Global", description: "Every configured workspace that uses this template." },
+            ],
+          }],
+        },
+        output: "Scope: Project\nAdditional details: Run typecheck and preview SQL before applying.",
+        approval: { id: "approval-question-1", approved: true },
+      }],
+      provenance: {
+        timestamp: "2026-07-09T09:01:15Z",
+        cwd: "/repo",
+        model: "gpt-5-codex",
+        source: "codex",
+      },
+    },
+  ],
+  turns: [{ id: "turn-1", index: 1, messageIds: ["q-user", "q-ask", "q-answer"] }],
+  approvals: { approved: 1 },
+} satisfies UnifiedSessionInput;
+
+const APPROVAL_STATUS_SESSION = {
+  id: "approval-status-session",
+  source: "codex",
+  provider: "codex",
+  model: "gpt-5-codex",
+  messages: [
+    {
+      id: "a-user",
+      role: "user",
+      parts: [{ type: "text", text: "Run the checks, but wait for approval before network or filesystem changes." }],
+    },
+    {
+      id: "a-pending",
+      role: "assistant",
+      parts: [{
+        type: "dynamic-tool",
+        toolName: "Bash",
+        state: "approval-requested",
+        input: { command: "pnpm test -- --runInBand" },
+        approval: { id: "approval-bash-1" },
+      }],
+      provenance: { timestamp: "2026-07-09T09:05:00Z", cwd: "/repo", model: "gpt-5-codex", source: "codex" },
+    },
+    {
+      id: "a-approved",
+      role: "assistant",
+      parts: [{
+        type: "dynamic-tool",
+        toolName: "Bash",
+        state: "output-available",
+        input: { command: "pnpm test -- --runInBand" },
+        output: "Tests: 42 passed",
+        approval: { id: "approval-bash-1", approved: true },
+      }],
+      provenance: { timestamp: "2026-07-09T09:06:00Z", cwd: "/repo", model: "gpt-5-codex", source: "codex" },
+    },
+    {
+      id: "a-denied",
+      role: "assistant",
+      parts: [{
+        type: "dynamic-tool",
+        toolName: "WebFetch",
+        state: "approval-responded",
+        input: { url: "https://prod.example.com/config" },
+        approval: { id: "approval-web-1", approved: false, reason: "Use staging credentials first." },
+      }],
+      provenance: { timestamp: "2026-07-09T09:07:00Z", cwd: "/repo", model: "gpt-5-codex", source: "codex" },
+    },
+  ],
+  turns: [{ id: "turn-1", index: 1, messageIds: ["a-user", "a-pending", "a-approved", "a-denied"] }],
+  approvals: {
+    approved: 1,
+    denied: 1,
+    denials: [{ toolUseId: "approval-web-1", tool: "WebFetch", reason: "Use staging credentials first." }],
+  },
+} satisfies UnifiedSessionInput;
+
 export const Default: Story = {
   args: { session: SAMPLE_SESSION },
 };
@@ -48,6 +186,52 @@ export const WithoutReasoning: Story = {
 
 export const CompactDensity: Story = {
   args: { session: SAMPLE_SESSION, defaultDensity: "compact" },
+};
+
+export const AskUserQuestion: Story = {
+  args: {
+    session: QUESTION_SESSION,
+    defaultExpanded: true,
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("renders the question text and options", async () => {
+      await expect(canvas.getAllByText("Ask user")[0]).toBeInTheDocument();
+      await expect(canvas.getByText("Which deployment scope should this migration target?")).toBeInTheDocument();
+      await expect(canvas.getByText("Project")).toBeInTheDocument();
+      await expect(canvas.getByText("Only the current workspace and test database.")).toBeInTheDocument();
+      await expect(canvas.getByText("Preview SQL")).toBeInTheDocument();
+    });
+
+    await step("renders approval state and the eventual answer", async () => {
+      await expect(canvas.getByText("Awaiting approval")).toBeInTheDocument();
+      await expect(canvas.getByText("Approved")).toBeInTheDocument();
+      await expect(canvasElement.querySelector("ol")?.textContent).toContain("Scope: Project");
+      await expect(canvasElement.querySelector("ol")?.textContent).toContain("Run typecheck and preview SQL before applying.");
+    });
+  },
+};
+
+export const ApprovalStatuses: Story = {
+  args: {
+    session: APPROVAL_STATUS_SESSION,
+    defaultExpanded: true,
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("shows pending, approved and denied tool rows", async () => {
+      await expect(canvas.getByText("Awaiting approval")).toBeInTheDocument();
+      await expect(canvas.getByText("Approved")).toBeInTheDocument();
+      await expect(canvas.getByText("Denied: Use staging credentials first.")).toBeInTheDocument();
+    });
+
+    await step("keeps the underlying request visible", async () => {
+      await expect(canvasElement.querySelector("ol")?.textContent).toContain("pnpm test -- --runInBand");
+      await expect(canvas.getByText("https://prod.example.com/config")).toBeInTheDocument();
+    });
+  },
 };
 
 /** A self-contained dark override: paints `data-theme="dark"` on its own root

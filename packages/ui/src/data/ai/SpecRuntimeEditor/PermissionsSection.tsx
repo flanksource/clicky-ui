@@ -24,6 +24,7 @@ import {
   type AISpecRuntimeValue,
   type SpecPermissionMode,
 } from "../SpecRuntimeEditor.model";
+import { PERMISSION_MODE_ICONS } from "../agent-action-icons";
 import {
   PolicyTree,
   type PolicyOption,
@@ -114,6 +115,7 @@ export function PermissionsAdvanced({
       <SpecField label="Mode">
         <SpecSelect
           ariaLabel="Permission mode"
+          icon={PERMISSION_MODE_ICONS[value.permissions?.mode || "default"].icon}
           value={value.permissions?.mode || "default"}
           onChange={(mode) =>
             onChange(

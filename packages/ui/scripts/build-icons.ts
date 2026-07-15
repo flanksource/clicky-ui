@@ -1081,6 +1081,7 @@ export function getChangeIcon(
     "- Lucide — ISC — https://github.com/lucide-icons/lucide",
     "- Codicons — MIT — https://github.com/microsoft/vscode-codicons",
     "- Carbon Design — Apache 2.0 — https://github.com/carbon-design-system/carbon",
+    "- Simple Icons — CC0 1.0 — https://github.com/simple-icons/simple-icons",
     "- Flanksource Icons — Apache 2.0 — https://github.com/flanksource/flanksource-icons",
     "",
     "## Per-icon sources",

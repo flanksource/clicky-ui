@@ -1,4 +1,5 @@
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { SpecField } from "./SpecRuntimeEditor/fields";
@@ -53,7 +54,10 @@ export function RuntimeModePicker({
           size="sm"
           wrap
           value={family.id}
-          options={families.map((entry) => ({ id: entry.id, label: entry.label }))}
+          options={families.map((entry) => {
+            const icon = providerIcon(entry.id);
+            return { id: entry.id, label: entry.label, ...(icon ? { icon } : {}) };
+          })}
           onChange={(familyId) => applyBackend(familyId, firstMode(familyById(families, familyId)).id)}
         />
       </SpecField>

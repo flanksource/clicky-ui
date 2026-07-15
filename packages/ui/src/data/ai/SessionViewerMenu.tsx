@@ -14,7 +14,13 @@ import {
   UiSun,
 } from "../../icons";
 import { type Density } from "../../hooks/use-density";
-import { CATEGORY_LABELS, type SessionCategory, type SessionFilters } from "./session-categories";
+import { getSessionAction } from "./SessionViewer.model";
+import {
+  CATEGORY_ICONS,
+  CATEGORY_LABELS,
+  type SessionCategory,
+  type SessionFilters,
+} from "./session-categories";
 
 export type SessionThemeOverride = "light" | "dark";
 
@@ -105,6 +111,7 @@ export function SessionViewerMenu({
                 <CheckRow
                   key={category}
                   label={CATEGORY_LABELS[category]}
+                  icon={CATEGORY_ICONS[category]}
                   checked={!hiddenCategories.has(category)}
                   onToggle={() => onToggleCategory(category)}
                 />
@@ -118,6 +125,7 @@ export function SessionViewerMenu({
                 <CheckRow
                   key={tool.key}
                   label={tool.label}
+                  icon={getSessionAction(tool.key).icon}
                   checked={!hiddenTools.has(tool.key)}
                   onToggle={() => onToggleTool(tool.key)}
                 />
@@ -212,10 +220,12 @@ function CheckRow({
   label,
   checked,
   onToggle,
+  icon,
 }: {
   label: string;
   checked: boolean;
   onToggle: () => void;
+  icon?: StaticIconComponent;
 }) {
   return (
     <button
@@ -234,6 +244,7 @@ function CheckRow({
       >
         {checked && <Icon icon={UiCheck} className="text-[0.6rem]" />}
       </span>
+      {icon && <Icon icon={icon} className="size-3.5 shrink-0 text-muted-foreground" />}
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
   );

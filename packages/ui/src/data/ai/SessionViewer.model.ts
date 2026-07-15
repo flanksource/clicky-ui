@@ -3,36 +3,45 @@ import type {
   SessionBudget,
   SessionCapabilities,
   SessionContext,
+  SessionCost,
   SessionMetadataEvent,
   SessionTurn,
   SessionUIMessage,
   SessionUIPart,
+  SessionUsage,
   UnifiedSessionInput,
 } from "./SessionViewer.unified";
 import {
+  UiAsterisk,
   UiCamera,
   UiClose,
   UiCloudDownload,
   UiCode2,
   UiCommand,
+  UiCompass,
+  UiCursorClick,
+  UiCursorText,
   UiDiff,
-  UiEdit,
   UiEye,
-  UiFileSearch,
   UiGlobe,
   UiHourglass,
-  UiImage,
   UiKanban,
-  UiLayers,
+  UiKeyboard,
+  UiListChecks,
   UiMagicWand,
-  UiNetwork,
+  UiPalette,
+  UiPencilSimpleLine,
+  UiProhibit,
   UiPuzzle,
   UiQuestion,
   UiRobotAi,
+  UiScan,
+  UiScroll,
   UiSearch,
-  UiSelect,
+  UiShare,
   UiSparkles,
-  UiStop,
+  UiStack,
+  UiStrategy,
   UiTerminal,
   UiWrench,
 } from "../../icons";
@@ -100,6 +109,14 @@ export interface SessionMetadataSummary {
   budget?: SessionBudget;
   context?: SessionContext;
   events?: SessionMetadataEvent[];
+  /** Dominant model id, for the context meter's hover popover. */
+  model?: string;
+  /** Provider id, used to resolve the model's brand glyph. */
+  provider?: string;
+  /** Aggregate token usage, for the context meter's hover popover. */
+  usage?: SessionUsage;
+  /** Aggregate cost breakdown, for the context meter's hover popover. */
+  cost?: SessionCost;
 }
 
 // ── Normalized events ───────────────────────────────────────────────────────
@@ -107,7 +124,7 @@ export interface SessionMetadataSummary {
 // content blocks. normalizeSession flattens both shapes into a single ordered
 // list the viewer can render row-by-row.
 
-export type SessionEventKind = "user" | "assistant" | "thinking" | "tool" | "error";
+export type SessionEventKind = "system" | "user" | "assistant" | "thinking" | "tool" | "error";
 
 export interface SessionEvent {
   id: string;
@@ -166,7 +183,7 @@ function parseEntries(input: string | SessionEntry[]): SessionEntry[] {
 }
 
 function roleFromType(type: string | undefined): string {
-  return type === "user" || type === "assistant" ? type : "assistant";
+  return type === "system" || type === "user" || type === "assistant" ? type : "assistant";
 }
 
 function toolEvent(
@@ -224,7 +241,7 @@ function blockEvent(
   if (block.text) {
     return {
       id,
-      kind: role === "user" ? "user" : "assistant",
+      kind: role === "system" ? "system" : role === "user" ? "user" : "assistant",
       text: block.text,
       ...(timestamp ? { timestamp } : {}),
     };
@@ -291,6 +308,10 @@ export function getSessionMetadata(input: SessionInput): SessionMetadataSummary 
     ...(input.budget ? { budget: input.budget } : {}),
     ...(input.context ? { context: input.context } : {}),
     ...(input.events ? { events: input.events } : {}),
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.provider ? { provider: input.provider } : {}),
+    ...(input.usage ? { usage: input.usage } : {}),
+    ...(input.cost ? { cost: input.cost } : {}),
   };
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
@@ -343,7 +364,7 @@ function asRecord(input: unknown): Record<string, unknown> | undefined {
 
 function partEvent(
   part: SessionUIPart,
-  role: "user" | "assistant",
+  role: "system" | "user" | "assistant",
   id: string,
   meta: {
     timestamp?: string;
@@ -417,7 +438,8 @@ export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] 
       });
       return;
     }
-    const role: "user" | "assistant" = msg.role === "user" ? "user" : "assistant";
+    const role: "system" | "user" | "assistant" =
+      msg.role === "system" ? "system" : msg.role === "user" ? "user" : "assistant";
     const meta = {
       ...(prov?.timestamp ? { timestamp: prov.timestamp } : {}),
       ...(prov?.cwd ? { cwd: prov.cwd } : {}),
@@ -448,6 +470,8 @@ export type SessionTone =
   | "amber"
   | "violet"
   | "emerald"
+  | "teal"
+  | "orange"
   | "rose"
   | "indigo"
   | "fuchsia"
@@ -465,56 +489,59 @@ export interface SessionActionMeta {
 }
 
 const ACTIONS: Record<string, SessionActionMeta> = {
-  // File operations. Read (eye) and Write (diff) are deliberately far apart
-  // visually — write-type rows also carry a +/- diff stat.
+  // File operations. Read (eye) and Write (diff) are deliberately kept off the
+  // design's file-text / file-plus glyphs — they read better in a scrolling log
+  // and write-type rows also carry a +/- diff stat.
   Read: { icon: UiEye, tone: "sky", label: "Read file", summaryOnly: true },
   Write: { icon: UiDiff, tone: "amber", label: "Write file", summaryOnly: true },
-  Edit: { icon: UiEdit, tone: "violet", label: "Edit file", summaryOnly: true },
-  MultiEdit: { icon: UiLayers, tone: "violet", label: "Multi-edit", summaryOnly: true },
-  NotebookEdit: { icon: UiEdit, tone: "violet", label: "Edit notebook", summaryOnly: true },
+  Edit: { icon: UiPencilSimpleLine, tone: "violet", label: "Edit file", summaryOnly: true },
+  MultiEdit: { icon: UiStack, tone: "violet", label: "Multi-edit", summaryOnly: true },
+  NotebookEdit: { icon: UiPencilSimpleLine, tone: "violet", label: "Edit notebook", summaryOnly: true },
   // Search & navigation
   Grep: { icon: UiSearch, tone: "amber", label: "Grep" },
-  Glob: { icon: UiFileSearch, tone: "sky", label: "Glob" },
+  Glob: { icon: UiAsterisk, tone: "sky", label: "Glob" },
   // Execution & shell
   Bash: { icon: UiTerminal, tone: "emerald", label: "Run command" },
   BashOutput: { icon: UiCode2, tone: "emerald", label: "Shell output" },
-  KillShell: { icon: UiStop, tone: "rose", label: "Kill shell" },
-  KillBash: { icon: UiStop, tone: "rose", label: "Kill shell" },
+  KillShell: { icon: UiProhibit, tone: "rose", label: "Kill shell" },
+  KillBash: { icon: UiProhibit, tone: "rose", label: "Kill shell" },
   // Agents & planning
   Task: { icon: UiRobotAi, tone: "indigo", label: "Sub-agent task" },
   Agent: { icon: UiRobotAi, tone: "indigo", label: "Sub-agent task" },
   Skill: { icon: UiMagicWand, tone: "fuchsia", label: "Invoke skill" },
-  TodoWrite: { icon: UiKanban, tone: "sky", label: "Update todos" },
+  TodoWrite: { icon: UiListChecks, tone: "sky", label: "Update todos" },
+  Plan: { icon: UiStrategy, tone: "sky", label: "Plan" },
   TaskCreate: { icon: UiKanban, tone: "sky", label: "Create task" },
   TaskUpdate: { icon: UiKanban, tone: "sky", label: "Update task" },
   TaskList: { icon: UiKanban, tone: "sky", label: "List tasks" },
   TaskGet: { icon: UiKanban, tone: "sky", label: "Get task" },
   TaskOutput: { icon: UiKanban, tone: "sky", label: "Task output" },
-  TaskStop: { icon: UiStop, tone: "rose", label: "Stop task" },
+  TaskStop: { icon: UiProhibit, tone: "rose", label: "Stop task" },
   ToolSearch: { icon: UiSearch, tone: "amber", label: "Search tools" },
   AskUserQuestion: { icon: UiQuestion, tone: "sky", label: "Ask user" },
-  EnterPlanMode: { icon: UiKanban, tone: "sky", label: "Enter plan mode" },
-  ExitPlanMode: { icon: UiKanban, tone: "sky", label: "Exit plan mode" },
+  EnterPlanMode: { icon: UiStrategy, tone: "sky", label: "Enter plan mode" },
+  ExitPlanMode: { icon: UiStrategy, tone: "sky", label: "Exit plan mode" },
   // Web & browser automation
   WebFetch: { icon: UiCloudDownload, tone: "sky", label: "Fetch URL" },
   WebSearch: { icon: UiGlobe, tone: "sky", label: "Web search" },
-  browser_navigate: { icon: UiGlobe, tone: "sky", label: "Navigate" },
-  browser_navigate_back: { icon: UiGlobe, tone: "sky", label: "Navigate back" },
-  browser_click: { icon: UiSelect, tone: "sky", label: "Click" },
-  browser_triple_click: { icon: UiSelect, tone: "sky", label: "Triple click" },
-  browser_type: { icon: UiTerminal, tone: "emerald", label: "Type text" },
+  browser_navigate: { icon: UiCompass, tone: "sky", label: "Navigate" },
+  browser_navigate_back: { icon: UiCompass, tone: "sky", label: "Navigate back" },
+  browser_click: { icon: UiCursorClick, tone: "sky", label: "Click" },
+  browser_triple_click: { icon: UiCursorText, tone: "sky", label: "Triple click" },
+  browser_type: { icon: UiKeyboard, tone: "emerald", label: "Type text" },
   browser_press_key: { icon: UiCommand, tone: "amber", label: "Press key" },
-  browser_snapshot: { icon: UiEye, tone: "violet", label: "Snapshot" },
-  browser_take_screenshot: { icon: UiCamera, tone: "violet", label: "Screenshot" },
+  browser_snapshot: { icon: UiScan, tone: "violet", label: "Snapshot" },
+  browser_take_screenshot: { icon: UiCamera, tone: "indigo", label: "Screenshot" },
   browser_evaluate: { icon: UiCode2, tone: "violet", label: "Evaluate JS" },
-  browser_network_requests: { icon: UiNetwork, tone: "emerald", label: "Network" },
+  browser_console_messages: { icon: UiScroll, tone: "slate", label: "Console" },
+  browser_network_requests: { icon: UiShare, tone: "emerald", label: "Network" },
   browser_wait_for: { icon: UiHourglass, tone: "amber", label: "Wait" },
   browser_close: { icon: UiClose, tone: "rose", label: "Close browser" },
 };
 
 // MCP tools surface as `mcp__<server>__<name>` or `<server>__<name>`. Icon
-// servers get a distinct accent; generative servers reuse the sparkle; the rest
-// fall back to the puzzle piece.
+// servers get a distinct accent (palette); generative servers reuse the sparkle;
+// the rest fall back to the puzzle piece.
 const MCP_ICON_SERVERS = new Set(["iconify", "icons8", "lucide", "react-icons"]);
 const MCP_GEN_SERVERS = new Set(["gemini", "openai", "anthropic"]);
 
@@ -538,7 +565,7 @@ export function getSessionAction(tool: string): SessionActionMeta {
   const mcp = splitMcpTool(tool);
   if (mcp) {
     const label = `${mcp.server}: ${mcp.name.replace(/_/g, " ")}`;
-    if (MCP_ICON_SERVERS.has(mcp.server)) return { icon: UiImage, tone: "pink", label };
+    if (MCP_ICON_SERVERS.has(mcp.server)) return { icon: UiPalette, tone: "pink", label };
     if (MCP_GEN_SERVERS.has(mcp.server)) return { icon: UiSparkles, tone: "violet", label };
     return { icon: UiPuzzle, tone: "violet", label };
   }
@@ -557,7 +584,9 @@ export function summarizeSession(events: SessionEvent[]): {
   const modelCounts = new Map<string, number>();
   for (const event of events) {
     if (event.kind === "tool") toolCount += 1;
-    if (event.kind === "user" || event.kind === "assistant") messageCount += 1;
+    if (event.kind === "system" || event.kind === "user" || event.kind === "assistant") {
+      messageCount += 1;
+    }
     if (event.model) modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
   }
   let model: string | undefined;
