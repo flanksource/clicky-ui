@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { CodeBlock } from "../CodeBlock";
@@ -15,6 +16,7 @@ import {
 import {
   getSessionAction,
   normalizeSession,
+  shellCommand,
   summarizeSession,
   summarizeToolInput,
   type SessionEvent,
@@ -48,6 +50,11 @@ export interface SessionViewerProps {
   showHeader?: boolean;
   /** Show the 3-dot menu (density + category/tool/source filters). Defaults to true. */
   showMenu?: boolean;
+  /** Portal the 3-dot menu into this element instead of rendering it inline in
+   *  the summary header — lets a host place the menu in its own toolbar while the
+   *  filter/density state stays owned by the viewer. Ignored when `showMenu` is
+   *  false; falls back to inline rendering when null/undefined. */
+  menuContainer?: Element | null;
   /** Initial density override; undefined inherits the page/document density. */
   defaultDensity?: Density;
   /** Initial theme override; undefined inherits the page/document `data-theme`. */
@@ -94,6 +101,7 @@ export function SessionViewer({
   showThinking = true,
   showHeader = true,
   showMenu = true,
+  menuContainer,
   defaultDensity,
   defaultTheme,
 }: SessionViewerProps) {
@@ -137,10 +145,35 @@ export function SessionViewer({
     ...(themeOverride ? { "data-theme": themeOverride } : {}),
   };
 
+  const menu = showMenu ? (
+    <SessionViewerMenu
+      density={densityOverride}
+      onDensityChange={setDensityOverride}
+      theme={themeOverride}
+      onThemeChange={setThemeOverride}
+      filters={filters}
+      hiddenCategories={hiddenCategories}
+      hiddenTools={hiddenTools}
+      hiddenSources={hiddenSources}
+      onToggleCategory={(category) =>
+        setHiddenCategories((set) => toggleInSet(set, category))
+      }
+      onToggleTool={(tool) => setHiddenTools((set) => toggleInSet(set, tool))}
+      onToggleSource={(source) => setHiddenSources((set) => toggleInSet(set, source))}
+      showThinking={effectiveShowThinking}
+      onToggleThinking={() => setShowThinkingOverride(!effectiveShowThinking)}
+      hasThinking={hasThinking}
+    />
+  ) : null;
+  // When a host supplies `menuContainer`, the menu is portaled into it (e.g. the
+  // host's own toolbar) and the inline header collapses to just its summary.
+  const inlineMenu = menu && !menuContainer;
+
   return (
     <div className={cn("text-sm", className)} {...dataAttrs}>
       <DensityValueProvider density={effectiveDensity}>
-        {(showHeader || showMenu) && (
+        {menu && menuContainer && createPortal(menu, menuContainer)}
+        {(showHeader || inlineMenu) && (
           <div className="mb-density-3 flex items-center justify-between gap-density-3">
             <div className="flex flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
               {showHeader && summary.model && (
@@ -152,26 +185,7 @@ export function SessionViewer({
               {showHeader && <span>{summary.toolCount} actions</span>}
               {showHeader && <span>{summary.messageCount} messages</span>}
             </div>
-            {showMenu && (
-              <SessionViewerMenu
-                density={densityOverride}
-                onDensityChange={setDensityOverride}
-                theme={themeOverride}
-                onThemeChange={setThemeOverride}
-                filters={filters}
-                hiddenCategories={hiddenCategories}
-                hiddenTools={hiddenTools}
-                hiddenSources={hiddenSources}
-                onToggleCategory={(category) =>
-                  setHiddenCategories((set) => toggleInSet(set, category))
-                }
-                onToggleTool={(tool) => setHiddenTools((set) => toggleInSet(set, tool))}
-                onToggleSource={(source) => setHiddenSources((set) => toggleInSet(set, source))}
-                showThinking={effectiveShowThinking}
-                onToggleThinking={() => setShowThinkingOverride(!effectiveShowThinking)}
-                hasThinking={hasThinking}
-              />
-            )}
+            {inlineMenu && menu}
           </div>
         )}
 
@@ -298,10 +312,14 @@ function ToolBody({
   defaultExpanded: boolean;
 }) {
   const summary = summarizeToolInput(event.tool ?? "", event.toolInput);
+  const command = shellCommand(event.tool ?? "", event.toolInput);
   const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
   const [open, setOpen] = useState(defaultExpanded);
 
-  const header = (
+  // Shell rows read as the command itself — no "Run command" label prefix.
+  const header = command ? (
+    <span className="truncate font-mono text-xs text-foreground">{summary}</span>
+  ) : (
     <>
       <span className="font-medium text-foreground">{label}</span>
       {summary && <span className="truncate font-mono text-xs text-muted-foreground">{summary}</span>}
@@ -337,9 +355,12 @@ function ToolBody({
 
       {open && hasDetail && (
         <div className="mt-1.5 space-y-1.5">
-          {event.toolInput !== undefined && (
-            <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
-          )}
+          {event.toolInput !== undefined &&
+            (command !== undefined ? (
+              <DetailBlock language="bash" source={command} />
+            ) : (
+              <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
+            ))}
           {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
         </div>
       )}

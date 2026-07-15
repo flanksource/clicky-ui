@@ -338,6 +338,15 @@ export function getSessionAction(tool: string): SessionActionMeta {
   return { icon: UiWrench, tone: "slate", label: tool };
 }
 
+/** The raw shell command of a shell-execution tool call, if present. Shell rows
+ *  render this as the row heading and as a bash code block instead of the
+ *  generic label + tool-input JSON. */
+export function shellCommand(tool: string, input?: Record<string, unknown>): string | undefined {
+  if (tool !== "Bash") return undefined;
+  const command = input?.["command"];
+  return typeof command === "string" && command ? command : undefined;
+}
+
 // summarizeToolInput condenses a tool's input into a one-line preview, ported
 // from captain's history.FormatToolUseSummary so the viewer reads like the CLI.
 export function summarizeToolInput(tool: string, input?: Record<string, unknown>): string {
