@@ -3,7 +3,6 @@ export {
   GitCommitList,
   GitDiffPanel,
   GitFileList,
-  formatGitCommitDateHeader,
   type GitCommitItem,
   type GitCommitListProps,
   type GitDiffLoader,
@@ -13,3 +12,4 @@ export {
   type GitFileChangeStatus,
   type GitFileListProps,
 } from "./GitChangeList";
+export { formatGitCommitDateHeader } from "./git-dates";

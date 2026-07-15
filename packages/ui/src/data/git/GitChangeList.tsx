@@ -16,6 +16,7 @@ import {
 import type { IconComponent } from "../../icons/types";
 import { CodeDiff } from "../CodeDiff";
 import { languageFromPath } from "../code-highlight";
+import { dateKey, formatFallbackTime, formatGitCommitDateHeader } from "./git-dates";
 
 export type GitDiffPayload = {
   diff: string;
@@ -115,41 +116,6 @@ function messageFromError(error: unknown): string {
 
 function isActivationKey(event: KeyboardEvent<HTMLDivElement>): boolean {
   return event.key === "Enter" || event.key === " ";
-}
-
-function validDate(iso?: string): Date | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
-}
-
-function dateKey(iso?: string): string {
-  const date = validDate(iso);
-  if (!date) return "unknown";
-  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-}
-
-export function formatGitCommitDateHeader(iso?: string): string {
-  const date = validDate(iso);
-  if (!date) return "Commits on unknown date";
-  const formatted = new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-  return `Commits on ${formatted}`;
-}
-
-function formatFallbackTime(iso: string): string {
-  const date = validDate(iso);
-  if (!date) return iso;
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 function groupCommits(commits: GitCommitItem[], enabled: boolean): CommitGroup[] {

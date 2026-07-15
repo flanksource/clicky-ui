@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { editor, Uri } from "monaco-editor";
 import { Button } from "../components/button";
 import { MonacoEditor, type Monaco } from "./MonacoEditor";
-import { useMonacoWorkerFactory } from "./MonacoProvider";
+import { useMonacoWorkerFactory } from "./use-monaco-worker";
 import { normalizeSchemaForMonaco } from "./schema-normalizer";
 import { registerMonacoSchema } from "./schema-registry";
 import type { MonacoSchemaEditorProps, MonacoValidationState } from "./types";

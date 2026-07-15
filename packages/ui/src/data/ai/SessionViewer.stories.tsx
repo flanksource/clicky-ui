@@ -195,20 +195,40 @@ export const AskUserQuestion: Story = {
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
+    const question = "Which deployment scope should this migration target?";
+    const toolRows = canvasElement.querySelectorAll<HTMLElement>(
+      '[data-event-kind="tool"]',
+    );
+    await expect(toolRows).toHaveLength(2);
+    await expect(canvas.getAllByText(question)).toHaveLength(2);
+    const pendingRowElement = toolRows[0]!;
+    const completedRowElement = toolRows[1]!;
+    const pendingRow = within(pendingRowElement);
+    const completedRow = within(completedRowElement);
 
-    await step("renders the question text and options", async () => {
-      await expect(canvas.getAllByText("Ask user")[0]).toBeInTheDocument();
-      await expect(canvas.getByText("Which deployment scope should this migration target?")).toBeInTheDocument();
-      await expect(canvas.getByText("Project")).toBeInTheDocument();
-      await expect(canvas.getByText("Only the current workspace and test database.")).toBeInTheDocument();
-      await expect(canvas.getByText("Preview SQL")).toBeInTheDocument();
+    await step("renders the pending question and options", async () => {
+      await expect(pendingRow.getByText("Ask user")).toBeInTheDocument();
+      await expect(pendingRow.getByText(question)).toBeInTheDocument();
+      await expect(pendingRow.getByText("Project")).toBeInTheDocument();
+      await expect(
+        pendingRow.getByText("Only the current workspace and test database."),
+      ).toBeInTheDocument();
+      await expect(pendingRow.getByText("Preview SQL")).toBeInTheDocument();
+      await expect(pendingRow.getByText("Awaiting approval")).toBeInTheDocument();
     });
 
-    await step("renders approval state and the eventual answer", async () => {
-      await expect(canvas.getByText("Awaiting approval")).toBeInTheDocument();
-      await expect(canvas.getByText("Approved")).toBeInTheDocument();
-      await expect(canvasElement.querySelector("ol")?.textContent).toContain("Scope: Project");
-      await expect(canvasElement.querySelector("ol")?.textContent).toContain("Run typecheck and preview SQL before applying.");
+    await step("renders the approved question history and answer", async () => {
+      await expect(completedRow.getByText("Ask user")).toBeInTheDocument();
+      await expect(completedRow.getByText(question)).toBeInTheDocument();
+      await expect(completedRow.getByText("Project")).toBeInTheDocument();
+      await expect(
+        completedRow.getByText("Only the current workspace and test database."),
+      ).toBeInTheDocument();
+      await expect(completedRow.getByText("Approved")).toBeInTheDocument();
+      await expect(completedRowElement.textContent).toContain("Scope: Project");
+      await expect(completedRowElement.textContent).toContain(
+        "Run typecheck and preview SQL before applying.",
+      );
     });
   },
 };

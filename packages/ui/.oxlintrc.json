@@ -11,11 +11,18 @@
   },
   "overrides": [
     {
-      "files": ["**/*.stories.tsx", "**/*.test.tsx", "**/*.test.ts"],
+      "files": [
+        "**/*.stories.tsx",
+        "**/*.test.tsx",
+        "**/*.test.ts",
+        "**/*.test-utils.tsx",
+        "**/*.test-utils.ts"
+      ],
       "rules": {
         "react/only-export-components": "off",
         "clicky-icons/no-iconify-names": "off",
-        "clicky-ui/no-direct-z-index": "off"
+        "clicky-ui/no-direct-z-index": "off",
+        "unicorn/no-thenable": "off"
       }
     },
     {

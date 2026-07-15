@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   openSearchJSONCompletionSource,
   sqlCompletionNamespace,
-} from "./QueryBrowser";
+} from "./QueryBrowser.completion";
 
 describe("QueryBrowser completion", () => {
   it("builds a schema/table/column SQL namespace", () => {
