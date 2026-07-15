@@ -1,6 +1,7 @@
 export { Button, type ButtonProps } from "./components/button";
 export {
   Loading,
+  LoadingBar,
   LoadingDots,
   type LoadingProps,
   type LoadingSize,
@@ -18,11 +19,24 @@ export {
 } from "./components/SegmentedControl";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
-export { FormatOptionsDropdown, type FormatOptionsDropdownProps } from "./components/FormatOptionsDropdown";
-export { CLICKY_FORMAT_OPTIONS, type FormatOption } from "./components/format-options";
-export { DateField, type DateFieldMode, type DateFieldProps } from "./components/DateField";
+export {
+  FormatOptionsDropdown,
+  type FormatOptionsDropdownProps,
+} from "./components/FormatOptionsDropdown";
+export {
+  CLICKY_FORMAT_OPTIONS,
+  type FormatOption,
+} from "./components/format-options";
+export {
+  DateField,
+  type DateFieldMode,
+  type DateFieldProps,
+} from "./components/DateField";
 export { DatePicker, type DatePickerProps } from "./components/DatePicker";
-export { DateTimePicker, type DateTimePickerProps } from "./components/DateTimePicker";
+export {
+  DateTimePicker,
+  type DateTimePickerProps,
+} from "./components/DateTimePicker";
 export {
   TimeRange,
   type TimeRangeKind,
@@ -68,7 +82,11 @@ export {
   type MultiSelectOption,
   type MultiSelectProps,
 } from "./components/MultiSelect";
-export { Select, type SelectProps, type SelectOption } from "./components/select";
+export {
+  Select,
+  type SelectProps,
+  type SelectOption,
+} from "./components/select";
 export {
   Combobox,
   type ComboboxProps,
@@ -83,9 +101,18 @@ export {
   type UseFormResult,
   type FieldErrors,
 } from "./components/use-form";
-export { TreePickerField, type TreePickerFieldProps } from "./components/TreePickerField";
-export { WorkloadPicker, type WorkloadPickerProps } from "./components/WorkloadPicker";
-export { NamespacePicker, type NamespacePickerProps } from "./components/NamespacePicker";
+export {
+  TreePickerField,
+  type TreePickerFieldProps,
+} from "./components/TreePickerField";
+export {
+  WorkloadPicker,
+  type WorkloadPickerProps,
+} from "./components/WorkloadPicker";
+export {
+  NamespacePicker,
+  type NamespacePickerProps,
+} from "./components/NamespacePicker";
 export {
   workloadKey,
   parseWorkloadKey,
@@ -100,12 +127,23 @@ export {
   SecretKeySelector,
   type SecretKeySelectorProps,
   type SecretKind,
+  type SecretValueSource,
   type SecretKeyValue,
   type SecretResource,
   type KeyPreview,
 } from "./components/SecretKeySelector";
-export { ThemeSwitcher, type ThemeSwitcherProps } from "./components/theme-switcher";
-export { DensitySwitcher, type DensitySwitcherProps } from "./components/density-switcher";
+export {
+  serializeSecretRef,
+  parseSecretRef,
+} from "./components/SecretKeySelector.model";
+export {
+  ThemeSwitcher,
+  type ThemeSwitcherProps,
+} from "./components/theme-switcher";
+export {
+  DensitySwitcher,
+  type DensitySwitcherProps,
+} from "./components/density-switcher";
 export {
   IconMenuPicker,
   type IconMenuPickerProps,
@@ -132,7 +170,10 @@ export {
 
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
 export { FormLookupProvider } from "./components/FormLookupProvider";
-export { useLookupFetcher, resolveLookupScope } from "./components/form-lookup-context";
+export {
+  useLookupFetcher,
+  resolveLookupScope,
+} from "./components/form-lookup-context";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
 export {
@@ -140,7 +181,10 @@ export {
   readPreferences,
   writePreferences,
 } from "./components/json-schema-form-preferences";
-export type { FormPreferences, LayoutMode } from "./components/json-schema-form-preferences";
+export type {
+  FormPreferences,
+  LayoutMode,
+} from "./components/json-schema-form-preferences";
 export {
   resolveControl,
   effectiveProperties,
@@ -174,6 +218,17 @@ export type {
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {
+  Workspace,
+  type WorkspaceProps,
+  type WorkspaceSlots,
+  type WorkspaceLayoutDefaults,
+  type WorkspaceLayoutState,
+  type WorkspacePaneLocation,
+  type WorkspacePaneSlots,
+  type WorkspacePaneSpec,
+  type WorkspaceSideLocation,
+} from "./layout/Workspace";
+export {
   AppShell,
   type AppShellProps,
   type AppShellNavItem,
@@ -202,8 +257,22 @@ export {
   type DropdownMenuProps,
   type DropdownMenuItem,
 } from "./overlay/DropdownMenu";
-export { HoverCard, type HoverCardProps, type HoverCardPlacement } from "./overlay/HoverCard";
+export {
+  CellActions,
+  CellActionButton,
+  type CellActionsProps,
+  type CellActionButtonProps,
+} from "./overlay/CellActions";
+export {
+  HoverCard,
+  type HoverCardProps,
+  type HoverCardPlacement,
+} from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 export { useModalStack, type ModalStackPosition } from "./overlay/modalStack";
 export { ToastProvider, type ToastProviderProps } from "./overlay/Toast";
-export { useToast, type ToastOptions, type ToastTone } from "./overlay/toast-context";
+export {
+  useToast,
+  type ToastOptions,
+  type ToastTone,
+} from "./overlay/toast-context";

@@ -228,4 +228,104 @@ describe("DropdownMenu", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("renders one presentational header per contiguous group, above its items", () => {
+    render(
+      <DropdownMenu
+        label="Add"
+        items={[
+          { label: "Journals", group: "Financials", onSelect: vi.fn() },
+          { label: "Transactions", group: "Financials", onSelect: vi.fn() },
+          { label: "Accounts", group: "Xero", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    const menu = screen.getByRole("menu");
+    // Two contiguous groups → two headers (Transactions shares "Financials").
+    expect(menu.querySelectorAll('[role="presentation"]')).toHaveLength(2);
+    // Headers are not keyboard-navigable menu items.
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    // Each header sits directly above the first item of its group.
+    const rendered = within(menu)
+      .getAllByText(/^(Financials|Journals|Transactions|Xero|Accounts)$/)
+      .map((element) => element.textContent);
+    expect(rendered).toEqual([
+      "Financials",
+      "Journals",
+      "Transactions",
+      "Xero",
+      "Accounts",
+    ]);
+  });
+
+  it("renders no headers when items carry no group", () => {
+    render(<DropdownMenu label="Download" items={items()} />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    const menu = screen.getByRole("menu");
+    expect(menu.querySelectorAll('[role="presentation"]')).toHaveLength(0);
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(2);
+  });
+
+  it("tints an item's icon with iconColor", () => {
+    const Glyph = () => <svg data-testid="glyph" />;
+    render(
+      <DropdownMenu
+        label="Add"
+        items={[
+          {
+            label: "Journals",
+            icon: Glyph,
+            iconColor: "rgb(124, 58, 237)",
+            onSelect: vi.fn(),
+          },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    const item = screen.getByRole("menuitem", { name: /Journals/ });
+    const tinted = item.querySelector('span[style*="color"]');
+    expect(tinted).toHaveStyle({ color: "rgb(124, 58, 237)" });
+  });
+
+  const nestedItems = (onAccounts = vi.fn(), onParent = vi.fn()) => [
+    {
+      label: "Xero",
+      onSelect: onParent,
+      children: [
+        { label: "Accounts", onSelect: onAccounts },
+        { label: "Contacts", onSelect: vi.fn() },
+      ],
+    },
+  ];
+
+  it("marks an item with children as a submenu trigger and hides its children until opened", () => {
+    render(<DropdownMenu label="Add" items={nestedItems()} />);
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    const trigger = screen.getByRole("menuitem", { name: "Xero" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("menuitem", { name: "Accounts" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens a submenu on click without firing the parent's onSelect", () => {
+    const onParent = vi.fn();
+    render(<DropdownMenu label="Add" items={nestedItems(vi.fn(), onParent)} />);
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xero" }));
+    expect(onParent).not.toHaveBeenCalled();
+    expect(screen.getByRole("menuitem", { name: "Accounts" })).toBeInTheDocument();
+  });
+
+  it("selecting a nested item fires its onSelect and closes the whole menu", () => {
+    const onAccounts = vi.fn();
+    render(<DropdownMenu label="Add" items={nestedItems(onAccounts)} />);
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xero" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Accounts" }));
+    expect(onAccounts).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
 });

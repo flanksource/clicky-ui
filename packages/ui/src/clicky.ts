@@ -8,6 +8,7 @@ export {
   type ClickyResolvedCommand,
   type ClickyColumn,
   type ClickyDownloadOptions,
+  type ClickyDownloadScope,
   type ClickyDocument,
   type ClickyField,
   type ClickyNode,
@@ -20,6 +21,7 @@ export {
   type ClickyTableRowHref,
   type ClickyTableRowClick,
   type ClickyTableRowPredicate,
+  type ClickyTableRowSelection,
   type ClickyTreeItem,
   type ClickyViewOptions,
 } from "./data/Clicky";
