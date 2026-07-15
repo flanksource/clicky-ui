@@ -1,17 +1,24 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Badge } from "../data/Badge";
-import { Icon } from "../data/Icon";
+import { Icon, type StaticIconComponent } from "../data/Icon";
 import { Modal } from "../overlay/Modal";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
 import {
   parseTimestamp,
   formatRelativeTime,
 } from "../data/cells/timestamp-format";
-import { UiClose, UiDotsVertical, UiFullscreen, UiTrash } from "../icons";
+import {
+  UiCheck,
+  UiClose,
+  UiDotsVertical,
+  UiFullscreen,
+  UiTrash,
+} from "../icons";
 import { CommentAuthorAvatar } from "./CommentAuthor";
 import { CommentMarkdown } from "./CommentMarkdown";
 import {
+  authorDisplayName,
   resolveFacetOption,
   resolveStatusConfig,
   toneToBadgeTone,
@@ -29,7 +36,7 @@ export type CommentCardProps = {
   /** Custom body renderer; defaults to the lightweight CommentMarkdown. */
   renderBody?: (body: string) => ReactNode;
   /** Change this comment's status (roots only). */
-  onUpdateStatus?: (status: string) => void;
+  onUpdateStatus?: (status: string) => void | Promise<void>;
   /** Delete this comment. */
   onDelete?: () => void;
   /** Begin a reply to this comment. */
@@ -153,14 +160,24 @@ function statusMenuItems(
     onUpdateStatus?: (status: string) => void;
     onDelete?: () => void;
     onCollapse?: () => void;
+    onMaximize?: () => void;
+    resolvedStatus?: string;
   },
 ): DropdownMenuItem[] {
   const items: DropdownMenuItem[] = [];
+  if (opts.onMaximize) {
+    items.push({
+      label: "Maximize",
+      icon: UiFullscreen,
+      onSelect: opts.onMaximize,
+    });
+  }
   if (opts.onCollapse) {
     items.push({ label: "Collapse", icon: UiClose, onSelect: opts.onCollapse });
   }
   if (!isReply && opts.onUpdateStatus) {
     for (const status of config.statuses) {
+      if (status.value === opts.resolvedStatus) continue;
       const current = status.value === comment.status;
       items.push({
         label: (
@@ -188,10 +205,12 @@ function IconAction({
   icon,
   label,
   onClick,
+  className,
 }: {
-  icon: typeof UiClose;
+  icon: StaticIconComponent;
   label: string;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
@@ -199,9 +218,12 @@ function IconAction({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="rounded p-1 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
+      className={cn(
+        "rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+        className,
+      )}
     >
-      <Icon icon={icon} className="text-xs" />
+      <Icon icon={icon} className="text-sm" />
     </button>
   );
 }
@@ -217,45 +239,70 @@ function CommentBody({
   onCollapse,
   onMaximize,
 }: CommentCardProps & { onCollapse?: () => void; onMaximize?: () => void }) {
+  const [statusError, setStatusError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
+  const resolvedStatus = config.statuses.find(
+    (status) =>
+      status.value.toLowerCase() === "resolved" ||
+      status.label.toLowerCase() === "resolved",
+  );
+  const canResolve =
+    !isReply &&
+    onUpdateStatus != null &&
+    resolvedStatus != null &&
+    comment.status !== resolvedStatus.value;
+  const updateStatus = async (status: string) => {
+    setStatusError("");
+    try {
+      await onUpdateStatus?.(status);
+    } catch (error) {
+      setStatusError(
+        error instanceof Error ? error.message : "Unexpected error",
+      );
+    }
+  };
   const menuItems = statusMenuItems(comment, config, isReply, {
-    ...(onUpdateStatus ? { onUpdateStatus } : {}),
+    ...(onUpdateStatus
+      ? { onUpdateStatus: (status) => void updateStatus(status) }
+      : {}),
     ...(onDelete ? { onDelete } : {}),
     ...(onCollapse ? { onCollapse } : {}),
+    ...(onMaximize ? { onMaximize } : {}),
+    ...(resolvedStatus ? { resolvedStatus: resolvedStatus.value } : {}),
   });
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-2.5">
+      <div className="flex items-start gap-2.5">
         <CommentAuthorAvatar author={comment.author} />
-        {!isReply && (
-          <StatusChip status={comment.status} config={config} showLabel />
-        )}
-        {!isReply && <FacetBadges comment={comment} config={config} />}
-        <div className="ml-auto flex items-center gap-1">
-          {date && (
-            <span
-              title={date.toLocaleString()}
-              className="text-[10px] text-muted-foreground"
-            >
-              {formatRelativeTime(date)}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <span className="truncate text-xs font-semibold text-foreground">
+              {authorDisplayName(comment.author)}
             </span>
+            {date && (
+              <span
+                title={date.toLocaleString()}
+                className="shrink-0 text-[10px] text-muted-foreground"
+              >
+                {formatRelativeTime(date)}
+              </span>
+            )}
+          </div>
+          {!isReply && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              <FacetBadges comment={comment} config={config} />
+            </div>
           )}
-          {onReply && (
-            <button
-              type="button"
-              onClick={onReply}
-              className="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              Reply
-            </button>
-          )}
-          {onMaximize && (
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {canResolve && (
             <IconAction
-              icon={UiFullscreen}
-              label="Maximize"
-              onClick={onMaximize}
+              icon={UiCheck}
+              label="Resolve comment"
+              onClick={() => void updateStatus(resolvedStatus.value)}
+              className="hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-500/20 dark:hover:text-green-300"
             />
           )}
           {menuItems.length > 0 && (
@@ -267,7 +314,7 @@ function CommentBody({
                   role="button"
                   tabIndex={0}
                   aria-label="Comment actions"
-                  className="rounded p-1 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
+                  className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
@@ -277,13 +324,21 @@ function CommentBody({
           )}
         </div>
       </div>
-      <div className="text-[13px] leading-6">
+      <div className="text-[13px] leading-5 text-foreground">
         {renderBody ? (
           renderBody(comment.body)
         ) : (
           <CommentMarkdown text={comment.body} />
         )}
       </div>
+      {statusError && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+        >
+          Couldn't update comment: {statusError}
+        </div>
+      )}
       {!isReply && (
         <ChecklistChips
           comment={comment}
@@ -291,6 +346,15 @@ function CommentBody({
         />
       )}
       {!isReply && <RefChips comment={comment} />}
+      {onReply && (
+        <button
+          type="button"
+          onClick={onReply}
+          className="-ml-2 rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          Reply
+        </button>
+      )}
     </div>
   );
 }
@@ -348,7 +412,9 @@ export function CommentCard(props: CommentCardProps) {
           )}
         >
           <CommentAuthorAvatar author={comment.author} bare />
-          {!isReply && <StatusChip status={comment.status} config={config} />}
+          <span className="shrink-0 text-[11px] font-semibold text-foreground">
+            {authorDisplayName(comment.author)}
+          </span>
           {!isReply && (
             <FacetBadges comment={comment} config={config} compact />
           )}
@@ -395,10 +461,11 @@ export function CommentCard(props: CommentCardProps) {
         data-comment-kind={isReply ? "reply" : "root"}
         data-comment-id={comment.id}
         className={cn(
-          "group/comment rounded-xl bg-background px-3 py-3 text-xs",
-          !isReply && "border border-border shadow-sm",
+          "group/comment rounded-xl bg-background px-3.5 py-3 text-xs",
+          !isReply &&
+            "border border-border/80 shadow-sm transition-shadow hover:shadow-md",
           compact && "px-2.5 py-2.5",
-          isReply && "ml-4 border-l-2 border-l-border bg-muted/30 shadow-none",
+          isReply && "ml-4 border-l-2 border-l-border bg-muted/20 shadow-none",
         )}
       >
         {body}

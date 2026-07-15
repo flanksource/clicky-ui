@@ -76,6 +76,20 @@ describe("Combobox does not force the first item", () => {
 });
 
 describe("Combobox type-ahead", () => {
+  it("uses a compact selected label while keeping the full label in the menu", () => {
+    render(
+      <Combobox
+        value="medium"
+        onChange={vi.fn()}
+        options={[{ value: "medium", label: "Medium", selectedLabel: "Med" }]}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    expect(input).toHaveValue("Med");
+    fireEvent.focus(input);
+    expect(screen.getByRole("option", { name: "Medium" })).toHaveTextContent("Medium");
+  });
+
   it("shows the selected label while closed and an empty filter when opened", () => {
     render(<Combobox value="PrimaryDB" onChange={vi.fn()} options={OPTIONS} />);
     const input = screen.getByRole("combobox");

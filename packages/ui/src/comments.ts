@@ -30,11 +30,17 @@ export { CommentProvider, type CommentProviderProps } from "./comments/CommentPr
 export {
   useCommentContext,
   useCommentContextOptional,
+  useCommentAnchorOptional,
+  useCommentAnchorActionsOptional,
   exactAnchorResolver,
   dottedAnchorResolver,
+  strictAnchorResolver,
   type CommentContextValue,
+  type CommentAnchorState,
+  type CommentAnchorActions,
   type CommentRailMode,
   type AnchorResolver,
+  type CommentScrollOptions,
 } from "./comments/comment-context";
 export {
   CommentSidePanel,

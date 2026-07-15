@@ -26,6 +26,14 @@ const comments: Comment[] = [
   },
 ];
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe("CommentThreadList", () => {
   it("renders a card per root and reply", () => {
     render(<CommentThreadList comments={comments} config={config} />);
@@ -58,5 +66,32 @@ describe("CommentThreadList", () => {
     expect(onReply).toHaveBeenCalledTimes(1);
     expect(onReply.mock.calls[0]?.[0]).toMatchObject({ id: "r1" });
     expect(onReply.mock.calls[0]?.[1]).toBe("thanks");
+  });
+
+  it("submits a reply only once while the request is pending", async () => {
+    const request = deferred();
+    const onReply = vi.fn(() => request.promise);
+    render(
+      <CommentThreadList
+        comments={comments}
+        config={config}
+        onReply={onReply}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByTestId("comment-card")[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    fireEvent.change(screen.getByTestId("comment-reply-input"), {
+      target: { value: "Posted once" },
+    });
+    const send = screen.getByRole("button", { name: "Send" });
+    fireEvent.click(send);
+    fireEvent.click(send);
+
+    expect(onReply).toHaveBeenCalledTimes(1);
+    expect(send).toBeDisabled();
+
+    await act(async () => request.resolve());
+    expect(screen.queryByTestId("comment-reply-input")).not.toBeInTheDocument();
   });
 });

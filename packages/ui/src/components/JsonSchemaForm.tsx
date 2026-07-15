@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiClose, UiEllipsisBold, UiSearch } from "../icons";
@@ -8,6 +8,7 @@ import { FormLookupProvider } from "./FormLookupProvider";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
+import { applySchemaDefaults } from "./json-schema-form-resolve";
 import { normalizeColumns } from "./json-schema-form-utils";
 import {
   DEFAULT_FORM_SIZE,
@@ -94,6 +95,21 @@ export function JsonSchemaForm({
     if (persistPreferences) writePreferences(preferencesStorageKey, next);
   };
 
+  // A bundled schema (components under `$defs`, referenced by local `#/$defs`
+  // pointers) is resolved once into a self-contained tree the renderer walks
+  // directly; a non-bundled schema passes through untouched.
+  const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
+  const effectiveValue = useMemo(
+    () => applySchemaDefaults(resolvedSchema, value),
+    [resolvedSchema, value],
+  );
+  // Defaults are part of the submitted form value, not only presentation. This
+  // is especially important for required discriminator fields whose default
+  // selects an if/then branch.
+  useEffect(() => {
+    if (!readOnly && effectiveValue !== value) onChange(effectiveValue);
+  }, [effectiveValue, onChange, readOnly, value]);
+
   const ctx: RenderContext = {
     readOnly,
     hideReadOnlyFields,
@@ -102,25 +118,30 @@ export function JsonSchemaForm({
     sortMode: effectiveSortMode,
     pre: pre ?? [],
     post: post ?? [],
-    rootValue: value,
+    rootValue: effectiveValue,
+    onRootChange: onChange,
     depth: 0,
     render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
     ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
   };
-  // A bundled schema (components under `$defs`, referenced by local `#/$defs`
-  // pointers) is resolved once into a self-contained tree the renderer walks
-  // directly; a non-bundled schema passes through untouched.
-  const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
   // A schema may name a discriminator property whose value selects a "kind"; the
   // form then runs a two-phase pick-then-fill flow (see DiscriminatedForm).
   const discKey =
     typeof resolvedSchema["x-discriminator"] === "string" ? resolvedSchema["x-discriminator"] : undefined;
-  const inPickerPhase = discKey != null && (value[discKey] == null || value[discKey] === "");
+  const inPickerPhase =
+    discKey != null &&
+    (effectiveValue[discKey] == null || effectiveValue[discKey] === "");
 
   const objectRows = discKey
     ? null
-    : renderObjectFields(resolvedSchema, value, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
+    : renderObjectFields(
+        resolvedSchema,
+        effectiveValue,
+        onChange,
+        ctx,
+        hiddenKeys ? { hiddenKeys } : undefined,
+      );
   const noMatches = objectRows != null && objectRows.length === 0 && fieldFilter.trim() !== "";
 
   return (
@@ -150,7 +171,7 @@ export function JsonSchemaForm({
         {discKey ? (
           <DiscriminatedForm
             schema={resolvedSchema}
-            value={value}
+            value={effectiveValue}
             onChange={onChange}
             ctx={ctx}
             discKey={discKey}

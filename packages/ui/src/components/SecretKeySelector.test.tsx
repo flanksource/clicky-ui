@@ -1,132 +1,173 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import {
   SecretKeySelector,
   type KeyPreview,
   type SecretKind,
   type SecretResource,
 } from "./SecretKeySelector";
+import { parseSecretRef, serializeSecretRef } from "./SecretKeySelector.model";
 
 const RESOURCES: Record<SecretKind, SecretResource[]> = {
   secret: [{ name: "db", keys: ["host", "password"] }],
   configmap: [{ name: "app", keys: ["url"] }],
+  helm: [{ name: "mysql", keys: ["auth.password"] }],
 };
 const PREVIEWS: KeyPreview[] = [
   { key: "host", value: "sql-••••.com" },
   { key: "password", value: "••••" },
 ];
+const SERVICE_ACCOUNTS: SecretResource[] = [{ name: "reader" }, { name: "writer" }];
 
 const loadResources = (kind: SecretKind) => Promise.resolve(RESOURCES[kind]);
 const loadKeyPreview = () => Promise.resolve(PREVIEWS);
+const loadServiceAccounts = () => Promise.resolve(SERVICE_ACCOUNTS);
 
-describe("SecretKeySelector", () => {
-  it("uses the shared density-height segmented source control", () => {
-    render(
-      <SecretKeySelector
-        value={{ kind: "value", value: "" }}
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
+// The source picker is a Combobox with the accessible name "Secret value source".
+const sourceInput = () => screen.getByRole("combobox", { name: "Secret value source" });
+function chooseSource(name: RegExp) {
+  fireEvent.focus(sourceInput());
+  fireEvent.mouseDown(screen.getByRole("option", { name }));
+}
+
+function baseProps(overrides = {}) {
+  return {
+    onChange: vi.fn(),
+    loadResources,
+    loadKeyPreview,
+    ...overrides,
+  };
+}
+
+describe("SecretKeySelector references", () => {
+  it("wraps responsively while keeping the resource and key fields together", async () => {
+    const { container } = render(
+      <SecretKeySelector value={{ kind: "secret", name: "db", key: "host" }} {...baseProps()} />,
     );
-    expect(screen.getByRole("radiogroup", { name: "Secret value source" })).toHaveClass(
-      "h-control-h",
+
+    const fields = container.querySelector('[data-slot="secret-reference-fields"]')!;
+    await waitFor(() =>
+      expect(fields.querySelectorAll('[role="combobox"]')).toHaveLength(2),
     );
+    expect(container.firstElementChild).toHaveClass("flex-wrap");
+    expect(fields).toHaveClass("grid");
+  });
+
+  it("renders the source picker as a combobox, not a radio group", () => {
+    render(<SecretKeySelector value={{ kind: "value", value: "" }} {...baseProps()} />);
+    expect(sourceInput()).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
   it("lists the secret's keys with their masked preview as the label", async () => {
-    render(
-      <SecretKeySelector
-        value={{ kind: "secret", name: "db", key: "" }}
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
+    const { container } = render(
+      <SecretKeySelector value={{ kind: "secret", name: "db", key: "" }} {...baseProps()} />,
     );
-    // The key combobox is the second one; open it and assert the masked label.
-    const inputs = screen.getAllByRole("combobox");
-    fireEvent.focus(inputs[1]);
+    const fields = container.querySelector('[data-slot="secret-reference-fields"]')!;
+    const keyInput = within(fields).getAllByRole("combobox")[1];
+    fireEvent.focus(keyInput);
     await waitFor(() =>
       expect(screen.getByRole("option", { name: /host — sql-••••\.com/ })).toBeInTheDocument(),
     );
   });
 
-  it("switches kind via the toggle and resets the selection", async () => {
+  it("switches kind via the source combobox and resets the selection", async () => {
     const onChange = vi.fn();
     render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "host" }}
-        onChange={onChange}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps({ onChange })}
       />,
     );
-    // Let the initial async loads settle before interacting, so the toggle's
-    // state update isn't racing the effect resolution.
-    await waitFor(() => expect(screen.getByRole("radio", { name: /Secret/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("radio", { name: /ConfigMap/ }));
+    await waitFor(() => expect(sourceInput()).toBeInTheDocument());
+    chooseSource(/ConfigMap/);
     expect(onChange).toHaveBeenCalledWith({ kind: "configmap", name: "", key: "" });
   });
 
   it("emits the chosen key for the selected resource", async () => {
     const onChange = vi.fn();
-    render(
+    const { container } = render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "" }}
-        onChange={onChange}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps({ onChange })}
       />,
     );
-    const inputs = screen.getAllByRole("combobox");
-    fireEvent.focus(inputs[1]);
+    const fields = container.querySelector('[data-slot="secret-reference-fields"]')!;
+    fireEvent.focus(within(fields).getAllByRole("combobox")[1]);
     const option = await screen.findByRole("option", { name: /^password/ });
     fireEvent.mouseDown(option);
     expect(onChange).toHaveBeenCalledWith({ kind: "secret", name: "db", key: "password" });
   });
+
+  it("hints jsonpath for the helm key field", async () => {
+    render(
+      <SecretKeySelector
+        value={{ kind: "helm", name: "mysql", key: "" }}
+        sources={["secret", "helm", "value"]}
+        {...baseProps()}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("jsonpath…")).toBeInTheDocument(),
+    );
+  });
+});
+
+describe("SecretKeySelector service account", () => {
+  it("renders a name-only field and emits a serviceaccount value", async () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <SecretKeySelector
+        value={{ kind: "serviceaccount", name: "" }}
+        sources={["secret", "serviceaccount"]}
+        loadServiceAccounts={loadServiceAccounts}
+        {...baseProps({ onChange })}
+      />,
+    );
+    const field = container.querySelector('[data-slot="secret-serviceaccount-field"]')!;
+    expect(field).toBeInTheDocument();
+    // A single field (no key column) fed by loadServiceAccounts.
+    const input = within(field).getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "writer" }));
+    expect(onChange).toHaveBeenCalledWith({ kind: "serviceaccount", name: "writer" });
+  });
+});
+
+describe("SecretKeySelector 1Password", () => {
+  it("renders a single op:// reference input and emits an onepassword value", () => {
+    const onChange = vi.fn();
+    render(
+      <SecretKeySelector
+        value={{ kind: "onepassword", ref: "" }}
+        sources={["secret", "onepassword"]}
+        {...baseProps({ onChange })}
+      />,
+    );
+    const input = screen.getByPlaceholderText("op://vault/item/field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "op://prod/db/password" } });
+    expect(onChange).toHaveBeenCalledWith({ kind: "onepassword", ref: "op://prod/db/password" });
+  });
 });
 
 describe("SecretKeySelector literal value", () => {
-  it("offers the Value toggle by default", () => {
-    render(
-      <SecretKeySelector
-        value={{ kind: "value", value: "" }}
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
-    );
-    expect(screen.getByRole("radio", { name: /Value/ })).toBeInTheDocument();
+  it("offers the Value source by default", () => {
+    render(<SecretKeySelector value={{ kind: "value", value: "" }} {...baseProps()} />);
+    fireEvent.focus(sourceInput());
+    expect(screen.getByRole("option", { name: /Value/ })).toBeInTheDocument();
   });
 
-  it("hides the Value toggle when allowLiteral is false", async () => {
+  it("drops the Value source when allowLiteral is false", async () => {
     render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "" }}
         allowLiteral={false}
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps()}
       />,
     );
-    await waitFor(() => expect(screen.getAllByRole("combobox")).toHaveLength(2));
-    expect(screen.queryByRole("radio", { name: /Value/ })).not.toBeInTheDocument();
-  });
-
-  it("switches to literal mode and emits a value-kind value", async () => {
-    const onChange = vi.fn();
-    render(
-      <SecretKeySelector
-        value={{ kind: "secret", name: "db", key: "host" }}
-        allowLiteral
-        onChange={onChange}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
-    );
-    await waitFor(() => expect(screen.getByRole("radio", { name: /^Value/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("radio", { name: /^Value/ }));
-    expect(onChange).toHaveBeenCalledWith({ kind: "value", value: "" });
+    fireEvent.focus(sourceInput());
+    await waitFor(() => expect(screen.getByRole("option", { name: /Secret/ })).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: /Value/ })).not.toBeInTheDocument();
   });
 
   it("renders a text input in literal mode and emits typed text", () => {
@@ -134,14 +175,9 @@ describe("SecretKeySelector literal value", () => {
     render(
       <SecretKeySelector
         value={{ kind: "value", value: "prod-host" }}
-        allowLiteral
-        onChange={onChange}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps({ onChange })}
       />,
     );
-    // No comboboxes in literal mode — just the static-value text input.
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     const input = screen.getByPlaceholderText("Static value…") as HTMLInputElement;
     expect(input.value).toBe("prod-host");
     fireEvent.change(input, { target: { value: "new-host" } });
@@ -150,19 +186,17 @@ describe("SecretKeySelector literal value", () => {
 });
 
 describe("SecretKeySelector strict mode", () => {
+  function referenceComboboxes() {
+    const fields = document.querySelector('[data-slot="secret-reference-fields"]')!;
+    return within(fields as HTMLElement).getAllByRole("combobox");
+  }
+
   it("flags a name that names no loaded resource", async () => {
     render(
-      <SecretKeySelector
-        value={{ kind: "secret", name: "ghost", key: "" }}
-        strict
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
+      <SecretKeySelector value={{ kind: "secret", name: "ghost", key: "" }} strict {...baseProps()} />,
     );
-    // The first combobox is the name; it must go invalid once resources load.
     await waitFor(() =>
-      expect(screen.getAllByRole("combobox")[0]).toHaveAttribute("aria-invalid", "true"),
+      expect(referenceComboboxes()[0]).toHaveAttribute("aria-invalid", "true"),
     );
   });
 
@@ -171,16 +205,13 @@ describe("SecretKeySelector strict mode", () => {
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "ghost-key" }}
         strict
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps()}
       />,
     );
-    // Name resolves (db exists) so only the key combobox (second) is invalid.
     await waitFor(() =>
-      expect(screen.getAllByRole("combobox")[1]).toHaveAttribute("aria-invalid", "true"),
+      expect(referenceComboboxes()[1]).toHaveAttribute("aria-invalid", "true"),
     );
-    expect(screen.getAllByRole("combobox")[0]).not.toHaveAttribute("aria-invalid");
+    expect(referenceComboboxes()[0]).not.toHaveAttribute("aria-invalid");
   });
 
   it("accepts a name+key that both exist", async () => {
@@ -188,27 +219,38 @@ describe("SecretKeySelector strict mode", () => {
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "password" }}
         strict
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
+        {...baseProps()}
       />,
     );
-    await waitFor(() => expect(screen.getAllByRole("combobox")).toHaveLength(2));
-    expect(screen.getAllByRole("combobox")[0]).not.toHaveAttribute("aria-invalid");
-    expect(screen.getAllByRole("combobox")[1]).not.toHaveAttribute("aria-invalid");
+    await waitFor(() => expect(referenceComboboxes()).toHaveLength(2));
+    expect(referenceComboboxes()[0]).not.toHaveAttribute("aria-invalid");
+    expect(referenceComboboxes()[1]).not.toHaveAttribute("aria-invalid");
+  });
+});
+
+describe("secret reference serialization", () => {
+  it("round-trips every source through parse and serialize", () => {
+    const cases: string[] = [
+      "secret://db/password",
+      "configmap://app/url",
+      "helm://mysql/auth.password",
+      "serviceaccount://reader",
+      "op://prod/db/password",
+    ];
+    for (const raw of cases) {
+      expect(serializeSecretRef(parseSecretRef(raw))).toBe(raw);
+    }
   });
 
-  it("never flags when strict is off", async () => {
-    render(
-      <SecretKeySelector
-        value={{ kind: "secret", name: "ghost", key: "ghost-key" }}
-        onChange={vi.fn()}
-        loadResources={loadResources}
-        loadKeyPreview={loadKeyPreview}
-      />,
-    );
-    await waitFor(() => expect(screen.getAllByRole("combobox")).toHaveLength(2));
-    expect(screen.getAllByRole("combobox")[0]).not.toHaveAttribute("aria-invalid");
-    expect(screen.getAllByRole("combobox")[1]).not.toHaveAttribute("aria-invalid");
+  it("treats an unrecognised string as a literal value", () => {
+    expect(parseSecretRef("postgres://host/db")).toEqual({
+      kind: "value",
+      value: "postgres://host/db",
+    });
+  });
+
+  it("serializes undefined and empty selections to an empty string", () => {
+    expect(serializeSecretRef(undefined)).toBe("");
+    expect(serializeSecretRef({ kind: "serviceaccount", name: "" })).toBe("");
   });
 });
