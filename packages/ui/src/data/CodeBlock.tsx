@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
+import { CodeDiff } from "./CodeDiff";
 import { JsonView } from "./JsonView";
 import { highlightCode } from "./code-highlight";
 import { sanitizeHtml } from "./html-utils";
@@ -17,6 +18,10 @@ export type CodeBlockProps = {
   jsonDefaultOpenDepth?: number | undefined;
   /** Render only the code — no border, background, or language header. */
   bare?: boolean | undefined;
+  /** Render a language-aware diff instead of highlighting `source`. */
+  diff?: { original: string; modified: string } | { unified: string } | undefined;
+  /** Diff layout when `diff` is set. Defaults to `unified`. */
+  diffView?: "unified" | "split" | undefined;
 };
 
 export function CodeBlock({
@@ -26,6 +31,8 @@ export function CodeBlock({
   className,
   jsonDefaultOpenDepth = 2,
   bare = false,
+  diff,
+  diffView,
 }: CodeBlockProps) {
   const language = (languageProp ?? "").toLowerCase().replace(/^\.+/, "");
   const chromaHtml = highlightedHtml ? sanitizeHtml(highlightedHtml) : "";
@@ -51,6 +58,18 @@ export function CodeBlock({
       cancelled = true;
     };
   }, [wantsClientHighlight, language, source]);
+
+  if (diff) {
+    return (
+      <CodeDiff
+        language={languageProp}
+        view={diffView}
+        bare={bare}
+        className={className}
+        {...diff}
+      />
+    );
+  }
 
   if (parsedJson !== JSON_PARSE_FAILED) {
     const tree = <JsonView data={parsedJson} defaultOpenDepth={jsonDefaultOpenDepth} />;

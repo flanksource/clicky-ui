@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && storybook dev -p 5270",
-    "build": "pnpm --filter @flanksource/clicky-ui build:icons && storybook build",
-    "serve": "pnpm --filter @flanksource/clicky-ui build:icons && storybook build && vite preview --host 127.0.0.1 --port 5270 --strictPort --outDir storybook-static",
-    "test": "pnpm --filter @flanksource/clicky-ui build:icons && vitest run",
+    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && storybook dev -p 5270",
+    "build": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && storybook build",
+    "serve": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && storybook build && vite preview --host 127.0.0.1 --port 5270 --strictPort --outDir storybook-static",
+    "test": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && vitest run",
     "lint": "oxlint .storybook --deny-warnings",
     "check": "tsc -b --noEmit && pnpm run lint"
   },

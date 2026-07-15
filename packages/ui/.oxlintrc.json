@@ -1,9 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
-  "jsPlugins": ["./oxlint-plugins/no-iconify-names.js"],
+  "jsPlugins": ["./oxlint-plugins/no-iconify-names.js", "./oxlint-plugins/clicky-ui.js"],
   "plugins": ["unicorn", "typescript", "oxc", "import", "react"],
   "rules": {
     "clicky-icons/no-iconify-names": "error",
+    "clicky-ui/no-direct-z-index": "error",
     "react/only-export-components": ["error", { "allowConstantExport": true }],
     "import/no-cycle": "error",
     "react-hooks/exhaustive-deps": "off"
@@ -13,7 +14,19 @@
       "files": ["**/*.stories.tsx", "**/*.test.tsx", "**/*.test.ts"],
       "rules": {
         "react/only-export-components": "off",
-        "clicky-icons/no-iconify-names": "off"
+        "clicky-icons/no-iconify-names": "off",
+        "clicky-ui/no-direct-z-index": "off"
+      }
+    },
+    {
+      "files": [
+        "src/overlay/**",
+        "src/data/ai/ChatFab.tsx",
+        "src/data/ai/ChatWindow.tsx",
+        "src/data/ai/chat-window-context.ts"
+      ],
+      "rules": {
+        "clicky-ui/no-direct-z-index": "off"
       }
     }
   ],

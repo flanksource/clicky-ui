@@ -112,9 +112,9 @@ export {
 export {
   getSessionAction,
   normalizeSession,
+  normalizeMessages,
   splitMcpTool,
   summarizeSession,
-  summarizeToolInput,
   type SessionActionMeta,
   type SessionEventKind,
   type SessionToolUse,
@@ -122,6 +122,19 @@ export {
   type SessionContent,
   type SessionTone,
 } from "./SessionViewer.model";
+export {
+  type SessionUIMessage,
+  type SessionUIPart,
+  type SessionProvenance,
+} from "./SessionViewer.unified";
+export {
+  summarizeToolInput,
+  toolDiff,
+  toolInputParams,
+  type DiffSegment,
+  type ToolDiff,
+  type ToolParam,
+} from "./SessionViewer.input";
 export {
   CATEGORY_LABELS,
   classifyCommand,
