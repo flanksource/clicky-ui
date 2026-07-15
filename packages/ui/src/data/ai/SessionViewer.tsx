@@ -13,6 +13,9 @@ import {
   type SessionInput,
 } from "./SessionViewer.model";
 import { SessionRow } from "./SessionViewer.rows";
+import { ContextMeter } from "../chat/ContextMeter";
+import { providerIcon } from "../chat/provider-icons";
+import { costTotal, tokenTotal } from "./session-cost";
 import {
   collectSessionFilters,
   isEventVisible,
@@ -247,14 +250,19 @@ function SessionMetadataBadges({ metadata }: { metadata: SessionMetadataSummary 
     countBadge("agent", metadata.capabilities?.agents),
     countBadge("skill", metadata.capabilities?.skills),
   ].filter(Boolean) as Array<{ key: string; label: string; title?: string }>;
+  // The context window renders as an interactive meter (bar + hover popover);
+  // budget rides in that popover, so it only gets a text badge when there is no
+  // context to attach it to.
   const badges: Array<{ key: string; label: string; title?: string }> = [
     ...(metadata.turns?.length ? [{ key: "turns", label: countLabel(metadata.turns.length, "turn") }] : []),
     ...capabilityBadges,
-    ...(metadata.context ? [{ key: "context", label: contextLabel(metadata.context) }] : []),
-    ...(metadata.budget ? [{ key: "budget", label: budgetLabel(metadata.budget) }] : []),
+    ...(!metadata.context && metadata.budget
+      ? [{ key: "budget", label: budgetLabel(metadata.budget) }]
+      : []),
     ...(metadata.events?.length ? [{ key: "events", label: countLabel(metadata.events.length, "event") }] : []),
   ];
-  if (badges.length === 0) return null;
+  const modelIcon = metadata.provider ? providerIcon(metadata.provider) : undefined;
+  if (badges.length === 0 && !metadata.context) return null;
   return (
     <>
       {badges.map((badge) => (
@@ -266,6 +274,41 @@ function SessionMetadataBadges({ metadata }: { metadata: SessionMetadataSummary 
           <span className="truncate">{badge.label}</span>
         </span>
       ))}
+      {metadata.context && (
+        <ContextMeter
+          mode="bar"
+          usedPercent={100 - metadata.context.freePercent}
+          usedTokens={metadata.context.usedTokens}
+          windowTokens={metadata.context.windowTokens}
+          model={metadata.model}
+          {...(modelIcon ? { modelIcon } : {})}
+          {...(metadata.usage
+            ? {
+                tokens: {
+                  input: metadata.usage.inputTokens,
+                  output: metadata.usage.outputTokens,
+                  reasoning: metadata.usage.reasoningTokens,
+                  cacheRead: metadata.usage.cacheReadTokens,
+                  cacheWrite: metadata.usage.cacheWriteTokens,
+                  total: tokenTotal(metadata.usage),
+                },
+              }
+            : {})}
+          {...(metadata.cost
+            ? {
+                cost: {
+                  input: metadata.cost.inputCost,
+                  output: metadata.cost.outputCost,
+                  reasoning: metadata.cost.reasoningCost,
+                  cacheRead: metadata.cost.cacheReadCost,
+                  cacheWrite: metadata.cost.cacheWriteCost,
+                  total: costTotal(metadata.cost),
+                },
+              }
+            : {})}
+          {...(metadata.budget ? { budget: metadata.budget } : {})}
+        />
+      )}
     </>
   );
 }
@@ -281,12 +324,6 @@ function countLabel(count: number, label: string) {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
-function contextLabel(context: { freePercent: number; usedTokens?: number; windowTokens?: number }) {
-  const used = compactNumber(context.usedTokens ?? 0);
-  const total = compactNumber(context.windowTokens ?? 0);
-  return total ? `ctx ${context.freePercent}% free (${used}/${total})` : `ctx ${context.freePercent}% free`;
-}
-
 function budgetLabel(budget: { used?: number; total?: number; remaining?: number }) {
   if (budget.total !== undefined && budget.total > 0) {
     return `budget ${formatUSD(budget.used ?? 0)}/${formatUSD(budget.total)}`;
@@ -294,13 +331,6 @@ function budgetLabel(budget: { used?: number; total?: number; remaining?: number
   if (budget.remaining !== undefined) return `budget ${formatUSD(budget.remaining)} left`;
   if (budget.used !== undefined) return `budget ${formatUSD(budget.used)} used`;
   return "budget";
-}
-
-function compactNumber(value: number) {
-  if (!value) return "";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
-  return String(value);
 }
 
 function formatUSD(value: number) {

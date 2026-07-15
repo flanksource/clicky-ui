@@ -21,7 +21,18 @@ const FULL_SESSION: UnifiedSessionInput = {
   context: { usedTokens: 1500, windowTokens: 1_000_000, freePercent: 99 },
   budget: { used: 0.03, total: 1 },
   capabilities: { tools: ["Read", "Bash"], agents: ["general-purpose"], skills: ["gavel-runner"] },
-  events: [{ type: "last-prompt", scope: "session" }],
+  events: [
+    { type: "last-prompt", scope: "session" },
+    {
+      type: "memory_citation",
+      scope: "session",
+      turnId: "turn-1",
+      data: {
+        citation_entries: ["MEMORY.md:10-12|note=[session parser]"],
+        rollout_ids: ["019f3754-ecfa-7323-a76b-a0205ea30bbe"],
+      },
+    },
+  ],
   turns: [
     {
       id: "turn-1",
@@ -112,6 +123,8 @@ describe("SessionInspector", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Metadata" }));
     expect(screen.getByText("/repo/.claude/session.jsonl")).toBeInTheDocument();
     expect(screen.getByText("anthropic")).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/4 keys/));
+    expect(document.body.textContent).toContain("memory_citation");
 
     fireEvent.click(screen.getByRole("radio", { name: "Raw" }));
     expect(screen.getByText('"session-parity"')).toBeInTheDocument();

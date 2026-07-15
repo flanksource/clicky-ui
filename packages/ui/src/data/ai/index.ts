@@ -125,7 +125,14 @@ export {
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
-export { ContextUsage, type ContextUsageProps } from "../chat/ContextUsage";
+export {
+  ContextMeter,
+  type ContextMeterProps,
+  type ContextMeterMode,
+  type ContextMeterTokens,
+  type ContextMeterCost,
+  type ContextMeterBudget,
+} from "../chat/ContextMeter";
 
 export {
   serializeContext,
@@ -150,6 +157,25 @@ export {
   type SessionInspectorProps,
   type SessionInspectorTab,
 } from "./SessionInspector";
+export {
+  compactTokens,
+  costTotal,
+  formatCost,
+  tokenTotal,
+} from "./session-cost";
+export {
+  AGENT_RUNTIME_ICONS,
+  APPROVAL_ICONS,
+  EFFORT_ICONS,
+  PERMISSION_MODE_ICONS,
+  WORKFLOW_PHASES,
+  effortIcon,
+  type AgentActionMeta,
+  type AgentRuntime,
+  type ApprovalState,
+  type EffortLevel,
+  type WorkflowPhase,
+} from "./agent-action-icons";
 export {
   getSessionMetadata,
   getSessionAction,
@@ -189,14 +215,18 @@ export {
   type UnifiedSessionInput,
 } from "./SessionViewer.unified";
 export {
+  questionsFromToolInput,
   summarizeToolInput,
   toolDiff,
   toolInputParams,
   type DiffSegment,
+  type SessionQuestion,
+  type SessionQuestionOption,
   type ToolDiff,
   type ToolParam,
 } from "./SessionViewer.input";
 export {
+  CATEGORY_ICONS,
   CATEGORY_LABELS,
   classifyCommand,
   classifyToolCategory,

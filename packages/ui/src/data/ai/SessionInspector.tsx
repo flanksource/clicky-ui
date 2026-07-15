@@ -1,9 +1,21 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
+import {
+  UiBraces,
+  UiChatDots,
+  UiCoins,
+  UiFileText,
+  UiListDashes,
+  UiRepeat,
+  UiRobotAi,
+  UiSealCheck,
+  UiStrategy,
+} from "../../icons";
 import { cn } from "../../lib/utils";
 import { CodeBlock } from "../CodeBlock";
 import { KeyValueList, type KeyValueListItem } from "../KeyValueList";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
+import { compactTokens, costTotal, formatCost, tokenTotal } from "./session-cost";
 import type { SessionInput } from "./SessionViewer.model";
 import type {
   SessionAgent,
@@ -38,15 +50,15 @@ export interface SessionInspectorProps {
 }
 
 const TAB_OPTIONS: SegmentedOption<SessionInspectorTab>[] = [
-  { id: "transcript", label: "Transcript" },
-  { id: "turns", label: "Turns" },
-  { id: "agents", label: "Agents" },
-  { id: "files", label: "Files" },
-  { id: "plan", label: "Plan" },
-  { id: "approvals", label: "Approvals" },
-  { id: "costs", label: "Costs" },
-  { id: "metadata", label: "Metadata" },
-  { id: "raw", label: "Raw" },
+  { id: "transcript", label: "Transcript", icon: UiChatDots },
+  { id: "turns", label: "Turns", icon: UiRepeat },
+  { id: "agents", label: "Agents", icon: UiRobotAi },
+  { id: "files", label: "Files", icon: UiFileText },
+  { id: "plan", label: "Plan", icon: UiStrategy },
+  { id: "approvals", label: "Approvals", icon: UiSealCheck },
+  { id: "costs", label: "Costs", icon: UiCoins },
+  { id: "metadata", label: "Metadata", icon: UiListDashes },
+  { id: "raw", label: "Raw", icon: UiBraces },
 ];
 
 export function SessionInspector({
@@ -309,11 +321,11 @@ function CostsPanel({
         items={[
           kv("Tokens", usageLabel(usage ?? cost)),
           kv("Cost", costLabel(cost)),
-          kv("Input", compactNumber((usage ?? cost)?.inputTokens)),
-          kv("Output", compactNumber((usage ?? cost)?.outputTokens)),
-          kv("Reasoning", compactNumber((usage ?? cost)?.reasoningTokens)),
-          kv("Cache Read", compactNumber((usage ?? cost)?.cacheReadTokens)),
-          kv("Cache Write", compactNumber((usage ?? cost)?.cacheWriteTokens)),
+          kv("Input", compactTokens((usage ?? cost)?.inputTokens)),
+          kv("Output", compactTokens((usage ?? cost)?.outputTokens)),
+          kv("Reasoning", compactTokens((usage ?? cost)?.reasoningTokens)),
+          kv("Cache Read", compactTokens((usage ?? cost)?.cacheReadTokens)),
+          kv("Cache Write", compactTokens((usage ?? cost)?.cacheWriteTokens)),
         ]}
       />
       {toolCosts?.length ? <CostBreakdown costs={toolCosts} /> : null}
@@ -339,10 +351,10 @@ function CostBreakdown({ costs }: { costs: SessionCost[] }) {
           {costs.map((entry, index) => (
             <tr key={`${entry.model || "model"}-${index}`}>
               <Td>{entry.model || muted("unknown")}</Td>
-              <Td>{compactNumber(totalTokens(entry))}</Td>
-              <Td>{compactNumber(entry.inputTokens)}</Td>
-              <Td>{compactNumber(entry.outputTokens)}</Td>
-              <Td>{compactNumber((entry.cacheReadTokens ?? 0) + (entry.cacheWriteTokens ?? 0))}</Td>
+              <Td>{compactTokens(tokenTotal(entry))}</Td>
+              <Td>{compactTokens(entry.inputTokens)}</Td>
+              <Td>{compactTokens(entry.outputTokens)}</Td>
+              <Td>{compactTokens((entry.cacheReadTokens ?? 0) + (entry.cacheWriteTokens ?? 0))}</Td>
               <Td>{costLabel(entry)}</Td>
             </tr>
           ))}
@@ -499,48 +511,16 @@ function durationLabel(start?: string, end?: string) {
   return min ? `${hours}h ${min}m` : `${hours}h`;
 }
 
-function compactNumber(value?: number) {
-  if (!value) return "";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
-  return String(value);
-}
-
-function totalTokens(usage?: SessionUsage | SessionCost) {
-  if (!usage) return 0;
-  return (
-    usage.totalTokens ??
-    (usage.inputTokens ?? 0) +
-      (usage.outputTokens ?? 0) +
-      (usage.reasoningTokens ?? 0) +
-      (usage.cacheReadTokens ?? 0) +
-      (usage.cacheWriteTokens ?? 0)
-  );
-}
-
 function usageLabel(usage?: SessionUsage | SessionCost | Record<string, unknown>) {
-  const u = usage as SessionUsage | undefined;
-  const total = totalTokens(u);
+  const total = tokenTotal(usage as SessionUsage | undefined);
   if (!total) return muted("-");
-  return `${compactNumber(total)} tokens`;
-}
-
-function costTotal(cost?: SessionCost | Record<string, unknown>) {
-  const c = cost as SessionCost | undefined;
-  if (!c) return 0;
-  return (
-    (c.inputCost ?? 0) +
-    (c.outputCost ?? 0) +
-    (c.reasoningCost ?? 0) +
-    (c.cacheReadCost ?? 0) +
-    (c.cacheWriteCost ?? 0)
-  );
+  return `${compactTokens(total)} tokens`;
 }
 
 function costLabel(cost?: SessionCost | Record<string, unknown>) {
-  const total = costTotal(cost);
+  const total = costTotal(cost as SessionCost | undefined);
   if (!total) return muted("-");
-  return total < 0.01 ? `$${total.toFixed(4)}` : `$${total.toFixed(2)}`;
+  return formatCost(total);
 }
 
 function countLabel(count: number | undefined, label: string) {
@@ -550,8 +530,8 @@ function countLabel(count: number | undefined, label: string) {
 
 function contextLabel(context?: SessionContext) {
   if (!context) return muted("-");
-  const used = compactNumber(context.usedTokens);
-  const total = compactNumber(context.windowTokens);
+  const used = compactTokens(context.usedTokens);
+  const total = compactTokens(context.windowTokens);
   return total ? `${context.freePercent}% free (${used}/${total})` : `${context.freePercent}% free`;
 }
 

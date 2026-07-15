@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
+import { effortLevelIcon } from "../../chat/effort-icons";
 import type { ChatModel } from "../../chat/types";
 import { providerIcon } from "../../chat/provider-icons";
 import { Icon } from "../../Icon";
-import { Button } from "../../../components/button";
 import { IconButton } from "../../../components";
 import {
   UiAdd,
@@ -59,6 +59,11 @@ export function ModelSection({
   const selection = selectionForBackend(runtimeFamilies, value.backend);
   const family = familyById(runtimeFamilies, selection.family);
   const modelOptions = modelsForFamily(models, family, value.backend);
+  const selectedModel = models.find((m) => m.id === value.model);
+  // Show a control unless the resolved model reports it unsupported; an unknown
+  // selection or a catalog without the field keeps the control visible.
+  const showEffort = !selectedModel || selectedModel.reasoning;
+  const showTemperature = !selectedModel || selectedModel.temperature !== false;
 
   return (
     <div className="grid gap-density-2">
@@ -88,26 +93,30 @@ export function ModelSection({
             />
           )}
         </SpecField>
-        <SpecField label="Effort">
-          <EffortSelector
-            efforts={REASONING_EFFORTS}
-            value={value.effort ?? ""}
-            onChange={(effort) => onChange(withRoot(value, { effort }))}
-            className="w-full"
-            size="md"
+        {showEffort && (
+          <SpecField label="Effort">
+            <EffortSelector
+              efforts={REASONING_EFFORTS}
+              value={value.effort ?? ""}
+              onChange={(effort) => onChange(withRoot(value, { effort }))}
+              className="w-full"
+              size="md"
+            />
+          </SpecField>
+        )}
+        {showTemperature && (
+          <NumberField
+            label="Temperature"
+            value={value.temperature}
+            onChange={(temperature) =>
+              onChange(withOptionalRoot(value, "temperature", temperature))
+            }
+            icon={UiThermometer}
+            min={0}
+            max={2}
+            step={0.1}
           />
-        </SpecField>
-        <NumberField
-          label="Temperature"
-          value={value.temperature}
-          onChange={(temperature) =>
-            onChange(withOptionalRoot(value, "temperature", temperature))
-          }
-          icon={UiThermometer}
-          min={0}
-          max={2}
-          step={0.1}
-        />
+        )}
       </div>
       <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
         <NumberField
@@ -170,25 +179,23 @@ export function ModelAdvanced({
 }) {
   return (
     <div className="grid gap-density-2">
-      <div className="grid gap-density-2 md:grid-cols-2">
-        <FallbackModelsEditor
-          value={value}
-          onChange={onChange}
-          models={models}
-          {...(families ? { families } : {})}
+      <FallbackModelsEditor
+        value={value}
+        onChange={onChange}
+        models={models}
+        {...(families ? { families } : {})}
+      />
+      <SpecField label="Session ID">
+        <SpecInput
+          value={value.sessionId}
+          onChange={(sessionId) =>
+            onChange(withOptionalRoot(value, "sessionId", sessionId))
+          }
+          placeholder="session UUID"
+          icon={UiFingerprint}
+          mono
         />
-        <SpecField label="Session ID">
-          <SpecInput
-            value={value.sessionId}
-            onChange={(sessionId) =>
-              onChange(withOptionalRoot(value, "sessionId", sessionId))
-            }
-            placeholder="session UUID"
-            icon={UiFingerprint}
-            mono
-          />
-        </SpecField>
-      </div>
+      </SpecField>
       <CheckboxField
         label="Disable prompt caching"
         checked={value.noCache}
@@ -210,29 +217,42 @@ function FallbackModelsEditor({
   families?: SpecRuntimeFamily[] | undefined;
 }) {
   const fallbacks = value.fallbacks ?? [];
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<AISpecRuntimeModelFallback>(() =>
-    newFallbackDraft(value, families),
-  );
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  const setFallbacks = (nextFallbacks: AISpecRuntimeModelFallback[]) => {
+    onChange(withRoot(value, { fallbacks: nextFallbacks }));
+  };
 
   const removeFallback = (index: number) => {
-    onChange(
-      withRoot(value, {
-        fallbacks: fallbacks.filter((_, rowIndex) => rowIndex !== index),
-      }),
-    );
+    setFallbacks(fallbacks.filter((_, rowIndex) => rowIndex !== index));
+    setExpandedIndex((current) => {
+      if (current == null) return null;
+      if (current === index) return null;
+      return current > index ? current - 1 : current;
+    });
   };
 
   const addFallback = () => {
-    const fallback = compactFallbackDraft(draft);
-    if (!fallback) return;
-    onChange(withRoot(value, { fallbacks: [...fallbacks, fallback] }));
-    setDraft(newFallbackDraft(value, families));
-    setOpen(false);
+    const nextFallbacks = [...fallbacks, newFallbackDraft(value, families)];
+    setFallbacks(nextFallbacks);
+    setExpandedIndex(nextFallbacks.length - 1);
   };
 
-  const updateDraft = (patch: FallbackDraftPatch) => {
-    setDraft((current) => compactEditableFallback({ ...current, ...patch }));
+  const updateFallback = (index: number, nextFallback: FallbackDraftPatch) => {
+    setFallbacks(
+      fallbacks.map((fallback, rowIndex) =>
+        rowIndex === index ? compactEditableFallback(nextFallback) : fallback,
+      ),
+    );
+  };
+
+  const patchFallback = (index: number, patch: FallbackDraftPatch) => {
+    const fallback = fallbacks[index] ?? {};
+    updateFallback(index, { ...fallback, ...patch });
+  };
+
+  const toggleFallback = (index: number) => {
+    setExpandedIndex((current) => (current === index ? null : index));
   };
 
   return (
@@ -244,9 +264,7 @@ function FallbackModelsEditor({
         </div>
         <button
           type="button"
-          aria-expanded={open}
-          aria-controls="spec-runtime-fallback-picker"
-          onClick={() => setOpen((current) => !current)}
+          onClick={addFallback}
           className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-density-2 py-density-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Icon icon={UiAdd} className="size-3.5" />
@@ -261,22 +279,17 @@ function FallbackModelsEditor({
                 key={`${fallback.model ?? "fallback"}-${index}`}
                 fallback={fallback}
                 models={models}
+                families={families}
+                expanded={expandedIndex === index}
+                editorId={`spec-runtime-fallback-${index}-picker`}
+                onToggle={() => toggleFallback(index)}
+                onChange={(nextFallback) => updateFallback(index, nextFallback)}
+                onPatch={(patch) => patchFallback(index, patch)}
                 onRemove={() => removeFallback(index)}
               />
             ))}
           </div>
         </div>
-      )}
-      {open && (
-        <FallbackModelPicker
-          id="spec-runtime-fallback-picker"
-          value={draft}
-          onChange={setDraft}
-          onPatch={updateDraft}
-          onAdd={addFallback}
-          models={models}
-          families={families}
-        />
       )}
     </div>
   );
@@ -285,45 +298,84 @@ function FallbackModelsEditor({
 function FallbackModelRow({
   fallback,
   models,
+  families,
+  expanded,
+  editorId,
+  onToggle,
+  onChange,
+  onPatch,
   onRemove,
 }: {
   fallback: AISpecRuntimeModelFallback;
   models: ChatModel[];
+  families: SpecRuntimeFamily[];
+  expanded: boolean;
+  editorId: string;
+  onToggle: () => void;
+  onChange: (value: AISpecRuntimeModelFallback) => void;
+  onPatch: (patch: FallbackDraftPatch) => void;
   onRemove: () => void;
 }) {
   const meta = fallbackModelMeta(fallback, models);
   const Glyph = meta.provider ? providerIcon(meta.provider) : undefined;
-  const label = meta.label || "Model";
+  const label = meta.label || "Select model";
   return (
-    <div className="grid min-h-9 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-density-2 px-density-2 py-density-1">
-      {Glyph ? (
-        <Glyph className="size-4 shrink-0" />
-      ) : (
-        <Icon
-          icon={UiSparkles}
-          className="size-4 shrink-0 text-muted-foreground/70"
+    <div>
+      <div className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-density-1 px-density-1 py-density-1">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={editorId}
+          aria-label={`Edit fallback ${label}`}
+          onClick={onToggle}
+          className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-density-2 rounded-md px-density-1 py-density-1 text-left hover:bg-muted"
+        >
+          {Glyph ? (
+            <Glyph className="size-4 shrink-0" />
+          ) : (
+            <Icon
+              icon={UiSparkles}
+              className="size-4 shrink-0 text-muted-foreground/70"
+            />
+          )}
+          <span
+            className="min-w-0 truncate font-mono text-xs text-foreground"
+            title={label}
+          >
+            {label}
+          </span>
+          {fallback.effort ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+              {(() => {
+                const glyph = effortLevelIcon(fallback.effort);
+                return glyph ? <Icon icon={glyph} className="size-3" /> : null;
+              })()}
+              {formatEffort(fallback.effort)}
+            </span>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+        </button>
+        <IconButton
+          icon={UiTrash}
+          label={`Remove ${label}`}
+          onClick={onRemove}
+          className="size-6"
+          iconClassName="size-4"
         />
+      </div>
+      {expanded && (
+        <div className="border-t border-border p-density-2">
+          <FallbackModelPicker
+            id={editorId}
+            value={fallback}
+            onChange={onChange}
+            onPatch={onPatch}
+            models={models}
+            families={families}
+          />
+        </div>
       )}
-      <span
-        className="min-w-0 truncate font-mono text-xs text-foreground"
-        title={label}
-      >
-        {label}
-      </span>
-      {fallback.effort ? (
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
-          {formatEffort(fallback.effort)}
-        </span>
-      ) : (
-        <span aria-hidden="true" />
-      )}
-      <IconButton
-        icon={UiTrash}
-        label={`Remove ${label}`}
-        onClick={onRemove}
-        className="size-6"
-        iconClassName="size-4"
-      />
     </div>
   );
 }
@@ -333,7 +385,6 @@ function FallbackModelPicker({
   value,
   onChange,
   onPatch,
-  onAdd,
   models,
   families,
 }: {
@@ -341,7 +392,6 @@ function FallbackModelPicker({
   value: AISpecRuntimeModelFallback;
   onChange: (value: AISpecRuntimeModelFallback) => void;
   onPatch: (patch: FallbackDraftPatch) => void;
-  onAdd: () => void;
   models: ChatModel[];
   families: SpecRuntimeFamily[];
 }) {
@@ -349,7 +399,9 @@ function FallbackModelPicker({
     const family = familyForBackend(families, value.backend);
     return modelsForFamily(models, family, value.backend);
   }, [families, models, value.backend]);
-  const canAdd = Boolean(value.model?.trim());
+  const selectedModel = models.find((m) => m.id === value.model);
+  const showEffort = !selectedModel || selectedModel.reasoning;
+  const showTemperature = !selectedModel || selectedModel.temperature !== false;
 
   return (
     <div
@@ -385,36 +437,28 @@ function FallbackModelPicker({
               />
             )}
           </SpecField>
-          <SpecField label="Effort">
-            <EffortSelector
-              efforts={REASONING_EFFORTS}
-              value={value.effort ?? ""}
-              onChange={(effort) => onPatch({ effort })}
-              className="w-full"
-              size="md"
+          {showEffort && (
+            <SpecField label="Effort">
+              <EffortSelector
+                efforts={REASONING_EFFORTS}
+                value={value.effort ?? ""}
+                onChange={(effort) => onPatch({ effort })}
+                className="w-full"
+                size="md"
+              />
+            </SpecField>
+          )}
+          {showTemperature && (
+            <NumberField
+              label="Temperature"
+              value={value.temperature}
+              onChange={(temperature) => onPatch({ temperature })}
+              icon={UiThermometer}
+              min={0}
+              max={2}
+              step={0.1}
             />
-          </SpecField>
-          <NumberField
-            label="Temperature"
-            value={value.temperature}
-            onChange={(temperature) => onPatch({ temperature })}
-            icon={UiThermometer}
-            min={0}
-            max={2}
-            step={0.1}
-          />
-        </div>
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!canAdd}
-            onClick={onAdd}
-          >
-            <Icon icon={UiAdd} className="size-4" />
-            Add fallback
-          </Button>
+          )}
         </div>
       </div>
     </div>
@@ -459,13 +503,6 @@ function compactEditableFallback(
   return next;
 }
 
-function compactFallbackDraft(
-  value: AISpecRuntimeModelFallback,
-): AISpecRuntimeModelFallback | undefined {
-  const next = compactEditableFallback(value);
-  return next.model ? next : undefined;
-}
-
 function fallbackModelMeta(
   fallback: AISpecRuntimeModelFallback,
   models: ChatModel[],
@@ -476,7 +513,7 @@ function fallbackModelMeta(
   );
   if (match) return { label: match.label, provider: match.provider };
   return {
-    label: modelId || fallback.id || "Model",
+    label: modelId || fallback.id || "",
     provider: inferProvider(fallback),
   };
 }
