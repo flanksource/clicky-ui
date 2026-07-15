@@ -13,7 +13,15 @@ import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
 import { providerIcon } from "./provider-icons";
 import { ContextUsage } from "./ContextUsage";
-import type { ChatModel, ChatMessageMetadata, ChatUsageSummary, Suggestion, ToolResultRenderer } from "./types";
+import type {
+  ChatBudgetConfig,
+  ChatModel,
+  ChatMessageMetadata,
+  ChatUsageSummary,
+  ClaudePermissionMode,
+  Suggestion,
+  ToolResultRenderer,
+} from "./types";
 
 /** Assistant messages carry token usage + cost the backend rode on the finish
  *  part's `messageMetadata`. */
@@ -30,12 +38,26 @@ export type ChatProps = {
   modelsApi?: string | null;
   /** Initially selected model id; otherwise the first configured model. */
   defaultModel?: string;
+  /** Controlled selected model id. */
+  model?: string;
   /** Reasoning-effort options for capable models. */
   reasoningEfforts?: string[];
   /** Initially selected reasoning effort ("" = none). */
   defaultReasoningEffort?: string;
+  /** Controlled selected reasoning effort ("" = none). */
+  reasoningEffort?: string;
+  /** Sampling temperature forwarded to the backend when set. */
+  temperature?: number;
+  /** Per-request budget forwarded to the backend when set. */
+  budget?: ChatBudgetConfig;
+  /** Claude Agent SDK permission mode forwarded to the backend when set. */
+  permissionMode?: ClaudePermissionMode;
   /** Notified when the user changes the model. */
   onModelChange?: (id: string) => void;
+  /** Notified when the user changes reasoning effort. */
+  onReasoningEffortChange?: (effort: string) => void;
+  /** Notified when the user changes Claude permission mode. */
+  onPermissionModeChange?: (mode: ClaudePermissionMode) => void;
   /** Notified after each assistant turn with a usage snapshot (tokens used out
    *  of the model's context window + cumulative cost), for a usage gauge. */
   onUsage?: (usage: ChatUsageSummary) => void;
@@ -76,9 +98,15 @@ export function Chat({
   models: modelsProp,
   modelsApi = "/api/chat/models",
   defaultModel,
+  model: controlledModel,
   reasoningEfforts = DEFAULT_EFFORTS,
   defaultReasoningEffort = "",
+  reasoningEffort: controlledEffort,
+  temperature,
+  budget,
+  permissionMode,
   onModelChange,
+  onReasoningEffortChange,
   onUsage,
   suggestions,
   enableAttachments = false,
@@ -95,11 +123,17 @@ export function Chat({
   className,
 }: ChatProps) {
   const [models, setModels] = useState<ChatModel[]>(modelsProp ?? []);
-  const [model, setModel] = useState<string | undefined>(defaultModel);
-  const [effort, setEffort] = useState(defaultReasoningEffort);
+  const [model, setModel] = useState<string | undefined>(controlledModel ?? defaultModel);
+  const [effort, setEffort] = useState(controlledEffort ?? defaultReasoningEffort);
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const lastDefaultModel = useRef(defaultModel);
   const sentInitialPromptId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!modelsProp) return;
+    setModels(modelsProp);
+    setModel((m) => m ?? controlledModel ?? modelsProp.find((d) => d.configured !== false)?.id);
+  }, [modelsProp, controlledModel]);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
   useEffect(() => {
@@ -110,19 +144,30 @@ export function Chat({
       .then((data: ChatModel[]) => {
         if (cancelled) return;
         setModels(data);
-        setModel((m) => m ?? data.find((d) => d.configured !== false)?.id);
+        setModel((m) => m ?? controlledModel ?? data.find((d) => d.configured !== false)?.id);
       })
       .catch((err) => console.warn("clicky-ui: failed to load chat models", err));
     return () => {
       cancelled = true;
     };
-  }, [modelsProp, modelsApi]);
+  }, [modelsProp, modelsApi, controlledModel]);
 
   useEffect(() => {
+    if (controlledModel === undefined) return;
+    setModel(controlledModel);
+  }, [controlledModel]);
+
+  useEffect(() => {
+    if (controlledEffort === undefined) return;
+    setEffort(controlledEffort);
+  }, [controlledEffort]);
+
+  useEffect(() => {
+    if (controlledModel !== undefined) return;
     if (!defaultModel || defaultModel === lastDefaultModel.current) return;
     lastDefaultModel.current = defaultModel;
     setModel(defaultModel);
-  }, [defaultModel]);
+  }, [controlledModel, defaultModel]);
 
   const selectedModel = models.find((m) => m.id === model);
   const showEffort = !selectedModel || selectedModel.reasoning;
@@ -134,6 +179,11 @@ export function Chat({
     ...body,
     ...(model ? { model } : {}),
     ...(effort ? { reasoningEffort: effort } : {}),
+    ...(temperature !== undefined ? { temperature } : {}),
+    ...(budget && (budget.cost !== undefined || budget.maxTokens !== undefined)
+      ? { budget }
+      : {}),
+    ...(permissionMode ? { permissionMode } : {}),
     ...(toolApproval ? { toolApproval } : {}),
     ...(threadId ? { threadId } : {}),
   };
@@ -170,12 +220,14 @@ export function Chat({
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
     if (!meta) return;
-    const cost = meta.threadCostUsd ?? meta.cost;
+    const cost = meta.threadCostUsd ?? meta.costBreakdown?.totalUsd ?? meta.cost;
     const snapshot: ChatUsageSummary = {
       usedTokens: meta.contextTokens ?? meta.usage?.totalTokens ?? 0,
       maxTokens: selectedModel?.contextWindow ?? 0,
       messageCount: messages.length,
       ...(cost != null ? { cost } : {}),
+      ...(meta.usage ? { usage: meta.usage } : {}),
+      ...(meta.costBreakdown ? { costBreakdown: meta.costBreakdown } : {}),
       ...(selectedModel?.label ? { modelLabel: selectedModel.label } : {}),
     };
     setUsage(snapshot);
@@ -187,12 +239,17 @@ export function Chat({
     onModelChange?.(id);
   };
 
+  const onEffortSelect = (next: string) => {
+    setEffort(next);
+    onReasoningEffortChange?.(next);
+  };
+
   const ModelGlyph = providerIcon(selectedModel?.provider);
   const toolbar = models.length > 0 || showEffort || (usage && usage.maxTokens > 0) ? (
     <div className="flex flex-1 items-center gap-2">
       <ModelSelector models={models} value={model} onChange={onModelSelect} />
       {showEffort && (
-        <EffortSelector efforts={reasoningEfforts} value={effort} onChange={setEffort} />
+        <EffortSelector efforts={reasoningEfforts} value={effort} onChange={onEffortSelect} />
       )}
       {usage && usage.maxTokens > 0 && (
         <>

@@ -13,7 +13,7 @@
     "test:e2e": "pnpm --filter e2e test",
     "format": "prettier --write package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/storybook/package.json e2e/package.json",
     "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/storybook/package.json e2e/package.json",
-    "lint": "oxlint . --deny-warnings",
+    "lint": "pnpm --filter @flanksource/clicky-ui lint && pnpm --filter kitchen-sink lint && pnpm --filter storybook lint && pnpm --filter e2e lint",
     "typecheck": "tsc -b",
     "check": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm run format:check && pnpm run lint && pnpm run typecheck"
   },

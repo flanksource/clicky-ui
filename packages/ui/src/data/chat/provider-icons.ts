@@ -1,12 +1,13 @@
 import type { ComponentType } from "react";
-import { Anthropic, Gemini, Google, Openai } from "@flanksource/icons/mi";
+import { Claude, Gemini, Google, Openai } from "@flanksource/icons/mi";
 
 export type ProviderGlyph = ComponentType<{ className?: string }>;
 
 // Maps a backend provider id to its brand glyph. googleai surfaces as the Gemini
 // mark (the model family), plain google as the Google mark.
 const PROVIDER_ICONS: Record<string, ProviderGlyph> = {
-  anthropic: Anthropic,
+  anthropic: Claude,
+  claude: Claude,
   openai: Openai,
   google: Google,
   googleai: Gemini,

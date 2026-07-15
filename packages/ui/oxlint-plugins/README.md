@@ -12,13 +12,27 @@ without copying anything.
 ## Setup
 
 These rules require oxlint's [JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins.html)
-(oxlint `>=1.50`, Node `>=20.19`). Add the plugin and the rules you want to your
-downstream `.oxlintrc.json`:
+(oxlint `>=1.50`, Node `>=20.19`). Install oxlint in the consumer project. If
+the project does not already depend on `@flanksource/clicky-ui`, add that as
+the normal runtime dependency too:
+
+```bash
+pnpm add @flanksource/clicky-ui
+pnpm add -D oxlint
+```
+
+For npm or yarn, install `@flanksource/clicky-ui` as a regular dependency and
+`oxlint` with your package manager's development-dependency flag.
+
+Add the plugin and the rules you want to the downstream `.oxlintrc.json`:
 
 ```json
 {
   "jsPlugins": [
-    { "name": "clicky-ui", "specifier": "@flanksource/clicky-ui/oxlint-plugins" }
+    {
+      "name": "clicky-ui",
+      "specifier": "@flanksource/clicky-ui/oxlint-plugins"
+    }
   ],
   "rules": {
     "clicky-ui/prefer-clicky-components": "warn",
@@ -30,27 +44,49 @@ downstream `.oxlintrc.json`:
 }
 ```
 
+Add a script that points oxlint at the consumer source:
+
+```json
+{
+  "scripts": {
+    "lint:clicky-ui": "oxlint -c .oxlintrc.json src --deny-warnings"
+  }
+}
+```
+
+Run it with:
+
+```bash
+pnpm run lint:clicky-ui
+```
+
 The `specifier` form resolves through the package's `exports` map. If your
 toolchain can't resolve it, point `jsPlugins` at the file directly instead:
 
 ```json
 {
-  "jsPlugins": ["./node_modules/@flanksource/clicky-ui/oxlint-plugins/clicky-ui.js"]
+  "jsPlugins": [
+    "./node_modules/@flanksource/clicky-ui/oxlint-plugins/clicky-ui.js"
+  ]
 }
 ```
 
+In a monorepo or local sibling checkout, use the relative path from the consumer
+project to `clicky-ui/packages/ui/oxlint-plugins/clicky-ui.js`.
+
 Every rule is **opt-in** — nothing is enabled until you list it. Choose the
-severity (`"warn"` / `"error"`) per rule.
+severity (`"warn"` / `"error"`) per rule. If your script uses
+`--deny-warnings`, warning-level rules will still fail the command.
 
 ## Rules
 
-| Rule | Flags | Use instead |
-| --- | --- | --- |
-| `clicky-ui/prefer-clicky-components` | Native `<button>`, `<select>`, `<table>`, `<dialog>` that re-implement a shipped component | `Button`/`IconButton`, `Select`/`Combobox`, `DataTable`, `Modal` |
-| `clicky-ui/no-adhoc-overlay` | `role="dialog"`/`"alertdialog"`, arbitrary `z-[N]` classes, `style={{ zIndex: N }}` | `Modal`, `DropdownMenu`, `Toast`, and the `zIndex` scale |
-| `clicky-ui/prefer-tailwind-classes` | Inline `style` with **static** spacing/layout/typography values (`padding`, `margin`, `gap`, `display`, `fontWeight`, …) | Tailwind utilities + density utilities (`p-density-4`, `gap-density-2`) |
-| `clicky-ui/prefer-theme-tokens` | Hardcoded colors (`text-[#fff]`, `style={{ color: "#fff" }}`) and hand-reading the `clicky-ui-theme`/`clicky-ui-density` storage keys | Semantic tokens (`text-foreground`, `bg-background`, …) and the `useTheme`/`useDensity` hooks |
-| `clicky-ui/prefer-clicky-icons` | Icon imports from third-party libraries (lucide, react-icons, heroicons, MUI, phosphor, tabler, font-awesome, …), emoji used as icons, and raw iconify name strings (`codicon:clock`, `lucide:activity`, …) passed as a value/argument | `@flanksource/clicky-ui/icons` (`Ui*`), `@flanksource/icons/mi`, or `@iconify/react` |
+| Rule                                 | Flags                                                                                                                                                                                                                                  | Use instead                                                                                   |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `clicky-ui/prefer-clicky-components` | Native `<button>`, `<select>`, `<table>`, `<dialog>` that re-implement a shipped component                                                                                                                                             | `Button`/`IconButton`, `Select`/`Combobox`, `DataTable`, `Modal`                              |
+| `clicky-ui/no-adhoc-overlay`         | `role="dialog"`/`"alertdialog"`, arbitrary `z-[N]` classes, `style={{ zIndex: N }}`                                                                                                                                                    | `Modal`, `DropdownMenu`, `Toast`, and the `zIndex` scale                                      |
+| `clicky-ui/prefer-tailwind-classes`  | Inline `style` with **static** spacing/layout/typography values (`padding`, `margin`, `gap`, `display`, `fontWeight`, …)                                                                                                               | Tailwind utilities + density utilities (`p-density-4`, `gap-density-2`)                       |
+| `clicky-ui/prefer-theme-tokens`      | Hardcoded colors (`text-[#fff]`, `style={{ color: "#fff" }}`) and hand-reading the `clicky-ui-theme`/`clicky-ui-density` storage keys                                                                                                  | Semantic tokens (`text-foreground`, `bg-background`, …) and the `useTheme`/`useDensity` hooks |
+| `clicky-ui/prefer-clicky-icons`      | Icon imports from third-party libraries (lucide, react-icons, heroicons, MUI, phosphor, tabler, font-awesome, …), emoji used as icons, and raw iconify name strings (`codicon:clock`, `lucide:activity`, …) passed as a value/argument | `@flanksource/clicky-ui/icons` (`Ui*`), `@flanksource/icons/mi`, or `@iconify/react`          |
 
 ### `prefer-clicky-components`
 
@@ -76,11 +112,15 @@ compile to nothing.
 
 ```tsx
 // ✗ flagged
-<div role="dialog" className="z-[9999]">…</div>;
+<div role="dialog" className="z-[9999]">
+  …
+</div>;
 
 // ✓
 import { Modal } from "@flanksource/clicky-ui/components";
-<Modal open={open} onClose={close}>…</Modal>;
+<Modal open={open} onClose={close}>
+  …
+</Modal>;
 ```
 
 ### `prefer-tailwind-classes`

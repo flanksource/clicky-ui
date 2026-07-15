@@ -248,7 +248,7 @@ function schemaToProperty(
   if (!schema) {
     return { type: "string" };
   }
-  const prop: JSONSchemaProperty = { type: schema.type ?? "string" };
+  const prop: JSONSchemaProperty = { type: jsonSchemaType(schema.type) };
   if (schema.description !== undefined) {
     prop.description = schema.description;
   }
@@ -259,6 +259,21 @@ function schemaToProperty(
     prop.default = schema.default;
   }
   return prop;
+}
+
+function jsonSchemaType(type: string | undefined): NonNullable<JSONSchemaProperty["type"]> {
+  switch (type) {
+    case "object":
+    case "array":
+    case "string":
+    case "integer":
+    case "number":
+    case "boolean":
+    case "null":
+      return type;
+    default:
+      return "string";
+  }
 }
 
 function requestBodySchema(

@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import { Combobox } from "../../components/Combobox";
+import { SegmentedControl } from "../../components/SegmentedControl";
+import type { StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
 import { providerIcon } from "./provider-icons";
-import type { ChatModel } from "./types";
+import type { ChatBudgetConfig, ChatModel } from "./types";
 
 export type ModelSelectorProps = {
   models: ChatModel[];
@@ -33,7 +36,7 @@ export function ModelSelector({ models, value, onChange, className }: ModelSelec
         const Icon = providerIcon(m.provider);
         return {
           value: m.id,
-          label: m.reasoning ? `${m.label} ·🧠` : m.label,
+          label: m.label,
           ...(Icon ? { icon: <Icon className="size-4" /> } : {}),
           disabled: m.configured === false,
         };
@@ -67,4 +70,123 @@ export function EffortSelector({ efforts, value, onChange, className }: EffortSe
       ]}
     />
   );
+}
+
+export type ProviderSelectorOption<T extends string = string> = {
+  id: T;
+  label: ReactNode;
+  /** Provider id used for the default brand glyph when `icon` is omitted. */
+  provider?: string | undefined;
+  icon?: string | StaticIconComponent | undefined;
+  title?: string | undefined;
+  disabled?: boolean | undefined;
+};
+
+export type ProviderSelectorProps<T extends string = string> = {
+  providers: ProviderSelectorOption<T>[];
+  value: T;
+  onChange: (provider: T) => void;
+  className?: string | undefined;
+  ariaLabel?: string | undefined;
+};
+
+/** Segmented AI provider picker with the same provider glyphs used by the model
+ * selector. Use when the backend needs the provider/agent axis separate from the
+ * concrete model id. */
+export function ProviderSelector<T extends string = string>({
+  providers,
+  value,
+  onChange,
+  className,
+  ariaLabel = "AI provider",
+}: ProviderSelectorProps<T>) {
+  return (
+    <SegmentedControl
+      aria-label={ariaLabel}
+      size="sm"
+      value={value}
+      onChange={onChange}
+      className={cn("w-fit", className)}
+      options={providers.map((provider) => {
+        const icon = provider.icon ?? providerIcon(provider.provider);
+        return {
+          id: provider.id,
+          label: provider.label,
+          ...(provider.title ? { title: provider.title } : {}),
+          ...(provider.disabled !== undefined ? { disabled: provider.disabled } : {}),
+          ...(icon ? { icon } : {}),
+        };
+      })}
+    />
+  );
+}
+
+export type BudgetSelectorProps = {
+  budget?: ChatBudgetConfig | undefined;
+  onBudgetChange: (budget: ChatBudgetConfig) => void;
+  className?: string | undefined;
+  disabled?: boolean | undefined;
+  costLabel?: string | undefined;
+  maxTokensLabel?: string | undefined;
+  maxTokensStep?: number | undefined;
+};
+
+/** Compact budget fields matching the advanced chat settings surface. Callers may
+ * relabel the token field when their payload contract uses a different budgeted
+ * unit, such as conversation turns. */
+export function BudgetSelector({
+  budget,
+  onBudgetChange,
+  className,
+  disabled = false,
+  costLabel = "Max cost",
+  maxTokensLabel = "Max tokens",
+  maxTokensStep = 1,
+}: BudgetSelectorProps) {
+  const updateBudget = (key: keyof ChatBudgetConfig, raw: string, integer = false) => {
+    const next: ChatBudgetConfig = { ...budget };
+    const parsed = parseOptionalNumber(raw, integer);
+    if (parsed === undefined) {
+      delete next[key];
+    } else {
+      next[key] = parsed;
+    }
+    onBudgetChange(next);
+  };
+
+  return (
+    <div className={cn("grid grid-cols-2 gap-3", className)}>
+      <label className="space-y-1 text-xs">
+        <span className="text-muted-foreground">{costLabel}</span>
+        <input
+          type="number"
+          min={0}
+          step={0.01}
+          value={budget?.cost ?? ""}
+          onChange={(event) => updateBudget("cost", event.target.value)}
+          disabled={disabled}
+          className="h-8 w-full rounded border border-border bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </label>
+      <label className="space-y-1 text-xs">
+        <span className="text-muted-foreground">{maxTokensLabel}</span>
+        <input
+          type="number"
+          min={0}
+          step={maxTokensStep}
+          value={budget?.maxTokens ?? ""}
+          onChange={(event) => updateBudget("maxTokens", event.target.value, maxTokensStep >= 1)}
+          disabled={disabled}
+          className="h-8 w-full rounded border border-border bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </label>
+    </div>
+  );
+}
+
+function parseOptionalNumber(raw: string, integer = false): number | undefined {
+  if (raw.trim() === "") return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return undefined;
+  return integer ? Math.max(0, Math.trunc(value)) : value;
 }

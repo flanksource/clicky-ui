@@ -97,6 +97,8 @@ export interface SessionEvent {
   toolResponse?: string;
   /** Prose for user/assistant/thinking, or the error message for errors. */
   text?: string;
+  /** Working directory the tool ran in — used to relativize file paths. */
+  cwd?: string;
   timestamp?: string;
   model?: string;
   reasoningEffort?: string;
@@ -147,7 +149,7 @@ function toolEvent(
   input: Record<string, unknown> | undefined,
   response: string | undefined,
   timestamp: string | undefined,
-  meta: { model?: string; reasoningEffort?: string; source?: string } = {},
+  meta: { model?: string; reasoningEffort?: string; source?: string; cwd?: string } = {},
 ): SessionEvent {
   return {
     id,
@@ -159,6 +161,7 @@ function toolEvent(
     ...(meta.model ? { model: meta.model } : {}),
     ...(meta.reasoningEffort ? { reasoningEffort: meta.reasoningEffort } : {}),
     ...(meta.source ? { source: meta.source } : {}),
+    ...(meta.cwd ? { cwd: meta.cwd } : {}),
   };
 }
 
@@ -167,10 +170,11 @@ function blockEvent(
   role: string,
   id: string,
   timestamp: string | undefined,
+  cwd: string | undefined,
 ): SessionEvent | null {
   if (block.type === "tool_use" || (block.name && block.input)) {
     if (!block.name) return null;
-    return toolEvent(id, block.name, block.input, undefined, timestamp);
+    return toolEvent(id, block.name, block.input, undefined, timestamp, cwd ? { cwd } : {});
   }
   if (block.type === "thinking" || block.thinking) {
     const text = block.thinking ?? block.text;
@@ -208,11 +212,13 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
 
     const tu = entry.tool_use;
     if (tu?.tool) {
+      const cwd = tu.cwd ?? entry.cwd;
       events.push(
         toolEvent(`${baseId}-tool`, tu.tool, tu.input, tu.response, tu.timestamp ?? entry.timestamp, {
           ...(tu.model ? { model: tu.model } : {}),
           ...(tu.reasoning_effort ? { reasoningEffort: tu.reasoning_effort } : {}),
           ...(tu.source ? { source: tu.source } : {}),
+          ...(cwd ? { cwd } : {}),
         }),
       );
       return;
@@ -220,7 +226,7 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
 
     const role = roleFromType(entry.message?.role ?? entry.type);
     for (const [i, block] of (entry.message?.content ?? []).entries()) {
-      const ev = blockEvent(block, role, `${baseId}-${i}`, entry.timestamp);
+      const ev = blockEvent(block, role, `${baseId}-${i}`, entry.timestamp, entry.cwd);
       if (ev) events.push(ev);
     }
   });
@@ -253,17 +259,20 @@ export type SessionTone =
 export interface SessionActionMeta {
   icon: StaticIconComponent;
   tone: SessionTone;
-  /** Human-readable verb shown as the row heading. */
+  /** Human-readable verb shown as the row heading (and in the filter menu). */
   label: string;
+  /** The row heading is the input summary alone (file path, command) — the
+   *  icon and tone carry the verb, so the label only appears in the menu. */
+  summaryOnly?: boolean;
 }
 
 const ACTIONS: Record<string, SessionActionMeta> = {
   // File operations
-  Read: { icon: UiFileText, tone: "sky", label: "Read file" },
-  Write: { icon: UiSave, tone: "amber", label: "Write file" },
-  Edit: { icon: UiEdit, tone: "violet", label: "Edit file" },
-  MultiEdit: { icon: UiLayers, tone: "violet", label: "Multi-edit" },
-  NotebookEdit: { icon: UiEdit, tone: "violet", label: "Edit notebook" },
+  Read: { icon: UiFileText, tone: "sky", label: "Read file", summaryOnly: true },
+  Write: { icon: UiSave, tone: "amber", label: "Write file", summaryOnly: true },
+  Edit: { icon: UiEdit, tone: "violet", label: "Edit file", summaryOnly: true },
+  MultiEdit: { icon: UiLayers, tone: "violet", label: "Multi-edit", summaryOnly: true },
+  NotebookEdit: { icon: UiEdit, tone: "violet", label: "Edit notebook", summaryOnly: true },
   // Search & navigation
   Grep: { icon: UiSearch, tone: "amber", label: "Grep" },
   Glob: { icon: UiFileSearch, tone: "sky", label: "Glob" },
@@ -339,17 +348,65 @@ export function getSessionAction(tool: string): SessionActionMeta {
 }
 
 /** The raw shell command of a shell-execution tool call, if present. Shell rows
- *  render this as the row heading and as a bash code block instead of the
- *  generic label + tool-input JSON. */
+ *  render this inline as a bash code block instead of the generic label +
+ *  tool-input JSON. */
 export function shellCommand(tool: string, input?: Record<string, unknown>): string | undefined {
   if (tool !== "Bash") return undefined;
   const command = input?.["command"];
   return typeof command === "string" && command ? command : undefined;
 }
 
+/** Strip the event's working directory from an absolute file path. */
+export function relativizePath(path: string, cwd?: string): string {
+  if (!cwd) return path;
+  const base = cwd.replace(/\/+$/, "");
+  return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
+}
+
+export interface ToolParam {
+  name: string;
+  value: string;
+}
+
+// Keys already rendered elsewhere in the row — the file-path heading or the
+// inline shell command — so they don't repeat as inline params.
+const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
+  Bash: ["command"],
+  Read: ["file_path", "notebook_path", "path"],
+  Write: ["file_path", "notebook_path", "path"],
+  Edit: ["file_path", "notebook_path", "path"],
+  MultiEdit: ["file_path", "notebook_path", "path"],
+  NotebookEdit: ["file_path", "notebook_path", "path"],
+};
+
+/** Flatten a tool's input into JetBrains-style `name: value` inline params:
+ *  single-line values, cwd-relativized and truncated so the row never wraps. */
+export function toolInputParams(
+  tool: string,
+  input?: Record<string, unknown>,
+  cwd?: string,
+): ToolParam[] {
+  const consumed = CONSUMED_INPUT_KEYS[tool] ?? [];
+  return Object.entries(input ?? {})
+    .filter(
+      ([name, value]) =>
+        !consumed.includes(name) && value !== undefined && value !== null && value !== "",
+    )
+    .map(([name, value]) => ({ name, value: paramValue(value, cwd) }));
+}
+
+function paramValue(value: unknown, cwd?: string): string {
+  const text = typeof value === "string" ? relativizePath(value, cwd) : JSON.stringify(value);
+  return truncate(text.replace(/\s+/g, " ").trim(), 60);
+}
+
 // summarizeToolInput condenses a tool's input into a one-line preview, ported
 // from captain's history.FormatToolUseSummary so the viewer reads like the CLI.
-export function summarizeToolInput(tool: string, input?: Record<string, unknown>): string {
+export function summarizeToolInput(
+  tool: string,
+  input?: Record<string, unknown>,
+  cwd?: string,
+): string {
   if (!input) return "";
   const str = (key: string): string => (typeof input[key] === "string" ? (input[key] as string) : "");
   const first = (...keys: string[]): string => {
@@ -375,7 +432,7 @@ export function summarizeToolInput(tool: string, input?: Record<string, unknown>
     case "Edit":
     case "MultiEdit":
     case "NotebookEdit":
-      return first("file_path", "notebook_path", "path");
+      return relativizePath(first("file_path", "notebook_path", "path"), cwd);
     case "Grep":
       return [str("pattern"), str("path")].filter(Boolean).join(" ");
     case "Glob":
