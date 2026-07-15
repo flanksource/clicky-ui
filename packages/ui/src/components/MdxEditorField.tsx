@@ -9,6 +9,9 @@ type MdxEditorModule = typeof import("@mdxeditor/editor");
 
 export type {
   MdxEditorAdmonitionOptions,
+  MdxEditorCodeBlockEditorContext,
+  MdxEditorCodeBlockEditorDescriptor,
+  MdxEditorCodeBlockEditorProps,
   MdxEditorCodeBlockLanguage,
   MdxEditorCodeBlockOptions,
   MdxEditorCodeMirrorOptions,

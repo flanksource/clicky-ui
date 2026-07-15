@@ -7,7 +7,7 @@ import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
 import { useEscapeLayer, useModalStack } from "./modalStack";
 import { zIndex } from "./zIndex";
 
-export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
+export type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "full";
 
 /** Copy for the discard-confirmation prompt shown before a guarded close. */
 export type ConfirmCloseOptions = {
@@ -66,6 +66,7 @@ const sizeClass: Record<ModalSize, string> = {
   md: "max-w-md",
   lg: "max-w-2xl",
   xl: "max-w-4xl",
+  "2xl": "max-w-6xl",
   full: "max-w-[95vw]",
 };
 
@@ -187,7 +188,9 @@ export function Modal({
                 <button
                   type="button"
                   onClick={() => setExpanded((v) => !v)}
-                  aria-label={expanded ? "Restore size" : "Expand to fullscreen"}
+                  aria-label={
+                    expanded ? "Restore size" : "Expand to fullscreen"
+                  }
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <Icon icon={expanded ? UiFullscreenFilled : UiFullscreen} />
@@ -207,11 +210,21 @@ export function Modal({
             {subtitle ? <div className="mt-density-2">{subtitle}</div> : null}
           </div>
         )}
-        <div className="flex-1 overflow-auto px-density-4 py-density-3">{children}</div>
-        {footer && <div className="px-density-4 py-density-3 border-t border-border">{footer}</div>}
+        <div className="flex-1 overflow-auto px-density-4 py-density-3">
+          {children}
+        </div>
+        {footer && (
+          <div className="px-density-4 py-density-3 border-t border-border">
+            {footer}
+          </div>
+        )}
         {confirming && (
           <ConfirmClosePrompt
-            options={confirmClose === true ? DEFAULT_CONFIRM : { ...DEFAULT_CONFIRM, ...confirmClose }}
+            options={
+              confirmClose === true
+                ? DEFAULT_CONFIRM
+                : { ...DEFAULT_CONFIRM, ...confirmClose }
+            }
             onConfirm={() => {
               setConfirming(false);
               onClose();
@@ -227,7 +240,9 @@ export function Modal({
   // transform/overflow (e.g. a dropdown menu positioned via a CSS transform),
   // which would otherwise trap position:fixed inside that ancestor's box and clip
   // the modal to it.
-  return typeof document !== "undefined" ? createPortal(overlay, document.body) : null;
+  return typeof document !== "undefined"
+    ? createPortal(overlay, document.body)
+    : null;
 }
 
 function ConfirmClosePrompt({
@@ -244,12 +259,16 @@ function ConfirmClosePrompt({
       className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 p-density-4"
       role="alertdialog"
       aria-modal="true"
-      aria-label={typeof options.title === "string" ? options.title : "Confirm close"}
+      aria-label={
+        typeof options.title === "string" ? options.title : "Confirm close"
+      }
       onClick={(e) => e.stopPropagation()}
     >
       <div className="w-full max-w-sm rounded-lg border border-border bg-background p-density-4 shadow-xl">
         <h3 className="text-sm font-semibold">{options.title}</h3>
-        <p className="mt-density-2 text-sm text-muted-foreground">{options.message}</p>
+        <p className="mt-density-2 text-sm text-muted-foreground">
+          {options.message}
+        </p>
         <div className="mt-density-4 flex justify-end gap-density-2">
           <Button variant="ghost" size="sm" onClick={onCancel}>
             {options.cancelLabel}

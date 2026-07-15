@@ -20,6 +20,30 @@ function MultiSelectHarness() {
 }
 
 describe("MultiSelect", () => {
+  it("uses the density control height for the default trigger", () => {
+    render(<MultiSelectHarness />);
+
+    expect(screen.getByRole("button", { name: /status filter/i }).className).toContain(
+      "h-control-h",
+    );
+  });
+
+  it("lets triggerClassName override the default height for compact contexts", () => {
+    render(
+      <MultiSelect
+        placeholder="Status"
+        value={[]}
+        onChange={() => {}}
+        triggerClassName="h-6"
+        options={[{ value: "healthy", label: "Healthy" }]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /status filter/i });
+    expect(trigger.className).toContain("h-6");
+    expect(trigger.className).not.toContain("h-control-h");
+  });
+
   it("selects values and clears them", () => {
     render(<MultiSelectHarness />);
 

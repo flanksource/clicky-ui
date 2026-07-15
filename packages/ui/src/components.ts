@@ -9,6 +9,7 @@ export {
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
+export { InputField, type InputFieldProps } from "./components/InputField";
 export {
   SegmentedControl,
   type SegmentedControlProps,

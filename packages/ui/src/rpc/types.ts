@@ -143,6 +143,20 @@ export interface ClickyOperationMeta {
   supportsLookup?: boolean;
   supportsFilterMode?: boolean;
   group?: string;
+  toolHints?: ClickyToolHints;
+}
+
+export interface ClickyToolHints {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  icon?: string;
+  group?: string;
+  parent?: string;
+  defaultPermission?: "on" | "ask" | "off" | "auto";
+  strict?: boolean;
 }
 
 export type OperationLookupFilterType =

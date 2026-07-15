@@ -111,7 +111,6 @@ export function MultiSelect({
         ref={refs.setReference as Ref<HTMLButtonElement>}
         type="button"
         variant="outline"
-        size="sm"
         disabled={disabled}
         aria-label={ariaLabel ?? `${placeholder} filter`}
         className={cn(

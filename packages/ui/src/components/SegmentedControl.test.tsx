@@ -11,20 +11,56 @@ const OPTIONS: SegmentedOption[] = [
 
 function Controlled({ initial = "all" }: { initial?: string }) {
   const [value, setValue] = useState(initial);
-  return <SegmentedControl aria-label="Scope" value={value} onChange={setValue} options={OPTIONS} />;
+  return (
+    <SegmentedControl
+      aria-label="Scope"
+      value={value}
+      onChange={setValue}
+      options={OPTIONS}
+    />
+  );
 }
 
 describe("SegmentedControl", () => {
+  it("uses the density control height for the default md track", () => {
+    render(<Controlled initial="all" />);
+    expect(screen.getByRole("radiogroup", { name: "Scope" })).toHaveClass("h-control-h");
+  });
+
+  it("keeps sm as an explicit compact segmented control", () => {
+    render(
+      <SegmentedControl
+        aria-label="Scope"
+        value="all"
+        onChange={() => {}}
+        options={OPTIONS}
+        size="sm"
+      />,
+    );
+    expect(screen.getByRole("radiogroup", { name: "Scope" })).not.toHaveClass("h-control-h");
+  });
+
   it("marks the selected option via aria-checked", () => {
     render(<Controlled initial="all" />);
-    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("radio", { name: "Mine" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "Mine" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   it("emits the clicked option id", () => {
     const onChange = vi.fn();
     render(
-      <SegmentedControl aria-label="Scope" value="all" onChange={onChange} options={OPTIONS} />,
+      <SegmentedControl
+        aria-label="Scope"
+        value="all"
+        onChange={onChange}
+        options={OPTIONS}
+      />,
     );
     fireEvent.click(screen.getByRole("radio", { name: "Mine" }));
     expect(onChange).toHaveBeenCalledExactlyOnceWith("me");
@@ -32,8 +68,17 @@ describe("SegmentedControl", () => {
 
   it("moves selection to the next option on ArrowRight", () => {
     const onChange = vi.fn();
-    render(<SegmentedControl aria-label="Scope" value="me" onChange={onChange} options={OPTIONS} />);
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Mine" }), { key: "ArrowRight" });
+    render(
+      <SegmentedControl
+        aria-label="Scope"
+        value="me"
+        onChange={onChange}
+        options={OPTIONS}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Mine" }), {
+      key: "ArrowRight",
+    });
     expect(onChange).toHaveBeenCalledExactlyOnceWith("all");
   });
 
@@ -52,5 +97,40 @@ describe("SegmentedControl", () => {
     );
     fireEvent.click(screen.getByRole("radio", { name: "Week" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("renders large wrapped options with descriptions", () => {
+    render(
+      <SegmentedControl
+        aria-label="Permission preset"
+        value="edit"
+        onChange={() => {}}
+        size="lg"
+        wrap
+        options={[
+          {
+            id: "edit",
+            label: "Edit",
+            description: "Edits auto, shell asks.",
+          },
+          {
+            id: "plan",
+            label: "Plan",
+            description: "Writes off.",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Edit/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("Edits auto, shell asks.")).toBeInTheDocument();
+    expect(screen.getByText("Edits auto, shell asks.")).not.toHaveClass("truncate");
+    expect(screen.getByText("Edits auto, shell asks.")).toHaveClass("whitespace-normal");
+    expect(
+      screen.getByRole("radiogroup", { name: "Permission preset" }),
+    ).toHaveClass("flex-wrap");
   });
 });
