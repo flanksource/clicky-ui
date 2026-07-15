@@ -8,6 +8,7 @@ export function FilterBarDemo() {
     healthy: "include",
   });
   const [owner, setOwner] = useState("");
+  const [client, setClient] = useState<string[]>([]);
   const [namespace, setNamespace] = useState("");
   const [cluster, setCluster] = useState("");
   const [component, setComponent] = useState("");
@@ -28,6 +29,18 @@ export function FilterBarDemo() {
         { value: "degraded", label: "Degraded" },
         { value: "pending", label: "Pending" },
       ],
+    },
+    {
+      key: "client",
+      kind: "lookup-multi",
+      label: "Client",
+      value: client,
+      onChange: setClient,
+      options: [
+        { value: "smith", label: "Smith" },
+        { value: "jones", label: "Jones" },
+      ],
+      placeholder: "Name or GUID",
     },
     {
       key: "owner",

@@ -1,3 +1,4 @@
+import { isValidElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   effectiveProperties,
@@ -18,6 +19,21 @@ function control(key: string, prop: JsonSchemaProperty, required = false, value:
 describe("resolveControl", () => {
   it("infers a string control for a plain string property", () => {
     expect(control("Name", { type: "string" }).kind).toBe("string");
+  });
+
+  it("resolves schema description and x-help into helper text", () => {
+    const c = control("cwd", {
+      type: "string",
+      description: "Default working directory.",
+      "x-help": {
+        source: "fixtures --help",
+        section: "CWD resolution",
+        body: "Relative paths resolve from the fixture file.",
+      },
+    });
+    expect(c.helper).toBe(
+      "Default working directory. Relative paths resolve from the fixture file.",
+    );
   });
 
   it("infers a number control with minimum for integer/number", () => {
@@ -132,6 +148,20 @@ describe("resolveControl", () => {
     expect(c.itemSchema).toEqual({ type: "string" });
   });
 
+  it("resolves enum-backed arrays as filter-pill controls when requested", () => {
+    const c = control("framework", {
+      type: "array",
+      "x-array-display": "filter-pills",
+      items: { type: "string", enum: ["go test", "vitest"] },
+    });
+    expect(c.kind).toBe("array");
+    expect(c.arrayDisplay).toBe("filter-pills");
+    expect(c.options).toEqual([
+      { value: "go test", label: "go test" },
+      { value: "vitest", label: "vitest" },
+    ]);
+  });
+
   it("infers a string-map control for object + object additionalProperties", () => {
     const c = control("members", {
       type: "object",
@@ -154,6 +184,26 @@ describe("resolveControl", () => {
     expect(c.objectRequired).toEqual(["policyStatus"]);
   });
 
+  it("infers an object control when fixed properties come from unconditional allOf", () => {
+    const c = control("shape", {
+      type: "object",
+      allOf: [
+        {
+          properties: {
+            PayoutBankName: { type: "string" },
+            RiskRating: { type: "string", enum: ["Low", "High"] },
+          },
+          required: ["RiskRating"],
+        },
+      ],
+      unevaluatedProperties: false,
+    } as JsonSchemaProperty);
+    expect(c.kind).toBe("object");
+    expect(c.objectProperties).toHaveProperty("PayoutBankName");
+    expect(c.objectProperties).toHaveProperty("RiskRating");
+    expect(c.objectRequired).toEqual(["RiskRating"]);
+  });
+
   it("keeps an open map with known properties as a string-map", () => {
     const c = control("members", {
       type: "object",
@@ -163,6 +213,17 @@ describe("resolveControl", () => {
     expect(c.kind).toBe("string-map");
     expect(c.allowExtraKeys).toBe(true);
     expect(c.knownProperties).toHaveProperty("RecordGroupId");
+  });
+
+  it("keeps patternProperties objects as string-maps", () => {
+    const c = control("headers", {
+      type: "object",
+      patternProperties: {
+        "^x-": { type: "string" },
+      },
+    });
+    expect(c.kind).toBe("string-map");
+    expect(c.valuePatternSchemas).toEqual([{ pattern: "^x-", schema: { type: "string" } }]);
   });
 
   it("falls back to an open string-map for a bare object", () => {
@@ -435,5 +496,63 @@ describe("isScalarStringItems", () => {
     expect(isScalarStringItems({ type: "object", properties: {} })).toBe(false);
     expect(isScalarStringItems({ type: "array", items: { type: "string" } })).toBe(false);
     expect(isScalarStringItems({ type: "number" })).toBe(false);
+  });
+});
+
+describe("resolveControl presentation extensions", () => {
+  it("resolves x-enum-display: segmented", () => {
+    const c = control("mode", { type: "string", enum: ["a", "b"], "x-enum-display": "segmented" });
+    expect(c.kind).toBe("enum");
+    expect(c.display).toBe("segmented");
+  });
+
+  it("attaches x-enum-descriptions to the enum options", () => {
+    const c = control("mode", {
+      type: "string",
+      enum: ["plan", "auto"],
+      "x-enum-descriptions": { plan: "No tool execution" },
+    });
+    expect(c.options).toEqual([
+      { value: "plan", label: "plan", description: "No tool execution" },
+      { value: "auto", label: "auto" },
+    ]);
+  });
+
+  it("lifts x-label-classes / x-input-classes onto the control", () => {
+    const c = control("name", {
+      type: "string",
+      "x-label-classes": "text-primary",
+      "x-input-classes": "font-mono",
+    });
+    expect(c.labelClassName).toBe("text-primary");
+    expect(c.inputClassName).toBe("font-mono");
+  });
+
+  it("reads x-col-span as a finite integer, else leaves it unset", () => {
+    expect(control("m", { type: "string", "x-col-span": 2 }).colSpan).toBe(2);
+    expect(control("m", { type: "string" }).colSpan).toBeUndefined();
+  });
+
+  it("maps x-label-position onto the layout knob, with x-layout winning", () => {
+    expect(control("m", { type: "string", "x-label-position": "top" }).layout).toBe("stack");
+    expect(control("m", { type: "string", "x-label-position": "left" }).layout).toBe("inline");
+    expect(
+      control("m", { type: "string", "x-label-position": "top", "x-layout": "inline" }).layout,
+    ).toBe("inline");
+  });
+
+  it("builds prefix/suffix nodes from x-input-*[-icon], preferring the icon", () => {
+    const text = control("m", { type: "string", "x-input-prefix": "$", "x-input-suffix": "kg" });
+    expect(isValidElement(text.prefix)).toBe(true);
+    expect(isValidElement(text.suffix)).toBe(true);
+    const icon = control("m", { type: "string", "x-input-prefix-icon": "shield" });
+    expect(isValidElement(icon.prefix)).toBe(true);
+    const both = control("m", {
+      type: "string",
+      "x-input-suffix": "ignored",
+      "x-input-suffix-icon": "check",
+    });
+    expect(isValidElement(both.suffix)).toBe(true);
+    expect(control("m", { type: "string" }).prefix).toBeUndefined();
   });
 });

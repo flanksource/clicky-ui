@@ -15,9 +15,14 @@ import {
   inputClass,
   isPlainObject,
   keyPickerOptions,
+  normalizeColumns,
 } from "./json-schema-form-utils";
 import { FieldsGrid } from "./json-schema-form-fields";
-import { fieldInnerGapClass } from "./json-schema-form-size";
+import {
+  controlHeightClass,
+  fieldInnerGapClass,
+  inputSizeClass,
+} from "./json-schema-form-size";
 
 // ObjectControl renders a nested structured object as a sub-form: its own
 // properties, required markers, if/then, soft errors — all via the shared
@@ -30,6 +35,8 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
     ...(Array.isArray(field.schema["x-order"]) ? { "x-order": field.schema["x-order"] } : {}),
+    ...(typeof field.schema["x-columns"] === "number" ? { "x-columns": field.schema["x-columns"] } : {}),
+    ...(typeof field.schema["x-classes"] === "string" ? { "x-classes": field.schema["x-classes"] } : {}),
   };
   // No border/box: nested objects render as flat headed sections (see
   // ObjectSection in renderFieldRow) rather than progressively indented
@@ -38,7 +45,12 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
   // form-level readOnly on so child inputs are disabled (and any child the
   // schema marks readOnly still renders as a value span).
   return (
-    <FieldsGrid layout={ctx.layout} size={ctx.size}>
+    <FieldsGrid
+      layout={ctx.layout}
+      size={ctx.size}
+      columns={normalizeColumns(subSchema["x-columns"])}
+      {...(typeof subSchema["x-classes"] === "string" ? { className: subSchema["x-classes"] } : {})}
+    >
       {ctx.render.renderObjectFields(subSchema, obj, (next) => field.onChange(next), {
         ...ctx,
         readOnly: ctx.readOnly || field.readOnly === true,
@@ -163,7 +175,10 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
           <button
             type="button"
             aria-label={`Remove ${key}`}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            className={cn(
+              "inline-flex aspect-square shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
+              controlHeightClass[childCtx.size],
+            )}
             onClick={() => removeEntry(key)}
           >
             <Icon icon={UiTrash} className="text-sm" />
@@ -197,7 +212,12 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
         );
       })}
       {!readOnly && field.allowExtraKeys !== false && (
-        <Button type="button" variant="outline" size="sm" onClick={addEntry} className="gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={addEntry}
+          className={cn("gap-1.5", inputSizeClass[childCtx.size])}
+        >
           <Icon icon={UiAdd} className="text-sm" />
           Add field
         </Button>

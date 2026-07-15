@@ -21,6 +21,10 @@ export interface JsonSchemaProperty {
   readOnly?: boolean;
   minimum?: number;
   maximum?: number;
+  // Standard JSON Schema step. Its presence opts a number field into a native
+  // `<input type="number">` (with step/min/max) instead of the token-friendly
+  // text input.
+  multipleOf?: number;
   items?: JsonSchemaProperty;
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
@@ -52,8 +56,18 @@ export interface JsonSchemaProperty {
   // ({ "postgres": "postgres" }). Presence flips the enum control to a
   // selectable icon grid unless x-enum-display says otherwise.
   "x-enum-icons"?: Record<string, string>;
-  // Force the enum presentation: "combobox" (default), "radio", or "grid".
+  // Secondary descriptive line per enum value ({ "plan": "No tool execution" }).
+  // Used by the "segmented" (and grid) display to render descriptive cards.
+  "x-enum-descriptions"?: Record<string, string>;
+  // Force the enum presentation: "combobox" (default), "radio", "grid", or
+  // "segmented".
   "x-enum-display"?: EnumDisplay;
+  // Force the presentation for an enum-backed array. "filter-pills" renders
+  // each enum item as a compact toggle; an empty stored array means all options.
+  "x-array-display"?: ArrayDisplay;
+  // Render a bounded number (needs `maximum`) as a single-thumb slider with a
+  // progress-filled track instead of a numeric input.
+  "x-number-display"?: "slider";
   // Per-property render order: lower values sort first, properties without it
   // keep document order after the ordered ones. Composes across merged if/then
   // branches (each field carries its own order), unlike the object-level
@@ -61,6 +75,27 @@ export interface JsonSchemaProperty {
   "x-clicky-order"?: number;
   // Options passed to the MDXEditor-backed markdown field when `format: "md"`.
   "x-md-editor"?: MdxEditorPluginOptions;
+  // Optional inline help metadata emitted by CLI/schema generators. The form
+  // renders `body` together with `description` as helper text.
+  "x-help"?: JsonSchemaHelpBlock;
+  // Presentation extensions (all optional, additive). Extra classes merged onto
+  // the field's label / input; text or runtime-icon-name adornments rendered
+  // inside the input; label stacked on top vs. inline; and a grid column span
+  // (honoured when the enclosing object sets `x-columns`).
+  "x-label-classes"?: string;
+  "x-input-classes"?: string;
+  "x-input-prefix"?: string;
+  "x-input-suffix"?: string;
+  "x-input-prefix-icon"?: string;
+  "x-input-suffix-icon"?: string;
+  "x-label-position"?: "top" | "left";
+  "x-col-span"?: number;
+  // Object-level: lay this object's fields out in N equal columns (stacked
+  // layout). Fields span one column unless they set `x-col-span`.
+  "x-columns"?: number;
+  // Object-level: extra classes merged onto the object's fields-grid container,
+  // e.g. `"gap-2"` to set the section's row/column gap, or padding/background.
+  "x-classes"?: string;
   // Consumer extension keys pass through untouched.
   [key: string]: unknown;
 }
@@ -136,8 +171,19 @@ export type DisplayVariant = "heading" | "text" | "divider" | "spacer";
 
 // How an enum control renders. "combobox" (default) is the searchable dropdown;
 // "radio" is a segmented radio-button group for small, fixed option sets; "grid"
-// is a filterable grid of selectable icon cards (for enums with x-enum-icons).
-export type EnumDisplay = "combobox" | "radio" | "grid";
+// is a filterable grid of selectable icon cards (for enums with x-enum-icons);
+// "segmented" renders the shared SegmentedControl (icons, and large descriptive
+// cards when x-enum-descriptions is present).
+export type EnumDisplay = "combobox" | "radio" | "grid" | "segmented";
+
+// How an array control renders when the item schema has enum options.
+export type ArrayDisplay = "filter-pills";
+
+export interface JsonSchemaHelpBlock {
+  source?: string;
+  section?: string;
+  body?: string;
+}
 
 // FieldControl is the resolved, render-ready descriptor for one property. The
 // orchestrator infers a base control from the schema, then lets pre-extensions
@@ -161,6 +207,16 @@ export interface FieldControl {
 
   // Leading glyph for the label, lifted from the schema's `x-icon` extension.
   labelIcon?: LabelIconSpec;
+
+  // Extra classes merged onto the field's <label> / input element, lifted from
+  // the schema's `x-label-classes` / `x-input-classes` extensions.
+  labelClassName?: string;
+  inputClassName?: string;
+
+  // Grid column span for a multi-column object layout, from `x-col-span`. Only
+  // honoured when the enclosing object sets `x-columns` > 1 (stacked layout);
+  // otherwise ignored.
+  colSpan?: number;
 
   // enum
   options?: FieldOption[];
@@ -243,6 +299,8 @@ export interface FieldControl {
 
   // array — the schema each item is rendered against (recursively).
   itemSchema?: JsonSchemaProperty;
+  // array — optional presentation override resolved from x-array-display.
+  arrayDisplay?: ArrayDisplay;
 
   // object — a nested structured sub-form (its own properties + required).
   objectProperties?: Record<string, JsonSchemaProperty>;
@@ -255,6 +313,9 @@ export interface FieldOption {
   // Optional leading glyph (runtime icon name or a rendered node), shown by the
   // grid enum display. Resolved from the schema's x-enum-icons.
   icon?: LabelIconSpec;
+  // Optional secondary description, resolved from the schema's
+  // x-enum-descriptions. Shown by the segmented (card) enum display.
+  description?: string;
 }
 
 // LookupDescriptor is the `x-clicky-lookup` schema extension on a form field: it
@@ -373,6 +434,11 @@ export interface RenderContext {
   // "required-first" floats required fields up, "priority" floats required AND
   // non-empty fields up (see SortMode and JsonSchemaFormProps.requiredFirst).
   sortMode: SortMode;
+  // Case-insensitive substring the display-options menu filters top-level fields
+  // by (matched against each field's key and label). Only the outermost object
+  // level (depth 0) is filtered, so nested object subtrees stay intact. Unset or
+  // blank shows every field.
+  fieldFilter?: string;
   pre: PreExtension[];
   post: PostExtension[];
   // The form's top-level value, threaded unchanged through every depth so a

@@ -31,6 +31,24 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Object-level `x-columns`: how many equal columns to split a stacked object
+// into. Clamped to [1, 12] (a standard 12-track grid, so a 3-across row of
+// span-4 fields and a 4-across row of span-3 fields share one object); anything
+// invalid falls back to a single column.
+export function normalizeColumns(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(Math.trunc(n), 12);
+}
+
+// Per-field `x-col-span`: how many of the object's columns a field occupies.
+// Clamped to [1, columns]; invalid falls back to 1.
+export function normalizeColSpan(value: unknown, columns: number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(Math.trunc(n), columns);
+}
+
 // withSyntheticValue prepends the current value as an option when it is not in
 // the enum, so an out-of-enum value (e.g. a template token) still displays.
 export function withSyntheticValue(options: FieldOption[], value: string): FieldOption[] {
@@ -47,6 +65,21 @@ export function keyPickerOptions(
 ): FieldOption[] {
   const taken = new Set(usedKeys.filter((k) => k !== currentKey));
   return options.filter((o) => !taken.has(o.value));
+}
+
+// matchesFieldFilter reports whether a property should stay visible under the
+// display-options field filter: a case-insensitive substring match against the
+// field's key and its display label (`title` when set, otherwise the key). A
+// blank filter matches everything, so an empty box never hides fields.
+export function matchesFieldFilter(
+  key: string,
+  prop: JsonSchemaProperty,
+  filter: string,
+): boolean {
+  const query = filter.trim().toLowerCase();
+  if (!query) return true;
+  const label = typeof prop.title === "string" && prop.title ? prop.title : key;
+  return key.toLowerCase().includes(query) || label.toLowerCase().includes(query);
 }
 
 // orderByXOrder reorders property entries by the schema's `x-order` hint: keys

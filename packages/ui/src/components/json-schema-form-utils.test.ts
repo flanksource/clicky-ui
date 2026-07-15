@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   isEmptyValue,
+  matchesFieldFilter,
   moveItem,
+  normalizeColSpan,
+  normalizeColumns,
   orderByPriority,
   orderRequiredFirst,
   removeIndex,
@@ -110,6 +113,25 @@ describe("orderByPriority", () => {
   });
 });
 
+describe("matchesFieldFilter", () => {
+  it("matches everything when the filter is blank or whitespace", () => {
+    expect(matchesFieldFilter("email", { type: "string" }, "")).toBe(true);
+    expect(matchesFieldFilter("email", { type: "string" }, "   ")).toBe(true);
+  });
+  it("matches on the title case-insensitively", () => {
+    const prop = { type: "string", title: "First Name" };
+    expect(matchesFieldFilter("firstName", prop, "name")).toBe(true);
+    expect(matchesFieldFilter("firstName", prop, "NAME")).toBe(true);
+  });
+  it("matches on the key when there is no title", () => {
+    expect(matchesFieldFilter("alpha", { type: "string" }, "alph")).toBe(true);
+    expect(matchesFieldFilter("beta", { type: "string" }, "alph")).toBe(false);
+  });
+  it("returns false when neither key nor title contains the query", () => {
+    expect(matchesFieldFilter("email", { type: "string", title: "Email" }, "phone")).toBe(false);
+  });
+});
+
 describe("seedFromSchema", () => {
   it("honours an explicit default", () => {
     expect(seedFromSchema({ type: "string", default: "x" })).toBe("x");
@@ -142,5 +164,22 @@ describe("softError", () => {
   });
   it("returns undefined for a valid field", () => {
     expect(softError(field({ value: "ok" }))).toBeUndefined();
+  });
+});
+
+describe("normalizeColumns / normalizeColSpan", () => {
+  it("keeps a 12-track grid (so span-4 + span-3 rows fit) and clamps beyond 12", () => {
+    expect(normalizeColumns(12)).toBe(12);
+    expect(normalizeColumns(3)).toBe(3);
+    expect(normalizeColumns(24)).toBe(12);
+    expect(normalizeColumns(0)).toBe(1);
+    expect(normalizeColumns("nope")).toBe(1);
+  });
+
+  it("clamps a field span to the column count, defaulting to 1", () => {
+    expect(normalizeColSpan(3, 12)).toBe(3);
+    expect(normalizeColSpan(20, 12)).toBe(12);
+    expect(normalizeColSpan(undefined, 12)).toBe(1);
+    expect(normalizeColSpan(0, 12)).toBe(1);
   });
 });
