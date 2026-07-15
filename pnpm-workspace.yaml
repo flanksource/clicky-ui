@@ -22,6 +22,7 @@ catalog:
   "@chromatic-com/storybook": ^5.2.1
   "@floating-ui/react": ^0.27.19
   "@mdxeditor/editor": ^4.0.4
+  "@monaco-editor/react": ^4.7.0
   "@oxlint/plugins": ^1.60.0
   "@playwright/test": ^1.49.1
   "@preact/preset-vite": ^2.9.3
@@ -79,5 +80,6 @@ catalog:
   vite: ^6.4.3
   vite-plugin-dts: ^4.3.0
   vitest: ^3.2.6
+  yaml: ^2.8.3
 
 catalogMode: prefer
