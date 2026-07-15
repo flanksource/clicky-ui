@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { FormSize } from "./json-schema-form-size";
 
 export type MdxEditorHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
@@ -18,6 +18,33 @@ export interface MdxEditorToolbarOptions {
 
 export interface MdxEditorCodeBlockOptions {
   defaultLanguage?: string;
+  editorDescriptors?: readonly MdxEditorCodeBlockEditorDescriptor[];
+}
+
+export interface MdxEditorCodeBlockEditorContext {
+  setCode: (code: string) => void;
+  setLanguage: (language: string) => void;
+  setMeta: (meta: string) => void;
+}
+
+export interface MdxEditorCodeBlockEditorProps {
+  code: string;
+  language: string;
+  meta: string;
+  nodeKey: string;
+  focusEmitter: {
+    subscribe: (callback: () => void) => void;
+  };
+  context: MdxEditorCodeBlockEditorContext;
+}
+
+export interface MdxEditorCodeBlockEditorDescriptor {
+  priority: number;
+  match: (
+    language: string | null | undefined,
+    meta: string | null | undefined,
+  ) => boolean;
+  Editor: ComponentType<MdxEditorCodeBlockEditorProps>;
 }
 
 export interface MdxEditorCodeMirrorOptions {
@@ -42,6 +69,7 @@ export interface MdxEditorImageOptions {
 
 export interface MdxEditorDiffModeOptions {
   viewMode?: MdxEditorViewMode;
+  viewModes?: readonly MdxEditorViewMode[];
   diffMarkdown?: string;
   readOnlyDiff?: boolean;
 }

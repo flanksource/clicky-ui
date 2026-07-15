@@ -365,7 +365,7 @@ describe("Clicky", () => {
 
     render(<Clicky data={clickyDocument} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Status" }));
     const healthyFilter = document.querySelector(
       '[data-filter-option="healthy"]',
     );
@@ -1036,6 +1036,7 @@ describe("Clicky", () => {
       "type SourceResolver interface {}",
       {
         lang: "go",
+        theme: "github-light",
       },
     );
     expect(within(container).getByText("SourceResolver")).toBeInTheDocument();

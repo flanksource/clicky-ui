@@ -72,6 +72,14 @@ const preset: Partial<Config> = {
       fontSize: {
         "density-base": "var(--font-size-base)",
       },
+      // Bind Tailwind's font utilities to the Flanksource token stacks so
+      // `font-sans` / `font-mono` render Open Sans / Fira Code. Without this the
+      // utilities fall back to Tailwind's default families (e.g. `font-mono`
+      // resolves to ui-monospace/SF Mono instead of Fira Code).
+      fontFamily: {
+        sans: "var(--fs-font-sans)",
+        mono: "var(--fs-font-mono)",
+      },
     },
   },
   plugins: [

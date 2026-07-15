@@ -101,7 +101,7 @@ export function SchemaViewerRow({ node }: { node: SchemaViewerNode }) {
   const tone = node.badge ? BADGE_TONE[node.badge] : undefined;
   return (
     <span className="flex w-full min-w-0 items-center gap-2">
-      <span className="min-w-0 truncate font-mono">{node.label}</span>
+      <span className="shrink-0 whitespace-nowrap font-mono">{node.label}</span>
       {node.badge && (
         <span
           className={cn(

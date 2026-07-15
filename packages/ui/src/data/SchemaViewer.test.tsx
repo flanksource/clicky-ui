@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
-import { SchemaViewer } from "./SchemaViewer";
+import { SchemaViewer, SchemaViewerRow } from "./SchemaViewer";
 import { buildSchemaTree, buildStepBranchTree } from "./schema-viewer-model";
 
 const THEN = String.fromCharCode(116, 104, 101, 110);
@@ -178,5 +178,28 @@ describe("SchemaViewer", () => {
     expect(screen.getByText("Product")).toBeInTheDocument();
     expect(screen.getByText("Query")).toBeInTheDocument();
     expect(screen.getByText("SELECT Code FROM AsCode")).toBeInTheDocument();
+  });
+});
+
+describe("SchemaViewerRow", () => {
+  it("truncates the description, not the field name", () => {
+    render(
+      <SchemaViewerRow
+        node={{
+          key: "db-url",
+          label: "db-url",
+          badge: "string",
+          description: "External PostgreSQL DSN (FIN_DB_URL env honored; empty = embedded)",
+        }}
+      />,
+    );
+
+    const label = screen.getByText("db-url");
+    expect(label).toHaveClass("shrink-0");
+    expect(label).not.toHaveClass("truncate");
+
+    const description = screen.getByText(/External PostgreSQL DSN/);
+    expect(description).toHaveClass("truncate");
+    expect(description).toHaveClass("min-w-0");
   });
 });

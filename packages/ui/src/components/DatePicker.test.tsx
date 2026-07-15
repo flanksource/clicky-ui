@@ -3,6 +3,30 @@ import { vi } from "vitest";
 import { DatePicker } from "./DatePicker";
 
 describe("DatePicker", () => {
+  it("uses the density control height by default", () => {
+    render(<DatePicker aria-label="Selected date" value="" onChange={vi.fn()} />);
+
+    const input = screen.getByLabelText("Selected date");
+    expect(input.className).toContain("h-control-h");
+    expect(input.className).toContain("px-control-px");
+    expect(input.className).toContain("text-sm");
+  });
+
+  it("lets inputClassName override the default height", () => {
+    render(
+      <DatePicker
+        aria-label="Selected date"
+        value=""
+        onChange={vi.fn()}
+        inputClassName="h-8"
+      />,
+    );
+
+    const input = screen.getByLabelText("Selected date");
+    expect(input.className).toContain("h-8");
+    expect(input.className).not.toContain("h-control-h");
+  });
+
   it("updates the selected value", () => {
     const onChange = vi.fn();
 

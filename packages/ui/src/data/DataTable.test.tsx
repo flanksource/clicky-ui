@@ -299,7 +299,7 @@ describe("DataTable", () => {
       "overflow-hidden",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /status filter/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Status" }));
     const healthyFilter = document.querySelector(
       '[data-filter-option="healthy"]',
     );
@@ -470,7 +470,9 @@ describe("DataTable", () => {
     );
     expect(screen.getByRole("table")).not.toHaveClass("w-full");
     expect(screen.getByRole("table").parentElement).toHaveClass(
+      "min-h-0",
       "max-w-full",
+      "flex-1",
       "overflow-auto",
       "overscroll-x-contain",
     );
@@ -480,6 +482,39 @@ describe("DataTable", () => {
     expect(
       screen.getByRole("columnheader", { name: /service/i }),
     ).not.toHaveClass("pr-5");
+  });
+
+  it("keeps the table body scrollable while the header and pagination stay visible", () => {
+    const onPageChange = vi.fn();
+    const onPageSizeChange = vi.fn();
+
+    render(
+      <DataTable
+        className="h-full"
+        data={rows}
+        columns={columns}
+        pagination={{
+          page: 0,
+          pageSize: 3,
+          total: 3,
+          onPageChange,
+          onPageSizeChange,
+        }}
+      />,
+    );
+
+    const table = screen.getByRole("table");
+    const scrollBody = table.parentElement;
+    const shell = scrollBody?.parentElement;
+    const header = screen
+      .getByRole("columnheader", { name: /service/i })
+      .closest("thead");
+    const footer = screen.getByText("1-3 of 3").parentElement;
+
+    expect(shell).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(scrollBody).toHaveClass("min-h-0", "flex-1", "overflow-auto");
+    expect(header).toHaveClass("sticky", "top-0");
+    expect(footer).toHaveClass("shrink-0");
   });
 
   it("uses distinct table row padding for compact and spacious density", () => {
@@ -709,11 +744,9 @@ describe("DataTable", () => {
     expect(
       screen.queryByRole("columnheader", { name: /status/i }),
     ).not.toBeInTheDocument();
-    const statusFilterButton = screen.getByRole("button", {
-      name: /status filter/i,
-    });
+    const statusFilterInput = screen.getByRole("combobox", { name: "Status" });
 
-    fireEvent.click(statusFilterButton);
+    fireEvent.focus(statusFilterInput);
     const degradedFilter = document.querySelector(
       '[data-filter-option="degraded"]',
     );
