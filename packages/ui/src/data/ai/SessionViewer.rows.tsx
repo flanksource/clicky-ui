@@ -3,9 +3,13 @@ import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { CodeBlock } from "../CodeBlock";
 import { CodeDiff } from "../CodeDiff";
+import { Button } from "../../components/button";
 import {
   UiBrain,
+  UiCancel,
+  UiCheck,
   UiChevronDown,
+  UiComment,
   UiSparkles,
   UiUserCircle,
   UiWarningTriangle,
@@ -16,6 +20,7 @@ import {
   type SessionEvent,
   type SessionTone,
 } from "./SessionViewer.model";
+import type { SessionEventGroup } from "./SessionViewer.grouping";
 import {
   shellCommand,
   questionsFromToolInput,
@@ -26,6 +31,7 @@ import {
   type ToolDiff,
   type ToolParam,
 } from "./SessionViewer.input";
+import type { SessionToolDecision } from "./SessionViewer";
 
 // Disc colors per tone. The dark variants key off a `[data-theme="dark"]`
 // ancestor (the document attribute set by ThemeProvider, or the component-level
@@ -58,12 +64,14 @@ export function SessionRow({
   defaultExpanded,
   showRowMetadata = false,
   showRaw = false,
+  onPendingToolDecision,
 }: {
   event: SessionEvent;
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
   showRaw?: boolean;
+  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
 }) {
   if (event.kind === "user")
     return <UserRow event={event} showRowMetadata={showRowMetadata} showRaw={showRaw} />;
@@ -93,9 +101,100 @@ export function SessionRow({
           event={event}
           visual={visual}
           defaultExpanded={defaultExpanded}
+          onPendingToolDecision={onPendingToolDecision}
         />
         {showRowMetadata && <EventMetadata event={event} />}
         {showRaw && event.raw !== undefined && <RawEventBlock raw={event.raw} />}
+      </div>
+    </li>
+  );
+}
+
+export function WaitGroupRow({
+  group,
+  last,
+  defaultExpanded,
+  showRowMetadata = false,
+  showRaw = false,
+  onPendingToolDecision,
+}: {
+  group: SessionEventGroup;
+  last: boolean;
+  defaultExpanded: boolean;
+  showRowMetadata?: boolean;
+  showRaw?: boolean;
+  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const visual = getSessionAction("Wait");
+  const first = group.representative;
+  const final = group.events[group.events.length - 1] ?? first;
+  const label = `Wait × ${group.count}`;
+  const metadataEvent = { ...first };
+  delete metadataEvent.timestamp;
+  delete metadataEvent.toolState;
+  delete metadataEvent.approval;
+  metadataEvent.pending = false;
+  const timestampLabel = formatEventRange(first.timestamp, final.timestamp);
+
+  return (
+    <li
+      data-event-kind="tool"
+      data-event-group="wait"
+      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+    >
+      {!last && (
+        <span
+          aria-hidden
+          className="absolute bottom-0 left-[10px] top-[22px] w-px bg-border"
+        />
+      )}
+      <span
+        className={cn(
+          "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
+          DISC_TONE[visual.tone],
+        )}
+      >
+        <Icon icon={visual.icon} className="h-3 w-3" />
+      </span>
+      <div className="min-w-0 flex-1 pt-px">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+          onClick={() => setOpen((value) => !value)}
+          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
+        >
+          <span className="font-medium text-foreground">{label}</span>
+          <Icon
+            icon={UiChevronDown}
+            className={cn(
+              "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+        {showRowMetadata && (
+          <EventMetadata
+            event={metadataEvent}
+            {...(timestampLabel ? { timestampLabel } : {})}
+          />
+        )}
+        {open && (
+          <ol className="relative mt-density-3 border-l border-border pl-density-3">
+            {group.events.map((event, index) => (
+              <SessionRow
+                key={event.id}
+                event={event}
+                last={index === group.events.length - 1}
+                defaultExpanded={defaultExpanded}
+                showRowMetadata={showRowMetadata}
+                showRaw={showRaw}
+                onPendingToolDecision={onPendingToolDecision}
+              />
+            ))}
+          </ol>
+        )}
       </div>
     </li>
   );
@@ -143,12 +242,14 @@ function UserRow({
 function EventMetadata({
   event,
   align = "left",
+  timestampLabel,
 }: {
   event: SessionEvent;
   align?: "left" | "right";
+  timestampLabel?: string;
 }) {
   const parts = [
-    event.timestamp ? formatEventTime(event.timestamp) : "",
+    timestampLabel ?? (event.timestamp ? formatEventTime(event.timestamp) : ""),
     event.source,
     event.model,
     event.reasoningEffort,
@@ -179,7 +280,7 @@ function approvalLabel(event: SessionEvent) {
   if (event.approval?.approved === false) {
     return event.approval.reason ? `denied: ${event.approval.reason}` : "denied";
   }
-  if (event.approval) return "approval pending";
+  if (event.pending) return "approval pending";
   if (event.toolState === "output-denied") return "denied";
   return "";
 }
@@ -204,7 +305,7 @@ function approvalStatus(
         "border-rose-500/30 bg-rose-500/10 text-rose-700 [[data-theme=dark]_&]:text-rose-300",
     };
   }
-  if (event.approval || event.toolState === "approval-requested") {
+  if (event.pending) {
     return {
       label: "Awaiting approval",
       icon: APPROVAL_ICONS.pending.icon,
@@ -243,6 +344,12 @@ function formatEventTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function formatEventRange(start: string | undefined, end: string | undefined) {
+  if (!start) return end ? formatEventTime(end) : undefined;
+  if (!end || end === start) return formatEventTime(start);
+  return `${formatEventTime(start)} – ${formatEventTime(end)}`;
 }
 
 function RawEventBlock({ raw, align = "left" }: { raw: unknown; align?: "left" | "right" }) {
@@ -334,10 +441,12 @@ function EventBody({
   event,
   visual,
   defaultExpanded,
+  onPendingToolDecision,
 }: {
   event: SessionEvent;
   visual: EventVisual;
   defaultExpanded: boolean;
+  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
 }) {
   if (event.kind === "tool")
     return (
@@ -345,6 +454,7 @@ function EventBody({
         event={event}
         visual={visual}
         defaultExpanded={defaultExpanded}
+        onPendingToolDecision={onPendingToolDecision}
       />
     );
   if (event.kind === "thinking") return <ThinkingBody event={event} />;
@@ -357,10 +467,12 @@ function ToolBody({
   event,
   visual,
   defaultExpanded,
+  onPendingToolDecision,
 }: {
   event: SessionEvent;
   visual: EventVisual;
   defaultExpanded: boolean;
+  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
 }) {
   const summary = summarizeToolInput(
     event.tool ?? "",
@@ -371,7 +483,7 @@ function ToolBody({
   const [open, setOpen] = useState(defaultExpanded);
 
   if (event.tool === "AskUserQuestion") {
-    return <QuestionToolBody event={event} visual={visual} />;
+    return <QuestionToolBody event={event} visual={visual} onDecision={onPendingToolDecision} />;
   }
 
   // Shell rows inline the full command as a bash block — no "Run command"
@@ -406,6 +518,9 @@ function ToolBody({
           <div className="mt-1.5">
             <ResponseBlock response={event.toolResponse} />
           </div>
+        )}
+        {event.pending && onPendingToolDecision && (
+          <PendingDecisionControls event={event} onDecision={onPendingToolDecision} />
         )}
       </div>
     );
@@ -487,11 +602,22 @@ function ToolBody({
           )}
         </div>
       )}
+      {event.pending && onPendingToolDecision && (
+        <PendingDecisionControls event={event} onDecision={onPendingToolDecision} />
+      )}
     </div>
   );
 }
 
-function QuestionToolBody({ event, visual }: { event: SessionEvent; visual: EventVisual }) {
+function QuestionToolBody({
+  event,
+  visual,
+  onDecision,
+}: {
+  event: SessionEvent;
+  visual: EventVisual;
+  onDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+}) {
   const questions = questionsFromToolInput(event.toolInput);
   const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
 
@@ -518,7 +644,105 @@ function QuestionToolBody({ event, visual }: { event: SessionEvent; visual: Even
             <ResponseBlock response={event.toolResponse} />
           </div>
         )}
+        {event.pending && onDecision && (
+          <QuestionDecisionControls event={event} questions={questions} onDecision={onDecision} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function PendingDecisionControls({
+  event,
+  onDecision,
+}: {
+  event: SessionEvent;
+  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
+}) {
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const decide = async (allow: boolean, message?: string) => {
+    setBusy(true);
+    setError("");
+    try { await onDecision({ event, allow, ...(message ? { message } : {}) }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-density-3">
+      <textarea aria-label="Decision comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional rejection feedback" className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" loading={busy} onClick={() => decide(true)}><Icon icon={UiCheck} />Allow</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => decide(false)}><Icon icon={UiCancel} />Reject</Button>
+        <Button size="sm" variant="outline" disabled={busy || !comment.trim()} onClick={() => decide(false, comment.trim())}><Icon icon={UiComment} />Reject with comment</Button>
+      </div>
+      {error && <div role="alert" className="text-xs text-rose-600">{error}</div>}
+    </div>
+  );
+}
+
+function QuestionDecisionControls({
+  event,
+  questions,
+  onDecision,
+}: {
+  event: SessionEvent;
+  questions: SessionQuestion[];
+  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [details, setDetails] = useState<Record<string, string>>({});
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const decide = async (allow: boolean, message?: string) => {
+    setBusy(true); setError("");
+    const submittedAnswers = Object.fromEntries(Object.entries(answers).map(([question, answer]) => {
+      const detail = details[question]?.trim();
+      if (!detail) return [question, answer];
+      return [question, Array.isArray(answer)
+        ? [...answer, `Additional details: ${detail}`]
+        : `${answer}\nAdditional details: ${detail}`];
+    }));
+    try { await onDecision({ event, allow, answers: submittedAnswers, ...(message ? { message } : {}) }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3 rounded-md border border-sky-500/25 bg-sky-500/5 p-density-3">
+      {questions.map((question) => (
+        <fieldset key={question.id} className="space-y-1.5">
+          <legend className="text-sm font-medium text-foreground">{question.text}</legend>
+          {question.options.map((option) => question.multiSelect ? (
+            <label key={option.value} className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={Array.isArray(answers[question.text]) && (answers[question.text] as string[]).includes(option.value)} onChange={(e) => setAnswers((current) => { const selected = Array.isArray(current[question.text]) ? current[question.text] as string[] : []; return { ...current, [question.text]: e.target.checked ? [...selected, option.value] : selected.filter((value) => value !== option.value) }; })} />
+              <span>{option.label}{option.description && <span className="ml-1 text-muted-foreground">{option.description}</span>}</span>
+            </label>
+          ) : (
+            <label key={option.value} className="flex items-start gap-2 text-sm">
+              <input type="radio" name={`question-${event.id}-${question.id}`} value={option.value} checked={answers[question.text] === option.value} onChange={() => setAnswers((current) => ({ ...current, [question.text]: option.value }))} />
+              <span>{option.label}{option.description && <span className="ml-1 text-muted-foreground">{option.description}</span>}</span>
+            </label>
+          ))}
+          <textarea
+            aria-label={`${question.text} additional details`}
+            value={question.options.length ? details[question.text] ?? "" : typeof answers[question.text] === "string" ? answers[question.text] as string : ""}
+            onChange={(e) => question.options.length
+              ? setDetails((current) => ({ ...current, [question.text]: e.target.value }))
+              : setAnswers((current) => ({ ...current, [question.text]: e.target.value }))}
+            placeholder={question.options.length ? "Additional details" : "Your answer"}
+            className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+          />
+        </fieldset>
+      ))}
+      <textarea aria-label="Rejection comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional rejection feedback" className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" loading={busy} onClick={() => decide(true)}><Icon icon={UiCheck} />Send answer</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => decide(false)}><Icon icon={UiCancel} />Reject</Button>
+        <Button size="sm" variant="outline" disabled={busy || !comment.trim()} onClick={() => decide(false, comment.trim())}><Icon icon={UiComment} />Reject with comment</Button>
+      </div>
+      {error && <div role="alert" className="text-xs text-rose-600">{error}</div>}
     </div>
   );
 }

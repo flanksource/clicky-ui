@@ -9,13 +9,36 @@ import {
   findSurfaceEntityActions,
   findSurfaceListOperation,
 } from "./clickyMetadata";
+import { resolveSurfaceIcon } from "./surfaceIconMap";
 import { ExecutionResult } from "./ExecutionResult";
 import { OperationActionBar } from "./OperationActionBar";
 import { type FormActionsRenderer } from "./SchemaActionForm";
 import type { RenderLink } from "./EndpointList";
 import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
 import type { DomainDefinition } from "./types";
+import type { ExecutionResponse } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
+
+export type EntityDetailBodyRenderContext = {
+  id: string;
+  surfaceKey?: string;
+  entity?: Record<string, unknown>;
+  response: ExecutionResponse | null;
+  defaultView: ReactNode;
+};
+
+export type EntityDetailBodyRenderer = (context: EntityDetailBodyRenderContext) => ReactNode;
+
+export type EntityDetailHeaderRenderContext = {
+  id: string;
+  surfaceKey?: string;
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  defaultHeader: ReactNode;
+};
+
+export type EntityDetailHeaderRenderer = (context: EntityDetailHeaderRenderContext) => ReactNode;
 
 export type OperationEntityPageProps = {
   id?: string;
@@ -38,6 +61,19 @@ export type OperationEntityPageProps = {
   // Optional extra footer actions for the edit form (e.g. a connection "Test"
   // button).
   formActions?: FormActionsRenderer;
+  actionLabels?: Record<string, string>;
+  /**
+   * Replaces the detail body after the entity has loaded while leaving the
+   * explorer-owned heading and entity actions in place. Hosts can use this for
+   * connection browsers and other entity-specific workspaces.
+   */
+  entityDetailBodyRenderer?: EntityDetailBodyRenderer;
+  /**
+   * Replaces the explorer-owned "{title}: {id}" heading while leaving the back
+   * link, method badge, and entity actions in place. Hosts use this for compact
+   * entity summaries (e.g. a connection's name, endpoint, and server version).
+   */
+  entityDetailHeaderRenderer?: EntityDetailHeaderRenderer;
 };
 
 function defaultRenderError(err: unknown, title: string) {
@@ -68,6 +104,9 @@ export function OperationEntityPage({
   formPre,
   formPost,
   formActions,
+  actionLabels,
+  entityDetailBodyRenderer,
+  entityDetailHeaderRenderer,
 }: OperationEntityPageProps) {
   const { operations, isLoading } = useOperations(client);
   const surfaceOps = useMemo(
@@ -189,6 +228,36 @@ export function OperationEntityPage({
     );
   }
 
+  const defaultDetailBody = (
+    <section className="rounded-xl border bg-card p-4">
+      <h2 className="text-lg font-medium">Entity detail</h2>
+      <ExecutionResult
+        response={detailQuery.data ?? null}
+        {...(commandRuntime ? { commandRuntime } : {})}
+      />
+    </section>
+  );
+
+  const defaultHeader = (
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {definition.title}: {id}
+      </h1>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{definition.description}</p>
+    </div>
+  );
+  const SurfaceIcon = resolveSurfaceIcon(definition.icon);
+  const surfaceIcon = SurfaceIcon ? <SurfaceIcon className="h-6 w-6 shrink-0" /> : undefined;
+  const entityHeader =
+    entityDetailHeaderRenderer?.({
+      id,
+      ...(surfaceKey ? { surfaceKey } : {}),
+      title: definition.title,
+      ...(definition.description ? { description: definition.description } : {}),
+      ...(surfaceIcon ? { icon: surfaceIcon } : {}),
+      defaultHeader,
+    }) ?? defaultHeader;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -200,27 +269,27 @@ export function OperationEntityPage({
               {resolvedDetailEndpoint.path}
             </code>
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {definition.title}: {id}
-            </h1>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{definition.description}</p>
-          </div>
+          {entityHeader}
         </div>
       </div>
 
-      <OperationActionBar
-        actions={actionOps}
-        client={client}
-        getLockedValues={() => ({ [idParameterName]: id })}
-        onExecuted={() => void detailQuery.refetch()}
-        hideLockedInForm
-        {...(editInitialValue ? { initialValue: editInitialValue } : {})}
-        {...(commandRuntime ? { commandRuntime } : {})}
-        {...(formPre ? { formPre } : {})}
-        {...(formPost ? { formPost } : {})}
-        {...(formActions ? { formActions } : {})}
-      />
+      {!rawDetailQuery.isLoading && (
+        <OperationActionBar
+          actions={actionOps}
+          client={client}
+          getLockedValues={() => ({ [idParameterName]: id })}
+          onExecuted={async () => {
+            await Promise.all([detailQuery.refetch(), rawDetailQuery.refetch()]);
+          }}
+          hideLockedInForm
+          {...(editInitialValue ? { initialValue: editInitialValue } : {})}
+          {...(commandRuntime ? { commandRuntime } : {})}
+          {...(formPre ? { formPre } : {})}
+          {...(formPost ? { formPost } : {})}
+          {...(formActions ? { formActions } : {})}
+          {...(actionLabels ? { actionLabels } : {})}
+        />
+      )}
 
       {detailQuery.isLoading ? (
         <section className="rounded-xl border bg-card p-4">
@@ -230,13 +299,13 @@ export function OperationEntityPage({
       ) : detailQuery.isError ? (
         renderError(detailQuery.error, `Failed to load ${resolvedDetailEndpoint.path}`)
       ) : (
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="text-lg font-medium">Entity detail</h2>
-          <ExecutionResult
-            response={detailQuery.data ?? null}
-            {...(commandRuntime ? { commandRuntime } : {})}
-          />
-        </section>
+        entityDetailBodyRenderer?.({
+          id,
+          ...(surfaceKey ? { surfaceKey } : {}),
+          ...(editInitialValue ? { entity: editInitialValue } : {}),
+          response: detailQuery.data ?? null,
+          defaultView: defaultDetailBody,
+        }) ?? defaultDetailBody
       )}
     </div>
   );

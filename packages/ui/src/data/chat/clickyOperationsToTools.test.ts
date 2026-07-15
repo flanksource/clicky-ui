@@ -67,7 +67,7 @@ const groupedXeroAccounts: OpenAPIOperation = {
     surface: "xero-accounts",
     verb: "list",
     scope: "collection",
-    group: "Xero Read",
+    group: "provider.xero.read",
   },
 };
 
@@ -110,11 +110,11 @@ describe("clickyOperationsToTools", () => {
     expect(tool?.group).toBe("orders");
   });
 
-  it("uses x-clicky group as the preference key and applies group defaults", () => {
+  it("uses an explicit x-clicky group as the preference key without host defaults", () => {
     const tool = operationToTool(groupedXeroAccounts);
-    expect(tool?.group).toBe("Xero Read");
-    expect(tool?.preferenceKey).toBe("Xero Read");
-    expect(tool?.defaultPermission).toBe("off");
+    expect(tool?.group).toBe("provider.xero.read");
+    expect(tool?.preferenceKey).toBe("provider.xero.read");
+    expect(tool?.defaultPermission).toBeUndefined();
   });
 
   it("uses x-clicky tool hints for grouping, permission, parent, icon, strictness, and annotations", () => {
@@ -160,15 +160,22 @@ describe("clickyOperationsToTools", () => {
         parent: "providers",
       },
     ];
+    const operation: OpenAPIOperation = {
+      ...groupedXeroAccounts,
+      "x-clicky": {
+        ...groupedXeroAccounts["x-clicky"]!,
+        toolHints: { parent: "xero" },
+      },
+    };
     const [tool] = clickyOperationsToTools(
-      [resolve(groupedXeroAccounts)],
+      [resolve(operation)],
       surfaces,
     );
     expect(tool.parent).toBe("Xero Accounts");
     expect(tool.entity).toBe("accounts");
     // The verb stays the leaf label; the parent disambiguates sibling verbs.
     expect(tool.label).toBe("List");
-    expect(tool.group).toBe("Xero Read");
+    expect(tool.group).toBe("provider.xero.read");
   });
 
   it("disambiguates sibling list tools by their resolved parent, not the verb", () => {
@@ -201,17 +208,6 @@ describe("clickyOperationsToTools", () => {
     expect(tool?.parent).toBeUndefined();
   });
 
-  it("skips operations in the Disabled group", () => {
-    const disabled: OpenAPIOperation = {
-      operationId: "auth_status",
-      summary: "Auth status",
-      responses: {},
-      "x-clicky": { group: "Disabled" },
-    };
-    expect(operationToTool(disabled)).toBeNull();
-    expect(clickyOperationsToTools([resolve(disabled)])).toEqual([]);
-  });
-
   it("skips cobra help and completion operations", () => {
     const completion: OpenAPIOperation = {
       operationId: "completion_bash",
@@ -236,117 +232,17 @@ describe("clickyOperationsToTools", () => {
     ).toEqual([]);
   });
 
-  it("infers xero, accounting, comments, and admin group defaults for hand-written routes", () => {
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "providerAccountsList" },
-          "get",
-          "/api/v1/provider/accounts",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Xero Read",
-      preferenceKey: "Xero Read",
-      defaultPermission: "off",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "providerAccountsCreate" },
-          "post",
-          "/api/v1/provider/accounts",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Xero Write",
-      preferenceKey: "Xero Write",
-      defaultPermission: "off",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "accountMappingList" },
-          "get",
-          "/api/v1/accounts/mapping",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Accounting Read",
-      defaultPermission: "on",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "accountMappingUpdate" },
-          "post",
-          "/api/v1/accounts/mapping",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Accounting Metadata Write",
-      defaultPermission: "ask",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "transactionsCreate" },
-          "post",
-          "/api/v1/transactions",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Accounting Transaction Write",
-      defaultPermission: "ask",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "commentsList" },
-          "get",
-          "/api/v1/comments",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Comments Read",
-      defaultPermission: "on",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "commentsCreate" },
-          "post",
-          "/api/v1/comments",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Comments Write",
-      defaultPermission: "ask",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "rulesDefinitionSave" },
-          "post",
-          "/api/v1/rules/definitions",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Admin Write",
-      defaultPermission: "ask",
-    });
-    expect(
-      clickyOperationsToTools([
-        resolve(
-          { ...listPods, operationId: "rulesPreview" },
-          "post",
-          "/api/v1/rules/preview",
-        ),
-      ])[0],
-    ).toMatchObject({
-      group: "Admin Read",
-      defaultPermission: "on",
-    });
+  it("does not infer host-specific tiers from operation ids or paths", () => {
+    const [tool] = clickyOperationsToTools([
+      resolve(
+        { ...listPods, operationId: "providerAccountsList" },
+        "get",
+        "/api/v1/provider/accounts",
+      ),
+    ]);
+    expect(tool.group).toBeUndefined();
+    expect(tool.preferenceKey).toBeUndefined();
+    expect(tool.defaultPermission).toBeUndefined();
   });
 
   it("labels from the summary and omits group when x-clicky is absent", () => {

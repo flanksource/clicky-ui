@@ -11,10 +11,17 @@ import {
   findSurfaceListOperation,
   getOperationClickyMeta,
 } from "./clickyMetadata";
-import type { ClickyCommandRuntime } from "../data/Clicky";
+import type {
+  ClickyCommandRuntime,
+  ClickyDownloadOptions,
+  ClickyRemoteFormat,
+} from "../data/Clicky";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { OperationActionBar } from "./OperationActionBar";
-import { OperationResultView, type ResultRenderer } from "./OperationResultView";
+import {
+  OperationResultView,
+  type ResultRenderer,
+} from "./OperationResultView";
 import { type FormActionsRenderer } from "./SchemaActionForm";
 import {
   applyFilterExtensions,
@@ -60,6 +67,7 @@ export type OperationCatalogProps = {
   // Optional extra footer actions for the create/edit form (e.g. a connection
   // "Test" button).
   formActions?: FormActionsRenderer;
+  actionLabels?: Record<string, string>;
   // Optional host override for the result surface, keyed off the current surface.
   // Receives the default OperationResultView so non-overridden surfaces render
   // unchanged.
@@ -97,6 +105,7 @@ export function OperationCatalog({
   formPre,
   formPost,
   formActions,
+  actionLabels,
   resultRenderer,
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
@@ -139,6 +148,25 @@ export function OperationCatalog({
     readFiltersFromUrl(),
   );
   const listParameters = listEndpoint?.operation.parameters ?? [];
+  const download = useMemo<ClickyDownloadOptions | undefined>(() => {
+    const meta = listEndpoint?.operation["x-clicky"]?.export;
+    if (!meta) return undefined;
+    return {
+      label: definition.title,
+      ...(meta.formats
+        ? { formats: meta.formats as ClickyRemoteFormat[] }
+        : {}),
+      ...(meta.scopes ? { scopes: meta.scopes } : {}),
+      ...(meta.allRowsMode ? { allRowsMode: meta.allRowsMode } : {}),
+      ...(meta.formatMaxRows
+        ? {
+            formatMaxRows: meta.formatMaxRows as Partial<
+              Record<ClickyRemoteFormat, number>
+            >,
+          }
+        : {}),
+    };
+  }, [definition.title, listEndpoint]);
 
   useEffect(() => {
     writeFiltersToUrl(filters);
@@ -230,7 +258,9 @@ export function OperationCatalog({
   // Lock the current list filters into a bulk action (supportsFilterMode), so a
   // collection action like "pause" runs against the same set the table shows.
   // Entity-scoped actions never reach here (they live on the detail page).
-  function getActionLockedValues(op: ResolvedOperation): Record<string, string> {
+  function getActionLockedValues(
+    op: ResolvedOperation,
+  ): Record<string, string> {
     const meta = getOperationClickyMeta(op);
     if (meta == null || !meta.supportsFilterMode) {
       return {};
@@ -248,7 +278,9 @@ export function OperationCatalog({
       locked[meta.idParam] = "all";
     }
 
-    if ((op.operation.parameters ?? []).some((param) => param.name === "filter")) {
+    if (
+      (op.operation.parameters ?? []).some((param) => param.name === "filter")
+    ) {
       locked.filter =
         Object.entries(filters)
           .filter(([, value]) => value)
@@ -272,7 +304,10 @@ export function OperationCatalog({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="flex h-full min-h-0 flex-col gap-6"
+      data-slot="operation-catalog"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -322,51 +357,54 @@ export function OperationCatalog({
         {...(formPre ? { formPre } : {})}
         {...(formPost ? { formPost } : {})}
         {...(formActions ? { formActions } : {})}
+        {...(actionLabels ? { actionLabels } : {})}
       />
 
       {showTable ? (
-        <>
-          {listQuery.isError && !listQuery.data ? (
-            renderError(
-              listQuery.error,
-              `Failed to load ${listEndpoint?.path ?? ""}`,
-            )
-          ) : (
-            (() => {
-              const defaultView = (
-                <OperationResultView
-                  response={listQuery.data ?? null}
-                  loading={listQuery.isFetching}
-                  loadingMessage={`Loading ${definition.title} results…`}
-                  emptyMessage="No records returned"
-                  ariaLabel={`${definition.title} results`}
-                  className="mt-0"
-                  detailOperation={detailOperation}
-                  filterConfig={{
-                    filters: decoratedFilters,
-                    ...(filterBarConfig.search
-                      ? { search: filterBarConfig.search }
-                      : {}),
-                    ...(filterBarConfig.timeRange
-                      ? { timeRange: filterBarConfig.timeRange }
-                      : {}),
-                  }}
-                  {...(commandRuntime ? { commandRuntime } : {})}
-                  {...(dataTablePagination
-                    ? { pagination: dataTablePagination }
-                    : {})}
-                />
-              );
-              return resultRenderer
-                ? resultRenderer({
-                    response: listQuery.data ?? null,
-                    defaultView,
-                    ...(surfaceKey ? { surfaceKey } : {}),
-                  })
-                : defaultView;
-            })()
-          )}
-        </>
+        <div
+          className="min-h-0 flex-1"
+          data-slot="operation-catalog-results"
+        >
+          {listQuery.isError && !listQuery.data
+            ? renderError(
+                listQuery.error,
+                `Failed to load ${listEndpoint?.path ?? ""}`,
+              )
+            : (() => {
+                const defaultView = (
+                  <OperationResultView
+                    response={listQuery.data ?? null}
+                    loading={listQuery.isFetching}
+                    loadingMessage={`Loading ${definition.title} results…`}
+                    emptyMessage="No records returned"
+                    ariaLabel={`${definition.title} results`}
+                    className="mt-0 h-full min-h-0"
+                    detailOperation={detailOperation}
+                    filterConfig={{
+                      filters: decoratedFilters,
+                      ...(filterBarConfig.search
+                        ? { search: filterBarConfig.search }
+                        : {}),
+                      ...(filterBarConfig.timeRange
+                        ? { timeRange: filterBarConfig.timeRange }
+                        : {}),
+                    }}
+                    {...(commandRuntime ? { commandRuntime } : {})}
+                    {...(dataTablePagination
+                      ? { pagination: dataTablePagination }
+                      : {})}
+                    {...(download ? { download } : {})}
+                  />
+                );
+                return resultRenderer
+                  ? resultRenderer({
+                      response: listQuery.data ?? null,
+                      defaultView,
+                      ...(surfaceKey ? { surfaceKey } : {}),
+                    })
+                  : defaultView;
+              })()}
+        </div>
       ) : (
         <EndpointList
           operations={domainOps}

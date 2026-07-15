@@ -15,12 +15,18 @@ import { useRouter } from "./router";
 import { OperationCatalog } from "./OperationCatalog";
 import type { ResultRenderer } from "./OperationResultView";
 import { OperationCommandPage } from "./OperationCommandPage";
-import { OperationEntityPage } from "./OperationEntityPage";
+import {
+  OperationEntityPage,
+  type EntityDetailBodyRenderer,
+  type EntityDetailHeaderRenderer,
+} from "./OperationEntityPage";
 import type { FormActionsRenderer } from "./SchemaActionForm";
 import { resolveSurfaceIcon } from "./surfaceIconMap";
 import type { ClickySurface } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { useOperations } from "./useOperations";
+
+export type SurfaceActionLabels = Record<string, Record<string, string>>;
 
 export type EntityExplorerAppProps = {
   client: OperationsApiClient;
@@ -39,6 +45,8 @@ export type EntityExplorerAppProps = {
    * and the action it submits to, so it can scope itself to a given entity.
    */
   formActions?: FormActionsRenderer;
+  /** Per-surface labels keyed by x-clicky verb/actionName. */
+  surfaceActionLabels?: SurfaceActionLabels;
   /**
    * @deprecated Superseded by per-surface icons emitted by the backend
    * (x-clicky-icon → ClickySurface.icon). AppShell section labels are plain
@@ -54,6 +62,10 @@ export type EntityExplorerAppProps = {
    * flagged via x-clicky-render). Filtering/sorting policy is the host's choice.
    */
   resultRenderer?: ResultRenderer;
+  /** Host override for a loaded entity's body; heading and actions remain. */
+  entityDetailBodyRenderer?: EntityDetailBodyRenderer;
+  /** Host override for a loaded entity's "{title}: {id}" heading. */
+  entityDetailHeaderRenderer?: EntityDetailHeaderRenderer;
 };
 
 // SIDEBAR_COLLAPSED_KEY persists the AppShell rail collapsed flag across reloads.
@@ -65,7 +77,10 @@ export function EntityExplorerApp({
   showApiExplorer = true,
   formExtensions,
   formActions,
+  surfaceActionLabels,
   resultRenderer,
+  entityDetailBodyRenderer,
+  entityDetailHeaderRenderer,
 }: EntityExplorerAppProps) {
   const formPre = formExtensions?.pre;
   const formPost = formExtensions?.post;
@@ -168,9 +183,12 @@ export function EntityExplorerApp({
               surfaceKey={resolvedRoute.surface.key}
               commandRuntime={commandRuntime}
               {...(formPre ? { formPre } : {})}
-              {...(formPost ? { formPost } : {})}
-              {...(formActions ? { formActions } : {})}
-              {...(resultRenderer ? { resultRenderer } : {})}
+            {...(formPost ? { formPost } : {})}
+            {...(formActions ? { formActions } : {})}
+            {...(surfaceActionLabels?.[resolvedRoute.surface.key]
+              ? { actionLabels: surfaceActionLabels[resolvedRoute.surface.key] }
+              : {})}
+            {...(resultRenderer ? { resultRenderer } : {})}
             />
           ) : (
             <UnknownSurface surfaceKey={resolvedRoute.surfaceKey} />
@@ -187,9 +205,14 @@ export function EntityExplorerApp({
               backLabel={`Back to ${resolvedRoute.surface.title}`}
               commandRuntime={commandRuntime}
               {...(formPre ? { formPre } : {})}
-              {...(formPost ? { formPost } : {})}
-              {...(formActions ? { formActions } : {})}
-              {...(resolvedRoute.id ? { id: resolvedRoute.id } : {})}
+            {...(formPost ? { formPost } : {})}
+            {...(formActions ? { formActions } : {})}
+            {...(surfaceActionLabels?.[resolvedRoute.surface.key]
+              ? { actionLabels: surfaceActionLabels[resolvedRoute.surface.key] }
+              : {})}
+            {...(entityDetailBodyRenderer ? { entityDetailBodyRenderer } : {})}
+            {...(entityDetailHeaderRenderer ? { entityDetailHeaderRenderer } : {})}
+            {...(resolvedRoute.id ? { id: resolvedRoute.id } : {})}
             />
           ) : (
             <UnknownSurface surfaceKey={resolvedRoute.surfaceKey} />

@@ -91,6 +91,44 @@ function installMemoryStorage() {
 }
 
 describe("ChatWindow tool approval default", () => {
+  it("lets an app-owned picker add removable context to the current window", async () => {
+    render(
+      <ChatWindowManagerProvider storageId="context-picker">
+        <OpenOnMount>
+          <ChatWindowLayer
+            threadsApi={null}
+            toolsApi={null}
+            renderContextPicker={({ onAddMany }) => (
+              <button
+                type="button"
+                onClick={() =>
+                  onAddMany([
+                    { id: "record-1", type: "record", label: "Record one" },
+                    { id: "record-2", type: "record", label: "Record two" },
+                  ])
+                }
+              >
+                Pick records
+              </button>
+            )}
+            chat={{ modelsApi: null, transport: mockChatTransport() }}
+          />
+        </OpenOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByRole("button", { name: "Pick records" });
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pick records" }));
+    expect(await screen.findByText("Record one")).toBeInTheDocument();
+    expect(await screen.findByText("Record two")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Record one" }));
+    await waitFor(() => expect(screen.queryByText("Record one")).toBeNull());
+  });
+
   it("forwards rich context items alongside the serialized context summary", () => {
     const contextItems = [
       {

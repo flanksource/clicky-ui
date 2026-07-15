@@ -10,24 +10,7 @@ import type {
   JSONSchemaProperty,
   ToolAnnotations,
   ToolMeta,
-  ToolMode,
 } from "./types";
-
-const DISABLED_TOOL_GROUP = "Disabled";
-
-const TOOL_GROUP_DEFAULTS: Record<string, ToolMode> = {
-  "Accounting Read": "on",
-  "Accounting Transaction Write": "ask",
-  "Accounting Metadata Write": "ask",
-  "Comments Read": "on",
-  "Comments Write": "ask",
-  "Xero Read": "off",
-  "Xero Write": "off",
-  "Takealot Read": "on",
-  "Takealot Write": "off",
-  "Admin Read": "on",
-  "Admin Write": "ask",
-};
 
 /** Converts a clicky RPC operation catalog into AI-tool metadata for display
  *  and request scoping. Execution stays in the Go backend; this maps an
@@ -66,16 +49,11 @@ export function operationToTool(
   }
   const meta = operation["x-clicky"];
   const hints = meta?.toolHints;
-  const group = operationToolGroup(operation, resolved);
-  if (group === DISABLED_TOOL_GROUP) {
-    return null;
-  }
+  const group = operationToolGroup(operation);
   const surface = meta?.surface ? surfacesByKey?.get(meta.surface) : undefined;
-  const parent = hints?.parent || surface?.title || surface?.entity;
+  const parent = surface?.title || hints?.parent || surface?.entity;
   const icon = hints?.icon || surface?.icon;
-  const defaultPermission =
-    hints?.defaultPermission ??
-    (group ? toolDefaultPermission(group) : undefined);
+  const defaultPermission = hints?.defaultPermission;
   const description = operation.description ?? operation.summary;
   return {
     name: operation.operationId,
@@ -93,7 +71,7 @@ export function operationToTool(
     ...(resolved?.method ? { method: resolved.method.toUpperCase() } : {}),
     ...(resolved?.path ? { path: resolved.path } : {}),
     strict: hints?.strict ?? true,
-    annotations: toolAnnotations(operation, resolved, group, description),
+    annotations: toolAnnotations(operation, resolved, description),
     inputSchema: buildInputSchema(operation),
   };
 }
@@ -101,7 +79,6 @@ export function operationToTool(
 function toolAnnotations(
   operation: OpenAPIOperation,
   resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
-  group: string | undefined,
   description: string | undefined,
 ): ToolAnnotations {
   const hints = operation["x-clicky"]?.toolHints;
@@ -115,7 +92,7 @@ function toolAnnotations(
   if (title) annotations.title = title;
   if (hints?.readOnlyHint !== undefined) {
     annotations.readOnlyHint = hints.readOnlyHint;
-  } else if (isReadOnlyTool(operation, resolved, group)) {
+  } else if (resolved?.method?.toUpperCase() === "GET") {
     annotations.readOnlyHint = true;
   }
   if (hints?.idempotentHint !== undefined) {
@@ -125,26 +102,13 @@ function toolAnnotations(
   }
   if (hints?.destructiveHint !== undefined) {
     annotations.destructiveHint = hints.destructiveHint;
-  } else if (isDestructiveTool(operation, resolved, group)) {
+  } else if (isDestructiveTool(operation, resolved)) {
     annotations.destructiveHint = true;
   }
   if (hints?.openWorldHint !== undefined) {
     annotations.openWorldHint = hints.openWorldHint;
   }
   return annotations;
-}
-
-function isReadOnlyTool(
-  operation: OpenAPIOperation,
-  resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
-  group: string | undefined,
-): boolean {
-  const method = resolved?.method?.toUpperCase() ?? "";
-  return (
-    method === "GET" ||
-    Boolean(group?.toLowerCase().includes(" read")) ||
-    isReadLikeOperation(operation.operationId ?? "")
-  );
 }
 
 function isIdempotentMethod(method: string): boolean {
@@ -160,14 +124,12 @@ function isIdempotentMethod(method: string): boolean {
 function isDestructiveTool(
   operation: OpenAPIOperation,
   resolved: Pick<ResolvedOperation, "path" | "method"> | undefined,
-  group: string | undefined,
 ): boolean {
   const method = resolved?.method?.toUpperCase() ?? "";
   if (method === "DELETE") return true;
   if (method === "GET" || method === "HEAD" || method === "OPTIONS")
     return false;
-  const text =
-    `${group ?? ""} ${resolved?.path ?? ""} ${operation.operationId ?? ""}`.toLowerCase();
+  const text = `${resolved?.path ?? ""} ${operation.operationId ?? ""}`.toLowerCase();
   return /\b(write|delete|remove|destroy|void|sync|create|update|patch|post)\b/.test(
     text,
   );
@@ -175,12 +137,11 @@ function isDestructiveTool(
 
 function operationToolGroup(
   operation: OpenAPIOperation,
-  resolved?: Pick<ResolvedOperation, "path" | "method">,
 ): string | undefined {
   const meta = operation["x-clicky"];
   if (meta?.toolHints?.group) return meta.toolHints.group;
   if (meta?.group) return meta.group;
-  return inferToolGroup(operation, resolved);
+  return undefined;
 }
 
 function isCobraHelpOrCompletionOperation(
@@ -219,78 +180,6 @@ function pathContainsCobraBuiltin(path: string | undefined): boolean {
   return first === "completion" || first === "help";
 }
 
-function inferToolGroup(
-  operation: OpenAPIOperation,
-  resolved?: Pick<ResolvedOperation, "path" | "method">,
-): string | undefined {
-  const id = operation.operationId ?? "";
-  const tags = operation.tags ?? [];
-  const path = resolved?.path ?? "";
-  const method = resolved?.method?.toUpperCase() ?? "";
-  const write = isWriteMethod(method);
-
-  if (path.startsWith("/api/v1/provider/") || id.startsWith("provider")) {
-    return write ? "Xero Write" : "Xero Read";
-  }
-  if (
-    path.startsWith("/api/v1/comments") ||
-    path.startsWith("/api/v1/comment-messages") ||
-    /^(comments|commentMessages|comment)/.test(id)
-  ) {
-    return write ? "Comments Write" : "Comments Read";
-  }
-  if (path === "/api/v1/accounts/mapping" || id.startsWith("accountMapping")) {
-    return write ? "Accounting Metadata Write" : "Accounting Read";
-  }
-  if (path === "/api/v1/entity/metadata" || id.startsWith("entityMetadata")) {
-    return write ? "Accounting Metadata Write" : "Accounting Read";
-  }
-  if (
-    path.startsWith("/api/v1/companies/") ||
-    id.startsWith("companyBranding")
-  ) {
-    return write ? "Accounting Metadata Write" : "Accounting Read";
-  }
-  if (
-    path.startsWith("/api/v1/transactions") ||
-    path.startsWith("/api/v1/journals") ||
-    /^(transactions|journals)/.test(id)
-  ) {
-    return write ? "Accounting Transaction Write" : "Accounting Read";
-  }
-  if (
-    path.startsWith("/api/v1/rules/") ||
-    path.startsWith("/api/v1/rates/") ||
-    path.startsWith("/api/v1/template/") ||
-    path.startsWith("/api/v1/formula/") ||
-    tags.some((tag) =>
-      ["rules", "rates", "template", "formula"].includes(tag),
-    ) ||
-    /^(rules|rates|template|formula)/.test(id)
-  ) {
-    return write && !isReadLikeOperation(id) ? "Admin Write" : "Admin Read";
-  }
-  return undefined;
-}
-
-function isWriteMethod(method: string): boolean {
-  return (
-    method === "POST" ||
-    method === "PUT" ||
-    method === "PATCH" ||
-    method === "DELETE"
-  );
-}
-
-function isReadLikeOperation(operationId: string): boolean {
-  return /(list|load|render|pdf|eval|context|validate|preview|coverage|entries|get|history|export)/i.test(
-    operationId,
-  );
-}
-
-function toolDefaultPermission(group: string): ToolMode {
-  return TOOL_GROUP_DEFAULTS[group] ?? "ask";
-}
 
 /** A concise popover label: the clicky action/verb (capitalized) when present,
  *  else the operation summary, else a humanized operationId. Mirrors the intent

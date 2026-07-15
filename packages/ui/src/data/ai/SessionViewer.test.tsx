@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { SessionViewer } from "./SessionViewer";
 import { SAMPLE_SESSION } from "./SessionViewer.fixtures";
 import type { SessionEntry } from "./SessionViewer.model";
@@ -109,6 +109,44 @@ describe("SessionViewer", () => {
     expect(screen.getByText("Scope: Project")).toBeInTheDocument();
   });
 
+  it("renders a pending question overlay and returns answers keyed by question text", async () => {
+    const onDecision = vi.fn();
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={[]}
+        pendingTools={[{
+          tool: "AskUserQuestion",
+          toolCallId: "ask-1",
+          input: { questions: [{ id: "scope", question: "Which scope?", options: [{ label: "Project", value: "project" }] }] },
+        }]}
+        onPendingToolDecision={onDecision}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /Project/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
+
+    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
+        allow: true,
+        answers: { "Which scope?": "project" },
+      })),
+    );
+  });
+
+  it("keeps permission decision errors on the pending tool row", async () => {
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={[]}
+        pendingTools={[{ tool: "Bash", input: { command: "npm test" } }]}
+        onPendingToolDecision={async () => { throw new Error("approval expired"); }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Allow/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("approval expired");
+  });
+
   it("shows approval status badges directly on tool rows", () => {
     render(
       <SessionViewer
@@ -178,6 +216,47 @@ describe("SessionViewer", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.getAllByText("claude-opus-4-8").length).toBeGreaterThan(0);
     expect(screen.getByText("6 actions")).toBeInTheDocument();
+  });
+
+  it("collapses adjacent Wait calls and expands back to the original rows", () => {
+    const waits = ["214", "215", "216"].map((cellId) => ({
+      id: `wait-${cellId}`,
+      role: "assistant",
+      turnId: "turn-wait",
+      provenance: {
+        timestamp: `2026-07-13T09:41:${cellId === "214" ? "33" : cellId === "215" ? "41" : "49"}.000Z`,
+        sessionId: "session-wait",
+        source: "codex",
+        model: "gpt-5.6-sol",
+        reasoningEffort: "max",
+        agentId: "agent-wait",
+      },
+      parts: [
+        {
+          type: "dynamic-tool",
+          toolName: "Wait",
+          toolCallId: `call-${cellId}`,
+          state: "output-available",
+          input: { cell_id: cellId, yield_time_ms: 20000, max_tokens: 5000 },
+          output: `cell ${cellId} completed`,
+        },
+      ],
+    }));
+    const { container } = render(<SessionViewer session={{ messages: waits }} />);
+
+    expect(screen.getByText("3 actions")).toBeInTheDocument();
+    expect(screen.getByText("Wait × 3")).toBeInTheDocument();
+    const group = container.querySelector('[data-event-group="wait"]') as HTMLElement;
+    expect(group).toBeInTheDocument();
+    expect(group.textContent).not.toContain("cell_id:");
+
+    fireEvent.click(within(group).getByRole("button", { name: "Expand Wait × 3" }));
+
+    expect(within(group).getByRole("button", { name: "Collapse Wait × 3" })).toBeInTheDocument();
+    expect(group.querySelectorAll('li[data-event-kind="tool"]')).toHaveLength(3);
+    expect(group.textContent).toContain("cell_id: 214");
+    expect(group.textContent).toContain("cell_id: 215");
+    expect(group.textContent).toContain("cell_id: 216");
   });
 
   it("shows session-level turn, capability, context and budget metadata", () => {

@@ -2,6 +2,10 @@ import { useMemo, useState } from "react";
 import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
 import { effortLevelIcon } from "../../chat/effort-icons";
 import type { ChatModel } from "../../chat/types";
+import {
+  effortOptionsForModel,
+  reconcileModelCapabilities,
+} from "../model-capabilities";
 import { providerIcon } from "../../chat/provider-icons";
 import { Icon } from "../../Icon";
 import { IconButton } from "../../../components";
@@ -62,7 +66,8 @@ export function ModelSection({
   const selectedModel = models.find((m) => m.id === value.model);
   // Show a control unless the resolved model reports it unsupported; an unknown
   // selection or a catalog without the field keeps the control visible.
-  const showEffort = !selectedModel || selectedModel.reasoning;
+  const modelEfforts = effortOptionsForModel(selectedModel, REASONING_EFFORTS);
+  const showEffort = modelEfforts.length > 0;
   const showTemperature = !selectedModel || selectedModel.temperature !== false;
 
   return (
@@ -79,7 +84,15 @@ export function ModelSection({
             <ModelSelector
               models={modelOptions}
               value={value.model}
-              onChange={(model) => onChange(withRoot(value, { model }))}
+              onChange={(model) =>
+                onChange(
+                  reconcileModelCapabilities(
+                    value,
+                    models.find((item) => item.id === model),
+                    REASONING_EFFORTS,
+                  ),
+                )
+              }
               className="w-full"
               size="md"
             />
@@ -96,7 +109,7 @@ export function ModelSection({
         {showEffort && (
           <SpecField label="Effort">
             <EffortSelector
-              efforts={REASONING_EFFORTS}
+              efforts={modelEfforts}
               value={value.effort ?? ""}
               onChange={(effort) => onChange(withRoot(value, { effort }))}
               className="w-full"
@@ -400,7 +413,8 @@ function FallbackModelPicker({
     return modelsForFamily(models, family, value.backend);
   }, [families, models, value.backend]);
   const selectedModel = models.find((m) => m.id === value.model);
-  const showEffort = !selectedModel || selectedModel.reasoning;
+  const modelEfforts = effortOptionsForModel(selectedModel, REASONING_EFFORTS);
+  const showEffort = modelEfforts.length > 0;
   const showTemperature = !selectedModel || selectedModel.temperature !== false;
 
   return (
@@ -423,7 +437,15 @@ function FallbackModelPicker({
               <ModelSelector
                 models={modelOptions}
                 value={value.model}
-                onChange={(model) => onPatch({ model })}
+                onChange={(model) =>
+                  onChange(
+                    reconcileModelCapabilities(
+                      value,
+                      models.find((item) => item.id === model),
+                      REASONING_EFFORTS,
+                    ),
+                  )
+                }
                 className="w-full"
                 size="md"
               />
@@ -440,7 +462,7 @@ function FallbackModelPicker({
           {showEffort && (
             <SpecField label="Effort">
               <EffortSelector
-                efforts={REASONING_EFFORTS}
+                efforts={modelEfforts}
                 value={value.effort ?? ""}
                 onChange={(effort) => onPatch({ effort })}
                 className="w-full"

@@ -5,6 +5,7 @@ export {
 export {
   EntityExplorerApp,
   type EntityExplorerAppProps,
+  type SurfaceActionLabels,
 } from "./rpc/EntityExplorerApp";
 export {
   ACCEPT_OPTIONS,
@@ -17,6 +18,7 @@ export {
   type SchemaActionFormProps,
   type FormActionContext,
   type FormActionsRenderer,
+  type SchemaActionFormSlots,
 } from "./rpc/SchemaActionForm";
 export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
 export {
@@ -34,7 +36,26 @@ export {
 export {
   OperationEntityPage,
   type OperationEntityPageProps,
+  type EntityDetailBodyRenderContext,
+  type EntityDetailBodyRenderer,
+  type EntityDetailHeaderRenderContext,
+  type EntityDetailHeaderRenderer,
 } from "./rpc/OperationEntityPage";
+export {
+  OperationEntityContextPicker,
+  type OperationEntityContextPickerProps,
+  type EntityContextSurfaceFilter,
+  type EntityContextSurfaceText,
+  type EntityContextSurfaceIcon,
+  type EntityContextSurfaceColor,
+  type EntityContextGroupIcon,
+  type EntityContextGroupColor,
+} from "./rpc/OperationEntityContextPicker";
+export {
+  entityContextItemID,
+  clickyRowRecord,
+  contextItemFromEntityRow,
+} from "./rpc/OperationEntityContextPicker.model";
 export {
   OperationCommandPage,
   type OperationCommandPageProps,
