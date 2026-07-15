@@ -216,7 +216,7 @@ function DropdownMenuRoot({
         )}
         {open && (
           <FloatingPortal>
-            <FloatingFocusManager context={context} modal={false}>
+            <FloatingFocusManager context={context} modal={false} closeOnFocusOut={false}>
               <div
                 ref={refs.setFloating}
                 role="menu"

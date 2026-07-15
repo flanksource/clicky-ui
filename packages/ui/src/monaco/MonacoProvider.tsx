@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect } from "react";
-import type { MonacoProviderProps, MonacoWorkerFactory } from "./types";
-
-const WorkerContext = createContext<MonacoWorkerFactory | null>(null);
+import { useEffect } from "react";
+import type { MonacoProviderProps } from "./types";
+import { WorkerContext } from "./use-monaco-worker";
 
 export function MonacoProvider({ getWorker, children }: MonacoProviderProps) {
   useEffect(() => {
@@ -20,8 +19,4 @@ export function MonacoProvider({ getWorker, children }: MonacoProviderProps) {
   }, [getWorker]);
 
   return <WorkerContext.Provider value={getWorker}>{children}</WorkerContext.Provider>;
-}
-
-export function useMonacoWorkerFactory(): MonacoWorkerFactory | null {
-  return useContext(WorkerContext);
 }

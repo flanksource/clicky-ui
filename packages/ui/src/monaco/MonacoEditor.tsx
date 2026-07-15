@@ -1,7 +1,7 @@
 import Editor, { loader, type Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { useResolvedTheme } from "../hooks/use-theme";
-import { useMonacoWorkerFactory } from "./MonacoProvider";
+import { useMonacoWorkerFactory } from "./use-monaco-worker";
 import type { MonacoEditorProps } from "./types";
 
 loader.config({ monaco });

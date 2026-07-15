@@ -110,14 +110,17 @@ export const OpensModal: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
+    let menu: HTMLElement | null = null;
     await step("opens a Modal from a button inside the menu", async () => {
       await userEvent.click(canvas.getByRole("button", { name: "Actions" }));
-      await body.findByRole("menu");
-      await userEvent.click(body.getByRole("button", { name: "View log" }));
+      menu = await body.findByRole("menu");
+      await userEvent.click(
+        within(menu).getByRole("button", { name: "View log" }),
+      );
     });
+    if (!menu) throw new Error("Dropdown menu did not open");
 
     await step("the Modal escapes the dropdown's box", async () => {
-      const menu = body.getByRole("menu");
       const dialog = await body.findByRole("dialog");
       // Portaled out of the menu's DOM subtree, and overflows the menu's box
       // rather than being clipped to it.
@@ -130,7 +133,7 @@ export const OpensModal: Story = {
 
     await step("the menu stays open behind the Modal", async () => {
       // Closing the menu would unmount the Modal it renders, so it must persist.
-      await expect(body.queryByRole("menu")).not.toBeNull();
+      await expect(document.body.contains(menu)).toBe(true);
     });
   },
 };

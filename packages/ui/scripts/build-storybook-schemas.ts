@@ -53,9 +53,22 @@ const outputs: SchemaOutput[] = [
 await mkdir(generatedRoot, { recursive: true });
 
 for (const output of outputs) {
-  const data = runJSONCommand(output.command);
   const target = join(generatedRoot, output.file);
-  await writeIfChanged(target, `${JSON.stringify(data, null, 2)}\n`);
+  const result = runJSONCommand(output.command);
+  if (!result.ok) {
+    // The schemas are committed artifacts; the generator only refreshes them
+    // from the sibling Go tools when those are available. Where the CLI is
+    // absent (CI, contributors without gavel/captain installed) keep the
+    // committed copy rather than failing the whole Storybook build.
+    if (existsSync(target)) {
+      console.warn(`${output.command.label}: ${result.reason}; keeping committed ${output.file}`);
+      continue;
+    }
+    throw new Error(
+      `${output.command.label}: ${result.reason}; no committed ${output.file} to fall back to`,
+    );
+  }
+  await writeIfChanged(target, `${JSON.stringify(result.data, null, 2)}\n`);
   console.log(`Generated ${target}`);
 }
 
@@ -84,7 +97,11 @@ function resolveSchemaCommand({
   return { label, cmd: binary, args: binaryArgs };
 }
 
-function runJSONCommand(command: CommandSpec): unknown {
+type CommandResult =
+  | { ok: true; data: unknown }
+  | { ok: false; reason: string };
+
+function runJSONCommand(command: CommandSpec): CommandResult {
   const result = spawnSync(command.cmd, command.args, {
     cwd: command.cwd,
     encoding: "utf8",
@@ -92,6 +109,12 @@ function runJSONCommand(command: CommandSpec): unknown {
     maxBuffer: 20 * 1024 * 1024,
   });
   if (result.error) {
+    // ENOENT means the tool itself is not installed; treat as unavailable so
+    // the caller can fall back to the committed schema. Any other spawn error
+    // is a genuine failure.
+    if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { ok: false, reason: `${command.cmd} not found` };
+    }
     throw new Error(`${command.label}: ${result.error.message}`);
   }
   if (result.status !== 0) {
@@ -106,7 +129,7 @@ function runJSONCommand(command: CommandSpec): unknown {
     );
   }
   try {
-    return JSON.parse(result.stdout);
+    return { ok: true, data: JSON.parse(result.stdout) };
   } catch (error) {
     throw new Error(
       `${command.label} did not print valid JSON: ${
