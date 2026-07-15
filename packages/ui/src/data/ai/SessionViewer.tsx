@@ -1,36 +1,25 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
-import { Icon, type StaticIconComponent } from "../Icon";
-import { CodeBlock } from "../CodeBlock";
+import { Icon } from "../Icon";
 import { useDensityValue, type Density } from "../../hooks/use-density";
 import { DensityValueProvider } from "../../hooks/density-provider";
+import { UiRobotAi } from "../../icons";
 import {
-  UiBrain,
-  UiChevronDown,
-  UiRobotAi,
-  UiSparkles,
-  UiUserCircle,
-  UiWarningTriangle,
-} from "../../icons";
-import {
-  getSessionAction,
+  getSessionMetadata,
   normalizeSession,
-  shellCommand,
   summarizeSession,
-  summarizeToolInput,
-  toolInputParams,
-  type SessionEvent,
+  type SessionMetadataSummary,
   type SessionInput,
-  type SessionTone,
-  type ToolParam,
 } from "./SessionViewer.model";
+import { SessionRow } from "./SessionViewer.rows";
 import {
   collectSessionFilters,
   isEventVisible,
   type SessionCategory,
 } from "./session-categories";
 import { SessionViewerMenu, type SessionThemeOverride } from "./SessionViewerMenu";
+import { useSessionScroll } from "./use-session-scroll";
 
 export type {
   SessionEntry,
@@ -61,24 +50,21 @@ export interface SessionViewerProps {
   defaultDensity?: Density;
   /** Initial theme override; undefined inherits the page/document `data-theme`. */
   defaultTheme?: SessionThemeOverride;
+  /** Own an internal scroll container that fills its parent's height: render only
+   *  the newest screenful, stay pinned to the bottom (most recent activity), and
+   *  backfill older rows as the reader scrolls up. Off by default, so inline
+   *  consumers keep rendering the whole log in normal page flow. Requires a
+   *  height-bounded parent. */
+  scrollable?: boolean;
+  /** Rows rendered on first paint in `scrollable` mode. Defaults to 60. */
+  windowSize?: number;
+  /** Rows added each time older content loads in `scrollable` mode. Defaults to 40. */
+  batchSize?: number;
+  /** Show per-row timestamp/source/model/turn/agent metadata. Defaults to false. */
+  showRowMetadata?: boolean;
+  /** Show a per-row raw JSON payload expander when available. Defaults to false. */
+  showRaw?: boolean;
 }
-
-// Disc colors per tone. The dark variants key off a `[data-theme="dark"]`
-// ancestor (the document attribute set by ThemeProvider, or the component-level
-// override painted on this viewer's root) rather than Tailwind's `dark:` —
-// which this library compiles to `prefers-color-scheme` and so would ignore the
-// `data-theme` attribute. Written as literal class strings so Tailwind scans them.
-const DISC_TONE: Record<SessionTone, string> = {
-  sky: "bg-sky-100 text-sky-700 [[data-theme=dark]_&]:bg-sky-500/15 [[data-theme=dark]_&]:text-sky-300",
-  amber: "bg-amber-100 text-amber-700 [[data-theme=dark]_&]:bg-amber-500/15 [[data-theme=dark]_&]:text-amber-300",
-  violet: "bg-violet-100 text-violet-700 [[data-theme=dark]_&]:bg-violet-500/15 [[data-theme=dark]_&]:text-violet-300",
-  emerald: "bg-emerald-100 text-emerald-700 [[data-theme=dark]_&]:bg-emerald-500/15 [[data-theme=dark]_&]:text-emerald-300",
-  rose: "bg-rose-100 text-rose-700 [[data-theme=dark]_&]:bg-rose-500/15 [[data-theme=dark]_&]:text-rose-300",
-  indigo: "bg-indigo-100 text-indigo-700 [[data-theme=dark]_&]:bg-indigo-500/15 [[data-theme=dark]_&]:text-indigo-300",
-  fuchsia: "bg-fuchsia-100 text-fuchsia-700 [[data-theme=dark]_&]:bg-fuchsia-500/15 [[data-theme=dark]_&]:text-fuchsia-300",
-  pink: "bg-pink-100 text-pink-700 [[data-theme=dark]_&]:bg-pink-500/15 [[data-theme=dark]_&]:text-pink-300",
-  slate: "bg-muted text-muted-foreground",
-};
 
 function toggleInSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
   const next = new Set(set);
@@ -108,8 +94,14 @@ export function SessionViewer({
   menuContainer,
   defaultDensity,
   defaultTheme,
+  scrollable = false,
+  windowSize = 60,
+  batchSize = 40,
+  showRowMetadata = false,
+  showRaw = false,
 }: SessionViewerProps) {
   const allEvents = useMemo(() => normalizeSession(session), [session]);
+  const metadata = useMemo(() => getSessionMetadata(session), [session]);
 
   const pageDensity = useDensityValue();
   const [densityOverride, setDensityOverride] = useState<Density | undefined>(defaultDensity);
@@ -128,6 +120,17 @@ export function SessionViewer({
 
   const visibility = { hiddenCategories, hiddenTools, hiddenSources, showThinking: effectiveShowThinking };
   const events = allEvents.filter((event) => isEventVisible(event, visibility));
+
+  // Reset the window when the underlying session changes, not on filter toggles —
+  // so hiding a category doesn't yank the reader back to the bottom.
+  const resetKey = `${allEvents.length}:${allEvents[0]?.id ?? ""}`;
+  const { scrollRef, contentRef, startIndex } = useSessionScroll({
+    total: events.length,
+    enabled: scrollable,
+    windowSize,
+    batchSize,
+    resetKey,
+  });
 
   if (allEvents.length === 0) {
     return (
@@ -173,12 +176,41 @@ export function SessionViewer({
   // host's own toolbar) and the inline header collapses to just its summary.
   const inlineMenu = menu && !menuContainer;
 
+  const list =
+    events.length === 0 ? (
+      <div className="rounded-md border border-dashed border-border p-density-4 text-center text-sm text-muted-foreground">
+        All actions are hidden by the active filters.
+      </div>
+    ) : (
+      // In scrollable mode only the newest `startIndex..` slice is mounted; `last`
+      // is measured against the full length so the timeline connector stays right.
+      <ol className="relative">
+        {events.slice(startIndex).map((event, index) => (
+          <SessionRow
+            key={event.id}
+            event={event}
+            last={startIndex + index === events.length - 1}
+            defaultExpanded={defaultExpanded}
+            showRowMetadata={showRowMetadata}
+            showRaw={showRaw}
+          />
+        ))}
+      </ol>
+    );
+
   return (
-    <div className={cn("text-sm", className)} {...dataAttrs}>
+    <div className={cn("text-sm", scrollable && "flex h-full min-h-0 flex-col", className)} {...dataAttrs}>
       <DensityValueProvider density={effectiveDensity}>
         {menu && menuContainer && createPortal(menu, menuContainer)}
         {(showHeader || inlineMenu) && (
-          <div className="mb-density-3 flex items-center justify-between gap-density-3">
+          <div
+            className={cn(
+              "flex items-center justify-between gap-density-3",
+              scrollable
+                ? "shrink-0 border-b border-border px-density-4 py-density-2 md:px-density-6"
+                : "mb-density-3",
+            )}
+          >
             <div className="flex flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
               {showHeader && summary.model && (
                 <span className="inline-flex items-center gap-1 font-medium text-foreground">
@@ -188,283 +220,90 @@ export function SessionViewer({
               )}
               {showHeader && <span>{summary.toolCount} actions</span>}
               {showHeader && <span>{summary.messageCount} messages</span>}
+              {showHeader && metadata && <SessionMetadataBadges metadata={metadata} />}
             </div>
             {inlineMenu && menu}
           </div>
         )}
 
-        {events.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border p-density-4 text-center text-sm text-muted-foreground">
-            All actions are hidden by the active filters.
+        {scrollable ? (
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={contentRef} className="p-density-4 md:p-density-6">
+              {list}
+            </div>
           </div>
         ) : (
-          <ol className="relative">
-            {events.map((event, index) => (
-              <SessionRow
-                key={event.id}
-                event={event}
-                last={index === events.length - 1}
-                defaultExpanded={defaultExpanded}
-              />
-            ))}
-          </ol>
+          list
         )}
       </DensityValueProvider>
     </div>
   );
 }
 
-function SessionRow({
-  event,
-  last,
-  defaultExpanded,
-}: {
-  event: SessionEvent;
-  last: boolean;
-  defaultExpanded: boolean;
-}) {
-  if (event.kind === "user") return <UserRow event={event} />;
-
-  const visual = eventVisual(event);
+function SessionMetadataBadges({ metadata }: { metadata: SessionMetadataSummary }) {
+  const capabilityBadges = [
+    countBadge("tool", metadata.capabilities?.tools),
+    countBadge("mcp", metadata.capabilities?.pendingMcpServers),
+    countBadge("agent", metadata.capabilities?.agents),
+    countBadge("skill", metadata.capabilities?.skills),
+  ].filter(Boolean) as Array<{ key: string; label: string; title?: string }>;
+  const badges: Array<{ key: string; label: string; title?: string }> = [
+    ...(metadata.turns?.length ? [{ key: "turns", label: countLabel(metadata.turns.length, "turn") }] : []),
+    ...capabilityBadges,
+    ...(metadata.context ? [{ key: "context", label: contextLabel(metadata.context) }] : []),
+    ...(metadata.budget ? [{ key: "budget", label: budgetLabel(metadata.budget) }] : []),
+    ...(metadata.events?.length ? [{ key: "events", label: countLabel(metadata.events.length, "event") }] : []),
+  ];
+  if (badges.length === 0) return null;
   return (
-    <li data-event-kind={event.kind} className="relative flex gap-density-3 pb-density-4 last:pb-0">
-      {!last && <span aria-hidden className="absolute bottom-0 left-[10px] top-[22px] w-px bg-border" />}
-      <span
-        className={cn(
-          "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-          DISC_TONE[visual.tone],
-        )}
-      >
-        <Icon icon={visual.icon} className="h-3 w-3" />
-      </span>
-      <div className="min-w-0 flex-1 pt-px">
-        <EventBody event={event} visual={visual} defaultExpanded={defaultExpanded} />
-      </div>
-    </li>
-  );
-}
-
-// User prompts and selections sit on the right, like a chat composer turn.
-function UserRow({ event }: { event: SessionEvent }) {
-  return (
-    <li data-event-kind="user" className="relative flex justify-end pb-density-4 last:pb-0">
-      <div className="flex max-w-[85%] items-start gap-density-3">
-        <div className="min-w-0">
-          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">You</div>
-          <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right leading-relaxed text-accent-foreground">
-            {event.text}
-          </div>
-        </div>
-        <span
-          className={cn(
-            "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-            DISC_TONE.slate,
-          )}
-        >
-          <Icon icon={UiUserCircle} className="h-3 w-3" />
-        </span>
-      </div>
-    </li>
-  );
-}
-
-interface EventVisual {
-  icon: StaticIconComponent;
-  tone: SessionTone;
-  label: string;
-  summaryOnly: boolean;
-}
-
-function eventVisual(event: SessionEvent): EventVisual {
-  switch (event.kind) {
-    case "tool": {
-      const action = getSessionAction(event.tool ?? "");
-      return {
-        icon: action.icon,
-        tone: action.tone,
-        label: action.label,
-        summaryOnly: action.summaryOnly ?? false,
-      };
-    }
-    case "user":
-      return { icon: UiUserCircle, tone: "slate", label: "User", summaryOnly: false };
-    case "assistant":
-      return { icon: UiSparkles, tone: "indigo", label: "Assistant", summaryOnly: false };
-    case "thinking":
-      return { icon: UiBrain, tone: "slate", label: "Thinking", summaryOnly: false };
-    case "error":
-      return { icon: UiWarningTriangle, tone: "rose", label: "Error", summaryOnly: false };
-  }
-}
-
-function EventBody({
-  event,
-  visual,
-  defaultExpanded,
-}: {
-  event: SessionEvent;
-  visual: EventVisual;
-  defaultExpanded: boolean;
-}) {
-  if (event.kind === "tool") return <ToolBody event={event} visual={visual} defaultExpanded={defaultExpanded} />;
-  if (event.kind === "thinking") return <ThinkingBody event={event} />;
-  if (event.kind === "error") return <ErrorBody event={event} />;
-  return <MessageBody event={event} />;
-}
-
-function ToolBody({
-  event,
-  visual,
-  defaultExpanded,
-}: {
-  event: SessionEvent;
-  visual: EventVisual;
-  defaultExpanded: boolean;
-}) {
-  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
-  const command = shellCommand(event.tool ?? "", event.toolInput);
-  const [open, setOpen] = useState(defaultExpanded);
-
-  // Shell rows inline the full command as a bash block — no "Run command"
-  // label, no tool-input JSON. Only the response stays behind the chevron.
-  if (command !== undefined) {
-    return (
-      <div className="not-prose">
-        <div className="flex items-start gap-1.5">
-          <div className="min-w-0 flex-1">
-            <CodeBlock bare language="bash" source={command} />
-          </div>
-          {event.toolResponse !== undefined && (
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-label="Toggle response"
-              onClick={() => setOpen((value) => !value)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Icon
-                icon={UiChevronDown}
-                className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")}
-              />
-            </button>
-          )}
-        </div>
-        {open && event.toolResponse !== undefined && (
-          <div className="mt-1.5">
-            <ResponseBlock response={event.toolResponse} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
-  const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
-  // summaryOnly rows (file ops) read as their path alone — the icon carries the
-  // verb. Remaining input keys follow as JetBrains-style inline param hints.
-  const header = (
     <>
-      {visual.summaryOnly && summary ? (
-        <span className="min-w-0 truncate font-mono text-xs text-foreground">{summary}</span>
-      ) : (
-        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
-      )}
-      {params.length > 0 && <InlineParams params={params} />}
-    </>
-  );
-
-  return (
-    <div className="not-prose">
-      {hasDetail ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
+      {badges.map((badge) => (
+        <span
+          key={badge.key}
+          title={badge.title}
+          className="inline-flex max-w-40 items-center rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
         >
-          {header}
-          <Icon
-            icon={UiChevronDown}
-            className={cn("ml-auto size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
-          />
-        </button>
-      ) : (
-        <div className="flex items-center gap-1.5">{header}</div>
-      )}
-
-      {open && hasDetail && (
-        <div className="mt-1.5 space-y-1.5">
-          {event.toolInput !== undefined && (
-            <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
-          )}
-          {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// A single truncating line of `name: value` hints — the container clips with an
-// ellipsis instead of wrapping, and each value is already truncated by the model.
-function InlineParams({ params }: { params: ToolParam[] }) {
-  return (
-    <span className="min-w-0 flex-1 truncate font-mono text-xs">
-      {params.map((param) => (
-        <span key={param.name} className="[&:not(:first-child)]:ml-2">
-          <span className="text-muted-foreground/70">{param.name}: </span>
-          <span className="text-muted-foreground">{param.value}</span>
+          <span className="truncate">{badge.label}</span>
         </span>
       ))}
-    </span>
+    </>
   );
 }
 
-function ResponseBlock({ response }: { response: string }) {
-  const trimmed = response.trim();
-  const isJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-  return <DetailBlock language={isJson ? "json" : "text"} source={response} />;
+function countBadge(label: string, values: string[] | undefined) {
+  const count = values?.length ?? 0;
+  if (!count) return null;
+  return { key: label, label: countLabel(count, label), title: values?.join(", ") };
 }
 
-function DetailBlock({ language, source }: { language: string; source: string }): ReactNode {
-  return (
-    <div className="overflow-x-auto text-xs">
-      <CodeBlock bare language={language} source={source} />
-    </div>
-  );
+function countLabel(count: number, label: string) {
+  if (label === "mcp") return `${count} mcp`;
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
-function MessageBody({ event }: { event: SessionEvent }) {
-  return (
-    <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">{event.text}</div>
-  );
+function contextLabel(context: { freePercent: number; usedTokens?: number; windowTokens?: number }) {
+  const used = compactNumber(context.usedTokens ?? 0);
+  const total = compactNumber(context.windowTokens ?? 0);
+  return total ? `ctx ${context.freePercent}% free (${used}/${total})` : `ctx ${context.freePercent}% free`;
 }
 
-function ThinkingBody({ event }: { event: SessionEvent }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="not-prose">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <span className="italic">Reasoning</span>
-        <Icon icon={UiChevronDown} className={cn("size-3 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="mt-1 whitespace-pre-wrap break-words border-l-2 border-border pl-density-3 text-xs italic leading-relaxed text-muted-foreground">
-          {event.text}
-        </div>
-      )}
-    </div>
-  );
+function budgetLabel(budget: { used?: number; total?: number; remaining?: number }) {
+  if (budget.total !== undefined && budget.total > 0) {
+    return `budget ${formatUSD(budget.used ?? 0)}/${formatUSD(budget.total)}`;
+  }
+  if (budget.remaining !== undefined) return `budget ${formatUSD(budget.remaining)} left`;
+  if (budget.used !== undefined) return `budget ${formatUSD(budget.used)} used`;
+  return "budget";
 }
 
-function ErrorBody({ event }: { event: SessionEvent }) {
-  return (
-    <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
-      {event.text}
-    </div>
-  );
+function compactNumber(value: number) {
+  if (!value) return "";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return String(value);
+}
+
+function formatUSD(value: number) {
+  if (value < 1 || !Number.isInteger(value)) return `$${value.toFixed(2)}`;
+  return `$${value.toFixed(0)}`;
 }

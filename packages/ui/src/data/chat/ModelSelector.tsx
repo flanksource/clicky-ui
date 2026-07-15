@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Combobox } from "../../components/Combobox";
+import type { FormSize } from "../../components/json-schema-form-size";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import type { StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
@@ -12,13 +13,16 @@ export type ModelSelectorProps = {
   value?: string | undefined;
   onChange: (id: string) => void;
   className?: string;
+  /** Control size. Defaults to `sm` (compact chat toolbar); pass `md` to match
+   *  a standard-density form row. */
+  size?: FormSize;
 };
 
 /** A searchable model picker driven by the backend model menu, showing each
  *  provider's brand icon. Models whose provider is not configured are disabled
  *  rather than hidden, so the menu communicates what would be available with the
  *  right API key. */
-export function ModelSelector({ models, value, onChange, className }: ModelSelectorProps) {
+export function ModelSelector({ models, value, onChange, className, size = "sm" }: ModelSelectorProps) {
   if (models.length === 0) return null;
   const selected = models.find((m) => m.id === value);
   const SelectedGlyph = providerIcon(selected?.provider);
@@ -29,7 +33,7 @@ export function ModelSelector({ models, value, onChange, className }: ModelSelec
       onChange={onChange}
       allowCustomValue={false}
       required
-      size="sm"
+      size={size}
       className={cn("w-48", className)}
       {...(SelectedGlyph ? { prefix: <SelectedGlyph className="size-4" /> } : {})}
       options={models.map((m) => {
@@ -50,11 +54,13 @@ export type EffortSelectorProps = {
   value?: string | undefined;
   onChange: (effort: string) => void;
   className?: string;
+  /** Control size. Defaults to `sm`; pass `md` to match a standard form row. */
+  size?: FormSize;
 };
 
 /** Reasoning-effort picker, shown only for reasoning-capable models. The empty
  *  value means "no extended thinking". Strict: only the listed options commit. */
-export function EffortSelector({ efforts, value, onChange, className }: EffortSelectorProps) {
+export function EffortSelector({ efforts, value, onChange, className, size = "sm" }: EffortSelectorProps) {
   return (
     <Combobox
       ariaLabel="Reasoning effort"
@@ -62,7 +68,7 @@ export function EffortSelector({ efforts, value, onChange, className }: EffortSe
       onChange={onChange}
       allowCustomValue={false}
       required
-      size="sm"
+      size={size}
       className={cn("w-36", className)}
       options={[
         { value: "", label: "No reasoning" },

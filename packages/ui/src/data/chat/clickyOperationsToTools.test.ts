@@ -3,7 +3,11 @@ import {
   clickyOperationsToTools,
   operationToTool,
 } from "./clickyOperationsToTools";
-import type { OpenAPIOperation, ResolvedOperation } from "../../rpc/types";
+import type {
+  ClickySurface,
+  OpenAPIOperation,
+  ResolvedOperation,
+} from "../../rpc/types";
 
 const listPods: OpenAPIOperation = {
   operationId: "listPods",
@@ -80,6 +84,8 @@ describe("clickyOperationsToTools", () => {
     const [tool] = clickyOperationsToTools([resolve(listPods)]);
     expect(tool.name).toBe("listPods");
     expect(tool.description).toBe("List pods in a namespace");
+    expect(tool.method).toBe("GET");
+    expect(tool.path).toBe("/x");
     expect(tool.inputSchema?.properties.namespace).toEqual({
       type: "string",
       description: "namespace to scope to",
@@ -89,6 +95,13 @@ describe("clickyOperationsToTools", () => {
       default: 50,
     });
     expect(tool.inputSchema?.required).toEqual(["namespace"]);
+    expect(tool.inputSchema?.additionalProperties).toBe(false);
+    expect(tool.strict).toBe(true);
+    expect(tool.annotations).toMatchObject({
+      title: "List pods",
+      readOnlyHint: true,
+      idempotentHint: true,
+    });
   });
 
   it("derives the popover label and surface group from x-clicky metadata", () => {
@@ -101,7 +114,91 @@ describe("clickyOperationsToTools", () => {
     const tool = operationToTool(groupedXeroAccounts);
     expect(tool?.group).toBe("Xero Read");
     expect(tool?.preferenceKey).toBe("Xero Read");
-    expect(tool?.defaultMode).toBe("disabled");
+    expect(tool?.defaultPermission).toBe("off");
+  });
+
+  it("uses x-clicky tool hints for grouping, permission, parent, icon, strictness, and annotations", () => {
+    const tool = operationToTool({
+      ...groupedXeroAccounts,
+      "x-clicky": {
+        ...groupedXeroAccounts["x-clicky"]!,
+        toolHints: {
+          title: "Post invoice",
+          group: "Billing",
+          parent: "Accounting",
+          icon: "receipt",
+          defaultPermission: "ask",
+          strict: false,
+          readOnlyHint: false,
+          destructiveHint: true,
+          openWorldHint: true,
+        },
+      },
+    });
+    expect(tool).toMatchObject({
+      group: "Billing",
+      preferenceKey: "Billing",
+      parent: "Accounting",
+      icon: "receipt",
+      defaultPermission: "ask",
+      strict: false,
+    });
+    expect(tool?.annotations).toMatchObject({
+      title: "Post invoice",
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true,
+    });
+  });
+
+  it("resolves parent title and entity from the matching x-clicky surface", () => {
+    const surfaces: ClickySurface[] = [
+      {
+        key: "xero-accounts",
+        entity: "accounts",
+        title: "Xero Accounts",
+        parent: "providers",
+      },
+    ];
+    const [tool] = clickyOperationsToTools(
+      [resolve(groupedXeroAccounts)],
+      surfaces,
+    );
+    expect(tool.parent).toBe("Xero Accounts");
+    expect(tool.entity).toBe("accounts");
+    // The verb stays the leaf label; the parent disambiguates sibling verbs.
+    expect(tool.label).toBe("List");
+    expect(tool.group).toBe("Xero Read");
+  });
+
+  it("disambiguates sibling list tools by their resolved parent, not the verb", () => {
+    const xeroContacts: OpenAPIOperation = {
+      ...groupedXeroAccounts,
+      operationId: "xero_contacts_list",
+      summary: "List Xero contacts",
+      "x-clicky": {
+        ...groupedXeroAccounts["x-clicky"]!,
+        surface: "xero-contacts",
+      },
+    };
+    const surfaces: ClickySurface[] = [
+      { key: "xero-accounts", entity: "accounts", title: "Xero Accounts" },
+      { key: "xero-contacts", entity: "contacts", title: "Xero Contacts" },
+    ];
+    const tools = clickyOperationsToTools(
+      [resolve(groupedXeroAccounts), resolve(xeroContacts)],
+      surfaces,
+    );
+    expect(tools.map((t) => t.label)).toEqual(["List", "List"]);
+    expect(tools.map((t) => t.parent)).toEqual([
+      "Xero Accounts",
+      "Xero Contacts",
+    ]);
+  });
+
+  it("leaves parent undefined when no surfaces are provided", () => {
+    const tool = operationToTool(groupedXeroAccounts);
+    expect(tool?.parent).toBeUndefined();
   });
 
   it("skips operations in the Disabled group", () => {
@@ -151,7 +248,7 @@ describe("clickyOperationsToTools", () => {
     ).toMatchObject({
       group: "Xero Read",
       preferenceKey: "Xero Read",
-      defaultMode: "disabled",
+      defaultPermission: "off",
     });
     expect(
       clickyOperationsToTools([
@@ -164,7 +261,7 @@ describe("clickyOperationsToTools", () => {
     ).toMatchObject({
       group: "Xero Write",
       preferenceKey: "Xero Write",
-      defaultMode: "disabled",
+      defaultPermission: "off",
     });
     expect(
       clickyOperationsToTools([
@@ -176,7 +273,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Accounting Read",
-      defaultMode: "enabled",
+      defaultPermission: "on",
     });
     expect(
       clickyOperationsToTools([
@@ -188,7 +285,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Accounting Metadata Write",
-      defaultMode: "ask",
+      defaultPermission: "ask",
     });
     expect(
       clickyOperationsToTools([
@@ -200,7 +297,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Accounting Transaction Write",
-      defaultMode: "ask",
+      defaultPermission: "ask",
     });
     expect(
       clickyOperationsToTools([
@@ -212,7 +309,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Comments Read",
-      defaultMode: "enabled",
+      defaultPermission: "on",
     });
     expect(
       clickyOperationsToTools([
@@ -224,7 +321,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Comments Write",
-      defaultMode: "ask",
+      defaultPermission: "ask",
     });
     expect(
       clickyOperationsToTools([
@@ -236,7 +333,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Admin Write",
-      defaultMode: "ask",
+      defaultPermission: "ask",
     });
     expect(
       clickyOperationsToTools([
@@ -248,7 +345,7 @@ describe("clickyOperationsToTools", () => {
       ])[0],
     ).toMatchObject({
       group: "Admin Read",
-      defaultMode: "enabled",
+      defaultPermission: "on",
     });
   });
 
@@ -270,6 +367,35 @@ describe("clickyOperationsToTools", () => {
       description: "pod name",
     });
     expect(tool?.inputSchema?.properties.image).toEqual({ type: "string" });
+    expect(tool?.inputSchema?.additionalProperties).toBe(false);
+    expect(tool?.strict).toBe(true);
+  });
+
+  it("marks delete operations with destructive and idempotent annotations", () => {
+    const tool = operationToTool(
+      {
+        operationId: "deletePod",
+        summary: "Delete pod",
+        parameters: [],
+        responses: {},
+      },
+      resolve(
+        {
+          operationId: "deletePod",
+          summary: "Delete pod",
+          parameters: [],
+          responses: {},
+        },
+        "delete",
+        "/api/v1/pods/{name}",
+      ),
+    );
+
+    expect(tool?.annotations).toMatchObject({
+      title: "Delete pod",
+      destructiveHint: true,
+      idempotentHint: true,
+    });
   });
 
   it("skips operations without an operationId (no stable tool name)", () => {

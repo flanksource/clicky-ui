@@ -16,7 +16,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     label: "List Xero accounts",
     group: "Xero",
     preferenceKey: "Xero Read",
-    defaultMode: "disabled",
+    defaultPermission: "off",
     description: "List account balances from Xero.",
     hints: [
       "Read-only accounting lookup.",
@@ -25,6 +25,13 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     source: "clicky",
     method: "GET",
     path: "/api/xero/accounts",
+    strict: true,
+    annotations: {
+      title: "List Xero accounts",
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -38,6 +45,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
         },
       },
       required: ["tenantId"],
+      additionalProperties: false,
     },
     outputSchema: {
       type: "object",
@@ -61,7 +69,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     label: "List Xero contacts",
     group: "Xero",
     preferenceKey: "Xero Read",
-    defaultMode: "disabled",
+    defaultPermission: "off",
     description: "List customer and supplier contacts from Xero.",
     source: "clicky",
     method: "GET",
@@ -82,7 +90,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     name: "sync_finance",
     label: "Sync finance",
     group: "Admin Write",
-    defaultMode: "ask",
+    defaultPermission: "ask",
     description: "Start a financial data sync for the selected organization.",
     hints: ["Write operation; prefer Default or Ask in shared environments."],
     source: "clicky",
@@ -108,7 +116,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     name: "search_docs",
     label: "Search docs",
     group: "Knowledge",
-    defaultMode: "enabled",
+    defaultPermission: "on",
     description: "Search the internal documentation index.",
     hints: ["Quote exact phrases for narrower results."],
     source: "mcp",
@@ -134,7 +142,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     label: "Filesystem write",
     group: "MCP Servers",
     preferenceKey: "Filesystem Write",
-    defaultMode: "ask",
+    defaultPermission: "ask",
     description: "Write generated output to the mounted workspace.",
     hints: ["Requires an explicit workspace path."],
     source: "mcp",
@@ -155,9 +163,9 @@ const SAMPLE_TOOLS: ToolMeta[] = [
 
 const INITIAL_PREFS: Record<string, ToolMode> = {
   filesystem_write: "ask",
-  xero_accounts_list: "disabled",
-  xero_contacts_list: "disabled",
-  search_docs: "enabled",
+  xero_accounts_list: "off",
+  xero_contacts_list: "off",
+  search_docs: "on",
   sync_finance: "ask",
 };
 
@@ -201,7 +209,8 @@ function ToolPreferencesStory({
   const [prefs, setPrefs] = useState<Record<string, ToolMode>>(initialValue);
   const [model, setModel] = useState<string | undefined>(MOCK_MODELS[0]?.id);
   const [reasoningEffort, setReasoningEffort] = useState("medium");
-  const [permissionMode, setPermissionMode] = useState<ClaudePermissionMode>("default");
+  const [permissionMode, setPermissionMode] =
+    useState<ClaudePermissionMode>("default");
   const [temperature, setTemperature] = useState<number | undefined>(0.4);
   const [budget, setBudget] = useState<ChatBudgetConfig>(INITIAL_BUDGET);
 
@@ -321,13 +330,21 @@ export const Dropdown: Story = {
 
       await expect(menuView.getByText("Tool Preferences")).toBeInTheDocument();
       await expect(menuView.getByText("Admin Write")).toBeInTheDocument();
-      await expect(menuView.getAllByText("Knowledge").length).toBeGreaterThan(0);
+      await expect(menuView.getAllByText("Knowledge").length).toBeGreaterThan(
+        0,
+      );
       await expect(menuView.getByText("Xero")).toBeInTheDocument();
-      await expect(menuView.getByText("List Xero accounts")).toBeInTheDocument();
-      await userEvent.click(menuView.getByRole("button", { name: "Collapse Xero" }));
+      await expect(
+        menuView.getByText("List Xero accounts"),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        menuView.getByRole("button", { name: "Collapse Xero" }),
+      );
       await expect(menuView.queryByText("List Xero accounts")).toBeNull();
-      await userEvent.click(menuView.getByRole("button", { name: "Toggle Xero group" }));
-      await expect(menuView.getAllByText("Auto").length).toBeGreaterThan(0);
+      await userEvent.click(
+        menuView.getByRole("button", { name: "Toggle Xero group" }),
+      );
+      await expect(menuView.getAllByText("On").length).toBeGreaterThan(0);
       await expect(menuView.getAllByText("Ask").length).toBeGreaterThan(0);
     });
   },
@@ -344,10 +361,18 @@ export const AdvancedConfig: Story = {
       await expect(dialogView.getByText("Budget")).toBeInTheDocument();
       await expect(dialogView.getByText("Usage")).toBeInTheDocument();
       await expect(dialogView.getByText("Thread total")).toBeInTheDocument();
-      const select = dialogView.getByRole("combobox", { name: "Permission mode" });
-      await expect(within(select).getByRole("option", { name: "Default" })).toBeInTheDocument();
-      await expect(within(select).getByRole("option", { name: "Accept edits" })).toBeInTheDocument();
-      await expect(within(select).getByRole("option", { name: "Bypass" })).toBeInTheDocument();
+      const select = dialogView.getByRole("combobox", {
+        name: "Permission mode",
+      });
+      await expect(
+        within(select).getByRole("option", { name: "Default" }),
+      ).toBeInTheDocument();
+      await expect(
+        within(select).getByRole("option", { name: "Accept edits" }),
+      ).toBeInTheDocument();
+      await expect(
+        within(select).getByRole("option", { name: "Bypass" }),
+      ).toBeInTheDocument();
     });
   },
 };
@@ -358,15 +383,25 @@ export const AdvancedPermissions: Story = {
     await step("opens grouped permissions", async () => {
       const { dialogView } = await openAdvancedDialog(canvasElement);
 
-      await userEvent.click(dialogView.getByRole("button", { name: /permissions/i }));
+      await userEvent.click(
+        dialogView.getByRole("button", { name: /permissions/i }),
+      );
       await expect(dialogView.getByText("Admin Write")).toBeInTheDocument();
       await expect(dialogView.getByText("Xero")).toBeInTheDocument();
-      await expect(dialogView.getByText("List Xero accounts")).toBeInTheDocument();
-      await expect(dialogView.getByText("List Xero contacts")).toBeInTheDocument();
-      await userEvent.click(dialogView.getByRole("button", { name: "Collapse Xero" }));
+      await expect(
+        dialogView.getByText("List Xero accounts"),
+      ).toBeInTheDocument();
+      await expect(
+        dialogView.getByText("List Xero contacts"),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Collapse Xero" }),
+      );
       await expect(dialogView.queryByText("List Xero accounts")).toBeNull();
-      await userEvent.click(dialogView.getByRole("button", { name: "Toggle Xero group" }));
-      await expect(dialogView.getAllByText("Auto").length).toBeGreaterThan(0);
+      await userEvent.click(
+        dialogView.getByRole("button", { name: "Toggle Xero group" }),
+      );
+      await expect(dialogView.getAllByText("On").length).toBeGreaterThan(0);
     });
   },
 };
@@ -374,18 +409,40 @@ export const AdvancedPermissions: Story = {
 export const AdvancedSchemaBrowser: Story = {
   render: () => <ToolPreferencesStory />,
   play: async ({ canvasElement, step }) => {
-    await step("opens schema browser with input/output schema details", async () => {
-      const { dialogView } = await openAdvancedDialog(canvasElement);
+    await step(
+      "opens schema browser with input/output schema details",
+      async () => {
+        const { dialogView } = await openAdvancedDialog(canvasElement);
 
-      await userEvent.click(dialogView.getByRole("button", { name: /browser/i }));
-      await expect(dialogView.getByPlaceholderText("Search tools")).toBeInTheDocument();
-      await expect(dialogView.getAllByText("List Xero accounts").length).toBeGreaterThan(0);
-      await expect(dialogView.getAllByText("xero_accounts_list").length).toBeGreaterThan(0);
-      await expect(dialogView.getByText("Hints")).toBeInTheDocument();
-      await expect(dialogView.getByText("Read-only accounting lookup.")).toBeInTheDocument();
-      await expect(dialogView.getByText("tenantId")).toBeInTheDocument();
-      await expect(dialogView.getByText("Connected Xero tenant id.")).toBeInTheDocument();
-      await expect(dialogView.getByText("Output")).toBeInTheDocument();
-    });
+        await userEvent.click(
+          dialogView.getByRole("button", { name: /browser/i }),
+        );
+        await expect(
+          dialogView.getByPlaceholderText("Search tools"),
+        ).toBeInTheDocument();
+        await expect(
+          dialogView.getAllByText("List Xero accounts").length,
+        ).toBeGreaterThan(0);
+        await expect(
+          dialogView.getAllByText("xero_accounts_list").length,
+        ).toBeGreaterThan(0);
+        await expect(dialogView.getByText("Hints")).toBeInTheDocument();
+        await expect(
+          dialogView.getByText("Read-only accounting lookup."),
+        ).toBeInTheDocument();
+        await expect(dialogView.getByText("Annotations")).toBeInTheDocument();
+        await expect(dialogView.getByText("readOnlyHint")).toBeInTheDocument();
+        await expect(dialogView.getByText("tenantId")).toBeInTheDocument();
+        await expect(
+          dialogView.getByText("Connected Xero tenant id."),
+        ).toBeInTheDocument();
+        await expect(dialogView.getByText("Output")).toBeInTheDocument();
+        await userEvent.click(dialogView.getByRole("tab", { name: "JSON" }));
+        await expect(dialogView.getByText("annotations")).toBeInTheDocument();
+        await expect(
+          dialogView.getByText('"xero_accounts_list"'),
+        ).toBeInTheDocument();
+      },
+    );
   },
 };

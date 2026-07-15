@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
-import { HoverCard } from "../../overlay/HoverCard";
 import { Modal } from "../../overlay/Modal";
 import { Button } from "../../components/button";
 import { Icon } from "../Icon";
@@ -9,7 +8,6 @@ import {
   UiChevronDown,
   UiChevronRight,
   UiCode2,
-  UiInfo,
   UiShield,
   UiSliders,
 } from "../../icons";
@@ -20,24 +18,29 @@ import type {
   ChatModel,
   ChatUsageSummary,
   ClaudePermissionMode,
+  ToolAnnotations,
   ToolMeta,
   ToolMode,
 } from "../chat/types";
 import { CLAUDE_PERMISSION_MODE_OPTIONS } from "../chat/types";
 
-export type { ClaudePermissionMode, ToolMeta, ToolMode };
+export type { ClaudePermissionMode, ToolAnnotations, ToolMeta, ToolMode };
 
-const MODE_CYCLE: ToolMode[] = ["enabled", "ask", "disabled"];
+// Tools cycle Auto -> Ask -> Off -> On on click (the compact toggle approach).
+const MODE_CYCLE: ToolMode[] = ["auto", "ask", "off", "on"];
+
 const MODE_LABEL: Record<ToolMode, string> = {
-  enabled: "Auto",
+  on: "On",
+  auto: "Auto",
   ask: "Ask",
-  disabled: "Off",
+  off: "Off",
 };
 
 const MODE_DESCRIPTION: Record<ToolMode, string> = {
-  enabled: "Allow this tool to run automatically.",
+  on: "Always allow this tool to run automatically.",
+  auto: "Use the backend's default permission policy.",
   ask: "Ask before running this tool.",
-  disabled: "Hide this tool from the model.",
+  off: "Hide this tool from the model.",
 };
 
 type ToolPreferenceEntry = {
@@ -45,7 +48,7 @@ type ToolPreferenceEntry = {
   label: string;
   group: string;
   tool: ToolMeta;
-  defaultMode: ToolMode;
+  defaultPermission: ToolMode;
 };
 
 export type ToolPreferencesProps = {
@@ -84,6 +87,28 @@ export type CompactToolPreferencesListProps = {
 
 type AdvancedTab = "config" | "permissions" | "browser";
 
+// A single mode badge — shows exactly the current mode's label, tone-colored.
+function ModeBadge({ mode }: { mode: ToolMode }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
+        mode === "on" &&
+          "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        mode === "auto" && "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+        mode === "ask" && "bg-amber-500/10 text-amber-600 dark:text-amber-500",
+        mode === "off" && "text-muted-foreground",
+      )}
+      title={MODE_DESCRIPTION[mode]}
+    >
+      {MODE_LABEL[mode]}
+    </span>
+  );
+}
+
+// A collapsible group header: a chevron to expand/collapse, the group name +
+// count as a button that cycles every tool in the group, and the group's
+// (most-restrictive) mode badge.
 function ToolGroupHeader({
   group,
   count,
@@ -91,7 +116,6 @@ function ToolGroupHeader({
   mode,
   onCollapseToggle,
   onModeToggle,
-  compact = false,
 }: {
   group: string;
   count: number;
@@ -99,22 +123,14 @@ function ToolGroupHeader({
   mode: ToolMode;
   onCollapseToggle: () => void;
   onModeToggle: () => void;
-  compact?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "grid items-center gap-1 border-b border-border bg-muted/50",
-        compact
-          ? "grid-cols-[1.5rem_minmax(0,1fr)_auto] px-1 py-0.5"
-          : "grid-cols-[1.75rem_minmax(0,1fr)_4rem] px-2 py-1",
-      )}
-    >
+    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-1 px-1 py-0.5">
       <button
         type="button"
         aria-label={`${collapsed ? "Expand" : "Collapse"} ${group}`}
         title={`${collapsed ? "Expand" : "Collapse"} ${group}`}
-        className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground"
+        className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground"
         onClick={onCollapseToggle}
       >
         <Icon
@@ -125,24 +141,27 @@ function ToolGroupHeader({
       <button
         type="button"
         aria-label={`Toggle ${group} group`}
-        title={`Toggle all ${count} ${count === 1 ? "tool" : "tools"} in ${group}`}
-        className="flex min-w-0 items-center gap-2 rounded px-1 py-1 text-left hover:bg-background/70"
+        title={`Cycle all ${count} ${count === 1 ? "tool" : "tools"} in ${group}`}
+        className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-background/70"
         onClick={onModeToggle}
       >
-        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {group}
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {group}
+          </span>
+          <span className="shrink-0 rounded bg-background px-1 text-[10px] text-muted-foreground">
+            {count}
+          </span>
         </span>
-        <span className="shrink-0 rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {count}
+        <span className="shrink-0">
+          <ModeBadge mode={mode} />
         </span>
       </button>
-      <span className="justify-self-end">
-        <ModeBadge mode={mode} />
-      </span>
     </div>
   );
 }
 
+// One tool row — the whole row is a button that cycles the tool's mode.
 function ToolRow({
   entry,
   mode,
@@ -155,14 +174,14 @@ function ToolRow({
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-between rounded px-2 py-1 text-left hover:bg-accent"
+      className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent"
       title={entry.tool.name}
       onClick={() => onToggle(entry, mode)}
     >
       <span
         className={cn(
           "min-w-0 truncate text-xs",
-          mode === "disabled" && "text-muted-foreground line-through",
+          mode === "off" && "text-muted-foreground line-through",
         )}
       >
         {entry.label}
@@ -172,75 +191,77 @@ function ToolRow({
   );
 }
 
-function AdvancedToolRow({
-  entry,
-  mode,
-  onToggle,
+// The compact per-tool list shared by the dropdown and the standalone list:
+// grouped, collapsible, single cycling badge per tool.
+function CompactToolList({
+  groups,
+  value,
+  onChange,
+  emptyLabel = "No tools available",
 }: {
-  entry: ToolPreferenceEntry;
-  mode: ToolMode;
-  onToggle: (entry: ToolPreferenceEntry, current: ToolMode) => void;
+  groups: Array<[string, ToolPreferenceEntry[]]>;
+  value: Record<string, ToolMode>;
+  onChange: (prefs: Record<string, ToolMode>) => void;
+  emptyLabel?: string | undefined;
 }) {
-  const description = entry.tool.description?.trim() || "No description";
+  const [collapsedGroups, setCollapsedGroups] = useState<
+    Record<string, boolean>
+  >({});
+  if (groups.length === 0) {
+    return (
+      <div className="px-2 py-2 text-xs text-muted-foreground">
+        {emptyLabel}
+      </div>
+    );
+  }
+  const toggleCollapsed = (group: string) =>
+    setCollapsedGroups((current) => ({ ...current, [group]: !current[group] }));
+  const handleToggle = (entry: ToolPreferenceEntry, current: ToolMode) =>
+    onChange({ ...value, [entry.key]: nextMode(current) });
+  const handleGroupToggle = (
+    entries: ToolPreferenceEntry[],
+    current: ToolMode,
+  ) => {
+    const next = nextMode(current);
+    const updated = { ...value };
+    for (const entry of entries) updated[entry.key] = next;
+    onChange(updated);
+  };
   return (
-    <button
-      type="button"
-      className="grid h-9 w-full grid-cols-[minmax(0,1fr)_4rem] items-center gap-3 border-b border-border px-2 text-left hover:bg-accent"
-      title={entry.tool.name}
-      onClick={() => onToggle(entry, mode)}
-    >
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span
-          className={cn(
-            "min-w-0 truncate text-xs",
-            mode === "disabled" && "text-muted-foreground line-through",
-          )}
-        >
-          {entry.label}
-        </span>
-        <HoverCard
-          placement="top"
-          delay={120}
-          trigger={
-            <span
-              aria-label={`Description for ${entry.label}`}
-              className="inline-flex shrink-0 text-muted-foreground"
-              title={description}
-            >
-              <Icon icon={UiInfo} className="size-3.5" />
-            </span>
-          }
-          cardClassName="max-w-xs whitespace-normal"
-        >
-          {description}
-        </HoverCard>
-      </span>
-      <span className="justify-self-end">
-        <ModeBadge mode={mode} />
-      </span>
-    </button>
+    <div className="space-y-1">
+      {groups.map(([group, entries]) => {
+        const collapsed = collapsedGroups[group] ?? false;
+        const groupMode = groupToolMode(entries, value);
+        return (
+          <div key={group}>
+            <ToolGroupHeader
+              group={group}
+              count={entries.length}
+              collapsed={collapsed}
+              mode={groupMode}
+              onCollapseToggle={() => toggleCollapsed(group)}
+              onModeToggle={() => handleGroupToggle(entries, groupMode)}
+            />
+            {!collapsed && (
+              <div className="p-0.5">
+                {entries.map((entry) => (
+                  <ToolRow
+                    key={entry.key}
+                    entry={entry}
+                    mode={entryMode(entry, value)}
+                    onToggle={handleToggle}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function ModeBadge({ mode }: { mode: ToolMode }) {
-  return (
-    <span
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-        mode === "enabled" &&
-          "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
-        mode === "ask" &&
-          "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-        mode === "disabled" && "bg-muted text-muted-foreground",
-      )}
-      title={MODE_DESCRIPTION[mode]}
-    >
-      {MODE_LABEL[mode]}
-    </span>
-  );
-}
-
-/** A popover that cycles tools through Auto -> Ask -> Off. The resulting
+/** A popover that cycles tools through Auto -> Ask -> Off -> On. The resulting
  *  `Record<name, ToolMode>` is meant to be forwarded to the backend (e.g. via
  *  `<Chat body={{ toolPreferences }}>`). */
 export function ToolPreferences({
@@ -266,37 +287,14 @@ export function ToolPreferences({
 }: ToolPreferencesProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedTab, setAdvancedTab] = useState<AdvancedTab>("config");
-  const [collapsedGroups, setCollapsedGroups] = useState<
-    Record<string, boolean>
-  >({});
   const groups = useMemo(() => groupedToolEntries(tools), [tools]);
-
-  const toggleCollapsed = (group: string) => {
-    setCollapsedGroups((current) => ({ ...current, [group]: !current[group] }));
-  };
-
-  const handleToggle = (entry: ToolPreferenceEntry, current: ToolMode) => {
-    onChange({ ...value, [entry.key]: nextMode(current) });
-  };
-
-  const handleGroupToggle = (
-    entries: ToolPreferenceEntry[],
-    current: ToolMode,
-  ) => {
-    const next = nextMode(current);
-    const updated = { ...value };
-    for (const entry of entries) {
-      updated[entry.key] = next;
-    }
-    onChange(updated);
-  };
 
   return (
     <>
       <DropdownMenu
         align="right"
         className={className}
-        menuClassName="w-72 max-h-[400px] overflow-y-auto p-2"
+        menuClassName="w-72 max-h-[70vh] overflow-y-auto p-1"
         trigger={
           <Button
             variant="ghost"
@@ -310,41 +308,15 @@ export function ToolPreferences({
       >
         {(closeMenu) => (
           <div>
-            <div className="mb-2 px-1 text-xs font-semibold">
+            <div className="mb-1 px-1 text-xs font-semibold">
               Tool Preferences
             </div>
-            {groups.map(([group, entries]) => {
-              const collapsed = collapsedGroups[group] ?? false;
-              const groupMode = groupToolMode(entries, value);
-              return (
-                <div
-                  key={group}
-                  className="mb-2 overflow-hidden rounded border border-border"
-                >
-                  <ToolGroupHeader
-                    group={group}
-                    count={entries.length}
-                    collapsed={collapsed}
-                    mode={groupMode}
-                    compact
-                    onCollapseToggle={() => toggleCollapsed(group)}
-                    onModeToggle={() => handleGroupToggle(entries, groupMode)}
-                  />
-                  {!collapsed && (
-                    <div className="p-1">
-                      {entries.map((entry) => (
-                        <ToolRow
-                          key={entry.key}
-                          entry={entry}
-                          mode={entryMode(entry, value)}
-                          onToggle={handleToggle}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <CompactToolList
+              groups={groups}
+              value={value}
+              onChange={onChange}
+              emptyLabel="No tools available"
+            />
             <div className="mt-2 border-t border-border pt-2">
               <button
                 type="button"
@@ -427,10 +399,7 @@ export function ToolPreferences({
             <AdvancedPermissionsPanel
               groups={groups}
               value={value}
-              collapsedGroups={collapsedGroups}
-              onCollapseToggle={toggleCollapsed}
-              onToolToggle={handleToggle}
-              onGroupToggle={handleGroupToggle}
+              onChange={onChange}
             />
           ) : (
             <ToolSchemaBrowser tools={tools} className="min-h-0 flex-1" />
@@ -449,76 +418,21 @@ export function CompactToolPreferencesList({
   emptyLabel = "No tools available",
   className,
 }: CompactToolPreferencesListProps) {
-  const [collapsedGroups, setCollapsedGroups] = useState<
-    Record<string, boolean>
-  >({});
   const groups = useMemo(
     () => groupedToolEntriesWithPreferences(tools, value),
     [tools, value],
   );
-
-  const toggleCollapsed = (group: string) => {
-    setCollapsedGroups((current) => ({
-      ...current,
-      [group]: !current[group],
-    }));
-  };
-  const handleToggle = (entry: ToolPreferenceEntry, current: ToolMode) => {
-    onChange({ ...value, [entry.key]: nextMode(current) });
-  };
-  const handleGroupToggle = (
-    entries: ToolPreferenceEntry[],
-    current: ToolMode,
-  ) => {
-    const next = nextMode(current);
-    const updated = { ...value };
-    for (const entry of entries) {
-      updated[entry.key] = next;
-    }
-    onChange(updated);
-  };
-
   return (
     <div className={cn("space-y-2", className)}>
       {title && (
         <div className="text-xs font-medium text-muted-foreground">{title}</div>
       )}
-      <div className="overflow-hidden rounded-md border border-border">
-        {groups.map(([group, entries]) => {
-          const collapsed = collapsedGroups[group] ?? false;
-          const groupMode = groupToolMode(entries, value);
-          return (
-            <div key={group} className="border-b border-border last:border-b-0">
-              <ToolGroupHeader
-                group={group}
-                count={entries.length}
-                collapsed={collapsed}
-                mode={groupMode}
-                compact
-                onCollapseToggle={() => toggleCollapsed(group)}
-                onModeToggle={() => handleGroupToggle(entries, groupMode)}
-              />
-              {!collapsed && (
-                <div className="p-1">
-                  {entries.map((entry) => (
-                    <ToolRow
-                      key={entry.key}
-                      entry={entry}
-                      mode={entryMode(entry, value)}
-                      onToggle={handleToggle}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {groups.length === 0 && (
-          <div className="px-2 py-3 text-xs text-muted-foreground">
-            {emptyLabel}
-          </div>
-        )}
-      </div>
+      <CompactToolList
+        groups={groups}
+        value={value}
+        onChange={onChange}
+        emptyLabel={emptyLabel}
+      />
     </div>
   );
 }
@@ -762,57 +676,20 @@ function MetricRow({
 function AdvancedPermissionsPanel({
   groups,
   value,
-  collapsedGroups,
-  onCollapseToggle,
-  onToolToggle,
-  onGroupToggle,
+  onChange,
 }: {
   groups: Array<[string, ToolPreferenceEntry[]]>;
   value: Record<string, ToolMode>;
-  collapsedGroups: Record<string, boolean>;
-  onCollapseToggle: (group: string) => void;
-  onToolToggle: (entry: ToolPreferenceEntry, mode: ToolMode) => void;
-  onGroupToggle: (entries: ToolPreferenceEntry[], mode: ToolMode) => void;
+  onChange: (prefs: Record<string, ToolMode>) => void;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-hidden rounded border border-border">
-      <div className="grid grid-cols-[minmax(0,1fr)_4rem] gap-3 border-b border-border bg-muted/40 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span>Tool</span>
-        <span className="text-right">Mode</span>
-      </div>
-      <div className="max-h-[60vh] overflow-y-auto">
-        {groups.length > 0 ? (
-          groups.map(([group, entries]) => {
-            const collapsed = collapsedGroups[group] ?? false;
-            const groupMode = groupToolMode(entries, value);
-            return (
-              <div key={group}>
-                <ToolGroupHeader
-                  group={group}
-                  count={entries.length}
-                  collapsed={collapsed}
-                  mode={groupMode}
-                  onCollapseToggle={() => onCollapseToggle(group)}
-                  onModeToggle={() => onGroupToggle(entries, groupMode)}
-                />
-                {!collapsed &&
-                  entries.map((entry) => (
-                    <AdvancedToolRow
-                      key={entry.key}
-                      entry={entry}
-                      mode={entryMode(entry, value)}
-                      onToggle={onToolToggle}
-                    />
-                  ))}
-              </div>
-            );
-          })
-        ) : (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">
-            No tools
-          </div>
-        )}
-      </div>
+    <div className="min-h-0 flex-1 overflow-y-auto rounded border border-border p-1">
+      <CompactToolList
+        groups={groups}
+        value={value}
+        onChange={onChange}
+        emptyLabel="No tools"
+      />
     </div>
   );
 }
@@ -828,7 +705,7 @@ function groupedToolEntries(
       label: tool.label || tool.name,
       group,
       tool,
-      defaultMode: toolDefaultMode(tool),
+      defaultPermission: toolDefaultPermission(tool),
     };
     (groups[group] ??= []).push(entry);
   }
@@ -849,55 +726,75 @@ function groupedToolEntriesWithPreferences(
 ): Array<[string, ToolPreferenceEntry[]]> {
   const groups = groupedToolEntries(tools);
   const known = new Set(tools.map((tool) => tool.name));
-  const customEntries = Object.entries(value)
-    .filter(([name, mode]) => !known.has(name) && isToolMode(mode))
-    .map(([name, mode]) => ({
-      key: name,
-      label: name,
-      group: "Custom",
-      tool: {
-        name,
+  const customEntries = Object.entries(value).flatMap(([name, mode]) => {
+    const normalizedMode = normalizeToolMode(mode);
+    if (known.has(name) || !normalizedMode) return [];
+    return [
+      {
+        key: name,
         label: name,
         group: "Custom",
-        defaultMode: mode,
+        tool: {
+          name,
+          label: name,
+          group: "Custom",
+          defaultPermission: normalizedMode,
+        },
+        defaultPermission: normalizedMode,
       },
-      defaultMode: mode,
-    }));
+    ];
+  });
   if (customEntries.length === 0) return groups;
   return [...groups, ["Custom", customEntries]];
 }
 
-function isToolMode(value: string): value is ToolMode {
-  return value === "enabled" || value === "ask" || value === "disabled";
+function normalizeToolMode(value: string): ToolMode | undefined {
+  switch (value.trim().toLowerCase()) {
+    case "on":
+    case "enabled":
+      return "on";
+    case "auto":
+      return "auto";
+    case "ask":
+      return "ask";
+    case "off":
+    case "disabled":
+      return "off";
+    default:
+      return undefined;
+  }
 }
 
 function toolGroup(meta: ToolMeta): string {
   return meta.group ?? "Tools";
 }
 
-function toolDefaultMode(meta: ToolMeta): ToolMode {
-  return meta.defaultMode ?? "enabled";
+function toolDefaultPermission(meta: ToolMeta): ToolMode {
+  return meta.defaultPermission ?? "auto";
 }
 
 function entryMode(
   entry: ToolPreferenceEntry,
   value: Record<string, ToolMode>,
 ): ToolMode {
-  return value[entry.key] ?? entry.defaultMode;
+  return normalizeToolMode(value[entry.key] ?? "") ?? entry.defaultPermission;
 }
 
+// A group's badge/toggle mode is its most-restrictive member, so a mixed group
+// reads (and cycles) from the safest current state.
 function groupToolMode(
   entries: ToolPreferenceEntry[],
   value: Record<string, ToolMode>,
 ): ToolMode {
   return entries.reduce<ToolMode>(
     (mode, entry) => mostRestrictiveMode(mode, entryMode(entry, value)),
-    "enabled",
+    "on",
   );
 }
 
 function nextMode(mode: ToolMode): ToolMode {
-  return MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length]!;
+  const current = MODE_CYCLE.indexOf(mode);
+  return MODE_CYCLE[((current >= 0 ? current : 0) + 1) % MODE_CYCLE.length]!;
 }
 
 function mostRestrictiveMode(a: ToolMode, b: ToolMode): ToolMode {
@@ -906,12 +803,14 @@ function mostRestrictiveMode(a: ToolMode, b: ToolMode): ToolMode {
 
 function modeRank(mode: ToolMode): number {
   switch (mode) {
-    case "enabled":
+    case "on":
       return 0;
-    case "ask":
+    case "auto":
       return 1;
-    case "disabled":
+    case "ask":
       return 2;
+    case "off":
+      return 3;
   }
 }
 

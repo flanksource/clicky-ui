@@ -61,6 +61,7 @@ export {
   type ClaudePermissionModeOption,
   type ToolResultRenderArgs,
   type ToolResultRenderer,
+  type ToolAnnotations,
   type ToolMeta,
   type ToolMode,
   type DynamicToolUIPart,
