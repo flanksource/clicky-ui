@@ -42,6 +42,11 @@ export type OperationCommandPageProps = {
   renderLink?: RenderLink;
   commandRuntime?: ClickyCommandRuntime;
   onNavigate?: (href: string) => void;
+  onResult?: (
+    response: ExecutionResponse,
+    operation: ResolvedOperation,
+    values: ParameterValues,
+  ) => void;
   hideLockedPathFilters?: boolean;
   className?: string;
 };
@@ -59,6 +64,7 @@ export function OperationCommandPage({
   backLabel = "Back",
   renderLink,
   onNavigate,
+  onResult,
   commandRuntime,
   hideLockedPathFilters = Boolean(providedOperation),
   className,
@@ -204,6 +210,7 @@ export function OperationCommandPage({
         { Accept: RESULT_ACCEPT },
       );
       setResult(response);
+      onResult?.(response, operation, values);
     } catch (err) {
       setResult(null);
       setError(err);

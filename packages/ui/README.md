@@ -133,8 +133,17 @@ Both hooks persist their choice to `localStorage` under `clicky-ui-theme` / `cli
 
 The package ships opt-in [oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins.html)
 rules that keep consuming projects on clicky-ui's components, overlays, theming
-and icons instead of rebuilding them by hand. Enable them in your downstream
-`.oxlintrc.json`:
+and icons instead of rebuilding them by hand.
+
+Install oxlint in the consuming project. If the project does not already depend
+on `@flanksource/clicky-ui`, add that as the normal runtime dependency too:
+
+```bash
+pnpm add @flanksource/clicky-ui
+pnpm add -D oxlint
+```
+
+Then enable the JS plugin in the consumer's `.oxlintrc.json`:
 
 ```json
 {
@@ -151,6 +160,28 @@ and icons instead of rebuilding them by hand. Enable them in your downstream
     "clicky-ui/prefer-theme-tokens": "error",
     "clicky-ui/prefer-clicky-icons": "warn"
   }
+}
+```
+
+Add a package script that runs oxlint over the consumer source:
+
+```json
+{
+  "scripts": {
+    "lint:clicky-ui": "oxlint -c .oxlintrc.json src --deny-warnings"
+  }
+}
+```
+
+The `specifier` form resolves through the package export. In a local sibling
+checkout, or if the package export is not available to your toolchain, point the
+plugin directly at the file instead:
+
+```json
+{
+  "jsPlugins": [
+    "./node_modules/@flanksource/clicky-ui/oxlint-plugins/clicky-ui.js"
+  ]
 }
 ```
 

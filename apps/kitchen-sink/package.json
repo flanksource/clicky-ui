@@ -7,7 +7,8 @@
     "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev",
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
-    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && oxlint src vite.config.ts --deny-warnings"
+    "lint": "oxlint src vite.config.ts --deny-warnings",
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",

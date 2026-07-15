@@ -70,4 +70,5 @@ describe("Chat initialPrompt", () => {
     await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(2));
     expect(onInitialPromptSent).toHaveBeenCalledTimes(2);
   });
+
 });

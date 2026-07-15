@@ -19,9 +19,11 @@ import {
   shellCommand,
   summarizeSession,
   summarizeToolInput,
+  toolInputParams,
   type SessionEvent,
   type SessionInput,
   type SessionTone,
+  type ToolParam,
 } from "./SessionViewer.model";
 import {
   collectSessionFilters,
@@ -90,7 +92,9 @@ function toggleInSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
  * `pkg/ai/history` JSON schema — Claude Code / Codex transcripts) as a vertical
  * action log. Each entry sits on a tone-colored icon disc from the Flanksource
  * "Agent Action Icons" set; user prompts/selections are right-aligned like a
- * chat. Tool calls expand to their input and response. The "3-dot" menu mirrors
+ * chat. Shell commands render inline as bash blocks and file ops as their
+ * cwd-relative path — the icon carries the verb. Tool responses expand behind
+ * a chevron, rendered bare (no panel chrome). The "3-dot" menu mirrors
  * `captain history` filtering — toggle density and hide categories, tools or
  * sources.
  */
@@ -268,22 +272,28 @@ interface EventVisual {
   icon: StaticIconComponent;
   tone: SessionTone;
   label: string;
+  summaryOnly: boolean;
 }
 
 function eventVisual(event: SessionEvent): EventVisual {
   switch (event.kind) {
     case "tool": {
       const action = getSessionAction(event.tool ?? "");
-      return { icon: action.icon, tone: action.tone, label: action.label };
+      return {
+        icon: action.icon,
+        tone: action.tone,
+        label: action.label,
+        summaryOnly: action.summaryOnly ?? false,
+      };
     }
     case "user":
-      return { icon: UiUserCircle, tone: "slate", label: "User" };
+      return { icon: UiUserCircle, tone: "slate", label: "User", summaryOnly: false };
     case "assistant":
-      return { icon: UiSparkles, tone: "indigo", label: "Assistant" };
+      return { icon: UiSparkles, tone: "indigo", label: "Assistant", summaryOnly: false };
     case "thinking":
-      return { icon: UiBrain, tone: "slate", label: "Thinking" };
+      return { icon: UiBrain, tone: "slate", label: "Thinking", summaryOnly: false };
     case "error":
-      return { icon: UiWarningTriangle, tone: "rose", label: "Error" };
+      return { icon: UiWarningTriangle, tone: "rose", label: "Error", summaryOnly: false };
   }
 }
 
@@ -296,33 +306,70 @@ function EventBody({
   visual: EventVisual;
   defaultExpanded: boolean;
 }) {
-  if (event.kind === "tool") return <ToolBody event={event} label={visual.label} defaultExpanded={defaultExpanded} />;
+  if (event.kind === "tool") return <ToolBody event={event} visual={visual} defaultExpanded={defaultExpanded} />;
   if (event.kind === "thinking") return <ThinkingBody event={event} />;
   if (event.kind === "error") return <ErrorBody event={event} />;
-  return <MessageBody event={event} label={visual.label} />;
+  return <MessageBody event={event} />;
 }
 
 function ToolBody({
   event,
-  label,
+  visual,
   defaultExpanded,
 }: {
   event: SessionEvent;
-  label: string;
+  visual: EventVisual;
   defaultExpanded: boolean;
 }) {
-  const summary = summarizeToolInput(event.tool ?? "", event.toolInput);
+  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
   const command = shellCommand(event.tool ?? "", event.toolInput);
-  const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
   const [open, setOpen] = useState(defaultExpanded);
 
-  // Shell rows read as the command itself — no "Run command" label prefix.
-  const header = command ? (
-    <span className="truncate font-mono text-xs text-foreground">{summary}</span>
-  ) : (
+  // Shell rows inline the full command as a bash block — no "Run command"
+  // label, no tool-input JSON. Only the response stays behind the chevron.
+  if (command !== undefined) {
+    return (
+      <div className="not-prose">
+        <div className="flex items-start gap-1.5">
+          <div className="min-w-0 flex-1">
+            <CodeBlock bare language="bash" source={command} />
+          </div>
+          {event.toolResponse !== undefined && (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label="Toggle response"
+              onClick={() => setOpen((value) => !value)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Icon
+                icon={UiChevronDown}
+                className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")}
+              />
+            </button>
+          )}
+        </div>
+        {open && event.toolResponse !== undefined && (
+          <div className="mt-1.5">
+            <ResponseBlock response={event.toolResponse} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const hasDetail = event.toolInput !== undefined || event.toolResponse !== undefined;
+  const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
+  // summaryOnly rows (file ops) read as their path alone — the icon carries the
+  // verb. Remaining input keys follow as JetBrains-style inline param hints.
+  const header = (
     <>
-      <span className="font-medium text-foreground">{label}</span>
-      {summary && <span className="truncate font-mono text-xs text-muted-foreground">{summary}</span>}
+      {visual.summaryOnly && summary ? (
+        <span className="min-w-0 truncate font-mono text-xs text-foreground">{summary}</span>
+      ) : (
+        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
+      )}
+      {params.length > 0 && <InlineParams params={params} />}
     </>
   );
 
@@ -345,26 +392,30 @@ function ToolBody({
         <div className="flex items-center gap-1.5">{header}</div>
       )}
 
-      {(event.model || event.source) && (
-        <div className="mt-0.5 flex gap-density-2 text-[11px] text-muted-foreground">
-          {event.source && <span>{event.source}</span>}
-          {event.model && <span>{event.model}</span>}
-          {event.reasoningEffort && <span>effort: {event.reasoningEffort}</span>}
-        </div>
-      )}
-
       {open && hasDetail && (
         <div className="mt-1.5 space-y-1.5">
-          {event.toolInput !== undefined &&
-            (command !== undefined ? (
-              <DetailBlock language="bash" source={command} />
-            ) : (
-              <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
-            ))}
+          {event.toolInput !== undefined && (
+            <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
+          )}
           {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
         </div>
       )}
     </div>
+  );
+}
+
+// A single truncating line of `name: value` hints — the container clips with an
+// ellipsis instead of wrapping, and each value is already truncated by the model.
+function InlineParams({ params }: { params: ToolParam[] }) {
+  return (
+    <span className="min-w-0 flex-1 truncate font-mono text-xs">
+      {params.map((param) => (
+        <span key={param.name} className="[&:not(:first-child)]:ml-2">
+          <span className="text-muted-foreground/70">{param.name}: </span>
+          <span className="text-muted-foreground">{param.value}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -377,17 +428,14 @@ function ResponseBlock({ response }: { response: string }) {
 function DetailBlock({ language, source }: { language: string; source: string }): ReactNode {
   return (
     <div className="overflow-x-auto text-xs">
-      <CodeBlock language={language} source={source} />
+      <CodeBlock bare language={language} source={source} />
     </div>
   );
 }
 
-function MessageBody({ event, label }: { event: SessionEvent; label: string }) {
+function MessageBody({ event }: { event: SessionEvent }) {
   return (
-    <div>
-      <div className="mb-0.5 text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">{event.text}</div>
-    </div>
+    <div className="whitespace-pre-wrap break-words leading-relaxed text-foreground">{event.text}</div>
   );
 }
 

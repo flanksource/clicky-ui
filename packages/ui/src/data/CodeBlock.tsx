@@ -15,6 +15,8 @@ export type CodeBlockProps = {
   className?: string | undefined;
   /** Default expansion depth when rendering JSON as a tree. */
   jsonDefaultOpenDepth?: number | undefined;
+  /** Render only the code — no border, background, or language header. */
+  bare?: boolean | undefined;
 };
 
 export function CodeBlock({
@@ -23,6 +25,7 @@ export function CodeBlock({
   highlightedHtml,
   className,
   jsonDefaultOpenDepth = 2,
+  bare = false,
 }: CodeBlockProps) {
   const language = (languageProp ?? "").toLowerCase().replace(/^\.+/, "");
   const chromaHtml = highlightedHtml ? sanitizeHtml(highlightedHtml) : "";
@@ -50,14 +53,14 @@ export function CodeBlock({
   }, [wantsClientHighlight, language, source]);
 
   if (parsedJson !== JSON_PARSE_FAILED) {
+    const tree = <JsonView data={parsedJson} defaultOpenDepth={jsonDefaultOpenDepth} />;
+    if (bare) return <div className={cn("overflow-auto text-xs", className)}>{tree}</div>;
     return (
       <div className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}>
         <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           json
         </div>
-        <div className="overflow-auto p-3 text-xs">
-          <JsonView data={parsedJson} defaultOpenDepth={jsonDefaultOpenDepth} />
-        </div>
+        <div className="overflow-auto p-3 text-xs">{tree}</div>
       </div>
     );
   }
@@ -72,29 +75,45 @@ export function CodeBlock({
         " [&_pre]:leading-relaxed"
       : "";
 
+  const pad = bare ? undefined : "p-3";
+  const body = chromaHtml ? (
+    <div
+      className={cn(
+        "overflow-auto text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent" +
+          xmlClasses,
+        pad,
+        bare && className,
+      )}
+      dangerouslySetInnerHTML={{ __html: chromaHtml }}
+    />
+  ) : shikiHtml ? (
+    <div
+      className={cn(
+        "overflow-auto text-xs font-mono [&_pre]:m-0 [&_pre.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap",
+        pad,
+        bare && className,
+      )}
+      dangerouslySetInnerHTML={{ __html: shikiHtml }}
+    />
+  ) : (
+    <pre
+      className={cn(
+        "overflow-auto whitespace-pre-wrap break-words text-xs font-mono text-foreground",
+        pad,
+        bare && className,
+      )}
+    >
+      {source}
+    </pre>
+  );
+
+  if (bare) return body;
   return (
     <div className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}>
       <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         {languageProp || "text"}
       </div>
-      {chromaHtml ? (
-        <div
-          className={
-            "overflow-auto p-3 text-xs font-mono [&_.chroma]:bg-transparent [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent" +
-            xmlClasses
-          }
-          dangerouslySetInnerHTML={{ __html: chromaHtml }}
-        />
-      ) : shikiHtml ? (
-        <div
-          className="overflow-auto p-3 text-xs font-mono [&_pre]:m-0 [&_pre.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap"
-          dangerouslySetInnerHTML={{ __html: shikiHtml }}
-        />
-      ) : (
-        <pre className="overflow-auto whitespace-pre-wrap break-words p-3 text-xs font-mono text-foreground">
-          {source}
-        </pre>
-      )}
+      {body}
     </div>
   );
 }

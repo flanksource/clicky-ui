@@ -7,6 +7,10 @@ import type {
   FileUIPart,
 } from "ai";
 import type { ReactNode } from "react";
+import type {
+  JsonSchemaObject,
+  JsonSchemaProperty as FormJsonSchemaProperty,
+} from "../../components/json-schema-form-types";
 
 export type {
   UIMessage,
@@ -32,11 +36,8 @@ export interface ChatModel {
 /** Per-message metadata the backend rides on the SSE `finish` part
  *  (`messageMetadata`), applied by the AI SDK to the assistant `UIMessage`. */
 export interface ChatMessageMetadata {
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-  };
+  usage?: ChatUsageBreakdown;
+  costBreakdown?: ChatCostBreakdown;
   /** This turn's cost in USD. */
   cost?: number;
   /** Cumulative thread cost in USD (when the turn is persisted to a thread). */
@@ -51,8 +52,36 @@ export interface ChatUsageSummary {
   usedTokens: number;
   maxTokens: number;
   cost?: number;
+  usage?: ChatUsageBreakdown;
+  costBreakdown?: ChatCostBreakdown;
   messageCount: number;
   modelLabel?: string;
+}
+
+export interface ChatBudgetConfig {
+  /** Per-thread/request cost cap in USD. */
+  cost?: number;
+  /** Max output tokens for one model call. */
+  maxTokens?: number;
+}
+
+export interface ChatUsageBreakdown {
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  totalTokens?: number;
+}
+
+export interface ChatCostBreakdown {
+  model?: string;
+  inputUsd?: number;
+  outputUsd?: number;
+  reasoningUsd?: number;
+  cacheReadUsd?: number;
+  cacheWriteUsd?: number;
+  totalUsd?: number;
 }
 
 /** A suggested prompt shown on the empty state. A bare string is both the label
@@ -86,6 +115,57 @@ export function isFilePart(part: { type: string }): part is FileUIPart {
  *  surface as dynamic tools, so the chat UI renders both shapes. */
 export type AnyToolPart = ToolUIPart | DynamicToolUIPart;
 
+/** Claude Agent SDK permission modes accepted by `permissionMode`. */
+export const CLAUDE_PERMISSION_MODES = [
+  "default",
+  "acceptEdits",
+  "bypassPermissions",
+  "plan",
+  "dontAsk",
+  "auto",
+] as const;
+
+export type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
+
+export type ClaudePermissionModeOption = {
+  value: ClaudePermissionMode;
+  label: string;
+  description: string;
+};
+
+export const CLAUDE_PERMISSION_MODE_OPTIONS: ClaudePermissionModeOption[] = [
+  {
+    value: "default",
+    label: "Default",
+    description: "Prompt for dangerous operations using standard Claude behavior.",
+  },
+  {
+    value: "auto",
+    label: "Auto",
+    description: "Use Claude's classifier to approve or deny permission prompts.",
+  },
+  {
+    value: "acceptEdits",
+    label: "Accept edits",
+    description: "Automatically accept file edit operations.",
+  },
+  {
+    value: "dontAsk",
+    label: "Don't ask",
+    description: "Do not prompt; deny actions that are not pre-approved.",
+  },
+  {
+    value: "plan",
+    label: "Plan",
+    description: "Planning mode with no tool execution.",
+  },
+  {
+    value: "bypassPermissions",
+    label: "Bypass",
+    description: "Bypass permission checks when explicitly allowed by the host.",
+  },
+];
+
 /** Tool metadata shared by the chat shell. It both configures the
  *  tool-preferences popover (`name`/`label`/`group`) and carries the schema
  *  derived from a clicky RPC operation (`description`/`inputSchema`). The Go
@@ -107,23 +187,23 @@ export interface ToolMeta {
   defaultMode?: ToolMode;
   /** Description shown in tool pickers / tool-call headers. */
   description?: string;
+  /** Short usage hints shown in the tool browser. */
+  hints?: string[];
+  source?: "clicky" | "custom" | "mcp" | string;
+  server?: string;
+  method?: string;
+  path?: string;
+  operationName?: string;
+  title?: string;
   /** JSON-Schema for the tool's input, assembled from an operation's
    *  parameters + request body. Omitted for hand-authored tools. */
   inputSchema?: ChatToolInputSchema;
+  outputSchema?: ChatToolInputSchema;
 }
 
-export interface ChatToolInputSchema {
-  type: "object";
-  properties: Record<string, JSONSchemaProperty>;
-  required: string[];
-}
-
-export interface JSONSchemaProperty {
-  type?: string;
-  description?: string;
-  enum?: unknown[];
-  default?: unknown;
-}
+export type ChatToolInputSchema = JsonSchemaObject;
+export type JsonSchemaProperty = FormJsonSchemaProperty;
+export type JSONSchemaProperty = FormJsonSchemaProperty;
 
 /** Returns true for a `dynamic-tool` part (clicky operations surface this way). */
 export function isDynamicToolPart(part: {

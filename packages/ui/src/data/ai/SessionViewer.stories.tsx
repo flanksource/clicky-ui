@@ -84,7 +84,7 @@ export const MenuFiltersAndAlignment: Story = {
       // data-theme attribute) — guards the `dark:`-vs-`[data-theme]` regression.
       const rows = [...canvasElement.querySelectorAll("ol > li")];
       const readDisc = rows
-        .find((li) => li.textContent?.includes("Read file"))
+        .find((li) => li.textContent?.includes("Timeline.tsx"))
         ?.querySelector("span.rounded-full") as HTMLElement;
       const lightBg = getComputedStyle(readDisc).backgroundColor;
 
@@ -95,12 +95,16 @@ export const MenuFiltersAndAlignment: Story = {
 
     await step("hiding the Explore category removes its rows", async () => {
       const list = canvasElement.querySelector("ol") as HTMLElement;
-      await expect(within(list).getByText("Read file")).toBeInTheDocument();
+      await expect(within(list).getByText("packages/ui/src/data/Timeline.tsx")).toBeInTheDocument();
       await userEvent.click(menu.getByRole("menuitemcheckbox", { name: "Explore" }));
-      await expect(within(list).queryByText("Read file")).not.toBeInTheDocument();
       await expect(
-        within(list).getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
-      ).toBeInTheDocument();
+        within(list).queryByText("packages/ui/src/data/Timeline.tsx"),
+      ).not.toBeInTheDocument();
+      // The shell row survives; its command is shiki-highlighted (split across
+      // token spans), so match on textContent rather than a single element.
+      await expect(list.textContent).toContain(
+        "pnpm --filter @flanksource/clicky-ui test SessionViewer",
+      );
     });
   },
 };
@@ -110,19 +114,21 @@ export const InteractsWithActions: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step("agent actions render with their labels", async () => {
-      await expect(canvas.getByText("Read file")).toBeInTheDocument();
+    await step("agent actions render inline without label prefixes", async () => {
       await expect(canvas.getByText("iconify: search icons")).toBeInTheDocument();
-      // Shell rows show the bare command — no "Run command" prefix.
+      // File rows show the cwd-relative path, shell rows the bare command.
+      await expect(canvas.queryByText("Read file")).not.toBeInTheDocument();
+      await expect(canvas.getByText("packages/ui/src/data/Timeline.tsx")).toBeInTheDocument();
       await expect(canvas.queryByText("Run command")).not.toBeInTheDocument();
-      await expect(
-        canvas.getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
-      ).toBeInTheDocument();
+      // The command is shiki-highlighted into token spans — assert on textContent.
+      await expect(canvasElement.querySelector("ol")?.textContent).toContain(
+        "pnpm --filter @flanksource/clicky-ui test SessionViewer",
+      );
     });
 
     await step("expanding a shell call reveals its response", async () => {
       await expect(canvas.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
-      await userEvent.click(canvas.getByRole("button", { name: /pnpm --filter/ }));
+      await userEvent.click(canvas.getByRole("button", { name: "Toggle response" }));
       await expect(canvas.getByText(/Tests: 8 passed/)).toBeInTheDocument();
     });
 
