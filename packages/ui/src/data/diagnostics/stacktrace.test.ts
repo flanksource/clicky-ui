@@ -66,9 +66,18 @@ describe("parseGoroutineDump", () => {
     expect(goroutines[0].id).toBe(5);
   });
 
-  it("handles long blank separators and malformed pointer receivers", () => {
-    const input = `goroutine 1 [running]:\n${".(*".repeat(20_000)}\n${" \n".repeat(20_000)}goroutine 2 [idle]:\nfoo.Bar()`;
+  it("parses Windows file locations and uppercase offsets", () => {
+    const input = "goroutine 1 [running]:\nfoo.Bar()\n\tC:\\src\\foo.go:42 +0XABC";
+    const [goroutine] = parseGoroutineDump(input);
+    expect(goroutine.frames[0].file).toBe("C:\\src\\foo.go");
+    expect(goroutine.frames[0].line).toBe(42);
+  });
+
+  it("handles long blank separators and malformed frame lines", () => {
+    const malformedLocation = `foo.go:1${" ".repeat(20_000)}!`;
+    const input = `goroutine 1 [running]:\n${".(*".repeat(20_000)}\n${malformedLocation}\n${" \n".repeat(20_000)}goroutine 2 [idle]:\nfoo.Bar()`;
     const goroutines = parseGoroutineDump(input);
     expect(goroutines.map((goroutine) => goroutine.id)).toEqual([1, 2]);
+    expect(goroutines[0].frames.every((frame) => frame.file === undefined)).toBe(true);
   });
 });
