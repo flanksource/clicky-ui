@@ -112,14 +112,54 @@ export function isApplicationStackFrame(file: string) {
 }
 
 function parseStackTraceFrame(line: string): ErrorStackFrame | null {
-  const match = line.match(/^--- at (.+):(\d+)(?:\s+(.+))?$/);
-  if (!match) return null;
+  const prefix = "--- at ";
+  if (!line.startsWith(prefix)) return null;
+
+  const value = line.slice(prefix.length);
+  let fileEnd = -1;
+  let lineStart = -1;
+  let lineEnd = -1;
+  let functionStart = -1;
+
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] !== ":" || !isDecimalDigit(value[index + 1])) continue;
+
+    let end = index + 1;
+    while (isDecimalDigit(value[end])) end++;
+    if (end === value.length) {
+      fileEnd = index;
+      lineStart = index + 1;
+      lineEnd = end;
+      functionStart = -1;
+      continue;
+    }
+    if (!isWhitespace(value[end])) continue;
+
+    let start = end;
+    while (isWhitespace(value[start])) start++;
+    if (start === value.length && start - end < 2) continue;
+    fileEnd = index;
+    lineStart = index + 1;
+    lineEnd = end;
+    functionStart = start;
+  }
+
+  if (fileEnd <= 0 || lineStart < 0 || lineEnd < 0) return null;
+  const functionName = functionStart >= 0 ? value.slice(functionStart).trim() : "";
   return {
     raw: line,
-    file: match[1] ?? "",
-    line: Number(match[2] ?? 0),
-    ...(match[3]?.trim() ? { functionName: match[3]!.trim() } : {}),
+    file: value.slice(0, fileEnd),
+    line: Number(value.slice(lineStart, lineEnd)),
+    ...(functionName ? { functionName } : {}),
   };
+}
+
+function isDecimalDigit(value: string | undefined): boolean {
+  return value !== undefined && value >= "0" && value <= "9";
+}
+
+function isWhitespace(value: string | undefined): boolean {
+  return value !== undefined && value.trim() === "";
 }
 
 function objectRecord(value: unknown): Record<string, unknown> | null {

@@ -180,10 +180,51 @@ function parseThreadBlock(block: string): ParsedThread | null {
 }
 
 function extractHeaderStateTrail(rest: string): string | undefined {
-  // Example header tails: "... nid=0x1903 waiting on condition [0x...]"
-  // Capture the descriptor between nid=... and the trailing [address].
-  const tail = rest.match(/nid=0x[0-9a-f]+\s+(?<desc>[^[]+?)(?:\s+\[0x[0-9a-f]+\])?\s*$/i);
-  return tail?.groups?.desc?.trim();
+  const lower = rest.toLowerCase();
+  const marker = "nid=0x";
+  const markerStart = lower.indexOf(marker);
+  if (markerStart === -1) return undefined;
+
+  let stateStart = markerStart + marker.length;
+  const hexStart = stateStart;
+  while (isHexDigit(rest[stateStart])) stateStart++;
+  if (stateStart === hexStart || !isWhitespace(rest[stateStart])) return undefined;
+  while (isWhitespace(rest[stateStart])) stateStart++;
+
+  let stateEnd = rest.length;
+  while (stateEnd > stateStart && isWhitespace(rest[stateEnd - 1])) stateEnd--;
+  if (rest[stateEnd - 1] === "]") {
+    const addressStart = lower.lastIndexOf("[0x", stateEnd - 1);
+    if (
+      addressStart > stateStart &&
+      isHexSequence(rest, addressStart + 3, stateEnd - 1) &&
+      isWhitespace(rest[addressStart - 1])
+    ) {
+      stateEnd = addressStart;
+      while (stateEnd > stateStart && isWhitespace(rest[stateEnd - 1])) stateEnd--;
+    }
+  }
+
+  const state = rest.slice(stateStart, stateEnd);
+  return state || undefined;
+}
+
+function isHexDigit(value: string | undefined): boolean {
+  if (value === undefined) return false;
+  const code = value.toLowerCase().charCodeAt(0);
+  return (code >= 48 && code <= 57) || (code >= 97 && code <= 102);
+}
+
+function isHexSequence(value: string, start: number, end: number): boolean {
+  if (start >= end) return false;
+  for (let index = start; index < end; index++) {
+    if (!isHexDigit(value[index])) return false;
+  }
+  return true;
+}
+
+function isWhitespace(value: string | undefined): boolean {
+  return value !== undefined && value.trim() === "";
 }
 
 function deriveSyntheticId(name: string, rest: string): number {

@@ -12,6 +12,7 @@ describe("slugify", () => {
   it("falls back to 'node' for an empty/symbol-only name", () => {
     expect(slugify("")).toBe("node");
     expect(slugify("***")).toBe("node");
+    expect(slugify("-".repeat(50_000))).toBe("node");
   });
 });
 

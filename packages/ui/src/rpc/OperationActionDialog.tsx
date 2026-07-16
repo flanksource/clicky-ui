@@ -5,7 +5,9 @@ import { UiPlay } from "../icons";
 import { Modal } from "../overlay/Modal";
 import { CommandForm } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
+import { pathParamNames } from "./command-form-utils";
 import { InlineError } from "./InlineError";
+import { apiPathToRoutePath } from "./rowNavigation";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 
@@ -103,22 +105,6 @@ function hrefForOperationAction(path: string, params: Record<string, string>): s
   }
   const query = search.toString();
   return query ? `${route}?${query}` : route;
-}
-
-function apiPathToRoutePath(path: string): string {
-  const cliPath = path
-    .trim()
-    .replace(/^\/api\/v1\/?/, "")
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
-  if (!cliPath) return "/";
-  return `/${cliPath.replace(/\{([^}]+)\}/g, ":$1")}`;
-}
-
-function pathParamNames(path: string): string[] {
-  return [...path.matchAll(/\{([^}]+)\}/g)]
-    .map((match) => match[1])
-    .filter((name): name is string => Boolean(name));
 }
 
 function parseArgsParam(value: string | undefined): string[] {

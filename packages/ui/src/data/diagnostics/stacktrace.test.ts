@@ -65,4 +65,10 @@ describe("parseGoroutineDump", () => {
     expect(goroutines).toHaveLength(1);
     expect(goroutines[0].id).toBe(5);
   });
+
+  it("handles long blank separators and malformed pointer receivers", () => {
+    const input = `goroutine 1 [running]:\n${".(*".repeat(20_000)}\n${" \n".repeat(20_000)}goroutine 2 [idle]:\nfoo.Bar()`;
+    const goroutines = parseGoroutineDump(input);
+    expect(goroutines.map((goroutine) => goroutine.id)).toEqual([1, 2]);
+  });
 });

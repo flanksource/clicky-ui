@@ -65,7 +65,7 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  const blocks = trimmed.split(/\n\s*\n+/);
+  const blocks = splitGoroutineBlocks(trimmed);
   const goroutines: ParsedGoroutine[] = [];
 
   for (const block of blocks) {
@@ -153,11 +153,25 @@ function isRuntimeFrame(functionName: string): boolean {
   );
 }
 
+function splitGoroutineBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  let lines: string[] = [];
+  for (const line of text.split("\n")) {
+    if (line.trim()) {
+      lines.push(line);
+    } else if (lines.length > 0) {
+      blocks.push(lines.join("\n"));
+      lines = [];
+    }
+  }
+  if (lines.length > 0) blocks.push(lines.join("\n"));
+  return blocks;
+}
+
 function sanitizeFunctionName(functionName: string): string {
   let name = functionName.trim();
   const paren = name.indexOf("(");
   if (paren !== -1) name = name.slice(0, paren);
-  name = name.replace(/\.\(\*([^)]+)\)\./g, ".$1.");
   return stripPackageQualifier(name);
 }
 

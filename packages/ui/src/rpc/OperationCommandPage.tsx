@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
+import { stripTrailingSlashes } from "../lib/string";
 import { CommandForm } from "./CommandForm";
 import { pathParamNames, submitValue } from "./command-form-utils";
 import type { RenderLink } from "./EndpointList";
@@ -429,7 +430,7 @@ function findRelatedOperations(
   if (current.method.toUpperCase() !== "GET") return [];
   if (!pathTemplateSatisfied(current.path, pathValues)) return [];
 
-  const basePath = current.path.replace(/\/+$/, "");
+  const basePath = stripTrailingSlashes(current.path);
   return operations
     .filter((candidate) => {
       if (candidate === current) return false;
@@ -466,7 +467,7 @@ function findDetailOperation(
   operations: ResolvedOperation[],
 ) {
   const method = current.method.toUpperCase();
-  const detailPath = `${current.path.replace(/\/+$/, "")}/{id}`;
+  const detailPath = `${stripTrailingSlashes(current.path)}/{id}`;
   return operations.find(
     (candidate) =>
       candidate.method.toUpperCase() === method &&
