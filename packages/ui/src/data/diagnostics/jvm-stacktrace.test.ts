@@ -107,4 +107,12 @@ describe("parseJvmThreadDump", () => {
     expect(t.id).toBeGreaterThan(0);
     expect(t.name).toBe("anon");
   });
+
+  it("extracts a state from a header with a long whitespace suffix", () => {
+    const [thread] = parseJvmThreadDump(
+      `"slow" #1 nid=0x0 waiting${" ".repeat(50_000)}`,
+    );
+    expect(thread.rawState).toBe("waiting");
+    expect(thread.state).toBe("waiting");
+  });
 });

@@ -4,12 +4,13 @@
 
 import { computeLineDiff } from "../code-diff";
 import { languageFromPath } from "../code-highlight";
+import { stripTrailingSlashes } from "../../lib/string";
 import { splitMcpTool, truncate } from "./SessionViewer.model";
 
 /** Strip the event's working directory from an absolute file path. */
 export function relativizePath(path: string, cwd?: string): string {
   if (!cwd) return path;
-  const base = cwd.replace(/\/+$/, "");
+  const base = stripTrailingSlashes(cwd);
   return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path;
 }
 

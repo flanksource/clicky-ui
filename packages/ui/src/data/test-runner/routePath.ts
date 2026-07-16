@@ -7,10 +7,9 @@
 import type { Test } from "./types";
 
 export function slugify(value: string): string {
-  const slug = (value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  let slug = (value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  if (slug.startsWith("-")) slug = slug.slice(1);
+  if (slug.endsWith("-")) slug = slug.slice(0, -1);
   return slug || "node";
 }
 

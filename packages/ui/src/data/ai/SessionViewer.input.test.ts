@@ -200,5 +200,8 @@ describe("relativizePath", () => {
     expect(relativizePath("/repo/src/a.ts", "/repo/")).toBe("src/a.ts");
     expect(relativizePath("/repository/src/a.ts", "/repo")).toBe("/repository/src/a.ts");
     expect(relativizePath("/repo/src/a.ts", undefined)).toBe("/repo/src/a.ts");
+    expect(relativizePath("/repo/src/a.ts", `/repo${"/".repeat(50_000)}`)).toBe(
+      "src/a.ts",
+    );
   });
 });

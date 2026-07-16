@@ -13,7 +13,6 @@ export interface ParsedStackTrace {
 }
 
 const frameRe = /^\s*at\s+([\w$.]+)\.([\w$<>]+)\(([^)]+)\)/;
-const headerRe = /^([\w.$]+(?:Exception|Error|Throwable))(?::\s*(.*))?$/;
 const continuationRe = /^\.\.\.\s+\d+\s+more$/;
 
 const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];
@@ -52,10 +51,10 @@ export function parseJavaStackTrace(input: string): ParsedStackTrace {
     }
 
     if (!out.exceptionClass) {
-      const headerMatch = headerRe.exec(trimmed);
-      if (headerMatch && headerMatch[1]) {
-        out.exceptionClass = headerMatch[1];
-        if (headerMatch[2]) out.message = headerMatch[2];
+      const header = parseExceptionHeader(trimmed);
+      if (header) {
+        out.exceptionClass = header.exceptionClass;
+        if (header.message) out.message = header.message;
         continue;
       }
     }
@@ -68,6 +67,34 @@ export function parseJavaStackTrace(input: string): ParsedStackTrace {
   }
 
   return out;
+}
+
+function parseExceptionHeader(
+  value: string,
+): { exceptionClass: string; message?: string } | null {
+  const separator = value.indexOf(":");
+  const exceptionClass = separator === -1 ? value : value.slice(0, separator);
+  if (
+    !exceptionClass ||
+    !["Exception", "Error", "Throwable"].some((suffix) => exceptionClass.endsWith(suffix))
+  ) {
+    return null;
+  }
+  for (const character of exceptionClass) {
+    const code = character.charCodeAt(0);
+    const valid =
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      character === "_" ||
+      character === "." ||
+      character === "$";
+    if (!valid) return null;
+  }
+
+  if (separator === -1) return { exceptionClass };
+  const message = value.slice(separator + 1).trimStart();
+  return message ? { exceptionClass, message } : { exceptionClass };
 }
 
 function buildFrame(cls: string, method: string, locRaw: string): ParsedStackFrame {

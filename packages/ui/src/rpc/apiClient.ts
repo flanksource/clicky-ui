@@ -1,4 +1,5 @@
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { stripLeadingSlashes, stripTrailingSlashes } from "../lib/string";
 import type {
   ExecutionPagination,
   ExecutionResponse,
@@ -439,7 +440,7 @@ function pruneParams(params: Record<string, string>) {
 
 function joinUrl(baseUrl: string | undefined, path: string) {
   if (!baseUrl || /^https?:\/\//i.test(path)) return path;
-  return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  return `${stripTrailingSlashes(baseUrl)}/${stripLeadingSlashes(path)}`;
 }
 
 function headerValue(headers: Record<string, string> | undefined, name: string) {

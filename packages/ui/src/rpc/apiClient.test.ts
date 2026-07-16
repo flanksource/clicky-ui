@@ -155,6 +155,18 @@ describe("createOperationsApiClient", () => {
     expect(JSON.parse(init!.body as string)).toEqual(body);
   });
 
+  it("joins base URLs and paths with long slash runs", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createOperationsApiClient({
+      baseUrl: `https://example.com${"/".repeat(50_000)}`,
+    });
+    await client.submitForm(`${"/".repeat(50_000)}api/v1/connection`, "POST", {});
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://example.com/api/v1/connection");
+  });
+
   it("applies path params, default params, and prepared headers", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
