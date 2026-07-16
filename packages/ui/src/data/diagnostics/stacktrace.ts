@@ -56,7 +56,6 @@ export interface ParsedGoroutine {
 }
 
 const headerRe = /^goroutine\s+(\d+)\s+\[(.+?)\]:$/;
-const fileRe = /^\s*(.+?):(\d+)(?:\s+\+0x[0-9a-f]+)?$/i;
 const goSrcPrefixRe = /^\/usr\/local\/go[\d.]+\/src\//;
 const goWorkspacePrefixRe = /^.*?\/go\/src\//;
 const goPkgModPrefixRe = /^.*?\/go\/pkg\/mod\//;
@@ -85,11 +84,11 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
       const trimmedLine = line.trim();
       if (!trimmedLine) continue;
 
-      const fileMatch = fileRe.exec(trimmedLine);
+      const fileLocation = parseGoroutineFileLocation(trimmedLine);
       const previousFrame = frames[frames.length - 1];
-      if (fileMatch && previousFrame && !previousFrame.file) {
-        previousFrame.file = fileMatch[1] ?? "";
-        previousFrame.line = Number(fileMatch[2] ?? 0);
+      if (fileLocation && previousFrame && !previousFrame.file) {
+        previousFrame.file = fileLocation.file;
+        previousFrame.line = fileLocation.line;
         continue;
       }
 
@@ -151,6 +150,44 @@ function isRuntimeFrame(functionName: string): boolean {
     functionName.startsWith("syscall.") ||
     functionName.startsWith("reflect.")
   );
+}
+
+function parseGoroutineFileLocation(value: string): { file: string; line: number } | undefined {
+  const separator = value.lastIndexOf(":");
+  if (separator <= 0) return undefined;
+
+  let index = separator + 1;
+  const lineStart = index;
+  while (index < value.length && isAsciiDigit(value[index] ?? "")) index++;
+  if (index === lineStart) return undefined;
+
+  const lineEnd = index;
+  if (index < value.length) {
+    const whitespaceStart = index;
+    while (index < value.length && (value[index] ?? "").trim() === "") index++;
+    if (index === whitespaceStart || value.slice(index, index + 3).toLowerCase() !== "+0x") {
+      return undefined;
+    }
+
+    index += 3;
+    const offsetStart = index;
+    while (index < value.length && isAsciiHexDigit(value[index] ?? "")) index++;
+    if (index === offsetStart || index !== value.length) return undefined;
+  }
+
+  return {
+    file: value.slice(0, separator),
+    line: Number(value.slice(lineStart, lineEnd)),
+  };
+}
+
+function isAsciiDigit(value: string): boolean {
+  return value >= "0" && value <= "9";
+}
+
+function isAsciiHexDigit(value: string): boolean {
+  const lower = value.toLowerCase();
+  return isAsciiDigit(value) || (lower >= "a" && lower <= "f");
 }
 
 function splitGoroutineBlocks(text: string): string[] {
