@@ -1,1 +1,0 @@
-function a(e){return e["x-clicky-placeholder"]??e.placeholder}function o(e){var r;return e.name==="args"||((r=e.description)==null?void 0:r.toLowerCase().includes("positional argument"))===!0}export{o as i,a as p};
