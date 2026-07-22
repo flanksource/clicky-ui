@@ -1,0 +1,1 @@
+import{as as a,a1 as r,aE as s,ab as t,b7 as i}from"./iframe-BNCeWgcu.js";function c(e){switch(e){case"go test":case"ginkgo":return i;case"jest":case"vitest":return t;case"playwright":return s;case"fixture":return r;case"task":return a;default:return null}}export{c as f};
