@@ -1,9 +1,19 @@
-import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Icon } from "../Icon";
 import { UiArrowUp, UiStop } from "../../icons";
-import { AttachmentButton, AttachmentList } from "./Attachment";
+import {
+  AttachmentButton,
+  AttachmentList,
+  type AttachmentLimits,
+  type AttachmentUploadAdapter,
+} from "./Attachment";
 import type { ChatStatus, FileUIPart } from "./types";
 
 export type PromptInputProps = {
@@ -13,11 +23,19 @@ export type PromptInputProps = {
   onStop?: (() => void) | undefined;
   /** Current chat status; drives the submit/stop button affordance. */
   status?: ChatStatus | undefined;
+  allowSubmitWhileStreaming?: boolean | undefined;
+  disabled?: boolean | undefined;
+  stopLabel?: string | undefined;
   placeholder?: string | undefined;
   /** Enables the attachment button and chips. */
   enableAttachments?: boolean | undefined;
+  attachmentUpload?: AttachmentUploadAdapter | undefined;
+  acceptedMediaTypes?: string[] | undefined;
+  attachmentLimits?: AttachmentLimits | undefined;
   /** Toolbar content (e.g. model/effort selectors) rendered in the footer. */
   toolbar?: ReactNode;
+  /** Compact host control rendered beside the textarea and submit button. */
+  inputAccessory?: ReactNode;
   className?: string | undefined;
 };
 
@@ -29,18 +47,31 @@ export function PromptInput({
   onSubmit,
   onStop,
   status,
+  allowSubmitWhileStreaming = false,
+  disabled = false,
+  stopLabel = "Stop",
   placeholder = "What would you like to know?",
   enableAttachments = false,
+  attachmentUpload,
+  acceptedMediaTypes,
+  attachmentLimits,
   toolbar,
+  inputAccessory,
   className,
 }: PromptInputProps) {
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<FileUIPart[]>([]);
+  const [attachmentError, setAttachmentError] = useState("");
   const isGenerating = status === "submitted" || status === "streaming";
 
   const submit = () => {
     const text = value.trim();
-    if ((!text && files.length === 0) || isGenerating) return;
+    if (
+      (!text && files.length === 0) ||
+      disabled ||
+      (isGenerating && !allowSubmitWhileStreaming)
+    )
+      return;
     onSubmit(text, files);
     setValue("");
     setFiles([]);
@@ -58,7 +89,10 @@ export function PromptInput({
     }
   };
 
-  const canSubmit = value.trim().length > 0 || files.length > 0;
+  const canSubmit =
+    !disabled &&
+    (!isGenerating || allowSubmitWhileStreaming) &&
+    (value.trim().length > 0 || files.length > 0);
 
   return (
     <form
@@ -69,7 +103,15 @@ export function PromptInput({
       )}
     >
       {enableAttachments && (
-        <AttachmentList files={files} onRemove={(i) => setFiles((f) => f.filter((_, j) => j !== i))} />
+        <>
+          <AttachmentList
+            files={files}
+            onRemove={(i) => setFiles((f) => f.filter((_, j) => j !== i))}
+          />
+          {attachmentError && (
+            <p className="px-1 text-xs text-destructive">{attachmentError}</p>
+          )}
+        </>
       )}
 
       <div className="flex items-end gap-2">
@@ -78,15 +120,29 @@ export function PromptInput({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          disabled={disabled}
           rows={1}
           className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
         />
-        {isGenerating && onStop ? (
-          <Button type="button" size="icon" variant="secondary" aria-label="Stop" onClick={onStop}>
+        {inputAccessory}
+        {isGenerating && onStop && (
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            aria-label={stopLabel}
+            onClick={onStop}
+          >
             <Icon icon={UiStop} className="size-4" />
           </Button>
-        ) : (
-          <Button type="submit" size="icon" aria-label="Send" disabled={!canSubmit}>
+        )}
+        {(!isGenerating || allowSubmitWhileStreaming) && (
+          <Button
+            type="submit"
+            size="icon"
+            aria-label="Send"
+            disabled={!canSubmit}
+          >
             <Icon icon={UiArrowUp} className="size-4" />
           </Button>
         )}
@@ -95,7 +151,15 @@ export function PromptInput({
       {(toolbar || enableAttachments) && (
         <div className="flex items-center gap-2">
           {enableAttachments && (
-            <AttachmentButton onAdd={(p) => setFiles((f) => [...f, ...p])} disabled={isGenerating} />
+            <AttachmentButton
+              onAdd={(p) => setFiles((f) => [...f, ...p])}
+              disabled={disabled || isGenerating}
+              files={files}
+              onError={setAttachmentError}
+              {...(attachmentUpload ? { upload: attachmentUpload } : {})}
+              {...(acceptedMediaTypes ? { acceptedMediaTypes } : {})}
+              {...(attachmentLimits ? { limits: attachmentLimits } : {})}
+            />
           )}
           {toolbar}
         </div>

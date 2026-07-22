@@ -1,8 +1,13 @@
 import { useState } from "react";
+import { Button } from "../components/button";
+import { UiPlay, UiRestart, UiStop } from "../icons";
 import { cn } from "../lib/utils";
+import { AnsiHtml } from "./AnsiHtml";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
-import type { LogEntry, TaskSnapshot } from "./TaskSnapshot";
+import { TaskProcessDetailsView } from "./TaskProcessDetails";
+import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
+import { isTaskProcessDetails } from "./task-process-details";
 import {
   bucketTasks,
   logLevelColor,
@@ -26,9 +31,11 @@ export interface TaskProgressProps {
   /** Tighter spacing for embedding in a panel. */
   compact?: boolean;
   className?: string;
+  onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  metricsBaseUrl?: string;
 }
 
-export function TaskProgress({ snapshots, title, compact, className }: TaskProgressProps) {
+export function TaskProgress({ snapshots, title, compact, className, onControl, metricsBaseUrl }: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
 
@@ -49,6 +56,8 @@ export function TaskProgress({ snapshots, title, compact, className }: TaskProgr
           group={g}
           tasks={tasks.filter((t) => t.groupId === g.groupId || t.group === g.id)}
           compact={compact}
+          {...(onControl ? { onControl } : {})}
+          {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
         />
       ))}
     </div>
@@ -63,10 +72,14 @@ function TaskGroupCard({
   group: g,
   tasks,
   compact,
+  onControl,
+  metricsBaseUrl,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
   compact: boolean | undefined;
+  onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  metricsBaseUrl?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const total = g.total ?? tasks.length;
@@ -92,7 +105,7 @@ function TaskGroupCard({
 
   return (
     <div className={cn("rounded-lg border bg-card", compact ? "p-3" : "p-4")}>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
           <Icon
             icon={taskStatusIcon(g.status)}
@@ -106,23 +119,33 @@ function TaskGroupCard({
             </span>
           )}
         </h3>
-        {isTerminal && (
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-xs",
-              taskStatusColor(g.status),
-              taskStatusBg(g.status),
-            )}
-          >
-            {g.status}
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {isTerminal && (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-xs",
+                taskStatusColor(g.status),
+                taskStatusBg(g.status),
+              )}
+            >
+              {g.status}
+            </span>
+          )}
+          {onControl && <TaskControls group={g} onControl={onControl} />}
+        </div>
       </div>
 
       {total > 0 && (
         <div className="mb-3">
           <ProgressBar segments={taskSegments(counts)} total={total} height="h-1.5" />
         </div>
+      )}
+
+      {isTaskProcessDetails(g.details) && (
+        <TaskProcessDetailsView
+          details={g.details}
+          {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+        />
       )}
 
       {hiddenCompleted > 0 || hiddenPending > 0 ? (
@@ -148,6 +171,7 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
   const [expanded, setExpanded] = useState(false);
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
+  const hasOutput = !!t.stdout || !!t.stderr;
   // Promote the latest warning message inline so a `warning` row shows its
   // reason without expanding. Suppressed when an error is already shown.
   const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
@@ -163,9 +187,9 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
     <div
       className={cn(
         "flex items-start gap-3 border-b py-2 last:border-0",
-        hasLogs && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
+        (hasLogs || hasOutput) && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
       )}
-      onClick={hasLogs ? () => setExpanded((v) => !v) : undefined}
+      onClick={hasLogs || hasOutput ? () => setExpanded((v) => !v) : undefined}
     >
       <Icon
         icon={taskStatusIcon(t.status)}
@@ -181,9 +205,9 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
                 {latestWarn.message}
               </span>
             )}
-            {hasLogs && (
+            {(hasLogs || hasOutput) && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-                {logs.length}
+                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0)}
               </span>
             )}
           </span>
@@ -220,7 +244,84 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
             ))}
           </div>
         )}
+        {expanded && hasOutput && (
+          <div className="mt-2 space-y-2">
+            {t.stdout && <TaskStream label="stdout" text={t.stdout} {...(t.stdoutTruncated ? { truncated: true } : {})} />}
+            {t.stderr && <TaskStream label="stderr" text={t.stderr} {...(t.stderrTruncated ? { truncated: true } : {})} error />}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function TaskStream({
+  label,
+  text,
+  truncated,
+  error,
+}: {
+  label: string;
+  text: string;
+  truncated?: boolean;
+  error?: boolean;
+}) {
+  return (
+    <div className="overflow-hidden rounded border bg-black">
+      <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 text-[10px] text-gray-400">
+        <span>{label}</span>
+        {truncated && <span>showing latest 1 MiB</span>}
+      </div>
+      <AnsiHtml
+        text={text}
+        className={cn("max-h-64 overflow-auto whitespace-pre-wrap p-2 text-xs text-gray-100", error && "text-red-300")}
+      />
+    </div>
+  );
+}
+
+function TaskControls({
+  group,
+  onControl,
+}: {
+  group: TaskSnapshot;
+  onControl: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState<TaskControlAction | null>(null);
+  const [error, setError] = useState("");
+  const icons = { start: UiPlay, stop: UiStop, restart: UiRestart };
+  const invoke = async (action: TaskControlAction) => {
+    setBusy(action);
+    setError("");
+    try {
+      await onControl(action, group);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `Failed to ${action} task`);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <>
+      {(group.controls ?? []).map((action) => {
+        const ControlIcon = icons[action];
+        const label = action[0]?.toUpperCase() + action.slice(1);
+        return (
+          <Button
+            key={action}
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={label}
+            title={label}
+            disabled={busy !== null}
+            onClick={() => void invoke(action)}
+          >
+            <ControlIcon />
+          </Button>
+        );
+      })}
+      {error && <span role="alert" className="text-xs text-red-600">{error}</span>}
+    </>
   );
 }

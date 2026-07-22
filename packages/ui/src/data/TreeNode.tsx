@@ -25,6 +25,7 @@ export type TreeNodeProps<T> = {
   defaultOpen?: (node: T, depth: number) => boolean;
   getChildren: (node: T) => T[] | undefined;
   getKey: (node: T) => string | number;
+  getAriaLabel?: (node: T) => string;
   onSelect?: (node: T) => void;
   renderRow: (ctx: TreeRowContext<T>) => ReactNode;
   rowClass?: (node: T, selected: boolean) => string;
@@ -72,6 +73,7 @@ export function TreeNode<T>({
   defaultOpen,
   getChildren,
   getKey,
+  getAriaLabel,
   onSelect,
   renderRow,
   rowClass,
@@ -181,6 +183,7 @@ export function TreeNode<T>({
   return (
     <div
       role="treeitem"
+      aria-label={getAriaLabel?.(node)}
       aria-expanded={expandable ? isOpen : undefined}
       aria-selected={isSelected}
     >
@@ -238,6 +241,7 @@ export function TreeNode<T>({
               indentPx={indentPx}
               basePaddingPx={basePaddingPx}
               {...(defaultOpen ? { defaultOpen } : {})}
+              {...(getAriaLabel ? { getAriaLabel } : {})}
               {...(onSelect ? { onSelect } : {})}
               {...(rowClass ? { rowClass } : {})}
               {...(isSecondary ? { isSecondary } : {})}

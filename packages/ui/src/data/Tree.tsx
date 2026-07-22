@@ -14,6 +14,8 @@ export type TreeProps<T> = Omit<
   empty?: ReactNode;
   /** Classes applied to the tree root. */
   className?: string;
+  /** Accessible name applied to the tree root. */
+  ariaLabel?: string;
   /**
    * Render the Expand all / Collapse all toolbar above the tree. Enabled by
    * default. Set to false to suppress when the tree is tiny or the controls
@@ -243,6 +245,7 @@ export function Tree<T>({
   roots,
   empty,
   className,
+  ariaLabel,
   showControls = true,
   expandAll: controlledExpandAll,
   onExpandAllChange,
@@ -317,7 +320,11 @@ export function Tree<T>({
 
   return (
     <div className={cn("flex flex-col min-h-0", className)}>
-      <div role="tree" className="min-h-0 flex-1 overflow-auto">
+      <div
+        role="tree"
+        aria-label={ariaLabel}
+        className="min-h-0 flex-1 overflow-auto"
+      >
         {showVirtualRow && (
           <div
             role="presentation"

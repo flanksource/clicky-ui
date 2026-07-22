@@ -11,8 +11,13 @@ import { Conversation } from "./Conversation";
 import { PromptInput } from "./PromptInput";
 import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
-import { providerIcon } from "./provider-icons";
+import { providerIcon, providerIconColor } from "./provider-icons";
 import { ContextMeter } from "./ContextMeter";
+import {
+  createAttachmentUploadAdapter,
+  type AttachmentLimits,
+  type AttachmentUploadAdapter,
+} from "./Attachment";
 import type {
   ChatBudgetConfig,
   ChatModel,
@@ -65,8 +70,11 @@ export type ChatProps = {
   suggestions?: Suggestion[];
   /** Enables file/image attachments. */
   enableAttachments?: boolean;
-  /** "manual" forwards a tool-approval policy hint to the backend. */
-  toolApproval?: "auto" | "manual";
+  /** Upload endpoint used before an attachment is added to a chat message. */
+  attachmentsApi?: string;
+  /** Custom durable upload adapter; overrides attachmentsApi. */
+  attachmentUpload?: AttachmentUploadAdapter;
+  attachmentLimits?: AttachmentLimits;
   /** Thread id to persist this conversation under (forwarded in the body). */
   threadId?: string;
   /** Optional host renderer for recognized completed tool outputs. */
@@ -92,7 +100,7 @@ const DEFAULT_EFFORTS = ["low", "medium", "high"];
  *  conversation with model/effort selectors, suggestions, attachments,
  *  per-message copy/regenerate, and human-in-the-loop tool approvals. The
  *  backend owns model selection and tool execution; the selected model,
- *  effort, approval policy and thread id are forwarded in the request body. */
+ *  effort, permission mode and thread id are forwarded in the request body. */
 export function Chat({
   api = "/api/chat",
   models: modelsProp,
@@ -110,7 +118,9 @@ export function Chat({
   onUsage,
   suggestions,
   enableAttachments = false,
-  toolApproval,
+  attachmentsApi = "/api/attachments",
+  attachmentUpload,
+  attachmentLimits,
   threadId,
   renderToolResult,
   body,
@@ -171,9 +181,15 @@ export function Chat({
 
   const selectedModel = models.find((m) => m.id === model);
   const showEffort = !selectedModel || selectedModel.reasoning;
+  const resolvedAttachmentUpload = useMemo(
+    () =>
+      attachmentUpload ??
+      createAttachmentUploadAdapter({ endpoint: attachmentsApi }),
+    [attachmentUpload, attachmentsApi],
+  );
 
   // A function body keeps the transport stable while always sending the latest
-  // model/effort/policy selections.
+  // model/effort/runtime selections.
   const bodyRef = useRef<Record<string, unknown>>({});
   bodyRef.current = {
     ...body,
@@ -184,7 +200,6 @@ export function Chat({
       ? { budget }
       : {}),
     ...(permissionMode ? { permissionMode } : {}),
-    ...(toolApproval ? { toolApproval } : {}),
     ...(threadId ? { threadId } : {}),
   };
 
@@ -262,7 +277,11 @@ export function Chat({
             {...(usage.messageCount != null ? { messageCount: usage.messageCount } : {})}
             {...(usage.cost != null ? { cost: { total: usage.cost } } : {})}
             {...(usage.modelLabel ? { model: usage.modelLabel } : {})}
+            {...(effort ? { effort } : {})}
             {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
+            {...(selectedModel?.provider
+              ? { modelIconClassName: providerIconColor(selectedModel.provider) }
+              : {})}
           />
         </>
       )}
@@ -285,6 +304,8 @@ export function Chat({
         status={status}
         error={error}
         onClearError={clearError}
+        {...(threadId ? { sessionId: threadId } : {})}
+        {...(model ? { model } : {})}
         emptyState={empty}
         onRegenerate={(messageId) => void regenerate({ messageId })}
         onApprove={(id, approved, reason) =>
@@ -298,6 +319,11 @@ export function Chat({
           onStop={() => void stop()}
           placeholder={placeholder}
           enableAttachments={enableAttachments}
+          attachmentUpload={resolvedAttachmentUpload}
+          {...(selectedModel?.inputMediaTypes
+            ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
+            : {})}
+          {...(attachmentLimits ? { attachmentLimits } : {})}
           toolbar={toolbar}
           onSubmit={(text, files) => void sendMessage({ text, files })}
         />

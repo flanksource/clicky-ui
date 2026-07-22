@@ -36,11 +36,11 @@ export const EFFORT_LEVEL_ICONS: Record<EffortLevel, StaticIconComponent> = {
 // them and dark mode keys off the `data-theme` attribute (not `dark:`).
 export const EFFORT_LEVEL_COLOR: Record<EffortLevel, string> = {
   minimal: "text-slate-500 [[data-theme=dark]_&]:text-slate-400",
-  low: "text-sky-500 [[data-theme=dark]_&]:text-sky-400",
-  medium: "text-amber-500 [[data-theme=dark]_&]:text-amber-400",
-  high: "text-orange-500 [[data-theme=dark]_&]:text-orange-400",
-  max: "text-red-500 [[data-theme=dark]_&]:text-red-400",
-  adaptive: "text-indigo-500 [[data-theme=dark]_&]:text-indigo-400",
+  low: "text-sky-700 [[data-theme=dark]_&]:text-sky-400",
+  medium: "text-amber-700 [[data-theme=dark]_&]:text-amber-400",
+  high: "text-orange-700 [[data-theme=dark]_&]:text-orange-400",
+  max: "text-red-700 [[data-theme=dark]_&]:text-red-400",
+  adaptive: "text-indigo-700 [[data-theme=dark]_&]:text-indigo-400",
 };
 
 function effortKey(value: string): EffortLevel | undefined {
