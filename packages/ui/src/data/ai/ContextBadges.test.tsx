@@ -41,4 +41,19 @@ describe("ContextBadges", () => {
     fireEvent.click(screen.getAllByTestId("context-badge-remove")[0]!);
     expect(onRemove).toHaveBeenCalledWith("a");
   });
+
+  it("omits the expand control for items without a preview", () => {
+    render(<ContextBadges items={items} />);
+    expect(screen.queryByTestId("context-badge-expand")).not.toBeInTheDocument();
+  });
+
+  it("opens a modal rendering the full preview markdown when the chip is expanded", async () => {
+    const withPreview: ChatContextItem[] = [
+      { id: "c", type: "cell", label: "Cash flow cell", preview: "# Cash Flow\n\nfull markdown supplied to the model" },
+    ];
+    render(<ContextBadges items={withPreview} />);
+    expect(screen.queryByText(/full markdown supplied to the model/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("context-badge-expand"));
+    expect(await screen.findByText(/full markdown supplied to the model/)).toBeInTheDocument();
+  });
 });

@@ -88,7 +88,7 @@ describe("ChatWindow", () => {
     await waitFor(() => expect(screen.queryByText("Record one")).toBeNull());
   });
 
-  it("forwards rich context items alongside the serialized context summary", () => {
+  it("forwards context and tool preferences without a legacy approval policy", () => {
     const contextItems = [
       {
         id: "formula",
@@ -99,19 +99,20 @@ describe("ChatWindow", () => {
       },
     ];
 
-    expect(
-      chatWindowRequestBody({
-        base: { model: "test" },
-        contextItems,
-        tools: CHAT_WINDOW_TEST_TOOLS,
-        toolPrefs: { listPods: "on" },
-      }),
-    ).toEqual({
+    const body = chatWindowRequestBody({
+      base: { model: "test" },
+      contextItems,
+      tools: CHAT_WINDOW_TEST_TOOLS,
+      toolPrefs: { listPods: "on" },
+    });
+
+    expect(body).toEqual({
       model: "test",
       context: "Context:\n[formula] Formula Playground (entity: Demo Co)\n\n",
       contextItems,
       toolPreferences: { listPods: "on" },
     });
+    expect(body).not.toHaveProperty("toolApproval");
   });
 
   it("passes panel initial prompts into the inner chat", async () => {

@@ -1,37 +1,24 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
-import { CodeBlock } from "../CodeBlock";
-import { CodeDiff } from "../CodeDiff";
-import { Button } from "../../components/button";
 import {
   UiBrain,
-  UiCancel,
-  UiCheck,
   UiChevronDown,
-  UiComment,
   UiSparkles,
   UiUserCircle,
   UiWarningTriangle,
 } from "../../icons";
-import { APPROVAL_ICONS } from "./agent-action-icons";
 import {
   getSessionAction,
   type SessionEvent,
   type SessionTone,
 } from "./SessionViewer.model";
 import type { SessionEventGroup } from "./SessionViewer.grouping";
-import {
-  shellCommand,
-  questionsFromToolInput,
-  summarizeToolInput,
-  toolDiff,
-  toolInputParams,
-  type SessionQuestion,
-  type ToolDiff,
-  type ToolParam,
-} from "./SessionViewer.input";
+import { EventMetadata, RawEventBlock } from "./SessionViewer.row-metadata";
+import { formatEventRange } from "./SessionViewer.row-time";
+import { ToolBody } from "./SessionViewer.tool-row";
 import type { SessionToolDecision } from "./SessionViewer";
+import { Markdown } from "../Markdown";
 
 // Disc colors per tone. The dark variants key off a `[data-theme="dark"]`
 // ancestor (the document attribute set by ThemeProvider, or the component-level
@@ -64,6 +51,7 @@ export function SessionRow({
   defaultExpanded,
   showRowMetadata = false,
   showRaw = false,
+  renderMessageBadge,
   onPendingToolDecision,
 }: {
   event: SessionEvent;
@@ -71,10 +59,12 @@ export function SessionRow({
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
   showRaw?: boolean;
-  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+  renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
+  onPendingToolDecision?:
+  | ((decision: SessionToolDecision) => Promise<void> | void)
+  | undefined;
 }) {
-  if (event.kind === "user")
-    return <UserRow event={event} showRowMetadata={showRowMetadata} showRaw={showRaw} />;
+
 
   const visual = eventVisual(event);
   return (
@@ -101,10 +91,15 @@ export function SessionRow({
           event={event}
           visual={visual}
           defaultExpanded={defaultExpanded}
+          messageBadge={
+            event.kind === "assistant" ? renderMessageBadge?.(event) : undefined
+          }
           onPendingToolDecision={onPendingToolDecision}
         />
         {showRowMetadata && <EventMetadata event={event} />}
-        {showRaw && event.raw !== undefined && <RawEventBlock raw={event.raw} />}
+        {showRaw && event.raw !== undefined && (
+          <RawEventBlock raw={event.raw} />
+        )}
       </div>
     </li>
   );
@@ -116,6 +111,7 @@ export function WaitGroupRow({
   defaultExpanded,
   showRowMetadata = false,
   showRaw = false,
+  renderMessageBadge,
   onPendingToolDecision,
 }: {
   group: SessionEventGroup;
@@ -123,7 +119,10 @@ export function WaitGroupRow({
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
   showRaw?: boolean;
-  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+  renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
+  onPendingToolDecision?:
+  | ((decision: SessionToolDecision) => Promise<void> | void)
+  | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const visual = getSessionAction("Wait");
@@ -190,6 +189,7 @@ export function WaitGroupRow({
                 defaultExpanded={defaultExpanded}
                 showRowMetadata={showRowMetadata}
                 showRaw={showRaw}
+                renderMessageBadge={renderMessageBadge}
                 onPendingToolDecision={onPendingToolDecision}
               />
             ))}
@@ -200,185 +200,36 @@ export function WaitGroupRow({
   );
 }
 
-// User prompts and selections sit on the right, like a chat composer turn.
-function UserRow({
-  event,
-  showRowMetadata,
-  showRaw,
-}: {
-  event: SessionEvent;
-  showRowMetadata: boolean;
-  showRaw: boolean;
-}) {
-  return (
-    <li
-      data-event-kind="user"
-      className="relative flex justify-end pb-density-4 last:pb-0"
-    >
-      <div className="flex max-w-[85%] items-start gap-density-3">
-        <div className="min-w-0">
-          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
-            You
-          </div>
-          <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right text-base font-medium leading-relaxed text-accent-foreground">
-            {event.text}
-          </div>
-          {showRowMetadata && <EventMetadata event={event} align="right" />}
-          {showRaw && event.raw !== undefined && <RawEventBlock raw={event.raw} align="right" />}
-        </div>
-        <span
-          className={cn(
-            "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-            DISC_TONE.slate,
-          )}
-        >
-          <Icon icon={UiUserCircle} className="h-3 w-3" />
-        </span>
-      </div>
-    </li>
-  );
-}
 
-function EventMetadata({
-  event,
-  align = "left",
-  timestampLabel,
-}: {
-  event: SessionEvent;
-  align?: "left" | "right";
-  timestampLabel?: string;
-}) {
-  const parts = [
-    timestampLabel ?? (event.timestamp ? formatEventTime(event.timestamp) : ""),
-    event.source,
-    event.model,
-    event.reasoningEffort,
-    event.turnId ? `turn ${event.turnId}` : "",
-    event.agentId ? `agent ${event.agentId}` : "",
-    event.toolState,
-    approvalLabel(event),
-  ].filter(Boolean);
-  if (parts.length === 0) return null;
+
+function UserRow({ event }: { event: SessionEvent }) {
+  const [open, setOpen] = useState(false);
+  const preview = event.text?.split("\n", 1)[0] ?? "Initial Prompt";
   return (
-    <div
-      className={cn(
-        "mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground",
-        align === "right" && "justify-end text-right",
+    <div className="not-prose text-xs text-muted-foreground">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-start gap-1.5 text-left hover:text-foreground"
+      >
+        <span className="shrink-0 font-medium text-foreground">You</span>
+        <span className="min-w-0 flex-1 truncate">{preview}</span>
+        <Icon
+          icon={UiChevronDown}
+          className={cn(
+            "mt-0.5 size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="mt-1.5 whitespace-pre-wrap break-words  bg-muted/20 px-density-3 py-density-2 leading-relaxed">
+          <Markdown text={event.text} />
+        </div>
       )}
-    >
-      {parts.map((part, index) => (
-        <span key={`${part}-${index}`} className="min-w-0 truncate">
-          {part}
-        </span>
-      ))}
     </div>
   );
-}
-
-function approvalLabel(event: SessionEvent) {
-  if (event.approval?.approved === true) return "approved";
-  if (event.approval?.approved === false) {
-    return event.approval.reason ? `denied: ${event.approval.reason}` : "denied";
-  }
-  if (event.pending) return "approval pending";
-  if (event.toolState === "output-denied") return "denied";
-  return "";
-}
-
-function approvalStatus(
-  event: SessionEvent,
-): { label: string; className: string; icon: StaticIconComponent } | null {
-  if (event.approval?.approved === true) {
-    return {
-      label: "Approved",
-      icon: APPROVAL_ICONS.approved.icon,
-      className:
-        "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 [[data-theme=dark]_&]:text-emerald-300",
-    };
-  }
-  if (event.approval?.approved === false || event.toolState === "output-denied") {
-    const reason = event.approval?.reason ? `: ${event.approval.reason}` : "";
-    return {
-      label: `Denied${reason}`,
-      icon: APPROVAL_ICONS.denied.icon,
-      className:
-        "border-rose-500/30 bg-rose-500/10 text-rose-700 [[data-theme=dark]_&]:text-rose-300",
-    };
-  }
-  if (event.pending) {
-    return {
-      label: "Awaiting approval",
-      icon: APPROVAL_ICONS.pending.icon,
-      className:
-        "border-amber-500/30 bg-amber-500/10 text-amber-700 [[data-theme=dark]_&]:text-amber-300",
-    };
-  }
-  if (event.toolState === "approval-responded") {
-    return {
-      label: "Approval answered",
-      icon: APPROVAL_ICONS.question.icon,
-      className:
-        "border-sky-500/30 bg-sky-500/10 text-sky-700 [[data-theme=dark]_&]:text-sky-300",
-    };
-  }
-  return null;
-}
-
-function ApprovalBadge({ event }: { event: SessionEvent }) {
-  const status = approvalStatus(event);
-  if (!status) return null;
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium",
-        status.className,
-      )}
-    >
-      <Icon icon={status.icon} className="size-3" />
-      {status.label}
-    </span>
-  );
-}
-
-function formatEventTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function formatEventRange(start: string | undefined, end: string | undefined) {
-  if (!start) return end ? formatEventTime(end) : undefined;
-  if (!end || end === start) return formatEventTime(start);
-  return `${formatEventTime(start)} – ${formatEventTime(end)}`;
-}
-
-function RawEventBlock({ raw, align = "left" }: { raw: unknown; align?: "left" | "right" }) {
-  const source = rawToSource(raw);
-  return (
-    <details className={cn("mt-1.5 text-left", align === "right" && "ml-auto max-w-full")}>
-      <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
-        Raw
-      </summary>
-      <div className="mt-1">
-        <CodeBlock language="json" source={source} jsonDefaultOpenDepth={1} />
-      </div>
-    </details>
-  );
-}
-
-function rawToSource(raw: unknown) {
-  if (typeof raw === "string") {
-    try {
-      return JSON.stringify(JSON.parse(raw), null, 2);
-    } catch {
-      return raw;
-    }
-  }
-  try {
-    return JSON.stringify(raw, null, 2);
-  } catch {
-    return String(raw);
-  }
 }
 
 interface EventVisual {
@@ -441,12 +292,16 @@ function EventBody({
   event,
   visual,
   defaultExpanded,
+  messageBadge,
   onPendingToolDecision,
 }: {
   event: SessionEvent;
   visual: EventVisual;
   defaultExpanded: boolean;
-  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+  messageBadge?: ReactNode;
+  onPendingToolDecision?:
+  | ((decision: SessionToolDecision) => Promise<void> | void)
+  | undefined;
 }) {
   if (event.kind === "tool")
     return (
@@ -460,68 +315,21 @@ function EventBody({
   if (event.kind === "thinking") return <ThinkingBody event={event} />;
   if (event.kind === "error") return <ErrorBody event={event} />;
   if (event.kind === "system") return <SystemBody event={event} />;
-  return <MessageBody event={event} />;
+  return <MessageBody event={event} badge={messageBadge} />;
 }
 
-function ToolBody({
+function MessageBody({
   event,
-  visual,
-  defaultExpanded,
-  onPendingToolDecision,
+  badge,
 }: {
   event: SessionEvent;
-  visual: EventVisual;
-  defaultExpanded: boolean;
-  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+  badge?: ReactNode;
 }) {
-  const summary = summarizeToolInput(
-    event.tool ?? "",
-    event.toolInput,
-    event.cwd,
-  );
-  const command = shellCommand(event.tool ?? "", event.toolInput);
-  const [open, setOpen] = useState(defaultExpanded);
+  return (
+    <div className="flex items-start gap-1.5">
 
-  if (event.tool === "AskUserQuestion") {
-    return <QuestionToolBody event={event} visual={visual} onDecision={onPendingToolDecision} />;
-  }
-
-  // Shell rows inline the full command as a bash block — no "Run command"
-  // label, no tool-input JSON. Only the response stays behind the chevron.
-  if (command !== undefined) {
-    return (
-      <div className="not-prose">
-        <div className="flex items-start gap-1.5">
-          <div className="min-w-0 flex-1">
-            <CodeBlock bare language="bash" source={command} />
-          </div>
-          <ApprovalBadge event={event} />
-          {event.toolResponse !== undefined && (
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-label="Toggle response"
-              onClick={() => setOpen((value) => !value)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Icon
-                icon={UiChevronDown}
-                className={cn(
-                  "size-3 shrink-0 transition-transform",
-                  open && "rotate-180",
-                )}
-              />
-            </button>
-          )}
-        </div>
-        {open && event.toolResponse !== undefined && (
-          <div className="mt-1.5">
-            <ResponseBlock response={event.toolResponse} />
-          </div>
-        )}
-        {event.pending && onPendingToolDecision && (
-          <PendingDecisionControls event={event} onDecision={onPendingToolDecision} />
-        )}
+      <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
+        {event.text && <Markdown text={event.text} />}
       </div>
     );
   }
@@ -903,12 +711,15 @@ function SystemBody({ event }: { event: SessionEvent }) {
         <span className="min-w-0 flex-1 truncate">{preview}</span>
         <Icon
           icon={UiChevronDown}
-          className={cn("mt-0.5 size-3 shrink-0 transition-transform", open && "rotate-180")}
+          className={cn(
+            "mt-0.5 size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
         />
       </button>
       {open && (
-        <div className="mt-1.5 whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 px-density-3 py-density-2 leading-relaxed">
-          {event.text}
+        <div className="mt-1.5 whitespace-pre-wrap break-words  bg-muted/20 px-density-3 py-density-2 leading-relaxed">
+          {event.text && <Markdown text={event.text} />}
         </div>
       )}
     </div>

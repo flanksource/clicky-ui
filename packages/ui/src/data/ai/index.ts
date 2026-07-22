@@ -99,15 +99,20 @@ export {
 } from "./SpecRuntimeEditor.model";
 export {
   PromptPickerField,
+  PromptSourceRepair,
   SpecEditorDialog,
+  isValidPromptSpecDetail,
   promptPreviewText,
   promptRuntimeValueToPayload,
   specToPromptRuntimeValue,
+  type InvalidPromptSpecDetail,
   type PromptPickerFieldProps,
   type PromptPickerValue,
+  type PromptSourceRepairProps,
   type PromptSpecDetail,
   type PromptSpecSavePayload,
   type SpecEditorDialogProps,
+  type ValidPromptSpecDetail,
 } from "./PromptPicker";
 export { PromptRunEditor, type PromptRunEditorProps } from "./PromptRunEditor";
 export {
@@ -139,6 +144,7 @@ export {
   type ContextMeterCost,
   type ContextMeterBudget,
 } from "../chat/ContextMeter";
+export { SessionContextMeter } from "./SessionViewer.header";
 
 export {
   serializeContext,
@@ -165,6 +171,18 @@ export {
   type SessionInspectorProps,
   type SessionInspectorTab,
 } from "./SessionInspector";
+export {
+  SessionChatComposer,
+  type SessionChatCapabilities,
+  type SessionChatComposerProps,
+  type SessionChatQueuedMessage,
+} from "./SessionChatComposer";
+export type {
+  SessionCollectionInput,
+  SessionCollectionItem,
+  SessionCollectionSummary,
+  SessionInspectorInput,
+} from "./SessionInspector.collection";
 export {
   compactTokens,
   costTotal,
@@ -222,6 +240,14 @@ export {
   type SessionUsage,
   type UnifiedSessionInput,
 } from "./SessionViewer.unified";
+export {
+  CLAUDE_COMPLETE_SESSION,
+  CLAUDE_SESSION_EXAMPLE,
+  CODEX_COMPLETE_SESSION,
+  CODEX_SESSION_EXAMPLE,
+  COMPLETE_EXAMPLE_SESSIONS,
+  EXAMPLE_SESSIONS,
+} from "./examples/sessions";
 export {
   questionsFromToolInput,
   summarizeToolInput,

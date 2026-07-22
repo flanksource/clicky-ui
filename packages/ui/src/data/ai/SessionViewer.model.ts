@@ -101,7 +101,11 @@ export interface SessionEntry {
  * `GET /api/captain/sessions/{id}` serves), a legacy `SessionEntry[]` log, or
  * raw log text (JSON array or JSONL).
  */
-export type SessionInput = string | SessionEntry[] | SessionUIMessage[] | UnifiedSessionInput;
+export type SessionInput =
+  | string
+  | SessionEntry[]
+  | SessionUIMessage[]
+  | UnifiedSessionInput;
 
 export interface SessionMetadataSummary {
   turns?: SessionTurn[];
@@ -113,6 +117,8 @@ export interface SessionMetadataSummary {
   model?: string;
   /** Provider id, used to resolve the model's brand glyph. */
   provider?: string;
+  /** Session reasoning effort, for the context meter's hover popover. */
+  reasoningEffort?: string;
   /** Aggregate token usage, for the context meter's hover popover. */
   usage?: SessionUsage;
   /** Aggregate cost breakdown, for the context meter's hover popover. */
@@ -124,7 +130,13 @@ export interface SessionMetadataSummary {
 // content blocks. normalizeSession flattens both shapes into a single ordered
 // list the viewer can render row-by-row.
 
-export type SessionEventKind = "system" | "user" | "assistant" | "thinking" | "tool" | "error";
+export type SessionEventKind =
+  | "system"
+  | "user"
+  | "assistant"
+  | "thinking"
+  | "tool"
+  | "error";
 
 export interface SessionEvent {
   id: string;
@@ -169,7 +181,9 @@ function parseEntries(input: string | SessionEntry[]): SessionEntry[] {
   if (!text) return [];
   try {
     const parsed: unknown = JSON.parse(text);
-    return Array.isArray(parsed) ? (parsed as SessionEntry[]) : [parsed as SessionEntry];
+    return Array.isArray(parsed)
+      ? (parsed as SessionEntry[])
+      : [parsed as SessionEntry];
   } catch {
     // not a single JSON document — treat as JSONL below
   }
@@ -181,13 +195,17 @@ function parseEntries(input: string | SessionEntry[]): SessionEntry[] {
       try {
         return JSON.parse(line) as SessionEntry;
       } catch {
-        throw new Error(`SessionViewer: invalid session JSON line: ${truncate(line, 80)}`);
+        throw new Error(
+          `SessionViewer: invalid session JSON line: ${truncate(line, 80)}`,
+        );
       }
     });
 }
 
 function roleFromType(type: string | undefined): string {
-  return type === "system" || type === "user" || type === "assistant" ? type : "assistant";
+  return type === "system" || type === "user" || type === "assistant"
+    ? type
+    : "assistant";
 }
 
 function toolEvent(
@@ -251,12 +269,15 @@ function blockEvent(
   }
   if (block.type === "thinking" || block.thinking) {
     const text = block.thinking ?? block.text;
-    return text ? { id, kind: "thinking", text, ...(timestamp ? { timestamp } : {}) } : null;
+    return text
+      ? { id, kind: "thinking", text, ...(timestamp ? { timestamp } : {}) }
+      : null;
   }
   if (block.text) {
     return {
       id,
-      kind: role === "system" ? "system" : role === "user" ? "user" : "assistant",
+      kind:
+        role === "system" ? "system" : role === "user" ? "user" : "assistant",
       text: block.text,
       ...(timestamp ? { timestamp } : {}),
     };
@@ -295,29 +316,46 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
     if (tu?.tool) {
       const cwd = tu.cwd ?? entry.cwd;
       events.push(
-        toolEvent(`${baseId}-tool`, tu.tool, tu.input, tu.response, tu.timestamp ?? entry.timestamp, {
-          ...(tu.model ? { model: tu.model } : {}),
-          ...(tu.reasoning_effort ? { reasoningEffort: tu.reasoning_effort } : {}),
-          ...(tu.source ? { source: tu.source } : {}),
-          ...(cwd ? { cwd } : {}),
-          ...(tu.tool_use_id ? { toolCallId: tu.tool_use_id } : {}),
-          ...(tu.session_id ? { sessionId: tu.session_id } : {}),
-          raw: entry,
-        }),
+        toolEvent(
+          `${baseId}-tool`,
+          tu.tool,
+          tu.input,
+          tu.response,
+          tu.timestamp ?? entry.timestamp,
+          {
+            ...(tu.model ? { model: tu.model } : {}),
+            ...(tu.reasoning_effort
+              ? { reasoningEffort: tu.reasoning_effort }
+              : {}),
+            ...(tu.source ? { source: tu.source } : {}),
+            ...(cwd ? { cwd } : {}),
+            ...(tu.tool_use_id ? { toolCallId: tu.tool_use_id } : {}),
+            ...(tu.session_id ? { sessionId: tu.session_id } : {}),
+            raw: entry,
+          },
+        ),
       );
       return;
     }
 
     const role = roleFromType(entry.message?.role ?? entry.type);
     for (const [i, block] of (entry.message?.content ?? []).entries()) {
-      const ev = blockEvent(block, role, `${baseId}-${i}`, entry.timestamp, entry.cwd);
+      const ev = blockEvent(
+        block,
+        role,
+        `${baseId}-${i}`,
+        entry.timestamp,
+        entry.cwd,
+      );
       if (ev) events.push(ev);
     }
   });
   return events;
 }
 
-export function getSessionMetadata(input: SessionInput): SessionMetadataSummary | undefined {
+export function getSessionMetadata(
+  input: SessionInput,
+): SessionMetadataSummary | undefined {
   if (!looksLikeUnifiedSession(input)) return undefined;
   const metadata: SessionMetadataSummary = {
     ...(input.turns ? { turns: input.turns } : {}),
@@ -327,6 +365,9 @@ export function getSessionMetadata(input: SessionInput): SessionMetadataSummary 
     ...(input.events ? { events: input.events } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.provider ? { provider: input.provider } : {}),
+    ...(input.reasoningEffort
+      ? { reasoningEffort: input.reasoningEffort }
+      : {}),
     ...(input.usage ? { usage: input.usage } : {}),
     ...(input.cost ? { cost: input.cost } : {}),
   };
@@ -345,12 +386,20 @@ function errorMessage(entry: SessionEntry): string {
 
 /** A unified message array is told apart from a SessionEntry log by its
  *  per-message `parts` array (a SessionEntry carries `message`/`tool_use`). */
-function looksLikeUnifiedMessages(arr: SessionEntry[] | SessionUIMessage[]): arr is SessionUIMessage[] {
+function looksLikeUnifiedMessages(
+  arr: SessionEntry[] | SessionUIMessage[],
+): arr is SessionUIMessage[] {
   const first: unknown = arr[0];
-  return typeof first === "object" && first !== null && Array.isArray((first as SessionUIMessage).parts);
+  return (
+    typeof first === "object" &&
+    first !== null &&
+    Array.isArray((first as SessionUIMessage).parts)
+  );
 }
 
-function looksLikeUnifiedSession(input: SessionInput): input is UnifiedSessionInput {
+function looksLikeUnifiedSession(
+  input: SessionInput,
+): input is UnifiedSessionInput {
   return (
     typeof input === "object" &&
     input !== null &&
@@ -364,7 +413,10 @@ function looksLikeUnifiedSession(input: SessionInput): input is UnifiedSessionIn
 }
 
 function isUnifiedToolPart(part: SessionUIPart): boolean {
-  return Boolean(part.toolName) && (part.type === "dynamic-tool" || part.type.startsWith("tool-"));
+  return (
+    Boolean(part.toolName) &&
+    (part.type === "dynamic-tool" || part.type.startsWith("tool-"))
+  );
 }
 
 /** Render a tool part's already-parsed JSON output as text. */
@@ -397,21 +449,30 @@ function partEvent(
 ): SessionEvent | null {
   if (isUnifiedToolPart(part)) {
     const pending = pendingFromPart(part);
-    return toolEvent(id, part.toolName as string, asRecord(part.input), outputToText(part.output), meta.timestamp, {
-      ...(meta.model ? { model: meta.model } : {}),
-      ...(meta.reasoningEffort ? { reasoningEffort: meta.reasoningEffort } : {}),
-      ...(meta.source ? { source: meta.source } : {}),
-      ...(meta.cwd ? { cwd: meta.cwd } : {}),
-      ...(meta.turnId ? { turnId: meta.turnId } : {}),
-      ...(meta.agentId ? { agentId: meta.agentId } : {}),
-      ...(meta.sessionId ? { sessionId: meta.sessionId } : {}),
-      ...(part.state ? { toolState: part.state } : {}),
-      ...(part.approval ? { approval: part.approval } : {}),
-      pending,
-      ...(part.toolCallId ? { toolCallId: part.toolCallId } : {}),
-      ...(part.approval?.id ? { approvalId: part.approval.id } : {}),
-      ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
-    });
+    return toolEvent(
+      id,
+      part.toolName as string,
+      asRecord(part.input),
+      outputToText(part.output),
+      meta.timestamp,
+      {
+        ...(meta.model ? { model: meta.model } : {}),
+        ...(meta.reasoningEffort
+          ? { reasoningEffort: meta.reasoningEffort }
+          : {}),
+        ...(meta.source ? { source: meta.source } : {}),
+        ...(meta.cwd ? { cwd: meta.cwd } : {}),
+        ...(meta.turnId ? { turnId: meta.turnId } : {}),
+        ...(meta.agentId ? { agentId: meta.agentId } : {}),
+        ...(meta.sessionId ? { sessionId: meta.sessionId } : {}),
+        ...(part.state ? { toolState: part.state } : {}),
+        ...(part.approval ? { approval: part.approval } : {}),
+        pending,
+        ...(part.toolCallId ? { toolCallId: part.toolCallId } : {}),
+        ...(part.approval?.id ? { approvalId: part.approval.id } : {}),
+        ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+      },
+    );
   }
   if (part.type === "reasoning") {
     return part.text
@@ -444,12 +505,23 @@ function partEvent(
 
 function pendingFromPart(part: SessionUIPart): boolean {
   if (part.approval?.approved !== undefined) return false;
-  if (["approval-responded", "output-available", "output-denied"].includes(part.state ?? "")) return false;
-  return part.pending === true || part.approval?.pending === true || part.state === "approval-requested";
+  if (
+    ["approval-responded", "output-available", "output-denied"].includes(
+      part.state ?? "",
+    )
+  )
+    return false;
+  return (
+    part.pending === true ||
+    part.approval?.pending === true ||
+    part.state === "approval-requested"
+  );
 }
 
 /** Flatten unified session messages into ordered SessionEvent rows. */
-export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] {
+export function normalizeMessages(
+  messages: SessionUIMessage[],
+): SessionEvent[] {
   const events: SessionEvent[] = [];
   messages.forEach((msg, seq) => {
     const prov = msg.provenance;
@@ -468,12 +540,18 @@ export function normalizeMessages(messages: SessionUIMessage[]): SessionEvent[] 
       return;
     }
     const role: "system" | "user" | "assistant" =
-      msg.role === "system" ? "system" : msg.role === "user" ? "user" : "assistant";
+      msg.role === "system"
+        ? "system"
+        : msg.role === "user"
+          ? "user"
+          : "assistant";
     const meta = {
       ...(prov?.timestamp ? { timestamp: prov.timestamp } : {}),
       ...(prov?.cwd ? { cwd: prov.cwd } : {}),
       ...(prov?.model ? { model: prov.model } : {}),
-      ...(prov?.reasoningEffort ? { reasoningEffort: prov.reasoningEffort } : {}),
+      ...(prov?.reasoningEffort
+        ? { reasoningEffort: prov.reasoningEffort }
+        : {}),
       ...(prov?.source ? { source: prov.source } : {}),
       ...(msg.turnId ? { turnId: msg.turnId } : {}),
       ...(prov?.agentId ? { agentId: prov.agentId } : {}),
@@ -523,10 +601,30 @@ const ACTIONS: Record<string, SessionActionMeta> = {
   // design's file-text / file-plus glyphs — they read better in a scrolling log
   // and write-type rows also carry a +/- diff stat.
   Read: { icon: UiEye, tone: "sky", label: "Read file", summaryOnly: true },
-  Write: { icon: UiDiff, tone: "amber", label: "Write file", summaryOnly: true },
-  Edit: { icon: UiPencilSimpleLine, tone: "violet", label: "Edit file", summaryOnly: true },
-  MultiEdit: { icon: UiStack, tone: "violet", label: "Multi-edit", summaryOnly: true },
-  NotebookEdit: { icon: UiPencilSimpleLine, tone: "violet", label: "Edit notebook", summaryOnly: true },
+  Write: {
+    icon: UiDiff,
+    tone: "amber",
+    label: "Write file",
+    summaryOnly: true,
+  },
+  Edit: {
+    icon: UiPencilSimpleLine,
+    tone: "violet",
+    label: "Edit file",
+    summaryOnly: true,
+  },
+  MultiEdit: {
+    icon: UiStack,
+    tone: "violet",
+    label: "Multi-edit",
+    summaryOnly: true,
+  },
+  NotebookEdit: {
+    icon: UiPencilSimpleLine,
+    tone: "violet",
+    label: "Edit notebook",
+    summaryOnly: true,
+  },
   // Search & navigation
   Grep: { icon: UiSearch, tone: "amber", label: "Grep" },
   Glob: { icon: UiAsterisk, tone: "sky", label: "Glob" },
@@ -555,16 +653,32 @@ const ACTIONS: Record<string, SessionActionMeta> = {
   WebFetch: { icon: UiCloudDownload, tone: "sky", label: "Fetch URL" },
   WebSearch: { icon: UiGlobe, tone: "sky", label: "Web search" },
   browser_navigate: { icon: UiCompass, tone: "sky", label: "Navigate" },
-  browser_navigate_back: { icon: UiCompass, tone: "sky", label: "Navigate back" },
+  browser_navigate_back: {
+    icon: UiCompass,
+    tone: "sky",
+    label: "Navigate back",
+  },
   browser_click: { icon: UiCursorClick, tone: "sky", label: "Click" },
-  browser_triple_click: { icon: UiCursorText, tone: "sky", label: "Triple click" },
+  browser_triple_click: {
+    icon: UiCursorText,
+    tone: "sky",
+    label: "Triple click",
+  },
   browser_type: { icon: UiKeyboard, tone: "emerald", label: "Type text" },
   browser_press_key: { icon: UiCommand, tone: "amber", label: "Press key" },
   browser_snapshot: { icon: UiScan, tone: "violet", label: "Snapshot" },
-  browser_take_screenshot: { icon: UiCamera, tone: "indigo", label: "Screenshot" },
+  browser_take_screenshot: {
+    icon: UiCamera,
+    tone: "indigo",
+    label: "Screenshot",
+  },
   browser_evaluate: { icon: UiCode2, tone: "violet", label: "Evaluate JS" },
   browser_console_messages: { icon: UiScroll, tone: "slate", label: "Console" },
-  browser_network_requests: { icon: UiShare, tone: "emerald", label: "Network" },
+  browser_network_requests: {
+    icon: UiShare,
+    tone: "emerald",
+    label: "Network",
+  },
   browser_wait_for: { icon: UiHourglass, tone: "amber", label: "Wait" },
   Wait: { icon: UiHourglass, tone: "amber", label: "Wait" },
   browser_close: { icon: UiClose, tone: "rose", label: "Close browser" },
@@ -573,7 +687,12 @@ const ACTIONS: Record<string, SessionActionMeta> = {
 // MCP tools surface as `mcp__<server>__<name>` or `<server>__<name>`. Icon
 // servers get a distinct accent (palette); generative servers reuse the sparkle;
 // the rest fall back to the puzzle piece.
-const MCP_ICON_SERVERS = new Set(["iconify", "icons8", "lucide", "react-icons"]);
+const MCP_ICON_SERVERS = new Set([
+  "iconify",
+  "icons8",
+  "lucide",
+  "react-icons",
+]);
 const MCP_GEN_SERVERS = new Set(["gemini", "openai", "anthropic"]);
 
 interface McpTool {
@@ -596,8 +715,10 @@ export function getSessionAction(tool: string): SessionActionMeta {
   const mcp = splitMcpTool(tool);
   if (mcp) {
     const label = `${mcp.server}: ${mcp.name.replace(/_/g, " ")}`;
-    if (MCP_ICON_SERVERS.has(mcp.server)) return { icon: UiPalette, tone: "pink", label };
-    if (MCP_GEN_SERVERS.has(mcp.server)) return { icon: UiSparkles, tone: "violet", label };
+    if (MCP_ICON_SERVERS.has(mcp.server))
+      return { icon: UiPalette, tone: "pink", label };
+    if (MCP_GEN_SERVERS.has(mcp.server))
+      return { icon: UiSparkles, tone: "violet", label };
     return { icon: UiPuzzle, tone: "violet", label };
   }
 
@@ -615,10 +736,15 @@ export function summarizeSession(events: SessionEvent[]): {
   const modelCounts = new Map<string, number>();
   for (const event of events) {
     if (event.kind === "tool") toolCount += 1;
-    if (event.kind === "system" || event.kind === "user" || event.kind === "assistant") {
+    if (
+      event.kind === "system" ||
+      event.kind === "user" ||
+      event.kind === "assistant"
+    ) {
       messageCount += 1;
     }
-    if (event.model) modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
+    if (event.model)
+      modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
   }
   let model: string | undefined;
   let best = 0;

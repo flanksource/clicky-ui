@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/button";
 import { JsonSchemaForm } from "../../../components/JsonSchemaForm";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
@@ -7,7 +7,16 @@ import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
 import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
+import {
+  AttachmentButton,
+  AttachmentList,
+  createAttachmentUploadAdapter,
+  type AttachmentFilePart,
+  type AttachmentLimits,
+  type AttachmentUploadAdapter,
+} from "../../chat/Attachment";
 import type { ChatModel, ToolMeta } from "../../chat/types";
+import type { FileUIPart } from "../../chat/types";
 import {
   effortOptionsForModel,
   reconcileModelCapabilities,
@@ -65,6 +74,9 @@ export type PromptRunEditorProps = {
   promptEditor?: ReactNode | undefined;
   promptLabel?: string | undefined;
   promptPlaceholder?: string | undefined;
+  enableAttachments?: boolean | undefined;
+  attachmentUpload?: AttachmentUploadAdapter | undefined;
+  attachmentLimits?: AttachmentLimits | undefined;
 
   /** Extra fields injected inside the Runtime block, below Model/Effort. */
   children?: ReactNode | undefined;
@@ -102,6 +114,9 @@ export function PromptRunEditor({
   promptEditor,
   promptLabel = "User prompt",
   promptPlaceholder = "Override the rendered user prompt",
+  enableAttachments = false,
+  attachmentUpload,
+  attachmentLimits,
   children,
   header,
   footer,
@@ -119,6 +134,25 @@ export function PromptRunEditor({
   // selection is unknown (a family alias or a not-yet-loaded catalog).
   const modelEfforts = effortOptionsForModel(selectedModel, reasoningEfforts);
   const showEffort = modelEfforts.length > 0;
+  const resolvedAttachmentUpload = useMemo(
+    () => attachmentUpload ?? createAttachmentUploadAdapter(),
+    [attachmentUpload],
+  );
+  const attachmentFiles: FileUIPart[] = (value.prompt?.attachments ?? []).map(
+    (attachment) => ({
+      type: "file",
+      url: attachment.id
+        ? `/api/attachments/${attachment.id}`
+        : (attachment.url ?? ""),
+      mediaType: attachment.mediaType ?? "application/octet-stream",
+      ...(attachment.id ? { attachmentId: attachment.id } : {}),
+      ...(attachment.size != null ? { size: attachment.size } : {}),
+      ...(attachment.filename ? { filename: attachment.filename } : {}),
+      ...(!attachment.filename && attachment.path
+        ? { filename: attachment.path }
+        : {}),
+    }),
+  ) as FileUIPart[];
 
   return (
     <div className={cn("grid gap-density-4", className)}>
@@ -221,6 +255,50 @@ export function PromptRunEditor({
             aria-label={promptLabel}
             className="min-h-[7rem] w-full resize-y rounded-md border border-border bg-background px-density-2 py-density-1 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
+        )}
+        {enableAttachments && (
+          <div className="space-y-density-2">
+            <AttachmentList
+              files={attachmentFiles}
+              onRemove={(index) =>
+                onChange(
+                  withPrompt(value, {
+                    attachments: (value.prompt?.attachments ?? []).filter(
+                      (_, itemIndex) => itemIndex !== index,
+                    ),
+                  }),
+                )
+              }
+            />
+            <AttachmentButton
+              files={attachmentFiles}
+              upload={resolvedAttachmentUpload}
+              onAdd={(parts) =>
+                onChange(
+                  withPrompt(value, {
+                    attachments: [
+                      ...(value.prompt?.attachments ?? []),
+                      ...parts.map((part) => {
+                        const uploaded = part as AttachmentFilePart;
+                        return {
+                          id: uploaded.attachmentId,
+                          mediaType: uploaded.mediaType,
+                          size: uploaded.size,
+                          ...(uploaded.filename
+                            ? { filename: uploaded.filename }
+                            : {}),
+                        };
+                      }),
+                    ],
+                  }),
+                )
+              }
+              {...(selectedModel?.inputMediaTypes
+                ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
+                : {})}
+              {...(attachmentLimits ? { limits: attachmentLimits } : {})}
+            />
+          </div>
         )}
       </Block>
 

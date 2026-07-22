@@ -3,80 +3,42 @@ import {
   useEffect,
   useState,
   type ComponentType,
-  type ReactNode,
 } from "react";
 import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Icon } from "../Icon";
 import { UiAdd, UiClose, UiFullscreen } from "../../icons";
-import { Chat, type ChatProps } from "../chat/Chat";
+import { Chat } from "../chat/Chat";
 import type {
   ChatBudgetConfig,
   ChatModel,
   ChatUsageSummary,
   ClaudePermissionMode,
 } from "../chat/types";
-import {
-  useChatWindowManager,
-  type ChatWindowState,
-} from "./chat-window-context";
-import { ThreadPicker, type ThreadSource } from "./ThreadPicker";
+import { useChatWindowManager } from "./chat-window-context";
+import { ThreadPicker } from "./ThreadPicker";
 import { ContextBadges } from "./ContextBadges";
 import {
   ToolPreferences,
   type ToolMeta,
   type ToolMode,
 } from "./ToolPreferences";
-import type { ChatContextItem, ContextTypeConfig } from "./context";
+import type { ChatContextItem } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
+import { selectConfiguredChatModel } from "./ChatWindow.models";
+import {
+  loadChatPreferences,
+  saveChatPreferences,
+  type StoredChatPreferences,
+} from "./ChatWindow.preferences";
+import { normalizeToolCatalog } from "./ChatWindow.tool-catalog";
+import type { ChatWindowProps } from "./ChatWindow.types";
+export type {
+  ChatContextPickerRenderProps,
+  ChatWindowProps,
+} from "./ChatWindow.types";
 
-export type ChatWindowProps = {
-  panel: ChatWindowState;
-  /** Props forwarded to the inner <Chat>. The window manages `threadId` and
-   *  merges attached context / tool preferences into `body` on top of these. */
-  chat?: Partial<ChatProps>;
-  /** Header title shown when the thread picker is disabled. */
-  title?: ReactNode;
-  /** Thread switcher endpoint, or null to hide the picker. Defaults to
-   *  "/api/chat/threads". Ignored when `threadsSource` is set. */
-  threadsApi?: string | null;
-  /** Inject the thread list/delete directly instead of fetching `threadsApi`
-   *  (e.g. an app that loads conversations via its own client). Shows the
-   *  picker regardless of `threadsApi`. */
-  threadsSource?: ThreadSource;
-  /** Maps context item `type` to an icon/colour for the badge row. */
-  contextTypeConfig?: ContextTypeConfig;
-  /** When provided, a tool-preferences popover is shown and forwarded as
-   *  `body.toolPreferences`. Tools default to "ask" (approval required); the
-   *  user can switch any tool to On/Auto/Off from the popover. */
-  tools?: ToolMeta[];
-  /** Initial mode assigned to tools when they first load. Defaults to "ask". */
-  defaultToolMode?: ToolMode;
-  /** Backend tool catalog endpoint. Defaults to "/api/chat/tools"; null disables fetching. */
-  toolsApi?: string | null;
-  /** Extra controls rendered in the header, e.g. a <ContextMeter mode="gauge"/> gauge. */
-  headerExtras?: ReactNode;
-  /** Optional app-owned entity/document picker rendered beside context badges. */
-  renderContextPicker?: (props: ChatContextPickerRenderProps) => ReactNode;
-};
-
-export type ChatContextPickerRenderProps = {
-  items: ChatContextItem[];
-  onAdd: (item: ChatContextItem) => void;
-  onAddMany: (items: ChatContextItem[]) => void;
-};
-
-type StoredChatPreferences = {
-  model?: string;
-  reasoningEffort?: string;
-  temperature?: number;
-  budget?: ChatBudgetConfig;
-  permissionMode?: ClaudePermissionMode;
-  toolPrefs?: Record<string, ToolMode>;
-};
-
-const CHAT_PREFS_STORAGE_KEY = "clicky-ui.chat-window.preferences";
 const EMPTY_TOOLS: ToolMeta[] = [];
 
 const MAXIMIZE_CSS = `
@@ -214,10 +176,7 @@ export function ChatWindow({
       .then((data: ChatModel[]) => {
         if (!active) return;
         setFetchedModels(data);
-        setModel(
-          (current) =>
-            current ?? data.find((item) => item.configured !== false)?.id,
-        );
+        setModel((current) => selectConfiguredChatModel(current, data));
       })
       .catch((err) =>
         console.warn("clicky-ui: failed to load chat models", err),
@@ -507,160 +466,6 @@ export function ChatWindow({
       </Rnd>
     </div>
   );
-}
-
-function loadChatPreferences(): StoredChatPreferences {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(CHAT_PREFS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as StoredChatPreferences;
-    if (!parsed || typeof parsed !== "object") return {};
-    const { toolPrefs: rawToolPrefs, ...rest } = parsed;
-    const toolPrefs = normalizeToolPreferences(rawToolPrefs);
-    return {
-      ...rest,
-      ...(toolPrefs ? { toolPrefs } : {}),
-    };
-  } catch {
-    return {};
-  }
-}
-
-function saveChatPreferences(prefs: StoredChatPreferences) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(CHAT_PREFS_STORAGE_KEY, JSON.stringify(prefs));
-  } catch {
-    // Ignore storage quota/privacy failures; chat stays functional.
-  }
-}
-
-function normalizeToolCatalog(data: unknown): ToolMeta[] {
-  const tools = Array.isArray(data)
-    ? data
-    : data &&
-        typeof data === "object" &&
-        Array.isArray((data as { tools?: unknown }).tools)
-      ? (data as { tools: unknown[] }).tools
-      : [];
-  return tools.flatMap((tool) => normalizeToolMeta(tool));
-}
-
-function normalizeToolMeta(tool: unknown): ToolMeta[] {
-  if (!tool || typeof tool !== "object") return [];
-  const item = tool as Record<string, unknown>;
-  const name = stringValue(item.name);
-  if (!name) return [];
-  const label =
-    stringValue(item.label) ??
-    stringValue(item.title) ??
-    stringValue(item.operationName) ??
-    name;
-  const defaultPermission = normalizeToolModeValue(
-    item.defaultPermission ?? item.defaultMode,
-  );
-  const group = stringValue(item.group);
-  const parent = stringValue(item.parent);
-  const entity = stringValue(item.entity);
-  const preferenceKey = stringValue(item.preferenceKey);
-  const icon = stringValue(item.icon);
-  const description = stringValue(item.description);
-  const hints = stringArrayValue(item.hints);
-  const source = stringValue(item.source);
-  const server = stringValue(item.server);
-  const method = stringValue(item.method);
-  const path = stringValue(item.path);
-  const operationName = stringValue(item.operationName);
-  const title = stringValue(item.title);
-  const strict = booleanValue(item.strict);
-  const annotations = annotationsValue(item.annotations);
-  const inputSchema = schemaValue(item.inputSchema);
-  const outputSchema = schemaValue(item.outputSchema);
-  return [
-    {
-      name,
-      label,
-      ...(group ? { group } : {}),
-      ...(parent ? { parent } : {}),
-      ...(entity ? { entity } : {}),
-      ...(preferenceKey ? { preferenceKey } : {}),
-      ...(defaultPermission ? { defaultPermission } : {}),
-      ...(icon ? { icon } : {}),
-      ...(description ? { description } : {}),
-      ...(hints ? { hints } : {}),
-      ...(source ? { source } : {}),
-      ...(server ? { server } : {}),
-      ...(method ? { method } : {}),
-      ...(path ? { path } : {}),
-      ...(operationName ? { operationName } : {}),
-      ...(title ? { title } : {}),
-      ...(strict !== undefined ? { strict } : {}),
-      ...(annotations ? { annotations } : {}),
-      ...(inputSchema ? { inputSchema } : {}),
-      ...(outputSchema ? { outputSchema } : {}),
-    },
-  ];
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
-
-function stringArrayValue(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const values = value.filter(
-    (item): item is string =>
-      typeof item === "string" && item.trim().length > 0,
-  );
-  return values.length > 0 ? values : undefined;
-}
-
-function schemaValue(value: unknown): ToolMeta["inputSchema"] | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return undefined;
-  return value as ToolMeta["inputSchema"];
-}
-
-function booleanValue(value: unknown): boolean | undefined {
-  return typeof value === "boolean" ? value : undefined;
-}
-
-function annotationsValue(value: unknown): ToolMeta["annotations"] | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return undefined;
-  return value as ToolMeta["annotations"];
-}
-
-function normalizeToolPreferences(
-  value: unknown,
-): Record<string, ToolMode> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return undefined;
-  const prefs: Record<string, ToolMode> = {};
-  for (const [key, rawMode] of Object.entries(value)) {
-    const mode = normalizeToolModeValue(rawMode);
-    if (key && mode) prefs[key] = mode;
-  }
-  return Object.keys(prefs).length ? prefs : undefined;
-}
-
-function normalizeToolModeValue(value: unknown): ToolMode | undefined {
-  if (typeof value !== "string") return undefined;
-  switch (value.trim().toLowerCase()) {
-    case "on":
-    case "enabled":
-      return "on";
-    case "ask":
-      return "ask";
-    case "off":
-    case "disabled":
-      return "off";
-    case "auto":
-      return "auto";
-    default:
-      return undefined;
-  }
 }
 
 /** Renders every open window for the current {@link useChatWindowManager}.

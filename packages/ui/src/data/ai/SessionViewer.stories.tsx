@@ -280,9 +280,23 @@ export const DarkThemed: Story = {
   args: {
     session: SAMPLE_SESSION,
     defaultTheme: "dark",
-    className: "max-w-2xl rounded-md bg-background p-4",
+    className: "max-w-2xl rounded-md p-4",
   },
   render: (args) => <SessionViewer {...args} />,
+  play: async ({ canvasElement }) => {
+    const viewer = canvasElement.querySelector(
+      '[data-theme="dark"]',
+    ) as HTMLElement;
+    await expect(getComputedStyle(viewer).backgroundColor).toBe(
+      "rgb(17, 24, 39)",
+    );
+    const assistantMessage = viewer.querySelector(
+      '[data-event-kind="assistant"] .text-foreground',
+    ) as HTMLElement;
+    await expect(getComputedStyle(assistantMessage).color).toBe(
+      "rgb(249, 250, 251)",
+    );
+  },
 };
 
 export const MenuFiltersAndAlignment: Story = {
