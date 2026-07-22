@@ -1,20 +1,24 @@
 // Orders surface — Inventory group. Showcases a monospace order number that
 // links to the detail page, status text, a priority badge, a monospace total,
 // channel tag chips, and a placed-at timestamp, with search + status enum +
-// channel filter + a placed time-range + limit.
+// channel filter + a placed time-range + limit/offset pagination.
+//
+// Rows are generated from the row index so the fake backend has enough of them
+// to page through and the fixture renders identically on every run.
 
 import {
   badge,
-  clickyDoc,
   detailDoc,
   detailLink,
+  fixtureTimestamp,
   mono,
+  pick,
   status,
-  table,
   tags,
   text,
   type SurfaceFixture,
 } from "./surface-fixture";
+import type { ClickyRow } from "../../data/Clicky";
 
 const PRIORITY_COLOR = {
   high: "#b91c1c",
@@ -35,6 +39,7 @@ const paths: SurfaceFixture["paths"] = {
         { name: "from", in: "query", schema: { type: "string", format: "date-time" }, description: "Placed after", "x-clicky": { role: "time-from" } },
         { name: "to", in: "query", schema: { type: "string", format: "date-time" }, description: "Placed before", "x-clicky": { role: "time-to" } },
         { name: "limit", in: "query", schema: { type: "integer", default: 25 }, description: "Page size", "x-clicky": { role: "limit" } },
+        { name: "offset", in: "query", schema: { type: "integer", default: 0 }, description: "Row offset", "x-clicky": { role: "offset" } },
       ],
       responses: { "200": { description: "OK" } },
       "x-clicky": { surface: "orders", verb: "list", scope: "collection" },
@@ -60,71 +65,85 @@ const paths: SurfaceFixture["paths"] = {
   },
 };
 
-const listResponse = clickyDoc(
-  table(
-    [
-      { name: "number", label: "Order #", sortable: true, shrink: true },
-      { name: "customer", label: "Customer", sortable: true, grow: true },
-      { name: "status", label: "Status", kind: "status", sortable: true, shrink: true },
-      { name: "priority", label: "Priority", shrink: true },
-      { name: "total", label: "Total", align: "right", sortable: true, shrink: true },
-      { name: "channels", label: "Channels", kind: "tags", filterable: true, grow: true },
-      { name: "placed", label: "Placed", kind: "timestamp", sortable: true, shrink: true },
-    ],
-    [
-      {
-        cells: {
-          number: detailLink("ord_1001", "order_get", "ord_1001"),
-          customer: text("Acme Robotics"),
-          status: status("delivered"),
-          priority: badge("priority", "normal", PRIORITY_COLOR.normal),
-          total: mono("1,248.00"),
-          channels: tags({ source: "web", region: "us-east" }),
-          placed: text("2026-05-28T11:02:00Z"),
-        },
-      },
-      {
-        cells: {
-          number: detailLink("ord_1002", "order_get", "ord_1002"),
-          customer: text("Globex Foods"),
-          status: status("shipped"),
-          priority: badge("priority", "high", PRIORITY_COLOR.high),
-          total: mono("18,940.50"),
-          channels: tags({ source: "edi", region: "eu-west" }),
-          placed: text("2026-06-09T08:45:00Z"),
-        },
-      },
-      {
-        cells: {
-          number: detailLink("ord_1003", "order_get", "ord_1003"),
-          customer: text("Initech"),
-          status: status("pending"),
-          priority: badge("priority", "low", PRIORITY_COLOR.low),
-          total: mono("312.75"),
-          channels: tags({ source: "retail", region: "us-west" }),
-          placed: text("2026-06-14T19:20:00Z"),
-        },
-      },
-    ],
-  ),
-);
+const CUSTOMERS = [
+  "Acme Robotics",
+  "Globex Foods",
+  "Initech",
+  "Umbrella Supply",
+  "Soylent Grocers",
+  "Vehement Capital",
+  "Massive Dynamic",
+  "Wayne Industries",
+];
+const STATES = ["delivered", "shipped", "pending", "cancelled"];
+const PRIORITIES = ["normal", "high", "low"] as const;
+const SOURCES = ["web", "edi", "retail", "partner"];
+const REGIONS = ["us-east", "eu-west", "us-west", "ap-south"];
 
-function orderDetail(id: string, customer: string, statusLabel: string, total: string) {
-  return detailDoc([
-    { name: "id", value: text(id) },
-    { name: "customer", value: text(customer) },
-    { name: "status", value: status(statusLabel) },
-    { name: "total", value: mono(total) },
-    { name: "lines", value: text("3 items") },
-    { name: "placed", value: text("2026-06-09T08:45:00Z") },
-  ]);
+const ORDER_COUNT = 120;
+
+type OrderSeed = {
+  id: string;
+  customer: string;
+  state: string;
+  priority: (typeof PRIORITIES)[number];
+  total: string;
+  source: string;
+  region: string;
+  placed: string;
+};
+
+function orderSeed(index: number): OrderSeed {
+  const cents = ((index * 7919) % 2_000_000) + 31_275;
+  return {
+    id: `ord_${1001 + index}`,
+    customer: pick(CUSTOMERS, index),
+    state: pick(STATES, index),
+    priority: pick(PRIORITIES, index),
+    total: (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    source: pick(SOURCES, index),
+    region: pick(REGIONS, index),
+    placed: fixtureTimestamp(index),
+  };
 }
 
-const detailById: Record<string, ReturnType<typeof detailDoc>> = {
-  ord_1001: orderDetail("ord_1001", "Acme Robotics", "delivered", "1,248.00"),
-  ord_1002: orderDetail("ord_1002", "Globex Foods", "shipped", "18,940.50"),
-  ord_1003: orderDetail("ord_1003", "Initech", "pending", "312.75"),
-};
+const SEEDS: OrderSeed[] = Array.from({ length: ORDER_COUNT }, (_, index) => orderSeed(index));
+
+const listColumns = [
+  { name: "number", label: "Order #", sortable: true, shrink: true },
+  { name: "customer", label: "Customer", sortable: true, grow: true },
+  { name: "status", label: "Status", kind: "status" as const, sortable: true, shrink: true },
+  { name: "priority", label: "Priority", shrink: true },
+  { name: "total", label: "Total", align: "right" as const, sortable: true, shrink: true },
+  { name: "channels", label: "Channels", kind: "tags" as const, filterable: true, grow: true },
+  { name: "placed", label: "Placed", kind: "timestamp" as const, sortable: true, shrink: true },
+];
+
+const listRows: ClickyRow[] = SEEDS.map((seed) => ({
+  cells: {
+    number: detailLink(seed.id, "order_get", seed.id),
+    customer: text(seed.customer),
+    status: status(seed.state),
+    priority: badge("priority", seed.priority, PRIORITY_COLOR[seed.priority]),
+    total: mono(seed.total),
+    channels: tags({ source: seed.source, region: seed.region }),
+    placed: text(seed.placed),
+  },
+}));
+
+const detailById: Record<string, ReturnType<typeof detailDoc>> = Object.fromEntries(
+  SEEDS.map((seed) => [
+    seed.id,
+    detailDoc([
+      { name: "id", value: text(seed.id) },
+      { name: "customer", value: text(seed.customer) },
+      { name: "status", value: status(seed.state) },
+      { name: "total", value: mono(seed.total) },
+      { name: "lines", value: text(`${(seed.id.length % 5) + 1} items`) },
+      { name: "placed", value: text(seed.placed) },
+    ]),
+  ]),
+);
 
 export const ORDERS_FIXTURE: SurfaceFixture = {
   surface: {
@@ -135,6 +154,7 @@ export const ORDERS_FIXTURE: SurfaceFixture = {
     description: "Customer orders across every sales channel.",
   },
   paths,
-  listResponse,
+  listColumns,
+  listRows,
   detailById,
 };

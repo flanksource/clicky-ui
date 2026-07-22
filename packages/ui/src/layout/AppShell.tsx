@@ -6,6 +6,7 @@ import { useRouter } from "../rpc/router";
 import type { RenderLink } from "../rpc/EndpointList";
 import { useEscapeLayer } from "../overlay/modalStack";
 import { SplitPane } from "./SplitPane";
+import { AppShellSlotOutlines } from "./AppShell.debug";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
 // owns the brand + collapse toggle and renders grouped nav sections; the top bar
@@ -89,6 +90,13 @@ export type AppShellProps = {
   /** Main content (body-main); fills the remaining space and scrolls. */
   children: ReactNode;
 
+  /**
+   * Outlines every slot in its own colour and labels it with its `data-slot`
+   * name — a layout-debugging aid for working out which region owns a given
+   * area or scrollbar. Uses `outline`, so enabling it does not shift layout.
+   */
+  debugSlots?: boolean;
+
   className?: string;
   headerClassName?: string;
   toolbarClassName?: string;
@@ -126,6 +134,7 @@ export function AppShell(props: AppShellProps) {
     bodySidebar,
     bodySplit = 24,
     children,
+    debugSlots = false,
     className,
     headerClassName,
     toolbarClassName,
@@ -175,9 +184,14 @@ export function AppShell(props: AppShellProps) {
           );
 
   return (
-    <div className={cn("flex h-full min-h-0 w-full bg-background", className)}>
+    <div
+      className={cn("flex h-full min-h-0 w-full bg-background", className)}
+      {...(debugSlots ? { "data-debug-slots": "true" } : {})}
+    >
+      {debugSlots && <AppShellSlotOutlines />}
       {hasSidebar && (
         <aside
+          data-slot="app-shell-sidebar"
           style={{ width: railWidth }}
           className={cn(
             "hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
@@ -193,7 +207,9 @@ export function AppShell(props: AppShellProps) {
             )}
           >
             {!collapsed && brand && (
-              <div className="flex min-w-0 items-center gap-2">{brand}</div>
+              <div data-slot="app-shell-brand" className="flex min-w-0 items-center gap-2">
+                {brand}
+              </div>
             )}
             {collapsible && (
               <button
@@ -208,7 +224,10 @@ export function AppShell(props: AppShellProps) {
             )}
           </div>
           {sidebarHeader && (
-            <div className="shrink-0 border-b border-sidebar-border px-density-3 py-density-2">
+            <div
+              data-slot="app-shell-sidebar-header"
+              className="shrink-0 border-b border-sidebar-border px-density-3 py-density-2"
+            >
               {sidebarHeader}
             </div>
           )}
@@ -216,7 +235,10 @@ export function AppShell(props: AppShellProps) {
             {renderSidebarContent(collapsed)}
           </div>
           {sidebarFooter && (
-            <div className="mt-auto shrink-0 border-t border-sidebar-border px-density-3 py-density-2">
+            <div
+              data-slot="app-shell-sidebar-footer"
+              className="mt-auto shrink-0 border-t border-sidebar-border px-density-3 py-density-2"
+            >
               {sidebarFooter}
             </div>
           )}
@@ -225,7 +247,10 @@ export function AppShell(props: AppShellProps) {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {(hasTopBar || hasMobileHeader) && (
-          <header className="shrink-0 border-b border-border bg-card">
+          <header
+            data-slot="app-shell-header"
+            className="shrink-0 border-b border-border bg-card"
+          >
             {hasMobileHeader && (
               <div className="flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:hidden">
                 <button
@@ -267,13 +292,23 @@ export function AppShell(props: AppShellProps) {
               )}
             >
               {!hasSidebar && brand && (
-                <div className="flex shrink-0 items-center gap-density-2">
+                <div
+                  data-slot="app-shell-brand"
+                  className="flex shrink-0 items-center gap-density-2"
+                >
                   {brand}
                 </div>
               )}
-              {nav && <div className="flex shrink-0 items-center">{nav}</div>}
+              {nav && (
+                <div data-slot="app-shell-nav" className="flex shrink-0 items-center">
+                  {nav}
+                </div>
+              )}
               {search !== undefined && (
-                <div className="flex min-w-0 flex-1 justify-center">
+                <div
+                  data-slot="app-shell-search"
+                  className="flex min-w-0 flex-1 justify-center"
+                >
                   <div className="w-full" style={{ maxWidth: searchMaxWidth }}>
                     {search}
                   </div>
@@ -281,13 +316,17 @@ export function AppShell(props: AppShellProps) {
               )}
               {search === undefined && <div className="flex-1" />}
               {actions && (
-                <div className="flex shrink-0 items-center gap-density-2">
+                <div
+                  data-slot="app-shell-actions"
+                  className="flex shrink-0 items-center gap-density-2"
+                >
                   {actions}
                 </div>
               )}
             </div>
             {toolbar && (
               <div
+                data-slot="app-shell-toolbar"
                 className={cn(
                   "flex flex-wrap items-center gap-density-2 border-t border-border bg-muted px-density-3 py-density-2 md:px-density-4",
                   toolbarClassName,
@@ -301,6 +340,7 @@ export function AppShell(props: AppShellProps) {
 
         {hasBodyHeader && (
           <div
+            data-slot="app-shell-body-header"
             className={cn(
               "flex shrink-0 flex-col items-stretch gap-density-2 border-b border-border bg-card px-density-3 py-density-2 md:flex-row md:items-start md:justify-between md:gap-density-3 md:px-density-4",
               bodyHeaderClassName,
@@ -308,7 +348,10 @@ export function AppShell(props: AppShellProps) {
           >
             <div className="min-w-0 flex-1">{bodyHeader}</div>
             {bodyActions && (
-              <div className="flex shrink-0 flex-wrap items-center gap-density-2">
+              <div
+                data-slot="app-shell-body-actions"
+                className="flex shrink-0 flex-wrap items-center gap-density-2"
+              >
                 {bodyActions}
               </div>
             )}
@@ -318,10 +361,14 @@ export function AppShell(props: AppShellProps) {
         {bodySidebar !== undefined ? (
           <>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
-              <div className="max-h-[40vh] shrink-0 overflow-y-auto border-b border-border bg-background">
+              <div
+                data-slot="app-shell-body-sidebar"
+                className="max-h-[40vh] shrink-0 overflow-y-auto border-b border-border bg-background"
+              >
                 {bodySidebar}
               </div>
               <main
+                data-slot="app-shell-main"
                 className={cn(
                   "min-h-0 min-w-0 flex-1 overflow-auto",
                   contentClassName,
@@ -335,9 +382,12 @@ export function AppShell(props: AppShellProps) {
               defaultSplit={bodySplit}
               minLeft={12}
               minRight={30}
-              left={bodySidebar}
+              left={<div data-slot="app-shell-body-sidebar" className="h-full">{bodySidebar}</div>}
               right={
-                <div className={cn("h-full min-w-0", contentClassName)}>
+                <div
+                  data-slot="app-shell-main"
+                  className={cn("h-full min-w-0", contentClassName)}
+                >
                   {children}
                 </div>
               }
@@ -346,6 +396,7 @@ export function AppShell(props: AppShellProps) {
           </>
         ) : (
           <main
+            data-slot="app-shell-main"
             className={cn(
               "min-h-0 min-w-0 flex-1 overflow-auto",
               contentClassName,

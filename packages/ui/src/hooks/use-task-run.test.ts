@@ -80,6 +80,32 @@ describe("useTaskRun (SSE)", () => {
     const group = result.current.snapshots.find((s) => s.type === "group");
     expect(group?.status).toBe("success");
   });
+
+  it("applies stdout and stderr SSE deltas without replacing task metadata", async () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+
+    act(() => {
+      es.emit("task", groupSnap("running"));
+      es.emit("task", taskSnap("running"));
+      es.emit("output", { id: "t1", groupId: "g1", stream: "stdout", data: "first", offset: 0 });
+      es.emit("output", { id: "t1", groupId: "g1", stream: "stdout", data: " second", offset: 5 });
+      es.emit("output", { id: "t1", groupId: "g1", stream: "stderr", data: "warn", offset: 0 });
+    });
+
+    await waitFor(() => {
+      const task = result.current.snapshots.find((snapshot) => snapshot.id === "t1");
+      expect(task).toMatchObject({ name: "rebuild", stdout: "first second", stderr: "warn" });
+    });
+
+    act(() => {
+      es.emit("output", { id: "t1", groupId: "g1", stream: "stdout", data: "tail", offset: 0, reset: true, truncated: true });
+    });
+    await waitFor(() => {
+      const task = result.current.snapshots.find((snapshot) => snapshot.id === "t1");
+      expect(task).toMatchObject({ stdout: "tail", stdoutTruncated: true });
+    });
+  });
 });
 
 describe("useTaskRun (polling fallback)", () => {

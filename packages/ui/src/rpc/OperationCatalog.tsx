@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
@@ -59,7 +60,6 @@ export type OperationCatalogProps = {
   filterPre?: FilterExtension[];
   getCommandHref?: (operationId: string, op: ResolvedOperation) => string;
   renderError?: (err: unknown, title: string) => ReactNode;
-  kind?: "operations" | "configuration";
   commandRuntime?: ClickyCommandRuntime;
   // Custom JsonSchemaForm field extensions forwarded to the create/edit form.
   formPre?: PreExtension[];
@@ -72,6 +72,22 @@ export type OperationCatalogProps = {
   // Receives the default OperationResultView so non-overridden surfaces render
   // unchanged.
   resultRenderer?: ResultRenderer;
+  /**
+   * Portal target for the collection action bar (Create, bulk actions). When
+   * set, the bar renders into this element — typically an app shell's
+   * `bodyActions` slot — instead of inline under the catalog header.
+   *
+   * A portal rather than a render-prop because the bar owns its own dialog
+   * state and closes over the catalog's live filters and list query; moving the
+   * element would sever both. Falls back to inline rendering when null, so
+   * existing consumers are unaffected.
+   */
+  actionsContainer?: Element | null;
+  /**
+   * Portal target for the table/endpoint-list view switcher — typically an app
+   * shell's top-bar `actions` slot. Falls back to inline rendering when null.
+   */
+  viewToggleContainer?: Element | null;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -100,13 +116,14 @@ export function OperationCatalog({
   filterPre,
   getCommandHref = defaultCommandHref,
   renderError = defaultRenderError,
-  kind,
   commandRuntime,
   formPre,
   formPost,
   formActions,
   actionLabels,
   resultRenderer,
+  actionsContainer,
+  viewToggleContainer,
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
   const [view, setView] = useState<"table" | "endpoints">("table");
@@ -251,10 +268,6 @@ export function OperationCatalog({
 
   const hasTable = !!listEndpoint;
   const showTable = hasTable && view === "table";
-  const sectionLabel =
-    kind === "configuration" || definition.key.startsWith("config-")
-      ? "Configuration"
-      : "Operations";
   // Lock the current list filters into a bulk action (supportsFilterMode), so a
   // collection action like "pause" runs against the same set the table shows.
   // Entity-scoped actions never reach here (they live on the detail page).
@@ -303,62 +316,63 @@ export function OperationCatalog({
     );
   }
 
+  // Both clusters are built here — they depend on catalog-local state (`view`,
+  // `filters`, `listQuery`) — but a host may relocate either into an app shell
+  // slot by supplying a portal target.
+  const viewToggle = hasTable ? (
+    <div data-slot="operation-catalog-view-toggle" className="flex gap-1 rounded-lg border p-1">
+      <Button
+        type="button"
+        variant={view === "table" ? "secondary" : "ghost"}
+        size="sm"
+        className="h-7 w-7 p-0"
+        aria-label="Table view"
+        aria-pressed={view === "table"}
+        onClick={() => setView("table")}
+      >
+        <Icon icon={UiTable} />
+      </Button>
+      <Button
+        type="button"
+        variant={view === "endpoints" ? "secondary" : "ghost"}
+        size="sm"
+        className="h-7 w-7 p-0"
+        aria-label="Endpoint list view"
+        aria-pressed={view === "endpoints"}
+        onClick={() => setView("endpoints")}
+      >
+        <Icon icon={UiListFlat} />
+      </Button>
+    </div>
+  ) : null;
+
+  const actionBar = (
+    <OperationActionBar
+      actions={actionOps}
+      client={client}
+      getLockedValues={getActionLockedValues}
+      onExecuted={() => void listQuery.refetch()}
+      {...(commandRuntime ? { commandRuntime } : {})}
+      {...(formPre ? { formPre } : {})}
+      {...(formPost ? { formPost } : {})}
+      {...(formActions ? { formActions } : {})}
+      {...(actionLabels ? { actionLabels } : {})}
+    />
+  );
+
   return (
     <div
       className="flex h-full min-h-0 flex-col gap-6"
       data-slot="operation-catalog"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            {sectionLabel}
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {definition.title}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {definition.description}
-          </p>
-        </div>
-        {hasTable && (
-          <div className="flex gap-1 rounded-lg border p-1">
-            <Button
-              type="button"
-              variant={view === "table" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 w-7 p-0"
-              aria-label="Table view"
-              aria-pressed={view === "table"}
-              onClick={() => setView("table")}
-            >
-              <Icon icon={UiTable} />
-            </Button>
-            <Button
-              type="button"
-              variant={view === "endpoints" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 w-7 p-0"
-              aria-label="Endpoint list view"
-              aria-pressed={view === "endpoints"}
-              onClick={() => setView("endpoints")}
-            >
-              <Icon icon={UiListFlat} />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <OperationActionBar
-        actions={actionOps}
-        client={client}
-        getLockedValues={getActionLockedValues}
-        onExecuted={() => void listQuery.refetch()}
-        {...(commandRuntime ? { commandRuntime } : {})}
-        {...(formPre ? { formPre } : {})}
-        {...(formPost ? { formPost } : {})}
-        {...(formActions ? { formActions } : {})}
-        {...(actionLabels ? { actionLabels } : {})}
-      />
+      {/* No title/description here by design: page headers and breadcrumbs are
+          the host's to define (e.g. an app shell's bodyHeader), so the catalog
+          never invents chrome the consumer would have to fight or duplicate. */}
+      {viewToggle && !viewToggleContainer && (
+        <div className="flex items-start justify-end gap-4">{viewToggle}</div>
+      )}
+      {viewToggle && viewToggleContainer && createPortal(viewToggle, viewToggleContainer)}
+      {actionsContainer ? createPortal(actionBar, actionsContainer) : actionBar}
 
       {showTable ? (
         <div
