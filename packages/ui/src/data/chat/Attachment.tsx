@@ -1,52 +1,159 @@
-import { useRef } from "react";
-import { convertFileListToFileUIParts } from "ai";
+import { useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
 import { Button } from "../../components/button";
 import { UiAdd, UiClose, UiFile } from "../../icons";
 import type { FileUIPart } from "./types";
 
-/** Files larger than this are rejected client-side: attachments are inlined as
- *  data URLs in the request body, so large files would bloat every turn. */
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+export const DEFAULT_ATTACHMENT_LIMITS = {
+  maxFileBytes: 20 * 1024 * 1024,
+  maxRequestBytes: 50 * 1024 * 1024,
+  maxFiles: 10,
+} as const;
+
+export type AttachmentLimits = {
+  maxFileBytes?: number;
+  maxRequestBytes?: number;
+  maxFiles?: number;
+};
+
+export type AttachmentFilePart = FileUIPart & {
+  attachmentId: string;
+  size: number;
+};
+
+export type AttachmentUploadAdapter = (file: File) => Promise<AttachmentFilePart>;
+
+type AttachmentDescriptor = {
+  id: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+};
+
+export function createAttachmentUploadAdapter(
+  options: {
+    endpoint?: string;
+    fetch?: typeof fetch;
+  } = {},
+): AttachmentUploadAdapter {
+  const endpoint = options.endpoint ?? "/api/attachments";
+  const fetcher = options.fetch ?? globalThis.fetch;
+  return async (file) => {
+    const body = new FormData();
+    body.append("file", file, file.name);
+    const response = await fetcher(endpoint, { method: "POST", body });
+    const payload = (await response.json()) as AttachmentDescriptor & {
+      error?: string;
+    };
+    if (!response.ok) {
+      throw new Error(
+        payload.error ?? `attachment upload failed (${response.status})`,
+      );
+    }
+    return {
+      type: "file",
+      filename: payload.filename,
+      mediaType: payload.mediaType,
+      url: `${endpoint.replace(/\/$/, "")}/${payload.id}`,
+      attachmentId: payload.id,
+      size: payload.size,
+    };
+  };
+}
 
 export type AttachmentButtonProps = {
   /** Called with newly selected files converted to FileUIParts. */
   onAdd: (parts: FileUIPart[]) => void;
   disabled?: boolean;
   className?: string;
+  upload?: AttachmentUploadAdapter;
+  files?: FileUIPart[];
+  acceptedMediaTypes?: string[];
+  limits?: AttachmentLimits;
+  onError?: (message: string) => void;
 };
 
-/** A paperclip-style button that opens the file picker and emits the chosen
- *  files as FileUIParts (data-URL encoded). */
-export function AttachmentButton({ onAdd, disabled, className }: AttachmentButtonProps) {
+/** A paperclip-style button that uploads selected files and emits durable file
+ * descriptors. Binary content never enters the chat message body. */
+export function AttachmentButton({
+  onAdd,
+  disabled,
+  className,
+  upload = createAttachmentUploadAdapter(),
+  files = [],
+  acceptedMediaTypes,
+  limits,
+  onError,
+}: AttachmentButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const resolvedLimits = { ...DEFAULT_ATTACHMENT_LIMITS, ...limits };
 
   const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list || list.length === 0) return;
-    const tooBig = Array.from(list).filter((f) => f.size > MAX_ATTACHMENT_BYTES);
-    if (tooBig.length > 0) {
-      console.warn(`clicky-ui: ${tooBig.length} attachment(s) exceed ${MAX_ATTACHMENT_BYTES} bytes and were skipped`);
+    const selected = Array.from(list);
+    const currentBytes = files.reduce(
+      (total, file) =>
+        total + Number((file as Partial<AttachmentFilePart>).size ?? 0),
+      0,
+    );
+    let validationError = "";
+    if (files.length + selected.length > resolvedLimits.maxFiles) {
+      validationError = `Attachments are limited to ${resolvedLimits.maxFiles} files.`;
+    } else if (
+      selected.some((file) => file.size > resolvedLimits.maxFileBytes)
+    ) {
+      validationError = `Each attachment must be ${resolvedLimits.maxFileBytes} bytes or smaller.`;
+    } else if (
+      currentBytes + selected.reduce((total, file) => total + file.size, 0) >
+      resolvedLimits.maxRequestBytes
+    ) {
+      validationError = `Attachments are limited to ${resolvedLimits.maxRequestBytes} bytes per request.`;
     }
-    const ok = Array.from(list).filter((f) => f.size <= MAX_ATTACHMENT_BYTES);
-    if (ok.length > 0) {
-      const dt = new DataTransfer();
-      ok.forEach((f) => dt.items.add(f));
-      onAdd(await convertFileListToFileUIParts(dt.files));
+    if (validationError) {
+      onError?.(validationError);
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      onAdd(await Promise.all(selected.map((file) => upload(file))));
+      onError?.("");
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploading(false);
     }
     e.target.value = "";
   };
 
+  const accept = acceptedMediaTypes?.join(",");
+  const capabilityDisabled =
+    acceptedMediaTypes != null && acceptedMediaTypes.length === 0;
+
   return (
     <>
-      <input ref={inputRef} type="file" multiple hidden onChange={onChange} />
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={onChange}
+        {...(accept ? { accept } : {})}
+      />
       <Button
         type="button"
         size="icon"
         variant="ghost"
         aria-label="Attach files"
-        disabled={disabled}
+        disabled={disabled || uploading || capabilityDisabled}
+        title={
+          capabilityDisabled
+            ? "The selected model does not support attachments"
+            : undefined
+        }
         onClick={() => inputRef.current?.click()}
         className={className}
       >

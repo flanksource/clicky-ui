@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The unified context-window meter. `mode=\"bar\"` (SessionViewer header) and `mode=\"gauge\"` (chat toolbar) share one hover popover: model, context-window breakdown, per-bucket token usage and cost + budget. Domain-agnostic — callers feed plain numbers.",
+          'The unified context-window meter. `mode="bar"` (SessionViewer header) and `mode="gauge"` (chat toolbar) share one hover popover: model, context-window breakdown, per-bucket token usage and cost + budget. Domain-agnostic — callers feed plain numbers.',
       },
     },
   },
@@ -36,8 +36,23 @@ const RICH = {
   messageCount: 32,
   model: "claude-opus-4-8",
   modelIcon: providerIcon("anthropic"),
-  tokens: { input: 120_000, output: 18_000, reasoning: 6_000, cacheRead: 40_000, cacheWrite: 4_000, total: 188_000 },
-  cost: { input: 0.36, output: 0.54, reasoning: 0.18, cacheRead: 0.12, cacheWrite: 0.04, total: 1.24 },
+  effort: "high",
+  tokens: {
+    input: 120_000,
+    output: 18_000,
+    reasoning: 6_000,
+    cacheRead: 40_000,
+    cacheWrite: 4_000,
+    total: 188_000,
+  },
+  cost: {
+    input: 0.36,
+    output: 0.54,
+    reasoning: 0.18,
+    cacheRead: 0.12,
+    cacheWrite: 0.04,
+    total: 1.24,
+  },
   budget: { used: 1.24, total: 5, remaining: 3.76 },
 } satisfies Partial<Story["args"]>;
 
@@ -47,7 +62,10 @@ export const Bar: Story = {
     const canvas = within(canvasElement);
     await userEvent.hover(canvas.getByLabelText("Context 74% used"));
     const body = within(document.body);
-    await waitFor(() => expect(body.getByText("claude-opus-4-8")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(body.getByText("claude-opus-4-8")).toBeInTheDocument(),
+    );
+    await expect(body.getByText("High effort")).toBeInTheDocument();
     // Tokens + Cost merged into one table: the Output bucket shows both cells.
     await expect(body.getByText("Output")).toBeInTheDocument();
     await expect(body.getByText("18k")).toBeInTheDocument();

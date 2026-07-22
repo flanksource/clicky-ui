@@ -41,6 +41,8 @@ export interface ChatModel {
   backends?: string[];
   /** Max context tokens — the denominator for a usage gauge. */
   contextWindow?: number;
+  /** MIME patterns accepted as model inputs, e.g. image/* or application/pdf. */
+  inputMediaTypes?: string[];
 }
 
 /** Per-message metadata the backend rides on the SSE `finish` part

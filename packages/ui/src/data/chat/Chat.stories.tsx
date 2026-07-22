@@ -93,7 +93,6 @@ export const ToolApproval: Story = {
       <Chat
         transport={mockApprovalTransport()}
         initialMessages={SAMPLE_TOOL_MESSAGES}
-        toolApproval="manual"
         placeholder="Try: restart the api service"
       />
     </div>

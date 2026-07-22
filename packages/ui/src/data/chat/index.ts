@@ -20,7 +20,7 @@ export {
   BudgetSelector,
   type BudgetSelectorProps,
 } from "./ModelSelector";
-export { providerIcon, type ProviderGlyph } from "./provider-icons";
+export { providerIcon, providerIconColor, type ProviderGlyph } from "./provider-icons";
 export {
   ContextMeter,
   type ContextMeterProps,
@@ -34,6 +34,11 @@ export {
   type AttachmentButtonProps,
   AttachmentList,
   type AttachmentListProps,
+  createAttachmentUploadAdapter,
+  DEFAULT_ATTACHMENT_LIMITS,
+  type AttachmentFilePart,
+  type AttachmentLimits,
+  type AttachmentUploadAdapter,
 } from "./Attachment";
 
 export {

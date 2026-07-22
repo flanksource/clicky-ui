@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { TaskProgress } from "./TaskProgress";
 import { bucketTasks, taskSegments } from "./task-status";
 import type { TaskSnapshot } from "./TaskSnapshot";
@@ -135,5 +135,76 @@ describe("TaskProgress", () => {
     render(<TaskProgress snapshots={snapshots} />);
     // Visible without any click — the warning text is promoted onto the row.
     expect(screen.getByText("skipped: index already optimal")).toBeInTheDocument();
+  });
+
+  it("renders captured streams and invokes advertised lifecycle controls", async () => {
+    const onControl = vi.fn();
+    const snapshots: TaskSnapshot[] = [
+      {
+        id: "commit",
+        name: "Commit changes",
+        type: "group",
+        status: "running",
+        groupId: "commit-1",
+        total: 1,
+        running: 1,
+        controls: ["stop", "restart"],
+      },
+      {
+        id: "command",
+        name: "Create commit",
+        type: "task",
+        status: "running",
+        groupId: "commit-1",
+        stdout: "staging files\n",
+        stderr: "hook warning\n",
+      },
+    ];
+    render(<TaskProgress snapshots={snapshots} onControl={onControl} />);
+
+    fireEvent.click(screen.getByText("Create commit"));
+    expect(screen.getByText("staging files")).toBeInTheDocument();
+    expect(screen.getByText("hook warning")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    await waitFor(() => expect(onControl).toHaveBeenCalledWith("stop", snapshots[0]));
+  });
+
+  it("renders the nested supervised process tree and current resource summary", () => {
+    const snapshots: TaskSnapshot[] = [
+      {
+        id: "api",
+        name: "api",
+        type: "group",
+        status: "running",
+        groupId: "proc-1",
+        kind: "supervised-process",
+        total: 1,
+        running: 1,
+        details: {
+          pid: 100,
+          command: "api serve",
+          status: "running",
+          restarts: 1,
+          restartPolicy: "on-failure",
+          latest: { cpuPercent: 12.5, rssBytes: 2048, vmsBytes: 8192, openFiles: 8, sampledAt: "2026-07-21T00:00:00Z" },
+          peak: { cpuPercent: 20, rssBytes: 4096, vmsBytes: 16384, openFiles: 10, sampledAt: "2026-07-21T00:00:00Z" },
+          metrics: {},
+          tree: [
+            { pid: 100, ppid: 1, command: "api serve", status: "sleep", isRoot: true, cpuPercent: 5, rssBytes: 1024, vmsBytes: 4096, openFiles: 4 },
+            { pid: 101, ppid: 100, command: "worker", status: "run", cpuPercent: 7.5, rssBytes: 1024, vmsBytes: 2048, openFiles: 4 },
+          ],
+        },
+      },
+      { id: "api-task", name: "api", type: "task", status: "running", groupId: "proc-1" },
+    ];
+    render(<TaskProgress snapshots={snapshots} />);
+
+    expect(screen.getByText("12.5% CPU")).toBeInTheDocument();
+    expect(screen.getByText("8 KB VMS")).toBeInTheDocument();
+    expect(screen.getByText("Peak 20.0% CPU · 4 KB RSS · 16 KB VMS · 10 files")).toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.getByText("pid 101")).toBeInTheDocument();
+    expect(screen.getByText("1 restart")).toBeInTheDocument();
   });
 });

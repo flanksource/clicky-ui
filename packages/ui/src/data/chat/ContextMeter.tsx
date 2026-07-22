@@ -1,7 +1,8 @@
 import { cn } from "../../lib/utils";
 import { compactTokens, formatCost } from "../../lib/tokens";
-import type { StaticIconComponent } from "../Icon";
+import { Icon, type StaticIconComponent } from "../Icon";
 import { HoverCard } from "../../overlay/HoverCard";
+import { effortLevelColor, effortLevelIcon } from "./effort-icons";
 
 export type ContextMeterMode = "bar" | "gauge";
 
@@ -43,6 +44,9 @@ export type ContextMeterProps = {
   /** Model id/label and its brand glyph. */
   model?: string | undefined;
   modelIcon?: StaticIconComponent | undefined;
+  modelIconClassName?: string | undefined;
+  /** Reasoning effort shown with its semantic glyph and color in the hover card. */
+  effort?: string | undefined;
   /** Per-bucket token counts for the popover breakdown. */
   tokens?: ContextMeterTokens | undefined;
   /** Per-bucket costs (USD) for the popover breakdown. */
@@ -51,20 +55,31 @@ export type ContextMeterProps = {
   className?: string | undefined;
 };
 
+const GAUGE_RADIUS = 15;
+const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
+
 function barTone(pct: number): string {
-  return pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-emerald-500";
+  return pct > 80
+    ? "bg-red-600 [[data-theme=dark]_&]:bg-red-400"
+    : pct > 50
+      ? "bg-amber-700 [[data-theme=dark]_&]:bg-amber-400"
+      : "bg-emerald-600 [[data-theme=dark]_&]:bg-emerald-400";
 }
 
 function ringTone(pct: number): string {
-  return pct > 80 ? "text-red-500" : pct > 50 ? "text-amber-500" : "text-emerald-500";
+  return pct > 80
+    ? "text-red-600 [[data-theme=dark]_&]:text-red-400"
+    : pct > 50
+      ? "text-amber-700 [[data-theme=dark]_&]:text-amber-400"
+      : "text-emerald-600 [[data-theme=dark]_&]:text-emerald-400";
 }
 
 function textTone(pct: number): string {
   return pct > 80
-    ? "text-red-600 [[data-theme=dark]_&]:text-red-400"
+    ? "text-red-700 [[data-theme=dark]_&]:text-red-400"
     : pct > 50
-      ? "text-amber-600 [[data-theme=dark]_&]:text-amber-400"
-      : "text-emerald-600 [[data-theme=dark]_&]:text-emerald-400";
+      ? "text-amber-700 [[data-theme=dark]_&]:text-amber-400"
+      : "text-emerald-700 [[data-theme=dark]_&]:text-emerald-400";
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -80,17 +95,28 @@ function anyPositive(...values: (number | undefined)[]): boolean {
   return values.some((v) => v != null && v > 0);
 }
 
-type BucketRow = { label: string; tokens?: number | undefined; cost?: number | undefined };
+type BucketRow = {
+  label: string;
+  tokens?: number | undefined;
+  cost?: number | undefined;
+};
 
 /** One row per token/cost bucket, kept only when it carries a token or cost
  *  value. Cache stays split into read and write on both axes. */
-function bucketRows(tokens?: ContextMeterTokens, cost?: ContextMeterCost): BucketRow[] {
+function bucketRows(
+  tokens?: ContextMeterTokens,
+  cost?: ContextMeterCost,
+): BucketRow[] {
   const rows: BucketRow[] = [
     { label: "Input", tokens: tokens?.input, cost: cost?.input },
     { label: "Output", tokens: tokens?.output, cost: cost?.output },
     { label: "Reasoning", tokens: tokens?.reasoning, cost: cost?.reasoning },
     { label: "Cache read", tokens: tokens?.cacheRead, cost: cost?.cacheRead },
-    { label: "Cache write", tokens: tokens?.cacheWrite, cost: cost?.cacheWrite },
+    {
+      label: "Cache write",
+      tokens: tokens?.cacheWrite,
+      cost: cost?.cacheWrite,
+    },
   ];
   return rows.filter((row) => (row.tokens ?? 0) > 0 || (row.cost ?? 0) > 0);
 }
@@ -114,29 +140,45 @@ function UsageTable({
       <thead>
         <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
           <th className="px-1 py-0.5 text-left font-medium" />
-          {showTokens && <th className="px-1 py-0.5 text-right font-medium">Tokens</th>}
-          {showCost && <th className="px-1 py-0.5 text-right font-medium">Cost</th>}
+          {showTokens && (
+            <th className="px-1 py-0.5 text-right font-medium">Tokens</th>
+          )}
+          {showCost && (
+            <th className="px-1 py-0.5 text-right font-medium">Cost</th>
+          )}
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.label}>
-            <td className="px-1 py-0.5 text-left text-muted-foreground">{row.label}</td>
+            <td className="px-1 py-0.5 text-left text-muted-foreground">
+              {row.label}
+            </td>
             {showTokens && (
               <td className={numCell}>
-                {row.tokens ? compactTokens(row.tokens) : <span className="text-muted-foreground/50">—</span>}
+                {row.tokens ? (
+                  compactTokens(row.tokens)
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
               </td>
             )}
             {showCost && (
               <td className={numCell}>
-                {row.cost ? formatCost(row.cost) : <span className="text-muted-foreground/50">—</span>}
+                {row.cost ? (
+                  formatCost(row.cost)
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
               </td>
             )}
           </tr>
         ))}
         <tr className="border-t border-border font-medium">
           <td className="px-1 py-0.5 text-left">Total</td>
-          {showTokens && <td className={numCell}>{compactTokens(totalTokens)}</td>}
+          {showTokens && (
+            <td className={numCell}>{compactTokens(totalTokens)}</td>
+          )}
           {showCost && <td className={numCell}>{formatCost(totalCost)}</td>}
         </tr>
       </tbody>
@@ -156,6 +198,8 @@ export function ContextMeter({
   messageCount,
   model,
   modelIcon: Glyph,
+  modelIconClassName,
+  effort,
   tokens,
   cost,
   budget,
@@ -164,35 +208,65 @@ export function ContextMeter({
   const pct = Math.min(100, Math.max(0, Math.round(usedPercent)));
   const totalTokens = tokens?.total ?? 0;
   const totalCost = cost?.total ?? 0;
+  const EffortGlyph = effort ? effortLevelIcon(effort) : undefined;
+  const effortColor = effort ? effortLevelColor(effort) : undefined;
 
   const trigger =
     mode === "gauge" ? (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          "inline-flex items-center rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           className,
         )}
         aria-label={`Context ${pct}% used`}
       >
-        {Glyph && <Glyph className="size-3.5 shrink-0" />}
-        <svg width="20" height="20" viewBox="0 0 20 20" className={cn("shrink-0", ringTone(pct))}>
-          <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.15" />
-          <circle
-            cx="10"
-            cy="10"
-            r="8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeDasharray={2 * Math.PI * 8}
-            strokeDashoffset={(1 - pct / 100) * 2 * Math.PI * 8}
-            strokeLinecap="round"
-            transform="rotate(-90 10 10)"
-          />
-          <text x="10" y="10" textAnchor="middle" dominantBaseline="central" fontSize="6" fill="currentColor" fontWeight="600">
-            {pct}
-          </text>
-        </svg>
+        <span className="relative inline-flex size-9 shrink-0 items-center justify-center">
+          <svg
+            data-context-gauge-ring
+            aria-hidden="true"
+            width="36"
+            height="36"
+            viewBox="0 0 36 36"
+            className={cn("absolute inset-0", ringTone(pct))}
+          >
+            <circle
+              cx="18"
+              cy="18"
+              r={GAUGE_RADIUS}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              opacity="0.15"
+            />
+            <circle
+              cx="18"
+              cy="18"
+              r={GAUGE_RADIUS}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeDasharray={GAUGE_CIRCUMFERENCE}
+              strokeDashoffset={(1 - pct / 100) * GAUGE_CIRCUMFERENCE}
+              strokeLinecap="round"
+              transform="rotate(-90 18 18)"
+            />
+          </svg>
+          {Glyph ? (
+            <Icon
+              icon={Glyph}
+              className={cn("relative size-5", modelIconClassName)}
+            />
+          ) : (
+            <span
+              className={cn(
+                "relative text-[9px] font-semibold tabular-nums",
+                textTone(pct),
+              )}
+            >
+              {pct}
+            </span>
+          )}
+        </span>
       </span>
     ) : (
       <span
@@ -204,9 +278,19 @@ export function ContextMeter({
       >
         <span className="shrink-0">ctx</span>
         <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-          <span className={cn("block h-full rounded-full transition-all", barTone(pct))} style={{ width: `${pct}%` }} />
+          <span
+            className={cn(
+              "block h-full rounded-full transition-all",
+              barTone(pct),
+            )}
+            style={{ width: `${pct}%` }}
+          />
         </span>
-        <span className={cn("shrink-0 font-medium tabular-nums", textTone(pct))}>{pct}%</span>
+        <span
+          className={cn("shrink-0 font-medium tabular-nums", textTone(pct))}
+        >
+          {pct}%
+        </span>
       </span>
     );
 
@@ -215,31 +299,61 @@ export function ContextMeter({
       <div className="space-y-2.5 text-xs">
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">Context usage</span>
-          <span className={cn("font-semibold tabular-nums", textTone(pct))}>{pct}%</span>
+          <span className={cn("font-semibold tabular-nums", textTone(pct))}>
+            {pct}%
+          </span>
         </div>
 
-        {model && (
-          <div className="flex items-center gap-2 border-b border-border pb-2">
-            {Glyph && <Glyph className="size-4 shrink-0" />}
-            <span className="truncate font-medium" title={model}>
-              {model}
-            </span>
+        {(model || effort) && (
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-2">
+            {model ? (
+              <div className="flex min-w-0 items-center gap-2">
+                {Glyph && (
+                  <Icon
+                    icon={Glyph}
+                    className={cn("size-4 shrink-0", modelIconClassName)}
+                  />
+                )}
+                <span className="truncate font-medium" title={model}>
+                  {model}
+                </span>
+              </div>
+            ) : null}
+            {effort ? (
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 font-medium",
+                  effortColor,
+                )}
+              >
+                {EffortGlyph ? <EffortGlyph className="size-3.5" /> : null}
+                {effortLabel(effort)} effort
+              </span>
+            ) : null}
           </div>
         )}
 
         <div className="space-y-1.5">
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className={cn("h-full rounded-full", barTone(pct))} style={{ width: `${pct}%` }} />
+            <div
+              className={cn("h-full rounded-full", barTone(pct))}
+              style={{ width: `${pct}%` }}
+            />
           </div>
           {windowTokens ? (
             <>
-              <Row label="Window" value={`${compactTokens(usedTokens ?? 0)} / ${compactTokens(windowTokens)}`} />
+              <Row
+                label="Window"
+                value={`${compactTokens(usedTokens ?? 0)} / ${compactTokens(windowTokens)}`}
+              />
               <Row label="Free" value={`${100 - pct}%`} />
             </>
           ) : (
             <Row label="Used" value={`${pct}%`} />
           )}
-          {messageCount != null ? <Row label="Messages" value={String(messageCount)} /> : null}
+          {messageCount != null ? (
+            <Row label="Messages" value={String(messageCount)} />
+          ) : null}
         </div>
 
         {(totalTokens > 0 || totalCost > 0 || budget) && (
@@ -254,7 +368,10 @@ export function ContextMeter({
               />
             )}
             {budget?.total != null && budget.total > 0 ? (
-              <Row label="Budget" value={`${formatCost(budget.used ?? 0)} / ${formatCost(budget.total)}`} />
+              <Row
+                label="Budget"
+                value={`${formatCost(budget.used ?? 0)} / ${formatCost(budget.total)}`}
+              />
             ) : budget?.remaining != null ? (
               <Row label="Budget left" value={formatCost(budget.remaining)} />
             ) : anyPositive(budget?.used) ? (
@@ -265,4 +382,9 @@ export function ContextMeter({
       </div>
     </HoverCard>
   );
+}
+
+function effortLabel(value: string) {
+  const normalized = value.trim();
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
 }

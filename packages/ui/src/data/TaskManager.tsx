@@ -207,9 +207,23 @@ function ExpandedRun({
   pollMs: number | undefined;
 }) {
   const { snapshots } = useTaskRun({ id: runId, basePath, pollMs });
+  const apiBase = basePath ?? "/api/v1";
+  const control = async (action: import("./TaskSnapshot").TaskControlAction) => {
+    const response = await fetch(`${apiBase}/tasks/${encodeURIComponent(runId)}/control`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!response.ok) throw new Error((await response.text()).trim() || `Failed to ${action} task`);
+  };
   return (
     <div className="border-t bg-muted/30 px-4 py-3">
-      <TaskProgress snapshots={snapshots} compact />
+      <TaskProgress
+        snapshots={snapshots}
+        compact
+        onControl={control}
+        metricsBaseUrl={`${apiBase}/tasks/metrics/`}
+      />
     </div>
   );
 }

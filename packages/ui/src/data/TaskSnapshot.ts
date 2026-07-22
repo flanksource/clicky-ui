@@ -8,6 +8,44 @@ export interface LogEntry {
   message: string;
 }
 
+export type TaskControlAction = "start" | "stop" | "restart";
+
+export interface TaskResourceSnapshot {
+  cpuPercent: number;
+  rssBytes: number;
+  vmsBytes: number;
+  openFiles: number;
+  sampledAt: string;
+}
+
+export interface TaskProcessSample {
+  pid: number;
+  ppid: number;
+  command: string;
+  status?: string;
+  isRoot?: boolean;
+  cpuPercent: number;
+  rssBytes: number;
+  vmsBytes: number;
+  openFiles: number;
+}
+
+export interface TaskProcessDetails {
+  pid?: number;
+  command: string;
+  status: string;
+  started?: string;
+  exitCode?: number;
+  ports?: number[];
+  restarts: number;
+  restartPolicy: string;
+  maxRestarts?: number;
+  latest: TaskResourceSnapshot;
+  peak: TaskResourceSnapshot;
+  metrics: Record<string, string>;
+  tree?: TaskProcessSample[];
+}
+
 export interface TaskSnapshot {
   id: string;
   name: string;
@@ -40,6 +78,13 @@ export interface TaskSnapshot {
   startedAt?: string;
   /** RFC3339. */
   finishedAt?: string;
+  href?: string;
+  controls?: TaskControlAction[];
+  stdout?: string;
+  stderr?: string;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
+  details?: TaskProcessDetails | Record<string, unknown>;
 }
 
 // TaskRunMeta mirrors the Go `task.RunMeta` listing summary returned by
@@ -58,6 +103,8 @@ export interface TaskRunMeta {
   completed: number;
   failed: number;
   running: number;
+  href?: string;
+  controls?: TaskControlAction[];
 }
 
 // Terminal run/group statuses (not running/pending). Used to decide when an SSE

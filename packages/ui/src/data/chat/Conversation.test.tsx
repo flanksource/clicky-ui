@@ -42,6 +42,29 @@ describe("Conversation", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("no AI provider configured");
   });
 
+  it("copies a diagnostic report with session, model, page and error detail", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(
+      <Conversation
+        messages={[USER_MESSAGE]}
+        status="error"
+        error={new Error('No tool invocation found for tool call ID "abc".')}
+        sessionId="thread-42"
+        model="anthropic/claude-sonnet-5"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+
+    expect(writeText).toHaveBeenCalledOnce();
+    const report = writeText.mock.calls[0]![0] as string;
+    expect(report).toContain('Error: No tool invocation found for tool call ID "abc".');
+    expect(report).toContain("Session: thread-42");
+    expect(report).toContain("Model: anthropic/claude-sonnet-5");
+    expect(report).toContain("Page: http://localhost");
+  });
+
   it("can dismiss the visible error", () => {
     const onClearError = vi.fn();
     render(
