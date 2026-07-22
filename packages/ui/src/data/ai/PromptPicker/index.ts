@@ -5,12 +5,19 @@ export {
   type SpecEditorDialogProps,
 } from "./PromptPicker";
 export {
+  PromptSourceRepair,
+  type PromptSourceRepairProps,
+} from "./PromptSourceRepair";
+export {
   promptPreviewText,
   promptRuntimeValueToPayload,
   specToPromptRuntimeValue,
 } from "./prompt-runtime";
-export type {
-  PromptPickerValue,
-  PromptSpecDetail,
-  PromptSpecSavePayload,
+export {
+  isValidPromptSpecDetail,
+  type InvalidPromptSpecDetail,
+  type PromptPickerValue,
+  type PromptSpecDetail,
+  type PromptSpecSavePayload,
+  type ValidPromptSpecDetail,
 } from "./types";

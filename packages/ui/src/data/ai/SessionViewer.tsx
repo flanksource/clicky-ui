@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
@@ -9,7 +9,6 @@ import {
   getSessionMetadata,
   normalizeSession,
   summarizeSession,
-  type SessionMetadataSummary,
   type SessionEvent,
   type SessionInput,
 } from "./SessionViewer.model";
@@ -18,15 +17,16 @@ import {
   isSessionEventGroup,
 } from "./SessionViewer.grouping";
 import { SessionRow, WaitGroupRow } from "./SessionViewer.rows";
-import { ContextMeter } from "../chat/ContextMeter";
-import { providerIcon } from "../chat/provider-icons";
-import { costTotal, tokenTotal } from "./session-cost";
+import { SessionMetadataBadges } from "./SessionViewer.header";
 import {
   collectSessionFilters,
   isEventVisible,
   type SessionCategory,
 } from "./session-categories";
-import { SessionViewerMenu, type SessionThemeOverride } from "./SessionViewerMenu";
+import {
+  SessionViewerMenu,
+  type SessionThemeOverride,
+} from "./SessionViewerMenu";
 import { useSessionScroll } from "./use-session-scroll";
 
 export type {
@@ -62,8 +62,12 @@ export interface SessionViewerProps {
   showThinking?: boolean;
   /** Show the summary header (model + action counts). Defaults to true. */
   showHeader?: boolean;
+  /** Show context usage in the summary header. Defaults to true. */
+  showContextMeter?: boolean;
   /** Show the 3-dot menu (density + category/tool/source filters). Defaults to true. */
   showMenu?: boolean;
+  /** Controls rendered beside the 3-dot menu in the summary header. */
+  headerActions?: ReactNode;
   /** Portal the 3-dot menu into this element instead of rendering it inline in
    *  the summary header — lets a host place the menu in its own toolbar while the
    *  filter/density state stays owned by the viewer. Ignored when `showMenu` is
@@ -87,8 +91,12 @@ export interface SessionViewerProps {
   showRowMetadata?: boolean;
   /** Show a per-row raw JSON payload expander when available. Defaults to false. */
   showRaw?: boolean;
+  /** Render content before each assistant message body. */
+  renderMessageBadge?: (event: SessionEvent) => ReactNode;
   pendingTools?: readonly SessionPendingTool[];
-  onPendingToolDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
+  onPendingToolDecision?:
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }
 
 function toggleInSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -115,7 +123,9 @@ export function SessionViewer({
   defaultExpanded = false,
   showThinking = true,
   showHeader = true,
+  showContextMeter = true,
   showMenu = true,
+  headerActions,
   menuContainer,
   defaultDensity,
   defaultTheme,
@@ -124,6 +134,7 @@ export function SessionViewer({
   batchSize = 40,
   showRowMetadata = false,
   showRaw = false,
+  renderMessageBadge,
   pendingTools = [],
   onPendingToolDecision,
 }: SessionViewerProps) {
@@ -135,23 +146,44 @@ export function SessionViewer({
   const metadata = useMemo(() => getSessionMetadata(session), [session]);
 
   const pageDensity = useDensityValue();
-  const [densityOverride, setDensityOverride] = useState<Density | undefined>(defaultDensity);
-  const [themeOverride, setThemeOverride] = useState<SessionThemeOverride | undefined>(defaultTheme);
-  const [hiddenCategories, setHiddenCategories] = useState<ReadonlySet<SessionCategory>>(
+  const [densityOverride, setDensityOverride] = useState<Density | undefined>(
+    defaultDensity,
+  );
+  const [themeOverride, setThemeOverride] = useState<
+    SessionThemeOverride | undefined
+  >(defaultTheme);
+  const [hiddenCategories, setHiddenCategories] = useState<
+    ReadonlySet<SessionCategory>
+  >(() => new Set());
+  const [hiddenTools, setHiddenTools] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
-  const [hiddenTools, setHiddenTools] = useState<ReadonlySet<string>>(() => new Set());
-  const [hiddenSources, setHiddenSources] = useState<ReadonlySet<string>>(() => new Set());
+  const [hiddenSources, setHiddenSources] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   // Undefined = follow the `showThinking` prop; the menu toggle sets an override.
-  const [showThinkingOverride, setShowThinkingOverride] = useState<boolean | undefined>(undefined);
+  const [showThinkingOverride, setShowThinkingOverride] = useState<
+    boolean | undefined
+  >(undefined);
   const effectiveShowThinking = showThinkingOverride ?? showThinking;
 
   const filters = useMemo(() => collectSessionFilters(allEvents), [allEvents]);
-  const hasThinking = useMemo(() => allEvents.some((e) => e.kind === "thinking"), [allEvents]);
+  const hasThinking = useMemo(
+    () => allEvents.some((e) => e.kind === "thinking"),
+    [allEvents],
+  );
 
-  const visibility = { hiddenCategories, hiddenTools, hiddenSources, showThinking: effectiveShowThinking };
+  const visibility = {
+    hiddenCategories,
+    hiddenTools,
+    hiddenSources,
+    showThinking: effectiveShowThinking,
+  };
   const items = displayItems.filter((item) =>
-    isEventVisible(isSessionEventGroup(item) ? item.representative : item, visibility),
+    isEventVisible(
+      isSessionEventGroup(item) ? item.representative : item,
+      visibility,
+    ),
   );
 
   // Reset the window when the underlying session changes, not on filter toggles —
@@ -199,7 +231,9 @@ export function SessionViewer({
         setHiddenCategories((set) => toggleInSet(set, category))
       }
       onToggleTool={(tool) => setHiddenTools((set) => toggleInSet(set, tool))}
-      onToggleSource={(source) => setHiddenSources((set) => toggleInSet(set, source))}
+      onToggleSource={(source) =>
+        setHiddenSources((set) => toggleInSet(set, source))
+      }
       showThinking={effectiveShowThinking}
       onToggleThinking={() => setShowThinkingOverride(!effectiveShowThinking)}
       hasThinking={hasThinking}
@@ -228,6 +262,7 @@ export function SessionViewer({
               defaultExpanded={defaultExpanded}
               showRowMetadata={showRowMetadata}
               showRaw={showRaw}
+              renderMessageBadge={renderMessageBadge}
               onPendingToolDecision={onPendingToolDecision}
             />
           ) : (
@@ -238,6 +273,7 @@ export function SessionViewer({
               defaultExpanded={defaultExpanded}
               showRowMetadata={showRowMetadata}
               showRaw={showRaw}
+              renderMessageBadge={renderMessageBadge}
               onPendingToolDecision={onPendingToolDecision}
             />
           );
@@ -246,10 +282,17 @@ export function SessionViewer({
     );
 
   return (
-    <div className={cn("text-sm", scrollable && "flex h-full min-h-0 flex-col", className)} {...dataAttrs}>
+    <div
+      className={cn(
+        "bg-background text-sm text-foreground data-[theme=dark]:bg-[var(--fs-bg-subtle)] [[data-theme=dark]_&]:bg-[var(--fs-bg-subtle)]",
+        scrollable && "flex h-full min-h-0 flex-col",
+        className,
+      )}
+      {...dataAttrs}
+    >
       <DensityValueProvider density={effectiveDensity}>
         {menu && menuContainer && createPortal(menu, menuContainer)}
-        {(showHeader || inlineMenu) && (
+        {(showHeader || headerActions || inlineMenu) && (
           <div
             className={cn(
               "flex items-center justify-between gap-density-3",
@@ -258,18 +301,34 @@ export function SessionViewer({
                 : "mb-density-3",
             )}
           >
-            <div className="flex flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
-              {showHeader && summary.model && (
-                <span className="inline-flex items-center gap-1 font-medium text-foreground">
-                  <Icon icon={UiRobotAi} className="size-3.5" />
-                  {summary.model}
-                </span>
-              )}
-              {showHeader && <span>{summary.toolCount} actions</span>}
-              {showHeader && <span>{summary.messageCount} messages</span>}
-              {showHeader && metadata && <SessionMetadataBadges metadata={metadata} />}
-            </div>
-            {inlineMenu && menu}
+            {showHeader && (
+              <div className="flex flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
+                {summary.model && (
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                    <Icon icon={UiRobotAi} className="size-3.5" />
+                    {summary.model}
+                  </span>
+                )}
+                <span>{summary.toolCount} actions</span>
+                <span>{summary.messageCount} messages</span>
+                {metadata && (
+                  <SessionMetadataBadges
+                    metadata={metadata}
+                    showContextMeter={showContextMeter}
+                  />
+                )}
+              </div>
+            )}
+            {(headerActions || inlineMenu) && (
+              <div
+                role="group"
+                aria-label="Session viewer actions"
+                className="ml-auto flex min-w-0 shrink-0 items-center gap-density-2"
+              >
+                {headerActions}
+                {inlineMenu && menu}
+              </div>
+            )}
           </div>
         )}
 
@@ -293,12 +352,14 @@ function mergePendingTools(
 ): SessionEvent[] {
   const merged = [...events];
   for (const [index, pending] of pendingTools.entries()) {
-    const matches = merged.filter((event) =>
-      event.kind === "tool" && (
-        (pending.toolCallId && event.toolCallId === pending.toolCallId) ||
-        (pending.approvalId && event.approvalId === pending.approvalId) ||
-        (pending.sessionId && event.sessionId === pending.sessionId && event.tool === pending.tool)
-      ),
+    const matches = merged.filter(
+      (event) =>
+        event.kind === "tool" &&
+        ((pending.toolCallId && event.toolCallId === pending.toolCallId) ||
+          (pending.approvalId && event.approvalId === pending.approvalId) ||
+          (pending.sessionId &&
+            event.sessionId === pending.sessionId &&
+            event.tool === pending.tool)),
     );
     const match = matches.length === 1 ? matches[0] : undefined;
     if (match) {
@@ -311,7 +372,9 @@ function mergePendingTools(
       });
     } else {
       merged.push({
-        id: `pending-${pending.approvalId ?? pending.toolCallId ?? `${pending.tool}-${index}`}`,
+        id: `pending-${
+          pending.approvalId ?? pending.toolCallId ?? `${pending.tool}-${index}`
+        }`,
         kind: "tool",
         tool: pending.tool,
         ...(pending.input ? { toolInput: pending.input } : {}),
@@ -323,99 +386,4 @@ function mergePendingTools(
     }
   }
   return merged;
-}
-
-function SessionMetadataBadges({ metadata }: { metadata: SessionMetadataSummary }) {
-  const capabilityBadges = [
-    countBadge("tool", metadata.capabilities?.tools),
-    countBadge("mcp", metadata.capabilities?.pendingMcpServers),
-    countBadge("agent", metadata.capabilities?.agents),
-    countBadge("skill", metadata.capabilities?.skills),
-  ].filter(Boolean) as Array<{ key: string; label: string; title?: string }>;
-  // The context window renders as an interactive meter (bar + hover popover);
-  // budget rides in that popover, so it only gets a text badge when there is no
-  // context to attach it to.
-  const badges: Array<{ key: string; label: string; title?: string }> = [
-    ...(metadata.turns?.length ? [{ key: "turns", label: countLabel(metadata.turns.length, "turn") }] : []),
-    ...capabilityBadges,
-    ...(!metadata.context && metadata.budget
-      ? [{ key: "budget", label: budgetLabel(metadata.budget) }]
-      : []),
-    ...(metadata.events?.length ? [{ key: "events", label: countLabel(metadata.events.length, "event") }] : []),
-  ];
-  const modelIcon = metadata.provider ? providerIcon(metadata.provider) : undefined;
-  if (badges.length === 0 && !metadata.context) return null;
-  return (
-    <>
-      {badges.map((badge) => (
-        <span
-          key={badge.key}
-          title={badge.title}
-          className="inline-flex max-w-40 items-center rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
-        >
-          <span className="truncate">{badge.label}</span>
-        </span>
-      ))}
-      {metadata.context && (
-        <ContextMeter
-          mode="bar"
-          usedPercent={100 - metadata.context.freePercent}
-          usedTokens={metadata.context.usedTokens}
-          windowTokens={metadata.context.windowTokens}
-          model={metadata.model}
-          {...(modelIcon ? { modelIcon } : {})}
-          {...(metadata.usage
-            ? {
-                tokens: {
-                  input: metadata.usage.inputTokens,
-                  output: metadata.usage.outputTokens,
-                  reasoning: metadata.usage.reasoningTokens,
-                  cacheRead: metadata.usage.cacheReadTokens,
-                  cacheWrite: metadata.usage.cacheWriteTokens,
-                  total: tokenTotal(metadata.usage),
-                },
-              }
-            : {})}
-          {...(metadata.cost
-            ? {
-                cost: {
-                  input: metadata.cost.inputCost,
-                  output: metadata.cost.outputCost,
-                  reasoning: metadata.cost.reasoningCost,
-                  cacheRead: metadata.cost.cacheReadCost,
-                  cacheWrite: metadata.cost.cacheWriteCost,
-                  total: costTotal(metadata.cost),
-                },
-              }
-            : {})}
-          {...(metadata.budget ? { budget: metadata.budget } : {})}
-        />
-      )}
-    </>
-  );
-}
-
-function countBadge(label: string, values: string[] | undefined) {
-  const count = values?.length ?? 0;
-  if (!count) return null;
-  return { key: label, label: countLabel(count, label), title: values?.join(", ") };
-}
-
-function countLabel(count: number, label: string) {
-  if (label === "mcp") return `${count} mcp`;
-  return `${count} ${label}${count === 1 ? "" : "s"}`;
-}
-
-function budgetLabel(budget: { used?: number; total?: number; remaining?: number }) {
-  if (budget.total !== undefined && budget.total > 0) {
-    return `budget ${formatUSD(budget.used ?? 0)}/${formatUSD(budget.total)}`;
-  }
-  if (budget.remaining !== undefined) return `budget ${formatUSD(budget.remaining)} left`;
-  if (budget.used !== undefined) return `budget ${formatUSD(budget.used)} used`;
-  return "budget";
-}
-
-function formatUSD(value: number) {
-  if (value < 1 || !Number.isInteger(value)) return `$${value.toFixed(2)}`;
-  return `$${value.toFixed(0)}`;
 }

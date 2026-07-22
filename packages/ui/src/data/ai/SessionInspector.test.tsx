@@ -1,132 +1,206 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { SessionInspector } from "./SessionInspector";
-import type { UnifiedSessionInput } from "./SessionViewer.unified";
-
-const FULL_SESSION: UnifiedSessionInput = {
-  id: "session-parity",
-  source: "claude",
-  project: "captain",
-  cwd: "/repo",
-  historyFile: "/repo/.claude/session.jsonl",
-  provider: "anthropic",
-  version: "1.2.3",
-  model: "claude-opus-4-8",
-  git: { branch: "main", commit: "abc123" },
-  startedAt: "2026-07-08T10:00:00Z",
-  endedAt: "2026-07-08T10:05:00Z",
-  usage: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
-  cost: { inputCost: 0.01, outputCost: 0.02, totalTokens: 1500 },
-  toolCosts: [{ model: "claude-opus-4-8", inputTokens: 1000, outputTokens: 500, inputCost: 0.01, outputCost: 0.02 }],
-  context: { usedTokens: 1500, windowTokens: 1_000_000, freePercent: 99 },
-  budget: { used: 0.03, total: 1 },
-  capabilities: { tools: ["Read", "Bash"], agents: ["general-purpose"], skills: ["gavel-runner"] },
-  events: [
-    { type: "last-prompt", scope: "session" },
-    {
-      type: "memory_citation",
-      scope: "session",
-      turnId: "turn-1",
-      data: {
-        citation_entries: ["MEMORY.md:10-12|note=[session parser]"],
-        rollout_ids: ["019f3754-ecfa-7323-a76b-a0205ea30bbe"],
-      },
-    },
-  ],
-  turns: [
-    {
-      id: "turn-1",
-      index: 1,
-      startedAt: "2026-07-08T10:00:00Z",
-      endedAt: "2026-07-08T10:05:00Z",
-      model: "claude-opus-4-8",
-      stopReason: "end_turn",
-      messageIds: ["m1"],
-      usage: { inputTokens: 1000, outputTokens: 500 },
-      cost: { inputCost: 0.01, outputCost: 0.02 },
-      context: { usedTokens: 1500, windowTokens: 1_000_000, freePercent: 99 },
-      events: [{ type: "budget_usd", scope: "turn", turnId: "turn-1" }],
-    },
-  ],
-  root: {
-    id: "root",
-    isRoot: true,
-    historyFile: "/repo/.claude/session.jsonl",
-    children: [{ id: "agent-1", type: "general-purpose", desc: "Review parity" }],
-  },
-  agents: [{ id: "root", isRoot: true }, { id: "agent-1", type: "general-purpose", desc: "Review parity" }],
-  files: { read: ["pkg/session/session.go"], written: ["pkg/cli/webapp/src/SessionBrowser.tsx"] },
-  plan: {
-    path: "/repo/.claude/plans/parity.md",
-    content: "Implement parity panels",
-    explicit: true,
-    events: [{ kind: "exit", timestamp: "2026-07-08T10:03:00Z" }],
-  },
-  approvals: {
-    approved: 2,
-    denied: 1,
-    denials: [{ toolUseId: "tool-1", tool: "Bash", reason: "Needs manual review" }],
-  },
-  health: [{ kind: "low_context", severity: "warning", message: "Context low" }],
-  live: { active: true, pid: 1234, status: "running", command: "claude" },
-  prompt: { name: "parity.prompt" },
-  messages: [
-    {
-      id: "m1",
-      role: "assistant",
-      turnId: "turn-1",
-      provenance: {
-        timestamp: "2026-07-08T10:00:01Z",
-        source: "claude",
-        model: "claude-opus-4-8",
-        cwd: "/repo",
-        agentId: "root",
-      },
-      raw: { type: "assistant", uuid: "m1" },
-      parts: [{ type: "text", text: "done" }],
-    },
-  ],
-};
+import { INSPECTOR_SESSION } from "./SessionViewer.fixtures";
 
 describe("SessionInspector", () => {
-  it("renders full unified session detail tabs", () => {
+  it("keeps the composer mounted across detail tabs", () => {
     render(
       <div className="h-[720px]">
-        <SessionInspector session={FULL_SESSION} />
+        <SessionInspector
+          session={INSPECTOR_SESSION}
+          composer={<div>Continue session</div>}
+        />
+      </div>,
+    );
+
+    expect(screen.getByText("Continue session")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Plan" }));
+    expect(screen.getByText("Continue session")).toBeInTheDocument();
+  });
+
+  it("renders the provider-aware summary, runtime details, and usage sidebar", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={INSPECTOR_SESSION} />
+      </div>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Running with claude-opus-4-8" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("High"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("session-runtime-mode")).toHaveTextContent(
+      "cmux",
+    );
+    expect(screen.getByText("1234")).toBeInTheDocument();
+    expect(screen.getByText("1.5k")).toBeInTheDocument();
+    expect(screen.getByText("$0.03")).toBeInTheDocument();
+    expect(screen.queryByText("Queued")).not.toBeInTheDocument();
+    // The context meter now leads the header (moved from the right), with the
+    // provider brand glyph — carrying its brand color — nested inside its ring.
+    const contextMeter = within(screen.getByRole("banner")).getByLabelText(
+      "Context 1% used",
+    );
+    expect(contextMeter.querySelector("svg")).not.toBeNull();
+    const bannerSvgs = [...screen.getByRole("banner").querySelectorAll("svg")];
+    expect(
+      bannerSvgs.some((svg) => svg.classList.contains("text-[#C15F3C]")),
+    ).toBe(true);
+    expect(screen.getAllByLabelText("Context 1% used")).toHaveLength(1);
+  });
+
+  it("renders full unified session detail tabs", async () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={INSPECTOR_SESSION} />
       </div>,
     );
 
     expect(screen.getByText("done")).toBeInTheDocument();
-    expect(screen.getByText("turn turn-1")).toBeInTheDocument();
+    expect(screen.getAllByTitle("Turn turn-1")).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Turns" }));
-    expect(screen.getByText("turn-1")).toBeInTheDocument();
-    expect(screen.getByText("end_turn")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: /Turns/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: /Agents/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Select session content: 1 of 1 session",
+      }),
+    );
+    const hierarchy = screen.getByRole("tree", { name: "Session content" });
+    expect(within(hierarchy).getByText("Review parity")).toBeInTheDocument();
+    expect(within(hierarchy).getByText("Turn 1")).toBeInTheDocument();
+    expect(within(hierarchy).getByText("Turn 3")).toBeInTheDocument();
+    fireEvent.click(within(hierarchy).getByText("Review parity"));
+    expect(within(hierarchy).getByText("Turn 2")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Select session content: 1 of 1 session",
+      }),
+    );
 
-    fireEvent.click(screen.getByRole("radio", { name: "Agents" }));
-    expect(screen.getByText("Root")).toBeInTheDocument();
-    expect(screen.getByText("Review parity")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Files 2" }));
+    expect(
+      screen.getByRole("tree", { name: "Session files" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("treeitem", { name: "pkg/session/session.go" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("treeitem", {
+        name: "pkg/cli/webapp/src/SessionBrowser.tsx",
+      }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Files" }));
-    expect(screen.getByText("pkg/session/session.go")).toBeInTheDocument();
-    expect(screen.getByText("pkg/cli/webapp/src/SessionBrowser.tsx")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Plan" }));
+    expect(
+      await screen.findByRole("heading", { name: "Implement parity panels" }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
-    expect(screen.getByText("Implement parity panels")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("radio", { name: "Approvals" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Approvals 3" }));
     expect(screen.getByText("Needs manual review")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Costs" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Costs $0.03" }));
     expect(screen.getAllByText("$0.03").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Metadata" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Metadata" }));
     expect(screen.getByText("/repo/.claude/session.jsonl")).toBeInTheDocument();
-    expect(screen.getByText("anthropic")).toBeInTheDocument();
+    expect(screen.getAllByText("anthropic").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText(/4 keys/));
     expect(document.body.textContent).toContain("memory_citation");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Raw" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Raw" }));
     expect(screen.getByText('"session-parity"')).toBeInTheDocument();
+  });
+
+  it("keeps the hierarchy picker left aligned across detail tabs", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={INSPECTOR_SESSION} />
+      </div>,
+    );
+
+    const hierarchyToolbar = screen.getByRole("toolbar", {
+      name: "Session content controls",
+    });
+    const hierarchyPicker = within(hierarchyToolbar).getByRole("button", {
+      name: "Select session content: 1 of 1 session",
+    });
+    expect(hierarchyToolbar).toHaveClass("justify-start");
+    const viewerActions = screen.getByRole("group", {
+      name: "Session viewer actions",
+    });
+    expect(
+      within(viewerActions).queryByRole("button", {
+        name: "Select session content: 1 of 1 session",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(viewerActions).getByRole("button", { name: "Session options" }),
+    ).toBeInTheDocument();
+    const badges = screen.getAllByTestId("transcript-turn-badge");
+    expect(badges).toHaveLength(3);
+    expect(badges[0]).toHaveClass("px-1", "py-px", "text-[9px]");
+    expect(badges[0]).toHaveAttribute("data-turn-color");
+    expect(badges[0]?.getAttribute("data-turn-color")).not.toBe(
+      badges[1]?.getAttribute("data-turn-color"),
+    );
+    const messageBadges = screen.getAllByTestId("message-turn-badge");
+    expect(messageBadges).toHaveLength(3);
+    expect(messageBadges[2]).toHaveTextContent("turn-3");
+    expect(messageBadges[2]?.parentElement).toHaveTextContent("third turn");
+    expect(messageBadges[2]).toHaveAttribute(
+      "data-turn-color",
+      badges[2]?.getAttribute("data-turn-color"),
+    );
+
+    fireEvent.click(hierarchyPicker);
+    const tree = screen.getByRole("tree", { name: "Session content" });
+    fireEvent.click(within(tree).getByText("Review parity"));
+    fireEvent.click(
+      within(tree).getByRole("checkbox", { name: "Include Turn 2" }),
+    );
+    expect(screen.queryByText("second turn")).not.toBeInTheDocument();
+    expect(screen.getByText("done")).toBeInTheDocument();
+    expect(screen.getAllByTestId("message-turn-badge")).toHaveLength(2);
+
+    fireEvent.click(hierarchyPicker);
+    fireEvent.click(screen.getByRole("tab", { name: /^Costs/ }));
+    expect(
+      within(
+        screen.getByRole("toolbar", { name: "Session content controls" }),
+      ).getByRole("button", {
+        name: "Select session content: 1 of 1 session",
+      }),
+    ).toBeVisible();
+  });
+
+  it("renders plan markdown inline and enables editing explicitly", async () => {
+    const onPlanChange = vi.fn();
+    render(
+      <div className="h-[720px]">
+        <SessionInspector
+          session={INSPECTOR_SESSION}
+          defaultTab="plan"
+          onPlanChange={onPlanChange}
+        />
+      </div>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Implement parity panels" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const editor = screen.getByRole("textbox", { name: "Plan markdown" });
+    fireEvent.change(editor, { target: { value: "# Revised plan" } });
+    expect(onPlanChange).toHaveBeenCalledWith("# Revised plan");
+    fireEvent.click(screen.getByRole("button", { name: "Done editing plan" }));
+    expect(await screen.findByText("Revised plan")).toBeInTheDocument();
   });
 });

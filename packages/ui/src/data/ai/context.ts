@@ -10,6 +10,10 @@ export interface ChatContextItem {
   type: string;
   label: string;
   fields?: Record<string, string>;
+  /** Full markdown content shown, rendered, when the badge is expanded in a
+   *  modal. Purely presentational — not folded into {@link serializeContext};
+   *  the caller forwards the real content to the backend via `payload`. */
+  preview?: string;
   /** Rich caller-owned data forwarded to the chat backend alongside the
    *  serialized context summary. It is intentionally not rendered in badges. */
   payload?: unknown;

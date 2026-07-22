@@ -44,6 +44,17 @@ export type AISpecRuntimePrompt = {
   appendSystem?: string;
   schemaJSON?: unknown;
   schemaStrictness?: SpecSchemaStrictness | "";
+  attachments?: AISpecRuntimeAttachment[];
+};
+
+export type AISpecRuntimeAttachment = {
+  id?: string;
+  path?: string;
+  url?: string;
+  filename?: string;
+  mediaType?: string;
+  size?: number;
+  sha256?: string;
 };
 
 export type AISpecRuntimeModelFallback = {
@@ -314,7 +325,37 @@ function compactPrompt(
   ) {
     prompt.schemaStrictness = value.schemaStrictness;
   }
+  const attachments = value.attachments
+    ?.map((attachment) => compactAttachment(attachment))
+    .filter(
+      (attachment): attachment is AISpecRuntimeAttachment =>
+        attachment !== undefined,
+    );
+  if (attachments && attachments.length > 0) prompt.attachments = attachments;
   return hasKeys(prompt) ? prompt : undefined;
+}
+
+function compactAttachment(
+  value: AISpecRuntimeAttachment,
+): AISpecRuntimeAttachment | undefined {
+  const attachment: AISpecRuntimeAttachment = {};
+  for (const key of [
+    "id",
+    "path",
+    "url",
+    "filename",
+    "mediaType",
+    "sha256",
+  ] as const) {
+    const text = cleanString(value[key]);
+    if (text) attachment[key] = text;
+  }
+  if (value.size != null && Number.isFinite(value.size) && value.size >= 0) {
+    attachment.size = value.size;
+  }
+  return attachment.id || attachment.path || attachment.url
+    ? attachment
+    : undefined;
 }
 
 function compactFallbacks(

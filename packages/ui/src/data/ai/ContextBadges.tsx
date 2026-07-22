@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import { UiClose } from "../../icons";
+import { Markdown } from "../Markdown";
+import { Modal } from "../../overlay/Modal";
+import { UiClose, UiEye } from "../../icons";
 import type { ChatContextItem, ContextTypeConfig, ContextTypeStyle } from "./context";
 
 const DEFAULT_STYLE: ContextTypeStyle = {
@@ -33,9 +36,12 @@ export type ContextBadgesProps = {
  *  is supplied, otherwise static. The financial type→colour map lives entirely
  *  in the caller-supplied `typeConfig`, so this is domain-agnostic. */
 export function ContextBadges({ items, onRemove, typeConfig, className }: ContextBadgesProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   if (items.length === 0) return null;
   const readonly = !onRemove;
+  const expanded = items.find((item) => item.id === expandedId) ?? null;
   return (
+    <>
     <div
       className={cn(
         readonly ? "flex flex-wrap gap-1" : "flex flex-wrap gap-1.5 px-2 py-1.5",
@@ -63,6 +69,17 @@ export function ContextBadges({ items, onRemove, typeConfig, className }: Contex
             )}
             <span className="font-medium truncate max-w-[180px]">{item.label}</span>
             {d && <span className="opacity-70 truncate max-w-[100px]">{d}</span>}
+            {item.preview && (
+              <button
+                type="button"
+                data-testid="context-badge-expand"
+                aria-label={`Expand ${item.label}`}
+                onClick={() => setExpandedId(item.id)}
+                className="ml-0.5 opacity-60 hover:opacity-100"
+              >
+                <Icon icon={UiEye} className="size-3" />
+              </button>
+            )}
             {onRemove && (
               <button
                 type="button"
@@ -78,6 +95,16 @@ export function ContextBadges({ items, onRemove, typeConfig, className }: Contex
         );
       })}
     </div>
+    <Modal
+      open={!!expanded}
+      onClose={() => setExpandedId(null)}
+      title={expanded?.label}
+      {...(expanded && detail(expanded) ? { subtitle: detail(expanded) } : {})}
+      size="xl"
+    >
+      {expanded?.preview ? <Markdown text={expanded.preview} /> : null}
+    </Modal>
+    </>
   );
 }
 
