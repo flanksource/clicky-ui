@@ -83,8 +83,31 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     const merge = (incoming: TaskSnapshot[]) => {
       setById((prev) => {
         const next = { ...prev };
-        for (const snap of incoming) next[snap.id] = snap;
+        for (const snap of incoming) next[snap.id] = { ...next[snap.id], ...snap };
         return next;
+      });
+    };
+
+    const mergeOutput = (delta: {
+      id: string;
+      stream: "stdout" | "stderr";
+      data: string;
+      reset?: boolean;
+      truncated?: boolean;
+    }) => {
+      setById((prev) => {
+        const snapshot = prev[delta.id];
+        if (!snapshot) return prev;
+        const value = delta.reset ? delta.data : `${snapshot[delta.stream] ?? ""}${delta.data}`;
+        const truncatedField = delta.stream === "stdout" ? "stdoutTruncated" : "stderrTruncated";
+        return {
+          ...prev,
+          [delta.id]: {
+            ...snapshot,
+            [delta.stream]: value,
+            [truncatedField]: delta.truncated ?? snapshot[truncatedField],
+          },
+        };
       });
     };
 
@@ -124,6 +147,13 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     es.addEventListener("task", (e) => {
       try {
         merge([JSON.parse((e as MessageEvent).data) as TaskSnapshot]);
+      } catch {
+        /* ignore malformed frame */
+      }
+    });
+    es.addEventListener("output", (e) => {
+      try {
+        mergeOutput(JSON.parse((e as MessageEvent).data) as Parameters<typeof mergeOutput>[0]);
       } catch {
         /* ignore malformed frame */
       }

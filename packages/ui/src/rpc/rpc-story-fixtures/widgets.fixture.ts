@@ -1,18 +1,23 @@
 // Widgets surface — Inventory group. Showcases a link-command name cell (detail
 // nav), colored status text, tag chips, and a timestamp column, with search +
-// enum + limit filters.
+// enum filters and limit/offset pagination.
+//
+// The row set is generated rather than hand-listed so the fake backend has
+// enough rows to page through; every value is derived from the row index, so
+// the fixture renders identically on every run.
 
 import {
   badge,
-  clickyDoc,
   detailDoc,
   detailLink,
+  fixtureTimestamp,
+  pick,
   status,
-  table,
   tags,
   text,
   type SurfaceFixture,
 } from "./surface-fixture";
+import type { ClickyRow } from "../../data/Clicky";
 
 const paths: SurfaceFixture["paths"] = {
   "/api/v1/widgets": {
@@ -24,6 +29,9 @@ const paths: SurfaceFixture["paths"] = {
         { name: "q", in: "query", schema: { type: "string" }, description: "Search query", placeholder: "Search widgets…", "x-clicky": { role: "search" } },
         { name: "kind", in: "query", schema: { type: "string", enum: ["big", "small"] }, description: "Widget kind", "x-clicky": { role: "filter" } },
         { name: "limit", in: "query", schema: { type: "integer", default: 25 }, description: "Page size", "x-clicky": { role: "limit" } },
+        // Both a limit AND an offset role are required before
+        // parametersToFormConfig builds a pagination config at all.
+        { name: "offset", in: "query", schema: { type: "integer", default: 0 }, description: "Row offset", "x-clicky": { role: "offset" } },
       ],
       responses: { "200": { description: "OK" } },
       "x-clicky": { surface: "widgets", verb: "list", scope: "collection" },
@@ -57,58 +65,88 @@ const paths: SurfaceFixture["paths"] = {
   },
 };
 
-const listResponse = clickyDoc(
-  table(
-    [
-      { name: "name", label: "Name", sortable: true, grow: true },
-      { name: "kind", label: "Kind", shrink: true },
-      { name: "status", label: "Status", kind: "status", sortable: true, shrink: true },
-      { name: "labels", label: "Labels", kind: "tags", filterable: true, grow: true },
-      { name: "updated", label: "Updated", kind: "timestamp", sortable: true, shrink: true },
-    ],
-    [
-      {
-        cells: {
-          name: detailLink("Hex bolt", "widget_get", "wgt_42"),
-          kind: text("small"),
-          status: status("active"),
-          labels: tags({ material: "steel", grade: "8.8" }),
-          updated: text("2026-06-02T09:30:00Z"),
-        },
-      },
-      {
-        cells: {
-          name: detailLink("Flange gasket", "widget_get", "wgt_77"),
-          kind: text("big"),
-          status: status("low"),
-          labels: tags({ material: "rubber", seal: "epdm" }),
-          updated: text("2026-06-11T16:05:00Z"),
-        },
-      },
-    ],
-  ),
-);
+const NAMES = [
+  "Hex bolt",
+  "Flange gasket",
+  "Thrust washer",
+  "Dowel pin",
+  "Spring clip",
+  "Cap screw",
+  "Lock nut",
+  "Shim plate",
+  "Drive belt",
+  "Idler pulley",
+  "Seal ring",
+  "Bushing",
+];
+const KINDS = ["small", "big"];
+const STATES = ["active", "low", "archived"];
+const MATERIALS = ["steel", "rubber", "brass", "nylon"];
+const GRADES = ["8.8", "10.9", "12.9"];
 
-const detailById: Record<string, ReturnType<typeof detailDoc>> = {
-  wgt_42: detailDoc([
-    { name: "id", value: text("wgt_42") },
-    { name: "name", value: text("Hex bolt") },
-    { name: "kind", value: text("small") },
-    { name: "status", value: status("active") },
-    { name: "material", value: badge("material", "steel", "#475569") },
-    { name: "stock", value: text("1240") },
-    { name: "updated", value: text("2026-06-02T09:30:00Z") },
-  ]),
-  wgt_77: detailDoc([
-    { name: "id", value: text("wgt_77") },
-    { name: "name", value: text("Flange gasket") },
-    { name: "kind", value: text("big") },
-    { name: "status", value: status("low") },
-    { name: "material", value: badge("material", "rubber", "#475569") },
-    { name: "stock", value: text("38") },
-    { name: "updated", value: text("2026-06-11T16:05:00Z") },
-  ]),
+const WIDGET_COUNT = 140;
+
+type WidgetSeed = {
+  id: string;
+  name: string;
+  kind: string;
+  state: string;
+  material: string;
+  grade: string;
+  stock: number;
+  updated: string;
 };
+
+function widgetSeed(index: number): WidgetSeed {
+  const n = index + 1;
+  return {
+    id: `wgt_${n}`,
+    name: `${pick(NAMES, index)} ${String(n).padStart(3, "0")}`,
+    kind: pick(KINDS, index),
+    state: pick(STATES, index),
+    material: pick(MATERIALS, index),
+    grade: pick(GRADES, index),
+    stock: ((n * 37) % 900) + 12,
+    updated: fixtureTimestamp(index),
+  };
+}
+
+const SEEDS: WidgetSeed[] = Array.from({ length: WIDGET_COUNT }, (_, index) => widgetSeed(index));
+
+const listColumns = [
+  { name: "name", label: "Name", sortable: true, grow: true },
+  { name: "kind", label: "Kind", shrink: true },
+  { name: "status", label: "Status", kind: "status" as const, sortable: true, shrink: true },
+  { name: "labels", label: "Labels", kind: "tags" as const, filterable: true, grow: true },
+  { name: "updated", label: "Updated", kind: "timestamp" as const, sortable: true, shrink: true },
+];
+
+const listRows: ClickyRow[] = SEEDS.map((seed) => ({
+  cells: {
+    name: detailLink(seed.name, "widget_get", seed.id),
+    kind: text(seed.kind),
+    status: status(seed.state),
+    labels: tags({ material: seed.material, grade: seed.grade }),
+    updated: text(seed.updated),
+  },
+}));
+
+// Detail documents are derived from the same seeds so a row and its detail page
+// can never disagree.
+const detailById: Record<string, ReturnType<typeof detailDoc>> = Object.fromEntries(
+  SEEDS.map((seed) => [
+    seed.id,
+    detailDoc([
+      { name: "id", value: text(seed.id) },
+      { name: "name", value: text(seed.name) },
+      { name: "kind", value: text(seed.kind) },
+      { name: "status", value: status(seed.state) },
+      { name: "material", value: badge("material", seed.material, "#475569") },
+      { name: "stock", value: text(String(seed.stock)) },
+      { name: "updated", value: text(seed.updated) },
+    ]),
+  ]),
+);
 
 export const WIDGETS_FIXTURE: SurfaceFixture = {
   surface: {
@@ -119,6 +157,7 @@ export const WIDGETS_FIXTURE: SurfaceFixture = {
     description: "Demo widget surface.",
   },
   paths,
-  listResponse,
+  listColumns,
+  listRows,
   detailById,
 };

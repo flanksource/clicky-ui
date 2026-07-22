@@ -80,7 +80,7 @@ describe("AppShell", () => {
   });
 
   it("renders the fixed body header and body actions on the same row", () => {
-    render(
+    const { container } = render(
       <AppShell bodyHeader={<div>HeaderBar</div>} bodyActions={<button>Run</button>}>
         <p>content</p>
       </AppShell>,
@@ -88,17 +88,50 @@ describe("AppShell", () => {
     expect(screen.getByText("HeaderBar")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Run" })).toBeTruthy();
     expect(screen.getByText("content")).toBeTruthy();
+    expect(container.querySelector('[data-slot="app-shell-column"]')).toHaveClass(
+      "@container/app-content",
+    );
+    expect(container.querySelector('[data-slot="app-shell-body-header-content"]')).toHaveClass(
+      "max-w-7xl",
+      "@8xl/app-content:max-w-8xl",
+      "@9xl/app-content:max-w-9xl",
+    );
+    expect(container.querySelector('[data-slot="app-shell-content"]')).toHaveClass(
+      "max-w-7xl",
+      "@8xl/app-content:max-w-8xl",
+      "@9xl/app-content:max-w-9xl",
+    );
+  });
+
+  it("supports explicit full-width content", () => {
+    const { container } = render(
+      <AppShell contentWidth="full" bodyHeader={<div>HeaderBar</div>}>
+        <p>content</p>
+      </AppShell>,
+    );
+
+    const header = container.querySelector('[data-slot="app-shell-body-header-content"]');
+    const content = container.querySelector('[data-slot="app-shell-content"]');
+    expect(header).toHaveAttribute("data-content-width", "full");
+    expect(header).not.toHaveClass("max-w-7xl");
+    expect(content).toHaveAttribute("data-content-width", "full");
+    expect(content).not.toHaveClass("max-w-7xl");
   });
 
   it("renders a body-sidebar split alongside the scrolling body-main", () => {
-    render(
-      <AppShell bodySidebar={<nav>tree</nav>}>
+    const { container } = render(
+      <AppShell bodySidebar={<nav>tree</nav>} bodyHeader={<div>HeaderBar</div>}>
         <p>content</p>
       </AppShell>,
     );
     expect(screen.getAllByText("tree")).toHaveLength(2);
     expect(screen.getAllByText("content")).toHaveLength(2);
     expect(screen.getByRole("separator", { name: "" })).toBeTruthy();
+    expect(container.querySelector('[data-slot="app-shell-body-header-content"]')).toHaveAttribute(
+      "data-content-width",
+      "full",
+    );
+    expect(container.querySelector('[data-slot="app-shell-content"]')).toBeNull();
   });
 
   it("passes the collapsed flag to a custom sidebar render-prop", () => {
@@ -130,5 +163,63 @@ describe("AppShell", () => {
 
     fireEvent.click(within(drawer).getByRole("link", { name: "Policies" }));
     expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull();
+  });
+
+  describe("debugSlots", () => {
+    function renderShell(debugSlots: boolean) {
+      return render(
+        <AppShell
+          debugSlots={debugSlots}
+          brand={<span>brand</span>}
+          search={<input aria-label="search" />}
+          actions={<button type="button">act</button>}
+          toolbar={<span>toolbar</span>}
+          bodyHeader={<span>title</span>}
+          bodyActions={<button type="button">edit</button>}
+        >
+          <p>content</p>
+        </AppShell>,
+      );
+    }
+
+    it("tags each slot with a data-slot name regardless of the flag", () => {
+      const { container } = renderShell(false);
+
+      // The attributes are always present so consumers can target regions in
+      // tests and styles; only the outline stylesheet is conditional.
+      const slots = Array.from(container.querySelectorAll("[data-slot^='app-shell-']")).map(
+        (el) => el.getAttribute("data-slot"),
+      );
+      expect(slots).toEqual(
+        expect.arrayContaining([
+          "app-shell-header",
+          "app-shell-search",
+          "app-shell-actions",
+          "app-shell-toolbar",
+          "app-shell-body-header",
+          "app-shell-body-actions",
+          "app-shell-main",
+        ]),
+      );
+    });
+
+    it("ships no outline styles or debug marker when disabled", () => {
+      const { container } = renderShell(false);
+
+      expect(container.querySelector("[data-debug-slots]")).toBeNull();
+      expect(container.querySelector("style")).toBeNull();
+    });
+
+    it("marks the root and injects a coloured rule per slot when enabled", () => {
+      const { container } = renderShell(true);
+
+      expect(container.querySelector("[data-debug-slots]")).not.toBeNull();
+      const css = container.querySelector("style")?.textContent ?? "";
+      expect(css).toContain('[data-slot="app-shell-main"]');
+      expect(css).toContain("--app-shell-debug-color");
+      // outline, not border: the overlay must not shift the layout it measures.
+      expect(css).toContain("outline:");
+      expect(css).not.toContain("border:");
+    });
   });
 });

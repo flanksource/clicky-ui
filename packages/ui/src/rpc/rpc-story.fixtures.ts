@@ -11,7 +11,11 @@ import { createElement, type ReactElement } from "react";
 import type { RenderLinkArgs } from "./EndpointList";
 import type { OperationsApiClient } from "./useOperations";
 import type { DomainDefinition, ExecutionResponse, OpenAPISpec, ResolvedOperation } from "./types";
-import type { SurfaceFixture } from "./rpc-story-fixtures/surface-fixture";
+import {
+  DEFAULT_PAGE_LIMIT,
+  listPage,
+  type SurfaceFixture,
+} from "./rpc-story-fixtures/surface-fixture";
 import { WIDGETS_FIXTURE } from "./rpc-story-fixtures/widgets.fixture";
 import { ORDERS_FIXTURE } from "./rpc-story-fixtures/orders.fixture";
 import { SERVICES_FIXTURE } from "./rpc-story-fixtures/services.fixture";
@@ -25,15 +29,24 @@ export const SAMPLE_SPEC: OpenAPISpec = {
   paths: Object.assign({}, ...FIXTURES.map((fixture) => fixture.paths)),
 };
 
-// Route maps: a collection path → its list table; a `/{id}` path → its surface
-// fixture (so the detail document is looked up per requested id).
-const listResponseByPath: Record<string, ExecutionResponse> = {};
+// Route maps: a collection path → its surface fixture (so each request is paged
+// from the master row set); a `/{id}` path → its surface fixture (so the detail
+// document is looked up per requested id).
+const listFixtureByPath: Record<string, SurfaceFixture> = {};
 const detailFixtureByPath: Record<string, SurfaceFixture> = {};
 for (const fixture of FIXTURES) {
   for (const path of Object.keys(fixture.paths)) {
     if (path.includes("{")) detailFixtureByPath[path] = fixture;
-    else listResponseByPath[path] = fixture.listResponse;
+    else listFixtureByPath[path] = fixture;
   }
+}
+
+/** Parses a query parameter the executor sent as a string. Returns undefined for
+ *  absent/blank/non-numeric values so `listPage` applies its own default. */
+function intParam(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined;
 }
 
 export const FAKE_CLIENT: OperationsApiClient = {
@@ -42,7 +55,17 @@ export const FAKE_CLIENT: OperationsApiClient = {
   },
   async executeCommand(path, method, params): Promise<ExecutionResponse> {
     if (method === "get") {
-      if (listResponseByPath[path]) return listResponseByPath[path];
+      // List routes page server-side: the response carries only the requested
+      // slice plus a {total, limit, offset} envelope, exactly as a real backend
+      // reports via X-Total-Count / X-Page-Limit / X-Page-Offset.
+      const listFixture = listFixtureByPath[path];
+      if (listFixture) {
+        return listPage(
+          listFixture,
+          intParam(params?.limit) ?? DEFAULT_PAGE_LIMIT,
+          intParam(params?.offset) ?? 0,
+        );
+      }
       const detailFixture = detailFixtureByPath[path];
       if (detailFixture) {
         const id = params?.id ?? "";
@@ -67,8 +90,13 @@ export const SAMPLE_OPERATIONS: ResolvedOperation[] = Object.entries(SAMPLE_SPEC
 );
 
 /** Widgets list/detail responses — kept as named exports for the focused stories
- *  (CommandOutput, OperationEntityPage) that render a single document. */
-export const SAMPLE_LIST_RESPONSE: ExecutionResponse = WIDGETS_FIXTURE.listResponse;
+ *  (CommandOutput, OperationEntityPage) that render a single document. The list
+ *  export is the first page, matching what an unparameterised request returns. */
+export const SAMPLE_LIST_RESPONSE: ExecutionResponse = listPage(
+  WIDGETS_FIXTURE,
+  DEFAULT_PAGE_LIMIT,
+  0,
+);
 const widgetDetail = WIDGETS_FIXTURE.detailById.wgt_42;
 if (!widgetDetail) throw new Error("Missing widget detail fixture (wgt_42)");
 export const SAMPLE_DETAIL_RESPONSE: ExecutionResponse = widgetDetail;

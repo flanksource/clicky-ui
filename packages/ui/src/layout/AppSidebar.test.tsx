@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AppSidebar, type AppNavSection } from "./AppSidebar";
+import { AppLayout, AppSidebar, type AppNavSection } from "./AppSidebar";
 import type { RenderLink } from "../rpc/EndpointList";
 import { useMemoryRouter } from "../rpc/router";
 import { RouterProvider } from "../rpc/RouterProvider";
@@ -76,5 +76,41 @@ describe("AppSidebar", () => {
     fireEvent.click(screen.getByRole("link", { name: "Policies" }));
     expect(screen.getByRole("link", { name: "Policies" }).className).toContain("font-medium");
     expect(screen.getByRole("link", { name: "Dashboard" }).className).not.toContain("font-medium");
+  });
+});
+
+describe("AppLayout", () => {
+  it("centers header and body content against the post-sidebar query container", () => {
+    const { container } = render(
+      <AppLayout sidebar={<nav>Sidebar</nav>} header={<div>Header</div>}>
+        <div>Content</div>
+      </AppLayout>,
+    );
+
+    expect(container.querySelector('[data-slot="app-layout-column"]')).toHaveClass(
+      "@container/app-content",
+    );
+    expect(container.querySelector('[data-slot="app-layout-header-content"]')).toHaveClass(
+      "max-w-7xl",
+      "@8xl/app-content:max-w-8xl",
+      "@9xl/app-content:max-w-9xl",
+    );
+    expect(container.querySelector('[data-slot="app-layout-content"]')).toHaveClass(
+      "max-w-7xl",
+      "@8xl/app-content:max-w-8xl",
+      "@9xl/app-content:max-w-9xl",
+    );
+  });
+
+  it("supports a full-width workspace", () => {
+    const { container } = render(
+      <AppLayout sidebar={<nav>Sidebar</nav>} contentWidth="full">
+        <div>Workspace</div>
+      </AppLayout>,
+    );
+
+    const content = container.querySelector('[data-slot="app-layout-content"]');
+    expect(content).toHaveAttribute("data-content-width", "full");
+    expect(content).not.toHaveClass("max-w-7xl");
   });
 });

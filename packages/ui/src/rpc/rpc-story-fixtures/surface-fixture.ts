@@ -6,15 +6,61 @@
 import type { ClickyColumn, ClickyField, ClickyNode, ClickyRow, ClickyStyle } from "../../data/Clicky";
 import type { ClickySurface, ExecutionResponse, OpenAPIOperation } from "../types";
 
+/** Page size used when an operation declares no `limit` value. Mirrors the
+ *  `dataTablePaginationFromForm` fallback so the footer and the fake backend
+ *  agree on the first page. */
+export const DEFAULT_PAGE_LIMIT = 25;
+
 export type SurfaceFixture = {
   surface: ClickySurface;
   /** Spec paths contributed by this surface; merged into SAMPLE_SPEC.paths. */
   paths: Record<string, Record<string, OpenAPIOperation>>;
-  /** The collection list response (a Clicky `table` document). */
-  listResponse: ExecutionResponse;
+  /** Columns of the collection list table. */
+  listColumns: ClickyColumn[];
+  /**
+   * The full server-side row set. The fake client slices this per the request's
+   * `limit`/`offset` rather than returning it whole, so stories exercise the
+   * same remote-pagination path as a real clicky-rpc backend.
+   */
+  listRows: ClickyRow[];
   /** Per-entity-id detail responses (Clicky `map` documents). */
   detailById: Record<string, ExecutionResponse>;
 };
+
+/**
+ * Builds the Clicky list document for a single page plus the pagination
+ * envelope. A real backend reports these as `X-Total-Count` / `X-Page-Limit` /
+ * `X-Page-Offset` headers, which `createOperationsApiClient` parses into
+ * `ExecutionResponse.pagination`; the fake client sets the field directly.
+ */
+export function listPage(
+  fixture: Pick<SurfaceFixture, "listColumns" | "listRows">,
+  limit: number,
+  offset: number,
+): ExecutionResponse {
+  const total = fixture.listRows.length;
+  const safeLimit = limit > 0 ? limit : DEFAULT_PAGE_LIMIT;
+  const safeOffset = Math.min(Math.max(offset, 0), Math.max(total - 1, 0));
+  return {
+    ...clickyDoc(table(fixture.listColumns, fixture.listRows.slice(safeOffset, safeOffset + safeLimit))),
+    pagination: { total, limit: safeLimit, offset: safeOffset },
+  };
+}
+
+/** Cyclic pick that satisfies `noUncheckedIndexedAccess`; throws on an empty list
+ *  rather than returning a silent placeholder. */
+export function pick<T>(values: readonly T[], index: number): T {
+  const value = values[index % values.length];
+  if (value === undefined) throw new Error("pick() called on an empty list");
+  return value;
+}
+
+/** Deterministic ISO timestamp `steps` slots after a fixed base — fixtures must
+ *  never depend on the wall clock or a story would re-render differently. */
+export function fixtureTimestamp(steps: number): string {
+  const base = Date.parse("2026-06-01T09:30:00Z");
+  return new Date(base + steps * 7 * 3_600_000).toISOString();
+}
 
 export function text(value: string, style?: ClickyStyle): ClickyNode {
   return { kind: "text", text: value, plain: value, ...(style ? { style } : {}) };

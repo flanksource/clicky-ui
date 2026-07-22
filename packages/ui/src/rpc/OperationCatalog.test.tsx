@@ -303,9 +303,6 @@ describe("OperationCatalog", () => {
     const client = makeClient();
     renderCatalog(client);
 
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
-    );
     await waitFor(() => {
       expect(screen.getByText("First")).toBeInTheDocument();
     });
@@ -325,13 +322,9 @@ describe("OperationCatalog", () => {
     const client = makeClient();
     renderCatalog(client);
 
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
-    );
-
     // Collection-scoped actions belong on the list: create + the bulk pause
     // (which acts on the filtered set).
-    expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Create" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
 
     // Entity-scoped actions require an {id} and live on the detail page; they
@@ -345,10 +338,7 @@ describe("OperationCatalog", () => {
     const client = makeClient();
     renderCatalog(client, { create: "Add Widget" });
 
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
-    );
-    expect(screen.getByRole("button", { name: "Add Widget" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add Widget" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
   });
 
@@ -527,11 +517,7 @@ describe("OperationCatalog", () => {
     const client = makeClient();
     renderCatalog(client);
 
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Widgets" })).toBeInTheDocument(),
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /endpoint list view/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /endpoint list view/i }));
     // The id path now carries several methods (get/put/delete), so it appears
     // once per operation in the endpoint list.
     expect(screen.getAllByText("/api/v1/widgets/{id}").length).toBeGreaterThan(0);

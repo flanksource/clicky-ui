@@ -170,6 +170,23 @@ export function EntityExplorerApp({
       }
       navSections={navSections}
       sidebarFooter={<ThemeSwitcher />}
+      // The page header belongs to the host, not to OperationCatalog — the
+      // catalog renders only its results. OperationEntityPage still titles
+      // itself, so this covers the collection route only.
+      {...(resolvedRoute.kind === "surface" && resolvedRoute.surface
+        ? {
+            bodyHeader: (
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-semibold tracking-tight">
+                  {resolvedRoute.surface.title}
+                </h1>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  {makeSurfaceDefinition(resolvedRoute.surface).description}
+                </p>
+              </div>
+            ),
+          }
+        : {})}
       collapsedStorageKey={SIDEBAR_COLLAPSED_KEY}
       contentClassName="p-6"
     >
