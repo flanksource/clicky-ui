@@ -27,7 +27,7 @@ describe("SearchInput", () => {
     render(
       <SearchInput value="" onChange={() => {}} onShortcut={onShortcut} />,
     );
-    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
     expect(onShortcut).toHaveBeenCalledOnce();
   });
 });

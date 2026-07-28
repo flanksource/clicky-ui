@@ -42,7 +42,7 @@ describe("InputField", () => {
       />,
     );
 
-    fireEvent.keyDown(window, { key: "j", metaKey: true });
+    fireEvent.keyDown(document, { key: "j", metaKey: true });
 
     expect(onShortcut).toHaveBeenCalledOnce();
     expect(screen.getByRole("textbox")).toHaveFocus();
