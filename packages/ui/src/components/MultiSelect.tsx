@@ -105,8 +105,11 @@ export function MultiSelect({
     onChange([...value, nextValue]);
   }
 
+  // `min-w-0` here, and a shrinkable trigger below, let the summary ellipsize
+  // inside a width-capped flex parent (a FilterBar chip) rather than overflow
+  // onto its neighbour.
   return (
-    <div className={cn("inline-flex", className)}>
+    <div className={cn("inline-flex min-w-0", className)}>
       <Button
         ref={refs.setReference as Ref<HTMLButtonElement>}
         type="button"
@@ -114,14 +117,14 @@ export function MultiSelect({
         disabled={disabled}
         aria-label={ariaLabel ?? `${placeholder} filter`}
         className={cn(
-          "w-fit max-w-[15rem] min-w-0 shrink-0 justify-between gap-3 text-left font-normal",
+          "w-fit max-w-[15rem] min-w-0 justify-between gap-3 text-left font-normal",
           triggerClassName,
           value.length === 0 && "text-muted-foreground",
         )}
         {...getReferenceProps()}
       >
         <span className="truncate">{selected}</span>
-        <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-muted-foreground" />
+        <Icon icon={open ? UiChevronUp : UiChevronDown} className="shrink-0 text-muted-foreground" />
       </Button>
       {open && (
         <FloatingPortal>
