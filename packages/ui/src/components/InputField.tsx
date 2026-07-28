@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useRef,
   type ChangeEvent,
@@ -10,6 +9,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "../lib/utils";
+import { useHotkey } from "../hooks/use-hotkey";
 
 type NativeInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -40,6 +40,13 @@ type InputFieldSharedProps<
   shortcut?: string | null | undefined;
   /** Override the key matched for cmd/ctrl shortcuts. Defaults to the shortcut's last character. */
   shortcutKey?: string | undefined;
+  /**
+   * Shortcut to bind, in `useHotkey` combo syntax (`"mod+k"`, `"mod+shift+p"`),
+   * where `mod` is ⌘ on macOS and Ctrl elsewhere. Preferred over `shortcutKey`:
+   * it matches modifiers exactly, whereas a key derived from the `shortcut`
+   * badge cannot express them.
+   */
+  hotkey?: string | undefined;
   /** Called before the field is focused when the shortcut is pressed. */
   onShortcut?: (() => void) | undefined;
   /** Classes applied to the outer control. */
@@ -79,6 +86,7 @@ export const InputField = forwardRef<
     suffix,
     shortcut,
     shortcutKey,
+    hotkey,
     onShortcut,
     className,
     inputClassName,
@@ -95,24 +103,20 @@ export const InputField = forwardRef<
     [],
   );
 
+  // `hotkey` is the precise form; `shortcut`/`shortcutKey` keep working by
+  // deriving a cmd/ctrl combo from the badge's last character.
   const effectiveShortcutKey =
     shortcutKey ?? (shortcut ? shortcut.slice(-1).toLowerCase() : undefined);
+  const combo = hotkey ?? (effectiveShortcutKey ? `mod+${effectiveShortcutKey}` : null);
 
-  useEffect(() => {
-    if (!onShortcut || !effectiveShortcutKey) return;
-    const handler = (event: KeyboardEvent) => {
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === effectiveShortcutKey.toLowerCase()
-      ) {
-        event.preventDefault();
-        onShortcut();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [effectiveShortcutKey, onShortcut]);
+  useHotkey(
+    combo,
+    () => {
+      onShortcut?.();
+      inputRef.current?.focus();
+    },
+    { enabled: Boolean(onShortcut) },
+  );
 
   return (
     <div
