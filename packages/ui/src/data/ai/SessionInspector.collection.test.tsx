@@ -231,6 +231,8 @@ describe("SessionInspector session collections", () => {
     );
 
     await waitFor(() => expect(loadSession).toHaveBeenCalledTimes(1));
+    // TEMP: debug
+    screen.debug();
     expect(await screen.findByText("lazy parallel answer")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {

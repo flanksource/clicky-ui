@@ -126,6 +126,11 @@ function CollectionSessionInspector({
   const [tab, setTab] = useState<SessionInspectorTab>(defaultTab);
   const transcriptClassName = cn("h-full", transcriptProps?.className);
   const panelDetail = tab === "costs" ? hierarchy.filtered : hierarchy.current;
+  // TEMP: debug
+  console.log(
+    hierarchy.filtered.messages?.map((message) => message.parts),
+    hierarchy.checked,
+  );
 
   return (
     <div
