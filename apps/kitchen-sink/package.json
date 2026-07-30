@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev",
+    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev --port 5801",
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "lint": "oxlint src vite.config.ts --deny-warnings",
-    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint"
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
@@ -16,17 +17,21 @@
     "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
     "@tanstack/react-query": "catalog:",
-    "preact": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "shiki": "catalog:"
   },
   "devDependencies": {
-    "@preact/preset-vite": "catalog:",
+    "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "autoprefixer": "catalog:",
+    "jsdom": "catalog:",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -1,30 +1,40 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import preact from "@preact/preset-vite";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
 const uiSrc = resolve(workspaceRoot, "packages/ui/src");
-const preactPath = (sub: string) => resolve(root, "node_modules/preact", sub);
 
 export default defineConfig({
-  plugins: [preact({ reactAliasesEnabled: false })],
+  plugins: [react()],
   resolve: {
     alias: [
-      { find: /^@flanksource\/clicky-ui\/styles\.css$/, replacement: resolve(uiSrc, "styles.ts") },
-      { find: /^@flanksource\/clicky-ui\/icons$/, replacement: resolve(uiSrc, "icons.ts") },
-      { find: /^@flanksource\/clicky-ui\/rpc$/, replacement: resolve(uiSrc, "rpc.ts") },
-      { find: /^@flanksource\/clicky-ui\/chat$/, replacement: resolve(uiSrc, "chat.ts") },
-      { find: /^@flanksource\/clicky-ui\/ai$/, replacement: resolve(uiSrc, "ai.ts") },
-      { find: /^@flanksource\/clicky-ui$/, replacement: resolve(uiSrc, "index.ts") },
-      { find: /^preact$/, replacement: preactPath("dist/preact.module.js") },
-      { find: /^preact\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
-      { find: /^react\/jsx-runtime$/, replacement: preactPath("jsx-runtime") },
-      { find: /^react\/jsx-dev-runtime$/, replacement: preactPath("jsx-runtime") },
-      { find: /^react-dom\/test-utils$/, replacement: preactPath("test-utils") },
-      { find: /^react-dom$/, replacement: preactPath("compat") },
-      { find: /^react$/, replacement: preactPath("compat") },
+      {
+        find: /^@flanksource\/clicky-ui\/styles\.css$/,
+        replacement: resolve(uiSrc, "styles.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/icons$/,
+        replacement: resolve(uiSrc, "icons.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/rpc$/,
+        replacement: resolve(uiSrc, "rpc.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/chat$/,
+        replacement: resolve(uiSrc, "chat.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/ai$/,
+        replacement: resolve(uiSrc, "ai.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui$/,
+        replacement: resolve(uiSrc, "index.ts"),
+      },
     ],
   },
   optimizeDeps: {

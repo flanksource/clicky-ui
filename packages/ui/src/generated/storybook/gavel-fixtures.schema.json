@@ -231,6 +231,11 @@
         "additionalProperties": false,
         "description": "Fixture lint step. YAML body maps to `gavel lint` options; each violation becomes a child node.",
         "properties": {
+          "api-url": {
+            "description": "Override the backend endpoint, e.g. a 'captain ai mock' URL. Required for codex-cli, which ignores OPENAI_BASE_URL when a ChatGPT credential is stored",
+            "title": "Api Url",
+            "type": "string"
+          },
           "baseline": {
             "description": "Path to previous results JSON; only report NEW violations not in baseline",
             "title": "Baseline",
@@ -332,6 +337,11 @@
               "source": "fixtures --help"
             }
           },
+          "mode": {
+            "description": "Runtime mechanism: api|cli|agent|cmux (sdk aliases agent). Combined with the model's family to pick a backend; contradicting --backend or a mode prefix on --model fails loud",
+            "title": "Mode",
+            "type": "string"
+          },
           "no-lint-cache": {
             "default": false,
             "description": "Disable linter result caching/debounce",
@@ -390,6 +400,7 @@
         },
         "x-order": [
           "files",
+          "api-url",
           "baseline",
           "changed",
           "dry-run",
@@ -397,6 +408,7 @@
           "fallback",
           "ignore",
           "linters",
+          "mode",
           "no-lint-cache",
           "since",
           "timeout",

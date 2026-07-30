@@ -4,57 +4,16 @@
       "authEnvVars": [
         "ANTHROPIC_API_KEY"
       ],
-      "authenticated": false,
-      "backend": "anthropic",
-      "kind": "api",
-      "modelError": "set ANTHROPIC_API_KEY to list models",
-      "ready": false
-    },
-    {
-      "authEnvVars": [
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY"
-      ],
-      "authenticated": false,
-      "backend": "gemini",
-      "kind": "api",
-      "modelError": "set GEMINI_API_KEY or GOOGLE_API_KEY to list models",
-      "ready": false
-    },
-    {
-      "authEnvVars": [
-        "OPENAI_API_KEY"
-      ],
-      "authenticated": false,
-      "backend": "openai",
-      "kind": "api",
-      "modelError": "set OPENAI_API_KEY to list models",
-      "ready": false
-    },
-    {
-      "authEnvVars": [
-        "DEEPSEEK_API_KEY"
-      ],
-      "authenticated": false,
-      "backend": "deepseek",
-      "kind": "api",
-      "modelError": "set DEEPSEEK_API_KEY to list models",
-      "ready": false
-    },
-    {
-      "authEnvVars": [
-        "ANTHROPIC_API_KEY"
-      ],
       "authenticated": true,
       "backend": "claude-cli",
       "binary": "/Users/moshe/.local/bin/claude",
       "kind": "cli",
       "modelDetails": [
         {
-          "id": "claude-sonnet-5",
-          "label": "Claude Sonnet 5",
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
           "backend": "claude-cli",
-          "releaseDate": "2026-06-29",
+          "releaseDate": "2026-07-24",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
@@ -97,32 +56,12 @@
             "xhigh",
             "max"
           ]
-        },
-        {
-          "id": "claude-sonnet-4-6",
-          "label": "Claude Sonnet 4.6",
-          "backend": "claude-cli",
-          "releaseDate": "2026-02-17",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        },
-        {
-          "id": "claude-haiku-4-5",
-          "label": "Claude Haiku 4.5 (latest)",
-          "backend": "claude-cli",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
         }
       ],
       "models": [
-        "claude-sonnet-5",
+        "claude-opus-5",
         "claude-fable-5",
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5"
+        "claude-opus-4-8"
       ],
       "ready": true
     },
@@ -136,13 +75,20 @@
       "kind": "cli",
       "modelDetails": [
         {
-          "id": "claude-sonnet-5",
-          "label": "Claude Sonnet 5",
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
           "backend": "claude-agent",
-          "releaseDate": "2026-06-29",
+          "releaseDate": "2026-07-24",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -159,6 +105,13 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -175,6 +128,13 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -182,28 +142,10 @@
             "xhigh",
             "max"
           ]
-        },
-        {
-          "id": "claude-sonnet-4-6",
-          "label": "Claude Sonnet 4.6",
-          "backend": "claude-agent",
-          "releaseDate": "2026-02-17",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        },
-        {
-          "id": "claude-haiku-4-5",
-          "label": "Claude Haiku 4.5 (latest)",
-          "backend": "claude-agent",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
         }
       ],
       "models": [
-        "claude-sonnet-5",
+        "claude-opus-5",
         "claude-fable-5",
         "claude-opus-4-8",
         "claude-sonnet-4-6",
@@ -393,6 +335,9 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/*"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -404,24 +349,6 @@
           "priority": 1
         },
         {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6 Terra",
-          "backend": "codex-cli",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 2
-        },
-        {
           "id": "gpt-5.6-luna",
           "label": "GPT-5.6 Luna",
           "backend": "codex-cli",
@@ -429,6 +356,9 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/*"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -437,28 +367,11 @@
             "max"
           ],
           "priority": 3
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "backend": "codex-cli",
-          "releaseDate": "2026-04-23",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ]
         }
       ],
       "models": [
         "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5"
+        "gpt-5.6-luna"
       ],
       "ready": false
     },
@@ -479,6 +392,9 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/*"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -490,24 +406,6 @@
           "priority": 1
         },
         {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6 Terra",
-          "backend": "codex-agent",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 2
-        },
-        {
           "id": "gpt-5.6-luna",
           "label": "GPT-5.6 Luna",
           "backend": "codex-agent",
@@ -515,6 +413,9 @@
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
+          "inputMediaTypes": [
+            "image/*"
+          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -523,223 +424,11 @@
             "max"
           ],
           "priority": 3
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "backend": "codex-agent",
-          "releaseDate": "2026-04-23",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ]
         }
       ],
       "models": [
         "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5"
-      ],
-      "ready": false
-    },
-    {
-      "args": {
-        "properties": {
-          "addDir": {
-            "description": "Extra writable directories",
-            "items": {
-              "type": "string"
-            },
-            "title": "Additional Dirs",
-            "type": "array",
-            "x-clicky-order": 5
-          },
-          "askForApproval": {
-            "default": "on-request",
-            "description": "When codex asks for human approval before running a command",
-            "enum": [
-              "untrusted",
-              "on-failure",
-              "on-request",
-              "never"
-            ],
-            "title": "Approval Policy",
-            "type": "string",
-            "x-clicky-order": 2,
-            "x-enum-display": "radio",
-            "x-enum-labels": {
-              "never": "Never",
-              "on-failure": "On failure (deprecated)",
-              "on-request": "On request",
-              "untrusted": "Untrusted only"
-            }
-          },
-          "config": {
-            "description": "Override config values as key=value",
-            "items": {
-              "type": "string"
-            },
-            "title": "Config Overrides",
-            "type": "array",
-            "x-clicky-order": 3
-          },
-          "disable": {
-            "description": "Disable named features",
-            "items": {
-              "type": "string"
-            },
-            "title": "Disable Features",
-            "type": "array",
-            "x-clicky-order": 7
-          },
-          "enable": {
-            "description": "Enable named features",
-            "items": {
-              "type": "string"
-            },
-            "title": "Enable Features",
-            "type": "array",
-            "x-clicky-order": 6
-          },
-          "image": {
-            "description": "Image files to attach to the initial prompt",
-            "items": {
-              "type": "string"
-            },
-            "title": "Images",
-            "type": "array",
-            "x-clicky-order": 11
-          },
-          "oss": {
-            "description": "Use an open-source model provider",
-            "title": "OSS Provider",
-            "type": "boolean",
-            "x-clicky-order": 10
-          },
-          "profile": {
-            "description": "Config profile to layer on the base config",
-            "title": "Profile",
-            "type": "string",
-            "x-clicky-order": 4
-          },
-          "sandbox": {
-            "default": "read-only",
-            "description": "Sandbox policy for model-run shell commands",
-            "enum": [
-              "read-only",
-              "workspace-write",
-              "danger-full-access"
-            ],
-            "title": "Sandbox",
-            "type": "string",
-            "x-clicky-order": 1,
-            "x-enum-display": "radio",
-            "x-enum-labels": {
-              "danger-full-access": "Danger: full access",
-              "read-only": "Read-only",
-              "workspace-write": "Workspace write"
-            }
-          },
-          "search": {
-            "description": "Enable live web search",
-            "title": "Web Search",
-            "type": "boolean",
-            "x-clicky-order": 9
-          },
-          "strictConfig": {
-            "description": "Error on unrecognized config fields",
-            "title": "Strict Config",
-            "type": "boolean",
-            "x-clicky-order": 8
-          }
-        },
-        "type": "object"
-      },
-      "authenticated": true,
-      "backend": "codex-cmux",
-      "binaryMissing": "codex",
-      "kind": "cli",
-      "modelDetails": [
-        {
-          "id": "gpt-5.6-sol",
-          "label": "GPT-5.6 Sol",
-          "backend": "codex-cmux",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 1
-        },
-        {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6 Terra",
-          "backend": "codex-cmux",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 2
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "label": "GPT-5.6 Luna",
-          "backend": "codex-cmux",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "priority": 3
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "backend": "codex-cmux",
-          "releaseDate": "2026-04-23",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ]
-        }
-      ],
-      "models": [
-        "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5"
+        "gpt-5.6-luna"
       ],
       "ready": false
     },
@@ -750,14 +439,14 @@
       ],
       "authenticated": true,
       "backend": "gemini-cli",
-      "binary": "/usr/local/opt/node/bin/gemini",
+      "binaryMissing": "gemini",
       "kind": "cli",
       "modelDetails": [
         {
-          "id": "gemini-3.5-flash",
-          "label": "Gemini 3.5 Flash",
+          "id": "gemini-3.6-flash",
+          "label": "Gemini 3.6 Flash",
           "backend": "gemini-cli",
-          "releaseDate": "2026-05-19",
+          "releaseDate": "2026-07-21",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": true,
@@ -766,33 +455,21 @@
             "medium",
             "high"
           ]
-        },
-        {
-          "id": "gemini-2.5-pro",
-          "label": "Gemini 2.5 Pro",
-          "backend": "gemini-cli",
-          "releaseDate": "2025-06-17",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        },
-        {
-          "id": "gemini-2.5-flash",
-          "label": "Gemini 2.5 Flash",
-          "backend": "gemini-cli",
-          "releaseDate": "2025-06-17",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
         }
       ],
       "models": [
-        "gemini-3.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.5-flash"
+        "gemini-3.6-flash"
       ],
-      "ready": true
+      "ready": false
     }
+  ],
+  "efforts": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra"
   ],
   "examples": {
     "spec": {
@@ -818,7 +495,7 @@
         ],
         "skipHooks": true
       },
-      "model": "claude-sonnet-5",
+      "model": "anthropic/claude-sonnet-5",
       "noCache": true,
       "permissions": {
         "mcp": {
@@ -872,13 +549,12 @@
       "backend": "claude-cli",
       "backends": [
         "claude-cli",
-        "claude-agent",
-        "claude-cmux"
+        "claude-agent"
       ],
       "configured": true,
-      "id": "claude-sonnet-5",
-      "label": "Claude Sonnet 5",
-      "provider": "claude-agent",
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "provider": "anthropic",
       "ready": true,
       "reasoning": true,
       "supportedEfforts": [
@@ -893,13 +569,12 @@
       "backend": "claude-cli",
       "backends": [
         "claude-cli",
-        "claude-agent",
-        "claude-cmux"
+        "claude-agent"
       ],
       "configured": true,
       "id": "claude-fable-5",
       "label": "Claude Fable 5",
-      "provider": "claude-agent",
+      "provider": "anthropic",
       "ready": true,
       "reasoning": true,
       "supportedEfforts": [
@@ -914,13 +589,12 @@
       "backend": "claude-cli",
       "backends": [
         "claude-cli",
-        "claude-agent",
-        "claude-cmux"
+        "claude-agent"
       ],
       "configured": true,
       "id": "claude-opus-4-8",
       "label": "Claude Opus 4.8",
-      "provider": "claude-agent",
+      "provider": "anthropic",
       "ready": true,
       "reasoning": true,
       "supportedEfforts": [
@@ -932,44 +606,15 @@
       ]
     },
     {
-      "backend": "claude-cli",
-      "backends": [
-        "claude-cli",
-        "claude-agent",
-        "claude-cmux"
-      ],
-      "configured": true,
-      "id": "claude-sonnet-4-6",
-      "label": "Claude Sonnet 4.6",
-      "provider": "claude-agent",
-      "ready": true,
-      "reasoning": true
-    },
-    {
-      "backend": "claude-cli",
-      "backends": [
-        "claude-cli",
-        "claude-agent",
-        "claude-cmux"
-      ],
-      "configured": true,
-      "id": "claude-haiku-4-5",
-      "label": "Claude Haiku 4.5 (latest)",
-      "provider": "claude-agent",
-      "ready": true,
-      "reasoning": true
-    },
-    {
       "backend": "codex-cli",
       "backends": [
         "codex-cli",
-        "codex-agent",
-        "codex-cmux"
+        "codex-agent"
       ],
       "configured": false,
       "id": "gpt-5.6-sol",
       "label": "GPT-5.6 Sol",
-      "provider": "codex-cli",
+      "provider": "openai",
       "ready": false,
       "reasoning": true,
       "supportedEfforts": [
@@ -985,35 +630,12 @@
       "backend": "codex-cli",
       "backends": [
         "codex-cli",
-        "codex-agent",
-        "codex-cmux"
-      ],
-      "configured": false,
-      "id": "gpt-5.6-terra",
-      "label": "GPT-5.6 Terra",
-      "provider": "codex-cli",
-      "ready": false,
-      "reasoning": true,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "ultra"
-      ]
-    },
-    {
-      "backend": "codex-cli",
-      "backends": [
-        "codex-cli",
-        "codex-agent",
-        "codex-cmux"
+        "codex-agent"
       ],
       "configured": false,
       "id": "gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
-      "provider": "codex-cli",
+      "provider": "openai",
       "ready": false,
       "reasoning": true,
       "supportedEfforts": [
@@ -1022,26 +644,6 @@
         "high",
         "xhigh",
         "max"
-      ]
-    },
-    {
-      "backend": "codex-cli",
-      "backends": [
-        "codex-cli",
-        "codex-agent",
-        "codex-cmux"
-      ],
-      "configured": false,
-      "id": "gpt-5.5",
-      "label": "GPT-5.5",
-      "provider": "codex-cli",
-      "ready": false,
-      "reasoning": true,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh"
       ]
     },
     {
@@ -1049,50 +651,59 @@
       "backends": [
         "gemini-cli"
       ],
-      "configured": true,
-      "id": "gemini-3.5-flash",
-      "label": "Gemini 3.5 Flash",
+      "configured": false,
+      "id": "gemini-3.6-flash",
+      "label": "Gemini 3.6 Flash",
       "provider": "googleai",
-      "ready": true,
+      "ready": false,
       "reasoning": true,
       "supportedEfforts": [
         "low",
         "medium",
         "high"
       ]
-    },
-    {
-      "backend": "gemini-cli",
-      "backends": [
-        "gemini-cli"
-      ],
-      "configured": true,
-      "id": "gemini-2.5-pro",
-      "label": "Gemini 2.5 Pro",
-      "provider": "googleai",
-      "ready": true,
-      "reasoning": true
-    },
-    {
-      "backend": "gemini-cli",
-      "backends": [
-        "gemini-cli"
-      ],
-      "configured": true,
-      "id": "gemini-2.5-flash",
-      "label": "Gemini 2.5 Flash",
-      "provider": "googleai",
-      "ready": true,
-      "reasoning": true
     }
   ],
   "prompt": {
     "$defs": {
+      "AttachmentRef": {
+        "additionalProperties": false,
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Prompt": {
         "additionalProperties": false,
         "properties": {
           "appendSystem": {
             "type": "string"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/$defs/AttachmentRef"
+            },
+            "type": "array"
           },
           "metadata": {
             "additionalProperties": {
@@ -1129,6 +740,9 @@
       "APIKey": {
         "type": "string"
       },
+      "APIURL": {
+        "type": "string"
+      },
       "AllowedTools": {
         "items": {
           "type": "string"
@@ -1137,6 +751,12 @@
       },
       "AppendSystem": {
         "type": "string"
+      },
+      "Attach": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "Backend": {
         "type": "string"
@@ -1172,6 +792,9 @@
       "MaxTurns": {
         "format": "int32",
         "type": "integer"
+      },
+      "Mode": {
+        "type": "string"
       },
       "Model": {
         "type": "string"
@@ -1243,12 +866,14 @@
     "required": [
       "Model",
       "Backend",
-      "APIKey",
+      "Mode",
+      "Effort",
+      "Temperature",
       "NoCache",
+      "APIKey",
+      "APIURL",
       "Budget",
       "MaxTokens",
-      "Temperature",
-      "Effort",
       "MaxTurns",
       "Resume",
       "Edit",
@@ -1269,6 +894,69 @@
     ],
     "type": "object"
   },
+  "runtimes": [
+    {
+      "family": "claude",
+      "provider": "anthropic",
+      "catalogPrefix": "anthropic",
+      "modes": [
+        {
+          "mode": "agent",
+          "backend": "claude-agent",
+          "kind": "cli",
+          "keyless": false,
+          "defaultModel": "claude-opus-5",
+          "disabled": false
+        },
+        {
+          "mode": "cli",
+          "backend": "claude-cli",
+          "kind": "cli",
+          "keyless": false,
+          "defaultModel": "claude-opus-5",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "family": "codex",
+      "provider": "openai",
+      "catalogPrefix": "openai",
+      "modes": [
+        {
+          "mode": "agent",
+          "backend": "codex-agent",
+          "kind": "cli",
+          "keyless": false,
+          "defaultModel": "gpt-5.6-sol",
+          "disabled": false
+        },
+        {
+          "mode": "cli",
+          "backend": "codex-cli",
+          "kind": "cli",
+          "keyless": false,
+          "defaultModel": "gpt-5.6-sol",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "family": "gemini",
+      "provider": "google",
+      "catalogPrefix": "googleai",
+      "modes": [
+        {
+          "mode": "cli",
+          "backend": "gemini-cli",
+          "kind": "cli",
+          "keyless": false,
+          "defaultModel": "gemini-3.6-flash",
+          "disabled": false
+        }
+      ]
+    }
+  ],
   "schemaVersion": 2,
   "source": "captain prompt --schema",
   "spec": {
@@ -1299,6 +987,33 @@
           },
           "skipTLSVerify": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "AttachmentRef": {
+        "additionalProperties": false,
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -1384,6 +1099,66 @@
           },
           "worktree": {
             "$ref": "#/$defs/Worktree"
+          }
+        },
+        "type": "object"
+      },
+      "Commit": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "gates": {
+            "enum": [
+              "none",
+              "cheap",
+              "full"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "commit",
+              "fixup",
+              "amend"
+            ],
+            "type": "string"
+          },
+          "on": {
+            "enum": [
+              "turn",
+              "agent",
+              "run"
+            ],
+            "type": "string"
+          },
+          "squash": {
+            "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "worktree",
+              "changed"
+            ],
+            "type": "string"
+          },
+          "when": {
+            "enum": [
+              "always",
+              "onSuccess",
+              "onVerify"
+            ],
+            "type": "string"
           }
         },
         "type": "object"
@@ -1627,6 +1402,21 @@
         },
         "type": "object"
       },
+      "Message": {
+        "additionalProperties": false,
+        "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/$defs/Part"
+            },
+            "type": "array"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Model": {
         "additionalProperties": false,
         "properties": {
@@ -1646,18 +1436,42 @@
             "type": "string"
           },
           "fallbacks": {
+            "$ref": "#/$defs/ModelList"
+          },
+          "id": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "mediaTypes": {
             "items": {
-              "$ref": "#/$defs/Model"
+              "type": "string"
             },
             "type": "array"
           },
-          "id": {
+          "mode": {
+            "enum": [
+              "api",
+              "cli",
+              "agent",
+              "cmux"
+            ],
             "type": "string"
           },
           "model": {
             "type": "string"
           },
           "noCache": {
+            "type": "boolean"
+          },
+          "resume": {
+            "type": "boolean"
+          },
+          "steer": {
+            "type": "boolean"
+          },
+          "streaming": {
             "type": "boolean"
           },
           "temperature": {
@@ -1667,6 +1481,33 @@
         "required": [
           "model"
         ],
+        "type": "object"
+      },
+      "ModelList": {
+        "items": {
+          "$ref": "#/$defs/Model"
+        },
+        "type": "array"
+      },
+      "Part": {
+        "additionalProperties": false,
+        "properties": {
+          "attachment": {
+            "$ref": "#/$defs/AttachmentRef"
+          },
+          "text": {
+            "type": "string"
+          },
+          "toolRequest": {
+            "$ref": "#/$defs/ToolRequest"
+          },
+          "toolResult": {
+            "$ref": "#/$defs/ToolResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Permissions": {
@@ -1696,29 +1537,17 @@
         },
         "type": "object"
       },
-      "PostRun": {
-        "additionalProperties": false,
-        "properties": {
-          "commit": {
-            "type": "boolean"
-          },
-          "commitMessage": {
-            "type": "string"
-          },
-          "dryRun": {
-            "type": "boolean"
-          },
-          "keepWorktree": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
       "Prompt": {
         "additionalProperties": false,
         "properties": {
           "appendSystem": {
             "type": "string"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/$defs/AttachmentRef"
+            },
+            "type": "array"
           },
           "metadata": {
             "additionalProperties": {
@@ -1818,16 +1647,37 @@
             "type": "string"
           },
           "fallbacks": {
-            "items": {
-              "$ref": "#/$defs/Model"
-            },
-            "type": "array"
+            "$ref": "#/$defs/ModelList"
           },
           "id": {
             "type": "string"
           },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "mediaTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "memory": {
             "$ref": "#/$defs/Memory"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/$defs/Message"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "api",
+              "cli",
+              "agent",
+              "cmux"
+            ],
+            "type": "string"
           },
           "model": {
             "type": "string"
@@ -1841,14 +1691,29 @@
           "prompt": {
             "$ref": "#/$defs/Prompt"
           },
+          "resume": {
+            "type": "boolean"
+          },
           "sessionId": {
             "type": "string"
           },
           "setup": {
             "$ref": "#/$defs/Setup"
           },
+          "steer": {
+            "type": "boolean"
+          },
+          "streaming": {
+            "type": "boolean"
+          },
           "temperature": {
             "type": "number"
+          },
+          "toolApproval": {
+            "$ref": "#/$defs/ToolApprovalResume"
+          },
+          "toolPreferences": {
+            "$ref": "#/$defs/ToolPreferences"
           },
           "workflow": {
             "$ref": "#/$defs/Workflow"
@@ -1857,6 +1722,118 @@
         "required": [
           "model"
         ],
+        "type": "object"
+      },
+      "ToolApprovalCall": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/ToolApprovalRequest"
+          },
+          "result": {
+            "$ref": "#/$defs/ToolResult"
+          }
+        },
+        "type": "object"
+      },
+      "ToolApprovalDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "input": true,
+          "message": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/$defs/ToolResult"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "toolCallId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ToolApprovalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "input": true,
+          "tool": {
+            "type": "string"
+          },
+          "toolCallId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ToolApprovalResume": {
+        "additionalProperties": false,
+        "properties": {
+          "decisions": {
+            "items": {
+              "$ref": "#/$defs/ToolApprovalDecision"
+            },
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/$defs/ToolApprovalState"
+          }
+        },
+        "type": "object"
+      },
+      "ToolApprovalState": {
+        "additionalProperties": false,
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/$defs/ToolApprovalCall"
+            },
+            "type": "array"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/$defs/Message"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ToolPreferences": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "ToolRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "input": true,
+          "name": {
+            "type": "string"
+          },
+          "toolCallId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ToolResult": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "output": true,
+          "toolCallId": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Tools": {
@@ -1897,8 +1874,11 @@
           "autoVerifyWithoutFixture": {
             "type": "boolean"
           },
-          "postRun": {
-            "$ref": "#/$defs/PostRun"
+          "commits": {
+            "items": {
+              "$ref": "#/$defs/Commit"
+            },
+            "type": "array"
           },
           "verify": {
             "$ref": "#/$defs/Verify"
@@ -1923,201 +1903,6 @@
           },
           "prefix": {
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "claudeCmuxArgs": {
-        "properties": {
-          "addDir": {
-            "description": "Extra directories tools may access",
-            "items": {
-              "type": "string"
-            },
-            "title": "Additional Dirs",
-            "type": "array",
-            "x-clicky-order": 2
-          },
-          "agent": {
-            "description": "Agent for the current session",
-            "title": "Agent",
-            "type": "string",
-            "x-clicky-order": 10
-          },
-          "appendSystemPrompt": {
-            "description": "Append to the default system prompt",
-            "title": "Append System Prompt",
-            "type": "string",
-            "x-clicky-order": 7
-          },
-          "betas": {
-            "description": "Beta headers to include in API requests",
-            "items": {
-              "type": "string"
-            },
-            "title": "Beta Headers",
-            "type": "array",
-            "x-clicky-order": 8
-          },
-          "excludeDynamicSystemPromptSections": {
-            "description": "Move per-machine sections to the first user message for prompt-cache reuse",
-            "title": "Exclude Dynamic Sections",
-            "type": "boolean",
-            "x-clicky-order": 9
-          },
-          "mcpConfig": {
-            "description": "Load MCP servers from JSON files or strings",
-            "items": {
-              "type": "string"
-            },
-            "title": "MCP Config",
-            "type": "array",
-            "x-clicky-order": 3
-          },
-          "safeMode": {
-            "description": "Start with all customizations disabled",
-            "title": "Safe Mode",
-            "type": "boolean",
-            "x-clicky-order": 11
-          },
-          "settings": {
-            "description": "Path to a settings JSON file or a JSON string",
-            "title": "Settings File/JSON",
-            "type": "string",
-            "x-clicky-order": 5
-          },
-          "strictMcpConfig": {
-            "description": "Only use MCP servers from --mcp-config",
-            "title": "Strict MCP Config",
-            "type": "boolean",
-            "x-clicky-order": 4
-          },
-          "systemPrompt": {
-            "description": "Replace the default system prompt",
-            "title": "System Prompt",
-            "type": "string",
-            "x-clicky-order": 6
-          },
-          "tools": {
-            "description": "Restrict the built-in tool set (e.g. Bash Edit Read)",
-            "items": {
-              "type": "string"
-            },
-            "title": "Built-in Tools",
-            "type": "array",
-            "x-clicky-order": 1
-          }
-        },
-        "type": "object"
-      },
-      "codexCmuxArgs": {
-        "properties": {
-          "addDir": {
-            "description": "Extra writable directories",
-            "items": {
-              "type": "string"
-            },
-            "title": "Additional Dirs",
-            "type": "array",
-            "x-clicky-order": 5
-          },
-          "askForApproval": {
-            "default": "on-request",
-            "description": "When codex asks for human approval before running a command",
-            "enum": [
-              "untrusted",
-              "on-failure",
-              "on-request",
-              "never"
-            ],
-            "title": "Approval Policy",
-            "type": "string",
-            "x-clicky-order": 2,
-            "x-enum-display": "radio",
-            "x-enum-labels": {
-              "never": "Never",
-              "on-failure": "On failure (deprecated)",
-              "on-request": "On request",
-              "untrusted": "Untrusted only"
-            }
-          },
-          "config": {
-            "description": "Override config values as key=value",
-            "items": {
-              "type": "string"
-            },
-            "title": "Config Overrides",
-            "type": "array",
-            "x-clicky-order": 3
-          },
-          "disable": {
-            "description": "Disable named features",
-            "items": {
-              "type": "string"
-            },
-            "title": "Disable Features",
-            "type": "array",
-            "x-clicky-order": 7
-          },
-          "enable": {
-            "description": "Enable named features",
-            "items": {
-              "type": "string"
-            },
-            "title": "Enable Features",
-            "type": "array",
-            "x-clicky-order": 6
-          },
-          "image": {
-            "description": "Image files to attach to the initial prompt",
-            "items": {
-              "type": "string"
-            },
-            "title": "Images",
-            "type": "array",
-            "x-clicky-order": 11
-          },
-          "oss": {
-            "description": "Use an open-source model provider",
-            "title": "OSS Provider",
-            "type": "boolean",
-            "x-clicky-order": 10
-          },
-          "profile": {
-            "description": "Config profile to layer on the base config",
-            "title": "Profile",
-            "type": "string",
-            "x-clicky-order": 4
-          },
-          "sandbox": {
-            "default": "read-only",
-            "description": "Sandbox policy for model-run shell commands",
-            "enum": [
-              "read-only",
-              "workspace-write",
-              "danger-full-access"
-            ],
-            "title": "Sandbox",
-            "type": "string",
-            "x-clicky-order": 1,
-            "x-enum-display": "radio",
-            "x-enum-labels": {
-              "danger-full-access": "Danger: full access",
-              "read-only": "Read-only",
-              "workspace-write": "Workspace write"
-            }
-          },
-          "search": {
-            "description": "Enable live web search",
-            "title": "Web Search",
-            "type": "boolean",
-            "x-clicky-order": 9
-          },
-          "strictConfig": {
-            "description": "Error on unrecognized config fields",
-            "title": "Strict Config",
-            "type": "boolean",
-            "x-clicky-order": 8
           }
         },
         "type": "object"
@@ -3098,7 +2883,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "claude-sonnet-5"
+                    "const": "claude-opus-5"
                   }
                 },
                 "required": [
@@ -3171,59 +2956,15 @@
                   }
                 }
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-4-6"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-haiku-4-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
             }
           ],
           "properties": {
             "cliArgs": false,
             "model": {
               "enum": [
-                "claude-sonnet-5",
+                "claude-opus-5",
                 "claude-fable-5",
-                "claude-opus-4-8",
-                "claude-sonnet-4-6",
-                "claude-haiku-4-5"
+                "claude-opus-4-8"
               ]
             }
           }
@@ -3246,7 +2987,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "claude-sonnet-5"
+                    "const": "claude-opus-5"
                   }
                 },
                 "required": [
@@ -3315,48 +3056,6 @@
                       "high",
                       "xhigh",
                       "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-4-6"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-haiku-4-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
                     ]
                   }
                 }
@@ -3367,161 +3066,9 @@
             "cliArgs": false,
             "model": {
               "enum": [
-                "claude-sonnet-5",
+                "claude-opus-5",
                 "claude-fable-5",
-                "claude-opus-4-8",
-                "claude-sonnet-4-6",
-                "claude-haiku-4-5"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "backend": {
-              "const": "claude-cmux"
-            }
-          },
-          "required": [
-            "backend"
-          ]
-        },
-        "then": {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-fable-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-opus-4-8"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-4-6"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-haiku-4-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "cliArgs": {
-              "$ref": "#/$defs/claudeCmuxArgs"
-            },
-            "model": {
-              "enum": [
-                "claude-sonnet-5",
-                "claude-fable-5",
-                "claude-opus-4-8",
-                "claude-sonnet-4-6",
-                "claude-haiku-4-5"
+                "claude-opus-4-8"
               ]
             }
           }
@@ -3571,33 +3118,6 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gpt-5.6-terra"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max",
-                      "ultra"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
                     "const": "gpt-5.6-luna"
                   }
                 },
@@ -3619,31 +3139,6 @@
                   }
                 }
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh"
-                    ]
-                  }
-                }
-              }
             }
           ],
           "properties": {
@@ -3651,9 +3146,7 @@
             "model": {
               "enum": [
                 "gpt-5.6-sol",
-                "gpt-5.6-terra",
-                "gpt-5.6-luna",
-                "gpt-5.5"
+                "gpt-5.6-luna"
               ]
             }
           }
@@ -3703,33 +3196,6 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gpt-5.6-terra"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max",
-                      "ultra"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
                     "const": "gpt-5.6-luna"
                   }
                 },
@@ -3747,31 +3213,6 @@
                       "high",
                       "xhigh",
                       "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh"
                     ]
                   }
                 }
@@ -3783,143 +3224,7 @@
             "model": {
               "enum": [
                 "gpt-5.6-sol",
-                "gpt-5.6-terra",
-                "gpt-5.6-luna",
-                "gpt-5.5"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "backend": {
-              "const": "codex-cmux"
-            }
-          },
-          "required": [
-            "backend"
-          ]
-        },
-        "then": {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.6-sol"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max",
-                      "ultra"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.6-terra"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max",
-                      "ultra"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.6-luna"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gpt-5.5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh"
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "cliArgs": {
-              "$ref": "#/$defs/codexCmuxArgs"
-            },
-            "model": {
-              "enum": [
-                "gpt-5.6-sol",
-                "gpt-5.6-terra",
-                "gpt-5.6-luna",
-                "gpt-5.5"
+                "gpt-5.6-luna"
               ]
             }
           }
@@ -3942,7 +3247,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gemini-3.5-flash"
+                    "const": "gemini-3.6-flash"
                   }
                 },
                 "required": [
@@ -3961,57 +3266,13 @@
                   }
                 }
               }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-2.5-pro"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-2.5-flash"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
             }
           ],
           "properties": {
             "cliArgs": false,
             "model": {
               "enum": [
-                "gemini-3.5-flash",
-                "gemini-2.5-pro",
-                "gemini-2.5-flash"
+                "gemini-3.6-flash"
               ]
             }
           }
