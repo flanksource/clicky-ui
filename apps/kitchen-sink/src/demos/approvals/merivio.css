@@ -1,0 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
+
+/* The Merivio design artifact's theme, scoped to the approvals demo root.
+ *
+ * Three jobs:
+ *
+ *  1. Publish the artifact's palette as `--mv-*` custom properties. The
+ *     kitchen-sink Tailwind config maps them to real utilities, so the demo
+ *     writes `bg-mv-surface` / `border-mv-hair` / `text-mv-muted` rather than
+ *     one-off arbitrary values.
+ *  2. Re-point clicky-ui's own semantic tokens at that palette, so every
+ *     library component rendered inside the scope — DataTable, Panel, Button,
+ *     Badge, Combobox — picks up the warm-paper look with no props at all.
+ *  3. Restate the handful of table and bar metrics Merivio sets in absolute
+ *     pixels, which no density preset reproduces.
+ *
+ * The fixed Tailwind status palettes the library hard-codes for `EntityCell`
+ * chips are deliberately *not* folded onto the `--mv-*` scale: Merivio tints
+ * each row glyph by financial category (violet journals, mint receivables,
+ * peach FX), and the pale `/12` tints reproduce that variety. Every pill in
+ * the demo is an `MvBadge`/`MvChip`, so nothing else needs the fold.
+ *
+ * Everything here is demo-local by design: the library stays domain-agnostic
+ * and nothing outside `.merivio` is affected.
+ */
+.merivio {
+  --mv-paper: #f3f1ea;
+  --mv-paper-2: #ebe7dc;
+  --mv-surface: #ffffff;
+  --mv-surface-2: #faf8f3;
+  --mv-ink: #0f1413;
+  --mv-ink-2: #2a2f2e;
+  --mv-ink-3: #4a514e;
+  --mv-muted: #7a8077;
+  --mv-muted-2: #a3a89e;
+  --mv-border: #e3dfd2;
+  --mv-border-strong: #d2cdbb;
+  --mv-hair: #ecead9;
+  --mv-accent: #114c40;
+  --mv-accent-2: #1c6b59;
+  --mv-accent-soft: #dde9e2;
+  --mv-warm: #b8642e;
+  --mv-warm-soft: #f2e3d3;
+  --mv-negative: #b13427;
+  --mv-negative-soft: #f6ddd6;
+  --mv-positive: #1f6b48;
+  --mv-info: #2a4f74;
+  --mv-info-soft: #dde7f0;
+  --mv-shadow-card:
+    0 1px 0 rgba(15, 20, 19, 0.04), 0 1px 2px rgba(15, 20, 19, 0.04);
+  --mv-shadow-pop:
+    0 1px 0 rgba(15, 20, 19, 0.04), 0 8px 24px rgba(15, 20, 19, 0.1);
+
+  /* clicky-ui semantic tokens, re-pointed. */
+  --background: var(--mv-paper);
+  --foreground: var(--mv-ink);
+  --card: var(--mv-surface);
+  --card-foreground: var(--mv-ink);
+  --popover: var(--mv-surface);
+  --popover-foreground: var(--mv-ink);
+  --primary: var(--mv-ink);
+  --primary-foreground: var(--mv-paper);
+  --secondary: var(--mv-surface-2);
+  --secondary-foreground: var(--mv-ink-2);
+  --muted: var(--mv-surface-2);
+  --muted-foreground: var(--mv-muted);
+  --accent: var(--mv-surface-2);
+  --accent-foreground: var(--mv-ink);
+  --destructive: var(--mv-negative);
+  --destructive-foreground: var(--mv-paper);
+  --border: var(--mv-border);
+  --input: var(--mv-border);
+  --ring: var(--mv-accent);
+  --radius: 10px;
+
+  background-color: var(--mv-paper);
+  color: var(--mv-ink);
+  font-family: "Geist", var(--fs-font-sans), system-ui, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+
+[data-theme="dark"] .merivio {
+  --mv-paper: #12140f;
+  --mv-paper-2: #1a1d16;
+  --mv-surface: #191c16;
+  --mv-surface-2: #20241c;
+  --mv-ink: #ecead9;
+  --mv-ink-2: #d3d1c0;
+  --mv-ink-3: #b0af9e;
+  --mv-muted: #8b8f80;
+  --mv-muted-2: #6b6f61;
+  --mv-border: #2f3429;
+  --mv-border-strong: #444a3b;
+  --mv-hair: #262a20;
+  --mv-accent: #6fcfb2;
+  --mv-accent-2: #55b899;
+  --mv-accent-soft: #16332b;
+  --mv-warm: #dc9a5f;
+  --mv-warm-soft: #3a2a17;
+  --mv-negative: #ec8878;
+  --mv-negative-soft: #3d1f19;
+  --mv-positive: #62c294;
+  --mv-info: #86b3dd;
+  --mv-info-soft: #1b2b3a;
+  --mv-shadow-card: 0 1px 0 rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --mv-shadow-pop: 0 1px 0 rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Geist Mono with tabular figures wherever the library asks for monospace. */
+.merivio :where(.font-mono, code, kbd, pre, textarea, input) {
+  font-family: "Geist Mono", var(--fs-font-mono), ui-monospace, monospace;
+}
+
+.merivio :where(.font-mono, code, kbd, pre) {
+  font-variant-numeric: tabular-nums;
+}
+
+.merivio :where(textarea, input) {
+  font-family: inherit;
+}
+
+/* Merivio's tables are hairline-ruled rather than fully bordered, its header
+ * row sits on the tinted second surface, and its cells run to a 14px gutter
+ * regardless of the density preset. */
+.merivio table thead th {
+  padding: 10px 14px 9px;
+  background-color: var(--mv-surface-2);
+  border-color: var(--mv-border);
+  color: var(--mv-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  --tw-shadow-color: transparent;
+}
+
+.merivio table tbody td {
+  padding: 11px 14px;
+  border-color: var(--mv-hair);
+}
+
+/* `.apl-bulk` — the one inverted surface in the design. `DataTable` renders the
+ * bar itself, so it is reached by test id; the buttons inside carry their own
+ * `mv-*` classes from the demo. */
+.merivio [data-testid="data-table-selection-actions"] {
+  padding: 9px 10px 9px 16px;
+  border-color: var(--mv-ink);
+  border-radius: 10px;
+  background-color: var(--mv-ink);
+  box-shadow: var(--mv-shadow-pop);
+  color: var(--mv-paper);
+}
+
+.merivio textarea:focus,
+.merivio input:focus {
+  border-color: var(--mv-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mv-accent) 12%, transparent);
+}

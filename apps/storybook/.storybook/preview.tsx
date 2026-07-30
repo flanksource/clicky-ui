@@ -100,11 +100,29 @@ const preview: Preview = {
     (Story, ctx) => {
       const theme = (ctx.globals.theme ?? "light") as Theme;
       const density = (ctx.globals.density ?? "comfortable") as Density;
+      // Shell-shaped stories (`layout: "fullscreen"`) need a definite, viewport-
+      // tall box: AppShell/Workspace/SplitPane are all `h-full`, which collapses
+      // against an auto-height ancestor. `dvh` is viewport-relative rather than
+      // parent-relative, so it gives the story a real height without requiring a
+      // height chain through body/#storybook-root. The padding is dropped too —
+      // an app shell should meet the viewport edge.
+      // Docs view keeps the padded box: every canvas on an autodocs page would
+      // otherwise be a full viewport tall.
+      const fullscreen = ctx.parameters?.layout === "fullscreen" && ctx.viewMode === "story";
       return (
         <ThemeProvider defaultTheme={theme}>
           <DensityProvider defaultDensity={density}>
             <GlobalSync theme={theme} density={density} />
-            <div className="min-h-[200px] bg-background p-density-4 text-foreground">
+            <div
+              className={
+                fullscreen
+                  // overflow-auto, not hidden: a fullscreen story whose content
+                  // is taller than the viewport (SpecRuntimeEditor) must stay
+                  // reachable rather than being clipped.
+                  ? "h-dvh overflow-auto bg-background text-foreground"
+                  : "min-h-[200px] bg-background p-density-4 text-foreground"
+              }
+            >
               <Story />
             </div>
           </DensityProvider>
