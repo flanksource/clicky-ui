@@ -76,6 +76,22 @@ describe("Combobox does not force the first item", () => {
 });
 
 describe("Combobox type-ahead", () => {
+  it("exposes the full selected label while the closed input is clipped", () => {
+    const selectedLabel = "password — ••••••••••••••••••••";
+    render(
+      <Combobox
+        value="password"
+        onChange={vi.fn()}
+        options={[{ value: "password", label: selectedLabel }]}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+
+    expect(input).toHaveAttribute("title", selectedLabel);
+    fireEvent.focus(input);
+    expect(input).not.toHaveAttribute("title");
+  });
+
   it("uses a compact selected label while keeping the full label in the menu", () => {
     render(
       <Combobox
