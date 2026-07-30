@@ -72,7 +72,8 @@
    * variables under [data-theme="dark"], so light/dark flips automatically.
    * Token *names* are unchanged, so every bg-primary / text-foreground /
    * border-border utility keeps working. */
-  :root {
+  :root,
+  [data-theme] {
     --background: var(--fs-bg-canvas);
     --foreground: var(--fs-fg-1);
     --card: var(--fs-bg-canvas);
@@ -204,6 +205,12 @@
   .clicky-mdx-editor-content :where(code, pre) {
     font-family: var(--fs-font-mono);
   }
+}
+
+.clicky-mdx-editor-content :where(ul, ol) {
+  list-style: revert;
+  margin-block: 0.5rem;
+  padding-inline-start: 1.5rem;
 }
 
 /* Inline-source styling for the rendered stack trace (RenderedStackTrace).
