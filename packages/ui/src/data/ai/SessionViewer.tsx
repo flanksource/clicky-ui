@@ -142,6 +142,8 @@ export function SessionViewer({
     () => mergePendingTools(normalizeSession(session), pendingTools),
     [session, pendingTools],
   );
+  // TEMP: debug
+  console.log(allEvents.map((event) => event.content));
   const displayItems = useMemo(() => collapseWaitRuns(allEvents), [allEvents]);
   const metadata = useMemo(() => getSessionMetadata(session), [session]);
 
