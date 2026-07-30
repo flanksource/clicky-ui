@@ -2851,6 +2851,46 @@
       "outline": "simple-icons:huggingface",
       "filled": "skip",
       "note": "Model vendor mark: Hugging Face. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "receipt",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:receipt-light",
+      "filled": "ph:receipt-fill",
+      "note": "Invoice / bill / transaction document"
+    },
+    {
+      "consumerName": "bank",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:bank-light",
+      "filled": "ph:bank-fill",
+      "note": "Bank account, bank feed, mapping rule"
+    },
+    {
+      "consumerName": "ledger",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:book-open-text-light",
+      "filled": "ph:book-open-text-fill",
+      "note": "Journal / ledger entry"
+    },
+    {
+      "consumerName": "chart-of-accounts",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:tree-structure-light",
+      "filled": "ph:tree-structure-fill",
+      "note": "Chart of accounts, account hierarchy"
+    },
+    {
+      "consumerName": "cloud-upload",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:cloud-arrow-up-light",
+      "filled": "ph:cloud-arrow-up-fill",
+      "note": "Upstream write to an external system"
     }
   ]
 }
