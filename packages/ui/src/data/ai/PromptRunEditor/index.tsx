@@ -11,11 +11,13 @@ import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
 import {
   AttachmentButton,
   AttachmentList,
+} from "../../chat/Attachment";
+import {
   createAttachmentUploadAdapter,
   type AttachmentFilePart,
   type AttachmentLimits,
   type AttachmentUploadAdapter,
-} from "../../chat/Attachment";
+} from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
 import type { FileUIPart } from "../../chat/types";
 import {

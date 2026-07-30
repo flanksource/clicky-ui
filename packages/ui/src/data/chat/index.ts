@@ -35,12 +35,14 @@ export {
   type AttachmentButtonProps,
   AttachmentList,
   type AttachmentListProps,
+} from "./Attachment";
+export {
   createAttachmentUploadAdapter,
   DEFAULT_ATTACHMENT_LIMITS,
   type AttachmentFilePart,
   type AttachmentLimits,
   type AttachmentUploadAdapter,
-} from "./Attachment";
+} from "./attachment-upload";
 
 export {
   clickyOperationsToTools,

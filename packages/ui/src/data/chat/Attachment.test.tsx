@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAttachmentUploadAdapter } from "./Attachment";
+import { createAttachmentUploadAdapter } from "./attachment-upload";
 import { compactAISpecRuntime } from "../ai/SpecRuntimeEditor.model";
 
 describe("createAttachmentUploadAdapter", () => {

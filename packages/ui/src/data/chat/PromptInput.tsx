@@ -11,9 +11,11 @@ import { UiArrowUp, UiStop } from "../../icons";
 import {
   AttachmentButton,
   AttachmentList,
-  type AttachmentLimits,
-  type AttachmentUploadAdapter,
 } from "./Attachment";
+import type {
+  AttachmentLimits,
+  AttachmentUploadAdapter,
+} from "./attachment-upload";
 import type { ChatStatus, FileUIPart } from "./types";
 
 export type PromptInputProps = {

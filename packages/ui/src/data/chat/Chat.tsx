@@ -19,7 +19,7 @@ import {
   createAttachmentUploadAdapter,
   type AttachmentLimits,
   type AttachmentUploadAdapter,
-} from "./Attachment";
+} from "./attachment-upload";
 import type {
   ChatBudgetConfig,
   ChatModel,

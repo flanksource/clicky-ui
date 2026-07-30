@@ -102,5 +102,6 @@ export function makeSurfaceDefinition(surface: ClickySurface): DomainDefinition 
     key: surface.key,
     title: surface.title,
     description: surface.description || `Manage ${surface.title.toLowerCase()} resources.`,
+    ...(surface.icon ? { icon: surface.icon } : {}),
   };
 }
