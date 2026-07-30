@@ -143,7 +143,7 @@ export function SessionViewer({
     [session, pendingTools],
   );
   // TEMP: debug
-  console.log(allEvents.map((event) => event.content));
+  console.log(allEvents);
   const displayItems = useMemo(() => collapseWaitRuns(allEvents), [allEvents]);
   const metadata = useMemo(() => getSessionMetadata(session), [session]);
 
@@ -198,6 +198,8 @@ export function SessionViewer({
     batchSize,
     resetKey,
   });
+  // TEMP: debug
+  console.log({ startIndex, itemTexts: items.map((item) => item.text) });
 
   if (allEvents.length === 0) {
     return (
