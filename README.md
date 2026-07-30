@@ -5,7 +5,7 @@ Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com
 - **Library** (`packages/ui`) — React + TypeScript + Tailwind, published as `@flanksource/clicky-ui`.
 - **Storybook** (`apps/storybook`) — Autodocs component catalog with interaction tests.
 - **Docs** (`apps/docs`) — Astro Starlight guides and generated TypeScript component API.
-- **Kitchen Sink** (`apps/kitchen-sink`) — Preact-hosted demo proving runtime compatibility.
+- **Kitchen Sink** (`apps/kitchen-sink`) — React-hosted demo covering the complete component catalog.
 - **E2E** (`e2e`) — Playwright tests against the kitchen sink.
 
 Toolchain: Vite + Vitest + Storybook + Astro Starlight + Playwright + pnpm workspaces.
