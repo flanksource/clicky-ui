@@ -6,7 +6,7 @@ import {
   type WorkloadKind,
   type WorkloadResource,
 } from "@flanksource/clicky-ui";
-import { Section } from "./Section";
+import { DemoSection } from "./Section";
 
 const WORKLOADS: Record<WorkloadKind, WorkloadResource[]> = {
   service: [
@@ -43,7 +43,8 @@ export function EndpointSelectorDemo() {
   });
 
   return (
-    <Section
+    <DemoSection
+      id="endpoint-selector"
       title="EndpointSelector"
       description="Consumer-scoped endpoint access modes with Kubernetes discovery and URL references."
     >
@@ -76,6 +77,6 @@ export function EndpointSelectorDemo() {
           {JSON.stringify(value, null, 2)}
         </pre>
       </div>
-    </Section>
+    </DemoSection>
   );
 }
