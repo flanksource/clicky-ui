@@ -2,6 +2,9 @@
 
 Shared ways of working, the gavel todo workflow, and global skills come from the root ~/.agents/AGENTS.md.
 
+## Skills
+- [clicky-ui conventions](.agents/skills/clicky-ui/SKILL.md) — AppShell slots and the scroll/height contract, DataTable sticky-header + pagination rules, clicky-rpc operation catalogs, theming/overlay/icon conventions, the custom oxlint rules, and the three testing layers
+
 ## Memory
 - [AI Tool Browser, Preferences & Permissions](.agents/memory/ai-tool-preferences.md) — ToolSchemaBrowser split view, CompactToolList as the one permissions interaction model, permissionMode at model level, one-line advanced rows
 - [MDX Editor, JsonSchemaForm & State Adapters](.agents/memory/markdown-forms-and-display-options.md) — lazy MdxEditorField package boundary, format:"md" seam, Jotai/URL adapters, form-local display-options menu with x-layout precedence

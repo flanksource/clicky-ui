@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `packages/ui` — the publishable library (`@flanksource/clicky-ui`). All real source lives here.
 - `apps/storybook` — Autodocs component catalog + interaction (play) tests. Dev on **:5270**.
-- `apps/kitchen-sink` — a **Preact**-hosted demo app that proves runtime compatibility under a non-React runtime. Dev on **:5273**.
+- `apps/kitchen-sink` — a **React**-hosted demo app covering the complete component catalog. Dev on **:5273**.
 - `e2e` — Playwright tests that run against the kitchen-sink.
 
 Toolchain: Vite (build) + Vitest (unit + storybook tests) + Storybook + Playwright + oxlint. Node `>=22.12`, pnpm `10.33` (use `corepack enable`). Dependency versions are pinned via the pnpm **catalog** in `pnpm-workspace.yaml` (`catalog:` entries) — add/bump shared deps there, not per-package.
@@ -171,4 +171,4 @@ New components conventionally ship all three artifacts where relevant: `Componen
 
 - Strict everywhere, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` (use `import type` for type-only imports), `noUnusedLocals`/`Parameters`. Project references — run `tsc -b`, not bare `tsc`.
 - oxlint enforces `import/no-cycle` (no circular imports between barrels — be careful what a barrel re-exports), `react/only-export-components` (relaxed for stories/tests), and the custom icon rule above.
-- The library targets React 18 **and** Preact (kitchen-sink) and React 19 (peer range) — avoid React-version-specific APIs.
+- The library and kitchen-sink run on React 18, with React 19 included in the library peer range — avoid React-version-specific APIs.
