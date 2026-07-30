@@ -4,25 +4,11 @@ import { Icon } from "../data/Icon";
 import { UiAdd, UiTrash } from "../icons";
 import { Button } from "./button";
 import { Combobox } from "./Combobox";
-import type {
-  FieldControl,
-  JsonSchemaObject,
-  JsonSchemaProperty,
-  RenderContext,
-} from "./json-schema-form-types";
-import {
-  fieldInputId,
-  inputClass,
-  isPlainObject,
-  keyPickerOptions,
-  normalizeColumns,
-} from "./json-schema-form-utils";
+import type { FieldControl, JsonSchemaObject, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
+import { fieldInputId, inputClass, isPlainObject, keyPickerOptions, normalizeColumns } from "./json-schema-form-utils";
 import { FieldsGrid } from "./json-schema-form-fields";
-import {
-  controlHeightClass,
-  fieldInnerGapClass,
-  inputSizeClass,
-} from "./json-schema-form-size";
+import { appendInstancePath } from "./json-schema-form-errors";
+import { controlHeightClass, fieldInnerGapClass, inputSizeClass } from "./json-schema-form-size";
 
 // ObjectControl renders a nested structured object as a sub-form: its own
 // properties, required markers, if/then, soft errors — all via the shared
@@ -128,6 +114,7 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
         required: false,
         value: map[key] ?? "",
         onChange: (next) => setEntry(key, next),
+        instancePath: appendInstancePath(ctx.instancePath, key),
       },
       childCtx,
     );
@@ -144,7 +131,11 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
     <div className={cn("flex flex-col rounded-md border border-input p-2", fieldInnerGapClass[childCtx.size])}>
       {knownKeys.map((key) => (
         <div key={`known-${key}`} className="grid grid-cols-[10rem_1fr] items-center gap-2">
-          <label htmlFor={fieldInputId(key, childCtx.idPrefix)} className="truncate text-xs text-muted-foreground" title={key}>
+          <label
+            htmlFor={fieldInputId(key, childCtx.idPrefix)}
+            className="truncate text-xs text-muted-foreground"
+            title={key}
+          >
             {key}
           </label>
           <div className="min-w-0">{valueControlFor(key, known[key] ?? { type: "string" })}</div>
@@ -192,9 +183,7 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
         if (entryIsStacked(key)) {
           return (
             <div key={`extra-${key}`} className="space-y-1.5 rounded-md border border-input p-2">
-              {keyTitle && (
-                <span className="block text-xs font-medium text-muted-foreground">{keyTitle}</span>
-              )}
+              {keyTitle && <span className="block text-xs font-medium text-muted-foreground">{keyTitle}</span>}
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">{keyControl}</div>
                 {removeButton}

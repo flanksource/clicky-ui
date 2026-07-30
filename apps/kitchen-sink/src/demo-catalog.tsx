@@ -6,6 +6,7 @@ import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
+import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { ProgressBarsDemo } from "./demos/ProgressBarsDemo";
 import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
@@ -33,6 +34,8 @@ import { TabsDemo } from "./demos/TabsDemo";
 import { SectionDemo } from "./demos/SectionDemo";
 import { PanelDemo } from "./demos/PanelDemo";
 import { AppShellDemo } from "./demos/AppShellDemo";
+import { AppShellRpcWorkbenchDemo } from "./demos/AppShellRpcWorkbenchDemo";
+import { ApprovalsDemo } from "./demos/approvals/ApprovalsDemo";
 import { AppSidebarDemo } from "./demos/AppSidebarDemo";
 import { SplitPaneDemo } from "./demos/SplitPaneDemo";
 import { TreeDemo } from "./demos/TreeDemo";
@@ -50,6 +53,7 @@ import { SegmentedControlDemo } from "./demos/SegmentedControlDemo";
 import { SearchInputDemo } from "./demos/SearchInputDemo";
 import { TimelineDemo } from "./demos/TimelineDemo";
 import { SessionViewerDemo } from "./demos/SessionViewerDemo";
+import { SessionInspectorDemo } from "./demos/SessionInspectorDemo";
 import { ToastDemo } from "./demos/ToastDemo";
 import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
@@ -68,6 +72,7 @@ import {
   UiTerminal,
   UiListFlat,
   UiTable,
+  UiGavel,
   UiListDashes,
   UiMarkdown,
   UiFilter,
@@ -88,6 +93,7 @@ import {
   UiNetwork,
   UiForm,
   UiCommand,
+  UiRobotAi,
 } from "@flanksource/clicky-ui";
 
 export type DemoEntry = {
@@ -240,6 +246,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         icon: UiForm,
       },
       {
+        id: "endpoint-selector",
+        label: "EndpointSelector",
+        component: EndpointSelectorDemo,
+        icon: UiNetwork,
+      },
+      {
         id: "filter-bar",
         label: "FilterBar / MultiSelect",
         component: FilterBarDemo,
@@ -270,6 +282,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         icon: UiTable,
       },
       {
+        id: "approvals",
+        label: "Approvals",
+        component: ApprovalsDemo,
+        icon: UiGavel,
+      },
+      {
         id: "trace-logs",
         label: "Trace logs",
         component: TraceLogsDemo,
@@ -290,6 +308,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         id: "app-shell",
         label: "AppShell",
         component: AppShellDemo,
+        icon: UiLayoutDashboard,
+      },
+      {
+        id: "app-shell-rpc-workbench",
+        label: "AppShell + RPC table",
+        component: AppShellRpcWorkbenchDemo,
         icon: UiLayoutDashboard,
       },
       {
@@ -402,6 +426,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
       { id: "search-input", label: "SearchInput", component: SearchInputDemo },
       { id: "timeline", label: "Timeline", component: TimelineDemo },
       { id: "session-viewer", label: "SessionViewer", component: SessionViewerDemo },
+      { id: "session-inspector", label: "SessionInspector", component: SessionInspectorDemo, icon: UiRobotAi },
       { id: "toast", label: "Toast", component: ToastDemo },
       {
         id: "gavel-styling-comparison",

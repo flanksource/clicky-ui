@@ -53,6 +53,11 @@ export type WorkloadPickerProps = {
    * fix it; freeform entry is not rejected, only marked.
    */
   strict?: boolean;
+  /**
+   * Whether a typed name absent from the loaded resources may be committed.
+   * Defaults to true for the existing free-form workload picker behavior.
+   */
+  allowCustomValue?: boolean;
   placeholder?: string;
   className?: string;
 };
@@ -64,6 +69,7 @@ export function WorkloadPicker({
   namespace,
   kinds = ALL_WORKLOAD_KINDS,
   strict = false,
+  allowCustomValue = true,
   placeholder = "Select workload / service…",
   className,
 }: WorkloadPickerProps) {
@@ -124,7 +130,7 @@ export function WorkloadPicker({
           options={options}
           value={value}
           onChange={onChange}
-          allowCustomValue
+          allowCustomValue={allowCustomValue}
           loading={loading}
           invalid={invalid}
           placeholder={placeholder}
@@ -133,4 +139,3 @@ export function WorkloadPicker({
     </div>
   );
 }
-

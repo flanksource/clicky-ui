@@ -1,7 +1,6 @@
 // AppShell hosting an rpc-driven table that pages remotely, plus a ⌘K command
-// palette in the top bar. Runs under the Preact runtime, which is the point of
-// the kitchen-sink: it proves the portal, the global hotkey, and the bounded
-// scroll container all behave outside React proper.
+// palette in the top bar. The kitchen-sink proves the portal, the global
+// hotkey, and the bounded scroll container all behave in a complete React app.
 
 import { useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

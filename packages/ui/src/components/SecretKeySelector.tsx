@@ -10,6 +10,7 @@ import { type StaticIconComponent } from "../data/Icon";
 import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
 import { Combobox, type ComboboxOption } from "./Combobox";
+import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
 
 // SecretKeySelector picks how a credential is sourced and lowers the choice into
 // a single reference string the consumer persists. It supports Kubernetes
@@ -23,7 +24,11 @@ import { Combobox, type ComboboxOption } from "./Combobox";
 export type SecretKind = "secret" | "configmap" | "helm";
 
 /** Every source the picker can emit, including the non-keyed ones. */
-export type SecretValueSource = SecretKind | "serviceaccount" | "onepassword" | "value";
+export type SecretValueSource =
+  | SecretKind
+  | "serviceaccount"
+  | "onepassword"
+  | "value";
 
 /** One key's mid-masked preview. `value` is already masked by the consumer. */
 export type KeyPreview = { key: string; value: string };
@@ -77,6 +82,12 @@ export type SecretKeySelectorProps = {
 
 const DEFAULT_SOURCES: SecretValueSource[] = ["secret", "configmap", "value"];
 
+const SHRINKABLE_FIELD = "max-w-full min-w-0 shrink";
+const SOURCE_FIELD = `${SHRINKABLE_FIELD} basis-40 grow-0`;
+const RESOURCE_FIELD = `${SHRINKABLE_FIELD} basis-40 grow-0`;
+const KEY_FIELD = `${SHRINKABLE_FIELD} basis-72 grow`;
+const VALUE_FIELD = `${SHRINKABLE_FIELD} basis-64 grow`;
+
 export function SecretKeySelector({
   value,
   onChange,
@@ -94,7 +105,8 @@ export function SecretKeySelector({
   );
 
   const source: SecretValueSource = value?.kind ?? sourceList[0] ?? "secret";
-  const isKeyed = source === "secret" || source === "configmap" || source === "helm";
+  const isKeyed =
+    source === "secret" || source === "configmap" || source === "helm";
   const isServiceAccount = source === "serviceaccount";
   const isOnePassword = source === "onepassword";
   const isLiteral = source === "value";
@@ -102,7 +114,9 @@ export function SecretKeySelector({
   const refKind: SecretKind = isKeyed ? (source as SecretKind) : "secret";
 
   const selectedName =
-    value && (value.kind === "serviceaccount" || isRefKind(value)) ? value.name : "";
+    value && (value.kind === "serviceaccount" || isRefKind(value))
+      ? value.name
+      : "";
   const selectedKey = value && isRefKind(value) ? value.key : "";
   const literalValue = value && value.kind === "value" ? value.value : "";
   const opRef = value && value.kind === "onepassword" ? value.ref : "";
@@ -168,7 +182,12 @@ export function SecretKeySelector({
   // resource's keys. Only names from a listed source are checked (a
   // serviceaccount source with no loader lists nothing, so it never flags).
   const listsNames = isKeyed || (isServiceAccount && !!loadServiceAccounts);
-  const nameInvalid = strict && listsNames && !!selectedName && !resourcesLoading && !selectedResource;
+  const nameInvalid =
+    strict &&
+    listsNames &&
+    !!selectedName &&
+    !resourcesLoading &&
+    !selectedResource;
   const keyInvalid =
     strict &&
     isKeyed &&
@@ -190,11 +209,16 @@ export function SecretKeySelector({
     }
   };
   const setName = (name: string) => {
-    if (isServiceAccount) return onChange(name ? { kind: "serviceaccount", name } : undefined);
-    return onChange(name ? { kind: refKind, name, key: selectedKey } : undefined);
+    if (isServiceAccount)
+      return onChange(name ? { kind: "serviceaccount", name } : undefined);
+    return onChange(
+      name ? { kind: refKind, name, key: selectedKey } : undefined,
+    );
   };
   const setKey = (key: string) =>
-    selectedName ? onChange({ kind: refKind, name: selectedName, key }) : undefined;
+    selectedName
+      ? onChange({ kind: refKind, name: selectedName, key })
+      : undefined;
   const setLiteral = (v: string) => onChange({ kind: "value", value: v });
   const setOpRef = (v: string) => onChange({ kind: "onepassword", ref: v });
 
@@ -207,52 +231,70 @@ export function SecretKeySelector({
       })),
     [sourceList],
   );
+  const sourceMenuOptions = useMemo<IconMenuOption<SecretValueSource>[]>(
+    () =>
+      sourceList.map((kind) => ({
+        value: kind,
+        label: SOURCE_LABEL[kind],
+        icon: SOURCE_ICON[kind],
+      })),
+    [sourceList],
+  );
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="w-[9.5rem] shrink-0">
-        <Combobox
-          ariaLabel="Secret value source"
-          options={sourceOptions}
-          value={source}
-          onChange={(next) => setSource(next as SecretValueSource)}
-          allowCustomValue={false}
-          required
-        />
-      </div>
-      {isLiteral ? (
-        <TextField
-          value={literalValue}
-          onChange={setLiteral}
-          placeholder="Static value…"
-          ariaLabel="Static value"
-        />
-      ) : isOnePassword ? (
-        <TextField
-          value={opRef}
-          onChange={setOpRef}
-          placeholder="op://vault/item/field"
-          ariaLabel="1Password reference"
-          mono
-        />
-      ) : isServiceAccount ? (
-        <div className="min-w-0 flex-[1_1_16rem]" data-slot="secret-serviceaccount-field">
+    <div
+      data-slot="secret-key-selector"
+      className={cn("@container w-full min-w-0", className)}
+    >
+      <div
+        className="flex w-full max-w-full min-w-0 flex-nowrap items-center gap-2"
+        data-slot="secret-fields"
+      >
+        <div
+          className={cn(SOURCE_FIELD, "@max-md:hidden")}
+          data-slot="secret-source-combobox"
+        >
           <Combobox
-            options={nameOptions}
-            value={selectedName}
-            onChange={setName}
-            allowCustomValue
-            loading={resourcesLoading}
-            invalid={nameInvalid}
-            placeholder="Service account…"
+            ariaLabel="Secret value source"
+            options={sourceOptions}
+            value={source}
+            onChange={(next) => setSource(next as SecretValueSource)}
+            allowCustomValue={false}
+            required
           />
         </div>
-      ) : (
         <div
-          className="grid min-w-0 flex-[1_1_18rem] grid-cols-[minmax(8rem,11rem)_minmax(8rem,1fr)] items-center gap-2"
-          data-slot="secret-reference-fields"
+          className="hidden shrink-0 @max-md:!block"
+          data-slot="secret-source-menu"
         >
-          <div className="min-w-0">
+          <IconMenuPicker
+            value={source}
+            onChange={setSource}
+            options={sourceMenuOptions}
+            ariaLabel="Secret value source"
+            triggerClassName="size-control-h rounded-md border border-input bg-background"
+          />
+        </div>
+        {isLiteral ? (
+          <TextField
+            value={literalValue}
+            onChange={setLiteral}
+            placeholder="Static value…"
+            ariaLabel="Static value"
+          />
+        ) : isOnePassword ? (
+          <TextField
+            value={opRef}
+            onChange={setOpRef}
+            placeholder="op://vault/item/field"
+            ariaLabel="1Password reference"
+            mono
+          />
+        ) : isServiceAccount ? (
+          <div
+            className={VALUE_FIELD}
+            data-slot="secret-serviceaccount-field"
+          >
             <Combobox
               options={nameOptions}
               value={selectedName}
@@ -260,22 +302,46 @@ export function SecretKeySelector({
               allowCustomValue
               loading={resourcesLoading}
               invalid={nameInvalid}
-              placeholder={`Select ${refKind}…`}
+              placeholder="Service account…"
             />
           </div>
-          <div className="min-w-0">
-            <Combobox
-              options={keyOptions}
-              value={selectedKey}
-              onChange={setKey}
-              allowCustomValue
-              loading={previewLoading}
-              invalid={keyInvalid}
-              placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
-            />
+        ) : (
+          <div
+            className={cn(
+              "flex flex-nowrap items-center gap-2",
+              SHRINKABLE_FIELD,
+              "grow",
+            )}
+            data-slot="secret-reference-fields"
+          >
+            <div
+              className={RESOURCE_FIELD}
+              data-slot="secret-resource-field"
+            >
+              <Combobox
+                options={nameOptions}
+                value={selectedName}
+                onChange={setName}
+                allowCustomValue
+                loading={resourcesLoading}
+                invalid={nameInvalid}
+                placeholder={`Select ${refKind}…`}
+              />
+            </div>
+            <div className={KEY_FIELD} data-slot="secret-key-field">
+              <Combobox
+                options={keyOptions}
+                value={selectedKey}
+                onChange={setKey}
+                allowCustomValue
+                loading={previewLoading}
+                invalid={keyInvalid}
+                placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -296,7 +362,7 @@ function TextField({
   mono?: boolean;
 }) {
   return (
-    <div className="min-w-0 flex-[1_1_16rem]" data-slot="secret-value-fields">
+    <div className={VALUE_FIELD} data-slot="secret-value-fields">
       <input
         type="text"
         value={value}

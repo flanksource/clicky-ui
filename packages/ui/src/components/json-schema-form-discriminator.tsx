@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { labelSizeClass } from "./json-schema-form-size";
+import { appendInstancePath } from "./json-schema-form-errors";
 import type { JsonSchemaObject, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
 
 // DiscriminatedForm renders the two-phase "pick a kind, then fill its form" flow
@@ -41,6 +42,7 @@ export function DiscriminatedForm({
         required,
         value: current,
         onChange: (next) => onChange({ ...value, [discKey]: next }),
+        instancePath: appendInstancePath(ctx.instancePath, discKey),
       },
       ctx,
     );
@@ -73,7 +75,9 @@ export function DiscriminatedForm({
           </button>
         )}
       </div>
-      {ctx.render.renderObjectFields(schema, value, onChange, ctx, { hiddenKeys: [discKey] })}
+      {ctx.render.renderObjectFields(schema, value, onChange, ctx, {
+        hiddenKeys: [discKey],
+      })}
     </>
   );
 }

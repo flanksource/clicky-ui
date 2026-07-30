@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LabelIconSpec } from "../data/Icon";
+import type { FieldInstancePath, FormErrorContext, FormErrorProps } from "./json-schema-form-error-types";
 import type { FormSize } from "./json-schema-form-size";
 import type { SortMode } from "./json-schema-form-preferences";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
@@ -392,7 +393,7 @@ export type PostExtension = (
 
 // FieldArgs is the raw input for rendering one field: the property key/schema,
 // whether it is required, and the current value + committer.
-export interface FieldArgs {
+export interface FieldArgs extends FieldInstancePath {
   key: string;
   prop: JsonSchemaProperty;
   required: boolean;
@@ -421,7 +422,7 @@ export interface RenderApi {
 // array items and object/map values: readOnly/inline layout, the consumer's
 // pre/post extension stacks (so they apply at EVERY depth, not just the top
 // level), and the current depth (for keys/labels).
-export interface RenderContext {
+export interface RenderContext extends FormErrorContext {
   readOnly: boolean;
   // Drop fields whose resolved control is read-only (schema `readOnly: true`)
   // instead of rendering them as value displays. Applies at every depth.
@@ -473,8 +474,7 @@ export interface FormLayout {
    */
   valueMaxWidth?: string;
 }
-
-export interface JsonSchemaFormProps {
+export interface JsonSchemaFormProps extends FormErrorProps {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
