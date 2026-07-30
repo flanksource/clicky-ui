@@ -1,3 +1,4 @@
+import { defaultChatModelId } from "../chat/models";
 import type { ChatModel } from "../chat/types";
 
 export function selectConfiguredChatModel(
@@ -10,5 +11,5 @@ export function selectConfiguredChatModel(
   ) {
     return current;
   }
-  return models.find((model) => model.configured !== false)?.id;
+  return defaultChatModelId(models);
 }

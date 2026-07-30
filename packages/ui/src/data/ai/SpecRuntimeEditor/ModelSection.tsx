@@ -1,14 +1,14 @@
-import { useMemo, useState } from "react";
-import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
-import { effortLevelIcon } from "../../chat/effort-icons";
-import type { ChatModel } from "../../chat/types";
+import { useState } from "react";
 import {
-  effortOptionsForModel,
-  reconcileModelCapabilities,
-} from "../model-capabilities";
-import { providerIcon } from "../../chat/provider-icons";
+  effortLevelColor,
+  effortLevelIcon,
+  effortLevelLabel,
+} from "../../chat/effort-icons";
+import type { ChatModel } from "../../chat/types";
+import { providerIcon, providerIconColor } from "../../chat/provider-icons";
 import { Icon } from "../../Icon";
 import { IconButton } from "../../../components";
+import { cn } from "../../../lib/utils";
 import {
   UiAdd,
   UiCoins,
@@ -16,7 +16,6 @@ import {
   UiFingerprint,
   UiRepeat,
   UiSparkles,
-  UiThermometer,
   UiTimer,
   UiTrash,
 } from "../../../icons";
@@ -24,20 +23,15 @@ import type {
   AISpecRuntimeModelFallback,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
-import { RuntimeModePicker } from "../RuntimeModePicker";
+import { RuntimeBar } from "../RuntimeBar";
 import {
   SPEC_RUNTIME_FAMILIES,
-  familyForBackend,
-  familyById,
   firstMode,
-  modelsForFamily,
-  selectionForBackend,
+  modeForBackend,
   type SpecRuntimeFamily,
 } from "../runtime-mode";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
-
-const REASONING_EFFORTS = ["low", "medium", "high", "xhigh"];
 
 type FallbackDraftPatch = {
   model?: string | undefined;
@@ -59,78 +53,16 @@ export function ModelSection({
   models: ChatModel[];
   families?: SpecRuntimeFamily[] | undefined;
 }) {
-  const runtimeFamilies = families ?? SPEC_RUNTIME_FAMILIES;
-  const selection = selectionForBackend(runtimeFamilies, value.backend);
-  const family = familyById(runtimeFamilies, selection.family);
-  const modelOptions = modelsForFamily(models, family, value.backend);
-  const selectedModel = models.find((m) => m.id === value.model);
-  // Show a control unless the resolved model reports it unsupported; an unknown
-  // selection or a catalog without the field keeps the control visible.
-  const modelEfforts = effortOptionsForModel(selectedModel, REASONING_EFFORTS);
-  const showEffort = modelEfforts.length > 0;
-  const showTemperature = !selectedModel || selectedModel.temperature !== false;
-
+  // The bar owns family, mode, model and effort — including the free-text model
+  // entry for families the catalog does not describe.
   return (
     <div className="grid gap-density-2">
-      <RuntimeModePicker
+      <RuntimeBar
         value={value}
         onChange={onChange}
         models={models}
         {...(families ? { families } : {})}
       />
-      <div className="grid gap-density-2 md:grid-cols-3">
-        <SpecField label="Model">
-          {modelOptions.length > 0 ? (
-            <ModelSelector
-              models={modelOptions}
-              value={value.model}
-              onChange={(model) =>
-                onChange(
-                  reconcileModelCapabilities(
-                    value,
-                    models.find((item) => item.id === model),
-                    REASONING_EFFORTS,
-                  ),
-                )
-              }
-              className="w-full"
-              size="md"
-            />
-          ) : (
-            <SpecInput
-              value={value.model}
-              onChange={(model) => onChange(withRoot(value, { model }))}
-              placeholder="claude-sonnet-4-6"
-              icon={UiSparkles}
-              mono
-            />
-          )}
-        </SpecField>
-        {showEffort && (
-          <SpecField label="Effort">
-            <EffortSelector
-              efforts={modelEfforts}
-              value={value.effort ?? ""}
-              onChange={(effort) => onChange(withRoot(value, { effort }))}
-              className="w-full"
-              size="md"
-            />
-          </SpecField>
-        )}
-        {showTemperature && (
-          <NumberField
-            label="Temperature"
-            value={value.temperature}
-            onChange={(temperature) =>
-              onChange(withOptionalRoot(value, "temperature", temperature))
-            }
-            icon={UiThermometer}
-            min={0}
-            max={2}
-            step={0.1}
-          />
-        )}
-      </div>
       <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
         <NumberField
           label="Max cost (USD)"
@@ -259,11 +191,6 @@ function FallbackModelsEditor({
     );
   };
 
-  const patchFallback = (index: number, patch: FallbackDraftPatch) => {
-    const fallback = fallbacks[index] ?? {};
-    updateFallback(index, { ...fallback, ...patch });
-  };
-
   const toggleFallback = (index: number) => {
     setExpandedIndex((current) => (current === index ? null : index));
   };
@@ -297,7 +224,6 @@ function FallbackModelsEditor({
                 editorId={`spec-runtime-fallback-${index}-picker`}
                 onToggle={() => toggleFallback(index)}
                 onChange={(nextFallback) => updateFallback(index, nextFallback)}
-                onPatch={(patch) => patchFallback(index, patch)}
                 onRemove={() => removeFallback(index)}
               />
             ))}
@@ -316,7 +242,6 @@ function FallbackModelRow({
   editorId,
   onToggle,
   onChange,
-  onPatch,
   onRemove,
 }: {
   fallback: AISpecRuntimeModelFallback;
@@ -326,12 +251,17 @@ function FallbackModelRow({
   editorId: string;
   onToggle: () => void;
   onChange: (value: AISpecRuntimeModelFallback) => void;
-  onPatch: (patch: FallbackDraftPatch) => void;
   onRemove: () => void;
 }) {
   const meta = fallbackModelMeta(fallback, models);
   const Glyph = meta.provider ? providerIcon(meta.provider) : undefined;
   const label = meta.label || "Select model";
+  // The collapsed row is the bar in miniature: brand mark, runtime mode, model,
+  // effort — each carrying the same tone it has inside the expanded editor.
+  const mode = modeForBackend(families, fallback.backend);
+  const effortGlyph = fallback.effort
+    ? effortLevelIcon(fallback.effort)
+    : undefined;
   return (
     <div>
       <div className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-density-1 px-density-1 py-density-1">
@@ -341,15 +271,30 @@ function FallbackModelRow({
           aria-controls={editorId}
           aria-label={`Edit fallback ${label}`}
           onClick={onToggle}
-          className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-density-2 rounded-md px-density-1 py-density-1 text-left hover:bg-muted"
+          className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-density-2 rounded-md px-density-1 py-density-1 text-left hover:bg-muted"
         >
           {Glyph ? (
-            <Glyph className="size-4 shrink-0" />
+            <Glyph
+              className={cn(
+                "size-4 shrink-0",
+                meta.provider ? providerIconColor(meta.provider) : undefined,
+              )}
+            />
           ) : (
             <Icon
               icon={UiSparkles}
               className="size-4 shrink-0 text-muted-foreground/70"
             />
+          )}
+          {mode?.icon ? (
+            <Icon
+              icon={mode.icon}
+              className="size-4 shrink-0 text-muted-foreground"
+              title={mode.title ?? mode.label}
+            />
+          ) : (
+            // Held open so rows with and without a known mode still align.
+            <span aria-hidden="true" className="size-4" />
           )}
           <span
             className="min-w-0 truncate font-mono text-xs text-foreground"
@@ -359,11 +304,13 @@ function FallbackModelRow({
           </span>
           {fallback.effort ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
-              {(() => {
-                const glyph = effortLevelIcon(fallback.effort);
-                return glyph ? <Icon icon={glyph} className="size-3" /> : null;
-              })()}
-              {formatEffort(fallback.effort)}
+              {effortGlyph && (
+                <Icon
+                  icon={effortGlyph}
+                  className={cn("size-3", effortLevelColor(fallback.effort))}
+                />
+              )}
+              {effortLevelLabel(fallback.effort)}
             </span>
           ) : (
             <span aria-hidden="true" />
@@ -383,7 +330,6 @@ function FallbackModelRow({
             id={editorId}
             value={fallback}
             onChange={onChange}
-            onPatch={onPatch}
             models={models}
             families={families}
           />
@@ -397,26 +343,15 @@ function FallbackModelPicker({
   id,
   value,
   onChange,
-  onPatch,
   models,
   families,
 }: {
   id: string;
   value: AISpecRuntimeModelFallback;
   onChange: (value: AISpecRuntimeModelFallback) => void;
-  onPatch: (patch: FallbackDraftPatch) => void;
   models: ChatModel[];
   families: SpecRuntimeFamily[];
 }) {
-  const modelOptions = useMemo(() => {
-    const family = familyForBackend(families, value.backend);
-    return modelsForFamily(models, family, value.backend);
-  }, [families, models, value.backend]);
-  const selectedModel = models.find((m) => m.id === value.model);
-  const modelEfforts = effortOptionsForModel(selectedModel, REASONING_EFFORTS);
-  const showEffort = modelEfforts.length > 0;
-  const showTemperature = !selectedModel || selectedModel.temperature !== false;
-
   return (
     <div
       id={id}
@@ -424,65 +359,13 @@ function FallbackModelPicker({
       aria-label="Fallback model picker"
       className="rounded-md border border-dashed border-border bg-muted/20 p-density-2"
     >
-      <div className="grid gap-density-2">
-        <RuntimeModePicker
-          value={value}
-          onChange={(next) => onChange(compactEditableFallback(next))}
-          models={models}
-          families={families}
-        />
-        <div className="grid gap-density-2 md:grid-cols-3">
-          <SpecField label="Model">
-            {modelOptions.length > 0 ? (
-              <ModelSelector
-                models={modelOptions}
-                value={value.model}
-                onChange={(model) =>
-                  onChange(
-                    reconcileModelCapabilities(
-                      value,
-                      models.find((item) => item.id === model),
-                      REASONING_EFFORTS,
-                    ),
-                  )
-                }
-                className="w-full"
-                size="md"
-              />
-            ) : (
-              <SpecInput
-                value={value.model}
-                onChange={(model) => onPatch({ model })}
-                placeholder="gpt-5-codex"
-                icon={UiSparkles}
-                mono
-              />
-            )}
-          </SpecField>
-          {showEffort && (
-            <SpecField label="Effort">
-              <EffortSelector
-                efforts={modelEfforts}
-                value={value.effort ?? ""}
-                onChange={(effort) => onPatch({ effort })}
-                className="w-full"
-                size="md"
-              />
-            </SpecField>
-          )}
-          {showTemperature && (
-            <NumberField
-              label="Temperature"
-              value={value.temperature}
-              onChange={(temperature) => onPatch({ temperature })}
-              icon={UiThermometer}
-              min={0}
-              max={2}
-              step={0.1}
-            />
-          )}
-        </div>
-      </div>
+      <RuntimeBar
+        value={value}
+        onChange={(next) => onChange(compactEditableFallback(next))}
+        models={models}
+        families={families}
+        ariaLabel="Fallback runtime"
+      />
     </div>
   );
 }
@@ -555,12 +438,6 @@ function inferProvider(
     return "openai";
   }
   return undefined;
-}
-
-function formatEffort(value: string): string {
-  const effort = value.trim();
-  if (!effort) return "";
-  return `${effort[0]?.toUpperCase() ?? ""}${effort.slice(1)}`;
 }
 
 function cleanString(value: string | undefined): string {

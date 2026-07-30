@@ -4,7 +4,11 @@ import type { FormSize } from "../../components/json-schema-form-size";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
-import { effortLevelColor, effortLevelIcon } from "./effort-icons";
+import {
+  effortLevelColor,
+  effortLevelIcon,
+  effortLevelLabel,
+} from "./effort-icons";
 import { providerIcon } from "./provider-icons";
 import type { ChatBudgetConfig, ChatModel } from "./types";
 
@@ -62,8 +66,11 @@ export type EffortSelectorProps = {
 /** Reasoning-effort picker, shown only for reasoning-capable models. The empty
  *  value means "no extended thinking". Strict: only the listed options commit. */
 export function EffortSelector({ efforts, value, onChange, className, size = "sm" }: EffortSelectorProps) {
-  const supportedEfforts = efforts.filter(Boolean);
-  const selectedEffort = value && supportedEfforts.includes(value) ? value : "";
+  const selectedEffort = value?.trim() ?? "";
+  const supportedEfforts = [...new Set(efforts.map((effort) => effort.trim()).filter(Boolean))];
+  if (selectedEffort && !supportedEfforts.includes(selectedEffort)) {
+    supportedEfforts.push(selectedEffort);
+  }
   const selectedGlyph = selectedEffort ? effortLevelIcon(selectedEffort) : undefined;
   const selectedColor = selectedEffort ? effortLevelColor(selectedEffort) : undefined;
   const selectedIcon = selectedGlyph
@@ -72,7 +79,7 @@ export function EffortSelector({ efforts, value, onChange, className, size = "sm
   return (
     <Combobox
       ariaLabel="Reasoning effort"
-      value={value ?? ""}
+      value={selectedEffort}
       onChange={onChange}
       allowCustomValue={false}
       required
@@ -98,7 +105,7 @@ function fullEffortLabel(value: string): string {
     case "max":
       return "Maximum";
     default:
-      return titleCaseEffort(value);
+      return effortLevelLabel(value);
   }
 }
 
@@ -115,13 +122,8 @@ function shortEffortLabel(value: string): string {
     case "max":
       return "Max";
     default:
-      return titleCaseEffort(value);
+      return effortLevelLabel(value);
   }
-}
-
-function titleCaseEffort(value: string): string {
-  const effort = value.trim();
-  return `${effort[0]?.toUpperCase() ?? ""}${effort.slice(1)}`;
 }
 
 export type ProviderSelectorOption<T extends string = string> = {

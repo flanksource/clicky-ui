@@ -262,11 +262,12 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
       scope: "changed",
       maxIterations: 2,
     },
-    postRun: {
-      commit: true,
-      commitMessage: "Update spec runtime editor lifecycle controls",
-      dryRun: false,
-    },
+    commits: [
+      {
+        on: "turn",
+        message: "Update spec runtime editor lifecycle controls",
+      },
+    ],
   },
 };
 
@@ -587,7 +588,7 @@ export const ModelSectionFromSchema: Story = {
     docs: {
       description: {
         story:
-          'The Model section rendered two ways: left is the hand-built `ModelSection`; right is a pure JSON schema fed to `JsonSchemaForm` using the presentation `x-*` extensions (`x-columns`/`x-col-span` for the 3- and 4-across rows, `x-enum-display: "segmented"` with `x-enum-icons` for Mode, `x-input-prefix-icon` on the inputs, and `x-input-classes`/`x-label-classes`/`x-classes` to match the editor\'s border, mono, label, and 8px-gap chrome). Model is a searchable dropdown whose options carry provider icons (shown in the closed field too) and change with the selected runtime — switch Mode to **cmux** and the model catalog swaps to Codex/OpenAI via a JSON-schema `if`/`then`. Numeric fields declare `multipleOf` so they render as real `<input type="number">` controls; **Max tokens** uses `x-number-display: "slider"` for a progress slider, and **Timeout** is an `enum` dropdown (2m…12h, default 4h). Proof that captain can own the schema. (Residuals: Mode renders at the same `md` size as the other controls rather than the editor\'s `sm`, and a ~2px prefix-icon offset.)',
+          'The Model section rendered two ways: left is the hand-built `ModelSection`, which now leads with the single-line `RuntimeBar` (family/mode/model/effort as four menu segments) instead of stacked fields; right is a pure JSON schema fed to `JsonSchemaForm` using the presentation `x-*` extensions (`x-columns`/`x-col-span` for the 3- and 4-across rows, `x-enum-display: "segmented"` with `x-enum-icons` for Mode, `x-input-prefix-icon` on the inputs, and `x-input-classes`/`x-label-classes`/`x-classes` to match the editor\'s border, mono, label, and 8px-gap chrome). Model is a searchable dropdown whose options carry provider icons (shown in the closed field too) and change with the selected runtime — switch Mode to **cmux** and the model catalog swaps to Codex/OpenAI via a JSON-schema `if`/`then`. Numeric fields declare `multipleOf` so they render as real `<input type="number">` controls; **Max tokens** uses `x-number-display: "slider"` for a progress slider, and **Timeout** is an `enum` dropdown (2m…12h, default 4h). Proof that captain can own the schema. (Residuals: Mode renders at the same `md` size as the other controls rather than the editor\'s `sm`, and a ~2px prefix-icon offset.)',
       },
     },
   },

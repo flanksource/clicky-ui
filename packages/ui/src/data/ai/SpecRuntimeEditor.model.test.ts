@@ -290,17 +290,13 @@ describe("buildAISpecRuntimePayload", () => {
         },
         workflow: {
           verify: { fixture: "", scope: "", maxIterations: 0 },
-          postRun: {
-            commit: false,
-            commitMessage: "",
-            dryRun: false,
-          },
+          commits: [],
         },
       }),
     ).toEqual({});
   });
 
-  it("emits the verify and postRun workflow into the spec", () => {
+  it("emits the verify and commit workflow into the spec", () => {
     expect(
       buildAISpecRuntimePayload({
         workflow: {
@@ -309,11 +305,14 @@ describe("buildAISpecRuntimePayload", () => {
             scope: "changed",
             maxIterations: 2.9,
           },
-          postRun: {
-            commit: true,
-            commitMessage: " Apply AI changes ",
-            dryRun: false,
-          },
+          commits: [
+            {
+              on: "turn",
+              message: " Apply AI changes ",
+              squash: false,
+              dryRun: false,
+            },
+          ],
         },
       }),
     ).toEqual({
@@ -324,12 +323,19 @@ describe("buildAISpecRuntimePayload", () => {
             scope: "changed",
             maxIterations: 2,
           },
-          postRun: {
-            commit: true,
-            commitMessage: "Apply AI changes",
-          },
+          // squash survives as false — it is the instruction to keep the fixup
+          // chain, unlike dryRun where absent and false mean the same thing.
+          commits: [{ on: "turn", message: "Apply AI changes", squash: false }],
         },
       },
+    });
+  });
+
+  // A stanza carrying nothing but defaults is still an instruction to commit, so
+  // it must survive compaction; only an empty list means "commit nothing".
+  it("keeps a defaults-only commit stanza", () => {
+    expect(buildAISpecRuntimePayload({ workflow: { commits: [{}] } })).toEqual({
+      spec: { workflow: { commits: [{}] } },
     });
   });
 
@@ -356,10 +362,7 @@ describe("buildAISpecRuntimePayload", () => {
             commands: ["pnpm test"],
             fixture: "- [ ] passes",
           },
-          postRun: {
-            commit: true,
-            keepWorktree: true,
-          },
+          commits: [{ on: "run", keepWorktree: true }],
         },
       } as any),
     ).toEqual({
@@ -368,7 +371,7 @@ describe("buildAISpecRuntimePayload", () => {
         setup: { checkout: { dirty: { stash: "all" } } },
         workflow: {
           verify: { fixture: "- [ ] passes" },
-          postRun: { commit: true },
+          commits: [{ on: "run" }],
         },
       },
     });

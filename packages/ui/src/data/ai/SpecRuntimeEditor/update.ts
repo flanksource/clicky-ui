@@ -5,6 +5,7 @@ import type {
   AISpecRuntimeSetup,
   AISpecRuntimeValue,
   SpecCheckoutMode,
+  SpecCommitPhase,
   SpecStashMode,
   SpecWorktreeMode,
 } from "../SpecRuntimeEditor.model";
@@ -13,6 +14,7 @@ type SpecCheckout = NonNullable<AISpecRuntimeSetup["checkout"]>;
 type SpecWorktree = NonNullable<SpecCheckout["worktree"]>;
 type SpecDirty = NonNullable<SpecCheckout["dirty"]>;
 type SpecWorkflow = NonNullable<AISpecRuntimeValue["workflow"]>;
+type SpecCommit = NonNullable<SpecWorkflow["commits"]>[number];
 type SpecBudget = NonNullable<AISpecRuntimeValue["budget"]>;
 
 export function withRoot(
@@ -126,16 +128,41 @@ export function withVerify(
   });
 }
 
-export function withPostRun(
+// The editor drives a single commit policy. A spec authored by hand may declare
+// several stanzas; the ones past the first are carried through untouched rather
+// than collapsed away by an edit to a field the editor does surface.
+export function withCommit(
   value: AISpecRuntimeValue,
-  patch: NonNullable<SpecWorkflow["postRun"]>,
+  patch: Partial<SpecCommit>,
 ): AISpecRuntimeValue {
+  const [first, ...rest] = value.workflow?.commits ?? [];
   return withRoot(value, {
-    workflow: {
-      ...value.workflow,
-      postRun: { ...value.workflow?.postRun, ...patch },
-    },
+    workflow: { ...value.workflow, commits: [{ ...first, ...patch }, ...rest] },
   });
+}
+
+// "Never" drops every stanza rather than flagging one off: an absent list is how
+// the spec says "commit nothing", and a surviving {dryRun: true} would leave the
+// section reading as configured.
+export function withCommitPhase(
+  value: AISpecRuntimeValue,
+  phase: SpecCommitPhase | "none",
+): AISpecRuntimeValue {
+  if (phase === "none") {
+    return withRoot(value, { workflow: { ...value.workflow, commits: [] } });
+  }
+  return withCommit(value, { on: phase });
+}
+
+// A stanza with no explicit phase commits at the end of the run, matching
+// api.Commit.Phase()'s default.
+export function commitPhase(
+  value: AISpecRuntimeValue,
+): SpecCommitPhase | "none" {
+  const commits = value.workflow?.commits;
+  if (!commits?.length) return "none";
+  const on = commits[0]?.on;
+  return on === "turn" || on === "agent" ? on : "run";
 }
 
 // Mode switches clear the fields that no longer apply, so stale values from a

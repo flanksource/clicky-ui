@@ -37,6 +37,13 @@ export interface ChatModel {
   /** Whether the model honours the temperature sampling control. */
   temperature?: boolean;
   configured?: boolean;
+  /**
+   * The catalog's own declared default — the row a picker seeds with when the
+   * caller names no model. At most one row carries it, and a catalog that
+   * declares none (or whose default is unconfigured) falls back to the first
+   * configured row.
+   */
+  default?: boolean;
   /** Concrete runtime backends that advertised this model. Empty/omitted means provider-wide. */
   backends?: string[];
   /** Max context tokens — the denominator for a usage gauge. */

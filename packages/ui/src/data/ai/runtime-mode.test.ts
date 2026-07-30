@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { ChatModel } from "../chat/types";
 import {
   SPEC_RUNTIME_FAMILIES,
+  familiesFromRuntimeCatalog,
   modelBelongsToFamily,
   modelsForFamily,
   selectionForBackend,
+  type RuntimeCatalogFamily,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -78,5 +80,83 @@ describe("runtime model filtering", () => {
       family: "codex",
       mode: "agent",
     });
+  });
+});
+
+// The served catalog captain projects from its model registry. Claude carries
+// all four modes on one provider — the split into a separate "Anthropic" family
+// only ever existed in the hardcoded default.
+const servedCatalog: RuntimeCatalogFamily[] = [
+  {
+    family: "claude",
+    provider: "anthropic",
+    catalogPrefix: "anthropic",
+    modes: [
+      { mode: "api", backend: "anthropic", kind: "api" },
+      { mode: "agent", backend: "claude-agent", kind: "cli" },
+      { mode: "cli", backend: "claude-cli", kind: "cli" },
+      {
+        mode: "cmux",
+        backend: "claude-cmux",
+        kind: "cli",
+        keyless: true,
+        disabled: true,
+        disabledReason: "mode cmux",
+      },
+    ],
+  },
+  {
+    family: "gemini",
+    provider: "google",
+    catalogPrefix: "googleai",
+    modes: [{ mode: "api", backend: "gemini", kind: "api" }],
+  },
+  {
+    family: "deepseek",
+    provider: "deepseek",
+    catalogPrefix: "deepseek",
+    modes: [{ mode: "api", backend: "deepseek", kind: "api", disabled: true, disabledReason: "provider deepseek" }],
+  },
+];
+
+describe("familiesFromRuntimeCatalog", () => {
+  it("collapses a provider's modes into one family and drops the disabled ones", () => {
+    const families = familiesFromRuntimeCatalog(servedCatalog);
+
+    expect(families.map((family) => family.id)).toEqual(["claude", "gemini"]);
+    const claude = families[0]!;
+    expect(claude.modes.map((mode) => mode.backend)).toEqual([
+      "anthropic",
+      "claude-agent",
+      "claude-cli",
+    ]);
+    // The catalog prefix, not the provider key: it is what ChatModel.provider
+    // carries, so modelsForFamily can filter on it.
+    expect(families[1]!.provider).toBe("googleai");
+  });
+
+  it("derives labels from ids without a served label field", () => {
+    const claude = familiesFromRuntimeCatalog(servedCatalog)[0]!;
+
+    expect(claude.label).toBe("Claude");
+    expect(claude.modes.map((mode) => mode.label)).toEqual(["API", "Agent", "CLI"]);
+    expect(claude.modes[0]!.title).toBe("Claude API");
+    expect(
+      familiesFromRuntimeCatalog([
+        { family: "deepseek", provider: "deepseek", catalogPrefix: "deepseek", modes: [{ mode: "api", backend: "deepseek" }] },
+      ])[0]!.label,
+    ).toBe("DeepSeek");
+  });
+
+  it("falls back to the offline default when the host serves nothing", () => {
+    expect(familiesFromRuntimeCatalog(undefined)).toBe(SPEC_RUNTIME_FAMILIES);
+    expect(familiesFromRuntimeCatalog([])).toBe(SPEC_RUNTIME_FAMILIES);
+  });
+
+  it("keeps a backend resolvable after the collapse", () => {
+    const families = familiesFromRuntimeCatalog(servedCatalog);
+
+    expect(selectionForBackend(families, "anthropic")).toEqual({ family: "claude", mode: "api" });
+    expect(selectionForBackend(families, "claude-cli")).toEqual({ family: "claude", mode: "cli" });
   });
 });

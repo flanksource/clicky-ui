@@ -50,13 +50,16 @@ describe("PERMISSION_MODE_ICONS is total over the permission-mode union", () => 
 });
 
 describe("effortIcon", () => {
-  it("resolves the six named levels", () => {
+  it("resolves every named effort level", () => {
     expect(effortIcon("minimal")).toBe(EFFORT_ICONS.minimal);
+    expect(effortIcon("xhigh")).toBe(EFFORT_ICONS.xhigh);
+    expect(effortIcon("max")).toBe(EFFORT_ICONS.max);
+    expect(effortIcon("ultra")).toBe(EFFORT_ICONS.ultra);
     expect(effortIcon("Adaptive")).toBe(EFFORT_ICONS.adaptive);
   });
 
-  it("aliases xhigh onto the high battery and rejects non-efforts", () => {
-    expect(effortIcon("xhigh")).toBe(EFFORT_ICONS.high);
+  it("rejects unknown effort values", () => {
+    expect(effortIcon("ultra-plus")).toBeUndefined();
     expect(effortIcon("nonsense")).toBeUndefined();
   });
 });

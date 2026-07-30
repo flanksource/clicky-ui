@@ -20,8 +20,11 @@ describe("ContextMeter", () => {
     expect(effortLevelColor("low")).toContain("text-sky-700");
     expect(effortLevelColor("medium")).toContain("text-amber-700");
     expect(effortLevelColor("high")).toContain("text-orange-700");
+    expect(effortLevelColor("xhigh")).toContain("text-orange-700");
     expect(effortLevelColor("max")).toContain("text-red-700");
+    expect(effortLevelColor("ultra")).toContain("text-fuchsia-700");
     expect(effortLevelColor("adaptive")).toContain("text-indigo-700");
+    expect(effortLevelColor("ultra-plus")).toBeUndefined();
   });
 
   it("centers a larger provider mark inside the radial gauge", () => {
@@ -95,5 +98,17 @@ describe("ContextMeter", () => {
         icon.classList.contains("text-[#C15F3C]"),
       ),
     ).toHaveLength(2);
+  });
+
+  it("shows unknown effort metadata without a known icon or tone", async () => {
+    render(
+      <ContextMeter mode="gauge" usedPercent={42} effort="ultra-plus" />,
+    );
+
+    fireEvent.mouseEnter(screen.getByLabelText("Context 42% used"));
+
+    const effort = await screen.findByText("Ultra-plus effort");
+    expect(effort.className).not.toContain("text-");
+    expect(effort.querySelector("svg")).toBeNull();
   });
 });

@@ -21,6 +21,7 @@ export {
   type BudgetSelectorProps,
 } from "./ModelSelector";
 export { providerIcon, providerIconColor, type ProviderGlyph } from "./provider-icons";
+export { defaultChatModelId } from "./models";
 export {
   ContextMeter,
   type ContextMeterProps,

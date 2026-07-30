@@ -13,6 +13,8 @@ import { Suggestions } from "./Suggestion";
 import { ModelSelector, EffortSelector } from "./ModelSelector";
 import { providerIcon, providerIconColor } from "./provider-icons";
 import { ContextMeter } from "./ContextMeter";
+import { DEFAULT_REASONING_EFFORTS } from "./effort-icons";
+import { defaultChatModelId } from "./models";
 import {
   createAttachmentUploadAdapter,
   type AttachmentLimits,
@@ -94,8 +96,6 @@ export type ChatProps = {
   className?: string;
 };
 
-const DEFAULT_EFFORTS = ["low", "medium", "high"];
-
 /** Self-contained AI chat over a v6-compatible `/api/chat`: a streaming
  *  conversation with model/effort selectors, suggestions, attachments,
  *  per-message copy/regenerate, and human-in-the-loop tool approvals. The
@@ -107,7 +107,7 @@ export function Chat({
   modelsApi = "/api/chat/models",
   defaultModel,
   model: controlledModel,
-  reasoningEfforts = DEFAULT_EFFORTS,
+  reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   defaultReasoningEffort = "",
   reasoningEffort: controlledEffort,
   temperature,
@@ -142,7 +142,7 @@ export function Chat({
   useEffect(() => {
     if (!modelsProp) return;
     setModels(modelsProp);
-    setModel((m) => m ?? controlledModel ?? modelsProp.find((d) => d.configured !== false)?.id);
+    setModel((m) => m ?? controlledModel ?? defaultChatModelId(modelsProp));
   }, [modelsProp, controlledModel]);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
@@ -154,7 +154,7 @@ export function Chat({
       .then((data: ChatModel[]) => {
         if (cancelled) return;
         setModels(data);
-        setModel((m) => m ?? controlledModel ?? data.find((d) => d.configured !== false)?.id);
+        setModel((m) => m ?? controlledModel ?? defaultChatModelId(data));
       })
       .catch((err) => console.warn("clicky-ui: failed to load chat models", err));
     return () => {

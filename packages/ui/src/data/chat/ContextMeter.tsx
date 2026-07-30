@@ -2,7 +2,11 @@ import { cn } from "../../lib/utils";
 import { compactTokens, formatCost } from "../../lib/tokens";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { HoverCard } from "../../overlay/HoverCard";
-import { effortLevelColor, effortLevelIcon } from "./effort-icons";
+import {
+  effortLevelColor,
+  effortLevelIcon,
+  effortLevelLabel,
+} from "./effort-icons";
 
 export type ContextMeterMode = "bar" | "gauge";
 
@@ -327,7 +331,7 @@ export function ContextMeter({
                 )}
               >
                 {EffortGlyph ? <EffortGlyph className="size-3.5" /> : null}
-                {effortLabel(effort)} effort
+                {effortLevelLabel(effort)} effort
               </span>
             ) : null}
           </div>
@@ -382,9 +386,4 @@ export function ContextMeter({
       </div>
     </HoverCard>
   );
-}
-
-function effortLabel(value: string) {
-  const normalized = value.trim();
-  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
 }
