@@ -64,7 +64,15 @@ export function SessionRow({
   | ((decision: SessionToolDecision) => Promise<void> | void)
   | undefined;
 }) {
-
+  if (event.kind === "user") {
+    return (
+      <UserRow
+        event={event}
+        showRowMetadata={showRowMetadata}
+        showRaw={showRaw}
+      />
+    );
+  }
 
   const visual = eventVisual(event);
   return (
@@ -200,35 +208,43 @@ export function WaitGroupRow({
   );
 }
 
-
-
-function UserRow({ event }: { event: SessionEvent }) {
-  const [open, setOpen] = useState(false);
-  const preview = event.text?.split("\n", 1)[0] ?? "Initial Prompt";
+function UserRow({
+  event,
+  showRowMetadata,
+  showRaw,
+}: {
+  event: SessionEvent;
+  showRowMetadata: boolean;
+  showRaw: boolean;
+}) {
   return (
-    <div className="not-prose text-xs text-muted-foreground">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-start gap-1.5 text-left hover:text-foreground"
-      >
-        <span className="shrink-0 font-medium text-foreground">You</span>
-        <span className="min-w-0 flex-1 truncate">{preview}</span>
-        <Icon
-          icon={UiChevronDown}
-          className={cn(
-            "mt-0.5 size-3 shrink-0 transition-transform",
-            open && "rotate-180",
+    <li
+      data-event-kind="user"
+      className="relative flex justify-end pb-density-4 last:pb-0"
+    >
+      <div className="flex max-w-[85%] items-start gap-density-3">
+        <div className="min-w-0">
+          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
+            You
+          </div>
+          <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right text-base font-medium leading-relaxed text-accent-foreground">
+            {event.text}
+          </div>
+          {showRowMetadata && <EventMetadata event={event} align="right" />}
+          {showRaw && event.raw !== undefined && (
+            <RawEventBlock raw={event.raw} align="right" />
           )}
-        />
-      </button>
-      {open && (
-        <div className="mt-1.5 whitespace-pre-wrap break-words  bg-muted/20 px-density-3 py-density-2 leading-relaxed">
-          <Markdown text={event.text} />
         </div>
-      )}
-    </div>
+        <span
+          className={cn(
+            "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
+            DISC_TONE.slate,
+          )}
+        >
+          <Icon icon={UiUserCircle} className="h-3 w-3" />
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -327,371 +343,10 @@ function MessageBody({
 }) {
   return (
     <div className="flex items-start gap-1.5">
-
+      {badge}
       <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
         {event.text && <Markdown text={event.text} />}
       </div>
-    );
-  }
-
-  const hasDetail =
-    event.toolInput !== undefined || event.toolResponse !== undefined;
-  const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
-  const diff = toolDiff(event.tool ?? "", event.toolInput);
-  // summaryOnly rows (file ops) read as their path alone — the icon carries the
-  // verb. Remaining input keys follow as JetBrains-style inline param hints;
-  // write-type rows carry a +/- diff stat.
-  const header = (
-    <>
-      {visual.summaryOnly && summary ? (
-        <span className="min-w-0 truncate font-mono text-xs text-foreground ">
-          {summary}
-        </span>
-      ) : (
-        <span className="shrink-0 font-medium text-foreground">
-          {visual.label}
-        </span>
-      )}
-      {diff && (
-        <span className="shrink-0 font-mono text-xs">
-          {diff.added > 0 && (
-            <span className="text-emerald-600 [[data-theme=dark]_&]:text-emerald-400">
-              +{diff.added}
-            </span>
-          )}
-          {diff.removed > 0 && (
-            <span className="ml-1 text-rose-600 [[data-theme=dark]_&]:text-rose-400">
-              -{diff.removed}
-            </span>
-          )}
-        </span>
-      )}
-      <ApprovalBadge event={event} />
-      {params.length > 0 && <InlineParams params={params} />}
-    </>
-  );
-
-  return (
-    <div className="not-prose">
-      {hasDetail ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
-        >
-          {header}
-          <Icon
-            icon={UiChevronDown}
-            className={cn(
-              "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      ) : (
-        <div className="flex items-center gap-1.5">{header}</div>
-      )}
-
-      {open && hasDetail && (
-        <div className="mt-1.5 space-y-1.5">
-          {diff ? (
-            <DiffBlock diff={diff} />
-          ) : (
-            event.toolInput !== undefined && (
-              <DetailBlock
-                language="json"
-                source={JSON.stringify(event.toolInput, null, 2)}
-              />
-            )
-          )}
-          {event.toolResponse !== undefined && (
-            <ResponseBlock response={event.toolResponse} />
-          )}
-        </div>
-      )}
-      {event.pending && onPendingToolDecision && (
-        <PendingDecisionControls event={event} onDecision={onPendingToolDecision} />
-      )}
-    </div>
-  );
-}
-
-function QuestionToolBody({
-  event,
-  visual,
-  onDecision,
-}: {
-  event: SessionEvent;
-  visual: EventVisual;
-  onDecision?: ((decision: SessionToolDecision) => Promise<void> | void) | undefined;
-}) {
-  const questions = questionsFromToolInput(event.toolInput);
-  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
-
-  return (
-    <div className="not-prose">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
-        <ApprovalBadge event={event} />
-        {summary && questions.length !== 1 && (
-          <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span>
-        )}
-      </div>
-      <div className="mt-1.5 space-y-1.5">
-        {questions.length > 0 ? (
-          questions.map((question, index) => (
-            <QuestionCard key={`${question.id}-${index}`} question={question} index={index} />
-          ))
-        ) : event.toolInput ? (
-          <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
-        ) : null}
-        {event.toolResponse !== undefined && (
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase text-muted-foreground">Answer</div>
-            <ResponseBlock response={event.toolResponse} />
-          </div>
-        )}
-        {event.pending && onDecision && (
-          <QuestionDecisionControls event={event} questions={questions} onDecision={onDecision} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PendingDecisionControls({
-  event,
-  onDecision,
-}: {
-  event: SessionEvent;
-  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
-}) {
-  const [comment, setComment] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const decide = async (allow: boolean, message?: string) => {
-    setBusy(true);
-    setError("");
-    try { await onDecision({ event, allow, ...(message ? { message } : {}) }); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
-  };
-  return (
-    <div className="mt-2 space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-density-3">
-      <textarea aria-label="Decision comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional rejection feedback" className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} onClick={() => decide(true)}><Icon icon={UiCheck} />Allow</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => decide(false)}><Icon icon={UiCancel} />Reject</Button>
-        <Button size="sm" variant="outline" disabled={busy || !comment.trim()} onClick={() => decide(false, comment.trim())}><Icon icon={UiComment} />Reject with comment</Button>
-      </div>
-      {error && <div role="alert" className="text-xs text-rose-600">{error}</div>}
-    </div>
-  );
-}
-
-function QuestionDecisionControls({
-  event,
-  questions,
-  onDecision,
-}: {
-  event: SessionEvent;
-  questions: SessionQuestion[];
-  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
-}) {
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [details, setDetails] = useState<Record<string, string>>({});
-  const [comment, setComment] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const decide = async (allow: boolean, message?: string) => {
-    setBusy(true); setError("");
-    const submittedAnswers = Object.fromEntries(Object.entries(answers).map(([question, answer]) => {
-      const detail = details[question]?.trim();
-      if (!detail) return [question, answer];
-      return [question, Array.isArray(answer)
-        ? [...answer, `Additional details: ${detail}`]
-        : `${answer}\nAdditional details: ${detail}`];
-    }));
-    try { await onDecision({ event, allow, answers: submittedAnswers, ...(message ? { message } : {}) }); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
-  };
-  return (
-    <div className="space-y-3 rounded-md border border-sky-500/25 bg-sky-500/5 p-density-3">
-      {questions.map((question) => (
-        <fieldset key={question.id} className="space-y-1.5">
-          <legend className="text-sm font-medium text-foreground">{question.text}</legend>
-          {question.options.map((option) => question.multiSelect ? (
-            <label key={option.value} className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={Array.isArray(answers[question.text]) && (answers[question.text] as string[]).includes(option.value)} onChange={(e) => setAnswers((current) => { const selected = Array.isArray(current[question.text]) ? current[question.text] as string[] : []; return { ...current, [question.text]: e.target.checked ? [...selected, option.value] : selected.filter((value) => value !== option.value) }; })} />
-              <span>{option.label}{option.description && <span className="ml-1 text-muted-foreground">{option.description}</span>}</span>
-            </label>
-          ) : (
-            <label key={option.value} className="flex items-start gap-2 text-sm">
-              <input type="radio" name={`question-${event.id}-${question.id}`} value={option.value} checked={answers[question.text] === option.value} onChange={() => setAnswers((current) => ({ ...current, [question.text]: option.value }))} />
-              <span>{option.label}{option.description && <span className="ml-1 text-muted-foreground">{option.description}</span>}</span>
-            </label>
-          ))}
-          <textarea
-            aria-label={`${question.text} additional details`}
-            value={question.options.length ? details[question.text] ?? "" : typeof answers[question.text] === "string" ? answers[question.text] as string : ""}
-            onChange={(e) => question.options.length
-              ? setDetails((current) => ({ ...current, [question.text]: e.target.value }))
-              : setAnswers((current) => ({ ...current, [question.text]: e.target.value }))}
-            placeholder={question.options.length ? "Additional details" : "Your answer"}
-            className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-          />
-        </fieldset>
-      ))}
-      <textarea aria-label="Rejection comment" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional rejection feedback" className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} onClick={() => decide(true)}><Icon icon={UiCheck} />Send answer</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => decide(false)}><Icon icon={UiCancel} />Reject</Button>
-        <Button size="sm" variant="outline" disabled={busy || !comment.trim()} onClick={() => decide(false, comment.trim())}><Icon icon={UiComment} />Reject with comment</Button>
-      </div>
-      {error && <div role="alert" className="text-xs text-rose-600">{error}</div>}
-    </div>
-  );
-}
-
-function QuestionCard({ question, index }: { question: SessionQuestion; index: number }) {
-  const label = question.context || (question.id ? `Question ${question.id}` : `Question ${index + 1}`);
-  return (
-    <div className="rounded-md border border-sky-500/20 bg-sky-500/5 px-density-3 py-density-2">
-      <div className="text-[11px] font-medium uppercase text-muted-foreground">{label}</div>
-      <div className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">{question.text}</div>
-      {question.options.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {question.options.map((option) => (
-            <span
-              key={option.value}
-              className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
-            >
-              <span className="font-medium text-foreground">{option.label}</span>
-              {option.description && <span className="ml-1">{option.description}</span>}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuestionToolBody({ event, visual }: { event: SessionEvent; visual: EventVisual }) {
-  const questions = questionsFromToolInput(event.toolInput);
-  const summary = summarizeToolInput(event.tool ?? "", event.toolInput, event.cwd);
-
-  return (
-    <div className="not-prose">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="shrink-0 font-medium text-foreground">{visual.label}</span>
-        <ApprovalBadge event={event} />
-        {summary && questions.length !== 1 && (
-          <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span>
-        )}
-      </div>
-      <div className="mt-1.5 space-y-1.5">
-        {questions.length > 0 ? (
-          questions.map((question, index) => (
-            <QuestionCard key={`${question.id}-${index}`} question={question} index={index} />
-          ))
-        ) : event.toolInput ? (
-          <DetailBlock language="json" source={JSON.stringify(event.toolInput, null, 2)} />
-        ) : null}
-        {event.toolResponse !== undefined && (
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase text-muted-foreground">Answer</div>
-            <ResponseBlock response={event.toolResponse} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function QuestionCard({ question, index }: { question: SessionQuestion; index: number }) {
-  const label = question.context || (question.id ? `Question ${question.id}` : `Question ${index + 1}`);
-  return (
-    <div className="rounded-md border border-sky-500/20 bg-sky-500/5 px-density-3 py-density-2">
-      <div className="text-[11px] font-medium uppercase text-muted-foreground">{label}</div>
-      <div className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">{question.text}</div>
-      {question.options.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {question.options.map((option) => (
-            <span
-              key={option.value}
-              className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
-            >
-              <span className="font-medium text-foreground">{option.label}</span>
-              {option.description && <span className="ml-1">{option.description}</span>}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// A single truncating line of `name: value` hints — the container clips with an
-// ellipsis instead of wrapping, and each value is already truncated by the model.
-function InlineParams({ params }: { params: ToolParam[] }) {
-  return (
-    <span className="min-w-0 flex-1 truncate font-mono text-xs">
-      {params.map((param) => (
-        <span key={param.name} className="[&:not(:first-child)]:ml-2">
-          <span className="text-muted-foreground/70">{param.name}: </span>
-          <span className="text-muted-foreground">{param.value}</span>
-        </span>
-      ))}
-    </span>
-  );
-}
-
-// Language-aware line diff for write-type tools: each edit renders as a
-// `CodeDiff` (real LCS + Shiki highlighting) with git-style add/remove gutters
-// whose tints track the theme tokens.
-function DiffBlock({ diff }: { diff: ToolDiff }) {
-  return (
-    <div className="space-y-1.5">
-      {diff.segments.map((segment, index) => (
-        <CodeDiff
-          key={index}
-          bare
-          showLineNumbers={false}
-          original={segment.original}
-          modified={segment.modified}
-          {...(diff.language ? { language: diff.language } : {})}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ResponseBlock({ response }: { response: string }) {
-  const trimmed = response.trim();
-  const isJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-  return <DetailBlock language={isJson ? "json" : "text"} source={response} />;
-}
-
-function DetailBlock({
-  language,
-  source,
-}: {
-  language: string;
-  source: string;
-}): ReactNode {
-  return (
-    <div className="overflow-x-auto text-xs">
-      <CodeBlock bare language={language} source={source} />
-    </div>
-  );
-}
-
-function MessageBody({ event }: { event: SessionEvent }) {
-  return (
-    <div className="whitespace-pre-wrap break-words text-base font-medium leading-relaxed text-foreground">
-      {event.text}
     </div>
   );
 }

@@ -154,6 +154,10 @@ export type FilterBarLookupMultiFilter = {
   onSearch?: (query: string) => void;
   /** Shows a loading indicator while a search is in flight. */
   loading?: boolean;
+  /** True when `options` is a capped head of a larger server-side result set. */
+  truncated?: boolean;
+  /** Total distinct option count behind a truncated result set. */
+  total?: number;
   disabled?: boolean;
   className?: string;
 };
@@ -951,6 +955,7 @@ function LookupMultiFilterValueControl({ filter }: { filter: FilterBarLookupMult
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      footer={lookupMultiFilterFooter(filter)}
       size="sm"
       className="w-full"
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
@@ -1236,6 +1241,7 @@ function LookupMultiFilterField({
       value={filter.value}
       onChange={filter.onChange}
       allowCustomValue={false}
+      footer={lookupMultiFilterFooter(filter)}
       size="sm"
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
@@ -1243,6 +1249,18 @@ function LookupMultiFilterField({
       {...(filter.loading !== undefined ? { loading: filter.loading } : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
+  );
+}
+
+function lookupMultiFilterFooter(filter: FilterBarLookupMultiFilter) {
+  const moreCount =
+    filter.truncated && filter.total ? Math.max(filter.total - filter.options.length, 0) : 0;
+  if (moreCount === 0) return undefined;
+  return (
+    <>
+      … and {moreCount.toLocaleString()} more
+      {filter.onSearch ? " — type to search all" : ""}
+    </>
   );
 }
 

@@ -811,6 +811,32 @@ describe("FilterBar", () => {
     expect(screen.getByText(/and 247 more/i)).toBeInTheDocument();
   });
 
+  it("renders an 'and N more' hint for a truncated lookup-multi filter", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "rule",
+            kind: "lookup-multi",
+            label: "Rule",
+            value: [],
+            options: [
+              { value: "tax-current", label: "Current tax" },
+              { value: "tax-deferred", label: "Deferred tax" },
+            ],
+            truncated: true,
+            total: 74,
+            onSearch: vi.fn(),
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Rule" }));
+    expect(screen.getByText(/and 72 more — type to search all/i)).toBeInTheDocument();
+  });
+
   it("replaces the head with onSearch matches and hides non-selected head items", async () => {
     vi.useFakeTimers();
     // onSearch returns a value (plan-0225) that is NOT in the head set.
