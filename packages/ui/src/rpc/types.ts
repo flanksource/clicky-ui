@@ -118,6 +118,7 @@ export interface DomainDefinition {
   key: string;
   title: string;
   description: string;
+  icon?: string;
   emptyTitle?: string;
   emptyDescription?: string;
 }

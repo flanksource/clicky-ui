@@ -16,7 +16,7 @@ export function OpenChatWindowOnMount({
 }): ReactNode {
   const { openPanel } = useChatWindowManager();
   useEffect(() => {
-    openPanel({ initialPrompt });
+    openPanel(initialPrompt === undefined ? undefined : { initialPrompt });
   }, [initialPrompt, openPanel]);
   return <>{children}</>;
 }

@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from "react";
 import { Combobox } from "../../components/Combobox";
 import type { FormSize } from "../../components/json-schema-form-size";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import { Icon, type StaticIconComponent } from "../Icon";
+import type { StaticIconComponent } from "../Icon";
 import { cn } from "../../lib/utils";
 import {
   effortLevelColor,
