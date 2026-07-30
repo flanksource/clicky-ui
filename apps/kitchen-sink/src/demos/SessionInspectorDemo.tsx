@@ -27,7 +27,7 @@ export function SessionInspectorDemo() {
         <div className="h-[720px] min-w-0">
           <SessionInspector
             session={CLAUDE_SESSION_EXAMPLE}
-            defaultTab="turns"
+            defaultTab="transcript"
           />
         </div>
       </div>

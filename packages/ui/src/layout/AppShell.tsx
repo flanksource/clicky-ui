@@ -2,11 +2,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiClose, UiMenu, UiSidebar } from "../icons";
-import { useRouter } from "../rpc/router";
-import type { RenderLink } from "../rpc/EndpointList";
 import { useEscapeLayer } from "../overlay/modalStack";
 import { SplitPane } from "./SplitPane";
 import { AppShellSlotOutlines } from "./AppShell.debug";
+import { NavSections } from "./AppShell.nav";
+import {
+  contentWidthClassName,
+  type ContentWidth,
+} from "./content-width";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
 // owns the brand + collapse toggle and renders grouped nav sections; the top bar
@@ -89,6 +92,8 @@ export type AppShellProps = {
   bodySplit?: number;
   /** Main content (body-main); fills the remaining space and scrolls. */
   children: ReactNode;
+  /** Centers content at responsive wide breakpoints, or allows it to fill the workspace. */
+  contentWidth?: ContentWidth;
 
   /**
    * Outlines every slot in its own colour and labels it with its `data-slot`
@@ -134,6 +139,7 @@ export function AppShell(props: AppShellProps) {
     bodySidebar,
     bodySplit = 24,
     children,
+    contentWidth = "contained",
     debugSlots = false,
     className,
     headerClassName,
@@ -170,6 +176,8 @@ export function AppShell(props: AppShellProps) {
     toolbar !== undefined;
   const hasMobileHeader = hasSidebar;
   const hasBodyHeader = bodyHeader !== undefined || bodyActions !== undefined;
+  const effectiveContentWidth =
+    bodySidebar === undefined ? contentWidth : "full";
   const renderSidebarContent = (collapsedValue: boolean, onNavigate?: () => void) =>
     typeof sidebar === "function"
       ? sidebar(collapsedValue)
@@ -245,7 +253,10 @@ export function AppShell(props: AppShellProps) {
         </aside>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div
+        data-slot="app-shell-column"
+        className="@container/app-content flex min-h-0 min-w-0 flex-1 flex-col"
+      >
         {(hasTopBar || hasMobileHeader) && (
           <header
             data-slot="app-shell-header"
@@ -342,19 +353,28 @@ export function AppShell(props: AppShellProps) {
           <div
             data-slot="app-shell-body-header"
             className={cn(
-              "flex shrink-0 flex-col items-stretch gap-density-2 border-b border-border bg-card px-density-3 py-density-2 md:flex-row md:items-start md:justify-between md:gap-density-3 md:px-density-4",
+              "shrink-0 border-b border-border bg-card",
               bodyHeaderClassName,
             )}
           >
-            <div className="min-w-0 flex-1">{bodyHeader}</div>
-            {bodyActions && (
-              <div
-                data-slot="app-shell-body-actions"
-                className="flex shrink-0 flex-wrap items-center gap-density-2"
-              >
-                {bodyActions}
-              </div>
-            )}
+            <div
+              data-slot="app-shell-body-header-content"
+              data-content-width={effectiveContentWidth}
+              className={cn(
+                "flex flex-col items-stretch gap-density-2 px-density-3 py-density-2 md:flex-row md:items-start md:justify-between md:gap-density-3 md:px-density-4",
+                contentWidthClassName(effectiveContentWidth),
+              )}
+            >
+              <div className="min-w-0 flex-1">{bodyHeader}</div>
+              {bodyActions && (
+                <div
+                  data-slot="app-shell-body-actions"
+                  className="flex shrink-0 flex-wrap items-center gap-density-2"
+                >
+                  {bodyActions}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -402,7 +422,13 @@ export function AppShell(props: AppShellProps) {
               contentClassName,
             )}
           >
-            {children}
+            <div
+              data-slot="app-shell-content"
+              data-content-width={contentWidth}
+              className={contentWidthClassName(contentWidth)}
+            >
+              {children}
+            </div>
           </main>
         )}
       </div>
@@ -451,112 +477,6 @@ export function AppShell(props: AppShellProps) {
           </aside>
         </div>
       )}
-    </div>
-  );
-}
-
-function NavSections({
-  sections,
-  collapsed,
-  onNavigate,
-}: {
-  sections: AppShellNavSection[];
-  collapsed: boolean;
-  onNavigate?: () => void;
-}) {
-  const { renderLink } = useRouter();
-  return (
-    <nav
-      className={cn(
-        "flex flex-col gap-0.5",
-        collapsed ? "px-2" : "px-density-2",
-      )}
-    >
-      {sections.map((section, i) => (
-        <div key={section.label ?? `section-${i}`} className="flex flex-col">
-          {section.label &&
-            (collapsed ? (
-              <div className="mx-2 mb-1 mt-3 border-t border-sidebar-border first:mt-1" />
-            ) : (
-              <div className="mb-0.5 mt-3 px-density-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55 first:mt-1">
-                {section.label}
-              </div>
-            ))}
-          {section.items.map((item) => (
-            <NavItemRow
-              key={item.key}
-              item={item}
-              collapsed={collapsed}
-              renderLink={renderLink}
-              {...(onNavigate ? { onNavigate } : {})}
-            />
-          ))}
-        </div>
-      ))}
-    </nav>
-  );
-}
-
-function NavItemRow({
-  item,
-  collapsed,
-  renderLink,
-  onNavigate,
-}: {
-  item: AppShellNavItem;
-  collapsed: boolean;
-  renderLink: RenderLink;
-  onNavigate?: () => void;
-}) {
-  const className = cn(
-    "flex w-full items-center gap-2.5 rounded-md px-density-2 py-1.5 text-left text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-    collapsed && "justify-center px-0",
-    item.active && "bg-sidebar-accent font-medium text-sidebar-primary",
-  );
-  const inner = (
-    <>
-      {item.icon && (
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-          <Icon
-            {...(typeof item.icon === "string"
-              ? { name: item.icon }
-              : { icon: item.icon })}
-          />
-        </span>
-      )}
-      {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-      {!collapsed && item.badge}
-    </>
-  );
-  const title =
-    collapsed && typeof item.label === "string" ? item.label : undefined;
-
-  if (item.external) {
-    return (
-      <a
-        href={item.to}
-        className={className}
-        title={title}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onNavigate}
-      >
-        {inner}
-      </a>
-    );
-  }
-  const link = renderLink({
-    key: item.key,
-    to: item.to,
-    className,
-    children: inner,
-    ...(title ? { title } : {}),
-  });
-
-  if (!onNavigate) return link;
-  return (
-    <div onClick={onNavigate}>
-      {link}
     </div>
   );
 }

@@ -1,15 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => {
-    try {
-      window.localStorage.clear();
-    } catch {}
-  });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-});
-
 test("renders the kitchen-sink page with Button showcase", async ({ page }) => {
   await page.goto("/?demo=button", { waitUntil: "domcontentloaded" });
 
@@ -24,6 +14,7 @@ test("renders the kitchen-sink page with Button showcase", async ({ page }) => {
 });
 
 test("theme switcher updates <html data-theme> and persists", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-theme", /light|dark/);
 
@@ -36,6 +27,7 @@ test("theme switcher updates <html data-theme> and persists", async ({ page }) =
 });
 
 test("density switcher updates <html data-density> and persists", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   const html = page.locator("html");
 
   await page.getByRole("banner").getByRole("button", { name: "Density" }).click();

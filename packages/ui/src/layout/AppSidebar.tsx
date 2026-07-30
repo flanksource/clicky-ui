@@ -4,6 +4,10 @@ import { Icon } from "../data/Icon";
 import { UiSidebar } from "../icons";
 import type { RenderLink } from "../rpc/EndpointList";
 import { useRouter } from "../rpc/router";
+import {
+  contentWidthClassName,
+  type ContentWidth,
+} from "./content-width";
 
 // AppSidebar / AppLayout are a router-agnostic application shell: a collapsible
 // left navigation rail driven by declarative sections, plus a flex layout that
@@ -324,18 +328,45 @@ export interface AppLayoutProps {
   sidebar: ReactNode;
   header?: ReactNode;
   children: ReactNode;
+  /** Centers content at responsive wide breakpoints, or allows it to fill the workspace. */
+  contentWidth?: ContentWidth;
   className?: string;
 }
 
 /** Flex shell pairing the sidebar rail with an optional header and the routed
  * content area. The content area scrolls independently of the rail. */
-export function AppLayout({ sidebar, header, children, className }: AppLayoutProps) {
+export function AppLayout({
+  sidebar,
+  header,
+  children,
+  contentWidth = "contained",
+  className,
+}: AppLayoutProps) {
   return (
     <div className={cn("flex h-full min-h-0 w-full overflow-hidden bg-background", className)}>
       {sidebar}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {header}
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
+      <div
+        data-slot="app-layout-column"
+        className="@container/app-content flex min-w-0 flex-1 flex-col"
+      >
+        {header && (
+          <div
+            data-slot="app-layout-header-content"
+            data-content-width={contentWidth}
+            className={contentWidthClassName(contentWidth)}
+          >
+            {header}
+          </div>
+        )}
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          <div
+            data-slot="app-layout-content"
+            data-content-width={contentWidth}
+            className={contentWidthClassName(contentWidth)}
+          >
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );
