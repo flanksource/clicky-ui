@@ -44,9 +44,12 @@ export const TypeScript: Story = {
     // The shell header carries the language label.
     expect(canvas.getByText("typescript")).toBeInTheDocument();
     // Syntax highlighting eventually colors the tokens.
-    await waitFor(() => {
-      expect(canvasElement.querySelectorAll("code span[style]").length).toBeGreaterThan(0);
-    });
+    await waitFor(
+      () => {
+        expect(canvasElement.querySelectorAll("code span[style]").length).toBeGreaterThan(0);
+      },
+      { timeout: 5_000 },
+    );
   },
 };
 

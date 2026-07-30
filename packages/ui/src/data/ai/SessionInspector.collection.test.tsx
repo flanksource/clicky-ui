@@ -213,7 +213,7 @@ describe("SessionInspector session collections", () => {
       loadSession,
     };
 
-    render(
+    const { container } = render(
       <div className="h-[720px]">
         <SessionInspector session={collection} />
       </div>
@@ -230,10 +230,12 @@ describe("SessionInspector session collections", () => {
       )
     );
 
-    await waitFor(() => expect(loadSession).toHaveBeenCalledTimes(1));
-    // TEMP: debug
-    console.log(document.body.textContent);
-    expect(await screen.findByText("lazy parallel answer")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(loadSession).toHaveBeenCalledTimes(1);
+      expect(
+        container.querySelectorAll('[data-event-kind="assistant"]')[1],
+      ).toHaveTextContent("lazy parallel answer");
+    });
     expect(
       screen.getByRole("button", {
         name: "Select session content: 2 of 2 sessions",

@@ -116,9 +116,11 @@ describe("SecretKeySelector references", () => {
       "shrink",
       "grow",
     );
-    expect(within(fields).getAllByRole("combobox")[1]).toHaveAttribute(
-      "title",
-      "host — sql-••••.com",
+    await waitFor(() =>
+      expect(within(fields).getAllByRole("combobox")[1]).toHaveAttribute(
+        "title",
+        "host — sql-••••.com",
+      ),
     );
   });
 

@@ -233,7 +233,7 @@ export const ResponsiveWidths: Story = {
         <div className="w-[22rem] max-w-full" data-testid="compact-literal">
           <Playground
             className="w-full"
-            initial={{ kind: "value", value: "LAB_ESW_OIPA_QA" }}
+            initial={{ kind: "value", value: "TENANT_X_SERVICE_QA" }}
           />
         </div>
       </section>

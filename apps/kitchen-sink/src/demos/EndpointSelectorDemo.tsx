@@ -35,7 +35,7 @@ const loadWorkloads = async (kinds: WorkloadKind[]) =>
   >;
 
 export function EndpointSelectorDemo() {
-  const [value, setValue] = useState<EndpointSelectorValue>({
+  const [value, setValue] = useState<EndpointSelectorValue | undefined>({
     mode: "service",
     target: { kind: "service", name: "opensearch", namespace: "platform" },
     scheme: "http",

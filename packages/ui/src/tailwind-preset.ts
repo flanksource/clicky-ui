@@ -4,6 +4,17 @@ const preset: Partial<Config> = {
   darkMode: ["selector", '[data-theme="dark"]'],
   theme: {
     extend: {
+      screens: {
+        "3xl": "1920px",
+      },
+      containers: {
+        "8xl": "1536px",
+        "9xl": "1920px",
+      },
+      maxWidth: {
+        "8xl": "1536px",
+        "9xl": "1920px",
+      },
       // Tokens are full-color aliases of the Flanksource fs-tokens (see
       // styles/tokens.css), so they are referenced directly with var(--token)
       // — no hsl() wrapper. Tailwind v4 applies opacity modifiers via color-mix.
