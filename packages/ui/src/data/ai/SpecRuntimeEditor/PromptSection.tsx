@@ -81,7 +81,6 @@ export function PromptAdvanced({
         value={schemaText(value.prompt?.schemaJSON)}
         onChange={(schemaJSON) => onChange(withPrompt(value, { schemaJSON }))}
         minHeight={176}
-        placeholder='{"type":"object","properties":{}}'
         icon={UiFileJson}
       />
     </div>

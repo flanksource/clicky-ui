@@ -8,6 +8,7 @@ import {
   UiTimer,
 } from "../../icons";
 import { Icon, type StaticIconComponent } from "../Icon";
+import { effortLevelLabel } from "../chat/effort-icons";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import { effortIcon } from "./agent-action-icons";
 import {
@@ -34,14 +35,15 @@ export function SessionInspectorHeader({
   const providerId = session.provider || provider?.family;
   const ProviderIcon = providerIcon(providerId) ?? UiRobotAi;
   const providerColor = providerIconColor(providerId);
-  const effort = session.reasoningEffort
-    ? effortIcon(session.reasoningEffort)
-    : undefined;
-  const status = session.live?.active
-    ? session.live.status || "running"
-    : session.endedAt
-    ? "completed"
-    : session.live?.status || "session";
+  const effortValue = session.reasoningEffort?.trim();
+  const effort = effortValue ? effortIcon(effortValue) : undefined;
+  const title =
+    session.title?.trim() ||
+    session.initialPrompt?.trim() ||
+    session.model ||
+    provider?.family ||
+    session.provider ||
+    "Session";
   const metadata = getSessionMetadata(session);
   const showMeter = Boolean(metadata?.context);
 
@@ -64,13 +66,12 @@ export function SessionInspectorHeader({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-density-2">
             <h2 className="min-w-0 max-w-full truncate text-base font-semibold tracking-tight text-foreground">
-              {titleCase(status)} with{" "}
-              {session.model || provider?.family || session.provider || "AI"}
+              {title}
             </h2>
-            {effort ? (
+            {effortValue ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-xs max-sm:basis-full max-sm:border-0 max-sm:bg-transparent max-sm:px-0">
-                <Icon icon={effort.icon} size="xs" />
-                {effort.label}
+                {effort ? <Icon icon={effort.icon} size="xs" /> : null}
+                {effortLevelLabel(effortValue)}
               </span>
             ) : null}
           </div>
@@ -208,10 +209,6 @@ function UsageMetric({ label, value }: { label: string; value: ReactNode }) {
       </div>
     </div>
   );
-}
-
-function titleCase(value: string) {
-  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
 }
 
 function preciseTokens(value: number) {

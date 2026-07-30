@@ -65,6 +65,12 @@ function openPermissionsAdvanced() {
   );
 }
 
+function commitPhaseSelect() {
+  return within(screen.getByRole("region", { name: "Commit" })).getByRole(
+    "combobox",
+  );
+}
+
 function openModelAdvanced() {
   fireEvent.click(
     within(screen.getByRole("region", { name: "Model" })).getByRole("button", {
@@ -111,7 +117,10 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByText("Environment variables")).toBeInTheDocument();
     expect(screen.getByText("Git checkout")).toBeInTheDocument();
     expect(screen.getByText("Verify fixture")).toBeInTheDocument();
-    expect(screen.getByText("Commit message")).toBeInTheDocument();
+    // The commit phase select is the section's always-present control; the
+    // message and dry-run fields belong to a policy that does not exist yet.
+    expect(commitPhaseSelect()).toHaveValue("none");
+    expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Static value…"), {
       target: { value: "changed" },
@@ -184,6 +193,49 @@ describe("SpecRuntimeEditor", () => {
       ),
     );
     expect(screen.getByLabelText("Since")).toHaveValue("");
+  });
+
+  // The commit phase is what makes per-turn commits reachable at all, and
+  // "Never" has to mean an absent policy rather than a stanza of falses — a
+  // lingering {dryRun: true} would still read as configured downstream.
+  it("edits a commit policy through the phase select and drops it on Never", () => {
+    const onChange = vi.fn();
+
+    function Host() {
+      const [value, setValue] = useState<AISpecRuntimeValue>({});
+      return (
+        <SpecRuntimeEditor
+          value={value}
+          onChange={(next) => {
+            onChange(next);
+            setValue(next);
+          }}
+        />
+      );
+    }
+
+    render(<Host />);
+
+    fireEvent.change(commitPhaseSelect(), { target: { value: "turn" } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      workflow: { commits: [{ on: "turn" }] },
+    });
+
+    fireEvent.change(screen.getByLabelText("Commit message"), {
+      target: { value: "feat: rewrite the config" },
+    });
+    fireEvent.click(screen.getByLabelText("Dry run"));
+    expect(onChange).toHaveBeenLastCalledWith({
+      workflow: {
+        commits: [
+          { on: "turn", message: "feat: rewrite the config", dryRun: true },
+        ],
+      },
+    });
+
+    fireEvent.change(commitPhaseSelect(), { target: { value: "none" } });
+    expect(onChange).toHaveBeenLastCalledWith({ workflow: { commits: [] } });
+    expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
   });
 
   it("moves prompt schema into advanced without source and metadata controls", () => {
@@ -266,7 +318,16 @@ describe("SpecRuntimeEditor", () => {
     ).toBeNull();
 
     expect(within(modelSection).getByText("GPT-4o")).toBeInTheDocument();
-    expect(within(modelSection).getByText("Low")).toBeInTheDocument();
+    const gpt4oRow = within(modelSection).getByRole("button", {
+      name: "Edit fallback GPT-4o",
+    });
+    expect(within(gpt4oRow).getByText("Low")).toBeInTheDocument();
+    // The collapsed row tones its glyphs like the bar does: the OpenAI mark in
+    // the brand color, the effort battery on the low (sky) rung.
+    expect(gpt4oRow.querySelector("svg.text-black")).not.toBeNull();
+    expect(gpt4oRow.querySelector("svg.text-sky-700")).not.toBeNull();
+    // This fallback names no backend, so the row claims no runtime mode.
+    expect(within(gpt4oRow).queryByRole("img")).not.toBeInTheDocument();
 
     fireEvent.click(
       within(modelSection).getByRole("button", {
@@ -305,38 +366,39 @@ describe("SpecRuntimeEditor", () => {
     expect(
       within(modelSection).queryByRole("button", { name: "Add fallback" }),
     ).not.toBeInTheDocument();
+    const bar = within(picker).getByRole("group", { name: "Fallback runtime" });
+    expect(within(bar).getByTitle("OpenAI API")).toHaveTextContent("API");
     expect(
-      within(picker).getByRole("radiogroup", { name: "Runtime mode" }),
+      within(bar).getByTitle("Model — prompt default"),
     ).toBeInTheDocument();
+    // The bar is the whole editor — temperature is no longer part of it.
+    expect(within(picker).queryByLabelText("Temperature")).not.toBeInTheDocument();
+    // The draft inherits the spec's backend, so its collapsed row shows the mode.
     expect(
-      within(picker).getByRole("combobox", { name: "Model" }),
+      within(
+        within(modelSection).getByRole("button", {
+          name: "Edit fallback Select model",
+        }),
+      ).getByRole("img", { name: "OpenAI API" }),
     ).toBeInTheDocument();
-    expect(
-      within(picker).getByRole("combobox", { name: "Reasoning effort" }),
-    ).toBeInTheDocument();
-    expect(within(picker).getByLabelText("Temperature")).toBeInTheDocument();
 
-    fireEvent.click(within(picker).getByRole("combobox", { name: "Model" }));
-    fireEvent.mouseDown(await screen.findByRole("option", { name: "o4-mini" }));
+    fireEvent.click(within(bar).getByTitle("Model — prompt default"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /o4-mini/ }));
     expect(
-      await within(modelSection).findByText("o4-mini"),
+      await within(modelSection).findByTitle("Model — openai/o4-mini"),
     ).toBeInTheDocument();
 
     const updatedPicker = within(modelSection).getByRole("group", {
       name: "Fallback model picker",
     });
-    fireEvent.click(
-      within(updatedPicker).getByRole("combobox", { name: "Reasoning effort" }),
-    );
-    fireEvent.mouseDown(
-      await screen.findByRole("option", { name: "High" }),
-    );
-    fireEvent.change(within(updatedPicker).getByLabelText("Temperature"), {
-      target: { value: "0.7" },
+    const updatedBar = within(updatedPicker).getByRole("group", {
+      name: "Fallback runtime",
     });
+    fireEvent.click(within(updatedBar).getByTitle("Reasoning effort"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^High/ }));
 
-    expect(within(modelSection).getByText("o4-mini")).toBeInTheDocument();
-    expect(within(modelSection).getByText("High")).toBeInTheDocument();
+    expect(within(modelSection).getAllByText("o4-mini").length).toBe(2);
+    expect(within(modelSection).getAllByText("High").length).toBe(2);
     expect(
       within(modelSection).getByRole("button", {
         name: "Remove o4-mini",
@@ -573,7 +635,7 @@ describe("SpecRuntimeEditor", () => {
     expect(onChange).toHaveBeenCalledWith({ cliArgs: { profile: "prod" } });
   });
 
-  it("selects the agent runtime through the model mode picker", () => {
+  it("selects the agent runtime through the runtime bar's mode segment", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
         backend: "claude-cli",
@@ -583,20 +645,18 @@ describe("SpecRuntimeEditor", () => {
 
     render(<Host />);
 
-    const modes = screen.getByRole("radiogroup", { name: "Runtime mode" });
-    expect(within(modes).getByRole("radio", { name: "CLI" })).toHaveAttribute(
-      "aria-checked",
-      "true",
+    const bar = screen.getByRole("group", { name: "Runtime" });
+    expect(within(bar).getByTitle("Claude Code CLI")).toHaveTextContent("CLI");
+
+    fireEvent.click(within(bar).getByTitle("Claude Code CLI"));
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Agent Claude Agent SDK/ }),
     );
-    fireEvent.click(within(modes).getByTitle("Claude Agent SDK"));
-    expect(within(modes).getByTitle("Claude Agent SDK")).toHaveAttribute(
-      "aria-checked",
-      "true",
+
+    expect(within(bar).getByTitle("Claude Agent SDK")).toHaveTextContent(
+      "Agent",
     );
-    expect(within(modes).getByRole("radio", { name: "CLI" })).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
+    expect(within(bar).queryByTitle("Claude Code CLI")).not.toBeInTheDocument();
   });
 
   it("collapses a section when its heading toggle is clicked", () => {
@@ -604,12 +664,12 @@ describe("SpecRuntimeEditor", () => {
 
     const section = screen.getByRole("region", { name: "Model" });
     expect(
-      within(section).getByRole("radiogroup", { name: "Runtime mode" }),
+      within(section).getByRole("group", { name: "Runtime" }),
     ).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: /Model/ }));
     expect(
-      within(section).queryByRole("radiogroup", { name: "Runtime mode" }),
+      within(section).queryByRole("group", { name: "Runtime" }),
     ).not.toBeInTheDocument();
   });
 });

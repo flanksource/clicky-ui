@@ -75,7 +75,6 @@ export function WorkspaceSection({
           <SpecInput
             value={value.setup?.cwd}
             onChange={(cwd) => onChange(withSetup(value, { cwd }))}
-            placeholder="."
             icon={UiFolder}
             mono
           />
@@ -84,7 +83,6 @@ export function WorkspaceSection({
           <SpecInput
             value={value.setup?.baseDir}
             onChange={(baseDir) => onChange(withSetup(value, { baseDir }))}
-            placeholder=".captain/workspaces"
             icon={UiFolder}
             mono
           />
@@ -221,7 +219,6 @@ export function WorkspaceSection({
                       onChange={(base) =>
                         onChange(withWorktree(value, { base }))
                       }
-                      placeholder="main"
                       icon={UiGitBranch}
                       mono
                     />
@@ -232,7 +229,6 @@ export function WorkspaceSection({
                 <SpecInput
                   value={value.setup?.checkout?.worktree?.path}
                   onChange={(path) => onChange(withWorktree(value, { path }))}
-                  placeholder=".shell/worktrees/spec-runtime"
                   icon={UiFolder}
                   mono
                 />
@@ -266,7 +262,6 @@ export function WorkspaceSection({
             <SpecInput
               value={value.setup?.checkout?.dirty?.since}
               onChange={(since) => onChange(withDirty(value, { since }))}
-              placeholder="origin/main"
               icon={UiClock}
               mono
             />

@@ -1,5 +1,9 @@
 import type { StaticIconComponent } from "../Icon";
-import { EFFORT_LEVEL_ICONS, type EffortLevel } from "../chat/effort-icons";
+import {
+  EFFORT_LEVEL_ICONS,
+  effortLevelLabel,
+  type EffortLevel,
+} from "../chat/effort-icons";
 import type { SessionTone } from "./SessionViewer.model";
 import type { SpecPermissionMode } from "./SpecRuntimeEditor.model";
 import {
@@ -25,7 +29,7 @@ import {
 // entry pairs a generated Ui* glyph with a SessionTone so the disc/text color
 // (DISC_TONE in SessionViewer.rows.tsx) encodes the action's category. Blue
 // reasons, green executes, teal confirms; the effort ramp climbs slate → sky →
-// amber → orange → rose; approval clears green / blocks red.
+// amber → orange → rose → fuchsia; approval clears green / blocks red.
 
 export interface AgentActionMeta {
   icon: StaticIconComponent;
@@ -52,32 +56,27 @@ const EFFORT_TONES: Record<EffortLevel, SessionTone> = {
   low: "sky",
   medium: "amber",
   high: "orange",
+  xhigh: "orange",
   max: "rose",
+  ultra: "fuchsia",
   adaptive: "indigo",
-};
-
-const EFFORT_LABELS: Record<EffortLevel, string> = {
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  max: "Max",
-  adaptive: "Adaptive",
 };
 
 export const EFFORT_ICONS: Record<EffortLevel, AgentActionMeta> = Object.fromEntries(
   (Object.keys(EFFORT_LEVEL_ICONS) as EffortLevel[]).map((level) => [
     level,
-    { icon: EFFORT_LEVEL_ICONS[level], tone: EFFORT_TONES[level], label: EFFORT_LABELS[level] },
+    {
+      icon: EFFORT_LEVEL_ICONS[level],
+      tone: EFFORT_TONES[level],
+      label: effortLevelLabel(level),
+    },
   ]),
 ) as Record<EffortLevel, AgentActionMeta>;
 
-/** Resolve the effort glyph, tolerating unknown/alias values (e.g. "xhigh" maps
- *  to the high ramp). Returns undefined when the value isn't an effort. */
+/** Resolve the effort glyph for a known value. */
 export function effortIcon(value: string): AgentActionMeta | undefined {
   const key = value.trim().toLowerCase();
   if (key in EFFORT_ICONS) return EFFORT_ICONS[key as EffortLevel];
-  if (key === "xhigh") return EFFORT_ICONS.high;
   return undefined;
 }
 

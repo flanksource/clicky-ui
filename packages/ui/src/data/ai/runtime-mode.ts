@@ -78,6 +78,95 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
   },
 ];
 
+// One provider×mode cell as captain serves it (`/whoami`.runtimes and the prompt
+// schema document's `runtimes`), projected from its model registry. It carries
+// ids, not display text: `claude`/`api` are enough to render both, and a served
+// label would be a second place for presentation to drift.
+export type RuntimeCatalogMode = {
+  /** api | agent | cli | cmux */
+  mode: string;
+  /** The concrete `spec.backend`, e.g. "claude-cmux". */
+  backend: string;
+  /** "api" (remote, in-process) or "cli" (supervised local binary). */
+  kind?: string | undefined;
+  /** Rides the local CLI's own login; never consults an API key. */
+  keyless?: boolean | undefined;
+  /** The model id a picker should seed this mode with. */
+  defaultModel?: string | undefined;
+  /** The user switched this off in `~/.captain.yaml`. */
+  disabled?: boolean | undefined;
+  disabledReason?: string | undefined;
+};
+
+export type RuntimeCatalogFamily = {
+  /** The coding-agent name: claude | codex | gemini | deepseek. */
+  family: string;
+  /** The canonical provider key: anthropic | openai | google | deepseek. */
+  provider: string;
+  /** The namespace this provider's model ids carry (`ChatModel.provider`). */
+  catalogPrefix: string;
+  modes: RuntimeCatalogMode[];
+};
+
+const MODE_ICONS: Record<string, StaticIconComponent> = {
+  api: UiCloud,
+  agent: UiRobotAi,
+  cli: UiTerminal,
+  cmux: UiColumns,
+};
+
+// Mode ids are lowercase tokens; only the acronyms and the lowercase brand
+// "cmux" need spelling out. `agent` falls through to plain title case.
+const MODE_LABELS: Record<string, string> = { api: "API", cli: "CLI", cmux: "cmux" };
+
+// Tooltip text, so "Claude cmux" reads as "Claude multiplexer".
+const MODE_TITLES: Record<string, string> = {
+  api: "API",
+  agent: "Agent SDK",
+  cli: "CLI",
+  cmux: "multiplexer",
+};
+
+// The one brand whose title case is not just an initial capital.
+const FAMILY_LABELS: Record<string, string> = { deepseek: "DeepSeek" };
+
+function titleCase(token: string): string {
+  return token ? token.charAt(0).toUpperCase() + token.slice(1) : token;
+}
+
+// Turns the served catalog into the picker's family list, dropping the modes the
+// user disabled — `/whoami` is the only surface that shows what is switched off.
+//
+// The registry has one provider per family, so Claude's API mode sits beside its
+// Agent/CLI/cmux modes here rather than in a separate "Anthropic" family the way
+// SPEC_RUNTIME_FAMILIES splits them.
+export function familiesFromRuntimeCatalog(
+  catalog: RuntimeCatalogFamily[] | undefined,
+): SpecRuntimeFamily[] {
+  if (!catalog?.length) return SPEC_RUNTIME_FAMILIES;
+  const families: SpecRuntimeFamily[] = [];
+  for (const entry of catalog) {
+    const label = FAMILY_LABELS[entry.family] ?? titleCase(entry.family);
+    const modes = entry.modes
+      .filter((mode) => !mode.disabled)
+      .map((mode) => ({
+        id: mode.mode,
+        label: MODE_LABELS[mode.mode] ?? titleCase(mode.mode),
+        backend: mode.backend,
+        icon: MODE_ICONS[mode.mode],
+        title: `${label} ${MODE_TITLES[mode.mode] ?? titleCase(mode.mode)}`,
+      }));
+    if (!modes.length) continue;
+    families.push({
+      id: entry.family,
+      label,
+      provider: entry.catalogPrefix,
+      modes,
+    });
+  }
+  return families.length ? families : SPEC_RUNTIME_FAMILIES;
+}
+
 export function familyById(
   families: SpecRuntimeFamily[],
   id: string,
@@ -95,6 +184,23 @@ export function firstMode(family: SpecRuntimeFamily): SpecRuntimeModeOption {
     throw new Error(`SpecRuntimeFamily "${family.id}" must have at least one mode`);
   }
   return mode;
+}
+
+// Every mode id in the catalog, first-seen order. A single-line picker renders
+// the whole union and disables the modes the current family lacks, so the
+// constraint reads before it is hit. The returned `backend` belongs to the
+// family that declared the mode first — resolve the real one with
+// `backendForFamilyMode`.
+export function runtimeModeOptions(
+  families: SpecRuntimeFamily[],
+): SpecRuntimeModeOption[] {
+  const modes = new Map<string, SpecRuntimeModeOption>();
+  for (const family of families) {
+    for (const mode of family.modes) {
+      if (!modes.has(mode.id)) modes.set(mode.id, mode);
+    }
+  }
+  return [...modes.values()];
 }
 
 export function backendForFamilyMode(
@@ -131,6 +237,24 @@ export function familyForBackend(
   return families.find((family) =>
     family.modes.some((mode) => mode.backend.toLowerCase() === target),
   );
+}
+
+// The mode a backend id names, or undefined when the catalog does not declare
+// it. Unlike `selectionForBackend` this does not fall back to the first family,
+// so a summary can stay silent about a runtime it cannot identify.
+export function modeForBackend(
+  families: SpecRuntimeFamily[],
+  backend: string | undefined,
+): SpecRuntimeModeOption | undefined {
+  const target = (backend ?? "").toLowerCase();
+  if (!target) return undefined;
+  for (const family of families) {
+    const mode = family.modes.find(
+      (entry) => entry.backend.toLowerCase() === target,
+    );
+    if (mode) return mode;
+  }
+  return undefined;
 }
 
 // "claude-agent" -> "Claude Agent"; unknown/empty -> "Prompt default".

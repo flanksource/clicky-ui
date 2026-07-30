@@ -7,6 +7,7 @@ import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
 import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
+import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
 import {
   AttachmentButton,
   AttachmentList,
@@ -46,8 +47,6 @@ import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
-
-const REASONING_EFFORTS = ["low", "medium", "high", "xhigh"];
 
 export type PromptRunEditorProps = {
   value: AISpecRuntimeValue;
@@ -105,7 +104,7 @@ export function PromptRunEditor({
   permissionCatalog,
   secretSelector,
   cliOptions,
-  reasoningEfforts = REASONING_EFFORTS,
+  reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   runtimeControls,
   variablesSchema,
   variables,

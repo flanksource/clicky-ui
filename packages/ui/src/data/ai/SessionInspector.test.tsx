@@ -27,8 +27,11 @@ describe("SessionInspector", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Running with claude-opus-4-8" }),
+      screen.getByRole("heading", { name: "claude-opus-4-8" }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/(?:Running|Completed) with/),
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole("banner")).getByText("High"),
     ).toBeInTheDocument();
@@ -50,6 +53,71 @@ describe("SessionInspector", () => {
       bannerSvgs.some((svg) => svg.classList.contains("text-[#C15F3C]")),
     ).toBe(true);
     expect(screen.getAllByLabelText("Context 1% used")).toHaveLength(1);
+  });
+
+  it("uses the session title and renders xhigh as a first-class effort", async () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector
+          session={{
+            ...INSPECTOR_SESSION,
+            title: "You are organizing a set of changes",
+            reasoningEffort: "xhigh",
+          }}
+        />
+      </div>,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        name: "You are organizing a set of changes",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).getByText("XHigh"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/(?:Running|Completed) with/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(screen.getByLabelText("Context 1% used"));
+    expect(await screen.findByText("XHigh effort")).toBeInTheDocument();
+  });
+
+  it("falls back to the initial prompt when the session has no title", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector
+          session={{
+            ...INSPECTOR_SESSION,
+            initialPrompt: "Investigate the effort discrepancy",
+          }}
+        />
+      </div>,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Investigate the effort discrepancy",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders unknown effort values as neutral metadata", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector
+          session={{
+            ...INSPECTOR_SESSION,
+            title: "Future effort",
+            reasoningEffort: "ultra-plus",
+          }}
+        />
+      </div>,
+    );
+
+    const effort = within(screen.getByRole("banner")).getByText("Ultra-plus");
+    expect(effort.parentElement?.querySelector("svg")).toBeNull();
   });
 
   it("renders full unified session detail tabs", async () => {

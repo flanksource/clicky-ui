@@ -1,6 +1,6 @@
 import type { ChatModel } from "../../chat/types";
 import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
-import { checkoutMode, worktreeMode } from "./update";
+import { checkoutMode, commitPhase, worktreeMode } from "./update";
 import { isDenyMode, type PermissionListEntry } from "./permissions-model";
 
 export function summarizeModel(
@@ -13,9 +13,6 @@ export function summarizeModel(
     parts.push(models.find((m) => m.id === model)?.label ?? model);
   }
   if (value.effort) parts.push(value.effort);
-  if (value.temperature != null && Number.isFinite(value.temperature)) {
-    parts.push(`temp ${value.temperature}`);
-  }
   return parts.length > 0 ? parts.join(" · ") : "Default model";
 }
 
@@ -86,10 +83,19 @@ export function summarizeVerify(value: AISpecRuntimeValue): string {
   return parts.length > 0 ? parts.join(" · ") : "No fixture";
 }
 
+const COMMIT_PHASE_SUMMARIES = {
+  none: "Leave uncommitted",
+  turn: "Commit every turn",
+  agent: "Commit after the loop",
+  run: "Commit changes",
+} as const;
+
 export function summarizeCommit(value: AISpecRuntimeValue): string {
-  const postRun = value.workflow?.postRun;
-  if (postRun?.dryRun) return "Dry run";
-  return postRun?.commit ? "Commit changes" : "Leave uncommitted";
+  const phase = commitPhase(value);
+  const summary = COMMIT_PHASE_SUMMARIES[phase];
+  return value.workflow?.commits?.[0]?.dryRun
+    ? `${summary} · dry run`
+    : summary;
 }
 
 export function summarizeCLIArgs(value: AISpecRuntimeValue): string {

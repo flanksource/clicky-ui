@@ -12,6 +12,7 @@ import {
   UiSliders,
 } from "../../icons";
 import { EffortSelector, ModelSelector } from "../chat/ModelSelector";
+import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import { ToolSchemaBrowser } from "./ToolSchemaBrowser";
 import type {
   ChatBudgetConfig,
@@ -428,7 +429,7 @@ export function ToolPreferences({
   models = [],
   model,
   onModelChange,
-  reasoningEfforts = ["low", "medium", "high"],
+  reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   reasoningEffort = "",
   onReasoningEffortChange,
   permissionMode = "default",

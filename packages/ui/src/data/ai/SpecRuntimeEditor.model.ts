@@ -35,6 +35,28 @@ export type SpecStashMode = (typeof SPEC_STASH_MODES)[number];
 export const SPEC_VERIFY_SCOPES = ["all", "changed"] as const;
 export type SpecVerifyScope = (typeof SPEC_VERIFY_SCOPES)[number];
 
+// The lifecycle boundary a commit fires on, mirroring captain's api.CommitPhase:
+// "turn" after every loop iteration, "agent" once the generate/verify loop ends,
+// "run" after the worktree is merged away.
+export const SPEC_COMMIT_PHASES = ["turn", "agent", "run"] as const;
+export type SpecCommitPhase = (typeof SPEC_COMMIT_PHASES)[number];
+
+export const SPEC_COMMIT_MODES = ["commit", "fixup", "amend"] as const;
+export type SpecCommitMode = (typeof SPEC_COMMIT_MODES)[number];
+
+export const SPEC_COMMIT_CONDITIONS = [
+  "always",
+  "onSuccess",
+  "onVerify",
+] as const;
+export type SpecCommitCondition = (typeof SPEC_COMMIT_CONDITIONS)[number];
+
+export const SPEC_COMMIT_STAGES = ["worktree", "changed"] as const;
+export type SpecCommitStage = (typeof SPEC_COMMIT_STAGES)[number];
+
+export const SPEC_COMMIT_GATES = ["none", "cheap", "full"] as const;
+export type SpecCommitGates = (typeof SPEC_COMMIT_GATES)[number];
+
 export const SPEC_SCHEMA_STRICTNESS = ["warning", "error", "retry"] as const;
 export type SpecSchemaStrictness = (typeof SPEC_SCHEMA_STRICTNESS)[number];
 
@@ -189,18 +211,28 @@ export type AISpecRuntimeVerify = {
   maxIterations?: number;
 };
 
-export type AISpecRuntimePostRun = {
-  commit?: boolean;
-  commitMessage?: string;
+// Mirrors captain's api.Commit: one commit policy keyed to a lifecycle phase.
+// Every field is optional because an omitted field means "captain's default",
+// which is why an empty stanza is still meaningful — see compactCommits.
+export type AISpecRuntimeCommit = {
+  on?: SpecCommitPhase | "";
+  mode?: SpecCommitMode | "";
+  when?: SpecCommitCondition | "";
+  message?: string;
+  anchor?: string;
+  squash?: boolean;
+  base?: string;
+  stage?: SpecCommitStage | "";
+  gates?: SpecCommitGates | "";
   dryRun?: boolean;
 };
 
-// Mirrors captain's api.Workflow (verify + postRun) so the SpecRuntimeEditor's
+// Mirrors captain's api.Workflow (verify + commits) so the SpecRuntimeEditor's
 // Verify/Commit sections round-trip through the spec frontmatter. Unlike the
 // prior client-only shape, this is part of the compacted spec.
 export type AISpecRuntimeWorkflow = {
   verify?: AISpecRuntimeVerify;
-  postRun?: AISpecRuntimePostRun;
+  commits?: AISpecRuntimeCommit[];
 };
 
 export type AISpecRuntimeValue = AISpecRuntimeSpec;
@@ -266,8 +298,8 @@ function compactWorkflow(
   const workflow: AISpecRuntimeWorkflow = {};
   const verify = compactVerify(value.verify);
   if (verify) workflow.verify = verify;
-  const postRun = compactPostRun(value.postRun);
-  if (postRun) workflow.postRun = postRun;
+  const commits = compactCommits(value.commits);
+  if (commits) workflow.commits = commits;
   return hasKeys(workflow) ? workflow : undefined;
 }
 
@@ -290,19 +322,39 @@ function compactVerify(
   return hasKeys(verify) ? verify : undefined;
 }
 
-// PostRun booleans compact to present-when-true: an unchecked commit/dryRun is
-// pruned to absent, which downstream reads as "off" (matching Go's omitempty on
-// api.PostRun, where false is unrepresentable on the wire).
-function compactPostRun(
-  value: AISpecRuntimePostRun | undefined,
-): AISpecRuntimePostRun | undefined {
-  if (!value) return undefined;
-  const postRun: AISpecRuntimePostRun = {};
-  if (value.commit) postRun.commit = true;
-  const commitMessage = cleanString(value.commitMessage);
-  if (commitMessage) postRun.commitMessage = commitMessage;
-  if (value.dryRun) postRun.dryRun = true;
-  return hasKeys(postRun) ? postRun : undefined;
+// Presence in the list is what turns committing on, so an empty stanza survives
+// compaction: `commits: [{}]` reads as "one commit at the end of the run with
+// every default". Committing nothing is an absent list, not a stanza of falses.
+function compactCommits(
+  value: AISpecRuntimeCommit[] | undefined,
+): AISpecRuntimeCommit[] | undefined {
+  if (!value?.length) return undefined;
+  return value.map(compactCommit);
+}
+
+function compactCommit(value: AISpecRuntimeCommit): AISpecRuntimeCommit {
+  const commit: AISpecRuntimeCommit = {};
+  const on = pickEnum(SPEC_COMMIT_PHASES, value.on);
+  if (on) commit.on = on;
+  const mode = pickEnum(SPEC_COMMIT_MODES, value.mode);
+  if (mode) commit.mode = mode;
+  const when = pickEnum(SPEC_COMMIT_CONDITIONS, value.when);
+  if (when) commit.when = when;
+  const message = cleanString(value.message);
+  if (message) commit.message = message;
+  const anchor = cleanString(value.anchor);
+  if (anchor) commit.anchor = anchor;
+  // Squash is a *bool in captain: `squash: false` is the instruction to keep the
+  // fixup chain for review, so it cannot be pruned the way a plain flag is.
+  if (value.squash != null) commit.squash = value.squash;
+  const base = cleanString(value.base);
+  if (base) commit.base = base;
+  const stage = pickEnum(SPEC_COMMIT_STAGES, value.stage);
+  if (stage) commit.stage = stage;
+  const gates = pickEnum(SPEC_COMMIT_GATES, value.gates);
+  if (gates) commit.gates = gates;
+  if (value.dryRun) commit.dryRun = true;
+  return commit;
 }
 
 function compactPrompt(
@@ -698,6 +750,15 @@ function compactList(value: string[] | undefined) {
 
 function cleanString(value: string | undefined) {
   return value?.trim() ?? "";
+}
+
+// Narrows an editor-held string (which may be "" while unset) to a member of an
+// enum, dropping anything the Go side would reject.
+function pickEnum<T extends string>(
+  options: readonly T[],
+  value: string | undefined,
+): T | undefined {
+  return options.find((option) => option === value);
 }
 
 function hasKeys(value: object) {

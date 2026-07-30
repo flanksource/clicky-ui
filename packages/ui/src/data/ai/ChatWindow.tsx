@@ -10,6 +10,7 @@ import { Button } from "../../components/button";
 import { Icon } from "../Icon";
 import { UiAdd, UiClose, UiFullscreen } from "../../icons";
 import { Chat } from "../chat/Chat";
+import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type {
   ChatBudgetConfig,
   ChatModel,
@@ -322,7 +323,7 @@ export function ChatWindow({
         models={resolvedModels}
         model={model}
         onModelChange={handleModelChange}
-        reasoningEfforts={chat?.reasoningEfforts ?? ["low", "medium", "high"]}
+        reasoningEfforts={chat?.reasoningEfforts ?? DEFAULT_REASONING_EFFORTS}
         reasoningEffort={reasoningEffort}
         onReasoningEffortChange={handleReasoningEffortChange}
         permissionMode={permissionMode}

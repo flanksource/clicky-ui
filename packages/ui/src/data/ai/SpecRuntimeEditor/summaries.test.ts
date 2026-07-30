@@ -52,7 +52,7 @@ const VALUE: AISpecRuntimeValue = {
       scope: "changed",
       maxIterations: 2,
     },
-    postRun: { commit: true },
+    commits: [{ on: "run" }],
   },
 };
 
@@ -62,10 +62,9 @@ describe("summaries", () => {
       summarizeModel(VALUE, [
         { id: "anthropic/claude-sonnet-4-5", label: "Sonnet 4.5" },
       ]),
-    ).toBe("Sonnet 4.5 · medium · temp 0.2");
-    expect(summarizeModel(VALUE)).toBe(
-      "anthropic/claude-sonnet-4-5 · medium · temp 0.2",
-    );
+    ).toBe("Sonnet 4.5 · medium");
+    // Temperature rides along in the spec but is not part of the runtime line.
+    expect(summarizeModel(VALUE)).toBe("anthropic/claude-sonnet-4-5 · medium");
     expect(summarizeModel({})).toBe("Default model");
   });
 
@@ -129,8 +128,16 @@ describe("summaries", () => {
   it("summarizes commit intent", () => {
     expect(summarizeCommit(VALUE)).toBe("Commit changes");
     expect(summarizeCommit({})).toBe("Leave uncommitted");
-    expect(summarizeCommit({ workflow: { postRun: { dryRun: true } } })).toBe(
-      "Dry run",
+    expect(summarizeCommit({ workflow: { commits: [] } })).toBe(
+      "Leave uncommitted",
+    );
+    // A stanza with no phase commits at the end of the run, so it reads the same
+    // as an explicit {on: "run"} — dry run is a qualifier, not a replacement.
+    expect(summarizeCommit({ workflow: { commits: [{ dryRun: true }] } })).toBe(
+      "Commit changes · dry run",
+    );
+    expect(summarizeCommit({ workflow: { commits: [{ on: "turn" }] } })).toBe(
+      "Commit every turn",
     );
   });
 
