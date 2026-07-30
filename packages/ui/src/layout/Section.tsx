@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown, UiChevronRight } from "../icons";
+import { PanelFrame, type PanelTone } from "./PanelFrame";
 
 export type SectionProps = {
   /** Header title. */
@@ -29,7 +30,7 @@ export type SectionProps = {
   /** Optional leading icon. */
   icon?: string | StaticIconComponent;
   /** Semantic border accent. */
-  tone?: "default" | "danger" | "warning" | "success" | "info";
+  tone?: PanelTone;
   /** Classes applied to the section root. */
   className?: string;
   /** Classes applied to the clickable header. */
@@ -38,14 +39,6 @@ export type SectionProps = {
   bodyClassName?: string;
   /** Collapsible content. */
   children: ReactNode;
-};
-
-const toneRing: Record<NonNullable<SectionProps["tone"]>, string> = {
-  default: "",
-  danger: "border-l-2 border-red-500",
-  warning: "border-l-2 border-yellow-500",
-  success: "border-l-2 border-green-500",
-  info: "border-l-2 border-blue-500",
 };
 
 export function Section({
@@ -82,43 +75,48 @@ export function Section({
         />
       )}
       {icon && (
-        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-base" />
+        <Icon
+          {...(typeof icon === "string" ? { name: icon } : { icon })}
+          className="text-base"
+        />
       )}
       <span className="font-medium text-sm flex-1 truncate">{title}</span>
     </>
   );
 
   return (
-    <div className={cn("rounded-md border border-border bg-background", toneRing[tone], className)}>
-      {/* The header is always a plain row so the summary (which may hold its own
-          interactive content) is never nested inside the toggle button. Only the
-          chevron + title region toggles; the summary is a sibling of it. */}
-      <div
-        className={cn(
-          "w-full flex items-center gap-2 px-density-3 py-density-2 text-left",
-          headerClassName,
-        )}
-      >
-        {collapsible ? (
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={open}
-            className="flex flex-1 min-w-0 items-center gap-2 text-left rounded-sm hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {leading}
-          </button>
-        ) : (
-          <div className="flex flex-1 min-w-0 items-center gap-2">{leading}</div>
-        )}
-        {summary && <span className="text-xs text-muted-foreground shrink-0">{summary}</span>}
-      </div>
-      {open && (
-        <div className={cn("px-density-3 py-density-2 border-t border-border", bodyClassName)}>
-          {children}
-        </div>
-      )}
-    </div>
+    <PanelFrame
+      header={
+        <>
+          {collapsible ? (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={open}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {leading}
+            </button>
+          ) : (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {leading}
+            </div>
+          )}
+          {summary && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {summary}
+            </span>
+          )}
+        </>
+      }
+      tone={tone}
+      bodyVisible={open}
+      className={cn("overflow-visible bg-background", className)}
+      headerClassName={cn("w-full text-left", headerClassName)}
+      {...(bodyClassName !== undefined ? { bodyClassName } : {})}
+    >
+      {children}
+    </PanelFrame>
   );
 }
 
@@ -133,9 +131,16 @@ export type DetailEmptyStateProps = {
   className?: string;
 };
 
-export function DetailEmptyState({ icon, label, description, className }: DetailEmptyStateProps) {
+export function DetailEmptyState({
+  icon,
+  label,
+  description,
+  className,
+}: DetailEmptyStateProps) {
   return (
-    <div className={cn("p-density-6 text-center text-muted-foreground", className)}>
+    <div
+      className={cn("p-density-6 text-center text-muted-foreground", className)}
+    >
       {icon && (
         <Icon
           {...(typeof icon === "string" ? { name: icon } : { icon })}
@@ -143,7 +148,9 @@ export function DetailEmptyState({ icon, label, description, className }: Detail
         />
       )}
       <p className="text-sm">{label}</p>
-      {description && <p className="text-xs mt-density-1 opacity-70">{description}</p>}
+      {description && (
+        <p className="text-xs mt-density-1 opacity-70">{description}</p>
+      )}
     </div>
   );
 }

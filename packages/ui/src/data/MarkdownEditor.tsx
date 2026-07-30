@@ -67,10 +67,17 @@ export type MarkdownEditorProps = {
     markdown: string;
     format: MarkdownEditorPreviewFormat;
   }) => string | undefined;
-  /** Custom loader for host-specific markdown conversion. */
+  /**
+   * Custom loader for host-specific markdown conversion. Return `undefined` for
+   * a format to leave it on the local preview — Clicky's `format=` contract has
+   * no `react`, so hosts commonly convert every other format remotely.
+   */
   loadPreview?: (
     request: MarkdownEditorPreviewRequest,
-  ) => Promise<MarkdownEditorPreviewResult> | MarkdownEditorPreviewResult;
+  ) =>
+    | Promise<MarkdownEditorPreviewResult | undefined>
+    | MarkdownEditorPreviewResult
+    | undefined;
   /** Local Clicky document for the React preview, or a mapper from markdown. */
   clickyData?: ClickyProps["data"] | ((markdown: string) => ClickyProps["data"] | undefined);
   /** Debounce interval for remote preview requests. */
@@ -237,9 +244,10 @@ export function MarkdownEditor({
         loadPreview,
       })
         .then((result) => {
-          if (!controller.signal.aborted) {
-            setPreviewState({ status: "success", result });
-          }
+          if (controller.signal.aborted) return;
+          setPreviewState(
+            result ? { status: "success", result } : { status: "idle" },
+          );
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
@@ -695,7 +703,7 @@ async function resolvePreview({
   previewHeaders: MarkdownEditorPreviewHeaders | undefined;
   buildPreviewUrl: MarkdownEditorProps["buildPreviewUrl"] | undefined;
   loadPreview: MarkdownEditorProps["loadPreview"] | undefined;
-}): Promise<MarkdownEditorPreviewResult> {
+}): Promise<MarkdownEditorPreviewResult | undefined> {
   if (loadPreview) {
     return loadPreview({ markdown, format, signal });
   }

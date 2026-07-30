@@ -27,13 +27,32 @@ export {
   type DataTableColumn,
   type DataTableColumnInput,
   type DataTableColumnKind,
+  type DataTableFooterContext,
   type DataTableMenuAction,
   type DataTableProps,
   type DataTableRowSelection,
+  type DataTableSelectionContext,
   type StatusOptions,
   type TagsOptions,
   type TimestampOptions,
 } from "./data/DataTable";
+export {
+  groupRecords,
+  isGroupCollapsedByDefault,
+  type DataTableGroup,
+  type DataTableGrouping,
+} from "./data/DataTable.grouping";
+export {
+  StatStrip,
+  type StatStripClassNames,
+  type StatStripItem,
+  type StatStripProps,
+} from "./data/StatStrip";
+export {
+  EntityCell,
+  type EntityCellProps,
+  type EntityCellSize,
+} from "./data/cells/EntityCell";
 export { Timestamp, type TimestampProps } from "./data/cells/Timestamp";
 export {
   chooseTimestampFormat,
@@ -138,6 +157,16 @@ export {
   type MarkdownEditorPreviewRequest,
   type MarkdownEditorPreviewResult,
 } from "./data/MarkdownEditor.model";
+export {
+  MARKDOWN_SYNTAX_DOCUMENT,
+  MARKDOWN_SYNTAX_SECTIONS,
+  type MarkdownSyntaxSection,
+} from "./data/examples/markdown-syntax";
+export {
+  markdownDocumentStats,
+  mockMarkdownPreview,
+  type MarkdownDocumentStats,
+} from "./data/examples/markdown-preview-mock";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
@@ -250,6 +279,7 @@ export {
 } from "./data/task-status";
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
+export { TaskManagerButton, type TaskManagerButtonProps } from "./data/TaskManagerButton";
 export { PromptDialog, type PromptDialogProps } from "./data/PromptDialog";
 export { PromptBanner, type PromptBannerProps } from "./data/PromptBanner";
 export {

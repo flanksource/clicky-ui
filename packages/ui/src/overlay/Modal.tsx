@@ -169,7 +169,7 @@ export function Modal({
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
         className={cn(
-          "relative flex w-full flex-col rounded-lg border border-border bg-background shadow-xl",
+          "relative flex w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
           expanded ? sizeClass.full : sizeClass[size],
           className,
         )}
@@ -184,7 +184,7 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {(title || subtitle || headerSlot || expandable || !hideClose) && (
-          <div className="px-density-4 py-density-3 border-b border-border">
+          <div className="shrink-0 px-density-4 py-density-3 border-b border-border">
             <div className="flex items-center gap-density-2">
               {title ? (
                 <h2 className="text-sm font-semibold flex-1">{title}</h2>
@@ -221,16 +221,19 @@ export function Modal({
         <div
           data-slot="modal-body"
           className={cn(
-            "flex-1 px-density-4 py-density-3",
+            "min-h-0 flex-1 px-density-4 py-density-3",
             scrollBody
               ? "overflow-auto"
-              : "flex min-h-0 flex-col overflow-hidden",
+              : "flex flex-col overflow-hidden",
           )}
         >
           {children}
         </div>
         {footer && (
-          <div data-slot="modal-footer" className="px-density-4 py-density-3 border-t border-border">
+          <div
+            data-slot="modal-footer"
+            className="shrink-0 px-density-4 py-density-3 border-t border-border"
+          >
             {footer}
           </div>
         )}

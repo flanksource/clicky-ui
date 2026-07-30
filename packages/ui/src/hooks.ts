@@ -37,3 +37,10 @@ export {
   type UsePromptsOptions,
   type UsePromptsResult,
 } from "./hooks/use-prompts";
+export {
+  useHotkey,
+  parseHotkey,
+  formatHotkey,
+  type UseHotkeyOptions,
+  type ParsedHotkey,
+} from "./hooks/use-hotkey";

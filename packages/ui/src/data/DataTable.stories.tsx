@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
+import { Button } from "../components/Button";
 import {
   UiFileCode,
   UiFileSpreadsheet,
@@ -898,6 +900,47 @@ function DialogTableShowcase() {
   );
 }
 
+function SelectionActionsShowcase() {
+  const [selected, setSelected] = useState<string[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columns={columns}
+      getRowId={(row) => row.service}
+      rowSelection={{
+        selectedRowIds: selected,
+        onSelectionChange: (ids) => setSelected(ids),
+      }}
+      getRowClassName={(row) =>
+        row.restarts >= 3
+          ? "bg-amber-400/10 [[data-theme=dark]_&]:bg-amber-400/10"
+          : undefined
+      }
+      footer={({ visibleRowCount, totalRowCount }) =>
+        `Showing ${visibleRowCount} of ${totalRowCount} services · ${rows.reduce((sum, row) => sum + row.restarts, 0)} restarts total`
+      }
+      selectionActions={({ selectedRows, clearSelection }) => (
+        <>
+          <span className="text-xs">
+            <b>{selectedRows.length} selected</b>
+            <span className="opacity-70">
+              {" · "}
+              {selectedRows.reduce((sum, row) => sum + row.restarts, 0)}{" "}
+              restarts
+            </span>
+          </span>
+          <span className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+            <Button size="sm">Restart {selectedRows.length}</Button>
+          </span>
+        </>
+      )}
+    />
+  );
+}
+
 const meta = {
   title: "Data/DataTable",
   component: DataTable,
@@ -991,6 +1034,40 @@ export const InDialogWithPagingAndSelection: Story = {
         ].join("\n"),
       },
     },
+  },
+};
+
+export const SelectionActionsAndFooter: Story = {
+  render: () => <SelectionActionsShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "`selectionActions` renders a bulk action bar pinned to the bottom of the table shell whenever `rowSelection` holds a non-empty selection — it receives the selected rows and a `clearSelection` callback, so the caller owns the copy and the actions but not the plumbing.",
+          "",
+          "`footer` replaces the default \"N of M rows\" strip, and `getRowClassName` tints the degraded row.",
+        ].join("\n"),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(/Showing 3 of 3 services/),
+    ).toBeInTheDocument();
+    await expect(canvas.queryByText("3 of 3 rows")).toBeNull();
+
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "Select row worker" }),
+    );
+    const bar = within(canvas.getByTestId("data-table-selection-actions"));
+    await expect(bar.getByText("1 selected")).toBeVisible();
+    await expect(bar.getByText(/3 restarts/)).toBeVisible();
+
+    await userEvent.click(bar.getByRole("button", { name: "Clear" }));
+    await expect(
+      canvas.queryByTestId("data-table-selection-actions"),
+    ).toBeNull();
   },
 };
 
