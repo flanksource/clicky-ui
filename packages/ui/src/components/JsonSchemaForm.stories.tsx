@@ -20,11 +20,15 @@ const ALL_SIZES: FormSize[] = ["xs", "sm", "md", "lg", "xl"];
 function FormHarness({
   schema,
   value: initialValue,
+  wrapperClassName = "max-w-xl",
   ...rest
-}: Omit<JsonSchemaFormProps, "onChange"> & { onChange?: never }) {
+}: Omit<JsonSchemaFormProps, "onChange"> & {
+  onChange?: never;
+  wrapperClassName?: string;
+}) {
   const [value, setValue] = useState<Record<string, unknown>>(initialValue);
   return (
-    <div className="max-w-xl space-y-4">
+    <div className={`${wrapperClassName} space-y-4`}>
       <JsonSchemaForm schema={schema} value={value} onChange={setValue} {...rest} />
       <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
         {JSON.stringify(value, null, 2)}
@@ -474,7 +478,10 @@ const markdownSchema: JsonSchemaObject = {
       description: "Markdown source stored as a plain string.",
       "x-md-editor": {
         admonitions: true,
-        diffMode: false,
+        diffMode: {
+          viewMode: "rich-text",
+          viewModes: ["rich-text", "source"],
+        },
         frontmatter: true,
         tables: true,
       },
@@ -483,12 +490,20 @@ const markdownSchema: JsonSchemaObject = {
 };
 
 export const MarkdownField: Story = {
+  render: (args) => <FormHarness {...args} wrapperClassName="max-w-4xl" />,
   args: {
     schema: markdownSchema,
     value: {
       summary: "Quarterly notes",
       body: [
         "# Quarterly notes",
+        "",
+        "- Revenue review",
+        "- Customer follow-up",
+        "",
+        "1. Draft",
+        "2. Review",
+        "3. Publish",
         "",
         ":::tip",
         "Use `format: md` to get the MDXEditor field.",
@@ -499,15 +514,49 @@ export const MarkdownField: Story = {
         "| Incidents | 3 |",
       ].join("\n"),
     },
+    layout: { mode: "stacked", valueMaxWidth: "56rem" },
     title: "Report",
   },
   parameters: {
     docs: {
       description: {
         story:
-          "`format: md` renders the MDXEditor-backed markdown field. Common plugins are enabled by default and can be controlled with typed `x-md-editor` options such as `admonitions`, `frontmatter`, `tables`, and `diffMode`.",
+          "`format: md` renders the MDXEditor-backed markdown field. This example uses a wider `layout.valueMaxWidth` and enables a two-way Rich text / Source mode switch with typed `x-md-editor.diffMode` options.",
       },
     },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step("Render unordered and ordered list markers", async () => {
+      await waitFor(
+        () => {
+          expect(canvasElement.querySelector(".clicky-mdx-editor-content > ul")).not.toBeNull();
+          expect(canvasElement.querySelector(".clicky-mdx-editor-content > ol")).not.toBeNull();
+        },
+        { timeout: 10_000 },
+      );
+      const unorderedList = canvasElement.querySelector<HTMLUListElement>(".clicky-mdx-editor-content > ul");
+      const orderedList = canvasElement.querySelector<HTMLOListElement>(".clicky-mdx-editor-content > ol");
+
+      expect(getComputedStyle(unorderedList!).listStyleType).toBe("disc");
+      expect(getComputedStyle(unorderedList!).paddingInlineStart).not.toBe("0px");
+      expect(getComputedStyle(orderedList!).listStyleType).toBe("decimal");
+      expect(getComputedStyle(orderedList!).paddingInlineStart).not.toBe("0px");
+    });
+    await step("Switch between rich text and markdown source", async () => {
+      const richText = await canvas.findByRole(
+        "radio",
+        { name: "Rich text" },
+        { timeout: 10_000 },
+      );
+      const source = canvas.getByRole("radio", { name: "Source mode" });
+
+      expect(richText).toBeChecked();
+      await userEvent.click(source);
+      await waitFor(() => expect(source).toBeChecked());
+      await userEvent.click(richText);
+      await waitFor(() => expect(richText).toBeChecked());
+    });
   },
 };
 

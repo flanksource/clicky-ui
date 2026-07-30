@@ -4,18 +4,15 @@ import { Icon } from "../data/Icon";
 import { UiCheck, UiClose, UiEllipsisBold, UiSearch } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-fields";
+import { FormErrorSummary } from "./json-schema-form-error-display";
+import { unmatchedFormErrors } from "./json-schema-form-errors";
 import { FormLookupProvider } from "./FormLookupProvider";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import { applySchemaDefaults } from "./json-schema-form-resolve";
 import { normalizeColumns } from "./json-schema-form-utils";
-import {
-  DEFAULT_FORM_SIZE,
-  fieldInnerGapClass,
-  labelSizeClass,
-  type FormSize,
-} from "./json-schema-form-size";
+import { DEFAULT_FORM_SIZE, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
 import {
   DEFAULT_PREFERENCES_STORAGE_KEY,
   readPreferences,
@@ -60,6 +57,7 @@ export function JsonSchemaForm({
   schema,
   value,
   onChange,
+  errors = [],
   readOnly = false,
   inline = false,
   layout,
@@ -99,9 +97,20 @@ export function JsonSchemaForm({
   // pointers) is resolved once into a self-contained tree the renderer walks
   // directly; a non-bundled schema passes through untouched.
   const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
-  const effectiveValue = useMemo(
-    () => applySchemaDefaults(resolvedSchema, value),
-    [resolvedSchema, value],
+  const effectiveValue = useMemo(() => applySchemaDefaults(resolvedSchema, value), [resolvedSchema, value]);
+  const preExtensions = pre ?? [];
+  const unmatchedErrors = useMemo(
+    () =>
+      unmatchedFormErrors({
+        schema: resolvedSchema,
+        value: effectiveValue,
+        errors,
+        hideReadOnlyFields,
+        pre: preExtensions,
+        ...(hiddenKeys ? { hiddenKeys } : {}),
+        ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
+      }),
+    [effectiveValue, errors, fieldFilter, hiddenKeys, hideReadOnlyFields, preExtensions, resolvedSchema],
   );
   // Defaults are part of the submitted form value, not only presentation. This
   // is especially important for required discriminator fields whose default
@@ -116,10 +125,12 @@ export function JsonSchemaForm({
     layout: resolvedLayout,
     size: effectiveSize,
     sortMode: effectiveSortMode,
-    pre: pre ?? [],
+    pre: preExtensions,
     post: post ?? [],
     rootValue: effectiveValue,
     onRootChange: onChange,
+    instancePath: "",
+    errors,
     depth: 0,
     render: renderApi,
     ...(idPrefix ? { idPrefix } : {}),
@@ -127,65 +138,55 @@ export function JsonSchemaForm({
   };
   // A schema may name a discriminator property whose value selects a "kind"; the
   // form then runs a two-phase pick-then-fill flow (see DiscriminatedForm).
-  const discKey =
-    typeof resolvedSchema["x-discriminator"] === "string" ? resolvedSchema["x-discriminator"] : undefined;
-  const inPickerPhase =
-    discKey != null &&
-    (effectiveValue[discKey] == null || effectiveValue[discKey] === "");
+  const discKey = typeof resolvedSchema["x-discriminator"] === "string" ? resolvedSchema["x-discriminator"] : undefined;
+  const inPickerPhase = discKey != null && (effectiveValue[discKey] == null || effectiveValue[discKey] === "");
 
   const objectRows = discKey
     ? null
-    : renderObjectFields(
-        resolvedSchema,
-        effectiveValue,
-        onChange,
-        ctx,
-        hiddenKeys ? { hiddenKeys } : undefined,
-      );
+    : renderObjectFields(resolvedSchema, effectiveValue, onChange, ctx, hiddenKeys ? { hiddenKeys } : undefined);
   const noMatches = objectRows != null && objectRows.length === 0 && fieldFilter.trim() !== "";
 
   return (
     <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
-    <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
-      {showPreferencesMenu && !inPickerPhase && (
-        <PreferencesMenu
-          size={effectiveSize}
-          layoutMode={resolvedLayout.mode}
-          sortMode={effectiveSortMode}
-          fieldFilter={fieldFilter}
-          onFilterChange={setFieldFilter}
-          onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
-          onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
-          onSelectSort={(next) => applyPrefs({ ...prefs, sortMode: next })}
-        />
-      )}
-      {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
-      <FieldsGrid
-        layout={resolvedLayout}
-        size={effectiveSize}
-        columns={normalizeColumns(resolvedSchema["x-columns"])}
-        {...(typeof resolvedSchema["x-classes"] === "string"
-          ? { className: resolvedSchema["x-classes"] }
-          : {})}
-      >
-        {discKey ? (
-          <DiscriminatedForm
-            schema={resolvedSchema}
-            value={effectiveValue}
-            onChange={onChange}
-            ctx={ctx}
-            discKey={discKey}
+      <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
+        {showPreferencesMenu && !inPickerPhase && (
+          <PreferencesMenu
+            size={effectiveSize}
+            layoutMode={resolvedLayout.mode}
+            sortMode={effectiveSortMode}
+            fieldFilter={fieldFilter}
+            onFilterChange={setFieldFilter}
+            onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
+            onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
+            onSelectSort={(next) => applyPrefs({ ...prefs, sortMode: next })}
           />
-        ) : (
-          objectRows
         )}
-      </FieldsGrid>
-      {noMatches && (
-        <p className={cn("text-muted-foreground", labelSizeClass[effectiveSize])}>
-          No fields match “{fieldFilter.trim()}”.
-        </p>
-      )}
-    </div>
+        {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
+        <FormErrorSummary errors={unmatchedErrors} />
+        <FieldsGrid
+          layout={resolvedLayout}
+          size={effectiveSize}
+          columns={normalizeColumns(resolvedSchema["x-columns"])}
+          {...(typeof resolvedSchema["x-classes"] === "string" ? { className: resolvedSchema["x-classes"] } : {})}
+        >
+          {discKey ? (
+            <DiscriminatedForm
+              schema={resolvedSchema}
+              value={effectiveValue}
+              onChange={onChange}
+              ctx={ctx}
+              discKey={discKey}
+            />
+          ) : (
+            objectRows
+          )}
+        </FieldsGrid>
+        {noMatches && (
+          <p className={cn("text-muted-foreground", labelSizeClass[effectiveSize])}>
+            No fields match “{fieldFilter.trim()}”.
+          </p>
+        )}
+      </div>
     </FormLookupProvider>
   );
 }
@@ -333,15 +334,7 @@ function PreferenceSection({ title }: { title: string }) {
   );
 }
 
-function PreferenceItem({
-  label,
-  selected,
-  onSelect,
-}: {
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
+function PreferenceItem({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"

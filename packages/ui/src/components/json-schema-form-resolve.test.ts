@@ -185,11 +185,11 @@ describe("resolveControl", () => {
     expect(c.objectRequired).toEqual(["policyStatus"]);
   });
 
-  it("infers an object control when fixed properties come from unconditional allOf", () => {
+  it("infers an untyped object control when fixed properties come from unconditional allOf", () => {
     const c = control("shape", {
-      type: "object",
       allOf: [
         {
+          type: "object",
           properties: {
             PayoutBankName: { type: "string" },
             RiskRating: { type: "string", enum: ["Low", "High"] },
@@ -203,6 +203,14 @@ describe("resolveControl", () => {
     expect(c.objectProperties).toHaveProperty("PayoutBankName");
     expect(c.objectProperties).toHaveProperty("RiskRating");
     expect(c.objectRequired).toEqual(["RiskRating"]);
+  });
+
+  it("keeps an explicit scalar type authoritative over object keywords", () => {
+    const c = control("shape", {
+      type: "string",
+      properties: { ignored: { type: "string" } },
+    });
+    expect(c.kind).toBe("string");
   });
 
   it("keeps an open map with known properties as a string-map", () => {
@@ -541,6 +549,9 @@ describe("applySchemaDefaults", () => {
 describe("isOpenStringMap", () => {
   it("is true for object with object additionalProperties", () => {
     expect(isOpenStringMap({ type: "object", additionalProperties: { type: "string" } })).toBe(true);
+  });
+  it("infers an untyped object map from additionalProperties", () => {
+    expect(isOpenStringMap({ additionalProperties: { type: "string" } })).toBe(true);
   });
   it("is false for additionalProperties false", () => {
     expect(isOpenStringMap({ type: "object", additionalProperties: false })).toBe(false);

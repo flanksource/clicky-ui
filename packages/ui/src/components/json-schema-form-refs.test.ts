@@ -4,7 +4,10 @@ import type { JsonSchemaObject } from "./json-schema-form-types";
 
 describe("rehydrateRefs", () => {
   it("returns a schema with no $defs unchanged", () => {
-    const schema = { type: "object", properties: { a: { type: "string" } } } as JsonSchemaObject;
+    const schema = {
+      type: "object",
+      properties: { a: { type: "string" } },
+    } as JsonSchemaObject;
     expect(rehydrateRefs(schema)).toBe(schema);
   });
 
@@ -15,7 +18,9 @@ describe("rehydrateRefs", () => {
         a: { $ref: "#/$defs/addr" },
         b: { $ref: "#/$defs/addr" },
       },
-      $defs: { addr: { type: "object", properties: { country: { type: "string" } } } },
+      $defs: {
+        addr: { type: "object", properties: { country: { type: "string" } } },
+      },
     } as unknown as JsonSchemaObject;
 
     const out = rehydrateRefs(schema) as Record<string, any>;
@@ -33,11 +38,81 @@ describe("rehydrateRefs", () => {
       properties: {
         fields: { allOf: [{ $ref: "#/$defs/cust" }] },
       },
-      $defs: { cust: { type: "object", properties: { Owner: { type: "string" } } } },
+      $defs: {
+        cust: { type: "object", properties: { Owner: { type: "string" } } },
+      },
     } as unknown as JsonSchemaObject;
 
     const out = rehydrateRefs(schema) as Record<string, any>;
-    expect(out.properties.fields.allOf[0].properties.Owner).toEqual({ type: "string" });
+    expect(out.properties.fields.allOf[0].properties.Owner).toEqual({
+      type: "string",
+    });
+  });
+
+  it("resolves arbitrary nested fragment pointers and decodes escaped tokens", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        account: {
+          $ref: "#/$defs/version~1company~02026/$defs/account~1dimensions",
+        },
+      },
+      $defs: {
+        "version/company~2026": {
+          $defs: {
+            "account/dimensions": {
+              type: "object",
+              properties: { asset_category: { type: "string" } },
+            },
+          },
+        },
+      },
+    } as unknown as JsonSchemaObject;
+
+    const out = rehydrateRefs(schema) as Record<string, any>;
+    expect(out.properties.account.properties.asset_category).toEqual({
+      type: "string",
+    });
+  });
+
+  it("percent-decodes URI fragment pointers before traversing them", () => {
+    const schema = {
+      properties: { value: { $ref: "#/%24defs/account%20role" } },
+      $defs: { "account role": { type: "string", title: "Account role" } },
+    } as unknown as JsonSchemaObject;
+
+    const out = rehydrateRefs(schema) as Record<string, any>;
+    expect(out.properties.value).toMatchObject({
+      type: "string",
+      title: "Account role",
+    });
+  });
+
+  it("traverses array indices without treating arbitrary properties as indices", () => {
+    const schema = {
+      properties: {
+        valid: { $ref: "#/$defs/versions/0/$defs/role" },
+        invalid: { $ref: "#/$defs/versions/01/$defs/role" },
+      },
+      $defs: {
+        versions: [
+          {
+            $defs: {
+              role: { type: "string", title: "Role" },
+            },
+          },
+        ],
+      },
+    } as unknown as JsonSchemaObject;
+
+    const out = rehydrateRefs(schema) as Record<string, any>;
+    expect(out.properties.valid).toMatchObject({
+      type: "string",
+      title: "Role",
+    });
+    expect(out.properties.invalid).toEqual({
+      $ref: "#/$defs/versions/01/$defs/role",
+    });
   });
 
   it("merges sibling keywords over the referenced body (local keywords win)", () => {
@@ -68,12 +143,21 @@ describe("rehydrateRefs", () => {
     expect(back.description).toBe("↻ recursive schema");
   });
 
-  it("leaves a dangling local ref permissive", () => {
+  it("retains a dangling local ref and its siblings instead of replacing it with an empty schema", () => {
     const schema = {
-      properties: { x: { $ref: "#/$defs/missing" } },
+      properties: {
+        x: { $ref: "#/$defs/missing", title: "Missing definition" },
+        invalidEscape: { $ref: "#/$defs/bad~2key" },
+      },
       $defs: { other: { type: "string" } },
     } as unknown as JsonSchemaObject;
     const out = rehydrateRefs(schema) as Record<string, any>;
-    expect(out.properties.x).toEqual({});
+    expect(out.properties.x).toEqual({
+      $ref: "#/$defs/missing",
+      title: "Missing definition",
+    });
+    expect(out.properties.invalidEscape).toEqual({
+      $ref: "#/$defs/bad~2key",
+    });
   });
 });

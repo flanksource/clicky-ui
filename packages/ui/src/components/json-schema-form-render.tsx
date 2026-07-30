@@ -19,7 +19,10 @@ import {
 } from "./json-schema-form-fields";
 import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
-import { effectiveProperties, resolveControl } from "./json-schema-form-resolve";
+import { FieldErrorMessages, FieldErrorText } from "./json-schema-form-error-display";
+import { appendInstancePath, errorsAtInstancePath } from "./json-schema-form-errors";
+import type { JsonSchemaFormError } from "./json-schema-form-error-types";
+import { effectiveProperties, resolveControl, schemaRendersAsObject } from "./json-schema-form-resolve";
 import type {
   FieldArgs,
   FieldControl,
@@ -123,7 +126,12 @@ function ownsReadOnlyRendering(kind: FieldControl["kind"]): boolean {
 function buildField(
   args: FieldArgs,
   ctx: RenderContext,
-): { field: FieldControl; label: ReactNode; value: ReactNode } | null {
+): {
+  field: FieldControl;
+  label: ReactNode;
+  value: ReactNode;
+  errors: JsonSchemaFormError[];
+} | null {
   const base = resolveControl(args);
   let field: FieldControl | null = base;
   for (const ext of ctx.pre) {
@@ -147,9 +155,12 @@ function buildField(
   // handled structurally inside the array/string-map controls, not here.
   const overrideMode =
     field.layout === "inline" ? "inline" : field.layout === "stack" ? "stacked" : undefined;
-  const valueCtx: RenderContext = overrideMode
-    ? { ...ctx, layout: { ...ctx.layout, mode: overrideMode } }
-    : ctx;
+  const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
+  const valueCtx: RenderContext = {
+    ...ctx,
+    instancePath,
+    ...(overrideMode ? { layout: { ...ctx.layout, mode: overrideMode } } : {}),
+  };
   let value: ReactNode = renderValueControl(field, valueCtx);
   const postCtx = {
     ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
@@ -160,7 +171,12 @@ function buildField(
     label = next.label;
     value = next.value;
   }
-  return { field, label, value };
+  return {
+    field,
+    label,
+    value,
+    errors: errorsAtInstancePath(ctx.errors, instancePath),
+  };
 }
 
 // renderFieldNodes runs the full pipeline and returns the raw {label, value}
@@ -172,7 +188,18 @@ export function renderFieldNodes(
 ): { label: ReactNode; value: ReactNode } | null {
   const built = buildField(args, ctx);
   if (!built) return null;
-  return { label: built.label, value: built.value };
+  return {
+    label: built.label,
+    value:
+      built.errors.length > 0 ? (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          {built.value}
+          <FieldErrorText errors={built.errors} />
+        </div>
+      ) : (
+        built.value
+      ),
+  };
 }
 
 // renderFieldRow runs the pipeline and wraps it in a FieldWrapper with the soft
@@ -202,6 +229,7 @@ export function renderFieldRow(
         {...(field.helper ? { helper: field.helper } : {})}
         {...(field.labelIcon != null ? { labelIcon: field.labelIcon } : {})}
       >
+        <FieldErrorText errors={built.errors} className="min-w-0 break-words" />
         {built.value}
       </ObjectSection>
     );
@@ -225,7 +253,7 @@ export function renderFieldRow(
   ) : (
     built.label
   );
-  const err = softError(field);
+  const err = built.errors.length > 0 ? <FieldErrorMessages errors={built.errors} /> : softError(field);
   return (
     <FieldWrapper
       layout={ctx.layout}
@@ -278,6 +306,7 @@ export function renderObjectFields(
         required: required.includes(key),
         value: value[key],
         onChange: (next) => onChange({ ...value, [key]: next }),
+        instancePath: appendInstancePath(ctx.instancePath, key),
       },
       ctx,
     );
@@ -301,9 +330,10 @@ export function renderObjectFields(
 // (a structured object → ObjectSection, or an `x-layout: "table"` array/map) so
 // a multi-column grid gives it the whole row instead of a single column.
 function rendersFullWidth(prop: JsonSchemaProperty): boolean {
-  const type = prop.type;
-  const isObject = type === "object" || (Array.isArray(type) && type.includes("object"));
-  if (isObject && prop.properties) return true;
+  const fixedProperties = effectiveProperties(prop as JsonSchemaObject, {}).properties;
+  if (schemaRendersAsObject(prop) && (prop.properties !== undefined || Object.keys(fixedProperties).length > 0)) {
+    return true;
+  }
   return prop["x-layout"] === "table";
 }
 

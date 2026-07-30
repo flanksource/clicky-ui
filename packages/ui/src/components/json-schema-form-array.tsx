@@ -13,6 +13,7 @@ import {
   type FormSize,
 } from "./json-schema-form-size";
 import { isScalarStringItems } from "./json-schema-form-resolve";
+import { appendInstancePath } from "./json-schema-form-errors";
 import {
   defaultPlaceholder,
   isPlainObject,
@@ -27,15 +28,7 @@ import type { FieldControl, JsonSchemaProperty, RenderContext } from "./json-sch
 // anything richer (objects, numbers, enums, nested arrays) renders one recursive
 // control per item with add / remove / reorder. Recursion goes through
 // ctx.render so this module never imports the renderer (no import cycle).
-export function ArrayControl({
-  field,
-  fieldId,
-  ctx,
-}: {
-  field: FieldControl;
-  fieldId: string;
-  ctx: RenderContext;
-}) {
+export function ArrayControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
   // A read-only array marks its whole subtree non-editable: no add/remove/reorder
   // and item inputs disabled (a child the schema marks readOnly still renders as
   // a value span).
@@ -67,6 +60,7 @@ export function ArrayControl({
                 required: false,
                 value: item,
                 onChange: (next) => field.onChange(setIndex(items, i, next)),
+                instancePath: appendInstancePath(ctx.instancePath, i),
               },
               childCtx,
               { labelOverride: `Item ${i + 1}` },
@@ -102,7 +96,10 @@ function enumItemOptions(field: FieldControl): Array<{ value: string; label: str
   const rawOptions =
     field.options ??
     (Array.isArray(field.itemSchema?.enum)
-      ? field.itemSchema.enum.map((value) => ({ value: String(value), label: String(value) }))
+      ? field.itemSchema.enum.map((value) => ({
+          value: String(value),
+          label: String(value),
+        }))
       : []);
   const seen = new Set<string>();
   return rawOptions.flatMap((option) => {
@@ -130,9 +127,7 @@ function FilterPillArray({
   const selected = new Set(implicitAll ? options.map((option) => option.value) : explicitValues);
 
   function commit(nextSelected: Set<string>) {
-    const next = options
-      .map((option) => option.value)
-      .filter((value) => nextSelected.has(value));
+    const next = options.map((option) => option.value).filter((value) => nextSelected.has(value));
     field.onChange(next.length === options.length ? [] : next);
   }
 
@@ -181,15 +176,7 @@ function hasObjectItemProperties(items: JsonSchemaProperty | undefined): boolean
 // TableArray renders an object-item array as a table: a header row of the item's
 // property names and one row per item with value-only controls, plus per-row
 // remove and an add button. Driven by `x-layout: table`.
-function TableArray({
-  field,
-  ctx,
-  readOnly,
-}: {
-  field: FieldControl;
-  ctx: RenderContext;
-  readOnly: boolean;
-}) {
+function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: RenderContext; readOnly: boolean }) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
   const columns = Object.entries(itemSchema.properties ?? {});
@@ -204,6 +191,7 @@ function TableArray({
         required: false,
         value: obj[col],
         onChange: (next) => field.onChange(setIndex(items, rowIndex, { ...obj, [col]: next })),
+        instancePath: appendInstancePath(appendInstancePath(ctx.instancePath, rowIndex), col),
       },
       childCtx,
     );
@@ -305,12 +293,7 @@ function ItemControls({
       >
         <Icon icon={UiChevronDown} className="text-sm" />
       </button>
-      <button
-        type="button"
-        aria-label={`Remove item ${index + 1}`}
-        className={actionClassName}
-        onClick={onRemove}
-      >
+      <button type="button" aria-label={`Remove item ${index + 1}`} className={actionClassName} onClick={onRemove}>
         <Icon icon={UiTrash} className="text-sm" />
       </button>
     </div>

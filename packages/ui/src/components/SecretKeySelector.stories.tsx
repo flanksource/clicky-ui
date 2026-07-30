@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { cn } from "../lib/utils";
 import {
   SecretKeySelector,
   type KeyPreview,
@@ -15,7 +16,9 @@ const RESOURCES: Record<SecretKind, SecretResource[]> = {
     { name: "elastic", keys: ["url", "apiKey"] },
   ],
   configmap: [{ name: "app", keys: ["demo.web_url", "demo.cycle_url"] }],
-  helm: [{ name: "mysql", keys: ["auth.rootPassword", "primary.service.port"] }],
+  helm: [
+    { name: "mysql", keys: ["auth.rootPassword", "primary.service.port"] },
+  ],
 };
 
 const SERVICE_ACCOUNTS: SecretResource[] = [
@@ -47,7 +50,9 @@ const PREVIEWS: Record<string, KeyPreview[]> = {
 
 const loadResources = (kind: SecretKind) => Promise.resolve(RESOURCES[kind]);
 const loadKeyPreview = (_kind: SecretKind, name: string) =>
-  new Promise<KeyPreview[]>((r) => setTimeout(() => r(PREVIEWS[name] ?? []), 200));
+  new Promise<KeyPreview[]>((r) =>
+    setTimeout(() => r(PREVIEWS[name] ?? []), 200),
+  );
 const loadServiceAccounts = () => Promise.resolve(SERVICE_ACCOUNTS);
 
 const ALL_SOURCES: SecretValueSource[] = [
@@ -79,14 +84,16 @@ function Playground({
   initial,
   allowLiteral,
   sources,
+  className = "w-[34rem]",
 }: {
   initial?: SecretKeyValue;
   allowLiteral?: boolean;
   sources?: SecretValueSource[];
+  className?: string;
 }) {
   const [value, setValue] = useState<SecretKeyValue | undefined>(initial);
   return (
-    <div className="w-[34rem] space-y-3">
+    <div className={cn("space-y-3", className)}>
       <SecretKeySelector
         value={value}
         onChange={setValue}
@@ -109,13 +116,21 @@ export const Empty: Story = {
 
 export const WithPreview: Story = {
   parameters: {
-    docs: { description: { story: "A chosen secret shows masked previews as key labels." } },
+    docs: {
+      description: {
+        story: "A chosen secret shows masked previews as key labels.",
+      },
+    },
   },
-  render: () => <Playground initial={{ kind: "secret", name: "db", key: "host" }} />,
+  render: () => (
+    <Playground initial={{ kind: "secret", name: "db", key: "host" }} />
+  ),
 };
 
 export const ConfigMap: Story = {
-  render: () => <Playground initial={{ kind: "configmap", name: "app", key: "" }} />,
+  render: () => (
+    <Playground initial={{ kind: "configmap", name: "app", key: "" }} />
+  ),
 };
 
 export const WithLiteralValue: Story = {
@@ -127,7 +142,9 @@ export const WithLiteralValue: Story = {
       },
     },
   },
-  render: () => <Playground initial={{ kind: "value", value: "prod.example.com" }} />,
+  render: () => (
+    <Playground initial={{ kind: "value", value: "prod.example.com" }} />
+  ),
 };
 
 export const ReferenceOnly: Story = {
@@ -140,7 +157,10 @@ export const ReferenceOnly: Story = {
     },
   },
   render: () => (
-    <Playground allowLiteral={false} initial={{ kind: "secret", name: "db", key: "host" }} />
+    <Playground
+      allowLiteral={false}
+      initial={{ kind: "secret", name: "db", key: "host" }}
+    />
   ),
 };
 
@@ -153,17 +173,70 @@ export const AllSources: Story = {
       },
     },
   },
-  render: () => <Playground sources={ALL_SOURCES} initial={{ kind: "helm", name: "mysql", key: "auth.rootPassword" }} />,
+  render: () => (
+    <Playground
+      sources={ALL_SOURCES}
+      initial={{ kind: "helm", name: "mysql", key: "auth.rootPassword" }}
+    />
+  ),
 };
 
 export const ServiceAccount: Story = {
   render: () => (
-    <Playground sources={ALL_SOURCES} initial={{ kind: "serviceaccount", name: "deployer" }} />
+    <Playground
+      sources={ALL_SOURCES}
+      initial={{ kind: "serviceaccount", name: "deployer" }}
+    />
   ),
 };
 
 export const OnePassword: Story = {
   render: () => (
-    <Playground sources={ALL_SOURCES} initial={{ kind: "onepassword", ref: "op://prod/postgres/password" }} />
+    <Playground
+      sources={ALL_SOURCES}
+      initial={{ kind: "onepassword", ref: "op://prod/postgres/password" }}
+    />
+  ),
+};
+
+export const ResponsiveWidths: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Every field shrinks to fit its content while remaining bounded by the selector container. The source combobox collapses to an icon menu below 28rem.",
+      },
+    },
+  },
+  render: () => (
+    <div className="space-y-8">
+      <section className="space-y-2">
+        <p className="text-sm font-medium">Wide reference — 34rem</p>
+        <div className="w-[34rem] max-w-full" data-testid="wide-reference">
+          <Playground
+            className="w-full"
+            initial={{ kind: "secret", name: "db", key: "password" }}
+          />
+        </div>
+      </section>
+      <section className="space-y-2">
+        <p className="text-sm font-medium">Compact reference — 22rem</p>
+        <div className="w-[22rem] max-w-full" data-testid="compact-reference">
+          <Playground
+            className="w-full"
+            initial={{ kind: "secret", name: "db", key: "password" }}
+          />
+        </div>
+      </section>
+      <section className="space-y-2">
+        <p className="text-sm font-medium">Compact literal — 22rem</p>
+        <div className="w-[22rem] max-w-full" data-testid="compact-literal">
+          <Playground
+            className="w-full"
+            initial={{ kind: "value", value: "LAB_ESW_OIPA_QA" }}
+          />
+        </div>
+      </section>
+    </div>
   ),
 };

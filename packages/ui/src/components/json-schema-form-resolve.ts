@@ -16,7 +16,7 @@ import { isPlainObject } from "./json-schema-form-utils";
 // by `patternProperties` (a per-key-pattern value map). Either makes it an
 // editable key/value control rather than a fixed-property sub-form.
 export function isOpenStringMap(prop: JsonSchemaProperty): boolean {
-  if (!schemaHasType(prop, "object")) return false;
+  if (!schemaRendersAsObject(prop)) return false;
   if (typeof prop.additionalProperties === "object" && prop.additionalProperties !== null) {
     return true;
   }
@@ -34,6 +34,30 @@ function patternSchemasOf(prop: JsonSchemaProperty): { pattern: string; schema: 
 function schemaHasType(prop: JsonSchemaProperty, type: string): boolean {
   if (Array.isArray(prop.type)) return prop.type.includes(type as never);
   return prop.type === type;
+}
+
+// schemaRendersAsObject accepts schemas that omit `type` but use object-only
+// keywords, including composed schemas whose local refs were rehydrated into
+// unconditional allOf members. An explicit incompatible type always wins.
+export function schemaRendersAsObject(prop: JsonSchemaProperty): boolean {
+  if (schemaHasType(prop, "object")) return true;
+  if (prop.type !== undefined) return false;
+  if (
+    prop.properties !== undefined ||
+    prop.required !== undefined ||
+    prop.additionalProperties !== undefined ||
+    prop.patternProperties !== undefined ||
+    prop.propertyNames !== undefined ||
+    prop.unevaluatedProperties !== undefined
+  ) {
+    return true;
+  }
+  return (
+    prop.allOf?.some(
+      (clause) =>
+        clause.if === undefined && clause.then === undefined && schemaRendersAsObject(clause as JsonSchemaProperty),
+    ) ?? false
+  );
 }
 
 function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
@@ -264,7 +288,7 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   }
   // A structured object: fixed `properties`, not an open map. Renders as a
   // nested sub-form (labels, required, if/then) — recursed into by the renderer.
-  if (schemaHasType(prop, "object")) {
+  if (schemaRendersAsObject(prop)) {
     const valueObject = isPlainObject(value) ? value : {};
     const objectFields = effectiveProperties(prop as JsonSchemaObject, valueObject);
     if (Object.keys(objectFields.properties).length > 0 || prop.properties) {
@@ -279,7 +303,7 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   }
   // A bare object with neither properties nor an additionalProperties schema:
   // treat as an open string map unless explicitly closed.
-  if (schemaHasType(prop, "object")) {
+  if (schemaRendersAsObject(prop)) {
     return {
       ...base,
       kind: "string-map",
@@ -382,10 +406,7 @@ function applyObjectDefaults(
         fieldChanged = true;
       }
 
-      const structuredObject =
-        schemaHasType(propertySchema, "object") ||
-        propertySchema.properties !== undefined ||
-        propertySchema.allOf !== undefined;
+      const structuredObject = schemaRendersAsObject(propertySchema);
       if (structuredObject && !isOpenStringMap(propertySchema)) {
         const objectValue = isPlainObject(fieldValue)
           ? (fieldValue as Record<string, unknown>)

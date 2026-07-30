@@ -70,6 +70,24 @@ describe("WorkloadPicker", () => {
     expect(onChange).toHaveBeenCalledWith("service/demo-svc");
   });
 
+  it("does not commit a workload name absent from the loaded options", async () => {
+    const onChange = vi.fn();
+    render(
+      <WorkloadPicker
+        value=""
+        onChange={onChange}
+        loadWorkloads={loadAll}
+        allowCustomValue={false}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    await waitFor(() => expect(screen.getByText("demo-svc")).toBeInTheDocument());
+    fireEvent.change(input, { target: { value: "ghost-svc" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("prefixes the namespace when supplied", async () => {
     const onChange = vi.fn();
     render(<WorkloadPicker value="" namespace="demo" onChange={onChange} loadWorkloads={loadAll} />);

@@ -2,7 +2,7 @@ import { Clicky, CodeBlock, CodeDiff, type ClickyDocument, type ClickyNode } fro
 import { DemoSection } from "./Section";
 
 // A before/after pair used to demonstrate the language-aware diff viewer under
-// the Preact runtime (kitchen-sink) — the same computed-diff path Storybook shows.
+// the React kitchen-sink runtime — the same computed-diff path Storybook shows.
 const DIFF_BEFORE = `export function greet(name: string): string {
   return "Hello, " + name;
 }`;
