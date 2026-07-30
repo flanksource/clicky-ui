@@ -28,7 +28,13 @@ describe("Modal", () => {
     const overlay = getDialog().closest("[role='presentation']") as HTMLElement;
     expect(overlay.className).toContain("p-density-2");
     expect(getDialog().style.maxHeight).toBe("calc(100dvh - 2rem)");
-    expect(getDialog().className).toContain("w-full");
+    expect(getDialog()).toHaveClass("w-full", "overflow-hidden");
+    expect(
+      document.querySelector("[data-slot='modal-body']"),
+    ).toHaveClass("min-h-0");
+    expect(
+      document.querySelector("[data-slot='modal-footer']"),
+    ).toHaveClass("shrink-0");
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 

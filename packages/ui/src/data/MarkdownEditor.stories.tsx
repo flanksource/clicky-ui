@@ -1,33 +1,21 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 import { MarkdownEditor } from "./MarkdownEditor";
-import type {
-  MarkdownEditorPreviewFormat,
-  MarkdownEditorPreviewRequest,
-  MarkdownEditorPreviewResult,
-} from "./MarkdownEditor.model";
-
-const sample = `# Markdown report
-
-Revenue stayed **ahead of plan** for the quarter.
-
-| Segment | Status | Change |
-| ------- | ------ | ------ |
-| SaaS    | Green  | +12%   |
-| Support | Amber  | -3%    |
-
-> Export-ready notes can be checked before publishing.`;
+import { mockMarkdownPreview } from "./examples/markdown-preview-mock";
+import { MARKDOWN_SYNTAX_DOCUMENT } from "./examples/markdown-syntax";
 
 const meta: Meta<typeof MarkdownEditor> = {
   title: "Data/MarkdownEditor",
   component: MarkdownEditor,
   args: {
-    defaultValue: sample,
+    defaultValue: MARKDOWN_SYNTAX_DOCUMENT,
+    minHeight: 640,
   },
   parameters: {
     docs: {
       description: {
         component:
-          "Split-pane markdown editor with local React preview and optional Clicky-backed previews for HTML, Markdown, PDF, JSON, CSV, and Excel outputs.",
+          "Split-pane markdown editor seeded with the complete syntax reference. The React pane renders locally through `Markdown`; HTML, Markdown, PDF, JSON, CSV, and Excel come from a host-supplied `loadPreview`, which returns `undefined` for any format it wants to leave on the local preview.",
       },
     },
   },
@@ -42,74 +30,20 @@ export const ClickyBackedPreview: Story = {
   args: {
     defaultPreviewFormat: "json",
     previewDebounceMs: 0,
-    loadPreview: async ({
-      markdown,
-      format,
-    }: MarkdownEditorPreviewRequest): Promise<MarkdownEditorPreviewResult> =>
-      mockClickyPreview(markdown, format),
+    loadPreview: mockMarkdownPreview,
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("the backend derives its stats from the live buffer", async () => {
+      await expect(await canvas.findByText("headings")).toBeInTheDocument();
+    });
+
+    await step("declining a format falls back to the local preview", async () => {
+      await userEvent.click(canvas.getByRole("radio", { name: /react/i }));
+      await expect(
+        await canvas.findByRole("heading", { name: "Markdown syntax reference" }),
+      ).toBeInTheDocument();
+    });
   },
 };
-
-function mockClickyPreview(
-  markdown: string,
-  format: MarkdownEditorPreviewFormat,
-): MarkdownEditorPreviewResult {
-  switch (format) {
-    case "react":
-      return {
-        kind: "clicky",
-        data: {
-          version: 1,
-          node: {
-            kind: "map",
-            fields: [
-              {
-                name: "title",
-                label: "Title",
-                value: { kind: "text", text: "Markdown report" },
-              },
-              {
-                name: "length",
-                label: "Characters",
-                value: { kind: "text", text: String(markdown.length) },
-              },
-            ],
-          },
-        },
-      };
-    case "html":
-      return {
-        kind: "html",
-        html: `<article><h1>Markdown report</h1><p>${markdown.length} characters</p></article>`,
-      };
-    case "json":
-      return {
-        kind: "json",
-        data: {
-          format,
-          characters: markdown.length,
-          headings: markdown.match(/^#/gm)?.length ?? 0,
-        },
-      };
-    case "csv":
-      return {
-        kind: "text",
-        text: "metric,value\ncharacters," + markdown.length,
-      };
-    case "pdf":
-      return {
-        kind: "url",
-        url: "/samples/clicky/services.json?format=pdf",
-      };
-    case "excel":
-      return {
-        kind: "url",
-        url: "/samples/clicky/services.json?format=excel",
-      };
-    case "markdown":
-      return {
-        kind: "text",
-        text: markdown,
-      };
-  }
-}

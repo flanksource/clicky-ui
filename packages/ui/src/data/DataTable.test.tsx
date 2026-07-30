@@ -139,6 +139,159 @@ describe("DataTable", () => {
     );
   });
 
+  it("renders selectionActions only while rows are selected", () => {
+    const onSelectionChange = vi.fn();
+    const { rerender } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: [], onSelectionChange }}
+        selectionActions={({ selectedRows, clearSelection }) => (
+          <button type="button" onClick={clearSelection}>
+            Clear {selectedRows.map((row) => row.service).join(", ")}
+          </button>
+        )}
+      />,
+    );
+
+    expect(screen.queryByTestId("data-table-selection-actions")).toBeNull();
+
+    rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange }}
+        selectionActions={({ selectedRows, clearSelection }) => (
+          <button type="button" onClick={clearSelection}>
+            Clear {selectedRows.map((row) => row.service).join(", ")}
+          </button>
+        )}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    fireEvent.click(bar.getByRole("button", { name: "Clear api, cron" }));
+    expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
+  });
+
+  it("applies getRowClassName to the matching row", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowClassName={(row) =>
+          row.restarts > 0 ? "stale-row" : "fresh-row"
+        }
+      />,
+    );
+
+    const bodyRows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(bodyRows[1]).toHaveClass("fresh-row");
+    expect(bodyRows[2]).toHaveClass("stale-row");
+  });
+
+  it("replaces the default row-count strip with the footer slot", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        footer={({ visibleRowCount, totalRowCount }) =>
+          `Showing ${visibleRowCount} of ${totalRowCount} services`
+        }
+      />,
+    );
+
+    expect(screen.getByText("Showing 3 of 3 services")).toBeInTheDocument();
+    expect(screen.queryByText("3 of 3 rows")).toBeNull();
+  });
+
+  it("introduces each group with a full-width header that collapses its rows", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={{
+          getGroupKey: (row) => row.status,
+          getGroupLabel: (key) => `Status: ${key}`,
+          getGroupMeta: (_key, groupRows) => `${groupRows.length} services`,
+        }}
+      />,
+    );
+
+    const header = screen.getByRole("button", { name: /Status: healthy/ });
+    const headerCell = header.closest("td");
+    expect(headerCell).toHaveAttribute(
+      "colSpan",
+      String(columns.length),
+    );
+    expect(headerCell).toHaveTextContent("2 services");
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.getByText("cron")).toBeInTheDocument();
+
+    fireEvent.click(header);
+
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("api")).not.toBeInTheDocument();
+    expect(screen.queryByText("cron")).not.toBeInTheDocument();
+    // Collapsing one group leaves the others rendered.
+    expect(screen.getByText("worker")).toBeInTheDocument();
+  });
+
+  it("selects only the selectable rows of the group whose header checkbox is toggled", () => {
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={{ getGroupKey: (row) => row.status }}
+        rowSelection={{
+          selectedRowIds: [],
+          onSelectionChange,
+          isRowSelectable: (row) => row.service !== "cron",
+        }}
+      />,
+    );
+
+    // The selection column widens every group header by one.
+    expect(
+      screen.getByRole("button", { name: /healthy/ }).closest("td"),
+    ).toHaveAttribute("colSpan", String(columns.length + 1));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select group healthy" }));
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["api"], [rows[0]]);
+  });
+
+  it("orders groups by compareGroups and starts matching groups collapsed", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={{
+          getGroupKey: (row) => row.status,
+          compareGroups: (a, b) => a.key.localeCompare(b.key),
+          defaultCollapsed: (key) => key === "degraded",
+        }}
+      />,
+    );
+
+    const groupHeaders = screen
+      .getAllByRole("button")
+      .filter((button) => button.hasAttribute("aria-expanded"));
+    expect(groupHeaders.map((button) => button.textContent)).toEqual([
+      "degraded1",
+      "healthy2",
+    ]);
+    expect(screen.queryByText("worker")).not.toBeInTheDocument();
+    expect(screen.getByText("api")).toBeInTheDocument();
+  });
+
   it("reports controlled manual sort without reordering the current page", () => {
     const onSortChange = vi.fn();
     render(

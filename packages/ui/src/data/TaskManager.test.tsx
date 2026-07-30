@@ -72,4 +72,22 @@ describe("TaskManager selection", () => {
     fireEvent.click(row);
     expect(onSelectRun).toHaveBeenCalledWith(null);
   });
+
+  it("scopes the run listing with label equality filters", async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <TaskManager
+        basePath="/api/v1"
+        kind="rules.backfill"
+        labels={{ entity_id: "entity-1", org_id: "org-1" }}
+      />,
+    );
+
+    await screen.findByText("fix-run");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/tasks?kind=rules.backfill&label=entity_id%3Dentity-1&label=org_id%3Dorg-1",
+      expect.objectContaining({ headers: { Accept: "application/json" } }),
+    );
+  });
 });

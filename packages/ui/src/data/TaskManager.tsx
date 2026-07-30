@@ -18,6 +18,8 @@ export interface TaskManagerProps {
   basePath?: string;
   /** Restrict the listing to a single kind (also hides the kind filter). */
   kind?: string;
+  /** Restrict the listing to runs whose labels contain every key/value pair. */
+  labels?: Record<string, string>;
   pollMs?: number;
   className?: string;
   /**
@@ -36,6 +38,7 @@ export interface TaskManagerProps {
 export function TaskManager({
   basePath,
   kind,
+  labels,
   pollMs,
   className,
   selectedId,
@@ -46,6 +49,7 @@ export function TaskManager({
   const { runs, status } = useTaskRuns({
     basePath,
     kind: kind ?? (kindFilter || undefined),
+    labels,
     status: statusFilter || undefined,
     pollMs,
   });

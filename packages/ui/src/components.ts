@@ -109,6 +109,22 @@ export {
   WorkloadPicker,
   type WorkloadPickerProps,
 } from "./components/WorkloadPicker";
+export { EndpointSelector } from "./components/EndpointSelector";
+export {
+  DEFAULT_PREFERRED_ENDPOINT_PORTS,
+  preferredEndpointPort,
+} from "./components/endpoint-port";
+export type {
+  EndpointMode,
+  EndpointResources,
+  EndpointSelectorDefaults,
+  EndpointSelectorProps,
+  EndpointSelectorValue,
+  EndpointTarget,
+  EndpointUrlSelectorProps,
+  EndpointWorkloadValue,
+  EndpointWorkloadMode,
+} from "./components/EndpointSelector.model";
 export {
   NamespacePicker,
   type NamespacePickerProps,
@@ -215,6 +231,7 @@ export type {
   LookupScope,
   LookupFetcher,
 } from "./components/json-schema-form-types";
+export type { JsonSchemaFormError } from "./components/json-schema-form-error-types";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {
@@ -269,7 +286,25 @@ export {
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
-export { useModalStack, type ModalStackPosition } from "./overlay/modalStack";
+export {
+  useModalStack,
+  useEscapeLayer,
+  useFloatingZIndex,
+  type ModalStackPosition,
+} from "./overlay/modalStack";
+export { zIndex } from "./overlay/zIndex";
+export {
+  CommandPalette,
+  type CommandPaletteProps,
+  type CommandFilter,
+  type CommandGroup,
+  type CommandItem,
+  type CommandSelectContext,
+} from "./overlay/CommandPalette";
+export {
+  CommandPaletteTrigger,
+  type CommandPaletteTriggerProps,
+} from "./overlay/CommandPaletteTrigger";
 export { ToastProvider, type ToastProviderProps } from "./overlay/Toast";
 export {
   useToast,

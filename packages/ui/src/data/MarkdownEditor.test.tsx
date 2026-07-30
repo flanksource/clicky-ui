@@ -71,6 +71,31 @@ describe("MarkdownEditor", () => {
     expect(screen.getByText('"Report"')).toBeInTheDocument();
   });
 
+  it("falls back to the local preview when loadPreview declines a format", async () => {
+    const loadPreview = vi.fn(({ format }: { format: string }) =>
+      format === "react" ? undefined : { kind: "text" as const, text: `converted ${format}` },
+    );
+
+    render(
+      <MarkdownEditor
+        defaultValue="# Local heading"
+        defaultPreviewFormat="react"
+        previewFormats={["react", "csv"]}
+        previewDebounceMs={0}
+        loadPreview={loadPreview}
+      />,
+    );
+
+    // React declined the remote result, so the pane renders the markdown itself.
+    expect(
+      await screen.findByRole("heading", { name: "Local heading" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: /csv/i }));
+
+    expect(await screen.findByText("converted csv")).toBeInTheDocument();
+  });
+
   it("loads React preview as Clicky JSON", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

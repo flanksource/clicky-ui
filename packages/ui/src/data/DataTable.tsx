@@ -45,6 +45,8 @@ import {
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
+  UiChevronDown,
+  UiChevronRight,
   UiClose,
   UiEllipsis,
   UiEyeClosed,
@@ -86,6 +88,11 @@ import {
 import { StatusDot } from "./cells/StatusDot";
 import { normalizeStatus } from "./cells/status-mapping";
 import type { BadgeStatus } from "./Badge";
+import {
+  groupRecords,
+  isGroupCollapsedByDefault,
+  type DataTableGrouping,
+} from "./DataTable.grouping";
 
 export type { TimestampOptions, TagsOptions };
 
@@ -114,6 +121,19 @@ type InternalRow<T> = {
   id: string;
   row: T;
 };
+
+type ResolvedGroup<T> = {
+  key: string;
+  records: InternalRow<T>[];
+  rows: T[];
+  label: ReactNode;
+  meta: ReactNode;
+  collapsed: boolean;
+};
+
+type RowStreamItem<T> =
+  | { kind: "group"; group: ResolvedGroup<T> }
+  | { kind: "row"; record: InternalRow<T> };
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
@@ -290,6 +310,26 @@ export type DataTableRowSelection<
   toggleOnRowClick?: boolean;
 };
 
+/** Passed to `selectionActions` while rows are selected. */
+export type DataTableSelectionContext<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  selectedRowIds: string[];
+  /** The selected rows currently loaded, in render order. */
+  selectedRows: T[];
+  /** Empties the selection through the same `onSelectionChange` callback. */
+  clearSelection: () => void;
+};
+
+/** Passed to a `footer` render function. */
+export type DataTableFooterContext = {
+  /** Rows left after filtering — what the table is showing. */
+  visibleRowCount: number;
+  /** Rows handed to the table before filtering. */
+  totalRowCount: number;
+  loading: boolean;
+};
+
 type DataTableInnerProps<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
@@ -378,6 +418,28 @@ type DataTableInnerProps<
   getRowId?: (row: T, index: number) => string;
   /** Controlled checkbox selection for entity/bulk-action tables. */
   rowSelection?: DataTableRowSelection<T>;
+  /**
+   * Bulk action bar, pinned to the bottom of the table shell while
+   * `rowSelection` holds a non-empty selection. Ignored without `rowSelection`.
+   */
+  selectionActions?: (context: DataTableSelectionContext<T>) => ReactNode;
+  /**
+   * Extra classes for a row's `<tr>`, applied last so tailwind-merge lets the
+   * caller override the built-in hover / selected backgrounds.
+   */
+  getRowClassName?: (row: T) => string | undefined;
+  /**
+   * Replaces the default "N of M rows" strip below the table. When
+   * `pagination` is also set, this renders directly above the pager instead.
+   */
+  footer?: ReactNode | ((context: DataTableFooterContext) => ReactNode);
+  /**
+   * Splits the rendered rows into collapsible groups, each introduced by a
+   * full-width header row. Grouping presents what is already on screen: it
+   * runs after filtering, sorting and pagination, so it never reorders rows
+   * within a group and never pulls in rows from another page.
+   */
+  grouping?: DataTableGrouping<T>;
   /** Called when a clickable row is selected. */
   onRowClick?: (row: T) => void;
   /** Predicate controlling whether a row is clickable. */
@@ -495,6 +557,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   pagination,
   getRowId,
   rowSelection,
+  selectionActions,
+  getRowClassName,
+  footer,
+  grouping,
   onRowClick,
   isRowClickable,
   getRowHref,
@@ -1197,6 +1263,91 @@ function DataTableInner<T extends Record<string, unknown>>({
     selectedRowIDs,
   ]);
 
+  const selectionBar = useMemo(() => {
+    if (!rowSelection || !selectionActions) return null;
+    const selected = rows.filter((record) => selectedRowIDs.has(record.id));
+    if (selected.length === 0) return null;
+    return selectionActions({
+      selectedRowIds: selected.map((record) => record.id),
+      selectedRows: selected.map((record) => record.row),
+      clearSelection: () => notifySelection(new Set()),
+    });
+  }, [notifySelection, rowSelection, rows, selectedRowIDs, selectionActions]);
+
+  const renderedFooter =
+    footer !== undefined
+      ? typeof footer === "function"
+        ? footer({
+            visibleRowCount: sorted.length,
+            totalRowCount: data.length,
+            loading,
+          })
+        : footer
+      : pagination
+        ? null
+        : loading
+          ? loadingMessage
+          : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`;
+
+  const [collapsedGroups, setCollapsedGroups] = useState<
+    Record<string, boolean>
+  >({});
+  const groups = useMemo(() => {
+    if (!grouping) return null;
+    const buckets = groupRecords(visibleSorted, (record) =>
+      grouping.getGroupKey(record.row),
+    );
+    const resolved = buckets.map((bucket) => ({
+      key: bucket.key,
+      records: bucket.rows,
+      rows: bucket.rows.map((record) => record.row),
+    }));
+    if (grouping.compareGroups) {
+      resolved.sort((a, b) => grouping.compareGroups!(a, b));
+    }
+    return resolved.map((group) => ({
+      ...group,
+      label: grouping.getGroupLabel?.(group.key, group.rows) ?? group.key,
+      meta: grouping.getGroupMeta?.(group.key, group.rows),
+      collapsed:
+        collapsedGroups[group.key] ??
+        isGroupCollapsedByDefault(group, grouping.defaultCollapsed),
+    }));
+  }, [collapsedGroups, grouping, visibleSorted]);
+
+  // Group headers and data rows share one flat stream so the <tbody> keeps a
+  // single row renderer whether or not grouping is on.
+  const rowStream = useMemo<Array<RowStreamItem<T>>>(() => {
+    if (!groups) {
+      return visibleSorted.map((record) => ({ kind: "row", record }) as const);
+    }
+    return groups.flatMap((group) => [
+      { kind: "group", group } as const,
+      ...(group.collapsed
+        ? []
+        : group.records.map((record) => ({ kind: "row", record }) as const)),
+    ]);
+  }, [groups, visibleSorted]);
+
+  const toggleGroupSelection = useCallback(
+    (records: InternalRow<T>[]) => {
+      if (!rowSelection) return;
+      const selectable = records.filter(
+        (record) => rowSelection.isRowSelectable?.(record.row) ?? true,
+      );
+      const next = new Set(selectedRowIDs);
+      const allSelected =
+        selectable.length > 0 &&
+        selectable.every((record) => next.has(record.id));
+      for (const record of selectable) {
+        if (allSelected) next.delete(record.id);
+        else next.add(record.id);
+      }
+      notifySelection(next);
+    },
+    [notifySelection, rowSelection, selectedRowIDs],
+  );
+
   const revealSentinelRef = useCallback(
     (node: HTMLTableRowElement | null) => {
       if (revealObserver.current) revealObserver.current.disconnect();
@@ -1486,7 +1637,43 @@ function DataTableInner<T extends Record<string, unknown>>({
                   selection={!!rowSelection}
                 />
               ) : (
-                visibleSorted.map((record) => {
+                rowStream.map((item) => {
+                  if (item.kind === "group") {
+                    return (
+                      <DataTableGroupHeaderRow
+                        key={`group:${item.group.key}`}
+                        label={item.group.label}
+                        meta={item.group.meta}
+                        count={item.group.records.length}
+                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        collapsed={item.group.collapsed}
+                        onToggleCollapsed={() =>
+                          setCollapsedGroups((current) => ({
+                            ...current,
+                            [item.group.key]: !item.group.collapsed,
+                          }))
+                        }
+                        {...(rowSelection
+                          ? {
+                              selection: {
+                                selectableCount: item.group.records.filter(
+                                  (record) =>
+                                    rowSelection.isRowSelectable?.(
+                                      record.row,
+                                    ) ?? true,
+                                ).length,
+                                selectedCount: item.group.records.filter(
+                                  (record) => selectedRowIDs.has(record.id),
+                                ).length,
+                                onToggle: () =>
+                                  toggleGroupSelection(item.group.records),
+                              },
+                            }
+                          : {})}
+                      />
+                    );
+                  }
+                  const record = item.record;
                   const href = getRowHref?.(record.row);
                   const expanded = expandedRows[record.id] ?? false;
                   const expandedContent =
@@ -1517,6 +1704,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                           "relative border-b border-border/60 align-top",
                           clickable && "cursor-pointer hover:bg-accent/40",
                           selectedRowIDs.has(record.id) && "bg-accent/50",
+                          getRowClassName?.(record.row),
                         )}
                         onClick={() => {
                           if (selectionClickEnabled) toggleRowSelection(record);
@@ -1643,6 +1831,21 @@ function DataTableInner<T extends Record<string, unknown>>({
           </div>
         </div>
 
+        {selectionBar ? (
+          <div
+            data-testid="data-table-selection-actions"
+            className="sticky bottom-2 z-10 flex shrink-0 items-center justify-between gap-density-3 rounded-md border border-border bg-card p-density-2 shadow-md"
+          >
+            {selectionBar}
+          </div>
+        ) : null}
+
+        {renderedFooter !== null && (
+          <div className="shrink-0 px-1 text-xs text-muted-foreground">
+            {renderedFooter}
+          </div>
+        )}
+
         {pagination ? (
           <DataTablePaginationFooter
             pagination={pagination}
@@ -1650,13 +1853,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             loading={loading}
             loadingMessage={loadingMessage}
           />
-        ) : (
-          <div className="shrink-0 px-1 text-xs text-muted-foreground">
-            {loading
-              ? loadingMessage
-              : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`}
-          </div>
-        )}
+        ) : null}
         {detailStyle === "dialog" && renderExpandedRow && (
           <Modal
             open={detailRow !== null}
@@ -1806,6 +2003,78 @@ function DataTablePaginationFooter({
         </button>
       </div>
     </div>
+  );
+}
+
+function DataTableGroupHeaderRow({
+  label,
+  meta,
+  count,
+  colSpan,
+  collapsed,
+  onToggleCollapsed,
+  selection,
+}: {
+  label: ReactNode;
+  meta: ReactNode;
+  count: number;
+  colSpan: number;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  selection?: {
+    selectableCount: number;
+    selectedCount: number;
+    onToggle: () => void;
+  };
+}) {
+  const allSelected =
+    !!selection &&
+    selection.selectableCount > 0 &&
+    selection.selectedCount === selection.selectableCount;
+  const someSelected =
+    !!selection && selection.selectedCount > 0 && !allSelected;
+  const checkboxRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (checkboxRef.current) checkboxRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  return (
+    <tr className="border-b border-border/60 bg-muted/40">
+      <td colSpan={colSpan} className="px-density-2 py-density-1">
+        <div className="flex items-center gap-2">
+          {selection ? (
+            <input
+              ref={checkboxRef}
+              type="checkbox"
+              aria-label={`Select group ${typeof label === "string" ? label : count}`}
+              checked={allSelected}
+              disabled={selection.selectableCount === 0}
+              onChange={selection.onToggle}
+              className="size-3.5 rounded border-border accent-primary"
+            />
+          ) : null}
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary"
+          >
+            <Icon
+              icon={collapsed ? UiChevronRight : UiChevronDown}
+              className="shrink-0 text-muted-foreground"
+            />
+            <span className="truncate">{label}</span>
+            <span className="shrink-0 font-normal text-muted-foreground">
+              {count}
+            </span>
+          </button>
+          {meta ? (
+            <div className="shrink-0 text-xs text-muted-foreground">{meta}</div>
+          ) : null}
+        </div>
+      </td>
+    </tr>
   );
 }
 

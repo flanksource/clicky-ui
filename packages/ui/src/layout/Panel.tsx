@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
+import { PanelFrame, type PanelTone } from "./PanelFrame";
 
-export type PanelTone = "default" | "danger" | "warning" | "success" | "info";
+export type { PanelTone } from "./PanelFrame";
 
 export type PanelProps = {
   /** Header title. Omit (with no icon/count/actions) to render a headerless card. */
@@ -29,14 +29,6 @@ export type PanelProps = {
   children: ReactNode;
 };
 
-const toneRing: Record<PanelTone, string> = {
-  default: "",
-  danger: "border-l-2 border-l-red-500",
-  warning: "border-l-2 border-l-yellow-500",
-  success: "border-l-2 border-l-green-500",
-  info: "border-l-2 border-l-blue-500",
-};
-
 /**
  * A non-collapsible carded surface with an optional header. Use for content
  * panels (checks, results, comments) where {@link Section}'s disclosure
@@ -55,43 +47,51 @@ export function Panel({
   bodyClassName,
   children,
 }: PanelProps) {
-  const hasHeader = title !== undefined || icon !== undefined || actions !== undefined;
+  const hasHeader =
+    title !== undefined || icon !== undefined || actions !== undefined;
   return (
-    <div
-      className={cn(
-        "rounded-md border border-border bg-card overflow-hidden",
-        toneRing[tone],
-        className,
-      )}
+    <PanelFrame
+      {...(hasHeader
+        ? {
+            header: (
+              <>
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  {icon && (
+                    <Icon
+                      {...(typeof icon === "string"
+                        ? { name: icon }
+                        : { icon })}
+                      className="text-base text-muted-foreground"
+                    />
+                  )}
+                  {title !== undefined && (
+                    <span className="truncate text-sm font-medium text-card-foreground">
+                      {title}
+                    </span>
+                  )}
+                  {count !== undefined && (
+                    <span className="inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">
+                      {count}
+                    </span>
+                  )}
+                </div>
+                {actions && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    {actions}
+                  </div>
+                )}
+              </>
+            ),
+          }
+        : {})}
+      {...(footer !== undefined ? { footer } : {})}
+      tone={tone}
+      padded={padded}
+      {...(className !== undefined ? { className } : {})}
+      {...(headerClassName !== undefined ? { headerClassName } : {})}
+      {...(bodyClassName !== undefined ? { bodyClassName } : {})}
     >
-      {hasHeader && (
-        <div
-          className={cn(
-            "flex items-center gap-2 px-density-3 py-density-2 border-b border-border",
-            headerClassName,
-          )}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {icon && (
-              <Icon
-                {...(typeof icon === "string" ? { name: icon } : { icon })}
-                className="text-base text-muted-foreground"
-              />
-            )}
-            {title !== undefined && (
-              <span className="font-medium text-sm truncate text-card-foreground">{title}</span>
-            )}
-            {count !== undefined && (
-              <span className="inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">
-                {count}
-              </span>
-            )}
-          </div>
-          {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
-        </div>
-      )}
-      <div className={cn(padded && "px-density-3 py-density-2", bodyClassName)}>{children}</div>
-      {footer && <div className="px-density-3 py-density-2 border-t border-border">{footer}</div>}
-    </div>
+      {children}
+    </PanelFrame>
   );
 }

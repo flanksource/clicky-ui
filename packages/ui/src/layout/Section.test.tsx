@@ -75,4 +75,15 @@ describe("Section", () => {
     expect(screen.queryByRole("button", { expanded: false })).toBeNull();
     expect(screen.getByText("body")).toBeTruthy();
   });
+
+  it("uses the same left-edge semantic tone as Panel", () => {
+    const { container } = render(
+      <Section title="Errors" tone="danger">
+        <p>body</p>
+      </Section>,
+    );
+    const classes = container.firstElementChild?.className.split(" ") ?? [];
+    expect(classes).toContain("border-l-red-500");
+    expect(classes).not.toContain("border-red-500");
+  });
 });
