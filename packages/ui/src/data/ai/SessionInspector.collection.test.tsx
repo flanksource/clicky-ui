@@ -232,7 +232,7 @@ describe("SessionInspector session collections", () => {
 
     await waitFor(() => expect(loadSession).toHaveBeenCalledTimes(1));
     // TEMP: debug
-    screen.debug();
+    console.log(document.body.textContent);
     expect(await screen.findByText("lazy parallel answer")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
