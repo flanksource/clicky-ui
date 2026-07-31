@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatModel } from "../chat/types";
 import { mockChatTransport } from "../chat/Chat.fixtures";
@@ -32,9 +32,7 @@ describe("ChatWindow model fetching", () => {
 
     renderChatWindow("stale-model");
 
-    expect(await screen.findByRole("combobox", { name: "Model" })).toHaveValue(
-      "Fake Chat"
-    );
+    await expectModelValue("Fake Chat");
   });
 
   it("preserves a stored model that exists and is configured", async () => {
@@ -49,11 +47,18 @@ describe("ChatWindow model fetching", () => {
 
     renderChatWindow("configured-model");
 
-    expect(await screen.findByRole("combobox", { name: "Model" })).toHaveValue(
-      "Current Chat"
-    );
+    await expectModelValue("Current Chat");
   });
 });
+
+// The picker mounts with the stored model and only settles once the catalog
+// fetch resolves, so re-query and assert together instead of holding on to the
+// combobox found before that update.
+async function expectModelValue(label: string): Promise<void> {
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue(label),
+  );
+}
 
 function renderChatWindow(storageId: string): void {
   render(

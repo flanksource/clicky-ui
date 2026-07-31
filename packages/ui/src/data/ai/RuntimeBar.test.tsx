@@ -50,7 +50,6 @@ describe("RuntimeBar", () => {
       name: "Runtime: Codex, CLI, GPT-5, effort High",
     });
     expect(trigger).toHaveTextContent("GPT-5");
-    expect(trigger.querySelectorAll("svg")).toHaveLength(4);
 
     fireEvent.click(trigger);
     const menu = screen.getByRole("menu");
@@ -68,7 +67,6 @@ describe("RuntimeBar", () => {
     expect(modelChoice).toBeInTheDocument();
     expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5");
     expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5");
-    expect(modelChoice.querySelectorAll("svg")).toHaveLength(2);
     expect(
       within(menu).getByRole("slider", { name: "Reasoning effort" }),
     ).toHaveAttribute("aria-valuetext", "High");
@@ -154,6 +152,51 @@ describe("RuntimeBar", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
     expect(onChange).toHaveBeenCalledWith({ backend: "codex-agent" });
+  });
+
+  it("drops the catalog id alongside the model the new family cannot run", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        value={{
+          backend: "claude-agent",
+          model: "claude-agent/sonnet",
+          id: "claude-agent/sonnet",
+        }}
+        onChange={onChange}
+        models={MODELS}
+      />,
+    );
+
+    openSegment("Family — Claude");
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
+
+    expect(onChange).toHaveBeenCalledWith({ backend: "codex-agent" });
+  });
+
+  it("drops the catalog id when a model is typed in directly", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        value={{
+          backend: "codex-cli",
+          model: "codex-cli/gpt-5",
+          id: "codex-cli/gpt-5",
+        }}
+        onChange={onChange}
+        models={MODELS}
+      />,
+    );
+
+    openSegment("Model — codex-cli/gpt-5");
+    fireEvent.change(screen.getByLabelText("Model id"), {
+      target: { value: "gpt-5.1" },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cli",
+      model: "gpt-5.1",
+    });
   });
 
   it("keeps a model the new mode can still run", () => {

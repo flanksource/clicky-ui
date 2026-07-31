@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ContextBadges } from "./ContextBadges";
 import type { ChatContextItem, ContextTypeConfig } from "./context";
@@ -54,6 +54,13 @@ describe("ContextBadges", () => {
     render(<ContextBadges items={withPreview} />);
     expect(screen.queryByText(/full markdown supplied to the model/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("context-badge-expand"));
-    expect(await screen.findByText(/full markdown supplied to the model/)).toBeInTheDocument();
+    // Markdown swaps its preformatted fallback for Streamdown once that optional
+    // import resolves, so query and assert inside one retried callback — a node
+    // captured by findBy* can be detached by that swap before the assertion.
+    await waitFor(() =>
+      expect(
+        screen.getByText(/full markdown supplied to the model/),
+      ).toBeInTheDocument(),
+    );
   });
 });

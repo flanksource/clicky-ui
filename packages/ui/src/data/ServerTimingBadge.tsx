@@ -38,7 +38,7 @@ export function ServerTimingBadge({
         </button>
       }
       cardClassName="w-64 whitespace-normal p-2.5"
-      {...(className ? { className } : {})}
+      className={className}
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4 text-xs font-medium">

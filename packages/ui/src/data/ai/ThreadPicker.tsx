@@ -20,6 +20,8 @@ export interface ThreadSummary {
 export interface ThreadSource {
   /** Returns the conversation list (re-invoked whenever the menu opens). */
   load: () => Promise<ThreadSummary[]>;
+  /** Creates a durable conversation before its first message is sent. */
+  create?: () => Promise<ThreadSummary>;
   /** Deletes a conversation. Omit to hide the delete affordance's effect. */
   remove?: (id: string) => Promise<void>;
 }
@@ -130,10 +132,14 @@ export function ThreadPicker({
           </button>
           <div className="my-1 border-t border-border" />
           {loading && threads.length === 0 && (
-            <div className="px-3 py-1.5 text-xs text-muted-foreground">Loading…</div>
+            <div className="px-3 py-1.5 text-xs text-muted-foreground">
+              Loading…
+            </div>
           )}
           {threads.length === 0 && !loading && (
-            <div className="px-3 py-1.5 text-xs text-muted-foreground">No previous conversations</div>
+            <div className="px-3 py-1.5 text-xs text-muted-foreground">
+              No previous conversations
+            </div>
           )}
           {threads.map((t) => (
             <div

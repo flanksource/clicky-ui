@@ -17,9 +17,9 @@ export type HoverCardProps = {
   /** Show the directional arrow. */
   arrow?: boolean;
   /** Classes applied to the trigger wrapper. */
-  className?: string;
+  className?: string | undefined;
   /** Classes applied to the floating card. */
-  cardClassName?: string;
+  cardClassName?: string | undefined;
 };
 
 const GAP_PX = 6;

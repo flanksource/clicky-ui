@@ -1,14 +1,10 @@
-import type { ChatModel } from "../chat/types";
+import type { ChatModel, ChatModelRuntime } from "../chat/types";
 
-export type ModelRuntimeSelection = {
-  model?: string;
-  id?: string;
-  backend?: string;
-  effort?: string;
-  temperature?: number;
-  noCache?: boolean;
-  fallbacks?: ModelRuntimeSelection[];
-};
+// The selection a runtime control edits is exactly the wire value a catalog row
+// carries (`reconcileModelCapabilities` copies one onto the other), so it stays
+// one declaration — a field added to the catalog shape cannot drift out of the
+// editable shape.
+export type ModelRuntimeSelection = ChatModelRuntime;
 
 export function effortOptionsForModel(
   model: ChatModel | undefined,

@@ -86,13 +86,17 @@ export function parseServerTiming(
     if (!name) return [];
     let duration = 0;
     let description: string | undefined;
+    let durationSeen = false;
     for (const token of tokens.slice(1)) {
       const separator = token.indexOf("=");
       if (separator < 0) continue;
       const key = token.slice(0, separator).trim().toLowerCase();
       const value = decodeParameterValue(token.slice(separator + 1).trim());
-      if (key === "desc") description = value;
-      if (key === "dur") {
+      // Server-Timing keeps the first instance of a duplicated parameter name
+      // within one metric and ignores the rest.
+      if (key === "desc" && description === undefined) description = value;
+      if (key === "dur" && !durationSeen) {
+        durationSeen = true;
         const parsed = Number(value);
         if (Number.isFinite(parsed) && parsed >= 0) duration = parsed;
       }

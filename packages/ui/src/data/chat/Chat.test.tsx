@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { Chat } from "./Chat";
@@ -21,6 +21,33 @@ function recordingTransport(sendMessages = vi.fn()): ChatTransport<UIMessage> {
     sendMessages(options) {
       sendMessages(options);
       return Promise.resolve(completeTurn());
+    },
+    reconnectToStream() {
+      return Promise.resolve(null);
+    },
+  };
+}
+
+function approvalCompletionTransport(): ChatTransport<UIMessage> {
+  return {
+    sendMessages() {
+      return Promise.resolve(
+        new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            controller.enqueue({ type: "start" });
+            controller.enqueue({ type: "start-step" });
+            controller.enqueue({
+              type: "tool-output-available",
+              toolCallId: "call-account-1",
+              output: { updated: true },
+              dynamic: true,
+            });
+            controller.enqueue({ type: "finish-step" });
+            controller.enqueue({ type: "finish" });
+            controller.close();
+          },
+        }),
+      );
     },
     reconnectToStream() {
       return Promise.resolve(null);
@@ -53,7 +80,9 @@ describe("Chat initialPrompt", () => {
     );
 
     await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
-    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain("Fix this formula");
+    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain(
+      "Fix this formula",
+    );
     expect(onInitialPromptSent).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -144,5 +173,80 @@ describe("Chat context meter", () => {
     );
 
     expect(screen.getByLabelText("Context 0% used")).toBeInTheDocument();
+  });
+
+  it("shows the selected runtime execution mode", async () => {
+    const runtimeModel: ChatModel = {
+      ...RESOLVED_MODEL,
+      runtime: {
+        backend: "claude-agent",
+        mode: "agent",
+      },
+    };
+    render(
+      <Chat
+        models={[runtimeModel]}
+        modelsApi={null}
+        defaultModel={runtimeModel.id}
+        transport={recordingTransport()}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByLabelText("Context 0% used"));
+
+    expect(await screen.findByText("Mode")).toBeInTheDocument();
+    expect(screen.getByText("agent")).toBeInTheDocument();
+  });
+});
+
+describe("Chat live tool approval", () => {
+  it("posts the decision before updating the local approval state", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const initialMessages: UIMessage[] = [
+      {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [
+          {
+            type: "dynamic-tool",
+            toolCallId: "call-account-1",
+            toolName: "account_edit",
+            state: "approval-requested",
+            input: { id: "account-1" },
+            approval: { id: "call-account-1" },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={approvalCompletionTransport()}
+        threadId="thread-1"
+        approvalApi="/api/chat/threads"
+        initialMessages={initialMessages}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/chat/threads/thread-1/approvals/call-account-1",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ approved: true }),
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Approve" }),
+      ).not.toBeInTheDocument(),
+    );
+    fetchMock.mockRestore();
   });
 });

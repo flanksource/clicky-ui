@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type ComponentType,
-} from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
@@ -34,6 +29,8 @@ import {
   type StoredChatPreferences,
 } from "./ChatWindow.preferences";
 import { normalizeToolCatalog } from "./ChatWindow.tool-catalog";
+import { useChatThreadSetup } from "./ChatWindow.thread";
+import { ChatThreadSetupStatus } from "./ChatWindow.thread-status";
 import type { ChatWindowProps } from "./ChatWindow.types";
 export type {
   ChatContextPickerRenderProps,
@@ -70,6 +67,12 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } =
     useChatWindowManager();
+  const threadSetup = useChatThreadSetup({
+    threadId: panel.threadId,
+    api: threadsApi,
+    source: threadsSource,
+    onCreated: (threadId) => updatePanel(panel.id, { threadId }),
+  });
   const [Rnd, setRnd] = useState<ComponentType<RndProps> | null>(null);
   const [storedPrefs] = useState<StoredChatPreferences>(() =>
     loadChatPreferences(),
@@ -382,25 +385,29 @@ export function ChatWindow({
         </div>
       )}
       <div className="min-h-0 flex-1">
-        <Chat
-          {...chat}
-          {...(resolvedModels.length
-            ? { models: resolvedModels, modelsApi: null }
-            : {})}
-          {...(defaultModel ? { defaultModel } : {})}
-          {...(model ? { model } : {})}
-          reasoningEffort={reasoningEffort}
-          permissionMode={permissionMode}
-          onModelChange={handleModelChange}
-          onReasoningEffortChange={handleReasoningEffortChange}
-          {...(temperature !== undefined ? { temperature } : {})}
-          budget={budget}
-          onUsage={handleUsage}
-          {...(panel.threadId ? { threadId: panel.threadId } : {})}
-          body={mergedBody}
-          initialPrompt={initialPrompt}
-          onInitialPromptSent={handleInitialPromptSent}
-        />
+        {threadSetup.blocked ? (
+          <ChatThreadSetupStatus setup={threadSetup} />
+        ) : (
+          <Chat
+            {...chat}
+            {...(resolvedModels.length
+              ? { models: resolvedModels, modelsApi: null }
+              : {})}
+            {...(defaultModel ? { defaultModel } : {})}
+            {...(model ? { model } : {})}
+            reasoningEffort={reasoningEffort}
+            permissionMode={permissionMode}
+            onModelChange={handleModelChange}
+            onReasoningEffortChange={handleReasoningEffortChange}
+            {...(temperature !== undefined ? { temperature } : {})}
+            budget={budget}
+            onUsage={handleUsage}
+            {...(panel.threadId ? { threadId: panel.threadId } : {})}
+            body={mergedBody}
+            initialPrompt={initialPrompt}
+            onInitialPromptSent={handleInitialPromptSent}
+          />
+        )}
       </div>
     </div>
   );

@@ -160,6 +160,12 @@ export const Combo: Story = {
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
 
+    // Claude has no API mode: the segment stays visible but inert, worded the
+    // same way the segmented variant words it.
+    const api = within(menu).getByRole("radio", { name: "API" });
+    await expect(api).toBeDisabled();
+    await expect(api).toHaveAttribute("title", "not on Claude");
+
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("menu")).not.toBeInTheDocument();
   },
@@ -168,6 +174,9 @@ export const Combo: Story = {
 /** A hosted-API family the catalog does not describe keeps the Model segment;
  *  its menu offers the free-text entry alone. */
 export const NoModelsForFamily: Story = {
+  // Pinned: the free-text model entry these interactions drive belongs to the
+  // segmented variant; the combo variant renders no SpecInput.
+  args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory initial={{ backend: "gemini" }} variant={variant} />
   ),
@@ -185,6 +194,9 @@ export const NoModelsForFamily: Story = {
 };
 
 export const SwitchingFamilyKeepsTheMode: Story = {
+  // Pinned: the segment menus these interactions drive exist only in the
+  // segmented variant; the combo variant exposes radios behind one trigger.
+  args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory
       variant={variant}
@@ -209,6 +221,9 @@ export const SwitchingFamilyKeepsTheMode: Story = {
 };
 
 export const UnsupportedModesAreDisabled: Story = {
+  // Pinned: the disabled mode is a menuitem here and a radio in combo, which
+  // the Combo story asserts instead.
+  args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
   ),

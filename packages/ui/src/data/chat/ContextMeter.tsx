@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { compactTokens, formatCost } from "../../lib/tokens";
 import { UiCheck, UiCopy } from "../../icons";
@@ -65,6 +65,7 @@ export type ContextMeterProps = {
   className?: string | undefined;
 };
 
+const COPY_STATUS_RESET_MS = 2000;
 const GAUGE_RADIUS = 15;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
@@ -221,6 +222,15 @@ export function ContextMeter({
   const [copyResult, setCopyResult] = useState<
     { sessionId: string; status: "copied" | "failed" } | undefined
   >();
+  const copyResetTimer = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => {
+      if (copyResetTimer.current !== undefined) {
+        window.clearTimeout(copyResetTimer.current);
+      }
+    },
+    [],
+  );
   const pct = Math.min(100, Math.max(0, Math.round(usedPercent)));
   const totalTokens = tokens?.total ?? 0;
   const totalCost = cost?.total ?? 0;
@@ -230,14 +240,23 @@ export function ContextMeter({
     copyResult && copyResult.sessionId === sessionId
       ? copyResult.status
       : undefined;
+  // The status is transient feedback for the click that produced it — without
+  // this it would greet every later hover of the same session.
   const copySessionId = async () => {
     if (!sessionId) return;
+    if (copyResetTimer.current !== undefined) {
+      window.clearTimeout(copyResetTimer.current);
+    }
     try {
       await navigator.clipboard.writeText(sessionId);
       setCopyResult({ sessionId, status: "copied" });
     } catch {
       setCopyResult({ sessionId, status: "failed" });
     }
+    copyResetTimer.current = window.setTimeout(
+      () => setCopyResult(undefined),
+      COPY_STATUS_RESET_MS,
+    );
   };
 
   const trigger =

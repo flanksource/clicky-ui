@@ -27,6 +27,7 @@ export interface ChatModelRuntime {
   model?: string;
   id?: string;
   backend?: string;
+  mode?: string;
   temperature?: number;
   effort?: string;
   noCache?: boolean;
