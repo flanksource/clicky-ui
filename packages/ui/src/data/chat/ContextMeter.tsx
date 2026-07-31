@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { cn } from "../../lib/utils";
 import { compactTokens, formatCost } from "../../lib/tokens";
+import { UiCheck, UiCopy } from "../../icons";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { HoverCard } from "../../overlay/HoverCard";
 import {
@@ -45,6 +47,10 @@ export type ContextMeterProps = {
   windowTokens?: number | undefined;
   /** Message count shown in the popover (chat). */
   messageCount?: number | undefined;
+  /** Session identifier exposed as a click-to-copy value in the popover. */
+  sessionId?: string | undefined;
+  /** Runtime mechanism used to execute the session, such as api or cmux. */
+  executionMode?: string | undefined;
   /** Model id/label and its brand glyph. */
   model?: string | undefined;
   modelIcon?: StaticIconComponent | undefined;
@@ -192,14 +198,17 @@ function UsageTable({
 
 /** Unified context-window meter. Renders as a compact progress `bar` or a
  *  circular `gauge`; hovering or focusing it opens a popover with the model, the
- *  context-window breakdown, per-bucket token usage and the cost + budget
- *  detail. Domain-agnostic — callers feed plain numbers. */
+ *  copyable session id, execution mode, context-window breakdown, per-bucket
+ *  token usage and the cost + budget detail. Domain-agnostic — callers feed
+ *  plain values. */
 export function ContextMeter({
   mode = "bar",
   usedPercent,
   usedTokens,
   windowTokens,
   messageCount,
+  sessionId,
+  executionMode,
   model,
   modelIcon: Glyph,
   modelIconClassName,
@@ -209,11 +218,27 @@ export function ContextMeter({
   budget,
   className,
 }: ContextMeterProps) {
+  const [copyResult, setCopyResult] = useState<
+    { sessionId: string; status: "copied" | "failed" } | undefined
+  >();
   const pct = Math.min(100, Math.max(0, Math.round(usedPercent)));
   const totalTokens = tokens?.total ?? 0;
   const totalCost = cost?.total ?? 0;
   const EffortGlyph = effort ? effortLevelIcon(effort) : undefined;
   const effortColor = effort ? effortLevelColor(effort) : undefined;
+  const copyStatus =
+    copyResult && copyResult.sessionId === sessionId
+      ? copyResult.status
+      : undefined;
+  const copySessionId = async () => {
+    if (!sessionId) return;
+    try {
+      await navigator.clipboard.writeText(sessionId);
+      setCopyResult({ sessionId, status: "copied" });
+    } catch {
+      setCopyResult({ sessionId, status: "failed" });
+    }
+  };
 
   const trigger =
     mode === "gauge" ? (
@@ -299,7 +324,12 @@ export function ContextMeter({
     );
 
   return (
-    <HoverCard trigger={trigger} placement="bottom" cardClassName="w-72 p-3">
+    <HoverCard
+      trigger={trigger}
+      placement="bottom"
+      delay={200}
+      cardClassName="w-72 p-3"
+    >
       <div className="space-y-2.5 text-xs">
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">Context usage</span>
@@ -334,6 +364,39 @@ export function ContextMeter({
                 {effortLevelLabel(effort)} effort
               </span>
             ) : null}
+          </div>
+        )}
+
+        {(sessionId || executionMode) && (
+          <div className="space-y-1.5 border-b border-border pb-2">
+            {sessionId ? (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Session</span>
+                <button
+                  type="button"
+                  aria-label={
+                    copyStatus === "copied"
+                      ? "Session ID copied"
+                      : copyStatus === "failed"
+                        ? "Session ID copy failed"
+                        : "Copy session ID"
+                  }
+                  title={sessionId}
+                  className={cn(
+                    "flex min-w-0 max-w-48 items-center gap-1.5 font-medium hover:text-foreground",
+                    copyStatus === "failed" && "text-destructive",
+                  )}
+                  onClick={() => void copySessionId()}
+                >
+                  <span className="truncate font-mono">{sessionId}</span>
+                  <Icon
+                    icon={copyStatus === "copied" ? UiCheck : UiCopy}
+                    className="size-3.5 shrink-0"
+                  />
+                </button>
+              </div>
+            ) : null}
+            {executionMode ? <Row label="Mode" value={executionMode} /> : null}
           </div>
         )}
 

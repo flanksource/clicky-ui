@@ -125,6 +125,11 @@ export {
   type ValidPromptSpecDetail,
 } from "./PromptPicker";
 export { PromptRunEditor, type PromptRunEditorProps } from "./PromptRunEditor";
+export type {
+  AIPromptRunSpec,
+  AIPromptRunValue,
+  AISpecRuntimeModel,
+} from "./PromptRunEditor/model";
 export {
   effortOptionsForModel,
   reconcileModelCapabilities,

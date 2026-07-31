@@ -3,6 +3,10 @@ import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import { costTotal, tokenTotal } from "./session-cost";
 import type { SessionMetadataSummary } from "./SessionViewer.model";
 
+function hasContextMeterMetadata(metadata: SessionMetadataSummary) {
+  return Boolean(metadata.context || metadata.sessionId || metadata.model);
+}
+
 export function SessionContextMeter({
   metadata,
   mode,
@@ -10,7 +14,8 @@ export function SessionContextMeter({
   metadata: SessionMetadataSummary;
   mode: ContextMeterMode;
 }) {
-  if (!metadata.context) return null;
+  if (!hasContextMeterMetadata(metadata)) return null;
+  const context = metadata.context;
   const modelIcon = metadata.provider
     ? providerIcon(metadata.provider)
     : undefined;
@@ -18,11 +23,21 @@ export function SessionContextMeter({
   return (
     <ContextMeter
       mode={mode}
-      usedPercent={100 - metadata.context.freePercent}
-      usedTokens={metadata.context.usedTokens}
-      windowTokens={metadata.context.windowTokens}
-      model={metadata.model}
-      effort={metadata.reasoningEffort}
+      usedPercent={context ? 100 - context.freePercent : 0}
+      {...(context
+        ? {
+            usedTokens: context.usedTokens,
+            windowTokens: context.windowTokens,
+          }
+        : {})}
+      {...(metadata.sessionId ? { sessionId: metadata.sessionId } : {})}
+      {...(metadata.executionMode
+        ? { executionMode: metadata.executionMode }
+        : {})}
+      {...(metadata.model ? { model: metadata.model } : {})}
+      {...(metadata.reasoningEffort
+        ? { effort: metadata.reasoningEffort }
+        : {})}
       {...(modelIcon ? { modelIcon } : {})}
       {...(metadata.provider
         ? {
@@ -83,8 +98,9 @@ export function SessionMetadataBadges({
       ? [{ key: "events", label: countLabel(metadata.events.length, "event") }]
       : []),
   ];
-  if (badges.length === 0 && (!showContextMeter || !metadata.context))
-    return null;
+  const renderContextMeter =
+    showContextMeter && hasContextMeterMetadata(metadata);
+  if (badges.length === 0 && !renderContextMeter) return null;
 
   return (
     <>
@@ -97,7 +113,7 @@ export function SessionMetadataBadges({
           <span className="truncate">{badge.label}</span>
         </span>
       ))}
-      {showContextMeter ? (
+      {renderContextMeter ? (
         <SessionContextMeter metadata={metadata} mode="bar" />
       ) : null}
     </>

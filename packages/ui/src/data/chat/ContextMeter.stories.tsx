@@ -11,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The unified context-window meter. `mode="bar"` (SessionViewer header) and `mode="gauge"` (chat toolbar) share one hover popover: model, context-window breakdown, per-bucket token usage and cost + budget. Domain-agnostic — callers feed plain numbers.',
+          'The unified context-window meter. `mode="bar"` (SessionViewer header) and `mode="gauge"` (chat toolbar) share one hover popover: model, copyable session id, execution mode, context-window breakdown, per-bucket token usage and cost + budget. Domain-agnostic — callers feed plain values.',
       },
     },
   },
@@ -34,6 +34,8 @@ const RICH = {
   usedTokens: 148_000,
   windowTokens: 200_000,
   messageCount: 32,
+  sessionId: "session-01JZQX7TXAXQM0RHD7XCGBF8F0",
+  executionMode: "cmux",
   model: "claude-opus-4-8",
   modelIcon: providerIcon("anthropic"),
   effort: "high",
@@ -66,6 +68,10 @@ export const Bar: Story = {
       expect(body.getByText("claude-opus-4-8")).toBeInTheDocument(),
     );
     await expect(body.getByText("High effort")).toBeInTheDocument();
+    await expect(body.getByText("cmux")).toBeInTheDocument();
+    await expect(
+      body.getByRole("button", { name: "Copy session ID" }),
+    ).toBeInTheDocument();
     // Tokens + Cost merged into one table: the Output bucket shows both cells.
     await expect(body.getByText("Output")).toBeInTheDocument();
     await expect(body.getByText("18k")).toBeInTheDocument();

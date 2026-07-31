@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
-import { DropdownMenu, type DropdownMenuItem } from "../../overlay/DropdownMenu";
+import {
+  DropdownMenu,
+  type DropdownMenuItem,
+} from "../../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
   DEFAULT_REASONING_EFFORTS,
@@ -9,12 +12,17 @@ import {
   effortLevelIcon,
   effortLevelLabel,
 } from "../chat/effort-icons";
-import { providerIcon, providerIconColor } from "../chat/provider-icons";
+import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
+import { runtimeFamilyBrand, runtimeModelMatches } from "./RuntimeBar.model";
+import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { SpecInput } from "./SpecRuntimeEditor/fields";
 import { withOptionalRoot, withRoot } from "./SpecRuntimeEditor/update";
-import { effortOptionsForModel, reconcileModelCapabilities } from "./model-capabilities";
+import {
+  effortOptionsForModel,
+  reconcileModelCapabilities,
+} from "./model-capabilities";
 import {
   SPEC_RUNTIME_FAMILIES,
   backendForFamilyMode,
@@ -30,6 +38,8 @@ import {
 export type RuntimeBarProps = {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
+  /** `segmented` uses field triggers; `combo` uses one direct-edit menu. */
+  variant?: "combo" | "segmented";
   /** Model catalog. Only the selected family's models are listed; a family the
    *  catalog does not describe is served by the segment's free-text entry. */
   models?: ChatModel[] | undefined;
@@ -40,19 +50,11 @@ export type RuntimeBarProps = {
   className?: string | undefined;
 };
 
-/**
- * The runtime as one self-describing row: family, mode, model and reasoning
- * effort as four menu segments in a single bordered bar. Each segment carries
- * its own value, so the bar needs no field labels above it and its width tracks
- * the content instead of the form grid. Unsupported combinations (a mode the
- * family lacks, an effort the model rejects) stay in place and disabled, so the
- * constraint reads before it is hit. The Model segment is always present — a
- * family with no catalog models is typed into the menu's free-text entry rather
- * than pushed out into a separate field.
- */
+/** Self-describing runtime controls with segmented and combo presentations. */
 export function RuntimeBar({
   value,
   onChange,
+  variant = "segmented",
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
@@ -62,24 +64,76 @@ export function RuntimeBar({
   const selection = selectionForBackend(families, value.backend);
   const family = familyById(families, selection.family);
   const mode =
-    family.modes.find((entry) => entry.id === selection.mode) ?? firstMode(family);
+    family.modes.find((entry) => entry.id === selection.mode) ??
+    firstMode(family);
   const modelOptions = modelsForFamily(models, family, value.backend);
-  const selectedModel = models.find((entry) => entry.id === value.model);
-  const supportedEfforts = effortOptionsForModel(selectedModel, reasoningEfforts);
+  const selectedModel = models.find(
+    (entry) =>
+      entry.runtime?.backend === value.backend &&
+      runtimeModelMatches(entry, value),
+  );
+  const resolvedModel =
+    selectedModel ?? models.find((entry) => runtimeModelMatches(entry, value));
+  const supportedEfforts = effortOptionsForModel(
+    resolvedModel,
+    reasoningEfforts,
+  );
 
   const applyBackend = (familyId: string, modeId: string) => {
     const backend = backendForFamilyMode(families, familyId, modeId);
     if (backend === (value.backend ?? "")) return;
     // A backend switch invalidates the previous backend's cmux CLI-arg values.
-    let next = withOptionalRoot(withRoot(value, { backend }), "cliArgs", undefined);
-    if (!modelBelongsToFamily(value.model, models, familyById(families, familyId), backend)) {
+    let next = withOptionalRoot(
+      withRoot(value, { backend }),
+      "cliArgs",
+      undefined,
+    );
+    if (
+      !modelBelongsToFamily(
+        value.model,
+        models,
+        familyById(families, familyId),
+        backend,
+      )
+    ) {
       next = withOptionalRoot(next, "model", undefined);
     }
     onChange(next);
   };
 
-  const brand = familyBrand(family);
-  const modelLabel = selectedModel?.label ?? value.model ?? "Default";
+  const applyCustomModel = (model: string) =>
+    onChange(withOptionalRoot(value, "model", model));
+  const applyModel = (model: ChatModel) =>
+    onChange(reconcileModelCapabilities(value, model, reasoningEfforts));
+  const clearModel = () =>
+    onChange(withOptionalRoot(value, "model", undefined));
+  const applyEffort = (effort: string) =>
+    onChange(withOptionalRoot(value, "effort", effort));
+
+  if (variant === "combo") {
+    return (
+      <RuntimeBarCombo
+        value={value}
+        families={families}
+        family={family}
+        mode={mode}
+        selectedMode={selection.mode}
+        models={modelOptions}
+        selectedModel={resolvedModel}
+        supportedEfforts={supportedEfforts}
+        ariaLabel={ariaLabel}
+        className={className}
+        onFamilyChange={(familyId) => applyBackend(familyId, selection.mode)}
+        onModeChange={(modeId) => applyBackend(family.id, modeId)}
+        onModelSelect={applyModel}
+        onModelClear={clearModel}
+        onEffortChange={applyEffort}
+      />
+    );
+  }
+
+  const brand = runtimeFamilyBrand(family);
+  const modelLabel = resolvedModel?.label ?? value.model ?? "Default";
 
   return (
     <div
@@ -105,7 +159,10 @@ export function RuntimeBar({
         })}
       >
         {brand.icon && (
-          <Icon icon={brand.icon} className={cn("size-4 shrink-0", brand.color)} />
+          <Icon
+            icon={brand.icon}
+            className={cn("size-4 shrink-0", brand.color)}
+          />
         )}
         <span className={CAPTION_CLASS}>{family.label}</span>
       </RuntimeSegment>
@@ -120,20 +177,25 @@ export function RuntimeBar({
         })}
       >
         {mode.icon && (
-          <Icon icon={mode.icon} className="size-4 shrink-0 text-muted-foreground" />
+          <Icon
+            icon={mode.icon}
+            className="size-4 shrink-0 text-muted-foreground"
+          />
         )}
         <span className={CAPTION_CLASS}>{mode.label}</span>
       </RuntimeSegment>
       <RuntimeSegment
         menuLabel="Model"
-        title={value.model ? `Model — ${value.model}` : "Model — prompt default"}
+        title={
+          value.model ? `Model — ${value.model}` : "Model — prompt default"
+        }
         className="min-w-0 max-w-56"
         header={
           <div className="grid gap-1">
             <span className={KEY_CLASS}>Model id</span>
             <SpecInput
               value={value.model}
-              onChange={(model) => onChange(withOptionalRoot(value, "model", model))}
+              onChange={applyCustomModel}
               ariaLabel="Model id"
               mono
             />
@@ -142,16 +204,9 @@ export function RuntimeBar({
         items={modelItems({
           models: modelOptions,
           group: `${family.label} models`,
-          selectedId: value.model,
-          onSelect: (model) =>
-            onChange(
-              reconcileModelCapabilities(
-                value,
-                models.find((entry) => entry.id === model),
-                reasoningEfforts,
-              ),
-            ),
-          onClear: () => onChange(withOptionalRoot(value, "model", undefined)),
+          selectedId: resolvedModel?.id ?? value.model,
+          onSelect: applyModel,
+          onClear: clearModel,
         })}
       >
         <span className="min-w-0 truncate font-mono text-xs text-foreground">
@@ -163,10 +218,14 @@ export function RuntimeBar({
           menuLabel="Reasoning effort"
           title="Reasoning effort"
           items={effortItems({
-            offered: effortUniverse(reasoningEfforts, supportedEfforts, value.effort),
+            offered: effortUniverse(
+              reasoningEfforts,
+              supportedEfforts,
+              value.effort,
+            ),
             supported: supportedEfforts,
             selected: value.effort,
-            onSelect: (effort) => onChange(withOptionalRoot(value, "effort", effort)),
+            onSelect: applyEffort,
           })}
         >
           <span className={KEY_CLASS}>Effort</span>
@@ -230,7 +289,10 @@ function EffortGlyph({ effort }: { effort?: string | undefined }) {
   return (
     <Icon
       icon={glyph}
-      className={cn("size-4 shrink-0", effort ? effortLevelColor(effort) : undefined)}
+      className={cn(
+        "size-4 shrink-0",
+        effort ? effortLevelColor(effort) : undefined,
+      )}
     />
   );
 }
@@ -263,11 +325,16 @@ function itemLabel({
         )}
       </span>
       {hint && !stacked && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">{hint}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {hint}
+        </span>
       )}
       <Icon
         icon={UiCheck}
-        className={cn("size-3.5 shrink-0 text-primary", !selected && "invisible")}
+        className={cn(
+          "size-3.5 shrink-0 text-primary",
+          !selected && "invisible",
+        )}
       />
     </>
   );
@@ -285,7 +352,7 @@ function familyItems({
   onSelect: (familyId: string) => void;
 }): DropdownMenuItem[] {
   return families.map((family) => {
-    const brand = familyBrand(family);
+    const brand = runtimeFamilyBrand(family);
     const count = modelsForFamily(models, family).length;
     return {
       group: "Family",
@@ -298,17 +365,6 @@ function familyItems({
       onSelect: () => onSelect(family.id),
     };
   });
-}
-
-// Families key their brand mark off the family id ("claude"), falling back to
-// the catalog provider ("googleai"); the raw backend provider ("claude-agent")
-// is not a brand.
-function familyBrand(family: SpecRuntimeFamily): {
-  icon: StaticIconComponent | undefined;
-  color: string | undefined;
-} {
-  const key = providerIcon(family.id) ? family.id : family.provider;
-  return { icon: providerIcon(key), color: providerIconColor(key) };
 }
 
 function modeItems({
@@ -350,7 +406,7 @@ function modelItems({
   models: ChatModel[];
   group: string;
   selectedId?: string | undefined;
-  onSelect: (modelId: string) => void;
+  onSelect: (model: ChatModel) => void;
   onClear: () => void;
 }): DropdownMenuItem[] {
   const clear: DropdownMenuItem = {
@@ -365,7 +421,9 @@ function modelItems({
   return [
     clear,
     ...models.map((model) => {
-      const glyph: StaticIconComponent | undefined = providerIcon(model.provider);
+      const glyph: StaticIconComponent | undefined = providerIcon(
+        model.provider,
+      );
       return {
         group,
         label: itemLabel({
@@ -376,7 +434,7 @@ function modelItems({
         }),
         ...(glyph ? { icon: glyph } : {}),
         disabled: model.configured === false,
-        onSelect: () => onSelect(model.id),
+        onSelect: () => onSelect(model),
       };
     }),
   ];
@@ -396,7 +454,11 @@ function effortItems({
   const current = selected?.trim() ?? "";
   const none: DropdownMenuItem = {
     group: "Reasoning effort",
-    label: itemLabel({ text: "None", hint: "single pass", selected: current === "" }),
+    label: itemLabel({
+      text: "None",
+      hint: "single pass",
+      selected: current === "",
+    }),
     onSelect: () => onSelect(""),
   };
   return [

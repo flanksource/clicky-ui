@@ -2,8 +2,12 @@ import type { ChatModel } from "../chat/types";
 
 export type ModelRuntimeSelection = {
   model?: string;
+  id?: string;
+  backend?: string;
   effort?: string;
   temperature?: number;
+  noCache?: boolean;
+  fallbacks?: ModelRuntimeSelection[];
 };
 
 export function effortOptionsForModel(
@@ -21,7 +25,18 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
   fallbackEfforts: readonly string[],
 ): T {
   const next = { ...value } as ModelRuntimeSelection;
-  if (model) next.model = model.id;
+  if (model?.runtime) {
+    delete next.model;
+    delete next.id;
+    delete next.backend;
+    delete next.temperature;
+    delete next.effort;
+    delete next.noCache;
+    delete next.fallbacks;
+    Object.assign(next, model.runtime);
+  } else if (model) {
+    next.model = model.id;
+  }
 
   const efforts = effortOptionsForModel(model, fallbackEfforts);
   if (model?.capabilitiesKnown && efforts.length === 0) {

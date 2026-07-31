@@ -68,6 +68,7 @@ describe("normalizeSession (unified messages)", () => {
   it("accepts a full unified session object and preserves session metadata separately", () => {
     const session: UnifiedSessionInput = {
       id: "s1",
+      executionMode: "agent",
       messages,
       turns: [{ id: "turn-1", index: 1, messageIds: ["u1", "a1"] }],
       capabilities: {
@@ -85,6 +86,8 @@ describe("normalizeSession (unified messages)", () => {
       normalizeSession(messages).map((e) => e.kind),
     );
     expect(getSessionMetadata(session)).toMatchObject({
+      sessionId: "s1",
+      executionMode: "agent",
       turns: [{ id: "turn-1" }],
       capabilities: { tools: ["Read", "Bash"], skills: ["gavel-runner"] },
       budget: { used: 1.25, total: 5 },

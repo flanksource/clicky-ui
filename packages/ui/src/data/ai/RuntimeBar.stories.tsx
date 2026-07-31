@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import type { ChatModel } from "../chat/types";
-import { RuntimeBar } from "./RuntimeBar";
+import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 
 // A catalog wide enough for every segment to have somewhere to go: agent/CLI
@@ -42,11 +42,22 @@ const MODELS: ChatModel[] = [
   },
 ];
 
-function RuntimeBarStory({ initial }: { initial: AISpecRuntimeValue }) {
+function RuntimeBarStory({
+  initial,
+  variant = "segmented",
+}: {
+  initial: AISpecRuntimeValue;
+  variant?: RuntimeBarProps["variant"];
+}) {
   const [value, setValue] = useState<AISpecRuntimeValue>(initial);
   return (
     <div className="grid max-w-3xl gap-4 p-6">
-      <RuntimeBar value={value} onChange={setValue} models={MODELS} />
+      <RuntimeBar
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        variant={variant}
+      />
       <pre className="rounded-md border border-border bg-muted/30 p-3 font-mono text-xs text-muted-foreground">
         {JSON.stringify(value, null, 2)}
       </pre>
@@ -58,16 +69,27 @@ const meta = {
   title: "AI/RuntimeBar",
   component: RuntimeBar,
   tags: ["autodocs"],
+  argTypes: {
+    variant: {
+      control: "inline-radio",
+      options: ["segmented", "combo"],
+    },
+  },
+  args: {
+    variant: "segmented",
+  },
   parameters: {
     layout: "fullscreen",
     docs: {
       description: {
         component:
-          "The runtime as one self-describing row. Family, mode, model and reasoning effort each open their own menu; every segment shows its current value, so the bar needs no field labels above it. Switching family keeps the current mode when the new family has it and drops a model the new provider cannot run. Unsupported modes and efforts stay listed but disabled, with the reason as a hint. The Model segment is always present: it lists the selected family's catalog models and carries a free-text entry for a family the catalog does not describe, so the model never leaves the bar.",
+          "The runtime as one self-describing control. The default segmented variant gives family, mode, model and reasoning effort their own menu triggers. The combo variant condenses the same values into one summary trigger and exposes direct controls in a single dropdown. Switching family keeps the current mode when the new family has it and drops a model the new provider cannot run. Unsupported modes and efforts stay visible but disabled, and the model can always be entered directly when the catalog does not describe it.",
       },
     },
   },
-  render: () => <RuntimeBarStory initial={{ backend: "claude-agent" }} />,
+  render: ({ variant }) => (
+    <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
+  ),
 } satisfies Meta<typeof RuntimeBar>;
 
 export default meta;
@@ -76,8 +98,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const WithModelAndEffort: Story = {
-  render: () => (
+  render: ({ variant }) => (
     <RuntimeBarStory
+      variant={variant}
       initial={{
         backend: "codex-cli",
         model: "codex-cli/gpt-5-codex",
@@ -87,10 +110,67 @@ export const WithModelAndEffort: Story = {
   ),
 };
 
+export const Combo: Story = {
+  args: {
+    variant: "combo",
+  },
+  render: ({ variant }) => (
+    <RuntimeBarStory
+      variant={variant}
+      initial={{
+        backend: "codex-cli",
+        model: "codex-cli/gpt-5-codex",
+        effort: "high",
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    const trigger = canvas.getByRole("button", {
+      name: "Runtime: Codex, CLI, GPT-5 Codex, effort High",
+    });
+
+    await userEvent.click(trigger);
+
+    const menu = await body.findByRole("menu");
+    await expect(
+      within(menu).getByRole("radiogroup", { name: "Family" }),
+    ).toBeInTheDocument();
+    await expect(
+      within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
+    ).toBeInTheDocument();
+    await expect(
+      within(menu).getByRole("slider", { name: "Reasoning effort" }),
+    ).toHaveAttribute("aria-valuetext", "High");
+    await expect(
+      within(menu).queryByLabelText("Model id"),
+    ).not.toBeInTheDocument();
+    const modelChoice = within(menu).getByRole("button", {
+      name: "GPT-5 Codex",
+    });
+    await expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5-codex");
+    await expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5-codex");
+
+    await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
+    await expect(
+      canvas.getByRole("button", {
+        name: "Runtime: Claude, CLI, Prompt default, effort High",
+      }),
+    ).toBeInTheDocument();
+    await expect(body.getByRole("menu")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    await expect(body.queryByRole("menu")).not.toBeInTheDocument();
+  },
+};
+
 /** A hosted-API family the catalog does not describe keeps the Model segment;
  *  its menu offers the free-text entry alone. */
 export const NoModelsForFamily: Story = {
-  render: () => <RuntimeBarStory initial={{ backend: "gemini" }} />,
+  render: ({ variant }) => (
+    <RuntimeBarStory initial={{ backend: "gemini" }} variant={variant} />
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -105,8 +185,9 @@ export const NoModelsForFamily: Story = {
 };
 
 export const SwitchingFamilyKeepsTheMode: Story = {
-  render: () => (
+  render: ({ variant }) => (
     <RuntimeBarStory
+      variant={variant}
       initial={{ backend: "claude-cli", model: "claude-agent/claude-opus-4-1" }}
     />
   ),
@@ -128,7 +209,9 @@ export const SwitchingFamilyKeepsTheMode: Story = {
 };
 
 export const UnsupportedModesAreDisabled: Story = {
-  render: () => <RuntimeBarStory initial={{ backend: "claude-agent" }} />,
+  render: ({ variant }) => (
+    <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
