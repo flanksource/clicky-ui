@@ -23,10 +23,22 @@ export type {
 
 /** A selectable chat model, as served by the backend's GET /api/chat/models.
  *  `configured` is false for catalogued models whose provider has no API key. */
+export interface ChatModelRuntime {
+  model?: string;
+  id?: string;
+  backend?: string;
+  temperature?: number;
+  effort?: string;
+  noCache?: boolean;
+  fallbacks?: ChatModelRuntime[];
+}
+
 export interface ChatModel {
   id: string;
   provider: string;
   label: string;
+  /** Exact Captain Model wire value submitted when this display row is selected. */
+  runtime?: ChatModelRuntime;
   reasoning: boolean;
   /** True when backend metadata is authoritative, including explicit unsupported values. */
   capabilitiesKnown?: boolean;

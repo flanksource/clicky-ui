@@ -193,6 +193,7 @@ export interface SessionLiveProcess {
 export interface UnifiedSessionInput {
   id?: string;
   source?: string;
+  executionMode?: string;
   project?: string;
   cwd?: string;
   slug?: string;

@@ -194,6 +194,7 @@ export function Chat({
   bodyRef.current = {
     ...body,
     ...(model ? { model } : {}),
+    ...(selectedModel?.runtime ? { runtime: selectedModel.runtime } : {}),
     ...(effort ? { reasoningEffort: effort } : {}),
     ...(temperature !== undefined ? { temperature } : {}),
     ...(budget && (budget.cost !== undefined || budget.maxTokens !== undefined)
@@ -260,33 +261,56 @@ export function Chat({
   };
 
   const ModelGlyph = providerIcon(selectedModel?.provider);
-  const toolbar = models.length > 0 || showEffort || (usage && usage.maxTokens > 0) ? (
-    <div className="flex flex-1 items-center gap-2">
-      <ModelSelector models={models} value={model} onChange={onModelSelect} />
-      {showEffort && (
-        <EffortSelector efforts={reasoningEfforts} value={effort} onChange={onEffortSelect} />
-      )}
-      {usage && usage.maxTokens > 0 && (
-        <>
-          <div className="flex-1" />
-          <ContextMeter
-            mode="gauge"
-            usedPercent={Math.round((usage.usedTokens / usage.maxTokens) * 100)}
-            usedTokens={usage.usedTokens}
-            windowTokens={usage.maxTokens}
-            {...(usage.messageCount != null ? { messageCount: usage.messageCount } : {})}
-            {...(usage.cost != null ? { cost: { total: usage.cost } } : {})}
-            {...(usage.modelLabel ? { model: usage.modelLabel } : {})}
-            {...(effort ? { effort } : {})}
-            {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
-            {...(selectedModel?.provider
-              ? { modelIconClassName: providerIconColor(selectedModel.provider) }
-              : {})}
+  const contextWindow = selectedModel?.contextWindow ?? usage?.maxTokens ?? 0;
+  const usedTokens = usage?.usedTokens ?? 0;
+  const showContextMeter = Boolean(threadId || selectedModel || usage);
+  const toolbar =
+    models.length > 0 || showEffort || showContextMeter ? (
+      <div className="flex flex-1 items-center gap-2">
+        <ModelSelector models={models} value={model} onChange={onModelSelect} />
+        {showEffort && (
+          <EffortSelector
+            efforts={reasoningEfforts}
+            value={effort}
+            onChange={onEffortSelect}
           />
-        </>
-      )}
-    </div>
-  ) : undefined;
+        )}
+        {showContextMeter && (
+          <>
+            <div className="flex-1" />
+            <ContextMeter
+              mode="gauge"
+              usedPercent={
+                contextWindow > 0
+                  ? Math.round((usedTokens / contextWindow) * 100)
+                  : 0
+              }
+              usedTokens={usedTokens}
+              {...(contextWindow > 0 ? { windowTokens: contextWindow } : {})}
+              {...(usage?.messageCount != null
+                ? { messageCount: usage.messageCount }
+                : {})}
+              {...(usage?.cost != null ? { cost: { total: usage.cost } } : {})}
+              {...(threadId ? { sessionId: threadId } : {})}
+              {...(selectedModel?.label
+                ? { model: selectedModel.label }
+                : usage?.modelLabel
+                  ? { model: usage.modelLabel }
+                  : {})}
+              {...(effort ? { effort } : {})}
+              {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
+              {...(selectedModel?.provider
+                ? {
+                    modelIconClassName: providerIconColor(
+                      selectedModel.provider,
+                    ),
+                  }
+                : {})}
+            />
+          </>
+        )}
+      </div>
+    ) : undefined;
 
   const empty = (messages.length === 0 && (emptyState || suggestions?.length)) ? (
     <div className="flex flex-col items-center gap-4">

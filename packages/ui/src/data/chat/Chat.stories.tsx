@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Chat } from "./Chat";
 import {
   mockChatTransport,
@@ -16,7 +17,7 @@ const meta: Meta<typeof Chat> = {
     docs: {
       description: {
         component:
-          "Self-contained AI chat over the Vercel AI SDK v6 UI Message Stream protocol. Streams assistant markdown and renders clicky operation tool-calls (args → result). The footer toolbar has a strict model picker (with provider brand icons), a strict reasoning-effort picker, and a token/cost gauge that appears once the first reply lands. The backend owns model selection + tool execution; these stories drive a mock transport.",
+          "Self-contained AI chat over the Vercel AI SDK v6 UI Message Stream protocol. Streams assistant markdown and renders clicky operation tool-calls (args → result). The footer toolbar has a strict model picker (with provider brand icons), a strict reasoning-effort picker, and a context gauge that appears as soon as session or model metadata resolves, then fills as usage arrives. The backend owns model selection + tool execution; these stories drive a mock transport.",
       },
     },
   },
@@ -73,6 +74,16 @@ export const WithModelSelector: Story = {
       />
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const meter = canvas.getByLabelText("Context 0% used");
+    await userEvent.hover(meter);
+    const body = within(document.body);
+    await waitFor(() => expect(body.getByRole("tooltip")).toBeInTheDocument());
+    await expect(
+      within(body.getByRole("tooltip")).getByText("Claude Sonnet 4.5"),
+    ).toBeInTheDocument();
+  },
 };
 
 export const Reasoning: Story = {

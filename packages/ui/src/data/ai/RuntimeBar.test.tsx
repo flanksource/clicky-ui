@@ -32,6 +32,98 @@ function openSegment(title: string) {
 }
 
 describe("RuntimeBar", () => {
+  it("renders the combo summary and direct runtime controls", () => {
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{
+          backend: "codex-cli",
+          model: "codex-cli/gpt-5",
+          effort: "high",
+        }}
+        onChange={vi.fn()}
+        models={MODELS}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Runtime: Codex, CLI, GPT-5, effort High",
+    });
+    expect(trigger).toHaveTextContent("GPT-5");
+    expect(trigger.querySelectorAll("svg")).toHaveLength(4);
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveAttribute("aria-label", "Runtime controls");
+    expect(
+      within(menu).getByRole("radiogroup", { name: "Family" }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
+    ).toBeInTheDocument();
+    expect(within(menu).queryByLabelText("Model id")).not.toBeInTheDocument();
+    const modelChoice = within(menu).getByRole("button", {
+      name: "GPT-5",
+    });
+    expect(modelChoice).toBeInTheDocument();
+    expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5");
+    expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5");
+    expect(modelChoice.querySelectorAll("svg")).toHaveLength(2);
+    expect(
+      within(menu).getByRole("slider", { name: "Reasoning effort" }),
+    ).toHaveAttribute("aria-valuetext", "High");
+  });
+
+  it("updates combo fields without closing the runtime menu", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{
+          backend: "codex-cli",
+          model: "codex-cli/gpt-5",
+          effort: "high",
+        }}
+        onChange={onChange}
+        models={MODELS}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Runtime: Codex, CLI, GPT-5, effort High",
+      }),
+    );
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveAttribute("aria-label", "Runtime controls");
+
+    fireEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "claude-cli",
+      effort: "high",
+    });
+    expect(menu).toBeInTheDocument();
+
+    fireEvent.click(within(menu).getByRole("radio", { name: "cmux" }));
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cmux",
+      model: "codex-cli/gpt-5",
+      effort: "high",
+    });
+    expect(menu).toBeInTheDocument();
+
+    fireEvent.change(
+      within(menu).getByRole("slider", { name: "Reasoning effort" }),
+      { target: { value: "1" } },
+    );
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cli",
+      model: "codex-cli/gpt-5",
+      effort: "low",
+    });
+    expect(menu).toBeInTheDocument();
+  });
+
   it("keeps the current mode when the new family supports it", () => {
     const onChange = vi.fn();
     render(
@@ -104,13 +196,17 @@ describe("RuntimeBar", () => {
   it("keeps the model segment when the catalog has none for the family", () => {
     const onChange = vi.fn();
     render(
-      <RuntimeBar value={{ backend: "gemini" }} onChange={onChange} models={MODELS} />,
+      <RuntimeBar
+        value={{ backend: "gemini" }}
+        onChange={onChange}
+        models={MODELS}
+      />,
     );
 
     openSegment("Model — prompt default");
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Prompt defaultno override",
-    ]);
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Prompt defaultno override"]);
 
     fireEvent.change(screen.getByLabelText("Model id"), {
       target: { value: "gemini-3-pro" },
@@ -145,6 +241,40 @@ describe("RuntimeBar", () => {
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cli",
       model: "codex-cli/gpt-5",
+      effort: "medium",
+    });
+  });
+
+  it("selects the catalog's canonical Captain runtime value", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        value={{ backend: "anthropic" }}
+        onChange={onChange}
+        models={[
+          {
+            id: "anthropic/claude-sonnet-4-6",
+            provider: "anthropic",
+            label: "Sonnet 4.6",
+            reasoning: true,
+            configured: true,
+            runtime: {
+              model: "claude-sonnet-4-6",
+              id: "anthropic/claude-sonnet-4-6",
+              backend: "anthropic",
+            },
+          },
+        ]}
+      />,
+    );
+
+    openSegment("Model — prompt default");
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Sonnet 4.6/ }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      model: "claude-sonnet-4-6",
+      id: "anthropic/claude-sonnet-4-6",
+      backend: "anthropic",
       effort: "medium",
     });
   });

@@ -1,5 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ContextMeter } from "./ContextMeter";
 import { effortLevelColor } from "./effort-icons";
 import { providerIcon, providerIconColor } from "./provider-icons";
@@ -98,6 +104,58 @@ describe("ContextMeter", () => {
         icon.classList.contains("text-[#C15F3C]"),
       ),
     ).toHaveLength(2);
+  });
+
+  it("shows the execution mode and copies the full session id", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(
+      <ContextMeter
+        mode="gauge"
+        usedPercent={42}
+        sessionId="session-01JZQX7TXAXQM0RHD7XCGBF8F0"
+        executionMode="cmux"
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByLabelText("Context 42% used"));
+
+    expect(await screen.findByText("Mode")).toBeInTheDocument();
+    expect(screen.getByText("cmux")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Copy session ID" }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        "session-01JZQX7TXAXQM0RHD7XCGBF8F0",
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: "Session ID copied" }),
+    ).toBeInTheDocument();
+  });
+
+  it("waits 200ms before opening the hover card", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <ContextMeter mode="gauge" usedPercent={42} model="model-1" />,
+      );
+
+      fireEvent.mouseEnter(screen.getByLabelText("Context 42% used"));
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(199));
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole("tooltip")).toBeInTheDocument();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows unknown effort metadata without a known icon or tone", async () => {

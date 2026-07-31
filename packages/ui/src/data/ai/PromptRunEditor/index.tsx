@@ -2,11 +2,10 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/button";
 import { JsonSchemaForm } from "../../../components/JsonSchemaForm";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
-import { UiGearSix } from "../../../icons";
+import { UiAdd, UiGearSix, UiTrash } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
-import { EffortSelector, ModelSelector } from "../../chat/ModelSelector";
 import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
 import {
   AttachmentButton,
@@ -20,39 +19,29 @@ import {
 } from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
 import type { FileUIPart } from "../../chat/types";
-import {
-  effortOptionsForModel,
-  reconcileModelCapabilities,
-} from "../model-capabilities";
-import { RuntimeModePicker } from "../RuntimeModePicker";
+import { RuntimeBar } from "../RuntimeBar";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
-  familyById,
   labelForBackend,
-  modelsForFamily,
-  selectionForBackend,
 } from "../runtime-mode";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
 import type { SpecRuntimeCLIOptions } from "../SpecRuntimeEditor/CLIArgsSection";
-import { SpecField, SpecInput } from "../SpecRuntimeEditor/fields";
 import type {
   SpecRuntimeSecretSelectorConfig,
   SpecSectionId,
 } from "../SpecRuntimeEditor/types";
+import { withPrompt } from "../SpecRuntimeEditor/update";
+import type { AISpecRuntimePermissionCatalog } from "../SpecRuntimeEditor.model";
 import {
-  withOptionalRoot,
-  withPrompt,
-  withRoot,
-} from "../SpecRuntimeEditor/update";
-import type {
-  AISpecRuntimePermissionCatalog,
-  AISpecRuntimeValue,
-} from "../SpecRuntimeEditor.model";
+  runtimeRows,
+  withRuntimeRows,
+  type AIPromptRunValue,
+} from "./model";
 
 export type PromptRunEditorProps = {
-  value: AISpecRuntimeValue;
-  onChange: (value: AISpecRuntimeValue) => void;
+  value: AIPromptRunValue;
+  onChange: (value: AIPromptRunValue) => void;
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
   tools?: ToolMeta[] | undefined;
@@ -60,14 +49,9 @@ export type PromptRunEditorProps = {
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   cliOptions?: SpecRuntimeCLIOptions | undefined;
   reasoningEfforts?: string[] | undefined;
-  /** Host-provided replacement for the inline Runtime controls. */
-  runtimeControls?: ReactNode | undefined;
 
   /** Schema-driven variables form; omit to render a raw-JSON editor. */
   variablesSchema?: JsonSchemaObject | undefined;
-  variables?: Record<string, unknown> | undefined;
-  /** The variables block only renders when this is supplied. */
-  onVariablesChange?: ((next: Record<string, unknown>) => void) | undefined;
   /** Fires false while raw-JSON variables fail to parse; always true with a schema. */
   onVariablesValidityChange?: ((valid: boolean) => void) | undefined;
 
@@ -92,9 +76,8 @@ export type PromptRunEditorProps = {
 };
 
 // The inline "prompt + variables + runtime" composer shared by captain's prompt
-// workbench and gavel's todo run dialog. It edits one AISpecRuntimeValue live
-// (runtime knobs + the prompt.user override) and takes variables as separate
-// props; the "Edit spec" button expands the same value into the full editor.
+// workbench and gavel's todo run dialog. It edits Captain's complete prompt-run
+// request without making hosts project that contract into editor-specific state.
 // Hosts should mount it with a `key` per prompt/todo so internal draft state
 // (raw-JSON text, modal open) resets on selection change.
 export function PromptRunEditor({
@@ -107,10 +90,7 @@ export function PromptRunEditor({
   secretSelector,
   cliOptions,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
-  runtimeControls,
   variablesSchema,
-  variables,
-  onVariablesChange,
   onVariablesValidityChange,
   promptEditor,
   promptLabel = "User prompt",
@@ -127,19 +107,16 @@ export function PromptRunEditor({
   specSections,
 }: PromptRunEditorProps) {
   const [specOpen, setSpecOpen] = useState(false);
-  const selection = selectionForBackend(families, value.backend);
-  const family = familyById(families, selection.family);
-  const familyModels = modelsForFamily(models, family, value.backend);
-  const selectedModel = models.find((m) => m.id === value.model);
-  // Hide effort for a model that does not reason; default to showing it when the
-  // selection is unknown (a family alias or a not-yet-loaded catalog).
-  const modelEfforts = effortOptionsForModel(selectedModel, reasoningEfforts);
-  const showEffort = modelEfforts.length > 0;
+  const spec = value.spec ?? {};
+  const rows = runtimeRows(value);
+  const selectedModel = models.find(
+    (model) => model.id === spec.id || model.id === spec.model,
+  );
   const resolvedAttachmentUpload = useMemo(
     () => attachmentUpload ?? createAttachmentUploadAdapter(),
     [attachmentUpload],
   );
-  const attachmentFiles: FileUIPart[] = (value.prompt?.attachments ?? []).map(
+  const attachmentFiles: FileUIPart[] = (spec.prompt?.attachments ?? []).map(
     (attachment) => ({
       type: "file",
       url: attachment.id
@@ -160,96 +137,96 @@ export function PromptRunEditor({
       {header}
 
       <Block title="Runtime">
-        {runtimeControls ?? (
-          <>
-            <RuntimeModePicker
-              value={value}
-              onChange={onChange}
-              families={families}
-              models={models}
-            />
-            <div className="grid gap-density-2 sm:grid-cols-2">
-              <SpecField label="Model">
-                <div className="flex min-w-0 items-center gap-density-2">
-                  {familyModels.length > 0 ? (
-                    <ModelSelector
-                      models={familyModels}
-                      value={value.model}
-                      onChange={(model) =>
-                        onChange(
-                          reconcileModelCapabilities(
-                            value,
-                            models.find((item) => item.id === model),
-                            reasoningEfforts,
-                          ),
-                        )
-                      }
-                      size="md"
-                      className="w-full"
-                    />
-                  ) : (
-                    <SpecInput
-                      value={value.model}
-                      onChange={(model) => onChange(withRoot(value, { model }))}
-                      placeholder="frontmatter/default"
-                      mono
-                    />
-                  )}
-                  {value.model && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        onChange(withOptionalRoot(value, "model", undefined))
-                      }
-                    >
-                      Default
-                    </Button>
-                  )}
-                </div>
-              </SpecField>
-              {showEffort && (
-                <SpecField label="Effort">
-                  <EffortSelector
-                    efforts={modelEfforts}
-                    value={value.effort ?? ""}
-                    onChange={(effort) => onChange(withRoot(value, { effort }))}
-                    size="md"
-                    className="w-full"
-                  />
-                </SpecField>
+        <div className="grid gap-density-2">
+          {rows.map((runtime, index) => (
+            <div
+              key={index}
+              role="group"
+              aria-label={`Runtime ${index + 1}`}
+              className="flex min-w-0 items-center gap-density-2"
+            >
+              <RuntimeBar
+                value={runtime}
+                onChange={(next) =>
+                  onChange(
+                    withRuntimeRows(
+                      value,
+                      rows.map((item, itemIndex) =>
+                        itemIndex === index ? next : item,
+                      ),
+                    ),
+                  )
+                }
+                models={models}
+                families={families}
+                reasoningEfforts={reasoningEfforts}
+                ariaLabel={`Runtime ${index + 1} controls`}
+              />
+              {rows.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Remove runtime ${index + 1}`}
+                  onClick={() =>
+                    onChange(
+                      withRuntimeRows(
+                        value,
+                        rows.filter((_, itemIndex) => itemIndex !== index),
+                      ),
+                    )
+                  }
+                >
+                  <Icon icon={UiTrash} className="size-4" />
+                </Button>
               )}
             </div>
-          </>
-        )}
-        {children}
-        <div>
-          <Button size="sm" variant="outline" onClick={() => setSpecOpen(true)}>
-            <Icon icon={UiGearSix} className="size-4" />
-            {editSpecLabel}
-          </Button>
+          ))}
+          <div className="flex flex-wrap items-center gap-density-2">
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Add runtime"
+              onClick={() =>
+                onChange(
+                  withRuntimeRows(value, [
+                    ...rows,
+                    rows[0]?.backend ? { backend: rows[0].backend } : {},
+                  ]),
+                )
+              }
+            >
+              <Icon icon={UiAdd} className="size-4" />
+              Add runtime
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setSpecOpen(true)}>
+              <Icon icon={UiGearSix} className="size-4" />
+              {editSpecLabel}
+            </Button>
+          </div>
         </div>
+        {children}
       </Block>
 
-      {onVariablesChange && (
-        <Block title="Variables">
-          <VariablesField
-            {...(variablesSchema ? { schema: variablesSchema } : {})}
-            value={variables ?? {}}
-            onChange={onVariablesChange}
-            {...(onVariablesValidityChange
-              ? { onValidityChange: onVariablesValidityChange }
-              : {})}
-          />
-        </Block>
-      )}
+      <Block title="Variables">
+        <VariablesField
+          {...(variablesSchema ? { schema: variablesSchema } : {})}
+          value={value.variables ?? {}}
+          onChange={(variables) => onChange({ ...value, variables })}
+          {...(onVariablesValidityChange
+            ? { onValidityChange: onVariablesValidityChange }
+            : {})}
+        />
+      </Block>
 
       <Block title={promptLabel}>
         {promptEditor ?? (
           <textarea
-            value={value.prompt?.user ?? ""}
+            value={spec.prompt?.user ?? ""}
             onChange={(event) =>
-              onChange(withPrompt(value, { user: event.target.value }))
+              onChange({
+                ...value,
+                spec: withPrompt(spec, { user: event.target.value }),
+              })
             }
             spellCheck={false}
             placeholder={promptPlaceholder}
@@ -262,23 +239,25 @@ export function PromptRunEditor({
             <AttachmentList
               files={attachmentFiles}
               onRemove={(index) =>
-                onChange(
-                  withPrompt(value, {
-                    attachments: (value.prompt?.attachments ?? []).filter(
+                onChange({
+                  ...value,
+                  spec: withPrompt(spec, {
+                    attachments: (spec.prompt?.attachments ?? []).filter(
                       (_, itemIndex) => itemIndex !== index,
                     ),
                   }),
-                )
+                })
               }
             />
             <AttachmentButton
               files={attachmentFiles}
               upload={resolvedAttachmentUpload}
               onAdd={(parts) =>
-                onChange(
-                  withPrompt(value, {
+                onChange({
+                  ...value,
+                  spec: withPrompt(spec, {
                     attachments: [
-                      ...(value.prompt?.attachments ?? []),
+                      ...(spec.prompt?.attachments ?? []),
                       ...parts.map((part) => {
                         const uploaded = part as AttachmentFilePart;
                         return {
@@ -292,7 +271,7 @@ export function PromptRunEditor({
                       }),
                     ],
                   }),
-                )
+                })
               }
               {...(selectedModel?.inputMediaTypes
                 ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
@@ -314,8 +293,8 @@ export function PromptRunEditor({
         className="h-[95vh]"
       >
         <SpecRuntimeEditor
-          value={value}
-          onChange={onChange}
+          value={spec}
+          onChange={(next) => onChange({ ...value, spec: next })}
           models={models}
           families={families}
           tools={tools}
@@ -326,7 +305,7 @@ export function PromptRunEditor({
           onSave={() => setSpecOpen(false)}
           onCancel={() => setSpecOpen(false)}
           saveLabel="Done"
-          footerStatus={labelForBackend(value.backend, families)}
+          footerStatus={labelForBackend(spec.backend, families)}
         />
       </Modal>
     </div>

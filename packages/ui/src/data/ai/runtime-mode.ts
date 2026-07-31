@@ -291,7 +291,12 @@ export function modelBelongsToFamily(
   backend?: string | undefined,
 ): boolean {
   if (!modelId) return true;
-  const selected = models.find((model) => model.id === modelId);
+  const selected = models.find(
+    (model) =>
+      model.id === modelId ||
+      model.runtime?.model === modelId ||
+      model.runtime?.id === modelId,
+  );
   if (!selected) return false;
   const providerMatches = !family || selected.provider === family.provider;
   return providerMatches && modelMatchesBackend(selected, backend);

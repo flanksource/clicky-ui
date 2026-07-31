@@ -108,6 +108,10 @@ export type SessionInput =
   | UnifiedSessionInput;
 
 export interface SessionMetadataSummary {
+  /** Session identifier exposed by the context meter's copy action. */
+  sessionId?: string;
+  /** Runtime mechanism used to execute the session. */
+  executionMode?: string;
   turns?: SessionTurn[];
   capabilities?: SessionCapabilities;
   budget?: SessionBudget;
@@ -358,6 +362,8 @@ export function getSessionMetadata(
 ): SessionMetadataSummary | undefined {
   if (!looksLikeUnifiedSession(input)) return undefined;
   const metadata: SessionMetadataSummary = {
+    ...(input.id ? { sessionId: input.id } : {}),
+    ...(input.executionMode ? { executionMode: input.executionMode } : {}),
     ...(input.turns ? { turns: input.turns } : {}),
     ...(input.capabilities ? { capabilities: input.capabilities } : {}),
     ...(input.budget ? { budget: input.budget } : {}),
