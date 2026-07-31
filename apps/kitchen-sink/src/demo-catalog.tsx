@@ -22,6 +22,7 @@ import { MarkdownEditorDemo } from "./demos/MarkdownEditorDemo";
 import { PropertiesDemo } from "./demos/PropertiesDemo";
 import { CellsDemo } from "./demos/CellsDemo";
 import { TimeseriesDemo } from "./demos/TimeseriesDemo";
+import { ServerTimingBadgeDemo } from "./demos/ServerTimingBadgeDemo";
 import { CacheBrowserDemo } from "./demos/CacheBrowserDemo";
 import { FilterBarDemo } from "./demos/FilterBarDemo";
 import { FilterPillDemo } from "./demos/FilterPillDemo";
@@ -94,6 +95,7 @@ import {
   UiForm,
   UiCommand,
   UiRobotAi,
+  UiClock,
 } from "@flanksource/clicky-ui";
 
 export type DemoEntry = {
@@ -227,6 +229,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "Timeseries",
         component: TimeseriesDemo,
         icon: UiChartBar,
+      },
+      {
+        id: "server-timing",
+        label: "Server timing",
+        component: ServerTimingBadgeDemo,
+        icon: UiClock,
       },
       {
         id: "cache-browser",
