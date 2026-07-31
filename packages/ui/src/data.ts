@@ -223,6 +223,17 @@ export {
   type GaugeHoverCardProps,
   type GaugeHoverRow,
 } from "./data/GaugeHoverCard";
+export {
+  ServerTimingBadge,
+  type ServerTimingBadgeProps,
+} from "./data/ServerTimingBadge";
+export {
+  formatServerTimingDuration,
+  parseServerTiming,
+  serverTimingCounterSummary,
+  serverTimingMetricLabel,
+  type ServerTimingMetric,
+} from "./data/server-timing";
 export { seriesStats, type SeriesStats } from "./data/gauge-stats";
 export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
 export {
