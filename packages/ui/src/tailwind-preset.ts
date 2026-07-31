@@ -7,6 +7,10 @@ const preset: Partial<Config> = {
       screens: {
         "3xl": "1920px",
       },
+      // This preset is only honoured by v3 consumers (and v4 consumers that
+      // `@config` it). Our own stylesheet does not, so the v4 source of truth for
+      // these scales is the `--container-*` block in styles/tokens.css — add a
+      // scale in both places or `max-w-*` silently compiles to nothing.
       containers: {
         "8xl": "1536px",
         "9xl": "1920px",

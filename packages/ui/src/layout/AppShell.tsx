@@ -425,7 +425,7 @@ export function AppShell(props: AppShellProps) {
             <div
               data-slot="app-shell-content"
               data-content-width={contentWidth}
-              className={contentWidthClassName(contentWidth)}
+              className={cn(contentWidthClassName(contentWidth), "h-full")}
             >
               {children}
             </div>

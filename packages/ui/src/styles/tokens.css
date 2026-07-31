@@ -20,6 +20,16 @@
   --spacing-density-8: calc(var(--spacing-unit, 0.25rem) * 8);
   --spacing-control-h: var(--control-height, 2.25rem);
   --spacing-control-px: var(--control-padding-x, 0.75rem);
+
+  /* Wide-viewport container scale, extending Tailwind's built-in --container-*
+   * (which stops at 7xl/80rem). v4 resolves BOTH `max-w-8xl` and the
+   * `@8xl/app-content:` container-query variant from this one namespace, so
+   * these two lines are what make layout/content-width.ts's `contained` class
+   * actually widen — without them the utilities compile to nothing and
+   * `contained` is a hard 80rem cap at every viewport.
+   * Keep in sync with tailwind-preset.ts (the v3-consumer path). */
+  --container-8xl: 96rem; /* 1536px */
+  --container-9xl: 120rem; /* 1920px */
 }
 
 /* `@theme inline` tells Tailwind to emit the `var(--...)` reference
