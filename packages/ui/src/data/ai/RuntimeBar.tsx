@@ -32,6 +32,7 @@ import {
   modelsForFamily,
   runtimeModeOptions,
   selectionForBackend,
+  unsupportedModeTitle,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -96,17 +97,19 @@ export function RuntimeBar({
         backend,
       )
     ) {
-      next = withOptionalRoot(next, "model", undefined);
+      next = withoutCatalogModel(next);
     }
     onChange(next);
   };
 
+  // `id` is the catalog row a `model` came from and `runtimeModelMatches` reads
+  // it first, so it has to travel with `model` — a surviving `id` would keep
+  // resolving the previous provider's row against a new backend.
   const applyCustomModel = (model: string) =>
-    onChange(withOptionalRoot(value, "model", model));
+    onChange(withOptionalRoot(withoutCatalogModel(value), "model", model));
   const applyModel = (model: ChatModel) =>
     onChange(reconcileModelCapabilities(value, model, reasoningEfforts));
-  const clearModel = () =>
-    onChange(withOptionalRoot(value, "model", undefined));
+  const clearModel = () => onChange(withoutCatalogModel(value));
   const applyEffort = (effort: string) =>
     onChange(withOptionalRoot(value, "effort", effort));
 
@@ -236,6 +239,14 @@ export function RuntimeBar({
         </RuntimeSegment>
       )}
     </div>
+  );
+}
+
+function withoutCatalogModel(value: AISpecRuntimeValue): AISpecRuntimeValue {
+  return withOptionalRoot(
+    withOptionalRoot(value, "model", undefined),
+    "id",
+    undefined,
   );
 }
 
@@ -380,7 +391,7 @@ function modeItems({
 }): DropdownMenuItem[] {
   return runtimeModeOptions(families).map((mode) => {
     const supported = family.modes.find((entry) => entry.id === mode.id);
-    const hint = supported?.title ?? `not on ${family.label}`;
+    const hint = supported?.title ?? unsupportedModeTitle(family);
     return {
       group: "Mode · runtime",
       label: itemLabel({

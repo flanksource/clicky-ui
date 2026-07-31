@@ -15,6 +15,7 @@ import { providerIcon, providerIconColor } from "./provider-icons";
 import { ContextMeter } from "./ContextMeter";
 import { DEFAULT_REASONING_EFFORTS } from "./effort-icons";
 import { defaultChatModelId } from "./models";
+import { postToolApproval } from "./approval";
 import {
   createAttachmentUploadAdapter,
   type AttachmentLimits,
@@ -79,6 +80,9 @@ export type ChatProps = {
   attachmentLimits?: AttachmentLimits;
   /** Thread id to persist this conversation under (forwarded in the body). */
   threadId?: string;
+  /** Base endpoint for resolving a tool approval while the provider stream is
+   *  still active. The thread and approval ids are appended to this URL. */
+  approvalApi?: string | null;
   /** Optional host renderer for recognized completed tool outputs. */
   renderToolResult?: ToolResultRenderer;
   /** Extra fields merged into every request body. */
@@ -122,6 +126,7 @@ export function Chat({
   attachmentUpload,
   attachmentLimits,
   threadId,
+  approvalApi = null,
   renderToolResult,
   body,
   transport,
@@ -133,9 +138,14 @@ export function Chat({
   className,
 }: ChatProps) {
   const [models, setModels] = useState<ChatModel[]>(modelsProp ?? []);
-  const [model, setModel] = useState<string | undefined>(controlledModel ?? defaultModel);
-  const [effort, setEffort] = useState(controlledEffort ?? defaultReasoningEffort);
+  const [model, setModel] = useState<string | undefined>(
+    controlledModel ?? defaultModel,
+  );
+  const [effort, setEffort] = useState(
+    controlledEffort ?? defaultReasoningEffort,
+  );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
+  const [approvalError, setApprovalError] = useState<Error | undefined>();
   const lastDefaultModel = useRef(defaultModel);
   const sentInitialPromptId = useRef<number | null>(null);
 
@@ -150,13 +160,17 @@ export function Chat({
     if (modelsProp || !modelsApi) return;
     let cancelled = false;
     fetch(modelsApi)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`models ${r.status}`))))
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(`models ${r.status}`)),
+      )
       .then((data: ChatModel[]) => {
         if (cancelled) return;
         setModels(data);
         setModel((m) => m ?? controlledModel ?? defaultChatModelId(data));
       })
-      .catch((err) => console.warn("clicky-ui: failed to load chat models", err));
+      .catch((err) =>
+        console.warn("clicky-ui: failed to load chat models", err),
+      );
     return () => {
       cancelled = true;
     };
@@ -205,16 +219,28 @@ export function Chat({
   };
 
   const resolvedTransport = useMemo<ChatTransport<UIMessage>>(
-    () => transport ?? new DefaultChatTransport({ api, body: () => bodyRef.current }),
+    () =>
+      transport ??
+      new DefaultChatTransport({ api, body: () => bodyRef.current }),
     [transport, api],
   );
 
-  const { messages, sendMessage, regenerate, addToolApprovalResponse, status, error, clearError, stop } =
-    useChat<ChatUIMessage>({
-      transport: resolvedTransport,
-      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-      ...(initialMessages ? { messages: initialMessages as ChatUIMessage[] } : {}),
-    });
+  const {
+    messages,
+    sendMessage,
+    regenerate,
+    addToolApprovalResponse,
+    status,
+    error,
+    clearError,
+    stop,
+  } = useChat<ChatUIMessage>({
+    transport: resolvedTransport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    ...(initialMessages
+      ? { messages: initialMessages as ChatUIMessage[] }
+      : {}),
+  });
 
   useEffect(() => {
     if (!initialPrompt || status !== "ready") return;
@@ -236,7 +262,8 @@ export function Chat({
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
     if (!meta) return;
-    const cost = meta.threadCostUsd ?? meta.costBreakdown?.totalUsd ?? meta.cost;
+    const cost =
+      meta.threadCostUsd ?? meta.costBreakdown?.totalUsd ?? meta.cost;
     const snapshot: ChatUsageSummary = {
       usedTokens: meta.contextTokens ?? meta.usage?.totalTokens ?? 0,
       maxTokens: selectedModel?.contextWindow ?? 0,
@@ -258,6 +285,33 @@ export function Chat({
   const onEffortSelect = (next: string) => {
     setEffort(next);
     onReasoningEffortChange?.(next);
+  };
+
+  const resolveToolApproval = async (
+    id: string,
+    approved: boolean,
+    reason?: string,
+  ) => {
+    setApprovalError(undefined);
+    if (approvalApi) {
+      try {
+        await postToolApproval({
+          approvalApi,
+          threadId: threadId ?? "",
+          approvalId: id,
+          approved,
+          ...(reason ? { reason } : {}),
+        });
+      } catch (cause) {
+        setApprovalError(
+          cause instanceof Error ? cause : new Error(String(cause)),
+        );
+        return;
+      }
+    }
+    await addToolApprovalResponse(
+      reason ? { id, approved, reason } : { id, approved },
+    );
   };
 
   const ModelGlyph = providerIcon(selectedModel?.provider);
@@ -298,6 +352,9 @@ export function Chat({
                   ? { model: usage.modelLabel }
                   : {})}
               {...(effort ? { effort } : {})}
+              {...(selectedModel?.runtime?.mode
+                ? { executionMode: selectedModel.runtime.mode }
+                : {})}
               {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
               {...(selectedModel?.provider
                 ? {
@@ -312,28 +369,35 @@ export function Chat({
       </div>
     ) : undefined;
 
-  const empty = (messages.length === 0 && (emptyState || suggestions?.length)) ? (
-    <div className="flex flex-col items-center gap-4">
-      {emptyState}
-      {suggestions && suggestions.length > 0 && (
-        <Suggestions suggestions={suggestions} onSelect={(text) => void sendMessage({ text })} />
-      )}
-    </div>
-  ) : undefined;
+  const empty =
+    messages.length === 0 && (emptyState || suggestions?.length) ? (
+      <div className="flex flex-col items-center gap-4">
+        {emptyState}
+        {suggestions && suggestions.length > 0 && (
+          <Suggestions
+            suggestions={suggestions}
+            onSelect={(text) => void sendMessage({ text })}
+          />
+        )}
+      </div>
+    ) : undefined;
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <Conversation
         messages={messages}
         status={status}
-        error={error}
-        onClearError={clearError}
+        error={approvalError ?? error}
+        onClearError={() => {
+          setApprovalError(undefined);
+          clearError();
+        }}
         {...(threadId ? { sessionId: threadId } : {})}
         {...(model ? { model } : {})}
         emptyState={empty}
         onRegenerate={(messageId) => void regenerate({ messageId })}
         onApprove={(id, approved, reason) =>
-          void addToolApprovalResponse(reason ? { id, approved, reason } : { id, approved })
+          void resolveToolApproval(id, approved, reason)
         }
         {...(renderToolResult ? { renderToolResult } : {})}
       />

@@ -203,6 +203,12 @@ export function runtimeModeOptions(
   return [...modes.values()];
 }
 
+// One phrasing for "this family does not offer that mode", shared by every
+// runtime presentation so the same state never reads two ways.
+export function unsupportedModeTitle(family: SpecRuntimeFamily): string {
+  return `not on ${family.label}`;
+}
+
 export function backendForFamilyMode(
   families: SpecRuntimeFamily[],
   familyId: string,

@@ -140,4 +140,67 @@ describe("ChatWindow", () => {
       "Fix this formula",
     );
   });
+
+  it("creates a durable thread before sending the first prompt", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/chat/threads" && init?.method === "POST") {
+          return Response.json(
+            { id: "thread-1", title: "New conversation" },
+            { status: 201 },
+          );
+        }
+        if (String(input) === "/api/chat" && init?.method === "POST") {
+          return new Response("", {
+            status: 200,
+            headers: {
+              "content-type": "text/event-stream",
+              "x-vercel-ai-ui-message-stream": "v1",
+            },
+          });
+        }
+        if (String(input) === "/api/chat/threads") {
+          return Response.json([]);
+        }
+        throw new Error(`unexpected request ${String(input)}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ChatWindowManagerProvider storageId="durable-thread">
+        <OpenChatWindowOnMount
+          initialPrompt={{ id: 1, text: "Edit this account" }}
+        >
+          <ChatWindowLayer
+            toolsApi={null}
+            chat={{
+              api: "/api/chat",
+              modelsApi: null,
+            }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            String(input) === "/api/chat" && init?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/chat/threads",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const chatRequest = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === "/api/chat" && init?.method === "POST",
+    );
+    expect(JSON.parse(String(chatRequest?.[1]?.body))).toMatchObject({
+      threadId: "thread-1",
+    });
+  });
 });

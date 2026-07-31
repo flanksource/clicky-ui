@@ -15,6 +15,7 @@ import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { runtimeFamilyBrand } from "./RuntimeBar.model";
 import {
   runtimeModeOptions,
+  unsupportedModeTitle,
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
@@ -191,7 +192,7 @@ function ModeSegments({
         return {
           id: mode.id,
           label: supported?.label ?? mode.label,
-          title: supported?.title ?? `Not available for ${family.label}`,
+          title: supported?.title ?? unsupportedModeTitle(family),
           disabled: !supported,
           ...(mode.icon ? { icon: mode.icon } : {}),
         };

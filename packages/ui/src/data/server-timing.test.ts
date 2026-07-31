@@ -42,6 +42,14 @@ describe("server timing", () => {
     ]);
   });
 
+  it("keeps the first instance of a duplicated dur/desc parameter", () => {
+    expect(
+      parseServerTiming('sql;dur=18.6;desc="first";dur=99;desc="second"'),
+    ).toEqual([
+      { name: "sql", duration: 18.6, description: "first", counters: {} },
+    ]);
+  });
+
   it("formats durations, metric labels, and counter summaries", () => {
     expect(formatServerTimingDuration(3.25)).toBe("3.3 ms");
     expect(formatServerTimingDuration(125)).toBe("125 ms");

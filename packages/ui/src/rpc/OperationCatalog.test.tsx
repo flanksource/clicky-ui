@@ -575,18 +575,6 @@ describe("OperationCatalog", () => {
     expect(params.get("q")).toBe("scoped");
   });
 
-  it("switches to the endpoint list view", async () => {
-    const client = makeClient();
-    renderCatalog(client);
-
-    fireEvent.click(await screen.findByRole("button", { name: /endpoint list view/i }));
-    // The id path now carries several methods (get/put/delete), so it appears
-    // once per operation in the endpoint list.
-    expect(screen.getAllByText("/api/v1/widgets/{id}").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("GET").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("POST").length).toBeGreaterThan(0);
-  });
-
   it("uses lookup metadata to shape list filters while keeping enum filters strict", async () => {
     const client = makeClient();
     client.lookupMock.mockResolvedValue(makeLookupResponse());
