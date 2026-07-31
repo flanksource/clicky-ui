@@ -225,7 +225,7 @@ export function ApprovalsList({
 
   return (
     <div className="flex min-h-0 flex-col gap-density-4">
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className="mb-1 flex items-center gap-2 text-mv-xs font-medium uppercase tracking-[0.12em] text-mv-muted">
             <span className="grid size-[22px] shrink-0 place-items-center rounded-mv-sm bg-mv-ink text-base text-mv-paper">
