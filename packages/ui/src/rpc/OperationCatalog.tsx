@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Button } from "../components/button";
-import { Icon } from "../data/Icon";
-import { UiListFlat, UiTable } from "../icons";
 import { filterOperationsByDomain } from "./classify";
 import {
   filterOperationsBySurface,
@@ -83,11 +80,6 @@ export type OperationCatalogProps = {
    * existing consumers are unaffected.
    */
   actionsContainer?: Element | null;
-  /**
-   * Portal target for the table/endpoint-list view switcher — typically an app
-   * shell's top-bar `actions` slot. Falls back to inline rendering when null.
-   */
-  viewToggleContainer?: Element | null;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -123,10 +115,8 @@ export function OperationCatalog({
   actionLabels,
   resultRenderer,
   actionsContainer,
-  viewToggleContainer,
 }: OperationCatalogProps) {
   const { operations, isLoading } = useOperations(client);
-  const [view, setView] = useState<"table" | "endpoints">("table");
 
   const surfaceOps = useMemo(
     () => filterOperationsBySurface(operations, surfaceKey),
@@ -205,7 +195,7 @@ export function OperationCatalog({
           Accept: "application/json+clicky",
         },
       ),
-    enabled: !!listEndpoint && view === "table",
+    enabled: !!listEndpoint,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
@@ -225,7 +215,7 @@ export function OperationCatalog({
         packParameterValues(filters, listParameters),
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
-    enabled: !!listEndpoint && view === "table" && !!client.lookupFilters,
+    enabled: !!listEndpoint && !!client.lookupFilters,
     staleTime: 30_000,
     retry: 0,
   });
@@ -266,8 +256,29 @@ export function OperationCatalog({
     [filterBarConfig.filters, filterPre],
   );
 
-  const hasTable = !!listEndpoint;
-  const showTable = hasTable && view === "table";
+  const showTable = !!listEndpoint;
+  let listError: unknown;
+  if (!listQuery.isFetching) {
+    if (listQuery.isError) {
+      listError = listQuery.error;
+    } else if (listQuery.data?.success === false) {
+      listError = new Error(
+        listQuery.data.error ||
+          listQuery.data.message ||
+          listQuery.data.stderr ||
+          `Command failed with exit code ${listQuery.data.exit_code}`,
+      );
+    }
+  }
+  const tableError =
+    listError !== undefined
+      ? renderError(
+          listError,
+          `Failed to load ${listEndpoint?.path ?? ""}`,
+        )
+      : undefined;
+  const tableResponse =
+    listQuery.data?.success === false ? null : (listQuery.data ?? null);
   // Lock the current list filters into a bulk action (supportsFilterMode), so a
   // collection action like "pause" runs against the same set the table shows.
   // Entity-scoped actions never reach here (they live on the detail page).
@@ -316,36 +327,6 @@ export function OperationCatalog({
     );
   }
 
-  // Both clusters are built here — they depend on catalog-local state (`view`,
-  // `filters`, `listQuery`) — but a host may relocate either into an app shell
-  // slot by supplying a portal target.
-  const viewToggle = hasTable ? (
-    <div data-slot="operation-catalog-view-toggle" className="flex gap-1 rounded-lg border p-1">
-      <Button
-        type="button"
-        variant={view === "table" ? "secondary" : "ghost"}
-        size="sm"
-        className="h-7 w-7 p-0"
-        aria-label="Table view"
-        aria-pressed={view === "table"}
-        onClick={() => setView("table")}
-      >
-        <Icon icon={UiTable} />
-      </Button>
-      <Button
-        type="button"
-        variant={view === "endpoints" ? "secondary" : "ghost"}
-        size="sm"
-        className="h-7 w-7 p-0"
-        aria-label="Endpoint list view"
-        aria-pressed={view === "endpoints"}
-        onClick={() => setView("endpoints")}
-      >
-        <Icon icon={UiListFlat} />
-      </Button>
-    </div>
-  ) : null;
-
   const actionBar = (
     <OperationActionBar
       actions={actionOps}
@@ -362,16 +343,12 @@ export function OperationCatalog({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col gap-6"
+      className="flex h-full min-h-0 flex-col gap-2"
       data-slot="operation-catalog"
     >
       {/* No title/description here by design: page headers and breadcrumbs are
           the host's to define (e.g. an app shell's bodyHeader), so the catalog
           never invents chrome the consumer would have to fight or duplicate. */}
-      {viewToggle && !viewToggleContainer && (
-        <div className="flex items-start justify-end gap-4">{viewToggle}</div>
-      )}
-      {viewToggle && viewToggleContainer && createPortal(viewToggle, viewToggleContainer)}
       {actionsContainer ? createPortal(actionBar, actionsContainer) : actionBar}
 
       {showTable ? (
@@ -379,45 +356,41 @@ export function OperationCatalog({
           className="min-h-0 flex-1"
           data-slot="operation-catalog-results"
         >
-          {listQuery.isError && !listQuery.data
-            ? renderError(
-                listQuery.error,
-                `Failed to load ${listEndpoint?.path ?? ""}`,
-              )
-            : (() => {
-                const defaultView = (
-                  <OperationResultView
-                    response={listQuery.data ?? null}
-                    loading={listQuery.isFetching}
-                    loadingMessage={`Loading ${definition.title} results…`}
-                    emptyMessage="No records returned"
-                    ariaLabel={`${definition.title} results`}
-                    className="mt-0 h-full min-h-0"
-                    detailOperation={detailOperation}
-                    filterConfig={{
-                      filters: decoratedFilters,
-                      ...(filterBarConfig.search
-                        ? { search: filterBarConfig.search }
-                        : {}),
-                      ...(filterBarConfig.timeRange
-                        ? { timeRange: filterBarConfig.timeRange }
-                        : {}),
-                    }}
-                    {...(commandRuntime ? { commandRuntime } : {})}
-                    {...(dataTablePagination
-                      ? { pagination: dataTablePagination }
-                      : {})}
-                    {...(download ? { download } : {})}
-                  />
-                );
-                return resultRenderer
-                  ? resultRenderer({
-                      response: listQuery.data ?? null,
-                      defaultView,
-                      ...(surfaceKey ? { surfaceKey } : {}),
-                    })
-                  : defaultView;
-              })()}
+          {(() => {
+            const defaultView = (
+              <OperationResultView
+                response={tableResponse}
+                loading={listQuery.isFetching}
+                loadingMessage={`Loading ${definition.title} results…`}
+                emptyMessage="No records returned"
+                ariaLabel={`${definition.title} results`}
+                className="mt-0 h-full min-h-0"
+                detailOperation={detailOperation}
+                filterConfig={{
+                  filters: decoratedFilters,
+                  ...(filterBarConfig.search
+                    ? { search: filterBarConfig.search }
+                    : {}),
+                  ...(filterBarConfig.timeRange
+                    ? { timeRange: filterBarConfig.timeRange }
+                    : {}),
+                }}
+                {...(tableError ? { error: tableError } : {})}
+                {...(commandRuntime ? { commandRuntime } : {})}
+                {...(dataTablePagination
+                  ? { pagination: dataTablePagination }
+                  : {})}
+                {...(download ? { download } : {})}
+              />
+            );
+            return resultRenderer
+              ? resultRenderer({
+                  response: listQuery.data ?? null,
+                  defaultView,
+                  ...(surfaceKey ? { surfaceKey } : {}),
+                })
+              : defaultView;
+          })()}
         </div>
       ) : (
         <EndpointList

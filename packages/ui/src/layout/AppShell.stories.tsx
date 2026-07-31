@@ -323,10 +323,8 @@ function RpcWorkbenchBody() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [surface, setSurface] = useState("widgets");
   const [debug, setDebug] = useState(false);
-  // Portal targets the catalog renders its own clusters into. Callback refs via
-  // state (not useRef) so attaching the node triggers the re-render that mounts
-  // the portal.
-  const [viewToggleHost, setViewToggleHost] = useState<HTMLElement | null>(null);
+  // Portal target the catalog renders its action cluster into. A callback ref
+  // via state (not useRef) ensures attaching the node mounts the portal.
   const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
 
   const navSections = [
@@ -404,8 +402,6 @@ function RpcWorkbenchBody() {
             }
             actions={
               <>
-                {/* The catalog portals its table/endpoint switcher in here. */}
-                <div ref={setViewToggleHost} className="flex items-center" />
                 <Switch
                   checked={debug}
                   onChange={setDebug}
@@ -447,7 +443,6 @@ function RpcWorkbenchBody() {
               surfaceKey={surface}
               client={FAKE_CLIENT}
               renderLink={anchorLink}
-              viewToggleContainer={viewToggleHost}
               actionsContainer={actionsHost}
             />
           </AppShell>

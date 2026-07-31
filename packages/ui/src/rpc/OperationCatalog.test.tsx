@@ -141,6 +141,14 @@ const clickyTableResponse: ExecutionResponse = {
   }),
 };
 
+const ambiguousPlanResponse: ExecutionResponse = {
+  success: false,
+  exit_code: 1,
+  error:
+    '--plan: plan "Example Plan" is ambiguous: 2 matches (Example Plan [11111111-1111-1111-1111-111111111111], Example Plan [22222222-2222-2222-2222-222222222222]) — re-run with one of the GUIDs',
+  stdout: "",
+};
+
 function clickyTablePageResponse(
   rowCount: number,
   pagination: NonNullable<ExecutionResponse["pagination"]>,
@@ -316,6 +324,60 @@ describe("OperationCatalog", () => {
     // ID cell rendered as a link-command node (no command runtime in the
     // test harness, so it falls back to an inline span containing the id).
     expect(screen.getByText("one")).toBeInTheDocument();
+  });
+
+  it("renders a resolved Clicky command failure as a table error", async () => {
+    renderCatalog(makeClient(ambiguousPlanResponse));
+
+    const alert = await screen.findByRole("alert");
+    const region = screen.getByRole("region", {
+      name: "Widgets results",
+    });
+    const table = within(region).getByRole("table");
+    expect(alert).toHaveTextContent(ambiguousPlanResponse.error!);
+    expect(
+      within(table).getByRole("columnheader", { name: "Error" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).queryByRole("button", { name: "Error" }),
+    ).not.toBeInTheDocument();
+    expect(within(region).queryByText("Success")).not.toBeInTheDocument();
+    expect(within(region).queryByText("ExitCode")).not.toBeInTheDocument();
+  });
+
+  it("renders a rejected list request as a table error", async () => {
+    const client = makeClient();
+    client.executeMock.mockRejectedValue(new Error("List request unavailable"));
+    renderCatalog(client);
+
+    const alert = await screen.findByRole("alert");
+    const region = screen.getByRole("region", {
+      name: "Widgets results",
+    });
+    expect(within(region).getByRole("table")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("List request unavailable");
+  });
+
+  it("keeps list filters available so a table error can recover", async () => {
+    const client = makeClient();
+    client.executeMock
+      .mockResolvedValueOnce(ambiguousPlanResponse)
+      .mockResolvedValueOnce(clickyTableResponse);
+    renderCatalog(client);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      ambiguousPlanResponse.error!,
+    );
+    fireEvent.change(screen.getByLabelText("Q"), {
+      target: { value: "11111111-1111-1111-1111-111111111111" },
+    });
+
+    await waitFor(
+      () => expect(client.executeMock).toHaveBeenCalledTimes(2),
+      { timeout: 2_000 },
+    );
+    expect(await screen.findByText("First")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows only collection-scoped actions in the list action bar", async () => {
