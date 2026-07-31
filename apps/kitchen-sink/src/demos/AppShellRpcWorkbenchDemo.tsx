@@ -130,8 +130,6 @@ export function AppShellRpcWorkbenchDemo() {
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  // Portal target the catalog renders its view switcher into.
-  const [viewToggleHost, setViewToggleHost] = useState<HTMLElement | null>(null);
 
   const commandGroups: CommandGroup[] = [
     {
@@ -189,13 +187,9 @@ export function AppShellRpcWorkbenchDemo() {
               />
             }
             actions={
-              <>
-                {/* The catalog portals its table/endpoint switcher in here. */}
-                <div ref={setViewToggleHost} className="flex items-center" />
-                <Button variant="outline" size="sm">
-                  acme-prod ▾
-                </Button>
-              </>
+              <Button variant="outline" size="sm">
+                acme-prod ▾
+              </Button>
             }
             // Consumer-owned: OperationCatalog renders no header of its own.
             bodyHeader={
@@ -222,7 +216,6 @@ export function AppShellRpcWorkbenchDemo() {
               surfaceKey="widgets"
               client={FAKE_CLIENT}
               renderLink={anchorLink}
-              viewToggleContainer={viewToggleHost}
             />
           </AppShell>
           <CommandPalette

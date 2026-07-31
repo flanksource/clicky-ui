@@ -364,6 +364,41 @@ describe("DataTable", () => {
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
   });
 
+  it("renders an accessible table error instead of rows and table actions", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        error={<span>Plan selection is ambiguous</span>}
+        pagination={{
+          page: 0,
+          pageSize: 10,
+          total: rows.length,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api"],
+          onSelectionChange: vi.fn(),
+        }}
+        selectionActions={() => <button type="button">Restart selected</button>}
+      />,
+    );
+
+    const table = within(screen.getByRole("table"));
+    expect(
+      table.getByRole("columnheader", { name: /service/i }),
+    ).toBeInTheDocument();
+    expect(table.getByRole("alert")).toHaveTextContent(
+      "Plan selection is ambiguous",
+    );
+    expect(table.getAllByRole("row")).toHaveLength(2);
+    expect(screen.queryByText("api")).not.toBeInTheDocument();
+    expect(screen.queryByText("Restart selected")).not.toBeInTheDocument();
+    expect(screen.queryByText("Page 1 of 1")).not.toBeInTheDocument();
+  });
+
   it("renders native server pagination controls", () => {
     const onPageChange = vi.fn();
     const onPageSizeChange = vi.fn();

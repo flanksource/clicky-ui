@@ -335,6 +335,8 @@ type DataTableInnerProps<
 > = {
   /** Rows to render. The table does not fetch or mutate row data. */
   data: T[];
+  /** Error content rendered as an accessible full-width row in the table body. */
+  error?: ReactNode;
   /**
    * Column descriptors. Pass a bare string for a default column —
    * `"foo"` is equivalent to `{ key: "foo", label: "foo" }` — handy for
@@ -533,6 +535,7 @@ export type DataTableProps<
 
 function DataTableInner<T extends Record<string, unknown>>({
   data,
+  error,
   columns: columnsInput,
   loading = false,
   loadingMessage = "Loading results…",
@@ -1275,7 +1278,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   }, [notifySelection, rowSelection, rows, selectedRowIDs, selectionActions]);
 
   const renderedFooter =
-    footer !== undefined
+    error != null
+      ? null
+      : footer !== undefined
       ? typeof footer === "function"
         ? footer({
             visibleRowCount: sorted.length,
@@ -1468,7 +1473,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   return (
     <DensityValueProvider density={densityOverride ?? "comfortable"}>
       <div
-        className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-3", className)}
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-1", className)}
         data-density={densityOverride}
       >
         {showFilterBar && (
@@ -1500,7 +1505,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         )}
 
         <div className="relative flex min-h-0 max-w-full flex-1 flex-col">
-          {loading ? (
+          {loading && error == null ? (
             <LoadingBar data-testid="data-table-loading-bar" className="rounded-t-md" />
           ) : null}
           <div
@@ -1508,11 +1513,11 @@ function DataTableInner<T extends Record<string, unknown>>({
               "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border",
               scrollContainerClassName,
             )}
-            aria-busy={loading || undefined}
+            aria-busy={(loading && error == null) || undefined}
           >
             <table className="w-max min-w-full table-auto text-left text-sm">
             <colgroup>
-              {rowSelection ? <col className="w-10" /> : null}
+              {rowSelection && error == null ? <col className="w-10" /> : null}
               {visibleColumns.map((column) => (
                 <col
                   key={column.key}
@@ -1523,7 +1528,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             </colgroup>
             <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {rowSelection ? (
+                {rowSelection && error == null ? (
                   <th
                     className={cn(
                       "w-10 text-center",
@@ -1629,7 +1634,12 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tr>
             </thead>
             <tbody>
-              {loading && visibleSorted.length === 0 ? (
+              {error != null ? (
+                <DataTableErrorRow
+                  colSpan={visibleColumns.length}
+                  error={error}
+                />
+              ) : loading && visibleSorted.length === 0 ? (
                 <DataTableLoadingRows
                   columns={visibleColumns}
                   rowCount={loadingRowCount}
@@ -1816,7 +1826,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   );
                 })
               )}
-              {hasMoreRows && (
+              {error == null && hasMoreRows && (
                 <tr ref={revealSentinelRef} aria-hidden>
                   <td
                     colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
@@ -1831,7 +1841,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           </div>
         </div>
 
-        {selectionBar ? (
+        {error == null && selectionBar ? (
           <div
             data-testid="data-table-selection-actions"
             className="sticky bottom-2 z-10 flex shrink-0 items-center justify-between gap-density-3 rounded-md border border-border bg-card p-density-2 shadow-md"
@@ -1846,7 +1856,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           </div>
         )}
 
-        {pagination ? (
+        {error == null && pagination ? (
           <DataTablePaginationFooter
             pagination={pagination}
             visibleRowCount={sorted.length}
@@ -2141,6 +2151,25 @@ function DataTableLoadingRows<T extends Record<string, unknown>>({
         </tr>
       ))}
     </>
+  );
+}
+
+function DataTableErrorRow({
+  colSpan,
+  error,
+}: {
+  colSpan: number;
+  error: ReactNode;
+}) {
+  return (
+    <tr className="border-b border-border/60">
+      <td
+        colSpan={Math.max(1, colSpan)}
+        className={cn(DATA_TABLE_CELL_DENSITY_CLASS, "p-density-3")}
+      >
+        <div role="alert">{error}</div>
+      </td>
+    </tr>
   );
 }
 

@@ -4,11 +4,16 @@ import type {
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
-import type { DataTablePagination } from "../data/DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTablePagination,
+} from "../data/DataTable";
 import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
 } from "../data/Clicky";
+import { cn } from "../lib/utils";
 import { ExecutionResult } from "./ExecutionResult";
 import { useRowDetailNavigation } from "./rowNavigation";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
@@ -39,6 +44,7 @@ export type OperationResultFilterConfig = {
 
 export type OperationResultViewProps = {
   response: ExecutionResponse | null;
+  error?: ReactNode;
   loading?: boolean;
   loadingMessage?: string;
   emptyMessage?: string;
@@ -52,6 +58,21 @@ export type OperationResultViewProps = {
   download?: ClickyDownloadOptions;
 };
 
+type ErrorResultRow = {
+  error: string;
+};
+
+const ERROR_RESULT_COLUMNS: DataTableColumn<ErrorResultRow>[] = [
+  {
+    key: "error",
+    label: "Error",
+    grow: true,
+    sortable: false,
+    resizable: false,
+    hideable: false,
+  },
+];
+
 // OperationResultView is the single result surface rendered by both the entity
 // list catalog and the operation runner. It renders the clicky result table
 // with its in-table FilterBar, the View/Download menu (automatic via the
@@ -59,6 +80,7 @@ export type OperationResultViewProps = {
 // surface looks and behaves identically wherever a result is shown.
 export function OperationResultView({
   response,
+  error,
   loading,
   loadingMessage,
   emptyMessage,
@@ -72,6 +94,39 @@ export function OperationResultView({
 }: OperationResultViewProps) {
   const rowNav = useRowDetailNavigation(detailOperation);
   const filters = filterConfig?.filters;
+
+  if (error != null) {
+    return (
+      <div
+        role={ariaLabel ? "region" : undefined}
+        aria-label={ariaLabel}
+        className={cn("mt-3 flex min-h-0 flex-col", className)}
+      >
+        <DataTable<ErrorResultRow>
+          data={[]}
+          columns={ERROR_RESULT_COLUMNS}
+          error={error}
+          className="h-full"
+          showGlobalFilter={false}
+          showDensityControl={false}
+          hideableColumns={false}
+          resizableColumns={false}
+          persistColumnWidths={false}
+          persistColumnVisibility={false}
+          persistDensity={false}
+          {...(filters && filters.length > 0
+            ? { externalFilters: filters }
+            : {})}
+          {...(filterConfig?.search
+            ? { externalSearch: filterConfig.search }
+            : {})}
+          {...(filterConfig?.timeRange
+            ? { externalTimeRange: filterConfig.timeRange }
+            : {})}
+        />
+      </div>
+    );
+  }
 
   return (
     <ExecutionResult
