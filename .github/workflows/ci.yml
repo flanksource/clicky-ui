@@ -32,7 +32,7 @@ jobs:
       # .gavel.yaml so they're visible in gavel's report and stay colocated
       # with the gavel invocation rather than duplicated across CI jobs.
       - name: Gavel test + lint
-        uses: flanksource/gavel@bec0766b728894efaa1bbebbab1666e77a13d1eb # v0.0.52
+        uses: flanksource/gavel@43a9189b99e71ed928f418e01cd34aa797c2c0e0 # v0.0.54
         with:
           args: test --lint
           comment-header: gavel
