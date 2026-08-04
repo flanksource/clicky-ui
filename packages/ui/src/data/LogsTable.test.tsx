@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import { LogsTable } from "./LogsTable";
 import { normalizeLogsTableRows } from "./logs-normalize";
@@ -273,5 +273,29 @@ describe("LogsTable", () => {
 
     expect(screen.queryByRole("menuitemradio", { name: /^light$/i })).toBeNull();
     expect(screen.queryByRole("menuitemradio", { name: /^dark$/i })).toBeNull();
+  });
+
+  it("maps native server filter keys onto the normalized log columns", () => {
+    vi.useFakeTimers();
+    const onCellFilterChange = vi.fn();
+    render(
+      <LogsTable
+        logs={envelopeLine}
+        autoFilter={false}
+        columnFilterKeys={{ level: "filter.Level" }}
+        onCellFilterChange={onCellFilterChange}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByText("INFO").closest("span.relative")!);
+    act(() => vi.advanceTimersByTime(150));
+    fireEvent.click(screen.getByRole("button", { name: "Include INFO" }));
+
+    expect(onCellFilterChange).toHaveBeenCalledWith({
+      key: "filter.Level",
+      value: "INFO",
+      mode: "include",
+    });
+    vi.useRealTimers();
   });
 });

@@ -44,6 +44,10 @@ import type {
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
+import type {
+  CellFilterChange,
+  CellFilterMode,
+} from "./cells/CellFilterActions";
 import { Tree } from "./Tree";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
@@ -106,10 +110,13 @@ export type ClickyColumn = {
   name: string;
   label?: string;
   type?: string;
+  format?: string;
+  unit?: string;
   header?: ClickyNode;
   align?: "left" | "right" | "center";
   sortable?: boolean;
   filterable?: boolean;
+  filterKey?: string;
   grow?: boolean;
   shrink?: boolean;
   kind?: "timestamp" | "tags" | "status";
@@ -153,6 +160,7 @@ export type ClickyNode = {
     | "object-graph"
     | "execution-tree";
   plain?: string;
+  filterValue?: string | number | boolean;
   style?: ClickyStyle;
   text?: string;
   children?: ClickyNode[];
@@ -318,6 +326,8 @@ export type ClickyProps = {
   // re-implementing them per page.
   search?: FilterBarSearchProps;
   externalFilters?: FilterBarFilter[];
+  cellFilters?: Record<string, Record<string, CellFilterMode>>;
+  onCellFilterChange?: (change: CellFilterChange) => void;
   /** Time-range control published into the first embedded table's FilterBar. */
   timeRange?: FilterBarRangeProps;
   /** Pagination footer configuration for the first embedded table. */
@@ -350,6 +360,8 @@ export type ClickyTableProps = {
   timeRange?: FilterBarRangeProps | undefined;
   /** Extra FilterBar controls rendered before generated filters. */
   externalFilters?: FilterBarFilter[] | undefined;
+  cellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
+  onCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   /** Pagination footer configuration. */
   pagination?: DataTablePagination | undefined;
   /** Controlled multi-row selection. */
@@ -388,6 +400,8 @@ type ClickyRuntimeContextValue = {
   tableSearch?: FilterBarSearchProps | undefined;
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
+  tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
+  onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -440,6 +454,10 @@ export function Clicky(props: ClickyProps) {
       {...(props.externalFilters
         ? { tableExternalFilters: props.externalFilters }
         : {})}
+      {...(props.cellFilters ? { tableCellFilters: props.cellFilters } : {})}
+      {...(props.onCellFilterChange
+        ? { onTableCellFilterChange: props.onCellFilterChange }
+        : {})}
       {...(props.pagination ? { tablePagination: props.pagination } : {})}
       {...(props.rowSelection ? { tableRowSelection: props.rowSelection } : {})}
       {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
@@ -472,6 +490,8 @@ function ClickyRuntimeProvider({
   tableSearch,
   tableTimeRange,
   tableExternalFilters,
+  tableCellFilters,
+  onTableCellFilterChange,
   tablePagination,
   tableRowSelection,
   tableMenuActions,
@@ -484,6 +504,8 @@ function ClickyRuntimeProvider({
   tableSearch?: FilterBarSearchProps | undefined;
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
+  tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
+  onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -497,6 +519,8 @@ function ClickyRuntimeProvider({
       tableSearch ||
       tableTimeRange ||
       tableExternalFilters ||
+      tableCellFilters ||
+      onTableCellFilterChange ||
       tablePagination ||
       tableRowSelection ||
       tableMenuActions;
@@ -512,6 +536,8 @@ function ClickyRuntimeProvider({
                 tableSearch,
                 tableTimeRange,
                 tableExternalFilters,
+                tableCellFilters,
+                onTableCellFilterChange,
                 tablePagination,
                 tableRowSelection,
                 tableMenuActions,
@@ -533,6 +559,8 @@ function ClickyRuntimeProvider({
       {...(tableSearch ? { tableSearch } : {})}
       {...(tableTimeRange ? { tableTimeRange } : {})}
       {...(tableExternalFilters ? { tableExternalFilters } : {})}
+      {...(tableCellFilters ? { tableCellFilters } : {})}
+      {...(onTableCellFilterChange ? { onTableCellFilterChange } : {})}
       {...(tablePagination ? { tablePagination } : {})}
       {...(tableRowSelection ? { tableRowSelection } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
@@ -550,6 +578,8 @@ function ClickyCommandRuntimeProvider({
   tableSearch,
   tableTimeRange,
   tableExternalFilters,
+  tableCellFilters,
+  onTableCellFilterChange,
   tablePagination,
   tableRowSelection,
   tableMenuActions,
@@ -562,6 +592,8 @@ function ClickyCommandRuntimeProvider({
   tableSearch?: FilterBarSearchProps | undefined;
   tableTimeRange?: FilterBarRangeProps | undefined;
   tableExternalFilters?: FilterBarFilter[] | undefined;
+  tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
+  onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -577,6 +609,8 @@ function ClickyCommandRuntimeProvider({
       tableSearch,
       tableTimeRange,
       tableExternalFilters,
+      tableCellFilters,
+      onTableCellFilterChange,
       tablePagination,
       tableRowSelection,
       tableMenuActions,
@@ -593,6 +627,8 @@ function ClickyCommandRuntimeProvider({
       tableSearch,
       tableTimeRange,
       tableExternalFilters,
+      tableCellFilters,
+      onTableCellFilterChange,
       tablePagination,
       tableRowSelection,
       tableMenuActions,
@@ -2891,6 +2927,8 @@ export function ClickyTable({
   search,
   timeRange,
   externalFilters,
+  cellFilters,
+  onCellFilterChange,
   pagination,
   rowSelection,
   menuActions,
@@ -2903,6 +2941,9 @@ export function ClickyTable({
   const effectiveTimeRange = timeRange ?? runtime.tableTimeRange;
   const effectiveExternalFilters =
     externalFilters ?? runtime.tableExternalFilters;
+  const effectiveCellFilters = cellFilters ?? runtime.tableCellFilters;
+  const effectiveCellFilterChange =
+    onCellFilterChange ?? runtime.onTableCellFilterChange;
   const effectivePagination = pagination ?? runtime.tablePagination;
   const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
@@ -2921,6 +2962,7 @@ export function ClickyTable({
     const jsonColumn = column.type === "json";
     const base: DataTableColumn<ClickyRow> = {
       key: `cells.${column.name}`,
+      accessor: (row) => row.cells[column.name],
       label: column.header ? (
         <ClickyNodeRenderer node={column.header} />
       ) : (
@@ -2931,10 +2973,15 @@ export function ClickyTable({
       ...(column.filterable !== undefined
         ? { filterable: column.filterable }
         : {}),
+      ...(column.filterKey ? { filterKey: column.filterKey } : {}),
+      serverFilterValue: (value) => {
+        const node = value as ClickyNode;
+        return node.filterValue ?? clickyNodeText(node);
+      },
+      serverFilterLabel: (value) => clickyNodeText(value as ClickyNode),
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
       ...(column.shrink !== undefined ? { shrink: column.shrink } : {}),
     };
-
     if (keyValueColumn) {
       return {
         ...base,
@@ -3019,6 +3066,10 @@ export function ClickyTable({
       {...(effectiveTimeRange ? { externalTimeRange: effectiveTimeRange } : {})}
       {...(effectiveExternalFilters
         ? { externalFilters: effectiveExternalFilters }
+        : {})}
+      {...(effectiveCellFilters ? { cellFilters: effectiveCellFilters } : {})}
+      {...(effectiveCellFilterChange
+        ? { onCellFilterChange: effectiveCellFilterChange }
         : {})}
       {...(effectivePagination ? { pagination: effectivePagination } : {})}
       {...(effectiveMenuActions ? { menuActions: effectiveMenuActions } : {})}
