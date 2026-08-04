@@ -8,10 +8,102 @@
 
 const LOCALE = "en-US";
 
+export type ClickyColumnOption = {
+  value: string;
+  label: string;
+  description: string;
+};
+
+export const CLICKY_COLUMN_FORMAT_OPTIONS = [
+  {
+    value: "date",
+    label: "Date/time",
+    description: "Render a date or timestamp.",
+  },
+  {
+    value: "float",
+    label: "Number",
+    description: "Render a number with decimal precision.",
+  },
+  {
+    value: "duration",
+    label: "Duration",
+    description: "Render a Go duration value.",
+  },
+  {
+    value: "bytes",
+    label: "Bytes",
+    description: "Render a byte count with binary scaling.",
+  },
+  {
+    value: "currency",
+    label: "Currency",
+    description: "Render a monetary amount.",
+  },
+] as const satisfies readonly ClickyColumnOption[];
+
+export const CLICKY_COLUMN_UNIT_OPTIONS = [
+  {
+    value: "none",
+    label: "Compact count",
+    description: "Use short SI count notation without a unit.",
+  },
+  {
+    value: "short",
+    label: "Short number",
+    description: "Use short SI count notation such as 1.2K.",
+  },
+  {
+    value: "percent",
+    label: "Percent (0-100)",
+    description: "Treat the source value as an existing percentage.",
+  },
+  {
+    value: "percentunit",
+    label: "Percent (0-1)",
+    description: "Convert a fractional source value to a percentage.",
+  },
+  {
+    value: "bytes",
+    label: "Bytes (IEC)",
+    description: "Scale byte values in powers of 1024.",
+  },
+  {
+    value: "decbytes",
+    label: "Bytes (SI)",
+    description: "Scale byte values in powers of 1000.",
+  },
+  {
+    value: "Bps",
+    label: "Bytes/sec",
+    description: "Render a byte rate in powers of 1024.",
+  },
+  {
+    value: "binBps",
+    label: "Binary bytes/sec",
+    description: "Render a binary byte rate in powers of 1024.",
+  },
+  {
+    value: "ms",
+    label: "Milliseconds",
+    description: "Treat the source duration as milliseconds.",
+  },
+  {
+    value: "s",
+    label: "Seconds",
+    description: "Treat the source duration as seconds.",
+  },
+] as const satisfies readonly ClickyColumnOption[];
+
+export type ClickyColumnFormat =
+  (typeof CLICKY_COLUMN_FORMAT_OPTIONS)[number]["value"];
+export type ClickyColumnUnit =
+  (typeof CLICKY_COLUMN_UNIT_OPTIONS)[number]["value"];
+
 function intl(value: number, maxFractionDigits = 1): string {
-  return new Intl.NumberFormat(LOCALE, { maximumFractionDigits: maxFractionDigits }).format(
-    Number.isFinite(value) ? value : 0,
-  );
+  return new Intl.NumberFormat(LOCALE, {
+    maximumFractionDigits: maxFractionDigits,
+  }).format(Number.isFinite(value) ? value : 0);
 }
 
 /** Drops a trailing ".0" so whole values read "1 KB" rather than "1.0 KB". */
@@ -35,7 +127,8 @@ const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
  */
 export function formatBytes(bytes?: number, opts?: FormatBytesOptions): string {
   const suffix = opts?.suffix ?? "";
-  if (bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return `0 B${suffix}`;
+  if (bytes === undefined || !Number.isFinite(bytes) || bytes <= 0)
+    return `0 B${suffix}`;
   const base = opts?.base ?? 1024;
   let size = bytes;
   let unit = 0;
@@ -43,7 +136,8 @@ export function formatBytes(bytes?: number, opts?: FormatBytesOptions): string {
     size /= base;
     unit++;
   }
-  const rendered = size >= 10 || unit === 0 ? size.toFixed(0) : trimZero(size.toFixed(1));
+  const rendered =
+    size >= 10 || unit === 0 ? size.toFixed(0) : trimZero(size.toFixed(1));
   return `${rendered} ${BYTE_UNITS[unit]}${suffix}`;
 }
 
@@ -73,7 +167,10 @@ export function formatShort(value?: number): string {
  * Duration rendered from a millisecond (default) or second input. Picks ms / s /
  * min / h by magnitude: 850 -> "850 ms", 1500 -> "1.5 s", 90_000 -> "1.5 min".
  */
-export function formatDuration(value?: number, opts?: { from?: "ms" | "s" }): string {
+export function formatDuration(
+  value?: number,
+  opts?: { from?: "ms" | "s" },
+): string {
   if (value === undefined || !Number.isFinite(value)) return "0 ms";
   const ms = opts?.from === "s" ? value * 1000 : value;
   const abs = Math.abs(ms);

@@ -162,4 +162,23 @@ describe("JsonSchemaForm idPrefix", () => {
     );
     expect(firstInput(container).id).toBe("jsf-Name");
   });
+
+  it("gives the same property name under two parents distinct ids and labels", () => {
+    const line: JsonSchemaObject = {
+      type: "object",
+      title: "Line",
+      properties: { asset: { type: "string", title: "Asset identifier" } },
+    };
+    const { container } = render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { lineA: line, lineB: line } }}
+        value={{ lineA: {}, lineB: {} }}
+        onChange={vi.fn()}
+      />,
+    );
+    const ids = [...container.querySelectorAll<HTMLElement>("input[data-jsf-input]")].map((el) => el.id);
+    expect(ids).toEqual(["jsf-lineA-asset", "jsf-lineB-asset"]);
+    const labelTargets = [...container.querySelectorAll("label[for]")].map((el) => el.getAttribute("for"));
+    expect(new Set(labelTargets).size).toBe(labelTargets.length);
+  });
 });

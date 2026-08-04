@@ -55,6 +55,44 @@ describe("JsonSchemaForm authoritative errors", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("announces an errored field as invalid and points it at its own message", () => {
+    renderForm(
+      {
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", title: "Name" } },
+      },
+      { name: "" },
+      [{ instancePath: "/name", message: "Name is required" }]
+    );
+
+    const input = screen.getByRole("textbox", { name: /^Name/ });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-required", "true");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBe(`${input.id}-error`);
+    expect(document.getElementById(describedBy!)).toHaveTextContent(
+      "Name is required"
+    );
+  });
+
+  it("leaves a valid field free of aria-invalid while still marking it required", () => {
+    renderForm(
+      {
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", title: "Name" } },
+      },
+      { name: "ok" },
+      []
+    );
+
+    const input = screen.getByRole("textbox", { name: /^Name/ });
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(input).not.toHaveAttribute("aria-describedby");
+    expect(input).toHaveAttribute("aria-required", "true");
+  });
+
   it("matches nested and conditional fields by their JSON Pointer", () => {
     const thenKeyword = ["th", "en"].join("") as "then";
     renderForm(

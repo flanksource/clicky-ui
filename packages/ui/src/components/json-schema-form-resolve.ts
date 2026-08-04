@@ -17,15 +17,22 @@ import { isPlainObject } from "./json-schema-form-utils";
 // editable key/value control rather than a fixed-property sub-form.
 export function isOpenStringMap(prop: JsonSchemaProperty): boolean {
   if (!schemaRendersAsObject(prop)) return false;
-  if (typeof prop.additionalProperties === "object" && prop.additionalProperties !== null) {
+  if (
+    typeof prop.additionalProperties === "object" &&
+    prop.additionalProperties !== null
+  ) {
     return true;
   }
-  return !!prop.patternProperties && Object.keys(prop.patternProperties).length > 0;
+  return (
+    !!prop.patternProperties && Object.keys(prop.patternProperties).length > 0
+  );
 }
 
 // patternSchemasOf compiles a schema's `patternProperties` into the ordered
 // {pattern, schema} list the string-map control matches keys against.
-function patternSchemasOf(prop: JsonSchemaProperty): { pattern: string; schema: JsonSchemaProperty }[] | undefined {
+function patternSchemasOf(
+  prop: JsonSchemaProperty,
+): { pattern: string; schema: JsonSchemaProperty }[] | undefined {
   const pp = prop.patternProperties;
   if (!pp || Object.keys(pp).length === 0) return undefined;
   return Object.entries(pp).map(([pattern, schema]) => ({ pattern, schema }));
@@ -55,7 +62,9 @@ export function schemaRendersAsObject(prop: JsonSchemaProperty): boolean {
   return (
     prop.allOf?.some(
       (clause) =>
-        clause.if === undefined && clause.then === undefined && schemaRendersAsObject(clause as JsonSchemaProperty),
+        clause.if === undefined &&
+        clause.then === undefined &&
+        schemaRendersAsObject(clause as JsonSchemaProperty),
     ) ?? false
   );
 }
@@ -71,9 +80,14 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
     const description = descriptions?.[value];
     return {
       value,
-      label: typeof desc === "string" && desc && desc !== value ? `${desc} (${value})` : value,
+      label:
+        typeof desc === "string" && desc && desc !== value
+          ? `${desc} (${value})`
+          : value,
       ...(typeof icon === "string" && icon ? { icon } : {}),
-      ...(typeof description === "string" && description ? { description } : {}),
+      ...(typeof description === "string" && description
+        ? { description }
+        : {}),
     };
   });
 }
@@ -83,21 +97,27 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
 // Returns undefined to keep the combobox default.
 function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
   const d = prop["x-enum-display"];
-  if (d === "combobox" || d === "radio" || d === "grid" || d === "segmented") return d;
+  if (d === "combobox" || d === "radio" || d === "grid" || d === "segmented")
+    return d;
   const icons = prop["x-enum-icons"];
   if (icons && Object.keys(icons).length > 0) return "grid";
   return undefined;
 }
 
 function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
-  return prop["x-array-display"] === "filter-pills" ? "filter-pills" : undefined;
+  return prop["x-array-display"] === "filter-pills"
+    ? "filter-pills"
+    : undefined;
 }
 
-function schemaHelper(prop: JsonSchemaProperty): string | undefined {
-  const description = typeof prop.description === "string" ? prop.description.trim() : "";
+export function schemaHelper(prop: JsonSchemaProperty): string | undefined {
+  const description =
+    typeof prop.description === "string" ? prop.description.trim() : "";
   const help = prop["x-help"];
   const helpBody =
-    isPlainObject(help) && typeof help.body === "string" ? help.body.trim() : "";
+    isPlainObject(help) && typeof help.body === "string"
+      ? help.body.trim()
+      : "";
 
   if (description && helpBody && helpBody !== description) {
     return `${description} ${helpBody}`;
@@ -111,10 +131,17 @@ function adornmentNode(iconName: unknown, text: unknown): ReactNode {
   if (typeof iconName === "string" && iconName) {
     // Match the library's InputField field-icon convention (16px, muted/70) so a
     // schema-driven field lines up with a hand-built one.
-    return createElement(LabelIcon, { icon: iconName, className: "size-4 text-muted-foreground/70" });
+    return createElement(LabelIcon, {
+      icon: iconName,
+      className: "size-4 text-muted-foreground/70",
+    });
   }
   if (typeof text === "string" && text) {
-    return createElement("span", { className: "text-sm text-muted-foreground" }, text);
+    return createElement(
+      "span",
+      { className: "text-sm text-muted-foreground" },
+      text,
+    );
   }
   return undefined;
 }
@@ -123,7 +150,9 @@ function adornmentNode(iconName: unknown, text: unknown): ReactNode {
 // for a union of "an enum value OR a free-form string" (e.g. a value-or-token
 // field). It lets such a union render as a dropdown. Returns undefined when no
 // branch enumerates values.
-export function enumBranch(prop: JsonSchemaProperty): JsonSchemaProperty | undefined {
+export function enumBranch(
+  prop: JsonSchemaProperty,
+): JsonSchemaProperty | undefined {
   for (const branch of [...(prop.anyOf ?? []), ...(prop.oneOf ?? [])]) {
     if (Array.isArray(branch.enum) && branch.enum.length > 0) return branch;
   }
@@ -132,11 +161,14 @@ export function enumBranch(prop: JsonSchemaProperty): JsonSchemaProperty | undef
 
 // lookupDescriptor reads the `x-clicky-lookup` extension into a LookupDescriptor,
 // returning undefined when the keyword is absent or lacks its required url/filter.
-function lookupDescriptor(prop: JsonSchemaProperty): LookupDescriptor | undefined {
+function lookupDescriptor(
+  prop: JsonSchemaProperty,
+): LookupDescriptor | undefined {
   const raw = prop["x-clicky-lookup"];
   if (!raw || typeof raw !== "object") return undefined;
   const d = raw as Record<string, unknown>;
-  if (typeof d.url !== "string" || typeof d.filter !== "string") return undefined;
+  if (typeof d.url !== "string" || typeof d.filter !== "string")
+    return undefined;
   return raw as LookupDescriptor;
 }
 
@@ -158,21 +190,38 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   const labelIcon = prop["x-icon"];
   const xLayout = prop["x-layout"];
   const explicitLayout =
-    xLayout === "inline" || xLayout === "stack" || xLayout === "table" ? xLayout : undefined;
+    xLayout === "inline" || xLayout === "stack" || xLayout === "table"
+      ? xLayout
+      : undefined;
   // `x-label-position` is a friendlier alias over the same per-field layout knob:
   // "top" stacks the label above the value; "left" forces inline. `x-layout` wins.
   const labelPosition = prop["x-label-position"];
   const layout =
     explicitLayout ??
-    (labelPosition === "top" ? "stack" : labelPosition === "left" ? "inline" : undefined);
-  const prefix = adornmentNode(prop["x-input-prefix-icon"], prop["x-input-prefix"]);
-  const suffix = adornmentNode(prop["x-input-suffix-icon"], prop["x-input-suffix"]);
+    (labelPosition === "top"
+      ? "stack"
+      : labelPosition === "left"
+        ? "inline"
+        : undefined);
+  const prefix = adornmentNode(
+    prop["x-input-prefix-icon"],
+    prop["x-input-prefix"],
+  );
+  const suffix = adornmentNode(
+    prop["x-input-suffix-icon"],
+    prop["x-input-suffix"],
+  );
   const labelClassName =
-    typeof prop["x-label-classes"] === "string" ? prop["x-label-classes"] : undefined;
+    typeof prop["x-label-classes"] === "string"
+      ? prop["x-label-classes"]
+      : undefined;
   const inputClassName =
-    typeof prop["x-input-classes"] === "string" ? prop["x-input-classes"] : undefined;
+    typeof prop["x-input-classes"] === "string"
+      ? prop["x-input-classes"]
+      : undefined;
   const colSpan =
-    typeof prop["x-col-span"] === "number" && Number.isFinite(prop["x-col-span"])
+    typeof prop["x-col-span"] === "number" &&
+    Number.isFinite(prop["x-col-span"])
       ? prop["x-col-span"]
       : undefined;
   const keyOptions = keyOptionsFor(prop);
@@ -186,9 +235,13 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     value,
     onChange,
     ...(prop.readOnly === true ? { readOnly: true } : {}),
-    ...(typeof prop.description === "string" ? { description: prop.description } : {}),
+    ...(typeof prop.description === "string"
+      ? { description: prop.description }
+      : {}),
     ...(helper ? { helper } : {}),
-    ...(labelIcon != null && labelIcon !== "" ? { labelIcon: labelIcon as FieldControl["labelIcon"] } : {}),
+    ...(labelIcon != null && labelIcon !== ""
+      ? { labelIcon: labelIcon as FieldControl["labelIcon"] }
+      : {}),
     ...(layout ? { layout } : {}),
     ...(prefix ? { prefix } : {}),
     ...(suffix ? { suffix } : {}),
@@ -202,11 +255,22 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   // free-form entry so a typed value outside the option set still commits.
   const lookup = lookupDescriptor(prop);
   if (lookup) {
-    return { ...base, kind: "lookup", lookup, options: [], allowCustomValue: lookup.multi !== true };
+    return {
+      ...base,
+      kind: "lookup",
+      lookup,
+      options: [],
+      allowCustomValue: lookup.multi !== true,
+    };
   }
   if (Array.isArray(prop.enum) && prop.enum.length > 0) {
     const display = enumDisplay(prop);
-    return { ...base, kind: "enum", options: enumOptions(prop), ...(display ? { display } : {}) };
+    return {
+      ...base,
+      kind: "enum",
+      options: enumOptions(prop),
+      ...(display ? { display } : {}),
+    };
   }
   // A value-or-template union: the enum lives in an anyOf/oneOf branch alongside
   // free-form branches. Render it as a dropdown using that branch's enum; the
@@ -266,7 +330,8 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   // rows (+ any known properties), with the value form resolved per key.
   if (isOpenStringMap(prop)) {
     const addl =
-      typeof prop.additionalProperties === "object" && prop.additionalProperties !== null
+      typeof prop.additionalProperties === "object" &&
+      prop.additionalProperties !== null
         ? (prop.additionalProperties as JsonSchemaProperty)
         : undefined;
     const patterns = patternSchemasOf(prop);
@@ -274,7 +339,8 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     // the author ADD keys — the additions are limited to the allowed set, not
     // free-form — so `additionalProperties: false` doesn't disable "Add field"
     // in that case. It only closes a plain open map with no key constraints.
-    const allowExtraKeys = keyOptions || patterns ? true : prop.additionalProperties !== false;
+    const allowExtraKeys =
+      keyOptions || patterns ? true : prop.additionalProperties !== false;
     return {
       ...base,
       kind: "string-map",
@@ -290,13 +356,18 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   // nested sub-form (labels, required, if/then) — recursed into by the renderer.
   if (schemaRendersAsObject(prop)) {
     const valueObject = isPlainObject(value) ? value : {};
-    const objectFields = effectiveProperties(prop as JsonSchemaObject, valueObject);
+    const objectFields = effectiveProperties(
+      prop as JsonSchemaObject,
+      valueObject,
+    );
     if (Object.keys(objectFields.properties).length > 0 || prop.properties) {
       return {
         ...base,
         kind: "object",
         objectProperties: objectFields.properties,
-        ...(objectFields.required.length > 0 ? { objectRequired: objectFields.required } : {}),
+        ...(objectFields.required.length > 0
+          ? { objectRequired: objectFields.required }
+          : {}),
         ...(layout ? { layout } : {}),
       };
     }
@@ -328,7 +399,9 @@ function keyOptionsFor(prop: JsonSchemaProperty): FieldOption[] | undefined {
 // with no richer shape — the case the array control renders as compact tags.
 // Anything with an enum/const/properties/items/additionalProperties/allOf needs
 // a real per-item control instead.
-export function isScalarStringItems(items: JsonSchemaProperty | undefined): boolean {
+export function isScalarStringItems(
+  items: JsonSchemaProperty | undefined,
+): boolean {
   if (!items) return true; // untyped items default to string tags
   if (items.type !== undefined && !schemaHasType(items, "string")) return false;
   return (
@@ -389,7 +462,9 @@ function applyObjectDefaults(
   // a chain of discriminator defaults while keeping malformed schemas bounded.
   const maxPasses = Math.min(
     100,
-    Object.keys(schema.properties ?? {}).length + (schema.allOf?.length ?? 0) + 2,
+    Object.keys(schema.properties ?? {}).length +
+      (schema.allOf?.length ?? 0) +
+      2,
   );
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const { properties } = effectiveProperties(schema, next);
@@ -458,7 +533,9 @@ export function effectiveProperties(
   schema: JsonSchemaObject,
   value: Record<string, unknown>,
 ): EffectiveProperties {
-  const properties: Record<string, JsonSchemaProperty> = { ...schema.properties };
+  const properties: Record<string, JsonSchemaProperty> = {
+    ...schema.properties,
+  };
   const required = new Set(schema.required ?? []);
   for (const clause of schema.allOf ?? []) {
     // Unconditional composition member: merge its own properties/required.

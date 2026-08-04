@@ -2,12 +2,14 @@ import { cn } from "../lib/utils";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 
 export function FieldErrorMessages({
+  id,
   errors,
 }: {
+  id?: string;
   errors: JsonSchemaFormError[];
 }) {
   return (
-    <span data-jsf-errors>
+    <span id={id} data-jsf-errors>
       {errors.map((error, index) => (
         <span
           key={`${error.schemaPath ?? ""}:${error.keyword ?? ""}:${
@@ -23,16 +25,18 @@ export function FieldErrorMessages({
 }
 
 export function FieldErrorText({
+  id,
   errors,
   className,
 }: {
+  id?: string;
   errors: JsonSchemaFormError[];
   className?: string;
 }) {
   if (errors.length === 0) return null;
   return (
     <p className={cn("text-xs text-destructive", className)}>
-      <FieldErrorMessages errors={errors} />
+      <FieldErrorMessages {...(id ? { id } : {})} errors={errors} />
     </p>
   );
 }

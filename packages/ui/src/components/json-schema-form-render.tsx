@@ -32,6 +32,7 @@ import type {
   RenderContext,
 } from "./json-schema-form-types";
 import {
+  fieldErrorId,
   fieldInputId,
   matchesFieldFilter,
   normalizeColSpan,
@@ -53,7 +54,9 @@ import { labelSizeClass } from "./json-schema-form-size";
 // its resolved kind. The RenderContext carries readOnly + the pre/post stacks so
 // container controls (array/object/map) can recurse with full context.
 export function renderValueControl(field: FieldControl, ctx: RenderContext): ReactNode {
-  const fieldId = fieldInputId(field.key, ctx.idPrefix);
+  // ctx.instancePath is the field's own path here: buildField descends into the
+  // child context before rendering the value.
+  const fieldId = fieldInputId(ctx.instancePath, ctx.idPrefix);
   // A field the schema marks `readOnly` is never editable: it shows its current
   // value as plain text, not a disabled input. (The form-level ctx.readOnly,
   // below, instead disables the real controls so the structure stays visible.)
@@ -128,6 +131,7 @@ function buildField(
   ctx: RenderContext,
 ): {
   field: FieldControl;
+  fieldId: string;
   label: ReactNode;
   value: ReactNode;
   errors: JsonSchemaFormError[];
@@ -148,14 +152,19 @@ function buildField(
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
   if (ctx.hideReadOnlyFields && field.readOnly) return null;
 
-  const fieldId = fieldInputId(field.key, ctx.idPrefix);
+  const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
+  const fieldId = fieldInputId(instancePath, ctx.idPrefix);
+  // Resolve this field's errors before rendering its control, so the control can
+  // carry aria-invalid / aria-describedby rather than leaving the error text
+  // visually adjacent but programmatically unassociated.
+  const errors = errorsAtInstancePath(ctx.errors, instancePath);
+  if (errors.length > 0) field = { ...field, invalid: true };
   let label: ReactNode = <FieldLabel field={field} fieldId={fieldId} size={ctx.size} />;
   // A field's `x-layout: inline|stack` overrides the form-level layout for its
   // own value subtree (the field's own row keeps the parent layout). "table" is
   // handled structurally inside the array/string-map controls, not here.
   const overrideMode =
     field.layout === "inline" ? "inline" : field.layout === "stack" ? "stacked" : undefined;
-  const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
   const valueCtx: RenderContext = {
     ...ctx,
     instancePath,
@@ -171,12 +180,7 @@ function buildField(
     label = next.label;
     value = next.value;
   }
-  return {
-    field,
-    label,
-    value,
-    errors: errorsAtInstancePath(ctx.errors, instancePath),
-  };
+  return { field, fieldId, label, value, errors };
 }
 
 // renderFieldNodes runs the full pipeline and returns the raw {label, value}
@@ -194,7 +198,7 @@ export function renderFieldNodes(
       built.errors.length > 0 ? (
         <div className="flex min-w-0 flex-col gap-0.5">
           {built.value}
-          <FieldErrorText errors={built.errors} />
+          <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.errors} />
         </div>
       ) : (
         built.value
@@ -229,7 +233,11 @@ export function renderFieldRow(
         {...(field.helper ? { helper: field.helper } : {})}
         {...(field.labelIcon != null ? { labelIcon: field.labelIcon } : {})}
       >
-        <FieldErrorText errors={built.errors} className="min-w-0 break-words" />
+        <FieldErrorText
+          id={fieldErrorId(built.fieldId)}
+          errors={built.errors}
+          className="min-w-0 break-words"
+        />
         {built.value}
       </ObjectSection>
     );
@@ -253,7 +261,12 @@ export function renderFieldRow(
   ) : (
     built.label
   );
-  const err = built.errors.length > 0 ? <FieldErrorMessages errors={built.errors} /> : softError(field);
+  const err =
+    built.errors.length > 0 ? (
+      <FieldErrorMessages id={fieldErrorId(built.fieldId)} errors={built.errors} />
+    ) : (
+      softError(field)
+    );
   return (
     <FieldWrapper
       layout={ctx.layout}

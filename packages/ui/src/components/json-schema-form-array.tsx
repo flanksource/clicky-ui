@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { FilterPill } from "../data/FilterPill";
 import { UiAdd, UiChevronDown, UiChevronUp, UiClose, UiTrash } from "../icons";
+import { HoverCard } from "../overlay/HoverCard";
 import { Button } from "./button";
 import {
   controlHeightClass,
@@ -12,32 +13,63 @@ import {
   labelSizeClass,
   type FormSize,
 } from "./json-schema-form-size";
-import { isScalarStringItems } from "./json-schema-form-resolve";
+import { isScalarStringItems, schemaHelper } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import {
   defaultPlaceholder,
   isPlainObject,
   moveItem,
+  orderByClickyOrder,
+  orderByXOrder,
   removeIndex,
   seedFromSchema,
   setIndex,
 } from "./json-schema-form-utils";
-import type { FieldControl, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
+import type {
+  FieldControl,
+  JsonSchemaProperty,
+  RenderContext,
+} from "./json-schema-form-types";
 
 // ArrayControl is a hybrid: plain string-item arrays keep the compact tag UI;
 // anything richer (objects, numbers, enums, nested arrays) renders one recursive
 // control per item with add / remove / reorder. Recursion goes through
 // ctx.render so this module never imports the renderer (no import cycle).
-export function ArrayControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
+export function ArrayControl({
+  field,
+  fieldId,
+  ctx,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  ctx: RenderContext;
+}) {
   // A read-only array marks its whole subtree non-editable: no add/remove/reorder
   // and item inputs disabled (a child the schema marks readOnly still renders as
   // a value span).
   const readOnly = ctx.readOnly || field.readOnly === true;
-  if (field.arrayDisplay === "filter-pills" && enumItemOptions(field).length > 0) {
-    return <FilterPillArray field={field} fieldId={fieldId} readOnly={readOnly} size={ctx.size} />;
+  if (
+    field.arrayDisplay === "filter-pills" &&
+    enumItemOptions(field).length > 0
+  ) {
+    return (
+      <FilterPillArray
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={ctx.size}
+      />
+    );
   }
   if (isScalarStringItems(field.itemSchema)) {
-    return <TagArray field={field} fieldId={fieldId} readOnly={readOnly} size={ctx.size} />;
+    return (
+      <TagArray
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={ctx.size}
+      />
+    );
   }
   // `x-layout: table` renders object-item arrays as compact rows with one column
   // per item property — a denser alternative to the per-item stacked sub-form.
@@ -49,7 +81,12 @@ export function ArrayControl({ field, fieldId, ctx }: { field: FieldControl; fie
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 
   return (
-    <div className={cn("flex flex-col rounded-md border border-input p-2", fieldInnerGapClass[ctx.size])}>
+    <div
+      className={cn(
+        "flex flex-col rounded-md border border-input p-2",
+        fieldInnerGapClass[ctx.size],
+      )}
+    >
       {items.map((item, i) => (
         <div key={i} className="grid grid-cols-[1fr_auto] items-start gap-2">
           <div className="min-w-0">
@@ -68,8 +105,16 @@ export function ArrayControl({ field, fieldId, ctx }: { field: FieldControl; fie
           </div>
           {!readOnly && (
             <ItemControls
-              onUp={i > 0 ? () => field.onChange(moveItem(items, i, i - 1)) : undefined}
-              onDown={i < items.length - 1 ? () => field.onChange(moveItem(items, i, i + 1)) : undefined}
+              onUp={
+                i > 0
+                  ? () => field.onChange(moveItem(items, i, i - 1))
+                  : undefined
+              }
+              onDown={
+                i < items.length - 1
+                  ? () => field.onChange(moveItem(items, i, i + 1))
+                  : undefined
+              }
               onRemove={() => field.onChange(removeIndex(items, i))}
               index={i}
               size={ctx.size}
@@ -92,7 +137,9 @@ export function ArrayControl({ field, fieldId, ctx }: { field: FieldControl; fie
   );
 }
 
-function enumItemOptions(field: FieldControl): Array<{ value: string; label: string }> {
+function enumItemOptions(
+  field: FieldControl,
+): Array<{ value: string; label: string }> {
   const rawOptions =
     field.options ??
     (Array.isArray(field.itemSchema?.enum)
@@ -122,12 +169,18 @@ function FilterPillArray({
 }) {
   const options = enumItemOptions(field);
   const validValues = new Set(options.map((option) => option.value));
-  const explicitValues = toStringArray(field.value).filter((value) => validValues.has(value));
+  const explicitValues = toStringArray(field.value).filter((value) =>
+    validValues.has(value),
+  );
   const implicitAll = explicitValues.length === 0;
-  const selected = new Set(implicitAll ? options.map((option) => option.value) : explicitValues);
+  const selected = new Set(
+    implicitAll ? options.map((option) => option.value) : explicitValues,
+  );
 
   function commit(nextSelected: Set<string>) {
-    const next = options.map((option) => option.value).filter((value) => nextSelected.has(value));
+    const next = options
+      .map((option) => option.value)
+      .filter((value) => nextSelected.has(value));
     field.onChange(next.length === options.length ? [] : next);
   }
 
@@ -158,7 +211,9 @@ function FilterPillArray({
           key={option.value}
           label={option.label}
           mode={selected.has(option.value) ? "active" : "neutral"}
-          title={implicitAll ? `${option.label} enabled by default` : option.label}
+          title={
+            implicitAll ? `${option.label} enabled by default` : option.label
+          }
           {...(!readOnly ? { onClick: () => toggle(option.value) } : {})}
           className="max-w-full"
         />
@@ -169,20 +224,42 @@ function FilterPillArray({
 
 // hasObjectItemProperties reports whether the array's items are objects with a
 // fixed `properties` set — the precondition for a column-per-property table.
-function hasObjectItemProperties(items: JsonSchemaProperty | undefined): boolean {
-  return !!items && !!items.properties && Object.keys(items.properties).length > 0;
+function hasObjectItemProperties(
+  items: JsonSchemaProperty | undefined,
+): boolean {
+  return (
+    !!items && !!items.properties && Object.keys(items.properties).length > 0
+  );
 }
 
 // TableArray renders an object-item array as a table: a header row of the item's
 // property names and one row per item with value-only controls, plus per-row
 // remove and an add button. Driven by `x-layout: table`.
-function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: RenderContext; readOnly: boolean }) {
+function TableArray({
+  field,
+  ctx,
+  readOnly,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+  readOnly: boolean;
+}) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
-  const columns = Object.entries(itemSchema.properties ?? {});
+  const columns = orderByClickyOrder(
+    orderByXOrder(
+      Object.entries(itemSchema.properties ?? {}),
+      itemSchema["x-order"],
+    ),
+  );
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 
-  function cell(item: unknown, rowIndex: number, col: string, prop: JsonSchemaProperty): ReactNode {
+  function cell(
+    item: unknown,
+    rowIndex: number,
+    col: string,
+    prop: JsonSchemaProperty,
+  ): ReactNode {
     const obj = isPlainObject(item) ? item : {};
     const nodes = ctx.render.renderFieldNodes(
       {
@@ -190,8 +267,12 @@ function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: Render
         prop,
         required: false,
         value: obj[col],
-        onChange: (next) => field.onChange(setIndex(items, rowIndex, { ...obj, [col]: next })),
-        instancePath: appendInstancePath(appendInstancePath(ctx.instancePath, rowIndex), col),
+        onChange: (next) =>
+          field.onChange(setIndex(items, rowIndex, { ...obj, [col]: next })),
+        instancePath: appendInstancePath(
+          appendInstancePath(ctx.instancePath, rowIndex),
+          col,
+        ),
       },
       childCtx,
     );
@@ -204,8 +285,11 @@ function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: Render
         <thead>
           <tr className="border-b border-input bg-muted/40 text-left">
             {columns.map(([col, prop]) => (
-              <th key={col} className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                {typeof prop.title === "string" && prop.title ? prop.title : col}
+              <th
+                key={col}
+                className="px-2 py-1 text-xs font-medium text-muted-foreground"
+              >
+                <TableColumnHeader name={col} schema={prop} />
               </th>
             ))}
             {!readOnly && <th className="w-10 px-2 py-1" />}
@@ -213,7 +297,10 @@ function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: Render
         </thead>
         <tbody>
           {items.map((item, i) => (
-            <tr key={i} className="border-b border-input last:border-b-0 align-top">
+            <tr
+              key={i}
+              className="border-b border-input last:border-b-0 align-top"
+            >
               {columns.map(([col, prop]) => (
                 <td key={col} className="px-2 py-1">
                   {cell(item, i, col, prop)}
@@ -244,7 +331,9 @@ function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: Render
             type="button"
             variant="outline"
             className={cn("gap-1.5", inputSizeClass[ctx.size])}
-            onClick={() => field.onChange([...items, seedFromSchema(itemSchema)])}
+            onClick={() =>
+              field.onChange([...items, seedFromSchema(itemSchema)])
+            }
           >
             <Icon icon={UiAdd} className="text-sm" />
             Add item
@@ -252,6 +341,37 @@ function TableArray({ field, ctx, readOnly }: { field: FieldControl; ctx: Render
         </div>
       )}
     </div>
+  );
+}
+
+function TableColumnHeader({
+  name,
+  schema,
+}: {
+  name: string;
+  schema: JsonSchemaProperty;
+}) {
+  const label =
+    typeof schema.title === "string" && schema.title ? schema.title : name;
+  const helper = schemaHelper(schema);
+  if (!helper) return label;
+
+  return (
+    <HoverCard
+      placement="bottom"
+      trigger={
+        <button
+          type="button"
+          aria-label={`${label} help`}
+          className="cursor-help border-b border-dotted border-current text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {label}
+        </button>
+      }
+      cardClassName="max-w-xs whitespace-normal text-left font-normal text-foreground"
+    >
+      {helper}
+    </HoverCard>
   );
 }
 
@@ -293,7 +413,12 @@ function ItemControls({
       >
         <Icon icon={UiChevronDown} className="text-sm" />
       </button>
-      <button type="button" aria-label={`Remove item ${index + 1}`} className={actionClassName} onClick={onRemove}>
+      <button
+        type="button"
+        aria-label={`Remove item ${index + 1}`}
+        className={actionClassName}
+        onClick={onRemove}
+      >
         <Icon icon={UiTrash} className="text-sm" />
       </button>
     </div>
@@ -365,8 +490,13 @@ function TagArray({
         <input
           id={fieldId}
           data-jsf-input
-          className={cn("min-w-32 flex-1 bg-transparent px-1 py-1 outline-none", labelSizeClass[size])}
-          placeholder={tags.length === 0 ? defaultPlaceholder(field.schema) : ""}
+          className={cn(
+            "min-w-32 flex-1 bg-transparent px-1 py-1 outline-none",
+            labelSizeClass[size],
+          )}
+          placeholder={
+            tags.length === 0 ? defaultPlaceholder(field.schema) : ""
+          }
           onKeyDown={handleKeyDown}
           onBlur={(e) => commit(e.currentTarget.value, e.currentTarget)}
         />

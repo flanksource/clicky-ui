@@ -132,7 +132,7 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
       {knownKeys.map((key) => (
         <div key={`known-${key}`} className="grid grid-cols-[10rem_1fr] items-center gap-2">
           <label
-            htmlFor={fieldInputId(key, childCtx.idPrefix)}
+            htmlFor={fieldInputId(appendInstancePath(ctx.instancePath, key), childCtx.idPrefix)}
             className="truncate text-xs text-muted-foreground"
             title={key}
           >

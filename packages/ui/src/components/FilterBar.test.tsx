@@ -54,6 +54,12 @@ function mockMatchMedia(matches: boolean) {
 }
 
 describe("FilterBar", () => {
+  it("exposes the shared filter bar styling slot", () => {
+    const { container } = render(<FilterBar />);
+
+    expect(container.querySelector('[data-slot="filter-bar"]')).toBeInTheDocument();
+  });
+
   it("renders native search, filters, and range controls", () => {
     vi.useFakeTimers();
     const onSearch = vi.fn();
@@ -289,6 +295,31 @@ describe("FilterBar", () => {
 
     fireEvent.click(screen.getByLabelText("Active"));
     expect(onActive).toHaveBeenCalledWith(true);
+  });
+
+  it("cycles a tristate filter and counts only its set states as active", () => {
+    const onIntercompany = vi.fn();
+    const filter = (value: boolean | undefined) => ({
+      key: "intercompany",
+      kind: "tristate" as const,
+      label: "Intercompany",
+      value,
+      onChange: onIntercompany,
+    });
+
+    const { rerender } = render(<FilterBar filters={[filter(undefined)]} />);
+
+    const toggle = () => screen.getByRole("checkbox", { name: "Intercompany" });
+    expect(toggle().getAttribute("aria-checked")).toBe("mixed");
+
+    fireEvent.click(toggle());
+    expect(onIntercompany).toHaveBeenLastCalledWith(true);
+
+    rerender(<FilterBar filters={[filter(false)]} />);
+    expect(toggle().getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(toggle());
+    expect(onIntercompany).toHaveBeenLastCalledWith(undefined);
   });
 
   it("renders include-only multi-select filters", () => {
