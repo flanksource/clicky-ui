@@ -37,6 +37,9 @@ packages/ui/NOTICE.md
 packages/ui/src/icons/
 packages/ui/icons/svg/
 
+# Playground feedback (local scratch notes)
+apps/playground/.playground/
+
 # Probe artefacts
 .playwright-mcp/
 

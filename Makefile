@@ -18,4 +18,4 @@ test:
 	pnpm run test
 
 clean:
-	rm -rf packages/ui/dist apps/kitchen-sink/dist apps/storybook/storybook-static
+	rm -rf packages/ui/dist apps/kitchen-sink/dist apps/playground/dist apps/storybook/storybook-static
