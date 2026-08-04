@@ -1,11 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { Timestamp } from "./cells/Timestamp";
 import { TaskProgress } from "./TaskProgress";
-import type { TaskRunMeta } from "./TaskSnapshot";
+import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
+import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./task-status";
 
 // TaskManager is the generic clicky-ui task-manager view: it lists every run
@@ -46,13 +49,29 @@ export function TaskManager({
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const queryClient = useQueryClient();
+  const apiBase = basePath ?? "/api/v1";
+  const activeKind = kind ?? (kindFilter || undefined);
   const { runs, status } = useTaskRuns({
     basePath,
-    kind: kind ?? (kindFilter || undefined),
+    kind: activeKind,
     labels,
     status: statusFilter || undefined,
     pollMs,
   });
+  const runsQueryKey = useMemo(
+    () => taskQueryKeys.runs({
+      basePath: apiBase,
+      kind: activeKind,
+      status: statusFilter || undefined,
+      labels,
+    }),
+    [activeKind, apiBase, labels, statusFilter],
+  );
+
+  useEffect(() => {
+    queryClient.setQueryData(runsQueryKey, runs);
+  }, [queryClient, runs, runsQueryKey]);
 
   const kinds = useMemo(() => {
     const set = new Set<string>();
@@ -106,6 +125,7 @@ export function TaskManager({
               pollMs={pollMs}
               selectedId={selectedId}
               onSelectRun={onSelectRun}
+              runsQueryKey={runsQueryKey}
             />
           ))}
         </div>
@@ -120,12 +140,14 @@ function RunRow({
   pollMs,
   selectedId,
   onSelectRun,
+  runsQueryKey,
 }: {
   run: TaskRunMeta;
   basePath: string | undefined;
   pollMs: number | undefined;
   selectedId: string | undefined;
   onSelectRun: ((id: string | null) => void) | undefined;
+  runsQueryKey: QueryKey;
 }) {
   const [localOpen, setLocalOpen] = useState(false);
   // Controlled by selectedId when a selection handler is wired; otherwise the
@@ -196,7 +218,14 @@ function RunRow({
           />
         </div>
       </button>
-      {open && <ExpandedRun runId={run.id} basePath={basePath} pollMs={pollMs} />}
+      {open && (
+        <ExpandedRun
+          runId={run.id}
+          basePath={basePath}
+          pollMs={pollMs}
+          runsQueryKey={runsQueryKey}
+        />
+      )}
     </div>
   );
 }
@@ -205,29 +234,98 @@ function ExpandedRun({
   runId,
   basePath,
   pollMs,
+  runsQueryKey,
 }: {
   runId: string;
   basePath: string | undefined;
   pollMs: number | undefined;
+  runsQueryKey: QueryKey;
 }) {
   const { snapshots } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
-  const control = async (action: import("./TaskSnapshot").TaskControlAction) => {
-    const response = await fetch(`${apiBase}/tasks/${encodeURIComponent(runId)}/control`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+  const queryClient = useQueryClient();
+  const pendingControls = useRef(new Map<string, Promise<void>>());
+  const cachedSnapshots = useRef<TaskSnapshot[] | undefined>(undefined);
+  const runQueryKey = useMemo(
+    () => taskQueryKeys.run({ basePath: apiBase, runId }),
+    [apiBase, runId],
+  );
+  const controlMutation = useMutation({
+    mutationKey: taskQueryKeys.control({ basePath: apiBase, runId }),
+    mutationFn: postTaskControl,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: runsQueryKey, exact: true, refetchType: "none" }),
+        queryClient.invalidateQueries({ queryKey: runQueryKey, exact: true, refetchType: "none" }),
+      ]);
+    },
+  });
+
+  useEffect(() => {
+    const previous = cachedSnapshots.current;
+    if (previous?.length === snapshots.length && previous.every((snapshot, index) => snapshot === snapshots[index])) {
+      return;
+    }
+    cachedSnapshots.current = snapshots;
+    queryClient.setQueryData(runQueryKey, snapshots);
+  }, [queryClient, runQueryKey, snapshots]);
+
+  const mutateControl = useCallback((request: TaskControlRequest) => {
+    const key = `${request.url}:${request.action}`;
+    const pending = pendingControls.current.get(key);
+    if (pending) return pending;
+    controlMutation.reset();
+    const mutation = controlMutation.mutateAsync(request).finally(() => {
+      if (pendingControls.current.get(key) === mutation) pendingControls.current.delete(key);
     });
-    if (!response.ok) throw new Error((await response.text()).trim() || `Failed to ${action} task`);
-  };
+    pendingControls.current.set(key, mutation);
+    return mutation;
+  }, [controlMutation.mutateAsync, controlMutation.reset]);
+  const control = (action: TaskControlAction, group: TaskSnapshot) =>
+    mutateControl({
+      url: `${apiBase}/tasks/${encodeURIComponent(runId)}/control`,
+      action,
+      target: group,
+    });
+  const controlTask = (action: TaskControlAction, task: TaskSnapshot) =>
+    mutateControl({
+      url: `${apiBase}/tasks/${encodeURIComponent(runId)}/tasks/${encodeURIComponent(task.id)}/control`,
+      action,
+      target: task,
+    });
   return (
     <div className="border-t bg-muted/30 px-4 py-3">
       <TaskProgress
         snapshots={snapshots}
         compact
         onControl={control}
+        onTaskControl={controlTask}
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}
       />
     </div>
   );
+}
+
+interface TaskControlRequest {
+  url: string;
+  action: TaskControlAction;
+  target: TaskSnapshot;
+}
+
+async function postTaskControl({ url, action, target }: TaskControlRequest) {
+  const context = `Failed to ${action} ${target.type} "${target.name}"`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+  } catch (cause) {
+    throw new Error(`${context}: ${cause instanceof Error ? cause.message : "request failed"}`, { cause });
+  }
+  if (!response.ok) {
+    const detail = (await response.text()).trim() || `HTTP ${response.status}`;
+    throw new Error(`${context}: ${detail}`);
+  }
 }
