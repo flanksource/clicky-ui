@@ -17,6 +17,8 @@ export type LogsTableProps = Omit<DataTableProps<LogsTableRow>, "data" | "column
   logs: string | LogsTableInput[];
   /** Optional custom columns; defaults to timestamp, level, pod, logger, thread, message, and tags. */
   columns?: DataTableColumn<LogsTableRow>[];
+  /** Native server-filter parameter keyed by normalized log column name. */
+  columnFilterKeys?: Record<string, string>;
   /** Render parsed/raw log details when a row is expanded. */
   showRawDetails?: boolean;
 };
@@ -79,6 +81,7 @@ function renderLogDetails(row: LogsTableRow, context: DataTableRowDetailContext<
 export function LogsTable({
   logs,
   columns,
+  columnFilterKeys,
   showRawDetails = true,
   className,
   autoFilter = true,
@@ -94,13 +97,23 @@ export function LogsTable({
   ...tableProps
 }: LogsTableProps) {
   const rows = useMemo(() => normalizeLogsTableRows(logs), [logs]);
+  const resolvedColumns = useMemo(() => {
+    const base = columns ?? DEFAULT_LOG_COLUMNS;
+    if (!columnFilterKeys) return base;
+    return base.map((column) => ({
+      ...column,
+      ...(columnFilterKeys[column.key]
+        ? { filterKey: columnFilterKeys[column.key] }
+        : {}),
+    }));
+  }, [columnFilterKeys, columns]);
   const resolvedRenderExpandedRow =
     renderExpandedRow ?? (showRawDetails ? renderLogDetails : undefined);
   return (
     <DataTable
       {...tableProps}
       data={rows}
-      columns={columns ?? DEFAULT_LOG_COLUMNS}
+      columns={resolvedColumns}
       className={cn("rounded-md bg-background p-2", className)}
       autoFilter={autoFilter}
       defaultDensity={defaultDensity}

@@ -90,6 +90,12 @@ describe("DataTable", () => {
     window.localStorage.clear();
   });
 
+  it("renders the table frame on the shared background surface", () => {
+    render(<DataTable data={rows} columns={columns} />);
+
+    expect(screen.getByRole("table").parentElement).toHaveClass("bg-background");
+  });
+
   it("sorts columns by default and toggles the sort order", () => {
     render(
       <DataTable
@@ -353,14 +359,14 @@ describe("DataTable", () => {
   });
 
   it("keeps the table shell visible with empty source data", () => {
-    render(<DataTable data={[]} columns={columns} />);
+    render(<DataTable data={[]} columns={columns} emptyMessage="No matching records" />);
 
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /service/i }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(1);
-    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    expect(screen.getByText("No matching records")).toBeInTheDocument();
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
   });
 
@@ -1497,6 +1503,40 @@ describe("DataTable", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Include env=prod$/ }));
     expect(screen.getAllByRole("row").slice(1)).toHaveLength(2);
 
+    vi.useRealTimers();
+  });
+
+  it("sends scalar hover actions through the controlled server-filter contract", () => {
+    vi.useFakeTimers();
+    const onCellFilterChange = vi.fn();
+    render(
+      <DataTable
+        data={[{ service: "payments" }]}
+        columns={[
+          {
+            key: "service",
+            label: "Service",
+            filterKey: "filter.service",
+          },
+        ]}
+        cellFilters={{ "filter.service": { payments: "exclude" } }}
+        onCellFilterChange={onCellFilterChange}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByText("payments").closest("span.relative")!);
+    act(() => vi.advanceTimersByTime(150));
+
+    expect(screen.getByRole("button", { name: "Exclude payments" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Include payments" }));
+    expect(onCellFilterChange).toHaveBeenCalledWith({
+      key: "filter.service",
+      value: "payments",
+      mode: "include",
+    });
     vi.useRealTimers();
   });
 

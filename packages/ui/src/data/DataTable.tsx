@@ -76,6 +76,11 @@ import {
 } from "./cells/timestamp-format";
 import { TagActionsProvider, TagList } from "./cells/TagList";
 import {
+  CellFilterActions,
+  type CellFilterChange,
+  type CellFilterMode,
+} from "./cells/CellFilterActions";
+import {
   normalizeTags,
   splitTagToken,
   tagActionsFromRecord,
@@ -220,6 +225,12 @@ export type DataTableColumn<
   sortable?: boolean;
   /** Enables a generated column filter when `autoFilter` is true. */
   filterable?: boolean;
+  /** Native server-filter parameter associated with this rendered column. */
+  filterKey?: string;
+  /** Converts the raw cell value to the exact scalar sent to the native server filter. */
+  serverFilterValue?: (value: unknown, row: T) => unknown;
+  /** Converts the raw cell value to the label shown by server-filter actions. */
+  serverFilterLabel?: (value: unknown, row: T) => string;
   /** Prefer allocating extra width to this column. */
   grow?: boolean;
   /** Prefer keeping this column compact. */
@@ -409,6 +420,10 @@ type DataTableInnerProps<
    * column filters so the caller's natural ordering wins.
    */
   externalFilters?: FilterBarFilter[];
+  /** Current modes for native server-backed cell filters. */
+  cellFilters?: Record<string, Record<string, CellFilterMode>>;
+  /** Called when a cell's include/exclude hover action changes. */
+  onCellFilterChange?: (change: CellFilterChange) => void;
   /**
    * Server-side pagination footer. When provided, a small page-size / prev /
    * next strip is rendered below the table; the DataTable does NOT slice
@@ -540,7 +555,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   loading = false,
   loadingMessage = "Loading results…",
   loadingRowCount = 8,
-  emptyMessage: _emptyMessage = "No data",
+  emptyMessage = "No data",
   clientReveal,
   className,
   scrollContainerClassName,
@@ -557,6 +572,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   externalSearch,
   externalTimeRange,
   externalFilters,
+  cellFilters,
+  onCellFilterChange,
   pagination,
   getRowId,
   rowSelection,
@@ -1510,7 +1527,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           ) : null}
           <div
             className={cn(
-              "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border",
+              "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border bg-background",
               scrollContainerClassName,
             )}
             aria-busy={(loading && error == null) || undefined}
@@ -1646,6 +1663,15 @@ function DataTableInner<T extends Record<string, unknown>>({
                   message={loadingMessage}
                   selection={!!rowSelection}
                 />
+              ) : data.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
+                  >
+                    {emptyMessage}
+                  </td>
+                </tr>
               ) : (
                 rowStream.map((item) => {
                   if (item.kind === "group") {
@@ -1760,6 +1786,43 @@ function DataTableInner<T extends Record<string, unknown>>({
                           let content: ReactNode = column.render
                             ? column.render(rawValue, record.row)
                             : formatCell(rawValue);
+
+                          const serverFilterValue = resolveServerFilterValue(
+                            rawValue,
+                            record.row,
+                            column,
+                          );
+                          const serverFilterDisplayValue =
+                            resolveCellFilterDisplayValue(
+                              rawValue,
+                              record.row,
+                              column,
+                            );
+                          if (
+                            column.filterKey &&
+                            onCellFilterChange &&
+                            serverFilterValue !== undefined
+                          ) {
+                            const filterKey = column.filterKey;
+                            content = (
+                              <CellFilterActions
+                                value={serverFilterValue}
+                                {...(serverFilterDisplayValue !== undefined
+                                  ? { displayValue: serverFilterDisplayValue }
+                                  : {})}
+                                mode={cellFilters?.[filterKey]?.[serverFilterValue]}
+                                onChange={(mode) =>
+                                  onCellFilterChange({
+                                    key: filterKey,
+                                    value: serverFilterValue,
+                                    mode,
+                                  })
+                                }
+                              >
+                                {content}
+                              </CellFilterActions>
+                            );
+                          }
 
                           // Tag cells get the + / − filter affordance via
                           // context; copy-to-clipboard works without it too.
@@ -1920,6 +1983,44 @@ function DataTableInner<T extends Record<string, unknown>>({
       </div>
     </DensityValueProvider>
   );
+}
+
+function resolveServerFilterValue<T extends Record<string, unknown>>(
+  rawValue: unknown,
+  row: T,
+  column: DataTableColumn<T>,
+): string | undefined {
+  const value = column.serverFilterValue
+    ? column.serverFilterValue(rawValue, row)
+    : rawValue;
+  switch (typeof value) {
+    case "string":
+      return value || undefined;
+    case "number":
+    case "boolean":
+      return String(value);
+    default:
+      return undefined;
+  }
+}
+
+function resolveCellFilterDisplayValue<T extends Record<string, unknown>>(
+  rawValue: unknown,
+  row: T,
+  column: DataTableColumn<T>,
+): string | undefined {
+  const value = column.serverFilterLabel
+    ? column.serverFilterLabel(rawValue, row)
+    : rawValue;
+  switch (typeof value) {
+    case "string":
+      return value || undefined;
+    case "number":
+    case "boolean":
+      return String(value);
+    default:
+      return undefined;
+  }
 }
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100, 200];
