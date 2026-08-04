@@ -173,14 +173,19 @@ export function EntityExplorerApp({
       // The page header belongs to the host, not to OperationCatalog — the
       // catalog renders only its results. OperationEntityPage still titles
       // itself, so this covers the collection route only.
+      //
+      // It rides in the top bar rather than a bodyHeader row: next to the rail
+      // that bar is otherwise empty, and the row it replaces cost the result
+      // table ~72px of the viewport it needs to keep its sticky head and
+      // pagination footer on screen without the page itself scrolling.
       {...(resolvedRoute.kind === "surface" && resolvedRoute.surface
         ? {
-            bodyHeader: (
-              <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight">
+            nav: (
+              <div className="flex min-w-0 items-baseline gap-density-2">
+                <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
                   {resolvedRoute.surface.title}
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                <p className="hidden min-w-0 truncate text-sm text-muted-foreground lg:block">
                   {makeSurfaceDefinition(resolvedRoute.surface).description}
                 </p>
               </div>
@@ -188,6 +193,9 @@ export function EntityExplorerApp({
           }
         : {})}
       collapsedStorageKey={SIDEBAR_COLLAPSED_KEY}
+      // Results are wide tables, not prose — let them use the whole workspace
+      // instead of the centred reading column.
+      contentWidth="full"
       contentClassName="p-6"
     >
       {resolvedRoute.kind === "surface" ? (

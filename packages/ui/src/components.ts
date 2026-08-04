@@ -1,5 +1,9 @@
 export { Button, type ButtonProps } from "./components/button";
 export {
+  ErrorWrapper,
+  type ErrorWrapperProps,
+} from "./components/ErrorWrapper";
+export {
   Loading,
   LoadingBar,
   LoadingDots,
@@ -17,6 +21,13 @@ export {
   type SegmentedOption,
   type SegmentedSize,
 } from "./components/SegmentedControl";
+export {
+  TriStateToggle,
+  nextTriState,
+  type TriState,
+  type TriStateLabels,
+  type TriStateToggleProps,
+} from "./components/TriStateToggle";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
 export {
@@ -249,6 +260,7 @@ export {
   AppShell,
   type AppShellProps,
   type AppShellNavItem,
+  type AppShellNavGroup,
   type AppShellNavSection,
 } from "./layout/AppShell";
 export {

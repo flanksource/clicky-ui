@@ -13,6 +13,10 @@ import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
 } from "../data/Clicky";
+import type {
+  CellFilterChange,
+  CellFilterMode,
+} from "../data/cells/CellFilterActions";
 import { cn } from "../lib/utils";
 import { ExecutionResult } from "./ExecutionResult";
 import { useRowDetailNavigation } from "./rowNavigation";
@@ -26,6 +30,7 @@ export type ResultRenderContext = {
   surfaceKey?: string;
   response: ExecutionResponse | null;
   defaultView: ReactNode;
+  filterConfig?: OperationResultFilterConfig;
 };
 
 // ResultRenderer lets the host app swap the result presentation per surface. It
@@ -40,6 +45,8 @@ export type OperationResultFilterConfig = {
   filters?: FilterBarFilter[];
   search?: FilterBarSearchProps;
   timeRange?: FilterBarRangeProps;
+  cellFilters?: Record<string, Record<string, CellFilterMode>>;
+  onCellFilterChange?: (change: CellFilterChange) => void;
 };
 
 export type OperationResultViewProps = {
@@ -148,6 +155,12 @@ export function OperationResultView({
       {...(filterConfig?.search ? { search: filterConfig.search } : {})}
       {...(filterConfig?.timeRange
         ? { timeRange: filterConfig.timeRange }
+        : {})}
+      {...(filterConfig?.cellFilters
+        ? { cellFilters: filterConfig.cellFilters }
+        : {})}
+      {...(filterConfig?.onCellFilterChange
+        ? { onCellFilterChange: filterConfig.onCellFilterChange }
         : {})}
       {...(pagination ? { pagination } : {})}
       {...(download ? { download } : {})}

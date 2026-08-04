@@ -1,6 +1,21 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { useEffect, useState } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
+
+function StatefulSlot({ name, onEffect }: { name: string; onEffect: () => void }) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    onEffect();
+  }, [onEffect]);
+
+  return (
+    <button type="button" data-testid={name} onClick={() => setCount((value) => value + 1)}>
+      {name}:{count}
+    </button>
+  );
+}
 
 describe("AppShell", () => {
   it("renders the brand, nav, search, actions and content slots", () => {
@@ -67,6 +82,74 @@ describe("AppShell", () => {
     expect(screen.queryByText("Policies")).toBeNull();
   });
 
+  it("folds group items behind a toggle and persists the group state", () => {
+    const storageKey = "test:app-shell:groups";
+    window.localStorage.removeItem(storageKey);
+    const shell = (
+      <AppShell
+        groupCollapsedStorageKey={storageKey}
+        navSections={[
+          {
+            label: "Providers",
+            items: [{ key: "home", label: "Home", to: "/" }],
+            groups: [
+              {
+                key: "xero",
+                label: "Xero",
+                defaultCollapsed: true,
+                items: [{ key: "invoices", label: "Invoices", to: "/xero/invoices" }],
+              },
+            ],
+          },
+        ]}
+      >
+        <p>content</p>
+      </AppShell>
+    );
+    const { unmount } = render(shell);
+
+    expect(screen.getByText("Home")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Invoices" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Xero/ }));
+    expect(screen.getByRole("link", { name: "Invoices" }).getAttribute("href")).toBe(
+      "/xero/invoices",
+    );
+
+    // Expanded state survives a remount through localStorage.
+    unmount();
+    render(shell);
+    expect(screen.getByRole("link", { name: "Invoices" })).toBeTruthy();
+  });
+
+  it("flattens group items into the rail when it is collapsed", () => {
+    render(
+      <AppShell
+        groupCollapsedStorageKey="test:app-shell:groups-collapsed"
+        navSections={[
+          {
+            groups: [
+              {
+                key: "xero",
+                label: "Xero",
+                defaultCollapsed: true,
+                items: [{ key: "invoices", label: "Invoices", to: "/xero/invoices" }],
+              },
+            ],
+          },
+        ]}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+
+    expect(screen.queryByRole("link", { name: "Invoices" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    // Collapsed rail: no group heading, and the item is reachable as an icon link.
+    expect(screen.queryByRole("button", { name: /Xero/ })).toBeNull();
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/xero/invoices");
+  });
+
   it("renders nav items as anchor links pointing at their `to`", () => {
     render(
       <AppShell navSections={[{ items: [{ key: "p", label: "Policies", to: "/policies" }] }]}>
@@ -124,14 +207,48 @@ describe("AppShell", () => {
         <p>content</p>
       </AppShell>,
     );
-    expect(screen.getAllByText("tree")).toHaveLength(2);
-    expect(screen.getAllByText("content")).toHaveLength(2);
-    expect(screen.getByRole("separator", { name: "" })).toBeTruthy();
+    expect(screen.getAllByText("tree")).toHaveLength(1);
+    expect(screen.getAllByText("content")).toHaveLength(1);
+    expect(screen.getByRole("separator", { name: "" })).toHaveClass(
+      "hidden",
+      "md:block",
+    );
     expect(container.querySelector('[data-slot="app-shell-body-header-content"]')).toHaveAttribute(
       "data-content-width",
       "full",
     );
     expect(container.querySelector('[data-slot="app-shell-content"]')).toBeNull();
+  });
+
+  it("mounts stateful responsive slots once and preserves them across viewport changes", () => {
+    const actionsEffect = vi.fn();
+    const bodySidebarEffect = vi.fn();
+    const childrenEffect = vi.fn();
+
+    render(
+      <AppShell
+        navSections={[{ items: [{ key: "p", label: "Policies", to: "/policies" }] }]}
+        actions={<StatefulSlot name="actions" onEffect={actionsEffect} />}
+        bodySidebar={<StatefulSlot name="body-sidebar" onEffect={bodySidebarEffect} />}
+      >
+        <StatefulSlot name="children" onEffect={childrenEffect} />
+      </AppShell>,
+    );
+
+    expect(screen.getAllByTestId("actions")).toHaveLength(1);
+    expect(screen.getAllByTestId("body-sidebar")).toHaveLength(1);
+    expect(screen.getAllByTestId("children")).toHaveLength(1);
+    expect(actionsEffect).toHaveBeenCalledTimes(1);
+    expect(bodySidebarEffect).toHaveBeenCalledTimes(1);
+    expect(childrenEffect).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId("children"));
+    fireEvent(window, new Event("resize"));
+
+    expect(screen.getByTestId("children")).toHaveTextContent("children:1");
+    expect(actionsEffect).toHaveBeenCalledTimes(1);
+    expect(bodySidebarEffect).toHaveBeenCalledTimes(1);
+    expect(childrenEffect).toHaveBeenCalledTimes(1);
   });
 
   it("passes the collapsed flag to a custom sidebar render-prop", () => {

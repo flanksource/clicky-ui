@@ -31,6 +31,12 @@ function makeSpec(): OpenAPISpec {
               "x-clicky": { role: "offset" },
             },
             {
+              name: "filter.Name",
+              in: "query",
+              schema: { type: "string" },
+              "x-clicky": { role: "filter" },
+            },
+            {
               name: "kind",
               in: "query",
               schema: { type: "string", enum: ["big", "small"] },
@@ -120,7 +126,7 @@ const clickyTableResponse: ExecutionResponse = {
       kind: "table",
       columns: [
         { name: "ID", label: "ID" },
-        { name: "Name", label: "Name" },
+        { name: "Name", label: "Name", filterKey: "filter.Name" },
       ],
       rows: [
         {
@@ -133,7 +139,12 @@ const clickyTableResponse: ExecutionResponse = {
               text: "one",
               plain: "one",
             },
-            Name: { kind: "text", text: "First", plain: "First" },
+            Name: {
+              kind: "text",
+              text: "First",
+              plain: "First",
+              filterValue: "first.raw",
+            },
           },
         },
       ],
@@ -237,6 +248,14 @@ function makeLookupResponse(): OperationLookupResponse {
           worker: { kind: "text", text: "Worker", plain: "Worker" },
         },
       },
+      "filter.Name": {
+        label: "Name",
+        multi: true,
+        type: "multi-filter",
+        options: {
+          First: { kind: "text", text: "First", plain: "First" },
+        },
+      },
       "include-archived": {
         label: "Include archived",
         type: "bool",
@@ -326,6 +345,30 @@ describe("OperationCatalog", () => {
     expect(screen.getByText("one")).toBeInTheDocument();
   });
 
+  it("updates the native list filter and URL from a table cell action", async () => {
+    const client = makeClient();
+    client.lookupMock.mockResolvedValue(makeLookupResponse());
+    renderCatalog(client);
+
+    const value = await screen.findByText("First");
+    fireEvent.mouseEnter(value.closest("span.relative")!);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Include First" }),
+    );
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenLastCalledWith(
+        "/api/v1/widgets",
+        "get",
+        { "filter.Name": "first.raw", offset: "0" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+    expect(new URLSearchParams(window.location.search).get("filter.Name")).toBe(
+      "first.raw",
+    );
+  });
+
   it("renders a resolved Clicky command failure as a table error", async () => {
     renderCatalog(makeClient(ambiguousPlanResponse));
 
@@ -404,7 +447,7 @@ describe("OperationCatalog", () => {
     expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
   });
 
-  it("places schema action controls in the modal footer", async () => {
+  it("uses a wide modal for schema actions and places controls in its footer", async () => {
     const client = makeClient();
     client.getSchema = vi.fn(async () => ({ type: "object", properties: {} }));
     client.submitForm = vi.fn();
@@ -412,6 +455,7 @@ describe("OperationCatalog", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Create" }));
     await waitFor(() => expect(document.querySelector('[data-slot="modal-footer"]')).not.toBeNull());
+    expect(screen.getByRole("dialog", { name: "Create" })).toHaveClass("max-w-6xl");
     const footer = document.querySelector('[data-slot="modal-footer"]');
     const body = document.querySelector('[data-slot="modal-body"]');
     const submit = within(footer as HTMLElement).getByRole("button", { name: "Create" });
@@ -454,6 +498,7 @@ describe("OperationCatalog", () => {
     });
     let seenSurfaceKey: string | undefined = "unset";
     let seenSuccess: boolean | undefined;
+    let seenCellFilterChange: unknown;
     render(
       <QueryClientProvider client={queryClient}>
         <OperationCatalog
@@ -462,7 +507,8 @@ describe("OperationCatalog", () => {
           surfaceKey="widgets"
           client={client}
           renderLink={renderFakeLink}
-          resultRenderer={({ surfaceKey, response }) => {
+          resultRenderer={({ filterConfig, surfaceKey, response }) => {
+            seenCellFilterChange = filterConfig.onCellFilterChange;
             seenSurfaceKey = surfaceKey;
             if (response) seenSuccess = response.success;
             return <div data-testid="custom-result">custom logs view</div>;
@@ -477,6 +523,7 @@ describe("OperationCatalog", () => {
     // The default clicky table cell must not render — the override replaced it.
     expect(screen.queryByText("First")).not.toBeInTheDocument();
     expect(seenSurfaceKey).toBe("widgets");
+    expect(seenCellFilterChange).toEqual(expect.any(Function));
   });
 
   it("renders the default table when the resultRenderer returns defaultView", async () => {

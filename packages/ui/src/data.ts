@@ -66,6 +66,11 @@ export {
 } from "./data/cells/timestamp-format";
 export { TagActionsProvider, TagList, type TagListProps } from "./data/cells/TagList";
 export {
+  CellFilterActions,
+  type CellFilterChange,
+  type CellFilterMode,
+} from "./data/cells/CellFilterActions";
+export {
   normalizeTags,
   splitTagToken,
   tagActionsFromRecord,
@@ -275,6 +280,7 @@ export * from "./data/cache-browser";
 export * from "./data/query-browser";
 export {
   type LogEntry,
+  type TaskControlAction,
   type TaskSnapshot,
   type TaskRunMeta,
   isTerminalStatus,
@@ -290,6 +296,11 @@ export {
 } from "./data/task-status";
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
+export {
+  taskQueryKeys,
+  type TaskRunQueryKeyOptions,
+  type TaskRunsQueryKeyOptions,
+} from "./data/task-query-keys";
 export { TaskManagerButton, type TaskManagerButtonProps } from "./data/TaskManagerButton";
 export { PromptDialog, type PromptDialogProps } from "./data/PromptDialog";
 export { PromptBanner, type PromptBannerProps } from "./data/PromptBanner";

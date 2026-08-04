@@ -183,7 +183,7 @@ export function OperationActionBar({
         open
         onClose={() => setActiveAction(null)}
         title={actionLabel(activeAction)}
-        size="lg"
+        size="2xl"
         {...(footer ? { footer } : {})}
       >
         <div className="space-y-4">

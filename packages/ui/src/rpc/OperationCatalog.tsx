@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { filterOperationsByDomain } from "./classify";
@@ -14,10 +14,12 @@ import type {
   ClickyDownloadOptions,
   ClickyRemoteFormat,
 } from "../data/Clicky";
+import type { CellFilterChange } from "../data/cells/CellFilterActions";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { OperationActionBar } from "./OperationActionBar";
 import {
   OperationResultView,
+  type OperationResultFilterConfig,
   type ResultRenderer,
 } from "./OperationResultView";
 import { type FormActionsRenderer } from "./SchemaActionForm";
@@ -40,6 +42,8 @@ import {
   dataTablePaginationFromForm,
   packParameterValues,
   parametersToFormConfig,
+  parseMultiFilterValue,
+  serializeMultiFilterValue,
   type ParameterFormOptions,
 } from "./formMetadata";
 
@@ -255,6 +259,72 @@ export function OperationCatalog({
       ),
     [filterBarConfig.filters, filterPre],
   );
+  const cellFilters = useMemo(
+    () =>
+      Object.fromEntries(
+        listParameters
+          .filter((parameter) => parameter["x-clicky"]?.role === "filter")
+          .map((parameter) => [
+            parameter.name,
+            parseMultiFilterValue(filters[parameter.name] ?? ""),
+          ]),
+      ),
+    [filters, listParameters],
+  );
+  const onCellFilterChange = useCallback(
+    ({ key, value, mode }: CellFilterChange) => {
+      if (
+        !listParameters.some(
+          (parameter) =>
+            parameter.name === key && parameter["x-clicky"]?.role === "filter",
+        )
+      ) {
+        throw new Error(`Clicky table column references unknown filter parameter ${key}`);
+      }
+
+      setFilters((current) => {
+        const selected = parseMultiFilterValue(current[key] ?? "");
+        if (mode === undefined) {
+          delete selected[value];
+        } else {
+          selected[value] = mode;
+        }
+
+        const next = { ...current };
+        const serialized = serializeMultiFilterValue(selected);
+        if (serialized) {
+          next[key] = serialized;
+        } else {
+          delete next[key];
+        }
+
+        const offset = listParameters.find(
+          (parameter) => parameter["x-clicky"]?.role === "offset",
+        );
+        if (offset) next[offset.name] = "0";
+        return next;
+      });
+    },
+    [listParameters],
+  );
+  const resultFilterConfig = useMemo<OperationResultFilterConfig>(
+    () => ({
+      filters: decoratedFilters,
+      cellFilters,
+      onCellFilterChange,
+      ...(filterBarConfig.search ? { search: filterBarConfig.search } : {}),
+      ...(filterBarConfig.timeRange
+        ? { timeRange: filterBarConfig.timeRange }
+        : {}),
+    }),
+    [
+      cellFilters,
+      decoratedFilters,
+      filterBarConfig.search,
+      filterBarConfig.timeRange,
+      onCellFilterChange,
+    ],
+  );
 
   const showTable = !!listEndpoint;
   let listError: unknown;
@@ -366,15 +436,7 @@ export function OperationCatalog({
                 ariaLabel={`${definition.title} results`}
                 className="mt-0 h-full min-h-0"
                 detailOperation={detailOperation}
-                filterConfig={{
-                  filters: decoratedFilters,
-                  ...(filterBarConfig.search
-                    ? { search: filterBarConfig.search }
-                    : {}),
-                  ...(filterBarConfig.timeRange
-                    ? { timeRange: filterBarConfig.timeRange }
-                    : {}),
-                }}
+                filterConfig={resultFilterConfig}
                 {...(tableError ? { error: tableError } : {})}
                 {...(commandRuntime ? { commandRuntime } : {})}
                 {...(dataTablePagination
@@ -387,6 +449,7 @@ export function OperationCatalog({
               ? resultRenderer({
                   response: listQuery.data ?? null,
                   defaultView,
+                  filterConfig: resultFilterConfig,
                   ...(surfaceKey ? { surfaceKey } : {}),
                 })
               : defaultView;
