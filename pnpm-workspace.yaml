@@ -69,6 +69,7 @@ catalog:
   prettier: ^3.8.3
   react: ^18.3.1
   react-dom: ^18.3.1
+  react-grab: ^0.1.50
   serve: ^14.2.6
   shiki: ^1.24.0
   sonner: ^1.7.1

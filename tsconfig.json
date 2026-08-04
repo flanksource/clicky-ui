@@ -8,6 +8,7 @@
     { "path": "./packages/ui" },
     { "path": "./apps/storybook" },
     { "path": "./apps/kitchen-sink" },
+    { "path": "./apps/playground" },
     { "path": "./e2e" }
   ]
 }
