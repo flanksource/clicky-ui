@@ -43,6 +43,8 @@ export function Combobox(props: ComboboxProps) {
     disabled,
     required,
     invalid,
+    ariaRequired,
+    describedBy,
     allowCustomValue = true,
     onNew,
     onCreate,
@@ -418,6 +420,8 @@ export function Combobox(props: ComboboxProps) {
           aria-activedescendant={highlighted >= 0 ? `${listId}-${highlighted}` : undefined}
           aria-label={ariaLabel}
           aria-invalid={invalid || undefined}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={describedBy}
           autoComplete="off"
           disabled={disabled}
           placeholder={placeholder}

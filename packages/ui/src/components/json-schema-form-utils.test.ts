@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  fieldInputId,
   isEmptyValue,
   matchesFieldFilter,
   moveItem,
@@ -181,5 +182,26 @@ describe("normalizeColumns / normalizeColSpan", () => {
     expect(normalizeColSpan(20, 12)).toBe(12);
     expect(normalizeColSpan(undefined, 12)).toBe(1);
     expect(normalizeColSpan(0, 12)).toBe(1);
+  });
+});
+
+describe("fieldInputId", () => {
+  it("keeps a top-level field's id as its bare key", () => {
+    expect(fieldInputId("/Name")).toBe("jsf-Name");
+    expect(fieldInputId("/Name", "form")).toBe("jsf-form-Name");
+  });
+
+  it("distinguishes the same property name under different parents", () => {
+    expect(fieldInputId("/journalLine1/asset", "req")).not.toBe(
+      fieldInputId("/journalLine2/asset", "req"),
+    );
+  });
+
+  it("does not let a hyphenated key collide with a nested path", () => {
+    expect(fieldInputId("/asset-class")).not.toBe(fieldInputId("/asset/class"));
+  });
+
+  it("unescapes JSON pointer tokens and array indices into a usable id", () => {
+    expect(fieldInputId("/lines/0/account~1code")).toBe("jsf-lines-0-account_code");
   });
 });

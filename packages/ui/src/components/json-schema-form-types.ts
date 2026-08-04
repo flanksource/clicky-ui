@@ -206,6 +206,12 @@ export interface FieldControl {
   // pre-extension may set or clear it.
   readOnly?: boolean;
 
+  // True when the form was given a validation error at this field's instance
+  // path. Set by the renderer, not by resolveControl, and consumed only through
+  // fieldAriaProps so the control announces itself as invalid and points at its
+  // own error text.
+  invalid?: boolean;
+
   // Leading glyph for the label, lifted from the schema's `x-icon` extension.
   labelIcon?: LabelIconSpec;
 

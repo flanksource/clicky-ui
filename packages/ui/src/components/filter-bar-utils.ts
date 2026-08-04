@@ -36,6 +36,11 @@ export function clearFilterBarFilter(filter: FilterBarFilter) {
     return;
   }
 
+  if (filter.kind === "tristate") {
+    filter.onChange(undefined);
+    return;
+  }
+
   filter.onChange({});
 }
 
@@ -52,5 +57,7 @@ export function isFilterBarFilterActive(filter: FilterBarFilter) {
     );
   }
   if (filter.kind === "boolean") return filter.value;
+  // Unset is "no filter"; both true and false narrow the result set.
+  if (filter.kind === "tristate") return filter.value !== undefined;
   return Object.keys(filter.value).length > 0;
 }

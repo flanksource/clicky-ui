@@ -45,6 +45,17 @@ type ComboboxBaseProps = {
    */
   invalid?: boolean;
   /**
+   * Sets aria-required on the input. Separate from `required`, which governs
+   * whether the value can be cleared; a consumer announcing a mandatory field
+   * to assistive technology need not also remove the clear button.
+   */
+  ariaRequired?: boolean;
+  /**
+   * Id of the element describing the control (typically its validation
+   * message), wired through as aria-describedby.
+   */
+  describedBy?: string;
+  /**
    * When false, the value is restricted to the provided options — typed text
    * that does not match an option is discarded instead of committed. Defaults
    * to true (freeform entry allowed).

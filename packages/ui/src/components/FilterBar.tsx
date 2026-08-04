@@ -58,6 +58,7 @@ import { DateTimePicker } from "./DateTimePicker";
 import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { TimeRange, type TimeRangePresetGroup } from "./TimeRange";
+import { TriStateToggle, type TriState, type TriStateLabels } from "./TriStateToggle";
 
 const FILTER_BAR_GAP_PX = 8;
 const FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX = 44;
@@ -271,6 +272,23 @@ export type FilterBarBooleanFilter = {
   className?: string;
 };
 
+export type FilterBarTriStateFilter = {
+  key: string;
+  /** Renders a yes/no/any toggle for a nullable boolean field. */
+  kind: "tristate";
+  label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
+  description?: string;
+  /** Controlled state; undefined means the filter is off. */
+  value: TriState;
+  onChange: (value: TriState) => void;
+  /** Per-state wording, e.g. { on: "Deductible", off: "Not deductible" }. */
+  labels?: TriStateLabels;
+  disabled?: boolean;
+  className?: string;
+};
+
 export type FilterBarFilter =
   | FilterBarTextFilter
   | FilterBarLookupFilter
@@ -280,7 +298,8 @@ export type FilterBarFilter =
   | FilterBarSelectMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
-  | FilterBarBooleanFilter;
+  | FilterBarBooleanFilter
+  | FilterBarTriStateFilter;
 
 export type FilterBarRangePreset = {
   /** Visible preset label. */
@@ -488,6 +507,7 @@ export function FilterBar({
   return (
     <FilterBarContext.Provider value={contextValue}>
       <div
+        data-slot="filter-bar"
         className={cn(
           "flex flex-nowrap items-center gap-2 overflow-visible bg-background py-1.5",
           "flex-wrap md:flex-nowrap",
@@ -598,6 +618,7 @@ function FilterBarFilterPanelContent({
       {filter.kind === "number" && <NumberFilterPanel filter={filter} chrome={chrome} />}
       {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
       {filter.kind === "boolean" && <BooleanFilterField filter={filter} />}
+      {filter.kind === "tristate" && <TriStateFilterField filter={filter} />}
       {filter.kind === "text" && <TextFilterField filter={filter} grow />}
     </>
   );
@@ -634,6 +655,10 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 
   if (filter.kind === "boolean") {
     return <BooleanFilterField filter={filter} />;
+  }
+
+  if (filter.kind === "tristate") {
+    return <TriStateFilterField filter={filter} />;
   }
 
   return <TextFilterField filter={filter} grow={grow} />;
@@ -856,6 +881,9 @@ function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
   if (filter.kind === "nested-multi") {
     return <NestedMultiFilterField filter={filter} grow />;
   }
+  if (filter.kind === "tristate") {
+    return <TriStateFilterValueControl filter={filter} />;
+  }
   return <NumberFilterField filter={filter} grow />;
 }
 
@@ -1005,6 +1033,21 @@ function BooleanFilterValueControl({ filter }: { filter: FilterBarBooleanFilter 
   );
 }
 
+function TriStateFilterValueControl({ filter }: { filter: FilterBarTriStateFilter }) {
+  return (
+    <div className="flex h-8 items-center">
+      <TriStateToggle
+        value={filter.value}
+        onChange={filter.onChange}
+        label={filter.label}
+        size="md"
+        {...(filter.labels ? { labels: filter.labels } : {})}
+        {...(filter.disabled ? { disabled: filter.disabled } : {})}
+      />
+    </div>
+  );
+}
+
 function SelectMultiFilterValueControl({ filter }: { filter: FilterBarSelectMultiFilter }) {
   return (
     <MultiSelect
@@ -1069,6 +1112,28 @@ function EnumFilterField({ filter, grow }: { filter: FilterBarEnumFilter; grow: 
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
     />
+  );
+}
+
+function TriStateFilterField({ filter }: { filter: FilterBarTriStateFilter }) {
+  return (
+    <div
+      title={filter.description}
+      className={cn(
+        "flex h-8 shrink-0 items-center gap-2 rounded-md border border-input bg-muted/30 px-2 text-xs",
+        filter.disabled && "opacity-60",
+        filter.className,
+      )}
+    >
+      <TriStateToggle
+        value={filter.value}
+        onChange={filter.onChange}
+        label={filter.label}
+        {...(filter.labels ? { labels: filter.labels } : {})}
+        {...(filter.disabled ? { disabled: filter.disabled } : {})}
+      />
+      <FilterFieldLabel icon={filter.icon} label={filter.label} />
+    </div>
   );
 }
 
@@ -2242,6 +2307,9 @@ type FilterBarValue =
   | string
   | string[]
   | boolean
+  // A tri-state filter's "off" position is undefined, so it is a real staged
+  // value rather than the absence of one.
+  | undefined
   | FilterBarNumberValue
   | Record<string, FilterBarMultiFilterMode>;
 
@@ -2314,6 +2382,13 @@ function filterWithStagedValue(
       onChange: (next: string) => onChange(next),
     };
   }
+  if (filter.kind === "tristate") {
+    return {
+      ...filter,
+      value: value === undefined ? undefined : Boolean(value),
+      onChange: (next: TriState) => onChange(next),
+    };
+  }
   return {
     ...filter,
     value: Boolean(value),
@@ -2326,7 +2401,11 @@ function applyStagedFilterValues(
   stagedValues: Record<string, FilterBarValue>,
 ) {
   for (const filter of filters) {
-    const next = stagedValues[filter.key] ?? filterBarFilterValue(filter);
+    // Key presence, not `??`: undefined is a tri-state filter's "off" value and
+    // must still be applied over a live true/false.
+    const next = Object.hasOwn(stagedValues, filter.key)
+      ? stagedValues[filter.key]
+      : filterBarFilterValue(filter);
     if (sameFilterBarValue(filterBarFilterValue(filter), next)) continue;
     applyFilterBarValue(filter, next);
   }
@@ -2347,6 +2426,10 @@ function applyFilterBarValue(filter: FilterBarFilter, value: FilterBarValue) {
   }
   if (filter.kind === "boolean") {
     filter.onChange(Boolean(value));
+    return;
+  }
+  if (filter.kind === "tristate") {
+    filter.onChange(value === undefined ? undefined : Boolean(value));
     return;
   }
   filter.onChange(isMultiFilterValue(value) ? value : {});

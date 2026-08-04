@@ -1,11 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLICKY_COLUMN_FORMAT_OPTIONS,
+  CLICKY_COLUMN_UNIT_OPTIONS,
   formatBytes,
   formatBytesPerSecond,
   formatDuration,
   formatShort,
   formatUnit,
 } from "./format";
+
+describe("column formatting options", () => {
+  it("publishes the strict profile format and unit values", () => {
+    expect(CLICKY_COLUMN_FORMAT_OPTIONS.map(({ value }) => value)).toEqual([
+      "date",
+      "float",
+      "duration",
+      "bytes",
+      "currency",
+    ]);
+    expect(CLICKY_COLUMN_UNIT_OPTIONS.map(({ value }) => value)).toEqual([
+      "none",
+      "short",
+      "percent",
+      "percentunit",
+      "bytes",
+      "decbytes",
+      "Bps",
+      "binBps",
+      "ms",
+      "s",
+    ]);
+  });
+});
 
 describe("formatBytes", () => {
   it.each([

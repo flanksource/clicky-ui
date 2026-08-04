@@ -1,4 +1,9 @@
-import { DataTable, type DataTableColumn } from "@flanksource/clicky-ui";
+import {
+  DataTable,
+  type CellFilterChange,
+  type CellFilterMode,
+  type DataTableColumn,
+} from "@flanksource/clicky-ui";
 import { useState } from "react";
 import { DemoSection } from "./Section";
 
@@ -62,7 +67,7 @@ const compactRows: CompactRow[] = [
 
 const compactColumns: DataTableColumn<CompactRow>[] = [
   { key: "name", label: "Name", shrink: true },
-  { key: "state", label: "State", shrink: true },
+  { key: "state", label: "State", shrink: true, filterKey: "filter.State" },
   { key: "age", label: "Age", shrink: true, align: "right" },
 ];
 
@@ -217,6 +222,20 @@ const wideColumns: DataTableColumn<WideRow>[] = [
 export function DataTableDemo() {
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
+  const [serverCellFilters, setServerCellFilters] = useState<
+    Record<string, Record<string, CellFilterMode>>
+  >({});
+  const updateServerCellFilter = ({ key, value, mode }: CellFilterChange) => {
+    setServerCellFilters((current) => {
+      const values = { ...current[key] };
+      if (mode) values[value] = mode;
+      else delete values[value];
+      if (Object.keys(values).length > 0) return { ...current, [key]: values };
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
 
   return (
     <DemoSection
@@ -248,13 +267,21 @@ export function DataTableDemo() {
       />
 
       <div className="space-y-density-2 border-t border-border pt-density-3">
-        <h3 className="text-sm font-medium">Few columns</h3>
+        <h3 className="text-sm font-medium">Native server filters</h3>
+        <p className="text-xs text-muted-foreground">
+          Hover a State value to add a Kibana-style include or exclude filter.
+        </p>
         <DataTable
           data={compactRows}
           columns={compactColumns}
+          cellFilters={serverCellFilters}
+          onCellFilterChange={updateServerCellFilter}
           defaultSort={{ key: "name", dir: "asc" }}
           columnResizeStorageKey="clicky-ui-kitchen-data-table-few-columns"
         />
+        <div className="text-xs font-mono" aria-live="polite">
+          Request filters: {JSON.stringify(serverCellFilters)}
+        </div>
       </div>
 
       <div className="space-y-density-2 border-t border-border pt-density-3">

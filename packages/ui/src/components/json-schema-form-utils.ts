@@ -11,9 +11,56 @@ export function inputClass(size: FormSize): string {
   return cn(INPUT_BASE, inputSizeClass[size]);
 }
 
-export function fieldInputId(key: string, prefix?: string): string {
-  const safe = key.replace(/[^a-zA-Z0-9_-]/g, "_");
+// fieldInputId derives a control's DOM id from its JSON-pointer instance path,
+// not from its leaf key: a schema that repeats a property name under two parents
+// (e.g. /journalLine1/asset and /journalLine2/asset) must not produce the same
+// id, or every `label[for]` binds to the first control. Path segments join with
+// "-" and any other separator inside a segment collapses to "_", so "/a-b" and
+// "/a/b" stay distinct.
+export function fieldInputId(instancePath: string, prefix?: string): string {
+  const safe = instancePath
+    .split("/")
+    .filter(Boolean)
+    .map((token) =>
+      token.replaceAll("~1", "/").replaceAll("~0", "~").replace(/[^a-zA-Z0-9_]/g, "_"),
+    )
+    .join("-");
   return prefix ? `jsf-${prefix}-${safe}` : `jsf-${safe}`;
+}
+
+// fieldErrorId names the element that holds a field's validation messages, so a
+// control can point at it with aria-describedby.
+export function fieldErrorId(fieldId: string): string {
+  return `${fieldId}-error`;
+}
+
+// fieldAriaProps is the assistive-technology half of a control: the visual `*`
+// and red message mean nothing to a screen reader on their own, so every
+// editable control spreads these onto its input element.
+export function fieldAriaProps(
+  field: FieldControl,
+  fieldId: string,
+): {
+  "aria-required"?: true;
+  "aria-invalid"?: true;
+  "aria-describedby"?: string;
+} {
+  return {
+    ...(field.required ? { "aria-required": true as const } : {}),
+    ...(field.invalid ? { "aria-invalid": true as const, "aria-describedby": fieldErrorId(fieldId) } : {}),
+  };
+}
+
+// comboboxAriaProps is the fieldAriaProps equivalent for Combobox, which takes
+// the same state as named props rather than raw aria-* attributes.
+export function comboboxAriaProps(
+  field: FieldControl,
+  fieldId: string,
+): { ariaRequired?: true; invalid?: true; describedBy?: string } {
+  return {
+    ...(field.required ? { ariaRequired: true as const } : {}),
+    ...(field.invalid ? { invalid: true as const, describedBy: fieldErrorId(fieldId) } : {}),
+  };
 }
 
 export function defaultPlaceholder(schema: JsonSchemaProperty): string {

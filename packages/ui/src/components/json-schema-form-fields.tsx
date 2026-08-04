@@ -9,7 +9,9 @@ import { GridControl } from "./json-schema-form-grid";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption, FormLayout } from "./json-schema-form-types";
 import {
+  comboboxAriaProps,
   defaultPlaceholder,
+  fieldAriaProps,
   inputClass,
   toText,
   withSyntheticValue,
@@ -253,6 +255,7 @@ export function StringControl({
         type={field.schema.format === "password" ? "password" : "text"}
         autoComplete={field.schema.format === "password" ? "new-password" : undefined}
         data-jsf-input
+        {...fieldAriaProps(field, fieldId)}
         className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
@@ -305,6 +308,7 @@ export function NumberControl({
             }
           : {})}
         data-jsf-input
+        {...fieldAriaProps(field, fieldId)}
         className={cn(inputClass(size), field.prefix && "pl-8", suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
@@ -372,6 +376,7 @@ export function NumberSliderControl({
           data-jsf-input
           type="range"
           aria-label={field.label}
+          {...fieldAriaProps(field, fieldId)}
           min={min}
           max={max}
           step={step}
@@ -421,6 +426,7 @@ export function DateControl({
       id={fieldId}
       aria-label={field.label}
       data-jsf-input
+      {...fieldAriaProps(field, fieldId)}
       inputClassName={cn(inputClass(size), field.prefix && "pl-8", field.suffix ? "pr-14" : "pr-8")}
       value={text}
       onChange={(next) => field.onChange(next)}
@@ -452,6 +458,7 @@ export function BooleanControl({
           id={fieldId}
           type="checkbox"
           className="h-4 w-4 accent-primary"
+          {...fieldAriaProps(field, fieldId)}
           checked={field.value === true}
           disabled={readOnly}
           onChange={(e) => field.onChange(e.target.checked)}
@@ -499,6 +506,7 @@ export function EnumControl({
       onChange={(v) => field.onChange(v)}
       prefix={field.prefix}
       suffix={field.suffix}
+      {...comboboxAriaProps(field, fieldId)}
       {...(field.inputClassName ? { className: field.inputClassName } : {})}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
@@ -621,6 +629,7 @@ export function LookupControl({
         size={size}
         allowCustomValue
         onChange={(v) => field.onChange(v)}
+        {...comboboxAriaProps(field, fieldId)}
         {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
       />
     );
@@ -637,6 +646,7 @@ export function LookupControl({
       allowCustomValue={field.allowCustomValue ?? false}
       onSearch={onSearch}
       onChange={(v) => field.onChange(v)}
+      {...comboboxAriaProps(field, fieldId)}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
   );
@@ -737,6 +747,7 @@ export function TextareaControl({
       <textarea
         id={fieldId}
         data-jsf-input
+        {...fieldAriaProps(field, fieldId)}
         rows={4}
         className={cn(
           inputClass(size),
@@ -769,6 +780,7 @@ export function MarkdownControl({
     <textarea
       id={fieldId}
       data-jsf-input
+      {...fieldAriaProps(field, fieldId)}
       rows={6}
       className={cn(inputClass(size), "h-auto resize-y font-mono", field.prefix && "pl-8", field.suffix && "pr-8")}
       value={toText(field.value)}
