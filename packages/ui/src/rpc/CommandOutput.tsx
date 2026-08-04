@@ -20,6 +20,10 @@ import {
   type ClickyTableRowPredicate,
   type ClickyTableRowSelection,
 } from "../data/Clicky";
+import type {
+  CellFilterChange,
+  CellFilterMode,
+} from "../data/cells/CellFilterActions";
 import { parseClickyData } from "../data/clicky-parse";
 import { JsonView } from "../data/JsonView";
 import { cn } from "../lib/utils";
@@ -40,6 +44,8 @@ export type CommandOutputProps = {
   search?: FilterBarSearchProps;
   timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
+  cellFilters?: Record<string, Record<string, CellFilterMode>>;
+  onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
@@ -74,6 +80,8 @@ export function CommandOutput({
   search,
   timeRange,
   externalFilters,
+  cellFilters,
+  onCellFilterChange,
   pagination,
   rowSelection,
   download,
@@ -109,6 +117,8 @@ export function CommandOutput({
         {...(search ? { search } : {})}
         {...(timeRange ? { timeRange } : {})}
         {...(externalFilters ? { externalFilters } : {})}
+        {...(cellFilters ? { cellFilters } : {})}
+        {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
@@ -202,6 +212,8 @@ function OutputBody({
   search,
   timeRange,
   externalFilters,
+  cellFilters,
+  onCellFilterChange,
   pagination,
   rowSelection,
   download,
@@ -219,6 +231,8 @@ function OutputBody({
   search?: FilterBarSearchProps;
   timeRange?: FilterBarRangeProps;
   externalFilters?: FilterBarFilter[];
+  cellFilters?: Record<string, Record<string, CellFilterMode>>;
+  onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
@@ -256,6 +270,8 @@ function OutputBody({
         {...(search ? { search } : {})}
         {...(timeRange ? { timeRange } : {})}
         {...(externalFilters ? { externalFilters } : {})}
+        {...(cellFilters ? { cellFilters } : {})}
+        {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}

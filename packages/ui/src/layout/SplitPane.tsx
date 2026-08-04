@@ -1,4 +1,10 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { cn } from "../lib/utils";
 
 export type SplitPaneProps = {
@@ -18,6 +24,8 @@ export type SplitPaneProps = {
   rightClass?: string;
   /** Classes applied to the root split container. */
   className?: string;
+  /** Stack the panes and hide the resize handle below the `md` breakpoint. */
+  stackOnMobile?: boolean;
 };
 
 export function SplitPane({
@@ -29,6 +37,7 @@ export function SplitPane({
   leftClass,
   rightClass,
   className,
+  stackOnMobile = false,
 }: SplitPaneProps) {
   const [split, setSplit] = useState(defaultSplit);
   const dragging = useRef(false);
@@ -65,23 +74,46 @@ export function SplitPane({
   return (
     <div
       ref={container}
-      className={cn("flex flex-1 overflow-hidden h-full", className)}
+      className={cn(
+        "flex h-full flex-1 overflow-hidden",
+        stackOnMobile && "flex-col md:flex-row",
+        className,
+      )}
     >
       <div
-        style={{ width: `${split}%` }}
-        className={cn("overflow-y-auto bg-background min-h-0", leftClass)}
+        style={
+          stackOnMobile
+            ? ({ "--split-pane-width": `${split}%` } as CSSProperties)
+            : { width: `${split}%` }
+        }
+        className={cn(
+          "min-h-0 overflow-y-auto bg-background",
+          stackOnMobile && "w-full md:w-[var(--split-pane-width)]",
+          leftClass,
+        )}
       >
         {left}
       </div>
       <div
         role="separator"
         aria-orientation="vertical"
-        className="w-1 bg-border hover:bg-primary cursor-col-resize shrink-0 transition-colors"
+        className={cn(
+          "w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary",
+          stackOnMobile && "hidden md:block",
+        )}
         onMouseDown={onMouseDown}
       />
       <div
-        style={{ width: `${100 - split}%` }}
-        className={cn("overflow-hidden bg-background min-h-0", rightClass)}
+        style={
+          stackOnMobile
+            ? ({ "--split-pane-width": `${100 - split}%` } as CSSProperties)
+            : { width: `${100 - split}%` }
+        }
+        className={cn(
+          "min-h-0 overflow-hidden bg-background",
+          stackOnMobile && "w-full md:w-[var(--split-pane-width)]",
+          rightClass,
+        )}
       >
         {right}
       </div>

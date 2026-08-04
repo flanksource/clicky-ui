@@ -67,4 +67,21 @@ describe("EntityExplorerApp", () => {
     const brands = await screen.findAllByText("test");
     expect(brands.length).toBeGreaterThan(0);
   });
+
+  it("titles the collection route in the top bar instead of a body header row", async () => {
+    const { container } = renderApp();
+    const heading = await screen.findByRole("heading", { name: "Widgets" });
+    expect(container.querySelector('[data-slot="app-shell-nav"]')).toContainElement(heading);
+    expect(container.querySelector('[data-slot="app-shell-body-header"]')).toBeNull();
+  });
+
+  it("gives the result surface the full workspace width", async () => {
+    const { container } = renderApp();
+    await screen.findByRole("heading", { name: "Widgets" });
+    expect(
+      container
+        .querySelector('[data-slot="app-shell-content"]')
+        ?.getAttribute("data-content-width"),
+    ).toBe("full");
+  });
 });

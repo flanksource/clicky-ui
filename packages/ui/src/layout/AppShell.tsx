@@ -36,10 +36,26 @@ export type AppShellNavItem = {
   badge?: ReactNode;
 };
 
+export type AppShellNavGroup = {
+  /** Stable key; also the key its collapsed state persists under. */
+  key: string;
+  /** Group heading rendered on the toggle row. */
+  label: string;
+  /** Leading icon (icon name or component). */
+  icon?: string | StaticIconComponent;
+  /** Folded on first render until the user toggles it. */
+  defaultCollapsed?: boolean;
+  items: AppShellNavItem[];
+};
+
 export type AppShellNavSection = {
   /** Section heading; collapses to a divider when the rail is collapsed. */
   label?: string;
-  items: AppShellNavItem[];
+  items?: AppShellNavItem[];
+  /** Collapsible groups rendered after the flat items. High-cardinality
+   *  clusters (provider surfaces, per-ledger journals) belong here so they can
+   *  be folded away; a collapsed rail flattens them back to plain items. */
+  groups?: AppShellNavGroup[];
 };
 
 export type AppShellProps = {
@@ -74,6 +90,8 @@ export type AppShellProps = {
   defaultCollapsed?: boolean;
   /** localStorage key persisting the collapsed state. */
   collapsedStorageKey?: string;
+  /** localStorage key persisting per-group collapsed state. */
+  groupCollapsedStorageKey?: string;
   /** Expanded rail width in px. Defaults to 240. */
   sidebarWidth?: number;
   /** Collapsed rail width in px. Defaults to 56. */
@@ -131,6 +149,7 @@ export function AppShell(props: AppShellProps) {
     collapsible = true,
     defaultCollapsed = false,
     collapsedStorageKey,
+    groupCollapsedStorageKey,
     sidebarWidth = 240,
     collapsedWidth = 56,
     mobileSidebarLabel = "Navigation",
@@ -166,7 +185,6 @@ export function AppShell(props: AppShellProps) {
   useEscapeLayer(mobileSidebarOpen, () => setMobileSidebarOpen(false));
 
   const railWidth = collapsed ? collapsedWidth : sidebarWidth;
-  const compactActions = mobileActions ?? actions;
   const hasTopBar =
     (!hasSidebar && brand !== undefined) ||
     nav !== undefined ||
@@ -187,6 +205,7 @@ export function AppShell(props: AppShellProps) {
             <NavSections
               sections={navSections}
               collapsed={collapsedValue}
+              {...(groupCollapsedStorageKey ? { groupCollapsedStorageKey } : {})}
               {...(onNavigate ? { onNavigate } : {})}
             />
           );
@@ -262,76 +281,85 @@ export function AppShell(props: AppShellProps) {
             data-slot="app-shell-header"
             className="shrink-0 border-b border-border bg-card"
           >
-            {hasMobileHeader && (
-              <div className="flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:hidden">
+            <div
+              className={cn(
+                hasSidebar
+                  ? "flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:h-14 md:flex-nowrap md:gap-density-3 md:px-density-4 md:py-0"
+                  : "flex h-14 items-center gap-density-3 px-density-4",
+                headerClassName,
+              )}
+            >
+              {hasSidebar && (
                 <button
                   type="button"
                   aria-label={`Open ${mobileSidebarLabel}`}
                   title={mobileSidebarLabel}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent md:hidden"
                   onClick={() => setMobileSidebarOpen(true)}
                 >
                   <Icon icon={UiMenu} className="h-4 w-4" />
                 </button>
-                {brand && (
-                  <div className="flex min-w-0 flex-1 items-center gap-density-2">
-                    {brand}
-                  </div>
-                )}
-                {compactActions && (
-                  <div className="ml-auto flex min-w-0 shrink items-center justify-end gap-density-2">
-                    {compactActions}
-                  </div>
-                )}
-                {search !== undefined && (
-                  <div className="basis-full min-w-0">
-                    {search}
-                  </div>
-                )}
-                {nav && (
-                  <div className="basis-full min-w-0 overflow-x-auto">
-                    {nav}
-                  </div>
-                )}
-              </div>
-            )}
-            <div
-              className={cn(
-                "hidden h-14 items-center gap-density-3 px-density-4 md:flex",
-                !hasSidebar && "flex",
-                headerClassName,
               )}
-            >
-              {!hasSidebar && brand && (
+              {brand && (
                 <div
                   data-slot="app-shell-brand"
-                  className="flex shrink-0 items-center gap-density-2"
+                  className={cn(
+                    "min-w-0 items-center gap-density-2",
+                    hasSidebar ? "flex flex-1 md:hidden" : "flex shrink-0",
+                  )}
                 >
                   {brand}
                 </div>
               )}
               {nav && (
-                <div data-slot="app-shell-nav" className="flex shrink-0 items-center">
+                <div
+                  data-slot="app-shell-nav"
+                  className={cn(
+                    "flex shrink-0 items-center",
+                    hasSidebar &&
+                      "order-3 basis-full overflow-x-auto md:order-none md:basis-auto md:overflow-visible",
+                  )}
+                >
                   {nav}
                 </div>
               )}
               {search !== undefined && (
                 <div
                   data-slot="app-shell-search"
-                  className="flex min-w-0 flex-1 justify-center"
+                  className={cn(
+                    "flex min-w-0 flex-1 justify-center",
+                    hasSidebar &&
+                      "order-2 basis-full md:order-none md:basis-auto md:flex-1",
+                  )}
                 >
                   <div className="w-full" style={{ maxWidth: searchMaxWidth }}>
                     {search}
                   </div>
                 </div>
               )}
-              {search === undefined && <div className="flex-1" />}
-              {actions && (
+              {search === undefined && (
+                <div className={cn("flex-1", hasSidebar && "hidden md:block")} />
+              )}
+              {(actions !== undefined || (hasSidebar && mobileActions !== undefined)) && (
                 <div
                   data-slot="app-shell-actions"
-                  className="flex shrink-0 items-center gap-density-2"
+                  className={cn(
+                    "flex shrink-0 items-center gap-density-2",
+                    hasSidebar && "order-1 ml-auto md:order-none md:ml-0",
+                  )}
                 >
-                  {actions}
+                  {!hasSidebar || mobileActions === undefined ? (
+                    actions
+                  ) : (
+                    <>
+                      <div className="hidden items-center gap-density-2 md:flex">
+                        {actions}
+                      </div>
+                      <div className="flex items-center gap-density-2 md:hidden">
+                        {mobileActions}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -379,41 +407,34 @@ export function AppShell(props: AppShellProps) {
         )}
 
         {bodySidebar !== undefined ? (
-          <>
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
+          <SplitPane
+            stackOnMobile
+            className="min-h-0 flex-1"
+            defaultSplit={bodySplit}
+            minLeft={12}
+            minRight={30}
+            left={
               <div
                 data-slot="app-shell-body-sidebar"
-                className="max-h-[40vh] shrink-0 overflow-y-auto border-b border-border bg-background"
+                className="h-full"
               >
                 {bodySidebar}
               </div>
+            }
+            right={
               <main
                 data-slot="app-shell-main"
                 className={cn(
-                  "min-h-0 min-w-0 flex-1 overflow-auto",
+                  "h-full min-h-0 min-w-0 overflow-auto",
                   contentClassName,
                 )}
               >
                 {children}
               </main>
-            </div>
-            <SplitPane
-              className="hidden min-h-0 flex-1 md:flex"
-              defaultSplit={bodySplit}
-              minLeft={12}
-              minRight={30}
-              left={<div data-slot="app-shell-body-sidebar" className="h-full">{bodySidebar}</div>}
-              right={
-                <div
-                  data-slot="app-shell-main"
-                  className={cn("h-full min-w-0", contentClassName)}
-                >
-                  {children}
-                </div>
-              }
-              rightClass="overflow-y-auto"
-            />
-          </>
+            }
+            leftClass="max-h-[40vh] shrink-0 border-b border-border md:max-h-none md:border-b-0"
+            rightClass="min-h-0 flex-1 md:flex-none"
+          />
         ) : (
           <main
             data-slot="app-shell-main"
