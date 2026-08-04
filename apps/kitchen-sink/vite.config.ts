@@ -10,6 +10,7 @@ const uiSrc = resolve(workspaceRoot, "packages/ui/src");
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: [
       {
         find: /^@flanksource\/clicky-ui\/styles\.css$/,
