@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { ErrorWrapper } from "@flanksource/clicky-ui";
 import { App } from "./App";
 import "@flanksource/clicky-ui/styles.css";
 import "./styles.css";
@@ -11,4 +12,8 @@ import "./styles.css";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("#app root not found");
-createRoot(root).render(<App />);
+createRoot(root).render(
+  <ErrorWrapper>
+    <App />
+  </ErrorWrapper>,
+);

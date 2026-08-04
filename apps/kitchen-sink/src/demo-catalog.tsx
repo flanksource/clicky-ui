@@ -45,6 +45,7 @@ import { HoverCardDemo } from "./demos/HoverCardDemo";
 import { ModalDemo } from "./demos/ModalDemo";
 import { DropdownMenuDemo } from "./demos/DropdownMenuDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
+import { ErrorWrapperDemo } from "./demos/ErrorWrapperDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
 import { CommandFormDemo } from "./demos/CommandFormDemo";
@@ -380,6 +381,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Diagnostics",
     items: [
+      {
+        id: "error-wrapper",
+        label: "ErrorWrapper",
+        component: ErrorWrapperDemo,
+        icon: UiBug,
+      },
       {
         id: "diagnostics",
         label: "Process & Stack",
