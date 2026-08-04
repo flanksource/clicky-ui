@@ -32,10 +32,23 @@ export interface TaskProgressProps {
   compact?: boolean;
   className?: string;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  onTaskControl?: (
+    action: TaskControlAction,
+    task: TaskSnapshot,
+    group: TaskSnapshot,
+  ) => void | Promise<void>;
   metricsBaseUrl?: string;
 }
 
-export function TaskProgress({ snapshots, title, compact, className, onControl, metricsBaseUrl }: TaskProgressProps) {
+export function TaskProgress({
+  snapshots,
+  title,
+  compact,
+  className,
+  onControl,
+  onTaskControl,
+  metricsBaseUrl,
+}: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
 
@@ -57,6 +70,7 @@ export function TaskProgress({ snapshots, title, compact, className, onControl, 
           tasks={tasks.filter((t) => t.groupId === g.groupId || t.group === g.id)}
           compact={compact}
           {...(onControl ? { onControl } : {})}
+          {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
         />
       ))}
@@ -73,12 +87,18 @@ function TaskGroupCard({
   tasks,
   compact,
   onControl,
+  onTaskControl,
   metricsBaseUrl,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
   compact: boolean | undefined;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  onTaskControl?: (
+    action: TaskControlAction,
+    task: TaskSnapshot,
+    group: TaskSnapshot,
+  ) => void | Promise<void>;
   metricsBaseUrl?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -131,7 +151,7 @@ function TaskGroupCard({
               {g.status}
             </span>
           )}
-          {onControl && <TaskControls group={g} onControl={onControl} />}
+          {onControl && <TaskControls target={g} onControl={onControl} />}
         </div>
       </div>
 
@@ -161,13 +181,30 @@ function TaskGroupCard({
       ) : null}
 
       {[...visibleSuccess, ...alwaysShow, ...running, ...visiblePending].map((t) => (
-        <TaskRow key={t.id} task={t} />
+        <TaskRow
+          key={t.id}
+          task={t}
+          group={g}
+          {...(onTaskControl ? { onTaskControl } : {})}
+        />
       ))}
     </div>
   );
 }
 
-function TaskRow({ task: t }: { task: TaskSnapshot }) {
+function TaskRow({
+  task: t,
+  group,
+  onTaskControl,
+}: {
+  task: TaskSnapshot;
+  group: TaskSnapshot;
+  onTaskControl?: (
+    action: TaskControlAction,
+    task: TaskSnapshot,
+    group: TaskSnapshot,
+  ) => void | Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
@@ -211,7 +248,17 @@ function TaskRow({ task: t }: { task: TaskSnapshot }) {
               </span>
             )}
           </span>
-          {t.duration && <span className="shrink-0 text-xs text-muted-foreground">{t.duration}</span>}
+          <div className="flex shrink-0 items-center gap-1">
+            {t.duration && <span className="text-xs text-muted-foreground">{t.duration}</span>}
+            {onTaskControl && (
+              <TaskControls
+                target={t}
+                labelSuffix={t.name}
+                stopPropagation
+                onControl={(action) => onTaskControl(action, t, group)}
+              />
+            )}
+          </div>
         </div>
         {(t.description || hasProgress) && (
           <div className="mt-0.5 flex items-center gap-2">
@@ -281,11 +328,15 @@ function TaskStream({
 }
 
 function TaskControls({
-  group,
+  target,
   onControl,
+  labelSuffix,
+  stopPropagation,
 }: {
-  group: TaskSnapshot;
-  onControl: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  target: TaskSnapshot;
+  onControl: (action: TaskControlAction, target: TaskSnapshot) => void | Promise<void>;
+  labelSuffix?: string;
+  stopPropagation?: boolean;
 }) {
   const [busy, setBusy] = useState<TaskControlAction | null>(null);
   const [error, setError] = useState("");
@@ -294,7 +345,7 @@ function TaskControls({
     setBusy(action);
     setError("");
     try {
-      await onControl(action, group);
+      await onControl(action, target);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Failed to ${action} task`);
     } finally {
@@ -303,9 +354,10 @@ function TaskControls({
   };
   return (
     <>
-      {(group.controls ?? []).map((action) => {
+      {(target.controls ?? []).map((action) => {
         const ControlIcon = icons[action];
-        const label = action[0]?.toUpperCase() + action.slice(1);
+        const actionLabel = action[0]?.toUpperCase() + action.slice(1);
+        const label = labelSuffix ? `${actionLabel} ${labelSuffix}` : actionLabel;
         return (
           <Button
             key={action}
@@ -315,7 +367,10 @@ function TaskControls({
             aria-label={label}
             title={label}
             disabled={busy !== null}
-            onClick={() => void invoke(action)}
+            onClick={(event) => {
+              if (stopPropagation) event.stopPropagation();
+              void invoke(action);
+            }}
           >
             <ControlIcon />
           </Button>

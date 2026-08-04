@@ -170,6 +170,36 @@ describe("TaskProgress", () => {
     await waitFor(() => expect(onControl).toHaveBeenCalledWith("stop", snapshots[0]));
   });
 
+  it("invokes a child task control without toggling its output", async () => {
+    const onTaskControl = vi.fn();
+    const snapshots: TaskSnapshot[] = [
+      {
+        id: "commit",
+        name: "Commit gavel",
+        type: "group",
+        status: "running",
+        groupId: "commit-1",
+        total: 1,
+        running: 1,
+      },
+      {
+        id: "command",
+        name: "Commit one.go",
+        type: "task",
+        status: "running",
+        groupId: "commit-1",
+        stdout: "staging one.go\n",
+        controls: ["stop"],
+      },
+    ];
+    render(<TaskProgress snapshots={snapshots} onTaskControl={onTaskControl} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop Commit one.go" }));
+
+    await waitFor(() => expect(onTaskControl).toHaveBeenCalledWith("stop", snapshots[1], snapshots[0]));
+    expect(screen.queryByText("staging one.go")).not.toBeInTheDocument();
+  });
+
   it("renders the nested supervised process tree and current resource summary", () => {
     const snapshots: TaskSnapshot[] = [
       {

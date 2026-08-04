@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { TaskProgress } from "./TaskProgress";
 import type { TaskSnapshot } from "./TaskSnapshot";
 
@@ -94,5 +95,54 @@ export const Complete: Story = {
       },
     ]),
     title: "Defrag fixes",
+  },
+};
+
+export const ControllableChildren: Story = {
+  args: {
+    snapshots: [
+      {
+        id: "commit-project",
+        name: "Commit gavel",
+        type: "group",
+        status: "running",
+        groupId: "commit-1",
+        kind: "gavel-commit",
+        total: 2,
+        running: 1,
+        controls: ["stop"],
+      },
+      {
+        id: "commit-one",
+        name: "Commit one.go",
+        description: "one.go",
+        type: "task",
+        groupId: "commit-1",
+        status: "running",
+        controls: ["stop"],
+      },
+      {
+        id: "commit-two",
+        name: "Commit two.go",
+        description: "two.go",
+        type: "task",
+        groupId: "commit-1",
+        status: "pending",
+        controls: ["stop"],
+      },
+    ],
+    onControl: fn(),
+    onTaskControl: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Stop Commit one.go" }),
+    );
+    await expect(args.onTaskControl).toHaveBeenCalledWith(
+      "stop",
+      expect.objectContaining({ id: "commit-one" }),
+      expect.objectContaining({ id: "commit-project" }),
+    );
   },
 };
