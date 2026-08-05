@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
@@ -35,6 +35,14 @@ export interface TreePickerFieldProps<T> {
   className?: string;
   triggerClassName?: string;
   panelClassName?: string;
+  renderTrigger?: (props: TreePickerTriggerProps) => ReactNode;
+}
+
+export interface TreePickerTriggerProps {
+  open: boolean;
+  disabled: boolean;
+  triggerRef: Ref<HTMLButtonElement>;
+  toggle: () => void;
 }
 
 // TreePickerField is a form-field-styled trigger (matching Combobox's closed
@@ -58,6 +66,7 @@ export function TreePickerField<T>({
   className,
   triggerClassName,
   panelClassName,
+  renderTrigger,
 }: TreePickerFieldProps<T>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(
@@ -79,7 +88,7 @@ export function TreePickerField<T>({
       return;
     }
     const update = () => {
-      const anchor = anchorRef.current;
+      const anchor = rootRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
       const viewportCap = window.innerWidth - rect.left - 8;
@@ -110,29 +119,40 @@ export function TreePickerField<T>({
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      <button
-        ref={anchorRef}
-        type="button"
-        disabled={disabled}
-        aria-haspopup="tree"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "relative flex w-full items-center rounded-md border border-input bg-background text-left text-foreground",
-          size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
-          "pr-8",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          triggerClassName,
-        )}
-      >
-        <span className={cn("min-w-0 flex-1 truncate", label == null && "text-muted-foreground")}>
-          {label ?? placeholder}
-        </span>
-        <span className="pointer-events-none absolute right-0 flex h-full items-center px-2 text-muted-foreground">
-          <Icon icon={UiChevronDown} className="text-xs" />
-        </span>
-      </button>
+      {renderTrigger ? (
+        renderTrigger({
+          open,
+          disabled: Boolean(disabled),
+          triggerRef: anchorRef,
+          toggle: () => {
+            if (!disabled) setOpen((current) => !current);
+          },
+        })
+      ) : (
+        <button
+          ref={anchorRef}
+          type="button"
+          disabled={disabled}
+          aria-haspopup="tree"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+          className={cn(
+            "relative flex w-full items-center rounded-md border border-input bg-background text-left text-foreground",
+            size ? inputSizeClass[size] : "h-control-h px-control-px text-sm",
+            "pr-8",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            triggerClassName,
+          )}
+        >
+          <span className={cn("min-w-0 flex-1 truncate", label == null && "text-muted-foreground")}>
+            {label ?? placeholder}
+          </span>
+          <span className="pointer-events-none absolute right-0 flex h-full items-center px-2 text-muted-foreground">
+            <Icon icon={UiChevronDown} className="text-xs" />
+          </span>
+        </button>
+      )}
 
       {open &&
         pos &&

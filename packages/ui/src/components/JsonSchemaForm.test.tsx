@@ -214,6 +214,40 @@ describe("JsonSchemaForm extension pipeline", () => {
     );
     expect(seen.at(-1)).toEqual({ namespace: "staging", url: "x" });
   });
+
+  it("lets a pre-extension commit an atomic root update", () => {
+    const onChange = vi.fn();
+    const replaceRoot: PreExtension = (field, ctx) =>
+      field.key === "url"
+        ? {
+            ...field,
+            onChange: (url) =>
+              ctx.onRootChange?.({
+                namespace: String(ctx.rootValue?.namespace ?? ""),
+                url,
+              }),
+          }
+        : field;
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            namespace: { type: "string" },
+            url: { type: "string" },
+          },
+        }}
+        value={{ namespace: "staging", url: "old" }}
+        onChange={onChange}
+        pre={[replaceRoot]}
+      />,
+    );
+
+    fireEvent.change(screen.getByDisplayValue("old"), {
+      target: { value: "new" },
+    });
+    expect(onChange).toHaveBeenCalledWith({ namespace: "staging", url: "new" });
+  });
 });
 
 describe("JsonSchemaForm defaults", () => {

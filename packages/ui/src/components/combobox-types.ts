@@ -6,7 +6,7 @@ export type ComboboxOption = {
   value: string;
   /** Full label used for searching and in the open option menu. */
   label: string;
-  /** Optional compact label used only while this option is selected and closed. */
+  /** Optional compact label used in the closed selection or a selected tag. */
   selectedLabel?: string;
   disabled?: boolean;
   /** Leading glyph for the option: a runtime icon name or a rendered node. */
@@ -107,6 +107,8 @@ export type ComboboxSingleProps = ComboboxBaseProps & {
 export type ComboboxMultiProps = ComboboxBaseProps & {
   multiple: true;
   tristate?: false;
+  /** Renders selected values as wrapping removable pills instead of a summary. */
+  variant?: "default" | "tags";
   value: string[];
   onChange: (value: string[]) => void;
 };

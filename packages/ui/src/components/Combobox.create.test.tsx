@@ -99,4 +99,63 @@ describe("Combobox custom value transforms", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(input).toHaveValue("");
   });
+
+  it("appends a custom value to a multi-selection without closing the menu", () => {
+    const onChange = vi.fn();
+    render(
+      <Combobox
+        multiple
+        value={["80"]}
+        onChange={onChange}
+        options={OPTIONS}
+        onNew={(value) => ({ value, label: `Use ${value}` })}
+        onCreate={(option) => `port:${option.value}`}
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "9443" } });
+    const candidate = screen.getByRole("option", { name: "Use 9443" });
+    fireEvent.mouseDown(candidate);
+    fireEvent.click(candidate);
+
+    expect(onChange).toHaveBeenCalledWith(["80", "port:9443"]);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
+
+  it("appends a typed multi-select value on Enter without closing the menu", () => {
+    const onChange = vi.fn();
+    render(
+      <Combobox
+        multiple
+        value={["80"]}
+        onChange={onChange}
+        options={OPTIONS}
+        onNew={(value) => ({ value, label: `Use ${value}` })}
+        onCreate={(option) => `port:${option.value}`}
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "9443" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onChange).toHaveBeenCalledWith(["80", "port:9443"]);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
+
+  it("shows selected custom values that are absent from the current option page", () => {
+    render(
+      <Combobox
+        multiple
+        value={["80", "9443"]}
+        onChange={vi.fn()}
+        options={OPTIONS}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveValue("http (80), 9443");
+  });
 });
