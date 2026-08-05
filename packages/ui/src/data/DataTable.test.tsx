@@ -352,9 +352,34 @@ describe("DataTable", () => {
     });
 
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(1);
-    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    // Header row + the empty-state row.
+    expect(screen.getAllByRole("row")).toHaveLength(2);
     expect(screen.getByText("0 of 3 rows")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("renders the empty message when client filtering removes every row", () => {
+    vi.useFakeTimers();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        autoFilter
+        emptyMessage="No matching records"
+      />,
+    );
+
+    expect(screen.queryByText("No matching records")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Search all columns…"), {
+      target: { value: "not-a-real-service" },
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByText("No matching records")).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -443,6 +468,145 @@ describe("DataTable", () => {
       target: { value: "10" },
     });
     expect(onPageSizeChange).toHaveBeenCalledWith(10);
+  });
+
+  // Sorting one page of a server-paged result reorders that page alone, which
+  // reads as a sort of the whole table and is not one.
+  it("disables the header sort under server paging unless the sort is server-backed", () => {
+    const paged = {
+      page: 0,
+      pageSize: 5,
+      total: 100,
+      onPageChange: vi.fn(),
+      onPageSizeChange: vi.fn(),
+    };
+    const view = render(<DataTable data={rows} columns={columns} pagination={paged} />);
+    expect(screen.queryByRole("button", { name: /service/i })).not.toBeInTheDocument();
+
+    // A caller that wired the sort to the server gets the header back, because
+    // then it sorts the whole result rather than the page.
+    const onSortChange = vi.fn();
+    view.rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        pagination={paged}
+        manualSort
+        sort={null}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /service/i }));
+    expect(onSortChange).toHaveBeenCalledWith({ key: "service", dir: "asc" });
+  });
+
+  // A total the backend could only bound is a lower bound, and rendering it as
+  // a count states a number nobody promised — including the page count derived
+  // from it, which is why the jump target disappears with it.
+  it("renders an approximate total as a bound and drops the page count", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        pagination={{
+          page: 0,
+          pageSize: 5,
+          total: 10000,
+          totalRelation: "gte",
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/of ~10000\+/)).toBeInTheDocument();
+    expect(screen.queryByText(/Page 1 of/)).not.toBeInTheDocument();
+  });
+
+  // A short page and the end of the data are different facts, and only the
+  // server knows which one happened.
+  it("keeps Next enabled on a short page the server says has more", () => {
+    render(
+      <DataTable
+        data={rows.slice(0, 2)}
+        columns={columns}
+        pagination={{
+          page: 0,
+          pageSize: 25,
+          hasMore: true,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Next page" })).not.toBeDisabled();
+  });
+
+  describe("cursor pagination", () => {
+    const cursorTable = (
+      cursor: { current?: string; next?: string },
+      onCursorChange = vi.fn(),
+    ) => {
+      const view = render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          pagination={{
+            page: 0,
+            pageSize: 5,
+            total: 10000,
+            totalRelation: "gte",
+            cursor: { ...cursor, onCursorChange },
+            onPageChange: vi.fn(),
+            onPageSizeChange: vi.fn(),
+          }}
+        />,
+      );
+      return { view, onCursorChange };
+    };
+
+    it("steps forward on the cursor the server minted", () => {
+      const { onCursorChange } = cursorTable({ next: "page-2" });
+
+      expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+      expect(onCursorChange).toHaveBeenCalledWith("page-2");
+    });
+
+    // A cursor points forward only, so Previous is a position the client
+    // already visited — the first page is the one it returns to from page two.
+    it("returns to the first page from the second", () => {
+      const onCursorChange = vi.fn();
+      const { view } = cursorTable({ next: "page-2" }, onCursorChange);
+
+      fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+      view.rerender(
+        <DataTable
+          data={rows}
+          columns={columns}
+          pagination={{
+            page: 0,
+            pageSize: 5,
+            cursor: { current: "page-2", next: "page-3", onCursorChange },
+            onPageChange: vi.fn(),
+            onPageSizeChange: vi.fn(),
+          }}
+        />,
+      );
+
+      const previous = screen.getByRole("button", { name: "Previous page" });
+      expect(previous).not.toBeDisabled();
+      fireEvent.click(previous);
+      expect(onCursorChange).toHaveBeenLastCalledWith(undefined);
+    });
+
+    // The end of a cursor walk is the absence of a next cursor, not a short
+    // page: there is no token to ask the server to resume from.
+    it("stops at the page with no next cursor", () => {
+      cursorTable({ current: "page-2" });
+      expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    });
   });
 
   it("renders caller menu actions in the table menu", () => {
@@ -576,6 +740,67 @@ describe("DataTable", () => {
     // A plain left-click routes client-side (no hard navigation).
     fireEvent.click(link);
     expect(navigate).toHaveBeenCalledWith("/services/api");
+  });
+
+  it("keeps cell-filter buttons outside the row link so both stay activatable", () => {
+    vi.useFakeTimers();
+    const navigate = vi.fn();
+    const onCellFilterChange = vi.fn();
+    const adapter: RouterAdapter = {
+      pathname: "/",
+      navigate,
+      renderLink: ({ to, className, children }) => (
+        <a
+          href={to}
+          className={className}
+          onClick={(event) => {
+            event.preventDefault();
+            navigate(to);
+          }}
+        >
+          {children}
+        </a>
+      ),
+    };
+
+    render(
+      <RouterProvider adapter={adapter}>
+        <DataTable
+          data={[{ service: "payments" }]}
+          columns={[
+            { key: "service", label: "Service", filterKey: "filter.service" },
+          ]}
+          getRowHref={(row) => `/services/${row.service}`}
+          onCellFilterChange={onCellFilterChange}
+        />
+      </RouterProvider>,
+    );
+
+    fireEvent.mouseEnter(screen.getByText("payments").closest("span.relative")!);
+    act(() => vi.advanceTimersByTime(150));
+
+    const link = screen.getByRole("link", { name: "payments" });
+    const include = screen.getByRole("button", { name: "Include payments" });
+
+    // Nested interactive controls are invalid HTML and break keyboard
+    // activation of both the filter button and the row link.
+    expect(link.contains(include)).toBe(false);
+    expect(include.closest("a")).toBeNull();
+
+    // The link's stretched ::after overlay paints over the cell, so the hover
+    // trigger that reveals the buttons has to be lifted above it.
+    const elevated = link.querySelector(".z-10");
+    expect(elevated).not.toBeNull();
+    expect(elevated).toHaveTextContent("payments");
+
+    fireEvent.click(include);
+    expect(onCellFilterChange).toHaveBeenCalledWith({
+      key: "filter.service",
+      value: "payments",
+      mode: "include",
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("generates multi-select and text filters automatically", () => {

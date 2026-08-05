@@ -31,6 +31,11 @@ export type ResultRenderContext = {
   response: ExecutionResponse | null;
   defaultView: ReactNode;
   filterConfig?: OperationResultFilterConfig;
+  // The pager and download menu the default view would have rendered. A
+  // replacement surface is still a page of a server-paged result, so it is
+  // handed the same controls rather than left to present one page as the whole.
+  pagination?: DataTablePagination;
+  download?: ClickyDownloadOptions;
 };
 
 // ResultRenderer lets the host app swap the result presentation per surface. It

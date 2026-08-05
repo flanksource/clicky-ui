@@ -1,11 +1,15 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type {
   FilterBarFilter,
-  FilterBarMultiFilterMode,
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
 import type { DataTablePagination } from "../data/DataTable";
+import {
+  parseMultiFilterValue,
+  serializeMultiFilterValue,
+  splitCommaValues,
+} from "../data/data-table-filter-values";
 import type {
   ExecutionResponse,
   OpenAPIParameter,
@@ -28,6 +32,13 @@ export type ParameterPagination = {
   offsetValue: string;
   setLimit: (next: string) => void;
   setOffset: (next: string) => void;
+
+  // Cursor paging, when the operation declares a cursor parameter. Present
+  // alongside limit/offset rather than instead of them: an operation can serve
+  // both, and which one a page uses is decided per request.
+  cursorParam?: string;
+  cursorValue?: string;
+  setCursor?: (next: string) => void;
 };
 
 export type ParameterFormConfig = {
@@ -81,6 +92,14 @@ export function buildInitialParameterValues(
   return { ...values, ...initialValues, ...lockedValues };
 }
 
+// OFFSET_DEPTH_LIMIT is where offset paging stops being available and a cursor
+// takes over. It exists because backends refuse a deep offset outright —
+// OpenSearch's default result window is 10,000 — so this is the one place that
+// decides the changeover rather than each surface discovering the refusal for
+// itself. Below it, page-number jumps stay available; past it there is nothing
+// to jump with, because a cursor names a position rather than a page.
+export const OFFSET_DEPTH_LIMIT = 10_000;
+
 export function dataTablePaginationFromForm(
   pagination: ParameterPagination | undefined,
   response: Pick<ExecutionResponse, "pagination"> | null | undefined,
@@ -90,19 +109,51 @@ export function dataTablePaginationFromForm(
   const pageSize = positiveInt(pagination.limitValue) ?? response?.pagination?.limit ?? 25;
   const offset = nonNegativeInt(pagination.offsetValue) ?? response?.pagination?.offset ?? 0;
   const page = Math.floor(offset / pageSize);
+  const served = response?.pagination;
+  const setCursor = pagination.setCursor;
 
   return {
     page,
     pageSize,
-    ...(response?.pagination?.total !== undefined ? { total: response.pagination.total } : {}),
+    ...(served?.total !== undefined ? { total: served.total } : {}),
+    ...(served?.totalRelation !== undefined ? { totalRelation: served.totalRelation } : {}),
+    ...(served?.hasMore !== undefined ? { hasMore: served.hasMore } : {}),
+    // Cursor mode needs both halves: a parameter to send the cursor on, and a
+    // cursor to send. An operation that declares one without the server minting
+    // the other pages by offset, which is correct and merely slower.
+    //
+    // Which mode applies is depth, not preference: a walk already under way
+    // continues, and a shallow page keeps its jump controls until the next one
+    // would cross OFFSET_DEPTH_LIMIT — the point past which the offset would be
+    // refused anyway.
+    ...(setCursor &&
+    (pagination.cursorValue ||
+      (served?.nextCursor && offset + pageSize >= OFFSET_DEPTH_LIMIT))
+      ? {
+          cursor: {
+            ...(pagination.cursorValue ? { current: pagination.cursorValue } : {}),
+            ...(served?.nextCursor ? { next: served.nextCursor } : {}),
+            onCursorChange: (next: string | undefined) => {
+              // Offset and cursor are two disagreeing positions in one request,
+              // so taking the cursor means dropping the offset.
+              pagination.setOffset("0");
+              setCursor(next ?? "");
+            },
+          },
+        }
+      : {}),
     onPageChange: (next: number) => {
       if (positiveInt(pagination.limitValue) == null) {
         pagination.setLimit(String(pageSize));
       }
+      setCursor?.("");
       pagination.setOffset(String(Math.max(next, 0) * pageSize));
     },
     onPageSizeChange: (next: number) => {
       pagination.setLimit(String(next));
+      // A cursor names a position in a page of the old size, so resizing the
+      // page invalidates it and the walk restarts.
+      setCursor?.("");
       pagination.setOffset("0");
     },
   };
@@ -159,9 +210,13 @@ export function parametersToFormConfig(
   // of truth for parameter classification.
   const limitParam = parameters.find((p) => p["x-clicky"]?.role === "limit");
   const offsetParam = parameters.find((p) => p["x-clicky"]?.role === "offset");
+  // A cursor is an opaque server-minted token, so it is never a filter chip a
+  // user could type into — it is only ever echoed back from a previous page.
+  const cursorParam = parameters.find((p) => p["x-clicky"]?.role === "cursor");
   const paginationOmitNames = new Set<string>();
   if (limitParam) paginationOmitNames.add(limitParam.name);
   if (offsetParam) paginationOmitNames.add(offsetParam.name);
+  if (cursorParam) paginationOmitNames.add(cursorParam.name);
 
   // The search-role param drives the FilterBar's dedicated search input rather
   // than a filter chip; pull it out of the chip loop the same way pagination is.
@@ -170,6 +225,16 @@ export function parametersToFormConfig(
   );
   const omitNames = new Set(paginationOmitNames);
   if (searchParam) omitNames.add(searchParam.name);
+
+  // rewind returns the caller to the first page whenever the result set itself
+  // changes. Both positions have to go: an offset into the old rows names
+  // different rows in the new ones, and a cursor minted under the old filters
+  // is rejected by the server outright rather than silently reinterpreted.
+  const rewind = (next: ParameterValues): ParameterValues => ({
+    ...next,
+    ...(offsetParam ? { [offsetParam.name]: "0" } : {}),
+    ...(cursorParam ? { [cursorParam.name]: "" } : {}),
+  });
 
   // Time-range first looks for server-stamped roles, then falls back to the
   // existing lookup-driven "from"/"to" detection so older specs keep working.
@@ -212,7 +277,7 @@ export function parametersToFormConfig(
     const onChange = (next: string | boolean) => {
       if (disabled) return;
       const stringValue = typeof next === "boolean" ? (next ? "true" : "false") : next;
-      setValues((current) => ({ ...current, [param.name]: stringValue }));
+      setValues((current) => rewind({ ...current, [param.name]: stringValue }));
     };
 
     const schema = param.schema;
@@ -227,10 +292,9 @@ export function parametersToFormConfig(
         disabled,
         options: lookupOptionsToFieldOptions(lookupFilter),
         onChange: (next) =>
-          setValues((current) => ({
-            ...current,
-            [param.name]: serializeMultiFilterValue(next),
-          })),
+          setValues((current) =>
+            rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+          ),
       });
       continue;
     }
@@ -274,7 +338,7 @@ export function parametersToFormConfig(
           options: lookupOptionsToFieldOptions(lookupFilter),
           ...placeholderProp,
           onChange: (next) =>
-            setValues((current) => ({ ...current, [param.name]: next.join(",") })),
+            setValues((current) => rewind({ ...current, [param.name]: next.join(",") })),
         });
         continue;
       }
@@ -320,7 +384,7 @@ export function parametersToFormConfig(
       value: searchValue,
       onChange: (next) => {
         if (searchDisabled) return;
-        setValues((current) => ({ ...current, [searchParam.name]: next }));
+        setValues((current) => rewind({ ...current, [searchParam.name]: next }));
       },
       ...(searchPlaceholder ? { placeholder: searchPlaceholder } : {}),
       ariaLabel: lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
@@ -334,6 +398,14 @@ export function parametersToFormConfig(
       offsetValue: values[offsetParam.name] ?? "",
       setLimit: (next) => setValues((current) => ({ ...current, [limitParam.name]: next })),
       setOffset: (next) => setValues((current) => ({ ...current, [offsetParam.name]: next })),
+      ...(cursorParam
+        ? {
+            cursorParam: cursorParam.name,
+            cursorValue: values[cursorParam.name] ?? "",
+            setCursor: (next: string) =>
+              setValues((current) => ({ ...current, [cursorParam.name]: next })),
+          }
+        : {}),
     };
   }
   if (hasTimeRange && rangeStart != null && rangeEnd != null) {
@@ -344,11 +416,9 @@ export function parametersToFormConfig(
       from: values[rangeStart.name] ?? "",
       to: values[rangeEnd.name] ?? "",
       onApply: (from, to) =>
-        setValues((current) => ({
-          ...current,
-          [rangeStart.name]: from,
-          [rangeEnd.name]: to,
-        })),
+        setValues((current) =>
+          rewind({ ...current, [rangeStart.name]: from, [rangeEnd.name]: to }),
+        ),
       ...(rangeMeta?.presets ? { presets: rangeMeta.presets } : {}),
       timeEnabled: rangeMeta?.timeEnabled ?? false,
       ...(rangeMeta?.timeZone ? { timeZone: rangeMeta.timeZone } : {}),
@@ -370,35 +440,6 @@ export function useDebouncedRecord<T>(value: T, delayMs: number) {
   }, [delayMs, value]);
 
   return debounced;
-}
-
-export function parseMultiFilterValue(value: string): Record<string, FilterBarMultiFilterMode> {
-  const parsed: Record<string, FilterBarMultiFilterMode> = {};
-  for (const item of splitCommaValues(value)) {
-    if (item.startsWith("!") && item.length > 1) {
-      parsed[item.slice(1)] = "exclude";
-    } else {
-      parsed[item] = "include";
-    }
-  }
-  return parsed;
-}
-
-export function serializeMultiFilterValue(value: Record<string, FilterBarMultiFilterMode>): string {
-  return Object.entries(value)
-    .flatMap(([key, mode]) => {
-      if (mode === "include") return [key];
-      if (mode === "exclude") return [`!${key}`];
-      return [];
-    })
-    .join(",");
-}
-
-function splitCommaValues(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function positiveInt(value: string | undefined): number | undefined {
