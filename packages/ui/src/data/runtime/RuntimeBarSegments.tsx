@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InputField } from "../../components/InputField";
 import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import {
@@ -7,146 +8,72 @@ import {
 } from "../../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
-  DEFAULT_REASONING_EFFORTS,
   effortLevelColor,
   effortLevelIcon,
   effortLevelLabel,
 } from "../chat/effort-icons";
 import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
-import { runtimeFamilyBrand, runtimeModelMatches } from "./RuntimeBar.model";
-import { RuntimeBarCombo } from "./RuntimeBarCombo";
-import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
-import { SpecInput } from "./SpecRuntimeEditor/fields";
-import { withOptionalRoot, withRoot } from "./SpecRuntimeEditor/update";
+import { runtimeFamilyBrand } from "./RuntimeBar.model";
+import type { RuntimeBarValue } from "./RuntimeBar";
+import { isUnavailable } from "./availability";
 import {
-  effortOptionsForModel,
-  reconcileModelCapabilities,
-} from "./model-capabilities";
-import {
-  SPEC_RUNTIME_FAMILIES,
-  backendForFamilyMode,
-  familyById,
-  firstMode,
-  modelBelongsToFamily,
   modelsForFamily,
-  runtimeModeOptions,
-  selectionForBackend,
-  unsupportedModeTitle,
   type SpecRuntimeFamily,
+  type SpecRuntimeModeOption,
 } from "./runtime-mode";
 
-export type RuntimeBarProps = {
-  value: AISpecRuntimeValue;
-  onChange: (value: AISpecRuntimeValue) => void;
-  /** `segmented` uses field triggers; `combo` uses one direct-edit menu. */
-  variant?: "combo" | "segmented";
-  /** Model catalog. Only the selected family's models are listed; a family the
-   *  catalog does not describe is served by the segment's free-text entry. */
-  models?: ChatModel[] | undefined;
-  families?: SpecRuntimeFamily[] | undefined;
-  /** Effort tiers offered when the catalog does not describe the model. */
-  reasoningEfforts?: string[] | undefined;
-  ariaLabel?: string | undefined;
+export type RuntimeBarSegmentsProps = {
+  value: RuntimeBarValue;
+  models: ChatModel[];
+  modelOptions: ChatModel[];
+  resolvedModel: ChatModel | undefined;
+  selectedModelUnavailable: boolean;
+  families: SpecRuntimeFamily[];
+  family: SpecRuntimeFamily;
+  mode: SpecRuntimeModeOption;
+  selectedMode: string;
+  reasoningEfforts: string[];
+  supportedEfforts: string[];
+  ariaLabel: string;
   className?: string | undefined;
+  onBackendChange: (familyId: string, modeId: string) => void;
+  onCustomModel: (model: string) => void;
+  onModelSelect: (model: ChatModel) => void;
+  onModelClear: () => void;
+  onEffortChange: (effort: string) => void;
 };
 
-/** Self-describing runtime controls with segmented and combo presentations. */
-export function RuntimeBar({
+export function RuntimeBarSegments({
   value,
-  onChange,
-  variant = "segmented",
-  models = [],
-  families = SPEC_RUNTIME_FAMILIES,
-  reasoningEfforts = DEFAULT_REASONING_EFFORTS,
-  ariaLabel = "Runtime",
+  models,
+  modelOptions,
+  resolvedModel,
+  selectedModelUnavailable,
+  families,
+  family,
+  mode,
+  selectedMode,
+  reasoningEfforts,
+  supportedEfforts,
+  ariaLabel,
   className,
-}: RuntimeBarProps) {
-  const selection = selectionForBackend(families, value.backend);
-  const family = familyById(families, selection.family);
-  const mode =
-    family.modes.find((entry) => entry.id === selection.mode) ??
-    firstMode(family);
-  const modelOptions = modelsForFamily(models, family, value.backend);
-  const selectedModel = models.find(
-    (entry) =>
-      entry.runtime?.backend === value.backend &&
-      runtimeModelMatches(entry, value),
-  );
-  const resolvedModel =
-    selectedModel ?? models.find((entry) => runtimeModelMatches(entry, value));
-  const supportedEfforts = effortOptionsForModel(
-    resolvedModel,
-    reasoningEfforts,
-  );
-
-  const applyBackend = (familyId: string, modeId: string) => {
-    const backend = backendForFamilyMode(families, familyId, modeId);
-    if (backend === (value.backend ?? "")) return;
-    // A backend switch invalidates the previous backend's cmux CLI-arg values.
-    let next = withOptionalRoot(
-      withRoot(value, { backend }),
-      "cliArgs",
-      undefined,
-    );
-    if (
-      !modelBelongsToFamily(
-        value.model,
-        models,
-        familyById(families, familyId),
-        backend,
-      )
-    ) {
-      next = withoutCatalogModel(next);
-    }
-    onChange(next);
-  };
-
-  // `id` is the catalog row a `model` came from and `runtimeModelMatches` reads
-  // it first, so it has to travel with `model` — a surviving `id` would keep
-  // resolving the previous provider's row against a new backend.
-  const applyCustomModel = (model: string) =>
-    onChange(withOptionalRoot(withoutCatalogModel(value), "model", model));
-  const applyModel = (model: ChatModel) =>
-    onChange(reconcileModelCapabilities(value, model, reasoningEfforts));
-  const clearModel = () => onChange(withoutCatalogModel(value));
-  const applyEffort = (effort: string) =>
-    onChange(withOptionalRoot(value, "effort", effort));
-
-  if (variant === "combo") {
-    return (
-      <RuntimeBarCombo
-        value={value}
-        families={families}
-        family={family}
-        mode={mode}
-        selectedMode={selection.mode}
-        models={modelOptions}
-        selectedModel={resolvedModel}
-        supportedEfforts={supportedEfforts}
-        ariaLabel={ariaLabel}
-        className={className}
-        onFamilyChange={(familyId) => applyBackend(familyId, selection.mode)}
-        onModeChange={(modeId) => applyBackend(family.id, modeId)}
-        onModelSelect={applyModel}
-        onModelClear={clearModel}
-        onEffortChange={applyEffort}
-      />
-    );
-  }
-
+  onBackendChange,
+  onCustomModel,
+  onModelSelect,
+  onModelClear,
+  onEffortChange,
+}: RuntimeBarSegmentsProps) {
   const brand = runtimeFamilyBrand(family);
-  const modelLabel = resolvedModel?.label ?? value.model ?? "Default";
+  const modelLabel = selectedModelUnavailable
+    ? "Unavailable selection"
+    : (resolvedModel?.label ?? value.model ?? "Default");
 
   return (
     <div
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        // `w-fit` so the bar hugs its segments instead of being stretched by a
-        // grid/flex parent — the row is content-sized, not a form field.
-        // The outer edge is a control border (`--input`); the segment dividers
-        // inside it are the subtler `--border`, so the bar reads as one object.
         "inline-flex h-control-h w-fit max-w-full items-stretch overflow-hidden rounded-md border border-input bg-background",
         className,
       )}
@@ -158,7 +85,7 @@ export function RuntimeBar({
           families,
           models,
           selectedId: family.id,
-          onSelect: (familyId) => applyBackend(familyId, selection.mode),
+          onSelect: (familyId) => onBackendChange(familyId, selectedMode),
         })}
       >
         {brand.icon && (
@@ -173,10 +100,9 @@ export function RuntimeBar({
         menuLabel="Runtime mode"
         title={mode.title ?? "Runtime mode"}
         items={modeItems({
-          families,
           family,
-          selectedId: selection.mode,
-          onSelect: (modeId) => applyBackend(family.id, modeId),
+          selectedId: selectedMode,
+          onSelect: (modeId) => onBackendChange(family.id, modeId),
         })}
       >
         {mode.icon && (
@@ -190,26 +116,36 @@ export function RuntimeBar({
       <RuntimeSegment
         menuLabel="Model"
         title={
-          value.model ? `Model — ${value.model}` : "Model — prompt default"
+          selectedModelUnavailable
+            ? "Model — unavailable selection"
+            : value.model
+              ? `Model — ${value.model}`
+              : "Model — prompt default"
         }
-        className="min-w-0 max-w-56"
+        className="min-w-0 max-w-56 flex-1 [&>span]:min-w-0 [&>span]:w-full [&>span>button]:w-full"
         header={
           <div className="grid gap-1">
             <span className={KEY_CLASS}>Model id</span>
-            <SpecInput
-              value={value.model}
-              onChange={applyCustomModel}
-              ariaLabel="Model id"
-              mono
+            <InputField
+              value={selectedModelUnavailable ? "" : (value.model ?? "")}
+              onChange={onCustomModel}
+              {...(selectedModelUnavailable
+                ? { placeholder: "Unavailable selection" }
+                : {})}
+              aria-label="Model id"
+              inputClassName="font-mono text-xs"
+              className="bg-background"
             />
           </div>
         }
         items={modelItems({
           models: modelOptions,
           group: `${family.label} models`,
-          selectedId: resolvedModel?.id ?? value.model,
-          onSelect: applyModel,
-          onClear: clearModel,
+          selectedId: selectedModelUnavailable
+            ? undefined
+            : (resolvedModel?.id ?? value.model),
+          onSelect: onModelSelect,
+          onClear: onModelClear,
         })}
       >
         <span className="min-w-0 truncate font-mono text-xs text-foreground">
@@ -228,7 +164,7 @@ export function RuntimeBar({
             ),
             supported: supportedEfforts,
             selected: value.effort,
-            onSelect: applyEffort,
+            onSelect: onEffortChange,
           })}
         >
           <span className={KEY_CLASS}>Effort</span>
@@ -239,14 +175,6 @@ export function RuntimeBar({
         </RuntimeSegment>
       )}
     </div>
-  );
-}
-
-function withoutCatalogModel(value: AISpecRuntimeValue): AISpecRuntimeValue {
-  return withOptionalRoot(
-    withOptionalRoot(value, "model", undefined),
-    "id",
-    undefined,
   );
 }
 
@@ -308,10 +236,6 @@ function EffortGlyph({ effort }: { effort?: string | undefined }) {
   );
 }
 
-// Menu rows share one grid: label, hint, and a check that stays in the layout
-// when unselected so the rows do not shift. Short hints ("3 models", "not on
-// Claude") sit inline on the right; a `stacked` hint — a model id, which is as
-// long as the label and would truncate both — gets its own line underneath.
 function itemLabel({
   text,
   hint,
@@ -330,7 +254,7 @@ function itemLabel({
           {text}
         </span>
         {hint && stacked && (
-          <span className="block truncate font-mono text-[11px] text-muted-foreground">
+          <span className="block whitespace-normal text-[11px] leading-4 text-muted-foreground">
             {hint}
           </span>
         )}
@@ -362,49 +286,48 @@ function familyItems({
   selectedId: string;
   onSelect: (familyId: string) => void;
 }): DropdownMenuItem[] {
-  return families.map((family) => {
-    const brand = runtimeFamilyBrand(family);
-    const count = modelsForFamily(models, family).length;
-    return {
-      group: "Family",
-      label: itemLabel({
-        text: family.label,
-        ...(count > 0 ? { hint: `${count} models` } : {}),
-        selected: family.id === selectedId,
-      }),
-      ...(brand.icon ? { icon: brand.icon } : {}),
-      onSelect: () => onSelect(family.id),
-    };
-  });
+  return families
+    .filter((family) =>
+      family.modes.some((mode) => !isUnavailable(mode.availability)),
+    )
+    .map((family) => {
+      const brand = runtimeFamilyBrand(family);
+      const count = modelsForFamily(models, family).length;
+      return {
+        group: "Family",
+        label: itemLabel({
+          text: family.label,
+          ...(count > 0 ? { hint: `${count} models` } : {}),
+          selected: family.id === selectedId,
+        }),
+        ...(brand.icon ? { icon: brand.icon } : {}),
+        onSelect: () => onSelect(family.id),
+      };
+    });
 }
 
 function modeItems({
-  families,
   family,
   selectedId,
   onSelect,
 }: {
-  families: SpecRuntimeFamily[];
   family: SpecRuntimeFamily;
   selectedId: string;
   onSelect: (modeId: string) => void;
 }): DropdownMenuItem[] {
-  return runtimeModeOptions(families).map((mode) => {
-    const supported = family.modes.find((entry) => entry.id === mode.id);
-    const hint = supported?.title ?? unsupportedModeTitle(family);
-    return {
+  return family.modes
+    .filter((mode) => !isUnavailable(mode.availability))
+    .map((mode) => ({
       group: "Mode · runtime",
       label: itemLabel({
-        text: supported?.label ?? mode.label,
-        hint,
+        text: mode.label,
+        ...(mode.title ? { hint: mode.title } : {}),
         selected: mode.id === selectedId,
       }),
       ...(mode.icon ? { icon: mode.icon } : {}),
-      title: hint,
-      disabled: !supported,
+      ...(mode.title ? { title: mode.title } : {}),
       onSelect: () => onSelect(mode.id),
-    };
-  });
+    }));
 }
 
 function modelItems({
@@ -444,7 +367,6 @@ function modelItems({
           stacked: true,
         }),
         ...(glyph ? { icon: glyph } : {}),
-        disabled: model.configured === false,
         onSelect: () => onSelect(model),
       };
     }),
@@ -492,9 +414,6 @@ function effortItems({
   ];
 }
 
-// The tiers the menu shows: everything offered by the catalog default, plus any
-// model-specific tier and the current selection, so a value set elsewhere is
-// never silently absent from its own menu.
 function effortUniverse(
   offered: readonly string[],
   supported: readonly string[],

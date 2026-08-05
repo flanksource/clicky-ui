@@ -3,10 +3,19 @@
 
 export { Chat, type ChatProps } from "./Chat";
 export { Conversation, type ConversationProps } from "./Conversation";
-export { Message, type MessageProps, type MessageActionHandlers } from "./Message";
+export {
+  Message,
+  type MessageProps,
+  type MessageActionHandlers,
+} from "./Message";
 export { MessageActions, type MessageActionsProps } from "./MessageActions";
 export { Reasoning, type ReasoningProps } from "./Reasoning";
 export { PromptInput, type PromptInputProps } from "./PromptInput";
+export {
+  RuntimeBar,
+  type RuntimeBarProps,
+  type RuntimeBarValue,
+} from "../runtime/RuntimeBar";
 export { ToolCall, type ToolCallProps } from "./ToolCall";
 export { Suggestions, type SuggestionsProps } from "./Suggestion";
 export {
@@ -20,7 +29,11 @@ export {
   BudgetSelector,
   type BudgetSelectorProps,
 } from "./ModelSelector";
-export { providerIcon, providerIconColor, type ProviderGlyph } from "./provider-icons";
+export {
+  providerIcon,
+  providerIconColor,
+  type ProviderGlyph,
+} from "./provider-icons";
 export { defaultChatModelId } from "./models";
 export {
   ContextMeter,
@@ -49,6 +62,46 @@ export {
   operationToTool,
 } from "./clickyOperationsToTools";
 
+// Tool input/output rendering: the adapter registry a host plugs domain
+// renderers into, plus the known-tool and heuristic defaults <ToolCall> uses.
+export {
+  ToolRenderRegistry,
+  createToolRenderRegistry,
+  toToolRenderRegistry,
+  toolNameAdapter,
+  ToolRenderRegistryProvider,
+  useToolRenderRegistry,
+  defaultToolInputView,
+  defaultToolOutputView,
+  defaultToolRenderAdapters,
+  knownToolRenderAdapters,
+  defaultToolSummary,
+  summarizeToolValue,
+  normalizeToolOutput,
+  classifyToolValue,
+  deriveColumns,
+  fieldMetaFromSchema,
+  listItemsSchema,
+  orderFieldKeys,
+  ToolParams,
+  ToolFieldValue,
+  ToolArgs,
+  ToolValue,
+  type ToolRenderAdapter,
+  type ToolRenderAdapterContext,
+  type ToolRenderBaseContext,
+  type ToolRenderRegistryOptions,
+  type ToolRenderSurface,
+  type NormalizedToolOutput,
+  type ClassifiedToolValue,
+  type ToolValueShape,
+  type ToolPageInfo,
+  type ToolFieldMeta,
+  type ToolParamsProps,
+  type ToolArgsProps,
+  type ToolValueProps,
+} from "./tool-render";
+
 // Backend-free mocks for previews, stories and demos: a transport that streams
 // a canned assistant turn and a sample model menu.
 export { mockChatTransport, MOCK_MODELS } from "./Chat.fixtures";
@@ -65,6 +118,9 @@ export {
   CLAUDE_PERMISSION_MODE_OPTIONS,
   type AnyToolPart,
   type ChatModel,
+  type ChatModelRuntime,
+  type RuntimeAvailability,
+  type RuntimeAvailabilityState,
   type ChatMessageMetadata,
   type ChatUsageSummary,
   type ChatBudgetConfig,

@@ -134,8 +134,16 @@ export {
   effortOptionsForModel,
   reconcileModelCapabilities,
   type ModelRuntimeSelection,
-} from "./model-capabilities";
-export { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
+} from "../runtime/model-capabilities";
+export {
+  RuntimeBar,
+  type RuntimeBarProps,
+  type RuntimeBarValue,
+} from "../runtime/RuntimeBar";
+export {
+  ProviderStatusPanel,
+  type ProviderStatusPanelProps,
+} from "../runtime/ProviderStatusPanel";
 export {
   RuntimeModePicker,
   type RuntimeModePickerProps,
@@ -156,7 +164,11 @@ export {
   type RuntimeCatalogMode,
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
-} from "./runtime-mode";
+} from "../runtime/runtime-mode";
+export type {
+  RuntimeAvailability,
+  RuntimeAvailabilityState,
+} from "../chat/types";
 export {
   ContextMeter,
   type ContextMeterProps,

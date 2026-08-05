@@ -1,6 +1,6 @@
 import { UiCloud, UiRobotAi, UiTerminal } from "../../icons";
 import type { StaticIconComponent } from "../Icon";
-import { SPEC_RUNTIME_FAMILIES } from "./runtime-mode";
+import { SPEC_RUNTIME_FAMILIES } from "../runtime/runtime-mode";
 
 export interface RuntimeDescriptor {
   family: string;

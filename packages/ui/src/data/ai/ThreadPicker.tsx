@@ -4,7 +4,7 @@ import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
 import { UiComment, UiAdd, UiTrash, UiChevronDown } from "../../icons";
 
-/** One conversation as returned by the threads endpoint. Only `id` is required;
+/** One conversation as returned by the sessions endpoint. Only `id` is required;
  *  `title`/cost are rendered when present so the picker works against minimal
  *  backends (e.g. clicky's in-memory ThreadStore, which has no cost). */
 export interface ThreadSummary {
@@ -31,8 +31,8 @@ export type ThreadPickerProps = {
   threadId: string | null;
   onSelect: (threadId: string) => void;
   onNew: () => void;
-  /** Base endpoint for thread CRUD. GET lists, `${api}/${id}` DELETE removes.
-   *  Defaults to clicky's "/api/chat/threads". Ignored when `source` is set. */
+  /** Base endpoint for session CRUD. GET lists, `${api}/${id}` DELETE removes.
+   *  Defaults to Captain's "/api/chat/sessions". Ignored when `source` is set. */
   api?: string;
   /** Inject the thread list/delete directly instead of fetching `api`. */
   source?: ThreadSource;
@@ -48,7 +48,7 @@ export function ThreadPicker({
   threadId,
   onSelect,
   onNew,
-  api = "/api/chat/threads",
+  api = "/api/chat/sessions",
   source,
   query,
   className = "",

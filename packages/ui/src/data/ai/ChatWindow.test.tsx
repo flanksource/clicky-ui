@@ -55,7 +55,7 @@ describe("ChatWindow", () => {
       <ChatWindowManagerProvider storageId="context-picker">
         <OpenChatWindowOnMount>
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             toolsApi={null}
             renderContextPicker={({ onAddMany }) => (
               <button
@@ -124,7 +124,7 @@ describe("ChatWindow", () => {
           initialPrompt={{ id: 1, text: "Fix this formula" }}
         >
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             toolsApi={null}
             chat={{
               modelsApi: null,
@@ -144,7 +144,7 @@ describe("ChatWindow", () => {
   it("creates a durable thread before sending the first prompt", async () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (String(input) === "/api/chat/threads" && init?.method === "POST") {
+        if (String(input) === "/api/chat/sessions" && init?.method === "POST") {
           return Response.json(
             { id: "thread-1", title: "New conversation" },
             { status: 201 },
@@ -159,7 +159,10 @@ describe("ChatWindow", () => {
             },
           });
         }
-        if (String(input) === "/api/chat/threads") {
+        if (String(input) === "/api/chat/sessions/thread-1") {
+          return Response.json({ id: "thread-1", revision: 1, messages: [] });
+        }
+        if (String(input) === "/api/chat/sessions") {
           return Response.json([]);
         }
         throw new Error(`unexpected request ${String(input)}`);
@@ -192,7 +195,7 @@ describe("ChatWindow", () => {
       ).toBe(true),
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/chat/threads",
+      "/api/chat/sessions",
       expect.objectContaining({ method: "POST" }),
     );
     const chatRequest = fetchMock.mock.calls.find(

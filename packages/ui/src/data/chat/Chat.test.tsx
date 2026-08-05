@@ -28,33 +28,6 @@ function recordingTransport(sendMessages = vi.fn()): ChatTransport<UIMessage> {
   };
 }
 
-function approvalCompletionTransport(): ChatTransport<UIMessage> {
-  return {
-    sendMessages() {
-      return Promise.resolve(
-        new ReadableStream<UIMessageChunk>({
-          start(controller) {
-            controller.enqueue({ type: "start" });
-            controller.enqueue({ type: "start-step" });
-            controller.enqueue({
-              type: "tool-output-available",
-              toolCallId: "call-account-1",
-              output: { updated: true },
-              dynamic: true,
-            });
-            controller.enqueue({ type: "finish-step" });
-            controller.enqueue({ type: "finish" });
-            controller.close();
-          },
-        }),
-      );
-    },
-    reconnectToStream() {
-      return Promise.resolve(null);
-    },
-  };
-}
-
 const RESOLVED_MODEL: ChatModel = {
   id: "anthropic/claude-sonnet-4-5",
   provider: "anthropic",
@@ -63,7 +36,146 @@ const RESOLVED_MODEL: ChatModel = {
   contextWindow: 200_000,
 };
 
+const RUNTIME_MODEL: ChatModel = {
+  ...RESOLVED_MODEL,
+  capabilitiesKnown: true,
+  supportedEfforts: ["low", "medium", "high"],
+  defaultEffort: "medium",
+  runtime: {
+    model: "claude-sonnet-4-5",
+    id: RESOLVED_MODEL.id,
+    backend: "anthropic",
+    effort: "medium",
+  },
+};
+
+describe("Chat runtime controls", () => {
+  it("renders the RuntimeBar combo instead of separate model and effort selectors", () => {
+    render(
+      <Chat
+        models={[RUNTIME_MODEL]}
+        modelsApi={null}
+        defaultModel={RUNTIME_MODEL.id}
+        transport={recordingTransport()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Model" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Reasoning effort" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("updates the complete runtime when the combo changes family", () => {
+    const onRuntimeChange = vi.fn();
+    render(
+      <Chat
+        models={[RUNTIME_MODEL]}
+        modelsApi={null}
+        defaultModel={RUNTIME_MODEL.id}
+        transport={recordingTransport()}
+        onRuntimeChange={onRuntimeChange}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+      }),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "OpenAI" }));
+
+    expect(onRuntimeChange).toHaveBeenCalledWith({
+      backend: "openai",
+      effort: "medium",
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "Runtime: OpenAI, API, Prompt default, effort Medium",
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("Chat initialPrompt", () => {
+  it("waits for canonical session hydration before sending an initial prompt", async () => {
+    const sendMessages = vi.fn();
+    let resolveHydration: ((response: Response) => void) | undefined;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveHydration = resolve;
+      }),
+    );
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport(sendMessages)}
+        threadId="session-1"
+        sessionsApi="/api/chat/sessions"
+        initialPrompt={{ id: 1, text: "Inspect the ledger" }}
+      />,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(sendMessages).not.toHaveBeenCalled();
+    resolveHydration?.(
+      new Response(
+        JSON.stringify({ id: "session-1", revision: 1, messages: [] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await waitFor(() => expect(sendMessages).toHaveBeenCalledOnce());
+    fetchMock.mockRestore();
+  });
+
+  it("uses the Captain thread id as the stable AI SDK chat id", async () => {
+    const sendMessages = vi.fn();
+    const transport = recordingTransport(sendMessages);
+
+    const { rerender } = render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={transport}
+        threadId="thread-1"
+        initialPrompt={{ id: 1, text: "Inspect account one" }}
+      />,
+    );
+
+    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
+    expect(sendMessages.mock.calls[0]?.[0]).toMatchObject({
+      chatId: "thread-1",
+      messages: [expect.objectContaining({ role: "user" })],
+    });
+
+    rerender(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={transport}
+        threadId="thread-2"
+        initialPrompt={{ id: 2, text: "Inspect account two" }}
+      />,
+    );
+
+    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(2));
+    expect(sendMessages.mock.calls[1]?.[0]).toMatchObject({
+      chatId: "thread-2",
+      messages: [expect.objectContaining({ role: "user" })],
+    });
+    expect(sendMessages.mock.calls[1]?.[0].messages).toHaveLength(1);
+  });
+
   it("sends each initial prompt id once", async () => {
     const sendMessages = vi.fn();
     const onInitialPromptSent = vi.fn();
@@ -109,7 +221,7 @@ describe("Chat initialPrompt", () => {
     expect(onInitialPromptSent).toHaveBeenCalledTimes(2);
   });
 
-  it("submits the selected model's exact runtime with its display id", async () => {
+  it("submits the selected model's exact runtime without conflicting scalar fields", async () => {
     const runtimeModel: ChatModel = {
       ...RESOLVED_MODEL,
       id: "claude-sonnet-5",
@@ -141,9 +253,9 @@ describe("Chat initialPrompt", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const request = fetchMock.mock.calls[0]?.[1];
     expect(JSON.parse(String(request?.body))).toMatchObject({
-      model: runtimeModel.id,
       runtime: runtimeModel.runtime,
     });
+    expect(JSON.parse(String(request?.body))).not.toHaveProperty("model");
     fetchMock.mockRestore();
   });
 });
@@ -199,54 +311,165 @@ describe("Chat context meter", () => {
   });
 });
 
-describe("Chat live tool approval", () => {
-  it("posts the decision before updating the local approval state", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    const initialMessages: UIMessage[] = [
+describe("Chat Captain session projection", () => {
+  const pendingMessage = (): UIMessage => ({
+    id: "assistant-pending",
+    role: "assistant",
+    parts: [
       {
-        id: "assistant-1",
-        role: "assistant",
-        parts: [
-          {
-            type: "dynamic-tool",
-            toolCallId: "call-account-1",
-            toolName: "account_edit",
-            state: "approval-requested",
-            input: { id: "account-1" },
-            approval: { id: "call-account-1" },
-          },
-        ],
+        type: "dynamic-tool",
+        toolCallId: "call-account-1",
+        toolName: "account_edit",
+        state: "approval-requested",
+        input: { id: "account-1" },
+        approval: { id: "approval-1" },
       },
-    ];
+    ],
+  });
+
+  it("hydrates messages from the Captain session GET", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "session-1",
+          revision: 2,
+          messages: [
+            {
+              id: "user-1",
+              role: "user",
+              parts: [{ type: "text", text: "Edit the account" }],
+            },
+            pendingMessage(),
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
 
     render(
       <Chat
         models={[]}
         modelsApi={null}
-        transport={approvalCompletionTransport()}
-        threadId="thread-1"
-        approvalApi="/api/chat/threads"
-        initialMessages={initialMessages}
+        transport={recordingTransport()}
+        threadId="session-1"
+        sessionsApi="/api/chat/sessions"
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Edit the account")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/chat/sessions/session-1", {
+      headers: { Accept: "application/json" },
+    });
+    fetchMock.mockRestore();
+  });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+  it("replaces local messages with the session returned by approval", async () => {
+    const sendMessages = vi.fn();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "session-1",
+            revision: 2,
+            messages: [pendingMessage()],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "session-1",
+            revision: 3,
+            messages: [
+              {
+                id: "assistant-pending",
+                role: "assistant",
+                parts: [
+                  {
+                    type: "dynamic-tool",
+                    toolCallId: "call-account-1",
+                    toolName: "account_edit",
+                    state: "output-available",
+                    input: { id: "account-1" },
+                    output: { updated: true },
+                    approval: { id: "approval-1", approved: true },
+                  },
+                  { type: "text", text: "Updated from Captain." },
+                ],
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport(sendMessages)}
+        threadId="session-1"
+        sessionsApi="/api/chat/sessions"
+        initialMessages={[pendingMessage()]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+    expect(
+      await screen.findByText("Updated from Captain."),
+    ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/chat/threads/thread-1/approvals/call-account-1",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ approved: true }),
-      }),
+      "/api/chat/sessions/session-1/approvals/approval-1",
+      expect.objectContaining({ method: "POST" }),
     );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "Approve" }),
-      ).not.toBeInTheDocument(),
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sendMessages).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Approve" }),
+    ).not.toBeInTheDocument();
+    fetchMock.mockRestore();
+  });
+
+  it("keeps a rejected decision pending and shows the backend reason", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "session-1",
+            revision: 2,
+            messages: [pendingMessage()],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response("approval already resolved", { status: 409 }),
+      );
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport()}
+        threadId="session-1"
+        sessionsApi="/api/chat/sessions"
+        initialMessages={[pendingMessage()]}
+      />,
     );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+    expect(
+      await screen.findByText(
+        "Tool approval failed with status 409: approval already resolved",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     fetchMock.mockRestore();
   });
 });

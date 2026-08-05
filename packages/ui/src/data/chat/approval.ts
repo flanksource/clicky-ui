@@ -1,28 +1,58 @@
+import type { UIMessage } from "ai";
+
+export type CaptainChatSession = {
+  id: string;
+  revision?: number;
+  messages: UIMessage[];
+};
+
 export type ToolApprovalDecision = {
-  approvalApi: string;
-  threadId: string;
+  sessionsApi: string;
+  sessionId: string;
   approvalId: string;
   approved: boolean;
   reason?: string;
 };
 
-type ApprovalFetch = (
+type SessionFetch = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
+export async function getChatSession(
+  sessionsApi: string,
+  sessionId: string,
+  fetcher: SessionFetch = fetch,
+): Promise<CaptainChatSession> {
+  if (!sessionId.trim()) {
+    throw new Error("A session id is required to load this chat.");
+  }
+  const response = await fetcher(sessionEndpoint(sessionsApi, sessionId), {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw await responseError("Chat session request", response);
+  }
+  return parseSession(await response.json());
+}
+
 export async function postToolApproval(
   decision: ToolApprovalDecision,
-  fetcher: ApprovalFetch = fetch,
-): Promise<void> {
-  if (!decision.threadId.trim()) {
-    throw new Error("A thread id is required to resolve this tool approval.");
+  fetcher: SessionFetch = fetch,
+): Promise<CaptainChatSession> {
+  if (!decision.sessionId.trim()) {
+    throw new Error("A session id is required to resolve this tool approval.");
   }
-  const base = decision.approvalApi.replace(/\/+$/, "");
-  const endpoint = `${base}/${encodeURIComponent(decision.threadId)}/approvals/${encodeURIComponent(decision.approvalId)}`;
+  const endpoint = `${sessionEndpoint(
+    decision.sessionsApi,
+    decision.sessionId,
+  )}/approvals/${encodeURIComponent(decision.approvalId)}`;
   const response = await fetcher(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(
       decision.reason
         ? { approved: decision.approved, reason: decision.reason }
@@ -30,6 +60,39 @@ export async function postToolApproval(
     ),
   });
   if (!response.ok) {
-    throw new Error(`Tool approval failed with status ${response.status}.`);
+    throw await responseError("Tool approval", response);
   }
+  return parseSession(await response.json());
+}
+
+function sessionEndpoint(sessionsApi: string, sessionId: string): string {
+  return `${sessionsApi.replace(/\/+$/, "")}/${encodeURIComponent(sessionId)}`;
+}
+
+function parseSession(value: unknown): CaptainChatSession {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("id" in value) ||
+    typeof value.id !== "string"
+  ) {
+    throw new Error("Captain chat session response is invalid.");
+  }
+  const messages = "messages" in value ? value.messages : [];
+  if (!Array.isArray(messages)) {
+    throw new Error("Captain chat session response is invalid.");
+  }
+  return { ...value, messages } as CaptainChatSession;
+}
+
+async function responseError(
+  label: string,
+  response: Response,
+): Promise<Error> {
+  const detail = (await response.text()).trim();
+  return new Error(
+    `${label} failed with status ${response.status}${
+      detail ? `: ${detail}` : "."
+    }`,
+  );
 }

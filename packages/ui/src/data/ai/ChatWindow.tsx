@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react";
 import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Icon } from "../Icon";
 import { UiAdd, UiClose, UiFullscreen } from "../../icons";
 import { Chat } from "../chat/Chat";
-import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type {
   ChatBudgetConfig,
-  ChatModel,
   ChatUsageSummary,
   ClaudePermissionMode,
 } from "../chat/types";
@@ -22,13 +26,17 @@ import {
 } from "./ToolPreferences";
 import type { ChatContextItem } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
-import { selectConfiguredChatModel } from "./ChatWindow.models";
 import {
   loadChatPreferences,
   saveChatPreferences,
   type StoredChatPreferences,
 } from "./ChatWindow.preferences";
-import { normalizeToolCatalog } from "./ChatWindow.tool-catalog";
+import { useChatWindowRuntime } from "./ChatWindow.runtime";
+import { useChatWindowCatalogs } from "./ChatWindow.catalogs";
+import {
+  effectiveToolPreferences,
+  normalizeToolCatalog,
+} from "./ChatWindow.tool-catalog";
 import { useChatThreadSetup } from "./ChatWindow.thread";
 import { ChatThreadSetupStatus } from "./ChatWindow.thread-status";
 import type { ChatWindowProps } from "./ChatWindow.types";
@@ -56,12 +64,14 @@ export function ChatWindow({
   panel,
   chat,
   title = "Assistant",
-  threadsApi = "/api/chat/threads",
+  sessionsApi = "/api/chat/sessions",
   threadsSource,
   contextTypeConfig,
   tools,
   defaultToolMode = "ask",
   toolsApi = "/api/chat/tools",
+  runtimesApi = null,
+  toolRenderers,
   headerExtras,
   renderContextPicker,
 }: ChatWindowProps) {
@@ -69,28 +79,13 @@ export function ChatWindow({
     useChatWindowManager();
   const threadSetup = useChatThreadSetup({
     threadId: panel.threadId,
-    api: threadsApi,
+    api: sessionsApi,
     source: threadsSource,
     onCreated: (threadId) => updatePanel(panel.id, { threadId }),
   });
   const [Rnd, setRnd] = useState<ComponentType<RndProps> | null>(null);
   const [storedPrefs] = useState<StoredChatPreferences>(() =>
     loadChatPreferences(),
-  );
-  const initialModel =
-    panel.initialModel ??
-    chat?.model ??
-    chat?.defaultModel ??
-    storedPrefs.model;
-  const [model, setModel] = useState<string | undefined>(initialModel);
-  const [reasoningEffort, setReasoningEffort] = useState(
-    chat?.reasoningEffort ??
-      chat?.defaultReasoningEffort ??
-      storedPrefs.reasoningEffort ??
-      "",
-  );
-  const [temperature, setTemperature] = useState<number | undefined>(
-    chat?.temperature ?? storedPrefs.temperature,
   );
   const [budget, setBudget] = useState<ChatBudgetConfig>(
     chat?.budget ?? storedPrefs.budget ?? {},
@@ -99,38 +94,45 @@ export function ChatWindow({
     chat?.permissionMode ?? storedPrefs.permissionMode ?? "default",
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
-  const [toolPrefs, setToolPrefs] = useState<Record<string, ToolMode>>(
-    storedPrefs.toolPrefs ?? {},
-  );
+  // Only the modes the user picked in the popover are stored. Everything else
+  // is derived, so a surface's declared defaults still reach tools the user has
+  // never touched (see effectiveToolPreferences).
+  const [explicitToolPrefs, setExplicitToolPrefs] = useState<
+    Record<string, ToolMode>
+  >(storedPrefs.toolPrefs ?? {});
   const [fetchedTools, setFetchedTools] = useState<ToolMeta[] | undefined>(
     undefined,
   );
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
-  const [fetchedModels, setFetchedModels] = useState<ChatModel[]>([]);
-
   const resolvedTools = tools ?? fetchedTools ?? EMPTY_TOOLS;
   const modelsApi =
     chat?.modelsApi === undefined ? "/api/chat/models" : chat.modelsApi;
-  const resolvedModels = chat?.models ?? fetchedModels;
-
-  useEffect(() => {
-    if (chat?.model !== undefined) setModel(chat.model);
-  }, [chat?.model]);
-
-  useEffect(() => {
-    if (chat?.model !== undefined || panel.initialModel) return;
-    if (chat?.defaultModel) setModel(chat.defaultModel);
-  }, [chat?.defaultModel, chat?.model, panel.initialModel]);
-
-  useEffect(() => {
-    if (chat?.reasoningEffort !== undefined)
-      setReasoningEffort(chat.reasoningEffort);
-  }, [chat?.reasoningEffort]);
-
-  useEffect(() => {
-    if (chat?.temperature !== undefined) setTemperature(chat.temperature);
-  }, [chat?.temperature]);
+  const {
+    models: resolvedModels,
+    runtimeFamilies,
+    loading: catalogLoading,
+    error: catalogError,
+    retry: retryCatalogs,
+  } = useChatWindowCatalogs({
+    models: chat?.models,
+    modelsApi,
+    runtimesApi,
+  });
+  const {
+    runtime,
+    temperature,
+    reasoningEfforts,
+    handleRuntimeChange,
+    handleModelChange,
+    handleReasoningEffortChange,
+    handleTemperatureChange,
+  } = useChatWindowRuntime({
+    chat,
+    initialModel: panel.initialModel,
+    models: resolvedModels,
+    storedRuntime: storedPrefs.runtime,
+  });
 
   useEffect(() => {
     if (chat?.budget !== undefined) setBudget(chat.budget);
@@ -140,10 +142,6 @@ export function ChatWindow({
     if (chat?.permissionMode !== undefined)
       setPermissionMode(chat.permissionMode);
   }, [chat?.permissionMode]);
-
-  useEffect(() => {
-    if (panel.initialModel) setModel(panel.initialModel);
-  }, [panel.initialModel]);
 
   useEffect(() => {
     if (tools || toolsApi === null) return;
@@ -171,55 +169,41 @@ export function ChatWindow({
   }, [tools, toolsApi]);
 
   useEffect(() => {
-    if (chat?.models || !modelsApi) return;
-    let active = true;
-    fetch(modelsApi)
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(`models ${r.status}`)),
-      )
-      .then((data: ChatModel[]) => {
-        if (!active) return;
-        setFetchedModels(data);
-        setModel((current) => selectConfiguredChatModel(current, data));
-      })
-      .catch((err) =>
-        console.warn("clicky-ui: failed to load chat models", err),
-      );
-    return () => {
-      active = false;
-    };
-  }, [chat?.models, modelsApi]);
-
-  useEffect(() => {
     saveChatPreferences({
-      ...(model ? { model } : {}),
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(temperature !== undefined ? { temperature } : {}),
+      runtime,
       ...(budget.cost !== undefined || budget.maxTokens !== undefined
         ? { budget }
         : {}),
       permissionMode,
-      toolPrefs,
+      toolPrefs: explicitToolPrefs,
     });
-  }, [budget, model, permissionMode, reasoningEffort, temperature, toolPrefs]);
+  }, [budget, permissionMode, runtime, explicitToolPrefs]);
 
-  // Seed any tool the user hasn't configured yet from the backend default
-  // permission; existing choices are preserved. Handles async catalog loads.
-  useEffect(() => {
-    if (!resolvedTools.length) return;
-    setToolPrefs((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const t of resolvedTools) {
-        const key = t.name;
-        if (next[key] === undefined) {
-          next[key] = t.defaultPermission ?? defaultToolMode;
-          changed = true;
+  const toolPrefs = useMemo(
+    () =>
+      effectiveToolPreferences({
+        tools: resolvedTools,
+        explicit: explicitToolPrefs,
+        surfaceDefaults: panel.toolDefaults,
+        fallback: defaultToolMode,
+      }),
+    [defaultToolMode, explicitToolPrefs, panel.toolDefaults, resolvedTools],
+  );
+
+  // The popover hands back the whole map, so the keys that differ from the
+  // currently effective modes are exactly what the user just changed.
+  const handleToolPrefsChange = useCallback(
+    (next: Record<string, ToolMode>) => {
+      setExplicitToolPrefs((prev) => {
+        const updated = { ...prev };
+        for (const [name, mode] of Object.entries(next)) {
+          if (toolPrefs[name] !== mode) updated[name] = mode;
         }
-      }
-      return changed ? next : prev;
-    });
-  }, [defaultToolMode, resolvedTools]);
+        return updated;
+      });
+    },
+    [toolPrefs],
+  );
 
   useEffect(() => {
     let active = true;
@@ -267,7 +251,6 @@ export function ChatWindow({
   });
 
   const initialPrompt = panel.initialPrompt ?? chat?.initialPrompt ?? null;
-  const defaultModel = panel.initialModel ?? chat?.defaultModel;
   const handleInitialPromptSent = useCallback(() => {
     if (panel.initialPrompt) updatePanel(panel.id, { initialPrompt: null });
     chat?.onInitialPromptSent?.();
@@ -276,20 +259,6 @@ export function ChatWindow({
     (snapshot: ChatUsageSummary) => {
       setUsage(snapshot);
       chat?.onUsage?.(snapshot);
-    },
-    [chat],
-  );
-  const handleModelChange = useCallback(
-    (next: string) => {
-      setModel(next);
-      chat?.onModelChange?.(next);
-    },
-    [chat],
-  );
-  const handleReasoningEffortChange = useCallback(
-    (next: string) => {
-      setReasoningEffort(next);
-      chat?.onReasoningEffortChange?.(next);
     },
     [chat],
   );
@@ -303,15 +272,15 @@ export function ChatWindow({
 
   const header = (
     <div className="chat-drag-handle flex cursor-move items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
-      {threadsSource != null || threadsApi !== null ? (
+      {threadsSource != null || sessionsApi !== null ? (
         <ThreadPicker
           threadId={panel.threadId}
           onSelect={(tid) => updatePanel(panel.id, { threadId: tid })}
           onNew={() => updatePanel(panel.id, { threadId: null })}
           {...(threadsSource
             ? { source: threadsSource }
-            : threadsApi !== null
-              ? { api: threadsApi }
+            : sessionsApi !== null
+              ? { api: sessionsApi }
               : {})}
         />
       ) : (
@@ -322,22 +291,26 @@ export function ChatWindow({
       <ToolPreferences
         tools={resolvedTools}
         value={toolPrefs}
-        onChange={setToolPrefs}
+        onChange={handleToolPrefsChange}
         models={resolvedModels}
-        model={model}
-        onModelChange={handleModelChange}
-        reasoningEfforts={chat?.reasoningEfforts ?? DEFAULT_REASONING_EFFORTS}
-        reasoningEffort={reasoningEffort}
-        onReasoningEffortChange={handleReasoningEffortChange}
+        runtime={runtime}
+        onRuntimeChange={handleRuntimeChange}
+        runtimeFamilies={runtimeFamilies}
+        reasoningEfforts={reasoningEfforts}
         permissionMode={permissionMode}
         onPermissionModeChange={handlePermissionModeChange}
         temperature={temperature}
-        onTemperatureChange={setTemperature}
+        onTemperatureChange={handleTemperatureChange}
         budget={budget}
         onBudgetChange={setBudget}
         usage={usage}
+        {...(sessionsApi ? { costsApi: sessionsApi } : {})}
+        {...(panel.threadId ? { threadId: panel.threadId } : {})}
         toolsLoading={toolsLoading}
         toolsError={toolsError}
+        catalogLoading={catalogLoading}
+        catalogError={catalogError}
+        onCatalogRetry={retryCatalogs}
       />
       <Button
         variant="ghost"
@@ -393,16 +366,18 @@ export function ChatWindow({
             {...(resolvedModels.length
               ? { models: resolvedModels, modelsApi: null }
               : {})}
-            {...(defaultModel ? { defaultModel } : {})}
-            {...(model ? { model } : {})}
-            reasoningEffort={reasoningEffort}
+            runtime={runtime}
+            {...(runtimeFamilies ? { runtimeFamilies } : {})}
             permissionMode={permissionMode}
+            onRuntimeChange={handleRuntimeChange}
             onModelChange={handleModelChange}
             onReasoningEffortChange={handleReasoningEffortChange}
-            {...(temperature !== undefined ? { temperature } : {})}
             budget={budget}
             onUsage={handleUsage}
             {...(panel.threadId ? { threadId: panel.threadId } : {})}
+            sessionsApi={sessionsApi}
+            tools={resolvedTools}
+            {...(toolRenderers ? { toolRenderers } : {})}
             body={mergedBody}
             initialPrompt={initialPrompt}
             onInitialPromptSent={handleInitialPromptSent}

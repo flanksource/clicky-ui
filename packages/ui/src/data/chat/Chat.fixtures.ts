@@ -1,11 +1,56 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { ChatModel } from "./types";
 
-/** A sample model menu for stories driving the model selector. */
+/** A sample model menu for stories driving the runtime selector. */
 export const MOCK_MODELS: ChatModel[] = [
-  { id: "anthropic/claude-sonnet-4-5", provider: "anthropic", label: "Claude Sonnet 4.5", reasoning: true, configured: true, contextWindow: 200_000 },
-  { id: "openai/gpt-4o", provider: "openai", label: "GPT-4o", reasoning: false, configured: true, contextWindow: 128_000 },
-  { id: "googleai/gemini-2.5-pro", provider: "googleai", label: "Gemini 2.5 Pro", reasoning: true, configured: false, contextWindow: 1_048_576 },
+  {
+    id: "anthropic/claude-sonnet-4-5",
+    provider: "anthropic",
+    label: "Claude Sonnet 4.5",
+    reasoning: true,
+    capabilitiesKnown: true,
+    supportedEfforts: ["low", "medium", "high"],
+    defaultEffort: "medium",
+    configured: true,
+    contextWindow: 200_000,
+    runtime: {
+      id: "anthropic/claude-sonnet-4-5",
+      model: "claude-sonnet-4-5",
+      backend: "anthropic",
+      effort: "medium",
+    },
+  },
+  {
+    id: "openai/gpt-4o",
+    provider: "openai",
+    label: "GPT-4o",
+    reasoning: false,
+    capabilitiesKnown: true,
+    configured: true,
+    contextWindow: 128_000,
+    runtime: {
+      id: "openai/gpt-4o",
+      model: "gpt-4o",
+      backend: "openai",
+    },
+  },
+  {
+    id: "googleai/gemini-2.5-pro",
+    provider: "googleai",
+    label: "Gemini 2.5 Pro",
+    reasoning: true,
+    capabilitiesKnown: true,
+    supportedEfforts: ["low", "high"],
+    defaultEffort: "high",
+    configured: false,
+    contextWindow: 1_048_576,
+    runtime: {
+      id: "googleai/gemini-2.5-pro",
+      model: "gemini-2.5-pro",
+      backend: "gemini",
+      effort: "high",
+    },
+  },
 ];
 
 /** A seeded conversation that already contains a completed tool call, so a

@@ -9,7 +9,7 @@ import { Tree } from "../Tree";
 import { Icon } from "../Icon";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import { effortIcon, WORKFLOW_PHASES } from "./agent-action-icons";
-import { SPEC_RUNTIME_FAMILIES } from "./runtime-mode";
+import { SPEC_RUNTIME_FAMILIES } from "../runtime/runtime-mode";
 import { formatCost } from "./session-cost";
 import {
   hierarchyCheckState,

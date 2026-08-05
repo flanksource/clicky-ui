@@ -1,10 +1,12 @@
-import type { ChatBudgetConfig, ClaudePermissionMode } from "../chat/types";
+import type {
+  ChatBudgetConfig,
+  ChatModelRuntime,
+  ClaudePermissionMode,
+} from "../chat/types";
 import type { ToolMode } from "./ToolPreferences";
 
 export type StoredChatPreferences = {
-  model?: string;
-  reasoningEffort?: string;
-  temperature?: number;
+  runtime?: ChatModelRuntime;
   budget?: ChatBudgetConfig;
   permissionMode?: ClaudePermissionMode;
   toolPrefs?: Record<string, ToolMode>;

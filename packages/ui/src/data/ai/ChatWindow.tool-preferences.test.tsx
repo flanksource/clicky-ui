@@ -31,21 +31,23 @@ describe("ChatWindow tool approval default", () => {
       <ChatWindowManagerProvider storageId="approval">
         <OpenChatWindowOnMount>
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             tools={CHAT_WINDOW_TEST_TOOLS}
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenChatWindowOnMount>
-      </ChatWindowManagerProvider>,
+      </ChatWindowManagerProvider>
     );
 
     await screen.findByTestId("tool-preferences-btn");
     await waitFor(() =>
-      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+      expect(document.querySelector(".react-draggable")).not.toBeNull()
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
-    fireEvent.click(await screen.findByRole("button", { name: "Expand Tools" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Expand Tools" })
+    );
 
     for (const tool of CHAT_WINDOW_TEST_TOOLS) {
       const row = screen.getByTitle(tool.name);
@@ -60,22 +62,24 @@ describe("ChatWindow tool approval default", () => {
       <ChatWindowManagerProvider storageId="approval-auto">
         <OpenChatWindowOnMount>
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             tools={CHAT_WINDOW_TEST_TOOLS}
             defaultToolMode="auto"
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenChatWindowOnMount>
-      </ChatWindowManagerProvider>,
+      </ChatWindowManagerProvider>
     );
 
     await screen.findByTestId("tool-preferences-btn");
     await waitFor(() =>
-      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+      expect(document.querySelector(".react-draggable")).not.toBeNull()
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
-    fireEvent.click(await screen.findByRole("button", { name: "Expand Tools" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Expand Tools" })
+    );
 
     for (const tool of CHAT_WINDOW_TEST_TOOLS) {
       const row = screen.getByTitle(tool.name);
@@ -114,17 +118,17 @@ describe("ChatWindow tool approval default", () => {
       <ChatWindowManagerProvider storageId="approval-groups">
         <OpenChatWindowOnMount>
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             tools={groupedTools}
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenChatWindowOnMount>
-      </ChatWindowManagerProvider>,
+      </ChatWindowManagerProvider>
     );
 
     await screen.findByTestId("tool-preferences-btn");
     await waitFor(() =>
-      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+      expect(document.querySelector(".react-draggable")).not.toBeNull()
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
@@ -181,7 +185,7 @@ describe("ChatWindow tool approval default", () => {
         tools={groupedTools}
         value={{ xero_accounts_list: "off", xero_contacts_list: "off" }}
         onChange={onChange}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
@@ -191,26 +195,26 @@ describe("ChatWindow tool approval default", () => {
       name: "Advanced Chat Settings",
     });
     fireEvent.click(
-      within(dialog).getByRole("button", { name: /permissions/i }),
+      within(dialog).getByRole("button", { name: /permissions/i })
     );
     expect(within(dialog).getByText("Admin Write")).toBeInTheDocument();
     expect(within(dialog).getByText("Xero Read")).toBeInTheDocument();
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Expand Xero Read" }),
+      within(dialog).getByRole("button", { name: "Expand Xero Read" })
     );
     expect(within(dialog).getByText("List Xero accounts")).toBeInTheDocument();
     expect(within(dialog).getByText("List Xero contacts")).toBeInTheDocument();
     expect(
-      within(dialog).queryByLabelText("Info for List Xero accounts"),
+      within(dialog).queryByLabelText("Info for List Xero accounts")
     ).toBeNull();
     expect(
       within(dialog).queryByRole("radiogroup", {
         name: "List Xero accounts policy",
-      }),
+      })
     ).toBeNull();
 
     fireEvent.click(
-      within(dialog).getByRole("button", { name: /List Xero accounts/ }),
+      within(dialog).getByRole("button", { name: /List Xero accounts/ })
     );
     expect(onChange).toHaveBeenCalledWith({
       xero_accounts_list: "on",
@@ -218,7 +222,7 @@ describe("ChatWindow tool approval default", () => {
     });
 
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Toggle Xero Read group" }),
+      within(dialog).getByRole("button", { name: "Toggle Xero Read group" })
     );
     expect(onChange).toHaveBeenLastCalledWith({
       xero_accounts_list: "on",
@@ -236,7 +240,7 @@ describe("ChatWindow tool approval default", () => {
         onChange={vi.fn()}
         permissionMode="default"
         onPermissionModeChange={onPermissionModeChange}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
@@ -249,17 +253,93 @@ describe("ChatWindow tool approval default", () => {
       name: "Permission mode",
     });
     expect(
-      within(select).getByRole("option", { name: "Default" }),
+      within(select).getByRole("option", { name: "Default" })
     ).toBeInTheDocument();
     expect(
-      within(select).getByRole("option", { name: "Accept edits" }),
+      within(select).getByRole("option", { name: "Accept edits" })
     ).toBeInTheDocument();
     expect(
-      within(select).getByRole("option", { name: "Bypass" }),
+      within(select).getByRole("option", { name: "Bypass" })
     ).toBeInTheDocument();
 
     fireEvent.change(select, { target: { value: "bypassPermissions" } });
     expect(onPermissionModeChange).toHaveBeenCalledWith("bypassPermissions");
+  });
+
+  it("keeps unavailable entries out of RuntimeBar and explains them in Provider Status", async () => {
+    render(
+      <ToolPreferences
+        tools={[]}
+        value={{}}
+        onChange={vi.fn()}
+        models={[
+          {
+            id: "claude-opus",
+            provider: "claude-agent",
+            label: "Claude Opus",
+            configured: false,
+            reasoning: true,
+            runtime: { backend: "claude-agent", model: "claude-opus" },
+            availability: {
+              state: "not_authenticated",
+              reason: "Claude Agent is installed but not authenticated.",
+              remediation: "Authenticate with `claude login`, then refresh.",
+            },
+          },
+        ]}
+        runtime={{ backend: "claude-agent" }}
+        runtimeFamilies={[
+          {
+            id: "claude",
+            label: "Claude",
+            provider: "claude-agent",
+            modes: [
+              {
+                id: "agent",
+                label: "Agent",
+                backend: "claude-agent",
+                title: "Claude Agent",
+              },
+              {
+                id: "cmux",
+                label: "cmux",
+                backend: "claude-cmux",
+                availability: {
+                  state: "missing_executable",
+                  reason: "`cmux` was not found on PATH.",
+                  remediation: "Install Claude cmux, then refresh.",
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+    fireEvent.click(await screen.findByText("Advanced"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Advanced Chat Settings",
+    });
+
+    fireEvent.click(within(dialog).getByTitle("Model — prompt default"));
+    expect(
+      screen.queryByRole("menuitem", { name: /Claude Opus/ })
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByTitle("Model — prompt default"));
+
+    fireEvent.click(within(dialog).getByTitle("Claude Agent"));
+    expect(
+      screen.queryByRole("menuitem", { name: /cmux/ })
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Claude Agent is installed but not authenticated."
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Install Claude cmux, then refresh.")
+    ).toBeInTheDocument();
   });
 
   it("advanced tool browser renders generated input schemas", async () => {
@@ -283,7 +363,7 @@ describe("ChatWindow tool approval default", () => {
         ]}
         value={{}}
         onChange={vi.fn()}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
@@ -295,15 +375,15 @@ describe("ChatWindow tool approval default", () => {
 
     await waitFor(() =>
       expect(within(dialog).getAllByText("search_docs").length).toBeGreaterThan(
-        0,
-      ),
+        0
+      )
     );
     expect(within(dialog).getAllByText("Search docs").length).toBeGreaterThan(
-      0,
+      0
     );
     expect(within(dialog).getByText("Hints")).toBeInTheDocument();
     expect(
-      within(dialog).getByText("Quote exact phrases for narrower results."),
+      within(dialog).getByText("Quote exact phrases for narrower results.")
     ).toBeInTheDocument();
     expect(within(dialog).getByText("query")).toBeInTheDocument();
     expect(within(dialog).getByText("Search query")).toBeInTheDocument();
@@ -339,24 +419,24 @@ describe("ChatWindow tool approval default", () => {
                 },
               ],
             }),
-        }),
-      ),
+        })
+      )
     );
 
     render(
       <ChatWindowManagerProvider storageId="fetched-tools">
         <OpenChatWindowOnMount>
           <ChatWindowLayer
-            threadsApi={null}
+            sessionsApi={null}
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenChatWindowOnMount>
-      </ChatWindowManagerProvider>,
+      </ChatWindowManagerProvider>
     );
 
     await screen.findByTestId("tool-preferences-btn");
     await waitFor(() =>
-      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+      expect(document.querySelector(".react-draggable")).not.toBeNull()
     );
 
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
@@ -368,15 +448,15 @@ describe("ChatWindow tool approval default", () => {
 
     await waitFor(() =>
       expect(
-        within(dialog).getAllByText("backend_search").length,
-      ).toBeGreaterThan(0),
+        within(dialog).getAllByText("backend_search").length
+      ).toBeGreaterThan(0)
     );
     expect(within(dialog).getAllByText("Knowledge").length).toBeGreaterThan(0);
     expect(within(dialog).getAllByText("readOnlyHint").length).toBeGreaterThan(
-      0,
+      0
     );
     expect(
-      within(dialog).getAllByText("idempotentHint").length,
+      within(dialog).getAllByText("idempotentHint").length
     ).toBeGreaterThan(0);
     expect(within(dialog).getAllByText("Strict").length).toBeGreaterThan(0);
   });

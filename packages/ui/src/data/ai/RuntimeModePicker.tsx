@@ -12,7 +12,7 @@ import {
   firstMode,
   modelBelongsToFamily,
   selectionForBackend,
-} from "./runtime-mode";
+} from "../runtime/runtime-mode";
 
 export type RuntimeModePickerProps = {
   value: AISpecRuntimeValue;

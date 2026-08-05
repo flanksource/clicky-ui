@@ -9,7 +9,10 @@ import type { ChatModel } from "../../chat/types";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
 import type { SpecSectionId } from "../SpecRuntimeEditor/types";
 import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
-import { SPEC_RUNTIME_FAMILIES, type SpecRuntimeFamily } from "../runtime-mode";
+import {
+  SPEC_RUNTIME_FAMILIES,
+  type SpecRuntimeFamily,
+} from "../../runtime/runtime-mode";
 import {
   promptPreviewText,
   promptRuntimeValueToPayload,

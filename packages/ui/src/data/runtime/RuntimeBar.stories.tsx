@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import type { ChatModel } from "../chat/types";
+import type { AISpecRuntimeValue } from "../ai/SpecRuntimeEditor.model";
 import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
-import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 
 // A catalog wide enough for every segment to have somewhere to go: agent/CLI
 // families that carry their own models, plus a hosted-API family that does not.

@@ -1,35 +1,43 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import {
-  DefaultChatTransport,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  type ChatTransport,
-  type UIMessage,
-} from "ai";
+import { DefaultChatTransport, type ChatTransport, type UIMessage } from "ai";
 import { cn } from "../../lib/utils";
 import { Conversation } from "./Conversation";
 import { PromptInput } from "./PromptInput";
 import { Suggestions } from "./Suggestion";
-import { ModelSelector, EffortSelector } from "./ModelSelector";
-import { providerIcon, providerIconColor } from "./provider-icons";
-import { ContextMeter } from "./ContextMeter";
 import { DEFAULT_REASONING_EFFORTS } from "./effort-icons";
 import { defaultChatModelId } from "./models";
-import { postToolApproval } from "./approval";
+import { getChatSession, postToolApproval } from "./approval";
+import {
+  hasStructuredRuntime,
+  resolveChatRuntime,
+  selectedChatModel,
+} from "./Chat.runtime";
 import {
   createAttachmentUploadAdapter,
   type AttachmentLimits,
   type AttachmentUploadAdapter,
 } from "./attachment-upload";
+import { toToolRenderRegistry } from "./tool-render/registry";
+import { ToolRenderRegistryProvider } from "./tool-render/context";
+import { ChatRuntimeToolbar } from "./ChatRuntimeToolbar";
+import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
+import type {
+  ToolRenderAdapter,
+  ToolRenderRegistry,
+} from "./tool-render/adapter";
 import type {
   ChatBudgetConfig,
   ChatModel,
   ChatMessageMetadata,
+  ChatModelRuntime,
   ChatUsageSummary,
   ClaudePermissionMode,
   Suggestion,
+  ToolMeta,
   ToolResultRenderer,
 } from "./types";
+import { usageSnapshotFromMetadata } from "./usage-snapshot";
 
 /** Assistant messages carry token usage + cost the backend rode on the finish
  *  part's `messageMetadata`. */
@@ -48,6 +56,12 @@ export type ChatProps = {
   defaultModel?: string;
   /** Controlled selected model id. */
   model?: string;
+  /** Initially selected structured runtime. */
+  defaultRuntime?: ChatModelRuntime;
+  /** Controlled structured runtime. */
+  runtime?: ChatModelRuntime;
+  /** Runtime families and their host availability. */
+  runtimeFamilies?: SpecRuntimeFamily[];
   /** Reasoning-effort options for capable models. */
   reasoningEfforts?: string[];
   /** Initially selected reasoning effort ("" = none). */
@@ -62,6 +76,8 @@ export type ChatProps = {
   permissionMode?: ClaudePermissionMode;
   /** Notified when the user changes the model. */
   onModelChange?: (id: string) => void;
+  /** Notified when the user changes any runtime field. */
+  onRuntimeChange?: (runtime: ChatModelRuntime) => void;
   /** Notified when the user changes reasoning effort. */
   onReasoningEffortChange?: (effort: string) => void;
   /** Notified when the user changes Claude permission mode. */
@@ -78,13 +94,20 @@ export type ChatProps = {
   /** Custom durable upload adapter; overrides attachmentsApi. */
   attachmentUpload?: AttachmentUploadAdapter;
   attachmentLimits?: AttachmentLimits;
-  /** Thread id to persist this conversation under (forwarded in the body). */
+  /** Captain thread id used as the AI SDK chat id and forwarded in the body. */
   threadId?: string;
-  /** Base endpoint for resolving a tool approval while the provider stream is
-   *  still active. The thread and approval ids are appended to this URL. */
-  approvalApi?: string | null;
-  /** Optional host renderer for recognized completed tool outputs. */
+  /** Canonical Captain session endpoint used to hydrate messages and resolve
+   *  approvals. The session and approval ids are appended to this URL. */
+  sessionsApi?: string | null;
+  /** Optional host renderer for recognized completed tool outputs. Takes
+   *  priority over `toolRenderers` on the output surface. */
   renderToolResult?: ToolResultRenderer;
+  /** Tool catalog, used to resolve each call's input/output JSON Schema so
+   *  params and results render with real labels instead of raw JSON. */
+  tools?: ToolMeta[];
+  /** Domain tool renderers. Host adapters are matched before the built-in
+   *  heuristics, which stay as the floor. */
+  toolRenderers?: ToolRenderAdapter[] | ToolRenderRegistry;
   /** Extra fields merged into every request body. */
   body?: Record<string, unknown>;
   /** Pre-built transport (e.g. a mock for stories/tests). */
@@ -111,13 +134,17 @@ export function Chat({
   modelsApi = "/api/chat/models",
   defaultModel,
   model: controlledModel,
+  defaultRuntime,
+  runtime: controlledRuntime,
+  runtimeFamilies,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
-  defaultReasoningEffort = "",
+  defaultReasoningEffort,
   reasoningEffort: controlledEffort,
   temperature,
   budget,
   permissionMode,
   onModelChange,
+  onRuntimeChange,
   onReasoningEffortChange,
   onUsage,
   suggestions,
@@ -126,8 +153,10 @@ export function Chat({
   attachmentUpload,
   attachmentLimits,
   threadId,
-  approvalApi = null,
+  sessionsApi = null,
   renderToolResult,
+  tools,
+  toolRenderers,
   body,
   transport,
   initialMessages,
@@ -138,22 +167,42 @@ export function Chat({
   className,
 }: ChatProps) {
   const [models, setModels] = useState<ChatModel[]>(modelsProp ?? []);
-  const [model, setModel] = useState<string | undefined>(
-    controlledModel ?? defaultModel,
-  );
-  const [effort, setEffort] = useState(
-    controlledEffort ?? defaultReasoningEffort,
+  const [internalRuntime, setInternalRuntime] = useState<ChatModelRuntime>(
+    () =>
+      controlledRuntime ??
+      resolveChatRuntime({
+        models: modelsProp ?? [],
+        current: defaultRuntime,
+        preferredModel:
+          controlledModel ??
+          (defaultRuntime
+            ? undefined
+            : (defaultModel ?? defaultChatModelId(modelsProp ?? []))),
+        effort: controlledEffort ?? defaultReasoningEffort,
+        temperature,
+        reasoningEfforts,
+      }),
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [approvalError, setApprovalError] = useState<Error | undefined>();
+  const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(
+    null,
+  );
   const lastDefaultModel = useRef(defaultModel);
   const sentInitialPromptId = useRef<number | null>(null);
+  const runtime = controlledRuntime ?? internalRuntime;
+
+  // Provided once here; <ToolCall> reads it from context, so no tool-render
+  // props thread through Conversation/Message.
+  const toolRegistry = useMemo(
+    () => toToolRenderRegistry(toolRenderers, tools ? { tools } : {}),
+    [toolRenderers, tools],
+  );
 
   useEffect(() => {
     if (!modelsProp) return;
     setModels(modelsProp);
-    setModel((m) => m ?? controlledModel ?? defaultChatModelId(modelsProp));
-  }, [modelsProp, controlledModel]);
+  }, [modelsProp]);
 
   // Fetch the model menu unless one was supplied or fetching is disabled.
   useEffect(() => {
@@ -166,7 +215,6 @@ export function Chat({
       .then((data: ChatModel[]) => {
         if (cancelled) return;
         setModels(data);
-        setModel((m) => m ?? controlledModel ?? defaultChatModelId(data));
       })
       .catch((err) =>
         console.warn("clicky-ui: failed to load chat models", err),
@@ -174,27 +222,41 @@ export function Chat({
     return () => {
       cancelled = true;
     };
-  }, [modelsProp, modelsApi, controlledModel]);
+  }, [modelsProp, modelsApi]);
 
   useEffect(() => {
-    if (controlledModel === undefined) return;
-    setModel(controlledModel);
-  }, [controlledModel]);
-
-  useEffect(() => {
-    if (controlledEffort === undefined) return;
-    setEffort(controlledEffort);
-  }, [controlledEffort]);
-
-  useEffect(() => {
-    if (controlledModel !== undefined) return;
-    if (!defaultModel || defaultModel === lastDefaultModel.current) return;
+    if (controlledRuntime !== undefined) return;
+    const defaultChanged =
+      Boolean(defaultModel) && defaultModel !== lastDefaultModel.current;
     lastDefaultModel.current = defaultModel;
-    setModel(defaultModel);
-  }, [controlledModel, defaultModel]);
+    setInternalRuntime((current) =>
+      resolveChatRuntime({
+        models,
+        current,
+        preferredModel:
+          controlledModel ??
+          (defaultChanged
+            ? defaultModel
+            : (selectedChatModel(models, current)?.id ??
+              defaultModel ??
+              defaultChatModelId(models))),
+        effort: controlledEffort,
+        temperature,
+        reasoningEfforts,
+      }),
+    );
+  }, [
+    controlledEffort,
+    controlledModel,
+    controlledRuntime,
+    defaultModel,
+    models,
+    reasoningEfforts,
+    temperature,
+  ]);
 
-  const selectedModel = models.find((m) => m.id === model);
-  const showEffort = !selectedModel || selectedModel.reasoning;
+  const selectedModel = selectedChatModel(models, runtime);
+  const structuredRuntime = hasStructuredRuntime(runtime, selectedModel);
   const resolvedAttachmentUpload = useMemo(
     () =>
       attachmentUpload ??
@@ -207,10 +269,15 @@ export function Chat({
   const bodyRef = useRef<Record<string, unknown>>({});
   bodyRef.current = {
     ...body,
-    ...(model ? { model } : {}),
-    ...(selectedModel?.runtime ? { runtime: selectedModel.runtime } : {}),
-    ...(effort ? { reasoningEffort: effort } : {}),
-    ...(temperature !== undefined ? { temperature } : {}),
+    ...(structuredRuntime
+      ? { runtime }
+      : {
+          ...(runtime.model ? { model: runtime.model } : {}),
+          ...(runtime.effort ? { reasoningEffort: runtime.effort } : {}),
+          ...(runtime.temperature !== undefined
+            ? { temperature: runtime.temperature }
+            : {}),
+        }),
     ...(budget && (budget.cost !== undefined || budget.maxTokens !== undefined)
       ? { budget }
       : {}),
@@ -227,30 +294,69 @@ export function Chat({
 
   const {
     messages,
+    setMessages,
     sendMessage,
     regenerate,
-    addToolApprovalResponse,
     status,
     error,
     clearError,
     stop,
   } = useChat<ChatUIMessage>({
     transport: resolvedTransport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    ...(threadId ? { id: threadId } : {}),
     ...(initialMessages
       ? { messages: initialMessages as ChatUIMessage[] }
       : {}),
   });
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+
+  useEffect(() => {
+    if (!sessionsApi || !threadId) return;
+    let cancelled = false;
+    setHydratedSessionId(null);
+    setApprovalError(undefined);
+    setMessagesRef.current([]);
+    void getChatSession(sessionsApi, threadId)
+      .then((session) => {
+        if (cancelled) return;
+        if (session.id !== threadId) {
+          throw new Error(
+            `Captain chat session response ID "${session.id}" does not match requested session "${threadId}".`,
+          );
+        }
+        setMessagesRef.current(session.messages as ChatUIMessage[]);
+        setHydratedSessionId(session.id);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        setApprovalError(
+          cause instanceof Error ? cause : new Error(String(cause)),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionsApi, threadId]);
 
   useEffect(() => {
     if (!initialPrompt || status !== "ready") return;
+    if (sessionsApi && threadId && hydratedSessionId !== threadId) return;
     if (sentInitialPromptId.current === initialPrompt.id) return;
     const text = initialPrompt.text.trim();
     if (!text) return;
     sentInitialPromptId.current = initialPrompt.id;
     void sendMessage({ text });
     onInitialPromptSent?.();
-  }, [initialPrompt, onInitialPromptSent, sendMessage, status]);
+  }, [
+    hydratedSessionId,
+    initialPrompt,
+    onInitialPromptSent,
+    sendMessage,
+    sessionsApi,
+    status,
+    threadId,
+  ]);
 
   // Surface a usage snapshot after each settled assistant turn. The backend
   // rides usage/cost on the finish part's messageMetadata; we read it off the
@@ -262,29 +368,25 @@ export function Chat({
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
     if (!meta) return;
-    const cost =
-      meta.threadCostUsd ?? meta.costBreakdown?.totalUsd ?? meta.cost;
-    const snapshot: ChatUsageSummary = {
-      usedTokens: meta.contextTokens ?? meta.usage?.totalTokens ?? 0,
-      maxTokens: selectedModel?.contextWindow ?? 0,
+    const snapshot = usageSnapshotFromMetadata(meta, {
+      contextWindow: selectedModel?.contextWindow,
+      modelLabel: selectedModel?.label,
       messageCount: messages.length,
-      ...(cost != null ? { cost } : {}),
-      ...(meta.usage ? { usage: meta.usage } : {}),
-      ...(meta.costBreakdown ? { costBreakdown: meta.costBreakdown } : {}),
-      ...(selectedModel?.label ? { modelLabel: selectedModel.label } : {}),
-    };
+    });
     setUsage(snapshot);
     onUsageRef.current?.(snapshot);
   }, [messages, status, selectedModel]);
 
-  const onModelSelect = (id: string) => {
-    setModel(id);
-    onModelChange?.(id);
-  };
-
-  const onEffortSelect = (next: string) => {
-    setEffort(next);
-    onReasoningEffortChange?.(next);
+  const handleRuntimeChange = (next: ChatModelRuntime) => {
+    if (controlledRuntime === undefined) setInternalRuntime(next);
+    onRuntimeChange?.(next);
+    const nextModel = selectedChatModel(models, next);
+    if (nextModel?.id !== selectedModel?.id) {
+      onModelChange?.(nextModel?.id ?? next.id ?? next.model ?? "");
+    }
+    if ((next.effort ?? "") !== (runtime.effort ?? "")) {
+      onReasoningEffortChange?.(next.effort ?? "");
+    }
   };
 
   const resolveToolApproval = async (
@@ -293,81 +395,44 @@ export function Chat({
     reason?: string,
   ) => {
     setApprovalError(undefined);
-    if (approvalApi) {
-      try {
-        await postToolApproval({
-          approvalApi,
-          threadId: threadId ?? "",
-          approvalId: id,
-          approved,
-          ...(reason ? { reason } : {}),
-        });
-      } catch (cause) {
-        setApprovalError(
-          cause instanceof Error ? cause : new Error(String(cause)),
+    try {
+      if (!sessionsApi) {
+        throw new Error(
+          "A Captain sessions API is required to resolve tool approvals.",
         );
-        return;
       }
+      const session = await postToolApproval({
+        sessionsApi,
+        sessionId: threadId ?? "",
+        approvalId: id,
+        approved,
+        ...(reason ? { reason } : {}),
+      });
+      if (session.id !== threadId) {
+        throw new Error(
+          `Captain chat session response ID "${session.id}" does not match active session "${threadId ?? ""}".`,
+        );
+      }
+      setMessages(session.messages as ChatUIMessage[]);
+    } catch (cause) {
+      setApprovalError(
+        cause instanceof Error ? cause : new Error(String(cause)),
+      );
     }
-    await addToolApprovalResponse(
-      reason ? { id, approved, reason } : { id, approved },
-    );
   };
 
-  const ModelGlyph = providerIcon(selectedModel?.provider);
-  const contextWindow = selectedModel?.contextWindow ?? usage?.maxTokens ?? 0;
-  const usedTokens = usage?.usedTokens ?? 0;
-  const showContextMeter = Boolean(threadId || selectedModel || usage);
-  const toolbar =
-    models.length > 0 || showEffort || showContextMeter ? (
-      <div className="flex flex-1 items-center gap-2">
-        <ModelSelector models={models} value={model} onChange={onModelSelect} />
-        {showEffort && (
-          <EffortSelector
-            efforts={reasoningEfforts}
-            value={effort}
-            onChange={onEffortSelect}
-          />
-        )}
-        {showContextMeter && (
-          <>
-            <div className="flex-1" />
-            <ContextMeter
-              mode="gauge"
-              usedPercent={
-                contextWindow > 0
-                  ? Math.round((usedTokens / contextWindow) * 100)
-                  : 0
-              }
-              usedTokens={usedTokens}
-              {...(contextWindow > 0 ? { windowTokens: contextWindow } : {})}
-              {...(usage?.messageCount != null
-                ? { messageCount: usage.messageCount }
-                : {})}
-              {...(usage?.cost != null ? { cost: { total: usage.cost } } : {})}
-              {...(threadId ? { sessionId: threadId } : {})}
-              {...(selectedModel?.label
-                ? { model: selectedModel.label }
-                : usage?.modelLabel
-                  ? { model: usage.modelLabel }
-                  : {})}
-              {...(effort ? { effort } : {})}
-              {...(selectedModel?.runtime?.mode
-                ? { executionMode: selectedModel.runtime.mode }
-                : {})}
-              {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
-              {...(selectedModel?.provider
-                ? {
-                    modelIconClassName: providerIconColor(
-                      selectedModel.provider,
-                    ),
-                  }
-                : {})}
-            />
-          </>
-        )}
-      </div>
-    ) : undefined;
+  const toolbar = (
+    <ChatRuntimeToolbar
+      models={models}
+      runtime={runtime}
+      runtimeFamilies={runtimeFamilies}
+      reasoningEfforts={reasoningEfforts}
+      selectedModel={selectedModel}
+      usage={usage}
+      threadId={threadId}
+      onRuntimeChange={handleRuntimeChange}
+    />
+  );
 
   const empty =
     messages.length === 0 && (emptyState || suggestions?.length) ? (
@@ -383,39 +448,45 @@ export function Chat({
     ) : undefined;
 
   return (
-    <div className={cn("flex h-full flex-col", className)}>
-      <Conversation
-        messages={messages}
-        status={status}
-        error={approvalError ?? error}
-        onClearError={() => {
-          setApprovalError(undefined);
-          clearError();
-        }}
-        {...(threadId ? { sessionId: threadId } : {})}
-        {...(model ? { model } : {})}
-        emptyState={empty}
-        onRegenerate={(messageId) => void regenerate({ messageId })}
-        onApprove={(id, approved, reason) =>
-          void resolveToolApproval(id, approved, reason)
-        }
-        {...(renderToolResult ? { renderToolResult } : {})}
-      />
-      <div className="p-4 pt-0">
-        <PromptInput
+    <ToolRenderRegistryProvider value={toolRegistry}>
+      <div className={cn("flex h-full flex-col", className)}>
+        <Conversation
+          messages={messages}
           status={status}
-          onStop={() => void stop()}
-          placeholder={placeholder}
-          enableAttachments={enableAttachments}
-          attachmentUpload={resolvedAttachmentUpload}
-          {...(selectedModel?.inputMediaTypes
-            ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
-            : {})}
-          {...(attachmentLimits ? { attachmentLimits } : {})}
-          toolbar={toolbar}
-          onSubmit={(text, files) => void sendMessage({ text, files })}
+          error={approvalError ?? error}
+          onClearError={() => {
+            setApprovalError(undefined);
+            clearError();
+          }}
+          {...(threadId ? { sessionId: threadId } : {})}
+          {...(selectedModel?.id
+            ? { model: selectedModel.id }
+            : runtime.model
+              ? { model: runtime.model }
+              : {})}
+          emptyState={empty}
+          onRegenerate={(messageId) => void regenerate({ messageId })}
+          onApprove={(id, approved, reason) =>
+            void resolveToolApproval(id, approved, reason)
+          }
+          {...(renderToolResult ? { renderToolResult } : {})}
         />
+        <div className="p-4 pt-0">
+          <PromptInput
+            status={status}
+            onStop={() => void stop()}
+            placeholder={placeholder}
+            enableAttachments={enableAttachments}
+            attachmentUpload={resolvedAttachmentUpload}
+            {...(selectedModel?.inputMediaTypes
+              ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
+              : {})}
+            {...(attachmentLimits ? { attachmentLimits } : {})}
+            toolbar={toolbar}
+            onSubmit={(text, files) => void sendMessage({ text, files })}
+          />
+        </div>
       </div>
-    </div>
+    </ToolRenderRegistryProvider>
   );
 }

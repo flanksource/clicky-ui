@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, waitFor, within } from "storybook/test";
 import { mockChatTransport, MOCK_MODELS } from "../chat/Chat.fixtures";
 import { UiComment, UiDatabase, UiFileText } from "../../icons";
 import { ChatWindowManagerProvider } from "./ChatWindowManager";
@@ -101,7 +102,7 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          "Multi-window chat shell: draggable/resizable floating windows (react-rnd, lazy-loaded), a launch FAB, a conversation thread switcher, a context-badge row, and per-tool preferences. The inner <Chat> footer carries a strict model picker with provider brand icons, a reasoning-effort picker, and a context gauge that appears when session or model metadata resolves and fills as usage arrives. Drives a mock transport. Drag the header, resize from the edges, maximize, switch threads, or open more windows with the + button / FAB.",
+          "Multi-window chat shell: draggable/resizable floating windows (react-rnd, lazy-loaded), a launch FAB, a conversation thread switcher, a context-badge row, and per-tool preferences. The shared <Chat> footer carries the same RuntimeBar combo used by inline chat, plus its context gauge. Drives a mock transport. Drag the header, resize from the edges, maximize, switch threads, or open more windows with the + button / FAB.",
       },
     },
   },
@@ -120,6 +121,16 @@ export const MultiWindow: Story = {
       </div>
     </ChatWindowManagerProvider>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("button", {
+          name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+        }),
+      ).toBeInTheDocument(),
+    );
+  },
 };
 
 export const LaunchFromFab: Story = {

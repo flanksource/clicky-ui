@@ -52,26 +52,43 @@ const models: ChatModel[] = [
 
 describe("runtime model filtering", () => {
   it("filters models by provider family and selected backend", () => {
-    expect(modelsForFamily(models, claudeFamily, "claude-agent").map((model) => model.id)).toEqual([
-      "claude-sonnet-agent",
-      "claude-haiku-shared",
-    ]);
+    expect(
+      modelsForFamily(models, claudeFamily, "claude-agent").map(
+        (model) => model.id,
+      ),
+    ).toEqual(["claude-sonnet-agent", "claude-haiku-shared"]);
 
-    expect(modelsForFamily(models, claudeFamily, "claude-cmux").map((model) => model.id)).toEqual([
-      "claude-opus-cmux",
-      "claude-haiku-shared",
-    ]);
+    expect(
+      modelsForFamily(models, claudeFamily, "claude-cmux").map(
+        (model) => model.id,
+      ),
+    ).toEqual(["claude-opus-cmux", "claude-haiku-shared"]);
   });
 
   it("invalidates selected models that belong to a different backend", () => {
     expect(
-      modelBelongsToFamily("claude-opus-cmux", models, claudeFamily, "claude-agent"),
+      modelBelongsToFamily(
+        "claude-opus-cmux",
+        models,
+        claudeFamily,
+        "claude-agent",
+      ),
     ).toBe(false);
     expect(
-      modelBelongsToFamily("claude-haiku-shared", models, claudeFamily, "claude-agent"),
+      modelBelongsToFamily(
+        "claude-haiku-shared",
+        models,
+        claudeFamily,
+        "claude-agent",
+      ),
     ).toBe(true);
     expect(
-      modelBelongsToFamily("gpt-codex-agent", models, claudeFamily, "claude-agent"),
+      modelBelongsToFamily(
+        "gpt-codex-agent",
+        models,
+        claudeFamily,
+        "claude-agent",
+      ),
     ).toBe(false);
   });
 
@@ -102,6 +119,11 @@ const servedCatalog: RuntimeCatalogFamily[] = [
         keyless: true,
         disabled: true,
         disabledReason: "mode cmux",
+        availability: {
+          state: "disabled",
+          reason: "Disabled by mode cmux in Captain configuration.",
+          remediation: "Enable mode cmux on the Whoami page, then refresh.",
+        },
       },
     ],
   },
@@ -115,21 +137,45 @@ const servedCatalog: RuntimeCatalogFamily[] = [
     family: "deepseek",
     provider: "deepseek",
     catalogPrefix: "deepseek",
-    modes: [{ mode: "api", backend: "deepseek", kind: "api", disabled: true, disabledReason: "provider deepseek" }],
+    modes: [
+      {
+        mode: "api",
+        backend: "deepseek",
+        kind: "api",
+        disabled: true,
+        disabledReason: "provider deepseek",
+        availability: {
+          state: "disabled",
+          reason: "Disabled by provider deepseek in Captain configuration.",
+          remediation:
+            "Enable provider deepseek on the Whoami page, then refresh.",
+        },
+      },
+    ],
   },
 ];
 
 describe("familiesFromRuntimeCatalog", () => {
-  it("collapses a provider's modes into one family and drops the disabled ones", () => {
+  it("collapses a provider's modes into one family and retains disabled entries", () => {
     const families = familiesFromRuntimeCatalog(servedCatalog);
 
-    expect(families.map((family) => family.id)).toEqual(["claude", "gemini"]);
+    expect(families.map((family) => family.id)).toEqual([
+      "claude",
+      "gemini",
+      "deepseek",
+    ]);
     const claude = families[0]!;
     expect(claude.modes.map((mode) => mode.backend)).toEqual([
       "anthropic",
       "claude-agent",
       "claude-cli",
+      "claude-cmux",
     ]);
+    expect(claude.modes[3]!.availability).toEqual({
+      state: "disabled",
+      reason: "Disabled by mode cmux in Captain configuration.",
+      remediation: "Enable mode cmux on the Whoami page, then refresh.",
+    });
     // The catalog prefix, not the provider key: it is what ChatModel.provider
     // carries, so modelsForFamily can filter on it.
     expect(families[1]!.provider).toBe("googleai");
@@ -139,11 +185,21 @@ describe("familiesFromRuntimeCatalog", () => {
     const claude = familiesFromRuntimeCatalog(servedCatalog)[0]!;
 
     expect(claude.label).toBe("Claude");
-    expect(claude.modes.map((mode) => mode.label)).toEqual(["API", "Agent", "CLI"]);
+    expect(claude.modes.map((mode) => mode.label)).toEqual([
+      "API",
+      "Agent",
+      "CLI",
+      "cmux",
+    ]);
     expect(claude.modes[0]!.title).toBe("Claude API");
     expect(
       familiesFromRuntimeCatalog([
-        { family: "deepseek", provider: "deepseek", catalogPrefix: "deepseek", modes: [{ mode: "api", backend: "deepseek" }] },
+        {
+          family: "deepseek",
+          provider: "deepseek",
+          catalogPrefix: "deepseek",
+          modes: [{ mode: "api", backend: "deepseek" }],
+        },
       ])[0]!.label,
     ).toBe("DeepSeek");
   });
@@ -156,7 +212,13 @@ describe("familiesFromRuntimeCatalog", () => {
   it("keeps a backend resolvable after the collapse", () => {
     const families = familiesFromRuntimeCatalog(servedCatalog);
 
-    expect(selectionForBackend(families, "anthropic")).toEqual({ family: "claude", mode: "api" });
-    expect(selectionForBackend(families, "claude-cli")).toEqual({ family: "claude", mode: "cli" });
+    expect(selectionForBackend(families, "anthropic")).toEqual({
+      family: "claude",
+      mode: "api",
+    });
+    expect(selectionForBackend(families, "claude-cli")).toEqual({
+      family: "claude",
+      mode: "cli",
+    });
   });
 });

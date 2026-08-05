@@ -29,7 +29,7 @@ import {
   type SpecRuntimeSecretSelectorConfig,
   type SpecSectionId,
 } from "./types";
-import type { SpecRuntimeFamily } from "../runtime-mode";
+import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import { useScrollSpy } from "./use-scrollspy";
 
 export type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
@@ -39,7 +39,7 @@ export {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
-} from "../runtime-mode";
+} from "../../runtime/runtime-mode";
 
 export type SpecRuntimeEditorProps = {
   value: AISpecRuntimeValue;

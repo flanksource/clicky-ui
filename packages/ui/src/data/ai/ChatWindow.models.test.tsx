@@ -1,4 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatModel } from "../chat/types";
 import { mockChatTransport } from "../chat/Chat.fixtures";
@@ -23,7 +30,13 @@ describe("ChatWindow model fetching", () => {
   it("replaces a stored unavailable model with the first configured fetched model", async () => {
     localStorage.setItem(
       CHAT_PREFERENCES_KEY,
-      JSON.stringify({ model: "claude-sonnet-5" })
+      JSON.stringify({
+        runtime: {
+          id: "claude-sonnet-5",
+          model: "claude-sonnet-5",
+          backend: "anthropic",
+        },
+      }),
     );
     stubModels([
       model("unconfigured", "Unavailable Chat", false),
@@ -32,13 +45,20 @@ describe("ChatWindow model fetching", () => {
 
     renderChatWindow("stale-model");
 
-    await expectModelValue("Fake Chat");
+    await expectRuntimeModel("Fake Chat");
+    await expectStoredRuntime("fake-chat");
   });
 
   it("preserves a stored model that exists and is configured", async () => {
     localStorage.setItem(
       CHAT_PREFERENCES_KEY,
-      JSON.stringify({ model: "current-chat" })
+      JSON.stringify({
+        runtime: {
+          id: "current-chat",
+          model: "current-chat",
+          backend: "anthropic",
+        },
+      }),
     );
     stubModels([
       model("fake-chat", "Fake Chat", true),
@@ -47,16 +67,98 @@ describe("ChatWindow model fetching", () => {
 
     renderChatWindow("configured-model");
 
-    await expectModelValue("Current Chat");
+    await expectRuntimeModel("Current Chat");
+    await expectStoredRuntime("current-chat");
+  });
+
+  it("shows runtime catalog failures in Advanced settings and retries", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              family: "claude",
+              provider: "anthropic",
+              catalogPrefix: "anthropic",
+              modes: [
+                {
+                  mode: "api",
+                  backend: "anthropic",
+                  kind: "api",
+                  catalogProvider: "anthropic",
+                  availability: { state: "available" },
+                },
+              ],
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ChatWindowManagerProvider storageId="catalog-retry">
+        <OpenChatWindowOnMount>
+          <ChatWindowLayer
+            sessionsApi={null}
+            toolsApi={null}
+            runtimesApi="/api/chat/runtimes"
+            chat={{
+              models: [model("claude-sonnet", "Claude Sonnet", true)],
+              transport: mockChatTransport(),
+            }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByTestId("tool-preferences-btn");
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+    fireEvent.click(await screen.findByText("Advanced"));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Advanced Chat Settings",
+    });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Unable to load runtime availability (runtimes 503). Check Captain and retry.",
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument(),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
-// The picker mounts with the stored model and only settles once the catalog
-// fetch resolves, so re-query and assert together instead of holding on to the
-// combobox found before that update.
-async function expectModelValue(label: string): Promise<void> {
+// The runtime control mounts with the stored model and settles after the
+// catalog fetch, so re-query and assert after that update.
+async function expectRuntimeModel(label: string): Promise<void> {
   await waitFor(() =>
-    expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue(label),
+    expect(
+      screen.getByRole("button", {
+        name: new RegExp(`^Runtime: Anthropic, API, ${label}, effort None$`),
+      }),
+    ).toBeInTheDocument(),
+  );
+}
+
+async function expectStoredRuntime(modelId: string): Promise<void> {
+  await waitFor(() =>
+    expect(
+      JSON.parse(localStorage.getItem(CHAT_PREFERENCES_KEY) ?? "{}").runtime,
+    ).toMatchObject({
+      id: modelId,
+      model: modelId,
+      backend: "anthropic",
+    }),
   );
 }
 
@@ -65,12 +167,12 @@ function renderChatWindow(storageId: string): void {
     <ChatWindowManagerProvider storageId={storageId}>
       <OpenChatWindowOnMount>
         <ChatWindowLayer
-          threadsApi={null}
+          sessionsApi={null}
           toolsApi={null}
           chat={{ transport: mockChatTransport() }}
         />
       </OpenChatWindowOnMount>
-    </ChatWindowManagerProvider>
+    </ChatWindowManagerProvider>,
   );
 }
 
@@ -82,12 +184,20 @@ function stubModels(models: ChatModel[]): void {
         new Response(JSON.stringify(models), {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        })
-      )
-    )
+        }),
+      ),
+    ),
   );
 }
 
 function model(id: string, label: string, configured: boolean): ChatModel {
-  return { id, label, configured, provider: "fake", reasoning: false };
+  return {
+    id,
+    label,
+    configured,
+    provider: "anthropic",
+    reasoning: false,
+    capabilitiesKnown: true,
+    runtime: { id, model: id, backend: "anthropic" },
+  };
 }
