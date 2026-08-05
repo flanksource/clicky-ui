@@ -4,11 +4,14 @@ import type {
   EnumDisplay,
   FieldControl,
   FieldOption,
+  HelpDisplay,
   JsonSchemaObject,
   JsonSchemaProperty,
   LookupDescriptor,
 } from "./json-schema-form-types";
 import { LabelIcon } from "../data/Icon";
+import { resolveItemSpec } from "./json-schema-form-item-summary";
+import { isFieldTone } from "./json-schema-form-tone";
 import { isPlainObject } from "./json-schema-form-utils";
 
 // isOpenStringMap reports whether a property is an object whose entries are
@@ -73,11 +76,13 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
   const labels = prop["x-enum-labels"];
   const icons = prop["x-enum-icons"];
   const descriptions = prop["x-enum-descriptions"];
+  const tones = prop["x-enum-tones"];
   return (prop.enum ?? []).map((v) => {
     const value = String(v);
     const desc = labels?.[value];
     const icon = icons?.[value];
     const description = descriptions?.[value];
+    const tone = tones?.[value];
     return {
       value,
       label:
@@ -88,6 +93,7 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
       ...(typeof description === "string" && description
         ? { description }
         : {}),
+      ...(isFieldTone(tone) ? { tone } : {}),
     };
   });
 }
@@ -105,9 +111,15 @@ function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
 }
 
 function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
-  return prop["x-array-display"] === "filter-pills"
-    ? "filter-pills"
-    : undefined;
+  const d = prop["x-array-display"];
+  return d === "filter-pills" || d === "accordion" ? d : undefined;
+}
+
+// helpDisplay reads the per-field `x-help-display` override. Returns undefined
+// to defer to the form-level FormLayout.help.
+function helpDisplay(prop: JsonSchemaProperty): HelpDisplay | undefined {
+  const d = prop["x-help-display"];
+  return d === "inline" || d === "hover" ? d : undefined;
 }
 
 export function schemaHelper(prop: JsonSchemaProperty): string | undefined {
@@ -220,12 +232,15 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       ? prop["x-input-classes"]
       : undefined;
   const colSpan =
-    typeof prop["x-col-span"] === "number" &&
-    Number.isFinite(prop["x-col-span"])
-      ? prop["x-col-span"]
-      : undefined;
+    prop["x-col-span"] === "full"
+      ? ("full" as const)
+      : typeof prop["x-col-span"] === "number" &&
+          Number.isFinite(prop["x-col-span"])
+        ? prop["x-col-span"]
+        : undefined;
   const keyOptions = keyOptionsFor(prop);
   const helper = schemaHelper(prop);
+  const helpMode = helpDisplay(prop);
   const base: FieldControl = {
     key,
     kind: "string",
@@ -239,6 +254,7 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       ? { description: prop.description }
       : {}),
     ...(helper ? { helper } : {}),
+    ...(helpMode ? { helpDisplay: helpMode } : {}),
     ...(labelIcon != null && labelIcon !== ""
       ? { labelIcon: labelIcon as FieldControl["labelIcon"] }
       : {}),
@@ -319,6 +335,11 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       kind: "array",
       ...(itemSchema ? { itemSchema } : {}),
       ...(display ? { arrayDisplay: display } : {}),
+      ...(display === "accordion" ? { itemSpec: resolveItemSpec(prop, itemSchema) } : {}),
+      // An accordion reuses the array's description as the zero-item copy in its
+      // add row, so a paragraph of the same sentence directly above would be a
+      // literal duplicate. The schema can still say otherwise.
+      ...(display === "accordion" && !helpMode ? { helpDisplay: "hover" as const } : {}),
       ...(display && itemSchema && Array.isArray(itemSchema.enum)
         ? { options: enumOptions(itemSchema) }
         : {}),

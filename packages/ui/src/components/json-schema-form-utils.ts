@@ -1,6 +1,11 @@
 import { cn } from "../lib/utils";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
-import type { FieldControl, FieldOption, JsonSchemaProperty } from "./json-schema-form-types";
+import type {
+  FieldControl,
+  FieldOption,
+  GridColumns,
+  JsonSchemaProperty,
+} from "./json-schema-form-types";
 
 // Non-size styling shared by every text-like input box; the size token supplies
 // height, horizontal padding, and text size (see inputSizeClass).
@@ -78,22 +83,66 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// hasObjectItemProperties reports whether an array's items are objects with a
+// fixed `properties` set — the precondition for both the column-per-property
+// table and the summary-row accordion, which need to know the item's shape.
+export function hasObjectItemProperties(
+  items: JsonSchemaProperty | undefined,
+): boolean {
+  return (
+    !!items && !!items.properties && Object.keys(items.properties).length > 0
+  );
+}
+
 // Object-level `x-columns`: how many equal columns to split a stacked object
-// into. Clamped to [1, 12] (a standard 12-track grid, so a 3-across row of
-// span-4 fields and a 4-across row of span-3 fields share one object); anything
-// invalid falls back to a single column.
-export function normalizeColumns(value: unknown): number {
+// into. "auto" fits as many as the width allows. A number is clamped to [1, 12]
+// (a standard 12-track grid, so a 3-across row of span-4 fields and a 4-across
+// row of span-3 fields share one object); anything invalid is a single column.
+export function normalizeColumns(value: unknown): GridColumns {
+  if (value === "auto") return "auto";
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n < 1) return 1;
   return Math.min(Math.trunc(n), 12);
 }
 
 // Per-field `x-col-span`: how many of the object's columns a field occupies.
-// Clamped to [1, columns]; invalid falls back to 1.
-export function normalizeColSpan(value: unknown, columns: number): number {
+// "full" spans the whole row. Under `x-columns: "auto"` a numeric span cannot be
+// clamped against a track count that only exists at layout time, so it is capped
+// at the 12-track maximum instead. Invalid falls back to 1.
+export function normalizeColSpan(
+  value: unknown,
+  columns: GridColumns,
+): number | "full" {
+  if (value === "full") return "full";
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n < 1) return 1;
-  return Math.min(Math.trunc(n), columns);
+  return Math.min(Math.trunc(n), columns === "auto" ? 12 : columns);
+}
+
+// The `x-columns: "auto"` column floor: wide enough for a labelled control to
+// stay readable, narrow enough that a 1440px pane gets three columns, not two.
+export const DEFAULT_COLUMN_MIN_WIDTH = "15rem";
+
+// cssLength guards a schema-supplied CSS length before it reaches an inline
+// style. Non-strings (and the empty string) fall back rather than emitting a
+// declaration the browser will drop.
+export function cssLength(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+// duplicateIndex copies the item at `index` and inserts the copy after it.
+// Plain objects and arrays are cloned one level deep so editing the copy cannot
+// write through to the original.
+export function duplicateIndex<T>(items: T[], index: number): T[] {
+  const source = items[index];
+  const copy = Array.isArray(source)
+    ? ([...source] as T)
+    : isPlainObject(source)
+      ? ({ ...source } as T)
+      : source;
+  const next = [...items];
+  next.splice(index + 1, 0, copy as T);
+  return next;
 }
 
 // withSyntheticValue prepends the current value as an option when it is not in

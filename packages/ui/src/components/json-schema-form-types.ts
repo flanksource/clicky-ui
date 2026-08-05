@@ -3,7 +3,10 @@ import type { LabelIconSpec } from "../data/Icon";
 import type { FieldInstancePath, FormErrorContext, FormErrorProps } from "./json-schema-form-error-types";
 import type { FormSize } from "./json-schema-form-size";
 import type { SortMode } from "./json-schema-form-preferences";
+import type { FieldTone } from "./json-schema-form-tone";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
+
+export type { FieldTone };
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -60,12 +63,23 @@ export interface JsonSchemaProperty {
   // Secondary descriptive line per enum value ({ "plan": "No tool execution" }).
   // Used by the "segmented" (and grid) display to render descriptive cards.
   "x-enum-descriptions"?: Record<string, string>;
+  // Hue per enum value ({ "list": "indigo" }), from the closed FieldTone
+  // vocabulary. Purely decorative — unlike x-enum-icons it does NOT change which
+  // enum control renders. Consumed by displays that colour a value, e.g. the
+  // accordion array's leading glyph.
+  "x-enum-tones"?: Record<string, FieldTone>;
   // Force the enum presentation: "combobox" (default), "radio", "grid", or
   // "segmented".
   "x-enum-display"?: EnumDisplay;
   // Force the presentation for an enum-backed array. "filter-pills" renders
   // each enum item as a compact toggle; an empty stored array means all options.
   "x-array-display"?: ArrayDisplay;
+  // Force how this field's description is presented, overriding the form-level
+  // `FormLayout.help`. Defaults to "inline" (a paragraph under the control).
+  "x-help-display"?: HelpDisplay;
+  // Array-level: how to summarize one item in a collapsed accordion row. Every
+  // value names a property of the item. See ArrayItemSpec.
+  "x-item"?: ArrayItemSpec;
   // Render a bounded number (needs `maximum`) as a single-thumb slider with a
   // progress-filled track instead of a numeric input.
   "x-number-display"?: "slider";
@@ -90,10 +104,21 @@ export interface JsonSchemaProperty {
   "x-input-prefix-icon"?: string;
   "x-input-suffix-icon"?: string;
   "x-label-position"?: "top" | "left";
-  "x-col-span"?: number;
+  // How many of the object's columns this field occupies. "full" spans the whole
+  // row — the only meaningful answer under `x-columns: "auto"`, where the track
+  // count is not known when the schema is written.
+  "x-col-span"?: number | "full";
   // Object-level: lay this object's fields out in N equal columns (stacked
-  // layout). Fields span one column unless they set `x-col-span`.
-  "x-columns"?: number;
+  // layout). Fields span one column unless they set `x-col-span`. "auto" fills
+  // as many equal columns as the container width allows, at `x-column-min-width`
+  // each — so a wide viewport gains columns instead of stretching one.
+  "x-columns"?: GridColumns;
+  // Object-level, `x-columns: "auto"` only: the minimum width of one column, as
+  // a CSS length (default "15rem"), and an optional cap on the whole grid. Both
+  // are lengths rather than classes because a class inside a JSON schema is data
+  // no Tailwind scanner ever reads.
+  "x-column-min-width"?: string;
+  "x-columns-max-width"?: string;
   // Object-level: extra classes merged onto the object's fields-grid container,
   // e.g. `"gap-2"` to set the section's row/column gap, or padding/background.
   "x-classes"?: string;
@@ -177,8 +202,63 @@ export type DisplayVariant = "heading" | "text" | "divider" | "spacer";
 // cards when x-enum-descriptions is present).
 export type EnumDisplay = "combobox" | "radio" | "grid" | "segmented";
 
+// How many columns a stacked object's fields flow into: a fixed count, or
+// "auto" to fit as many as the container width allows.
+export type GridColumns = number | "auto";
+
+// How a field's description reaches the reader. "inline" is a permanent
+// paragraph under the control (the default, and what every form does today);
+// "hover" moves it behind a `?` beside the label, costing no vertical space.
+export type HelpDisplay = "inline" | "hover";
+
 // How an array control renders when the item schema has enum options.
-export type ArrayDisplay = "filter-pills";
+export type ArrayDisplay = "filter-pills" | "accordion";
+
+// ArrayItemSpec is the `x-item` extension on an ARRAY schema: it says how to
+// summarize one element of this list in a collapsed row. Every value names a
+// property of the item — the library never learns what the item *is*, so the
+// consumer keeps ownership of its domain. It lives on the array rather than on
+// `items` because one item schema (often a shared $ref) may be summarized
+// differently by each array that uses it.
+export interface ArrayItemSpec {
+  /** Property keys tried in order; the first with a non-empty value is the row title. */
+  title?: string[];
+  /** Title used when every `title` candidate is empty. Defaults to `Item <n>`. */
+  fallback?: string;
+  /** The monospace trailing line, joined with " · ". */
+  summary?: Array<string | ArrayItemSummaryPart>;
+  /** Enum property supplying the leading glyph's icon and tone. */
+  glyph?: string;
+  /** Enum property supplying a secondary chip. */
+  badge?: string;
+  /** Boolean property rendered as the required mark. */
+  flag?: string;
+  /** Noun for the add row ("Add parameter"). Defaults to `items.title`, then "item". */
+  noun?: string;
+  /** Plural for the count line ("4 parameters"). Defaults to the array title, then "items". */
+  nounPlural?: string;
+  /** Copy shown by the add row at zero items. Defaults to the array's own description. */
+  empty?: string;
+}
+
+// One part of the summary line. `pattern` wraps the value, with a single literal
+// `{}` marking where it goes — the whole mechanism by which copy like
+// `{{.params.<name>}}` stays the consumer's rather than the library's.
+export interface ArrayItemSummaryPart {
+  property: string;
+  pattern?: string;
+}
+
+// ArrayItemSummary is the derived, render-ready description of one collapsed
+// row. A PreExtension may supply it directly via FieldControl.itemSummary to
+// bypass `x-item` entirely.
+export interface ArrayItemSummary {
+  title: string;
+  summary?: string;
+  glyph?: { icon?: LabelIconSpec; tone: FieldTone; label?: string };
+  badge?: { icon?: LabelIconSpec; label: string };
+  flagged?: boolean;
+}
 
 export interface JsonSchemaHelpBlock {
   source?: string;
@@ -223,7 +303,9 @@ export interface FieldControl {
   // Grid column span for a multi-column object layout, from `x-col-span`. Only
   // honoured when the enclosing object sets `x-columns` > 1 (stacked layout);
   // otherwise ignored.
-  colSpan?: number;
+  // Resolved `x-col-span`. "full" both spans the whole grid row and lifts the
+  // stacked value-width cap — a field given the full row is asking to use it.
+  colSpan?: number | "full";
 
   // enum
   options?: FieldOption[];
@@ -240,6 +322,10 @@ export interface FieldControl {
   // Enum presentation. Defaults to "combobox" when unset. A pre-extension sets
   // "radio" to render a small fixed option set as segmented radio buttons.
   display?: EnumDisplay;
+
+  // Resolved `x-help-display`. Overrides the form-level FormLayout.help for this
+  // field only. Unset defers to the form.
+  helpDisplay?: HelpDisplay;
 
   // adornment hints (set by pre-extensions)
   badge?: string;
@@ -308,6 +394,11 @@ export interface FieldControl {
   itemSchema?: JsonSchemaProperty;
   // array — optional presentation override resolved from x-array-display.
   arrayDisplay?: ArrayDisplay;
+  // array — resolved `x-item`: how to summarize one item in a collapsed row.
+  itemSpec?: ArrayItemSpec;
+  // array — a PreExtension-supplied summariser. Wins over `itemSpec` entirely,
+  // for a consumer whose row needs more than the declarative form can say.
+  itemSummary?: (args: { item: unknown; index: number }) => ArrayItemSummary;
 
   // object — a nested structured sub-form (its own properties + required).
   objectProperties?: Record<string, JsonSchemaProperty>;
@@ -323,6 +414,9 @@ export interface FieldOption {
   // Optional secondary description, resolved from the schema's
   // x-enum-descriptions. Shown by the segmented (card) enum display.
   description?: string;
+  // Optional hue, resolved from the schema's x-enum-tones. Used where a value
+  // is rendered as a coloured mark (e.g. the accordion array's item glyph).
+  tone?: FieldTone;
 }
 
 // LookupDescriptor is the `x-clicky-lookup` schema extension on a form field: it
@@ -374,27 +468,32 @@ export type LookupFetcher = (args: {
 // to drop the field. Composed in array order; each sees the prior's output.
 // `ctx.rootValue` is the form's top-level value (the same object at every depth),
 // so a widget can read sibling fields (e.g. a selected namespace) to scope itself.
+export interface PreExtensionContext {
+  key: string;
+  prop: JsonSchemaProperty;
+  value: unknown;
+  rootValue?: Record<string, unknown>;
+  onRootChange?: (next: Record<string, unknown>) => void;
+}
+
 export type PreExtension = (
   field: FieldControl,
-  ctx: {
-    key: string;
-    prop: JsonSchemaProperty;
-    value: unknown;
-    rootValue?: Record<string, unknown>;
-  },
+  ctx: PreExtensionContext,
 ) => FieldControl | null;
 
 // PostExtension wraps the rendered label/value nodes (e.g. add a button beside
 // the value, or helper text under the label). Composed in array order. The
 // optional third arg carries `rootValue` (the form's top-level value) so a
 // replacement widget can read sibling fields without global state.
+export interface PostExtensionContext {
+  rootValue?: Record<string, unknown>;
+  onRootChange?: (next: Record<string, unknown>) => void;
+}
+
 export type PostExtension = (
   field: FieldControl,
   nodes: { label: ReactNode; value: ReactNode },
-  ctx?: {
-    rootValue?: Record<string, unknown>;
-    onRootChange?: (next: Record<string, unknown>) => void;
-  },
+  ctx?: PostExtensionContext,
 ) => { label: ReactNode; value: ReactNode };
 
 // FieldArgs is the raw input for rendering one field: the property key/schema,
@@ -479,6 +578,13 @@ export interface FormLayout {
    * wide viewports instead of stretching edge to edge.
    */
   valueMaxWidth?: string;
+  /**
+   * How every field's description is presented. "inline" (default) keeps
+   * today's paragraph under the control; "hover" moves it behind a `?` beside
+   * the label, which costs no vertical space. A field's own `x-help-display`
+   * wins over this.
+   */
+  help?: HelpDisplay;
 }
 export interface JsonSchemaFormProps extends FormErrorProps {
   schema: JsonSchemaObject;
