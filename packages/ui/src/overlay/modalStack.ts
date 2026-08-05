@@ -9,6 +9,10 @@ const stack: string[] = [];
 const listeners = new Set<() => void>();
 const escapeStack: Array<{ id: string; onEscape: () => void }> = [];
 let escapeDocument: Document | null = null;
+// Running guided tours. A tour dims the page from `zIndex.tour`, far above the
+// modal band, so floating content opened *during* a tour (the menu a step tells
+// the user to open) has to clear that dim or it renders invisibly underneath.
+let tourLayers = 0;
 
 function emit() {
   for (const listener of listeners) listener();
@@ -21,10 +25,11 @@ function subscribe(listener: () => void) {
   };
 }
 
-// The snapshot is the stack identity; it only changes when an entry is pushed or
-// popped, so subscribers re-render exactly when their position could have moved.
+// The snapshot is the stack identity plus the tour-layer count; it only changes
+// when an entry is pushed or popped, so subscribers re-render exactly when their
+// position could have moved.
 function getSnapshot() {
-  return stack.join("\u0000");
+  return `${tourLayers}:` + stack.join("\u0000");
 }
 
 function onEscapeKeyDown(event: KeyboardEvent) {
@@ -119,14 +124,38 @@ export function useEscapeLayer(open: boolean, onEscape: () => void, enabled = tr
 }
 
 /**
+ * Registers a running guided tour while `active`, so floating layers lift above
+ * its dim. Symmetric with `useModalStack`, but a count rather than a stack: the
+ * tour overlay does not nest.
+ */
+export function useTourLayer(active: boolean): void {
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+  useEffect(() => {
+    if (!active) return;
+    tourLayers += 1;
+    emit();
+    return () => {
+      tourLayers -= 1;
+      emit();
+    };
+  }, [active]);
+}
+
+/**
  * z-index a floating layer (dropdown / combobox / tooltip / popover) should use
  * so it renders above any open modal — and below the next nested modal — or at
- * the popover floor when no modal is open. Subscribes to the modal stack so the
- * value tracks modals opening and closing.
+ * the popover floor when no modal is open. While a guided tour runs, the value
+ * also clears the tour's dim and step card, so a step that says "open this menu"
+ * shows the menu rather than hiding it under the overlay. Subscribes to the
+ * modal stack so the value tracks modals and tours opening and closing.
  */
 export function useFloatingZIndex(): number {
   useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  if (stack.length === 0) return zIndex.popover;
-  const topModalZ = zIndex.modal + (stack.length - 1) * zIndex.modalStep;
-  return topModalZ + zIndex.popoverOverModalOffset;
+  const base =
+    stack.length === 0
+      ? zIndex.popover
+      : zIndex.modal + (stack.length - 1) * zIndex.modalStep + zIndex.popoverOverModalOffset;
+  if (tourLayers === 0) return base;
+  return Math.max(base, zIndex.tour + zIndex.tourCardOffset + zIndex.popoverOverModalOffset);
 }
