@@ -290,6 +290,41 @@ describe("JsonSchemaForm accordion array", () => {
     expect(headerFor("Row 1")).toBeInTheDocument();
   });
 
+  it("puts help behind a ? inside the expanded body, not under every control", () => {
+    // The array resolves to hover; without pushing that into the child context
+    // the fields inside a row keep the form default and stack a paragraph under
+    // each control — the exact height the summary rows exist to reclaim.
+    const withHelp: Partial<JsonSchemaProperty> = {
+      items: {
+        ...PARAM_ITEM,
+        properties: {
+          ...PARAM_ITEM.properties,
+          name: { type: "string", title: "Name", description: "The parameter key." },
+        },
+      },
+    };
+    renderAccordion({ extras: withHelp });
+    fireEvent.click(headerFor("Service"));
+    expect(screen.queryByText("The parameter key.")).toBeNull();
+    expect(screen.getByRole("button", { name: "About Name" })).toBeInTheDocument();
+  });
+
+  it("lets the array opt its subtree back into inline help", () => {
+    const inlineHelp: Partial<JsonSchemaProperty> = {
+      "x-help-display": "inline",
+      items: {
+        ...PARAM_ITEM,
+        properties: {
+          ...PARAM_ITEM.properties,
+          name: { type: "string", title: "Name", description: "The parameter key." },
+        },
+      },
+    };
+    renderAccordion({ extras: inlineHelp });
+    fireEvent.click(headerFor("Service"));
+    expect(screen.getByText("The parameter key.")).toBeInTheDocument();
+  });
+
   it("gives the list the full width, with the array title as a section header", () => {
     renderAccordion();
     // Not a FieldWrapper label crammed into the 600px value column.
