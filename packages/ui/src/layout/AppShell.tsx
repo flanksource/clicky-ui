@@ -45,7 +45,26 @@ export type AppShellNavGroup = {
   icon?: string | StaticIconComponent;
   /** Folded on first render until the user toggles it. */
   defaultCollapsed?: boolean;
+  /**
+   * Keeps the group open regardless of stored state, so a deep-linked
+   * destination can never hide under a folder the user collapsed earlier.
+   * Mirrors `Tree.revealSelected`: set it on the active item's ancestors.
+   */
+  forceExpanded?: boolean;
   items: AppShellNavItem[];
+  /**
+   * Nested sub-groups, rendered after `items` at one further indent. Groups
+   * nest arbitrarily, so a backend hierarchy deeper than two levels does not
+   * have to be flattened to fit the rail.
+   */
+  groups?: AppShellNavGroup[];
+  /**
+   * Makes the group's own heading row a destination as well as a disclosure:
+   * the label becomes a nav link and the chevron sits beside it as a separate
+   * control. Needed wherever a node is both a folder and a leaf — e.g. a
+   * profile named `jms` that is runnable *and* the parent of `jms.incoming`.
+   */
+  item?: AppShellNavItem;
 };
 
 export type AppShellNavSection = {
@@ -56,6 +75,18 @@ export type AppShellNavSection = {
    *  clusters (provider surfaces, per-ledger journals) belong here so they can
    *  be folded away; a collapsed rail flattens them back to plain items. */
   groups?: AppShellNavGroup[];
+  /**
+   * How the groups read.
+   *
+   * `"list"` (the default) styles each group heading as a small uppercase
+   * cluster label — right for a handful of named clusters under one section.
+   *
+   * `"tree"` styles headings as ordinary nav rows, because in a tree a folder
+   * sits at the same level as its sibling destinations: a group carrying an
+   * `item` renders as a link either way, so an uppercase heading beside it
+   * would make two nodes of the same kind look like different things.
+   */
+  variant?: "list" | "tree";
 };
 
 export type AppShellProps = {

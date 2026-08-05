@@ -9,6 +9,12 @@ import {
   UiMarkdown,
 } from "../../icons";
 import type { IconComponent } from "../../icons/types";
+import {
+  buildPathTree,
+  foldersFirst,
+  splitPath,
+  type PathTreeNode,
+} from "../../lib/path-tree";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
 import { Tree } from "../Tree";
@@ -16,12 +22,11 @@ import type { SessionChangedFiles } from "./SessionViewer.unified";
 
 type FileAccess = "read" | "written";
 
-type FileTreeNode = {
-  name: string;
-  path: string;
-  children: Map<string, FileTreeNode>;
-  access: Set<FileAccess>;
-};
+// One touch of a path. A file read and then written contributes two, both
+// binding to the same tree node.
+type FileTouch = { path: string; access: FileAccess };
+
+type FileTreeNode = PathTreeNode<FileTouch>;
 
 export function SessionFilesPanel({
   files,
@@ -50,10 +55,10 @@ export function SessionFilesPanel({
       <Tree<FileTreeNode>
         roots={roots}
         ariaLabel="Session files"
-        getChildren={(node) => [...node.children.values()].sort(compareNodes)}
-        getKey={(node) => node.path}
-        getAriaLabel={(node) => node.path}
-        getSearchText={(node) => node.path}
+        getChildren={(node) => node.children}
+        getKey={(node) => node.key}
+        getAriaLabel={(node) => node.key}
+        getSearchText={(node) => node.key}
         defaultOpen={() => true}
         renderRow={({ node, hasChildren }) => (
           <FileTreeRow node={node} directory={hasChildren} />
@@ -61,9 +66,7 @@ export function SessionFilesPanel({
         rowClass={(node) =>
           cn(
             "group min-h-6 border-l-2 border-transparent py-0 pr-density-3 text-xs hover:border-primary/40 hover:bg-muted/40",
-            !node.children.size &&
-              node.access.has("written") &&
-              "border-l-amber-500/60",
+            !node.children.length && wasWritten(node) && "border-l-amber-500/60",
           )
         }
         className="pb-1"
@@ -79,7 +82,7 @@ function FileTreeRow({
   node: FileTreeNode;
   directory: boolean;
 }) {
-  const FileIcon = directory ? UiFolder : fileTypeIcon(node.name);
+  const FileIcon = directory ? UiFolder : fileTypeIcon(node.label);
   return (
     <>
       <Icon
@@ -97,20 +100,17 @@ function FileTreeRow({
           directory ? "font-medium" : "font-mono",
         )}
       >
-        {node.name}
+        {node.label}
       </span>
-      {!directory ? <AccessBadge access={node.access} /> : null}
+      {!directory ? <AccessBadge node={node} /> : null}
     </>
   );
 }
 
-function AccessBadge({ access }: { access: Set<FileAccess> }) {
-  const label =
-    access.has("read") && access.has("written")
-      ? "RW"
-      : access.has("written")
-        ? "W"
-        : "R";
+function AccessBadge({ node }: { node: FileTreeNode }) {
+  const read = node.items.some((touch) => touch.access === "read");
+  const written = wasWritten(node);
+  const label = read && written ? "RW" : written ? "W" : "R";
   return (
     <span
       title={
@@ -118,9 +118,7 @@ function AccessBadge({ access }: { access: Set<FileAccess> }) {
       }
       className={cn(
         "w-6 shrink-0 text-right font-mono text-[11px] font-semibold",
-        access.has("written")
-          ? "text-amber-600 dark:text-amber-400"
-          : "text-muted-foreground",
+        written ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
       )}
     >
       {label}
@@ -128,50 +126,25 @@ function AccessBadge({ access }: { access: Set<FileAccess> }) {
   );
 }
 
-function buildFileTree(files: SessionChangedFiles | undefined) {
-  const roots = new Map<string, FileTreeNode>();
-  addPaths(roots, files?.read ?? [], "read");
-  addPaths(roots, files?.written ?? [], "written");
-  return [...roots.values()].sort(compareNodes);
+function buildFileTree(files: SessionChangedFiles | undefined): FileTreeNode[] {
+  const touches: FileTouch[] = [
+    ...(files?.read ?? []).map((path): FileTouch => ({ path, access: "read" })),
+    ...(files?.written ?? []).map(
+      (path): FileTouch => ({ path, access: "written" }),
+    ),
+  ];
+  return buildPathTree(touches, (touch) => splitPath(touch.path, "/"), {
+    compare: foldersFirst,
+  });
 }
 
-function addPaths(
-  roots: Map<string, FileTreeNode>,
-  paths: string[],
-  access: FileAccess,
-) {
-  for (const path of paths) {
-    const parts = path.split("/").filter(Boolean);
-    let nodes = roots;
-    let currentPath = "";
-    parts.forEach((part, index) => {
-      currentPath = currentPath ? `${currentPath}/${part}` : part;
-      const node = nodes.get(part) ?? {
-        name: part,
-        path: currentPath,
-        children: new Map(),
-        access: new Set<FileAccess>(),
-      };
-      nodes.set(part, node);
-      if (index === parts.length - 1) node.access.add(access);
-      nodes = node.children;
-    });
-  }
-}
-
-function compareNodes(left: FileTreeNode, right: FileTreeNode) {
-  const leftDirectory = left.children.size > 0;
-  const rightDirectory = right.children.size > 0;
-  if (leftDirectory !== rightDirectory) return leftDirectory ? -1 : 1;
-  return left.name.localeCompare(right.name);
+function wasWritten(node: FileTreeNode): boolean {
+  return node.items.some((touch) => touch.access === "written");
 }
 
 function countFiles(node: FileTreeNode): number {
-  return node.children.size
-    ? [...node.children.values()].reduce(
-        (count, child) => count + countFiles(child),
-        0,
-      )
+  return node.children.length
+    ? node.children.reduce((count, child) => count + countFiles(child), 0)
     : 1;
 }
 

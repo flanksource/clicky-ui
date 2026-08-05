@@ -92,10 +92,11 @@ export function NavSections({
             />
           ))}
           {section.groups?.map((group) =>
-            // A collapsed rail has no room for a group heading, so its items
-            // flatten into the icon strip rather than hiding behind a toggle.
+            // A collapsed rail has no room for group headings, so the whole
+            // subtree flattens into the icon strip rather than hiding behind
+            // toggles the user cannot see.
             collapsed
-              ? group.items.map((item) => (
+              ? flattenGroup(group).map((item) => (
                   <NavItemRow
                     key={item.key}
                     item={item}
@@ -108,6 +109,7 @@ export function NavSections({
                   <NavGroupRows
                     key={group.key}
                     group={group}
+                    variant={section.variant ?? "list"}
                     renderLink={renderLink}
                     groupState={groupState}
                     {...(onNavigate ? { onNavigate } : {})}
@@ -120,41 +122,89 @@ export function NavSections({
   );
 }
 
+// flattenGroup collects every destination in a group's subtree — its own row
+// (when it has one), its items, and everything under its nested groups.
+function flattenGroup(group: AppShellNavGroup): AppShellNavItem[] {
+  return [
+    ...(group.item ? [group.item] : []),
+    ...group.items,
+    ...(group.groups ?? []).flatMap(flattenGroup),
+  ];
+}
+
 function NavGroupRows({
   group,
+  variant,
   renderLink,
   groupState,
   onNavigate,
 }: {
   group: AppShellNavGroup;
+  variant: "list" | "tree";
   renderLink: RenderLink;
   groupState: GroupState;
   onNavigate?: () => void;
 }) {
   const fallback = group.defaultCollapsed ?? false;
-  const collapsed = groupState.isCollapsed(group.key, fallback);
+  const collapsed =
+    !group.forceExpanded && groupState.isCollapsed(group.key, fallback);
+  const toggle = () => groupState.toggle(group.key, fallback);
+  const chevron = (
+    <span aria-hidden className="text-[0.65rem] opacity-60">
+      {collapsed ? "▸" : "▾"}
+    </span>
+  );
+  const groupIcon = group.icon && (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+      <Icon
+        {...(typeof group.icon === "string"
+          ? { name: group.icon }
+          : { icon: group.icon })}
+      />
+    </span>
+  );
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => groupState.toggle(group.key, fallback)}
-        aria-expanded={!collapsed}
-        className="flex items-center gap-2.5 rounded-md px-density-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      >
-        {group.icon && (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-            <Icon
-              {...(typeof group.icon === "string"
-                ? { name: group.icon }
-                : { icon: group.icon })}
+      {group.item ? (
+        // Folder AND leaf: the link and the disclosure are siblings. Nesting a
+        // button inside the anchor would be invalid DOM and would make the
+        // click target ambiguous.
+        <div className="group/nav flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <NavItemRow
+              item={group.item}
+              collapsed={false}
+              renderLink={renderLink}
+              {...(onNavigate ? { onNavigate } : {})}
             />
-          </span>
-        )}
-        <span className="flex-1 truncate text-left">{group.label}</span>
-        <span aria-hidden className="text-[0.65rem] opacity-60">
-          {collapsed ? "▸" : "▾"}
-        </span>
-      </button>
+          </div>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.label}`}
+            className="shrink-0 rounded-md px-1.5 py-1.5 text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            {chevron}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            variant === "tree"
+              ? "text-[13px] text-sidebar-foreground"
+              : "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+          )}
+        >
+          {groupIcon}
+          <span className="flex-1 truncate text-left">{group.label}</span>
+          {chevron}
+        </button>
+      )}
       {!collapsed && (
         <div className="ml-2 mt-0.5 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
           {group.items.map((item) => (
@@ -163,6 +213,16 @@ function NavGroupRows({
               item={item}
               collapsed={false}
               renderLink={renderLink}
+              {...(onNavigate ? { onNavigate } : {})}
+            />
+          ))}
+          {group.groups?.map((child) => (
+            <NavGroupRows
+              key={child.key}
+              group={child}
+              variant={variant}
+              renderLink={renderLink}
+              groupState={groupState}
               {...(onNavigate ? { onNavigate } : {})}
             />
           ))}
