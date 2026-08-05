@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@flanksource/clicky-ui": ["../../packages/ui/src/index.ts"],
+      "@flanksource/clicky-ui/comments": ["../../packages/ui/src/comments.ts"],
+      "@flanksource/clicky-ui/icons": ["../../packages/ui/src/icons.ts"],
+      "@flanksource/clicky-ui/monaco": ["../../packages/ui/src/monaco.ts"]
+    }
+  },
+  "include": ["src", "plugins", "vite.config.ts"]
+}
