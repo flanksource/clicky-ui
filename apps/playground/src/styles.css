@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The AppShell-based playground chrome is full-height; let it fill the viewport. */
+html,
+body,
+#app {
+  height: 100%;
+}
