@@ -1,6 +1,7 @@
 export {
   QueryBrowser,
-  type QueryBrowserColumn,
+  type QueryBrowserFilterLookup,
+  type QueryBrowserFilterLookupRequest,
   type QueryBrowserProps,
   type QueryBrowserRequest,
   type QueryBrowserResult,

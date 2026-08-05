@@ -42,10 +42,12 @@ import {
   dataTablePaginationFromForm,
   packParameterValues,
   parametersToFormConfig,
-  parseMultiFilterValue,
-  serializeMultiFilterValue,
   type ParameterFormOptions,
 } from "./formMetadata";
+import {
+  parseMultiFilterValue,
+  serializeMultiFilterValue,
+} from "../data/data-table-filter-values";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -450,6 +452,12 @@ export function OperationCatalog({
                   response: listQuery.data ?? null,
                   defaultView,
                   filterConfig: resultFilterConfig,
+                  // A renderer that replaces the table owns the whole surface,
+                  // pager and download menu included. Without these it can only
+                  // drop them, which is how a replaced view silently loses the
+                  // ability to reach page two.
+                  ...(dataTablePagination ? { pagination: dataTablePagination } : {}),
+                  ...(download ? { download } : {}),
                   ...(surfaceKey ? { surfaceKey } : {}),
                 })
               : defaultView;

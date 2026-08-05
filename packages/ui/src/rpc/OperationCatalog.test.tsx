@@ -601,7 +601,9 @@ describe("OperationCatalog", () => {
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",
-      { q: "foobar" },
+      // A filter change returns to the first page, so the position travels
+      // with the request that changed the result set.
+      { q: "foobar", offset: "0" },
       { Accept: "application/json+clicky" },
     );
   });
@@ -657,7 +659,7 @@ describe("OperationCatalog", () => {
         expect(client.executeMock).toHaveBeenLastCalledWith(
           "/api/v1/widgets",
           "get",
-          { team: "team/platform" },
+          { team: "team/platform", offset: "0" },
           { Accept: "application/json+clicky" },
         ),
       { timeout: 2_000 },

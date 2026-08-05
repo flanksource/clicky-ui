@@ -100,6 +100,70 @@ describe("createOperationsApiClient", () => {
     });
   });
 
+  // The cursor headers carry the facts a page cannot be inferred from: whether
+  // more rows exist, where to resume, whether the total is a count or a bound,
+  // and whether the server stopped short of the whole result.
+  it("reads the cursor paging headers alongside limit and offset", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(
+        { version: 1, node: { kind: "table", columns: [], rows: [] } },
+        {
+          headers: {
+            "Content-Type": "application/json+clicky",
+            "X-Total-Count": "10000",
+            "X-Total-Relation": "gte",
+            "X-Has-More": "true",
+            "X-Next-Cursor": "eyJrIjpbMTAwXX0",
+            "X-Truncated": "true",
+          },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await createOperationsApiClient().executeCommand(
+      "/api/v1/transactions",
+      "GET",
+      {},
+      { Accept: "application/json+clicky" },
+    );
+
+    expect(response.pagination).toEqual({
+      total: 10000,
+      totalRelation: "gte",
+      hasMore: true,
+      nextCursor: "eyJrIjpbMTAwXX0",
+      truncated: true,
+    });
+  });
+
+  // A page that says it is the last one has to be distinguishable from one
+  // whose server said nothing — "false" is an answer, absent is not.
+  it("keeps an explicit false apart from an absent paging header", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(
+        { version: 1, node: { kind: "table", columns: [], rows: [] } },
+        {
+          headers: {
+            "Content-Type": "application/json+clicky",
+            "X-Page-Limit": "5",
+            "X-Has-More": "false",
+          },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await createOperationsApiClient().executeCommand(
+      "/api/v1/transactions",
+      "GET",
+      {},
+      { Accept: "application/json+clicky" },
+    );
+
+    expect(response.pagination).toEqual({ limit: 5, hasMore: false });
+  });
+
   it("throws non-Clicky non-2xx responses", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ error: "plain failure" }, { status: 500 }),

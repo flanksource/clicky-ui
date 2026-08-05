@@ -23,12 +23,35 @@ export {
 } from "./data/code-diff";
 export { inferColumns } from "./data/data-table-utils";
 export {
+  parseMultiFilterValue,
+  serializeMultiFilterValue,
+  splitCommaValues,
+  updateFilterSelection,
+  type DataTableFilterSelection,
+} from "./data/data-table-filter-values";
+export {
+  DATA_TABLE_FILTER_LOOKUP_LIMIT,
+  serverColumnsToDataTableColumns,
+  serverFiltersToFilterBar,
+  type DataTableColumnFilter,
+  type DataTableFilterKind,
+  type DataTableFilterLookup,
+  type DataTableFilterLookupRequest,
+  type DataTableFilterLookupResult,
+  type DataTableFilterOption,
+  type DataTableServerColumn,
+  type ServerFilterBarOptions,
+  type ServerFilterConfig,
+} from "./data/data-table-server-filters";
+export {
   DataTable,
   type DataTableColumn,
   type DataTableColumnInput,
   type DataTableColumnKind,
+  type DataTableCursorPagination,
   type DataTableFooterContext,
   type DataTableMenuAction,
+  type DataTablePagination,
   type DataTableProps,
   type DataTableRowSelection,
   type DataTableSelectionContext,

@@ -21,6 +21,15 @@ import { Icon } from "../Icon";
 import { UiPlay } from "../../icons";
 import { DataTable } from "../DataTable";
 import { inferColumns } from "../data-table-utils";
+import type { DataTableFilterSelection } from "../data-table-filter-values";
+import {
+  serverColumnsToDataTableColumns,
+  serverFiltersToFilterBar,
+  type DataTableFilterLookup,
+  type DataTableFilterLookupRequest,
+  type DataTableFilterLookupResult,
+  type DataTableServerColumn,
+} from "../data-table-server-filters";
 import { ErrorDetails } from "../diagnostics/ErrorDetails";
 import { Properties } from "../Properties";
 import {
@@ -30,25 +39,52 @@ import {
   type QueryBrowserCompletion,
 } from "./QueryBrowser.completion";
 
-export type QueryBrowserColumn = {
-  name: string;
-  databaseType?: string;
-};
-
 export type QueryBrowserResult = {
   rows?: Record<string, unknown>[];
-  columns?: QueryBrowserColumn[];
+  /**
+   * How the source describes the columns it returned, including which of them
+   * it can narrow on. Present columns replace the ones inferred from the rows,
+   * so a filterable result is described rather than guessed at.
+   */
+  columns?: DataTableServerColumn[];
   affectedRows?: number;
   durationMs?: number;
   message?: string;
   truncated?: boolean;
+  /** Where a truncated read stopped, so the bound can be named rather than
+   * merely hinted at with a trailing "+". */
+  limit?: number;
   metadata?: Record<string, unknown>;
 };
 
 export type QueryBrowserRequest = {
   query: string;
   options: Record<string, unknown>;
+  /** The filter pills the user picked, if the last result described any. */
+  filters?: DataTableFilterSelection;
+  /**
+   * The columns the last result described, echoed back so a filter binds to
+   * what the source offered rather than to whatever the narrowed result
+   * describes. Sources that have a catalog of their own ignore it.
+   */
+  columns?: DataTableServerColumn[];
 };
+
+/**
+ * A filter value type-ahead, carrying the context the source needs to scope its
+ * suggestions: the last *executed* query and the rest of the selection, so a
+ * value list only offers values that would still return rows.
+ */
+export type QueryBrowserFilterLookupRequest = DataTableFilterLookupRequest & {
+  query: string;
+  options: Record<string, unknown>;
+  filters: DataTableFilterSelection;
+  columns?: DataTableServerColumn[];
+};
+
+export type QueryBrowserFilterLookup = (
+  request: QueryBrowserFilterLookupRequest,
+) => Promise<DataTableFilterLookupResult>;
 
 export type QueryBrowserResultContext = {
   result: QueryBrowserResult;
@@ -68,6 +104,11 @@ export type QueryBrowserProps = {
   onOptionsChange?: (options: Record<string, unknown>) => void;
   navigator?: ReactNode;
   execute: (request: QueryBrowserRequest) => Promise<QueryBrowserResult>;
+  /**
+   * Answers a filter's value type-ahead. Absent leaves every described filter
+   * showing only the options the result carried.
+   */
+  lookupFilterValues?: QueryBrowserFilterLookup;
   renderResults?: (context: QueryBrowserResultContext) => ReactNode;
   className?: string;
 };
@@ -175,6 +216,7 @@ export function QueryBrowser({
   onOptionsChange,
   navigator,
   execute,
+  lookupFilterValues,
   renderResults,
   className,
 }: QueryBrowserProps) {
@@ -190,6 +232,44 @@ export function QueryBrowser({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [entries, setEntries] = useState<HistoryEntry[]>(() => readHistory(id));
+  const [filters, setFilters] = useState<DataTableFilterSelection>({});
+  // What the displayed result came from. A filter re-runs *this*, never the
+  // editor's current text — otherwise changing a pill would execute a
+  // half-typed edit nobody asked to run.
+  const lastRun = useRef<{
+    query: string;
+    options: Record<string, unknown>;
+    columns?: DataTableServerColumn[];
+  } | null>(null);
+  const executedFilters = useRef<DataTableFilterSelection>({});
+
+  // Every run goes through here so the record a filter re-runs from is refreshed
+  // in one place: the query, its options, and the columns the source described,
+  // which are what a subsequent selection binds to.
+  const runRequest = useCallback(
+    async (request: QueryBrowserRequest) => {
+      setPending(true);
+      setError(null);
+      const started = performance.now();
+      try {
+        const next = await execute(request);
+        setResult({
+          ...next,
+          durationMs: next.durationMs ?? performance.now() - started,
+        });
+        lastRun.current = {
+          query: request.query,
+          options: request.options,
+          ...(next.columns ? { columns: next.columns } : {}),
+        };
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setPending(false);
+      }
+    },
+    [execute],
+  );
 
   const currentQuery = useCallback(() => {
     const view = editor.current;
@@ -203,22 +283,44 @@ export function QueryBrowser({
   const run = useCallback(async () => {
     const query = currentQuery().trim();
     if (!query || pending) return;
-    setPending(true);
-    setError(null);
     setEntries(rememberQuery(id, query));
-    const started = performance.now();
-    try {
-      const next = await execute({ query, options });
-      setResult({
-        ...next,
-        durationMs: next.durationMs ?? performance.now() - started,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPending(false);
-    }
-  }, [currentQuery, execute, id, options, pending]);
+    // A different statement is a different result set, so neither its filters
+    // nor the columns they bind to survive: both name columns the new query may
+    // not return.
+    const repeat = lastRun.current?.query === query ? lastRun.current : null;
+    const carried = repeat ? filters : {};
+    if (carried !== filters) setFilters(carried);
+    lastRun.current = { query, options };
+    executedFilters.current = carried;
+    await runRequest({
+      query,
+      options,
+      ...(Object.keys(carried).length > 0 ? { filters: carried } : {}),
+      ...(repeat?.columns ? { columns: repeat.columns } : {}),
+    });
+  }, [currentQuery, filters, id, options, pending, runRequest]);
+
+  // A filter pill is not a draft the way query text is: it commits a discrete
+  // value on selection, and the bar already debounces its free-text fields. So
+  // a change re-runs the last executed query immediately rather than waiting
+  // for Run, which is also how the profile catalog behaves.
+  const rerunWithFilters = useCallback(
+    async (selection: DataTableFilterSelection) => {
+      const previous = lastRun.current;
+      if (!previous) {
+        throw new Error("QueryBrowser: a filter changed before any query had run");
+      }
+      await runRequest({ ...previous, filters: selection });
+    },
+    [runRequest],
+  );
+
+  useEffect(() => {
+    if (!lastRun.current) return;
+    if (filters === executedFilters.current) return;
+    executedFilters.current = filters;
+    void rerunWithFilters(filters);
+  }, [filters, rerunWithFilters]);
 
   executeRef.current = () => void run();
   onQueryChangeRef.current = onQueryChange;
@@ -277,19 +379,57 @@ export function QueryBrowser({
     setEntries(readHistory(id));
     setResult(null);
     setError(null);
+    setFilters({});
+    lastRun.current = null;
+    executedFilters.current = {};
   }, [id]);
 
   const rows = result?.rows ?? [];
+  const described = result?.columns ?? [];
   const columns = useMemo(
-    () => inferColumns(rows, { literalKeys: true }),
-    [rows],
+    () =>
+      described.length > 0
+        ? serverColumnsToDataTableColumns<Record<string, unknown>>(described)
+        : inferColumns(rows, { literalKeys: true }),
+    [described, rows],
   );
+  const lookupValues = useMemo<DataTableFilterLookup | undefined>(() => {
+    if (!lookupFilterValues) return undefined;
+    return (request) => {
+      const previous = lastRun.current;
+      if (!previous) {
+        throw new Error("QueryBrowser: a filter lookup ran before any query had");
+      }
+      return lookupFilterValues({ ...request, ...previous, filters });
+    };
+  }, [filters, lookupFilterValues]);
+  const filterConfig = useMemo(
+    () =>
+      serverFiltersToFilterBar(
+        described,
+        filters,
+        setFilters,
+        lookupValues ? { lookupValues } : {},
+      ),
+    [described, filters, lookupValues],
+  );
+  const serverFiltered =
+    filterConfig.filters.length > 0 || filterConfig.timeRange !== undefined;
   const defaultResults = result ? (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span>
           {rows.length.toLocaleString()} rows{result.truncated ? "+" : ""}
         </span>
+        {/* A "+" says there is more without saying the console stopped, which
+            reads as a small table rather than a bounded read. Naming the bound
+            is what makes the difference visible. */}
+        {result.truncated && (
+          <span className="text-amber-600 [[data-theme=dark]_&]:text-amber-400">
+            stopped at the console's {(result.limit ?? rows.length).toLocaleString()}-row bound;
+            narrow the query to see the rest
+          </span>
+        )}
         {result.affectedRows !== undefined && (
           <span>{result.affectedRows.toLocaleString()} affected</span>
         )}
@@ -298,12 +438,21 @@ export function QueryBrowser({
         )}
         {result.message && <span>{result.message}</span>}
       </div>
-      {rows.length > 0 ? (
+      {/* A described result keeps its table at zero rows: a filter that
+          excluded everything must not unmount the bar that would undo it. */}
+      {rows.length > 0 || described.length > 0 ? (
         <DataTable
           data={rows}
           columns={columns}
+          loading={pending}
           autoFilter={false}
-          showGlobalFilter
+          {...(serverFiltered
+            ? {
+                manualFilter: true,
+                externalFilters: filterConfig.filters,
+                ...(filterConfig.timeRange ? { externalTimeRange: filterConfig.timeRange } : {}),
+              }
+            : { showGlobalFilter: true })}
           showFullscreenControl
           fullscreenTitle={title ?? queryLabel}
           detailStyle="dialog"

@@ -33,6 +33,36 @@ describe("QueryBrowser", () => {
     ).toContain("SELECT 42");
   });
 
+  // A trailing "+" says there is more without saying the console stopped, which
+  // reads as a small table rather than a bounded read.
+  it("names the bound a truncated console read stopped at", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      rows: [{ answer: 42 }],
+      truncated: true,
+      limit: 100,
+    });
+    render(
+      <QueryBrowser id="db-bound" initialQuery="SELECT *" language="sql" execute={execute} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(await screen.findByText("1 rows+")).toBeInTheDocument();
+    expect(await screen.findByText(/stopped at the console's 100-row bound/)).toBeInTheDocument();
+  });
+
+  it("says nothing about a bound when the read was complete", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [{ answer: 42 }] });
+    render(
+      <QueryBrowser id="db-whole" initialQuery="SELECT 42" language="sql" execute={execute} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(await screen.findByText("1 rows")).toBeInTheDocument();
+    expect(screen.queryByText(/stopped at the console/)).not.toBeInTheDocument();
+  });
+
   it("opens result rows in a Properties detail dialog", async () => {
     const execute = vi.fn().mockResolvedValue({
       rows: [{ id: "row-1", nullable: null, nested: { status: "ready" } }],
@@ -142,5 +172,134 @@ describe("QueryBrowser", () => {
       />,
     );
     await waitFor(() => expect(onQueryChange).toHaveBeenCalledWith("SELECT 3"));
+  });
+
+  describe("source-described filters", () => {
+    const describedResult = {
+      rows: [{ region: "us-east" }],
+      columns: [
+        {
+          name: "region",
+          filterKey: "region",
+          filter: { kind: "terms" as const, options: [{ value: "us-east" }, { value: "eu" }] },
+        },
+      ],
+    };
+
+    // Columns the source described say which of them it can narrow on, which is
+    // something no amount of looking at one page of rows can answer.
+    it("renders the described columns rather than inferring them", async () => {
+      render(
+        <QueryBrowser
+          id="db-described"
+          initialQuery="SELECT region FROM orders"
+          language="sql"
+          execute={vi.fn().mockResolvedValue({
+            ...describedResult,
+            columns: [{ name: "region", label: "Region name" }],
+          })}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+      await screen.findByRole("table");
+      expect(await screen.findByText("Region name")).toBeInTheDocument();
+    });
+
+    // A filter pill commits a value on selection, so it re-runs immediately —
+    // and it re-runs the query that produced the result, never the editor's
+    // current text, which may be a half-typed edit.
+    it("re-runs the last executed query when a filter changes", async () => {
+      const execute = vi.fn().mockResolvedValue(describedResult);
+      render(
+        <QueryBrowser
+          id="db-filter"
+          initialQuery="SELECT region FROM orders"
+          language="sql"
+          execute={execute}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+      await screen.findByRole("table");
+
+      // A server filter binds to its column through filterKey, so the header
+      // control and the cell actions address one filter rather than two.
+      fireEvent.click(
+        await screen.findByRole("button", { name: /open region column filter/i }),
+      );
+      const option = document.querySelector('[data-filter-option="eu"]');
+      if (!option) throw new Error("Expected an eu option in the header filter");
+      fireEvent.click(option);
+
+      // The columns the result described ride along, so the source binds the
+      // selection to what it offered rather than re-deriving it from a result
+      // the selection itself narrowed.
+      await waitFor(() =>
+        expect(execute).toHaveBeenLastCalledWith({
+          query: "SELECT region FROM orders",
+          options: {},
+          filters: { region: "eu" },
+          columns: describedResult.columns,
+        }),
+      );
+    });
+
+    // Filters name columns, so a different statement is a clean slate: neither
+    // the pills nor the column set they bind to may follow it across.
+    it("re-runs a changed query with neither filters nor stale columns", async () => {
+      const execute = vi.fn().mockResolvedValue(describedResult);
+      const { rerender } = render(
+        <QueryBrowser
+          id="db-requery"
+          initialQuery="SELECT region FROM orders"
+          language="sql"
+          execute={execute}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+      await screen.findByRole("table");
+      fireEvent.click(
+        await screen.findByRole("button", { name: /open region column filter/i }),
+      );
+      const option = document.querySelector('[data-filter-option="eu"]');
+      if (!option) throw new Error("Expected an eu option in the header filter");
+      fireEvent.click(option);
+      await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
+
+      rerender(
+        <QueryBrowser
+          id="db-requery"
+          initialQuery="SELECT env FROM orders"
+          language="sql"
+          execute={execute}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+      await waitFor(() =>
+        expect(execute).toHaveBeenLastCalledWith({
+          query: "SELECT env FROM orders",
+          options: {},
+        }),
+      );
+    });
+
+    // A filter that excluded everything must not unmount the bar that would
+    // undo it, so a described result keeps its table at zero rows.
+    it("keeps the table when a filter leaves no rows", async () => {
+      const execute = vi
+        .fn()
+        .mockResolvedValue({ ...describedResult, rows: [] });
+      render(
+        <QueryBrowser
+          id="db-empty"
+          initialQuery="SELECT region FROM orders"
+          language="sql"
+          execute={execute}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+      expect(await screen.findByRole("table")).toBeInTheDocument();
+    });
+
   });
 });

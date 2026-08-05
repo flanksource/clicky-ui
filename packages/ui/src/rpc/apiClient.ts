@@ -469,7 +469,26 @@ function paginationFromHeaders(headers: Record<string, string>): ExecutionPagina
   if (limit !== undefined) pagination.limit = limit;
   if (offset !== undefined) pagination.offset = offset;
 
+  const relation = headers["x-total-relation"];
+  if (relation === "eq" || relation === "gte") pagination.totalRelation = relation;
+
+  const hasMore = booleanHeader(headers["x-has-more"]);
+  if (hasMore !== undefined) pagination.hasMore = hasMore;
+
+  const cursor = headers["x-next-cursor"];
+  if (cursor != null && cursor.trim() !== "") pagination.nextCursor = cursor;
+
+  if (booleanHeader(headers["x-truncated"]) === true) pagination.truncated = true;
+
   return Object.keys(pagination).length > 0 ? pagination : undefined;
+}
+
+function booleanHeader(value: string | undefined): boolean | undefined {
+  if (value == null || value.trim() === "") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function integerHeader(value: string | undefined): number | undefined {

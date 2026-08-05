@@ -10,6 +10,23 @@ export interface ExecutionPagination {
   total?: number;
   limit?: number;
   offset?: number;
+
+  // totalRelation says whether total is a count or a lower bound. A backend
+  // that stops counting past a threshold reports "gte", and rendering that as
+  // a count would state a number nobody promised.
+  totalRelation?: "eq" | "gte";
+
+  // hasMore is the server's answer, not an inference from the page length: a
+  // short page and the end of the data are different facts.
+  hasMore?: boolean;
+
+  // nextCursor resumes after this page. Opaque — it is passed back unchanged
+  // and never parsed, because a client that can read one can forge one.
+  nextCursor?: string;
+
+  // truncated reports that the server stopped short of the whole result, so a
+  // partial answer is never rendered as a complete one.
+  truncated?: boolean;
 }
 
 export interface ExecutionResponse {
@@ -48,6 +65,7 @@ export interface OpenAPISchema {
 //   "filter"    — render as a FilterBar chip on the DataTable
 //   "limit"     — feed into DataTable pagination's pageSize
 //   "offset"    — feed into DataTable pagination's page (or skip)
+//   "cursor"    — carry the opaque position the previous page returned
 //   "time-from" — left edge of a time-range picker
 //   "time-to"   — right edge of a time-range picker
 // Set server-side by clicky's converter (see paramRole in clicky/rpc/openapi.go).
@@ -56,6 +74,7 @@ export type ClickyParameterRole =
   | "filter"
   | "limit"
   | "offset"
+  | "cursor"
   | "time-from"
   | "time-to";
 

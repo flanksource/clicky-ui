@@ -42,6 +42,7 @@ import {
   resolveColumnValue,
   resolvePath,
 } from "./data-table-utils";
+import { assertDataTableFilterProps } from "./data-table-server-filters";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -286,12 +287,44 @@ export type DataTablePagination = {
   pageSize: number;
   /** Total row count if known; enables "Page X of Y". */
   total?: number;
+  /**
+   * Whether `total` is a count ("eq") or a lower bound ("gte"). A backend that
+   * stops counting past a threshold reports a bound, and rendering it as a
+   * count would state a number nobody promised.
+   */
+  totalRelation?: "eq" | "gte";
+  /**
+   * The server's answer for whether rows follow this page. Preferred over
+   * inferring the end of the data from a short page: the two are different
+   * facts, and only the server knows which one happened.
+   */
+  hasMore?: boolean;
   /** Called when the user moves to another page. */
   onPageChange: (page: number) => void;
   /** Called when the page size select changes. */
   onPageSizeChange: (pageSize: number) => void;
   /** Available page sizes. Defaults to [25, 50, 100, 200]. */
   pageSizeOptions?: number[];
+  /**
+   * Cursor paging. When present the footer steps through the cursors the
+   * server minted instead of by page number — a cursor names a position in an
+   * ordered result, so there is no cursor for a page nobody has visited and
+   * the page-number jump is not offered.
+   */
+  cursor?: DataTableCursorPagination;
+};
+
+/**
+ * DataTableCursorPagination is the caller's half of a cursor walk. The tokens
+ * are opaque: they are handed back unchanged and never parsed.
+ */
+export type DataTableCursorPagination = {
+  /** The cursor this page was fetched with; undefined on the first page. */
+  current?: string;
+  /** The cursor that resumes after this page; absent when the data is exhausted. */
+  next?: string;
+  /** Fetch the page at this cursor; undefined returns to the first page. */
+  onCursorChange: (cursor: string | undefined) => void;
 };
 
 export type DataTableMenuAction = {
@@ -380,7 +413,13 @@ type DataTableInnerProps<
   scrollContainerClassName?: string;
   /** Generate filters from filterable columns. */
   autoFilter?: boolean;
-  /** Show the global search input. */
+  /**
+   * Show the built-in global search input. Defaults to `autoFilter` — the box
+   * narrows rows client-side, so it only mounts by default where DataTable
+   * already owns filtering. Set it explicitly to search a table that generates
+   * no column filters; combine with `manualFilter` plus `globalFilter` /
+   * `onGlobalFilterChange` (or use `externalSearch`) to drive a source query.
+   */
   showGlobalFilter?: boolean;
   /** Controlled global search value. */
   globalFilter?: string;
@@ -396,6 +435,13 @@ type DataTableInnerProps<
   onSortChange?: (sort: SortState | null) => void;
   /** When true, header sorting updates state but does not reorder `data`. */
   manualSort?: boolean;
+  /**
+   * When true, filters update state but do NOT narrow `data`. The mirror of
+   * `manualSort`: the source owns filtering and DataTable only renders the
+   * controls. Suppresses the client-side filter pass, the built-in search's row
+   * narrowing, and the column-derived time range.
+   */
+  manualFilter?: boolean;
   /** Extra props forwarded to the internal FilterBar. */
   filterBarProps?: Omit<FilterBarProps, "search" | "filters">;
   /**
@@ -560,7 +606,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   className,
   scrollContainerClassName,
   autoFilter = false,
-  showGlobalFilter = true,
+  showGlobalFilter,
+  manualFilter = false,
   globalFilter,
   onGlobalFilterChange,
   globalFilterPlaceholder = "Search all columns…",
@@ -826,7 +873,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   // the auto-mounted FilterBar time-range picker. The user can override by
   // supplying their own filterBarProps.timeRange.
   const timeRangeColumn = useMemo(() => {
-    if (filterBarProps?.timeRange) return null;
+    // A column-derived range narrows rows here, so it must not mount when the
+    // caller owns the range: the header control would quietly re-filter rows
+    // the source already filtered.
+    if (manualFilter || externalTimeRange || filterBarProps?.timeRange) return null;
     return (
       effectiveColumns.find(
         (column) =>
@@ -835,7 +885,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           column.timestamp?.autoRangeFilter !== false,
       ) ?? null
     );
-  }, [effectiveColumns, filterBarProps?.timeRange]);
+  }, [effectiveColumns, externalTimeRange, filterBarProps?.timeRange, manualFilter]);
 
   const filterableColumns = useMemo(
     () =>
@@ -1014,10 +1064,28 @@ function DataTableInner<T extends Record<string, unknown>>({
       }),
     [generatedFilters, multiFilters, numberFilters, textFilters],
   );
-  const nativeFilterByColumn = useMemo(
-    () => new Map(nativeFilters.map((filter) => [filter.key, filter])),
-    [nativeFilters],
+  const serverFilterByKey = useMemo(
+    () => new Map((externalFilters ?? []).map((filter) => [filter.key, filter])),
+    [externalFilters],
   );
+  // A header filter button comes from whichever pipeline owns the column:
+  // autoFilter's generated filter (keyed by column.key) or a caller-supplied
+  // server filter bound through the column's `filterKey` — the same key
+  // `cellFilters` is already indexed by, so the include/exclude cell actions
+  // and the header popover address one filter rather than two.
+  const headerFilterByColumn = useMemo(() => {
+    const bound = new Map<string, FilterBarFilter>();
+    for (const column of effectiveColumns) {
+      const native = nativeFilters.find((filter) => filter.key === column.key);
+      if (native) {
+        bound.set(column.key, native);
+        continue;
+      }
+      const server = column.filterKey ? serverFilterByKey.get(column.filterKey) : undefined;
+      if (server) bound.set(column.key, server);
+    }
+    return bound;
+  }, [effectiveColumns, nativeFilters, serverFilterByKey]);
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
     filterBarProps?.children ||
@@ -1048,9 +1116,20 @@ function DataTableInner<T extends Record<string, unknown>>({
     }
     return next;
   }, [timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
+  // The built-in search narrows rows here, so it mounts by default only where
+  // DataTable already owns filtering. An explicit value still wins, which is
+  // what lets a source-filtered table search its own page.
+  const resolvedShowGlobalFilter = showGlobalFilter ?? autoFilter;
+  assertDataTableFilterProps({
+    autoFilter,
+    manualFilter,
+    showGlobalFilter: resolvedShowGlobalFilter,
+    globalFilterControlled: globalFilter !== undefined || onGlobalFilterChange !== undefined,
+    hasExternalSearch: externalSearch !== undefined,
+  });
   const showFilterBar =
-    (autoFilter &&
-      (showGlobalFilter || nativeFilters.length > 0)) ||
+    resolvedShowGlobalFilter ||
+    nativeFilters.length > 0 ||
     !!autoTimeRange ||
     !!externalSearch ||
     !!externalTimeRange ||
@@ -1072,9 +1151,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     filterBarProps?.trailing
   );
   const showHeaderFilterControls =
-    showHeaderFilters && (autoFilter || !!autoTimeRange);
+    showHeaderFilters && (headerFilterByColumn.size > 0 || !!autoTimeRange);
 
   const filteredRows = useMemo(() => {
+    // The source already applied every filter, so applying them again here
+    // would narrow rows a second time and show fewer than were asked for.
+    if (manualFilter) return rows;
     const globalNeedle = effectiveGlobalFilter.trim().toLowerCase();
     const now = new Date();
     const rangeFromDate = timeRangeColumn
@@ -1168,6 +1250,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     effectiveGlobalFilter,
     filterableColumns,
     generatedFilters,
+    manualFilter,
     multiFilters,
     numberFilters,
     rows,
@@ -1198,6 +1281,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     ...(onSortChange ? { onSortChange } : {}),
     ...(defaultSort?.key ? { defaultKey: defaultSort.key } : {}),
   });
+
+  // Sorting one page of a server-paged result reorders that page and nothing
+  // else, which reads as a sort of the whole table and is not one. Under server
+  // paging the header therefore goes inert unless the caller wired the sort
+  // through to the server, where the whole result set actually lives.
+  const pageLocalSort = !!pagination && !onSortChange;
 
   // Client-side incremental reveal: when `clientReveal` is set (and the caller
   // is not doing server pagination), only the first `visibleCount` sorted rows
@@ -1498,7 +1587,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             {...filterBarProps}
             {...(externalSearch
               ? { search: externalSearch }
-              : autoFilter && showGlobalFilter
+              : resolvedShowGlobalFilter
                 ? {
                     search: {
                       value: effectiveGlobalFilter,
@@ -1589,8 +1678,17 @@ function DataTableInner<T extends Record<string, unknown>>({
                       )}
                     >
                       <span className="min-w-0">
-                        {column.sortable === false ? (
-                          <span>{column.label}</span>
+                        {column.sortable === false || pageLocalSort ? (
+                          <span
+                            {...(pageLocalSort && column.sortable !== false
+                              ? {
+                                  title:
+                                    "Sorting is served by the query while this table is paged by the server",
+                                }
+                              : {})}
+                          >
+                            {column.label}
+                          </span>
                         ) : (
                           <SortableHeader
                             active={sort?.key === column.key}
@@ -1605,15 +1703,15 @@ function DataTableInner<T extends Record<string, unknown>>({
                         )}
                       </span>
                       {showHeaderFilterControls &&
-                        (nativeFilterByColumn.has(column.key) ||
+                        (headerFilterByColumn.has(column.key) ||
                           (autoTimeRange &&
                             timeRangeColumn?.key === column.key)) && (
                           <HeaderFilterButton
                             column={column}
                             active={
-                              nativeFilterByColumn.has(column.key)
+                              headerFilterByColumn.has(column.key)
                                 ? isFilterBarFilterActive(
-                                    nativeFilterByColumn.get(column.key)!,
+                                    headerFilterByColumn.get(column.key)!,
                                   )
                                 : Boolean(
                                     timeRangeFilter.from || timeRangeFilter.to,
@@ -1663,7 +1761,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   message={loadingMessage}
                   selection={!!rowSelection}
                 />
-              ) : data.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
@@ -1798,6 +1896,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                               record.row,
                               column,
                             );
+                          const hasCellFilterActions =
+                            !!column.filterKey &&
+                            !!onCellFilterChange &&
+                            serverFilterValue !== undefined;
                           if (
                             column.filterKey &&
                             onCellFilterChange &&
@@ -1859,11 +1961,21 @@ function DataTableInner<T extends Record<string, unknown>>({
                                     // overlay stretches across the whole (relative)
                                     // row: right/middle-click give native "open in
                                     // new tab", plain left-click routes client-side.
+                                    // The overlay paints over the cell, so a cell
+                                    // with filter actions lifts them above it —
+                                    // otherwise the link swallows the hover that
+                                    // reveals the include/exclude buttons.
                                     renderLink({
                                       to: href,
                                       className:
                                         "hover:underline after:absolute after:inset-0 after:content-['']",
-                                      children: content,
+                                      children: hasCellFilterActions ? (
+                                        <span className="relative z-10 inline-flex min-w-0 items-center">
+                                          {content}
+                                        </span>
+                                      ) : (
+                                        content
+                                      ),
                                     })
                                   : content}
                               </CellContent>
@@ -1971,7 +2083,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         )}
         {headerFilterMenu && (
           <HeaderFilterMenu
-            filter={nativeFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
+            filter={headerFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
             {...(autoTimeRange &&
             timeRangeColumn?.key === headerFilterMenu.columnKey
               ? { timeRange: autoTimeRange }
@@ -2025,6 +2137,32 @@ function resolveCellFilterDisplayValue<T extends Record<string, unknown>>(
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100, 200];
 
+// useCursorTrail remembers the cursors used to reach each page, which is what
+// makes a cursor walk steppable backwards at all: a cursor points forward only,
+// so "the previous page" is a position the client already visited rather than
+// one it can ask the server to compute.
+//
+// The position is derived from the cursor the caller is currently on rather
+// than tracked alongside it, so a filter change — which clears the cursor and
+// invalidates every token minted under the old query — lands back on the first
+// page with no stale entry left for Previous to walk into. The trail behind it
+// is discarded by the next push, which slices at the derived index.
+//
+// A cursor the trail has never seen (one restored from a URL, say) is a page
+// the client cannot number: it counts as one page in, and Previous returns to
+// the start rather than guessing at a position it was not there for.
+function useCursorTrail(cursor: DataTableCursorPagination | undefined) {
+  const [trail, setTrail] = useState<string[]>([]);
+  const current = cursor?.current;
+  const index = current == null ? 0 : Math.max(trail.indexOf(current) + 1, 1);
+
+  return {
+    page: index,
+    push: (next: string) => setTrail((previous) => [...previous.slice(0, index), next]),
+    previous: () => (index <= 1 ? undefined : trail[index - 2]),
+  };
+}
+
 // DataTablePaginationFooter renders a small page-size selector and prev/next
 // controls below the table. Pure presentation: every interaction routes
 // straight to the caller-supplied callbacks so the data layer (which lives in
@@ -2041,34 +2179,60 @@ function DataTablePaginationFooter({
   loading: boolean;
   loadingMessage: ReactNode;
 }) {
-  const { page, pageSize, total, onPageChange, onPageSizeChange } = pagination;
+  const { page, pageSize, total, totalRelation, cursor, onPageChange, onPageSizeChange } =
+    pagination;
   const options = Array.from(
     new Set([
       ...(pagination.pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS),
       pageSize,
     ]),
   ).sort((a, b) => a - b);
-  const safePage = Math.max(0, page);
+  const trail = useCursorTrail(cursor);
+  const safePage = cursor ? trail.page : Math.max(0, page);
+  const approximate = totalRelation === "gte";
+  // A page count derived from a lower bound is a lower bound too, and offering
+  // it as "of N" invites a jump to a page that may not exist. A cursor walk has
+  // no page numbers to jump between at all.
   const totalPages =
-    total != null && pageSize > 0
+    total != null && pageSize > 0 && !approximate && !cursor
       ? Math.max(1, Math.ceil(total / pageSize))
       : undefined;
   const atFirst = safePage === 0;
-  const atLast =
-    totalPages != null
-      ? safePage >= totalPages - 1
-      : visibleRowCount < pageSize;
+  const atLast = cursor
+    ? cursor.next == null
+    : pagination.hasMore != null
+      ? !pagination.hasMore
+      : totalPages != null
+        ? safePage >= totalPages - 1
+        : visibleRowCount < pageSize;
   const hasVisibleRows = visibleRowCount > 0;
   const rangeStart =
     total === 0 || !hasVisibleRows ? 0 : safePage * pageSize + 1;
   const rangeEnd =
     total != null && hasVisibleRows
-      ? Math.min(total, rangeStart + Math.max(visibleRowCount - 1, 0))
+      ? Math.min(approximate ? Infinity : total, rangeStart + Math.max(visibleRowCount - 1, 0))
       : visibleRowCount;
   const rangeLabel =
     total != null
-      ? `${rangeStart}-${rangeEnd} of ${total}`
+      ? `${rangeStart}-${rangeEnd} of ${approximate ? `~${total}+` : total}`
       : `${visibleRowCount} row${visibleRowCount === 1 ? "" : "s"}`;
+
+  const goPrevious = () => {
+    if (!cursor) {
+      onPageChange(Math.max(0, safePage - 1));
+      return;
+    }
+    cursor.onCursorChange(trail.previous());
+  };
+  const goNext = () => {
+    if (!cursor) {
+      onPageChange(safePage + 1);
+      return;
+    }
+    if (cursor.next == null) return;
+    trail.push(cursor.next);
+    cursor.onCursorChange(cursor.next);
+  };
 
   return (
     <div className="flex min-h-9 shrink-0 flex-row items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -2098,7 +2262,7 @@ function DataTablePaginationFooter({
           aria-label="Previous page"
           title="Previous page"
           disabled={atFirst}
-          onClick={() => onPageChange(Math.max(0, safePage - 1))}
+          onClick={goPrevious}
         >
           <Icon icon={UiArrowLeft} />
         </button>
@@ -2108,7 +2272,7 @@ function DataTablePaginationFooter({
           aria-label="Next page"
           title="Next page"
           disabled={atLast}
-          onClick={() => onPageChange(safePage + 1)}
+          onClick={goNext}
         >
           <Icon icon={UiArrowRight} />
         </button>
