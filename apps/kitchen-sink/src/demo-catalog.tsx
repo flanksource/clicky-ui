@@ -6,6 +6,7 @@ import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
+import { JSONPathFieldDemo } from "./demos/JSONPathFieldDemo";
 import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { ProgressBarsDemo } from "./demos/ProgressBarsDemo";
@@ -253,6 +254,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "Form fields",
         component: FormFieldsDemo,
         icon: UiForm,
+      },
+      {
+        id: "json-path-field",
+        label: "JSONPathField",
+        component: JSONPathFieldDemo,
+        icon: UiListTree,
       },
       {
         id: "endpoint-selector",

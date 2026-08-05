@@ -59,6 +59,21 @@ describe("TreePickerField", () => {
     expect(screen.getByText("Co")).toBeInTheDocument();
   });
 
+  it("anchors the tree panel to a custom trigger", () => {
+    renderField({
+      renderTrigger: ({ open, triggerRef, toggle }) => (
+        <button ref={triggerRef} type="button" aria-expanded={open} onClick={toggle}>
+          Browse tree
+        </button>
+      ),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse tree" }));
+
+    expect(panel()).not.toBeNull();
+    expect(screen.getByText("Co")).toBeInTheDocument();
+  });
+
   it("selecting a selectable leaf fires onSelect and closes", () => {
     const { onSelect } = renderField();
     fireEvent.click(screen.getByRole("button")); // open

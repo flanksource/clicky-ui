@@ -34,3 +34,46 @@ export function withSelectedComboboxOptions(
     .map((value) => ({ value, label: value }));
   return pinned.length === 0 ? options : [...pinned, ...options];
 }
+
+export function multipleComboboxLabel(
+  options: ComboboxOption[],
+  selectedValues: string[],
+): string {
+  const labels = selectedValues.map((value) => {
+    const option = options.find((entry) => entry.value === value);
+    return option?.selectedLabel ?? option?.label ?? value;
+  });
+  if (labels.length <= 2) return labels.join(", ");
+  return `${labels.length} selected`;
+}
+
+export function createComboboxCustomEntry(options: {
+  allowCustomValue: boolean;
+  query: string;
+  multiple: boolean;
+  tristate: boolean;
+  onNew: ((value: string) => ComboboxOption | null) | undefined;
+  choices: ComboboxOption[];
+  selectedValues: string[];
+}): ComboboxOption | null {
+  const {
+    allowCustomValue,
+    query,
+    multiple,
+    tristate,
+    onNew,
+    choices,
+    selectedValues,
+  } = options;
+  if (
+    !allowCustomValue ||
+    !query ||
+    selectedValues.includes(query) ||
+    (!tristate && !multiple && !onNew) ||
+    choices.some((option) => option.value === query)
+  ) {
+    return null;
+  }
+  if (onNew) return onNew(query);
+  return { value: query, label: `Add "${query}"` };
+}

@@ -3,7 +3,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiClose, UiEllipsisBold, UiSearch } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
-import { FieldsGrid } from "./json-schema-form-fields";
+import { FieldsGrid } from "./json-schema-form-layout";
 import { FormErrorSummary } from "./json-schema-form-error-display";
 import { unmatchedFormErrors } from "./json-schema-form-errors";
 import { FormLookupProvider } from "./FormLookupProvider";
@@ -11,7 +11,11 @@ import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import { applySchemaDefaults } from "./json-schema-form-resolve";
-import { normalizeColumns } from "./json-schema-form-utils";
+import {
+  cssLength,
+  DEFAULT_COLUMN_MIN_WIDTH,
+  normalizeColumns,
+} from "./json-schema-form-utils";
 import { DEFAULT_FORM_SIZE, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
 import {
   DEFAULT_PREFERENCES_STORAGE_KEY,
@@ -40,11 +44,14 @@ function resolveFormLayout(
   const baseMode = layout?.mode ?? (inline ? "inline" : "stacked");
   const mode = modeOverride ?? baseMode;
   const valueMaxWidth = layout?.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH;
-  if (mode !== "inline") return { mode: "stacked", valueMaxWidth };
+  // `help` is orthogonal to mode, so it survives a menu-driven mode flip.
+  const help = layout?.help ? { help: layout.help } : {};
+  if (mode !== "inline") return { mode: "stacked", valueMaxWidth, ...help };
   return {
     mode: "inline",
     labelMaxWidth: layout?.labelMaxWidth ?? DEFAULT_LABEL_MAX_WIDTH,
     valueMaxWidth,
+    ...help,
   };
 }
 
@@ -167,6 +174,10 @@ export function JsonSchemaForm({
           layout={resolvedLayout}
           size={effectiveSize}
           columns={normalizeColumns(resolvedSchema["x-columns"])}
+          columnMinWidth={cssLength(resolvedSchema["x-column-min-width"], DEFAULT_COLUMN_MIN_WIDTH)}
+          {...(typeof resolvedSchema["x-columns-max-width"] === "string"
+            ? { columnsMaxWidth: resolvedSchema["x-columns-max-width"] }
+            : {})}
           {...(typeof resolvedSchema["x-classes"] === "string" ? { className: resolvedSchema["x-classes"] } : {})}
         >
           {discKey ? (

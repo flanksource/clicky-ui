@@ -198,6 +198,69 @@ export const Multiple: Story = {
   },
 };
 
+export const CreatableMultiple: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Multi-select keeps existing choices while allowing values outside the current option page. Type a new database name and choose the Add option.",
+      },
+    },
+  },
+  render: () => {
+    const [value, setValue] = useState<string[]>(["PrimaryDB"]);
+    return (
+      <div className="w-64 space-y-3">
+        <Combobox
+          multiple
+          label="Databases"
+          placeholder="Pick or add databases"
+          value={value}
+          onChange={setValue}
+          options={DATABASE_OPTIONS}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};
+
+export const Tags: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The tags variant keeps every selected value visible as a removable pill while the inline input searches or creates another value.",
+      },
+    },
+  },
+  render: () => {
+    const [value, setValue] = useState<string[]>([
+      "PrimaryDB",
+      "ArchiveDB",
+      "analytics-replica",
+    ]);
+    return (
+      <div className="w-96 space-y-3">
+        <Combobox
+          multiple
+          variant="tags"
+          label="Databases"
+          placeholder="Pick or add databases"
+          value={value}
+          onChange={setValue}
+          options={DATABASE_OPTIONS}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};
+
 const CLOUD_OPTIONS = [
   { value: "aws", label: "AWS", icon: <span aria-hidden>🟧</span> },
   { value: "gcp", label: "Google Cloud", icon: <span aria-hidden>🔵</span> },
