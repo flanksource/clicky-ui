@@ -258,6 +258,7 @@ export type {
   PostExtension,
   PostExtensionContext,
   LookupDescriptor,
+  LookupHierarchy,
   LookupScope,
   LookupFetcher,
 } from "./components/json-schema-form-types";
@@ -321,9 +322,39 @@ export {
   useModalStack,
   useEscapeLayer,
   useFloatingZIndex,
+  useTourLayer,
   type ModalStackPosition,
 } from "./overlay/modalStack";
 export { zIndex } from "./overlay/zIndex";
+export { Tour, type TourProps } from "./overlay/Tour";
+export { TourProvider, type TourProviderProps } from "./overlay/TourProvider";
+export {
+  useTour,
+  type TourContextValue,
+  type TourState,
+  type TourStatus,
+} from "./overlay/tour-context";
+export {
+  localStorageTourStorage,
+  memoryTourStorage,
+  isTourFinished,
+  type TourStorage,
+  type TourCompletion,
+  type TourCompletionStatus,
+} from "./overlay/tour-progress";
+export type {
+  TourStep,
+  TourDefinition,
+  TourTarget,
+  TourRoot,
+  TourRootSource,
+  TourMissingAnchor,
+  TourInteraction,
+  TourDirection,
+  TourStepContext,
+  TourStepErrorInfo,
+  TourLabels,
+} from "./overlay/tour-types";
 export {
   CommandPalette,
   type CommandPaletteProps,

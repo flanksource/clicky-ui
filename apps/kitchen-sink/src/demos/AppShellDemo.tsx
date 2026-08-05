@@ -121,6 +121,50 @@ function AppShellDemoInner() {
       active: i.key === active,
       to: `/${i.key}`,
     })),
+    ...(s.section === "Diagnostics"
+      ? {
+          groups: [
+            {
+              key: "messaging",
+              label: "Messaging",
+              item: {
+                key: "messaging",
+                label: "Messaging",
+                active: active === "messaging",
+                to: "/messaging",
+              },
+              items: [
+                {
+                  key: "messaging-all",
+                  label: "All queues",
+                  active: active === "messaging-all",
+                  to: "/messaging-all",
+                },
+              ],
+              groups: [
+                {
+                  key: "incoming",
+                  label: "Incoming",
+                  item: {
+                    key: "incoming",
+                    label: "Incoming",
+                    active: active === "incoming",
+                    to: "/incoming",
+                  },
+                  items: [
+                    {
+                      key: "incoming-disbursements",
+                      label: "Disbursements",
+                      active: active === "incoming-disbursements",
+                      to: "/incoming-disbursements",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }
+      : {}),
   }));
 
   return (

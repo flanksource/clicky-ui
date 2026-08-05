@@ -1,0 +1,40 @@
+/** @vitest-environment jsdom */
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { findDemoEntry } from "../demo-catalog";
+import { HierarchicalLookupDemo } from "./HierarchicalLookupDemo";
+import { TourDemo } from "./TourDemo";
+
+afterEach(cleanup);
+
+describe("kitchen sink examples", () => {
+  it("registers the new examples in the demo catalog", () => {
+    expect(findDemoEntry("tour")?.component).toBe(TourDemo);
+    expect(findDemoEntry("hierarchical-lookup")?.component).toBe(
+      HierarchicalLookupDemo,
+    );
+  });
+
+  it("starts the provider-managed guided tour from the demo", async () => {
+    render(<TourDemo />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Take the tour" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "Choose an environment" }),
+    ).toBeTruthy();
+  });
+
+  it("opens hierarchical lookup options as a tree", async () => {
+    render(<HierarchicalLookupDemo />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Select/ }),
+    );
+
+    const tree = await screen.findByRole("tree");
+    expect(tree).toBeTruthy();
+    expect(screen.getAllByText("jms")).toHaveLength(2);
+  });
+});

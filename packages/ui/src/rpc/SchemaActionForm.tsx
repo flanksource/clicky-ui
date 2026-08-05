@@ -2,7 +2,6 @@ import {
   lazy,
   Suspense,
   useCallback,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -10,15 +9,13 @@ import { useQuery } from "@tanstack/react-query";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { Button } from "../components/button";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
-import { resolveLookupScope } from "../components/form-lookup-context";
 import { Tabs } from "../layout/Tabs";
 import type {
   JsonSchemaObject,
-  LookupFetcher,
   PreExtension,
   PostExtension,
 } from "../components/json-schema-form-types";
-import { lookupOptionsToFieldOptions } from "./formMetadata";
+import { useOperationLookupFetcher } from "./operationLookupFetcher";
 import {
   collectionPath,
   resolveActionPath,
@@ -102,29 +99,7 @@ export function SchemaActionForm({
   );
   const schemaPath = collectionPath(action.path);
 
-  // Resolve `x-clicky-lookup` fields against the live form value: fetch the
-  // referenced entity's lookup options (server-side search) and scope them by a
-  // sibling field. Undefined when the client has no lookup endpoint (the field
-  // then degrades to a free-text combobox).
-  const lookupFetcher: LookupFetcher | undefined = useMemo(() => {
-    const lookup = client.lookupFilterOptions;
-    if (!lookup) return undefined;
-    return async ({ descriptor, query, rootValue }) => {
-      const extra = resolveLookupScope(descriptor, rootValue);
-      const filter = await lookup.call(
-        client,
-        descriptor.url,
-        "GET",
-        descriptor.filter,
-        query,
-        extra,
-      );
-      return lookupOptionsToFieldOptions(filter).map((o) => ({
-        value: o.value,
-        label: o.label,
-      }));
-    };
-  }, [client]);
+  const lookupFetcher = useOperationLookupFetcher(client);
 
   const schemaQuery = useQuery<JsonSchemaObject | null>({
     queryKey: ["entity-schema", schemaPath],
