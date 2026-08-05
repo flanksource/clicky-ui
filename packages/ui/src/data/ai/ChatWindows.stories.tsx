@@ -62,6 +62,10 @@ const THREADS_SOURCE: ThreadSource = {
     threads = threads.filter((t) => t.id !== id);
     return Promise.resolve();
   },
+  rename: (id, title) => {
+    threads = threads.map((t) => (t.id === id ? { ...t, title } : t));
+    return Promise.resolve();
+  },
 };
 
 const layerProps = {

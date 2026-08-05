@@ -174,7 +174,7 @@ export function EntityExplorerApp({
       {...(resolvedRoute.kind === "surface" && resolvedRoute.surface
         ? {
             nav: (
-              <div className="flex min-w-0 items-baseline gap-density-2">
+              <div className="flex min-w-0 flex-1 items-baseline gap-density-2">
                 <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
                   {resolvedRoute.surface.title}
                 </h1>

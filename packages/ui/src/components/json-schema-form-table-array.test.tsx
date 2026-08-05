@@ -69,6 +69,38 @@ describe("JsonSchemaForm table arrays", () => {
     expect(tableHeaders()).toEqual(["Label", "Name", "Type"]);
   });
 
+  it("lets the item schema x-order override x-clicky-order for the keys it lists", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        rows: {
+          type: "array",
+          "x-layout": "table",
+          items: {
+            type: "object",
+            "x-order": ["port", "name"],
+            properties: {
+              name: { type: "string", title: "Name", "x-clicky-order": 1 },
+              port: { type: "integer", title: "Port", "x-clicky-order": 2 },
+              label: { type: "string", title: "Label", "x-clicky-order": 0 },
+            },
+          },
+        },
+      },
+    };
+
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ rows: [{}] }}
+        onChange={vi.fn()}
+      />,
+    );
+    // x-order fixes Port before Name; Label, which x-order omits, keeps its
+    // x-clicky-order position among the leftovers.
+    expect(tableHeaders()).toEqual(["Port", "Name", "Label"]);
+  });
+
   it("shows merged description and x-help from a focusable header", () => {
     const schema: JsonSchemaObject = {
       type: "object",

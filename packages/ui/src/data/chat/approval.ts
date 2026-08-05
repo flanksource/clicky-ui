@@ -66,7 +66,15 @@ export async function postToolApproval(
 }
 
 function sessionEndpoint(sessionsApi: string, sessionId: string): string {
-  return `${sessionsApi.replace(/\/+$/, "")}/${encodeURIComponent(sessionId)}`;
+  return `${stripTrailingSlashes(sessionsApi)}/${encodeURIComponent(sessionId)}`;
+}
+
+// Linear scan instead of `.replace(/\/+$/, "")`: the regex backtracks
+// polynomially on caller-supplied base URLs with many trailing slashes.
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end--;
+  return value.slice(0, end);
 }
 
 function parseSession(value: unknown): CaptainChatSession {

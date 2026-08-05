@@ -47,7 +47,42 @@ describe("ErrorWrapper", () => {
     expect(report).toEqual(expect.stringContaining("Page: http://localhost"));
     expect(report).toEqual(expect.stringContaining("React component stack:"));
     expect(
-      screen.getByRole("button", { name: "Copy error details" }),
-    ).toHaveTextContent("Copied");
+      screen.getByRole("button", { name: "Copied" }),
+    ).toBeInTheDocument();
+    expect(liveRegion(fallback)).toHaveTextContent(
+      "Error details copied to clipboard.",
+    );
+  });
+
+  it("announces a clipboard failure in the live region", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(
+      <ErrorWrapper>
+        <BrokenPage />
+      </ErrorWrapper>,
+    );
+
+    const fallback = screen.getByRole("alert");
+    expect(liveRegion(fallback)).toHaveTextContent("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+
+    await waitFor(() =>
+      expect(liveRegion(fallback)).toHaveTextContent(
+        "Clipboard access failed. Expand the error details to copy individual values.",
+      ),
+    );
   });
 });
+
+function liveRegion(fallback: HTMLElement): HTMLElement {
+  const region = fallback.querySelector<HTMLElement>('[aria-live="polite"]');
+  if (!region) throw new Error("ErrorWrapper is missing its live region");
+  return region;
+}

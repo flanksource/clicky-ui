@@ -13,7 +13,7 @@
     "build": "pnpm --filter @flanksource/clicky-ui build",
     "build:docs": "pnpm --filter docs build",
     "serve:docs": "pnpm --filter docs preview",
-    "test": "pnpm --filter storybook build && pnpm --filter kitchen-sink build && pnpm --filter playground build && pnpm --filter @flanksource/clicky-ui test && pnpm --filter playground test && pnpm --filter storybook test && pnpm --filter e2e test",
+    "test": "pnpm --filter storybook build && pnpm --filter kitchen-sink build && pnpm --filter kitchen-sink test && pnpm --filter playground build && pnpm --filter @flanksource/clicky-ui test && pnpm --filter playground test && pnpm --filter storybook test && pnpm --filter e2e test",
     "test:e2e": "pnpm --filter e2e test",
     "format": "prettier --write package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",
     "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",

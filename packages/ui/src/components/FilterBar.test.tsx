@@ -803,6 +803,90 @@ describe("FilterBar", () => {
     measurement.mockRestore();
   });
 
+  it.each([
+    { live: true, clicksToUnset: 2 },
+    { live: false, clicksToUnset: 1 },
+  ])(
+    "keeps a tri-state staged as unset after cycling from $live in the overflow dialog",
+    async ({ live, clicksToUnset }) => {
+      const onIntercompany = vi.fn();
+      const measurement = mockFilterBarWidths({
+        listWidth: () => 220,
+        itemWidths: { team: 100, owner: 100, intercompany: 100 },
+      });
+
+      render(
+        <FilterBar
+          autoSubmit={false}
+          filters={[
+            { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+            { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+            {
+              key: "intercompany",
+              kind: "tristate",
+              label: "Intercompany",
+              value: live,
+              onChange: onIntercompany,
+            },
+          ]}
+        />,
+      );
+
+      fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+      const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+      const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
+      expect(toggle().getAttribute("aria-checked")).toBe(String(live));
+
+      for (let click = 0; click < clicksToUnset; click += 1) fireEvent.click(toggle());
+
+      // The staged `undefined` must survive the staged-value lookup rather than
+      // falling back to the still-live true/false.
+      expect(toggle().getAttribute("aria-checked")).toBe("mixed");
+      expect(onIntercompany).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: /^apply$/i }));
+      expect(onIntercompany).toHaveBeenCalledWith(undefined);
+      measurement.mockRestore();
+    },
+  );
+
+  it("activates the overflow tri-state toggle when its label is clicked", async () => {
+    const onIntercompany = vi.fn();
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 220,
+      itemWidths: { team: 100, owner: 100, intercompany: 100 },
+    });
+
+    render(
+      <FilterBar
+        autoSubmit={false}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "intercompany",
+            kind: "tristate",
+            label: "Intercompany",
+            value: undefined,
+            onChange: onIntercompany,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
+    expect(toggle().id).not.toBe("");
+
+    const labelText = within(dialog).getByText("Intercompany");
+    expect(labelText.closest("label")).toHaveAttribute("for", toggle().id);
+
+    fireEvent.click(labelText);
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+    measurement.mockRestore();
+  });
+
   it("keeps wrap mode available for legacy multi-row layouts", () => {
     const filters: FilterBarFilter[] = [
       { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },

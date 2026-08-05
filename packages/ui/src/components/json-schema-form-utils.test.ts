@@ -201,7 +201,32 @@ describe("fieldInputId", () => {
     expect(fieldInputId("/asset-class")).not.toBe(fieldInputId("/asset/class"));
   });
 
+  it("keeps keys that differ only by separator character distinct", () => {
+    const ids = [
+      fieldInputId("/asset-class"),
+      fieldInputId("/asset_class"),
+      fieldInputId("/asset.class"),
+      fieldInputId("/asset/class"),
+    ];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("preserves an empty pointer token instead of dropping it", () => {
+    expect(fieldInputId("/a//b")).not.toBe(fieldInputId("/a/b"));
+    expect(fieldInputId("")).not.toBe(fieldInputId("/"));
+  });
+
+  it("keeps the prefix separable from the path", () => {
+    expect(fieldInputId("/b-c", "a")).not.toBe(fieldInputId("/c", "a-b"));
+  });
+
+  it("emits ids usable as CSS selectors", () => {
+    for (const path of ["/asset-class", "/asset.class", "/a b", "/déjà~1vu", "/a//b"]) {
+      expect(fieldInputId(path, "form-1")).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/);
+    }
+  });
+
   it("unescapes JSON pointer tokens and array indices into a usable id", () => {
-    expect(fieldInputId("/lines/0/account~1code")).toBe("jsf-lines-0-account_code");
+    expect(fieldInputId("/lines/0/account~1code")).toBe("jsf-lines-0-account_2f_code");
   });
 });

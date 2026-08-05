@@ -220,7 +220,12 @@ describe("AppShell", () => {
     expect(container.querySelector('[data-slot="app-shell-content"]')).toBeNull();
   });
 
-  it("mounts stateful responsive slots once and preserves them across viewport changes", () => {
+  // Responsive variants are CSS-driven (`hidden md:flex`), so each slot must be
+  // mounted exactly once — a second mount would fork its state and re-run its
+  // effects. This asserts the mount count and that slot state survives a
+  // re-render; it does NOT exercise a viewport change (jsdom does not
+  // re-evaluate media queries, and AppShell has no resize listener to trip).
+  it("mounts stateful responsive slots once and keeps their state on re-render", () => {
     const actionsEffect = vi.fn();
     const bodySidebarEffect = vi.fn();
     const childrenEffect = vi.fn();
@@ -243,7 +248,6 @@ describe("AppShell", () => {
     expect(childrenEffect).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId("children"));
-    fireEvent(window, new Event("resize"));
 
     expect(screen.getByTestId("children")).toHaveTextContent("children:1");
     expect(actionsEffect).toHaveBeenCalledTimes(1);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
@@ -15,6 +15,10 @@ import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./t
 // (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
 // each row into a live <TaskProgress> for that run id. Fully generic — no
 // application concepts.
+//
+// Requires a react-query QueryClientProvider in the host app (like
+// TimeseriesPanel and CacheBrowser): control actions run through useMutation,
+// and the listing is mirrored into the query cache so sibling views can read it.
 
 export interface TaskManagerProps {
   /** Base path of the clicky task API, e.g. "/api/v1". */
@@ -52,8 +56,8 @@ export function TaskManager({
   const queryClient = useQueryClient();
   const apiBase = basePath ?? "/api/v1";
   const activeKind = kind ?? (kindFilter || undefined);
-  const { runs, status } = useTaskRuns({
-    basePath,
+  const { runs, runsKey, status } = useTaskRuns({
+    basePath: apiBase,
     kind: activeKind,
     labels,
     status: statusFilter || undefined,
@@ -69,9 +73,14 @@ export function TaskManager({
     [activeKind, apiBase, labels, statusFilter],
   );
 
+  // Changing a filter re-subscribes the transport but leaves the previous
+  // listing on screen until the next SSE/poll frame. Publishing that listing
+  // under the new key would hand cache consumers rows that do not match their
+  // filters, so mirror only once the delivered listing's own key agrees.
   useEffect(() => {
+    if (!runsKey || hashKey(runsKey) !== hashKey(runsQueryKey)) return;
     queryClient.setQueryData(runsQueryKey, runs);
-  }, [queryClient, runs, runsQueryKey]);
+  }, [queryClient, runs, runsKey, runsQueryKey]);
 
   const kinds = useMemo(() => {
     const set = new Set<string>();

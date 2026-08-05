@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
 import type { RenderLink } from "../rpc/EndpointList";
@@ -9,59 +9,28 @@ import type {
   AppShellNavSection,
 } from "./AppShell";
 
-const DEFAULT_GROUP_COLLAPSE_KEY = "clicky-ui:app-shell:groups";
-
-function readGroupState(storageKey: string): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, boolean>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-interface GroupState {
+// Per-group collapsed state. Owned by AppShell (see `useGroupCollapsed` there)
+// and passed down, because AppShell renders NavSections twice — the desktop
+// rail and the mobile drawer — and per-render state behind one storage key
+// would desync: the rail stays mounted while the drawer is open, so a drawer
+// toggle would write localStorage the rail never reads back.
+export interface GroupState {
   isCollapsed: (key: string, fallback: boolean) => boolean;
   toggle: (key: string, fallback: boolean) => void;
-}
-
-function useGroupCollapsed(storageKey: string): GroupState {
-  const [state, setState] = useState<Record<string, boolean>>(() =>
-    readGroupState(storageKey),
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {
-      // Rail state is a UX nicety; private-mode storage failures are safe to swallow.
-    }
-  }, [state, storageKey]);
-  return {
-    isCollapsed: (key, fallback) => state[key] ?? fallback,
-    toggle: (key, fallback) =>
-      setState((prev) => ({ ...prev, [key]: !(prev[key] ?? fallback) })),
-  };
 }
 
 export function NavSections({
   sections,
   collapsed,
-  groupCollapsedStorageKey = DEFAULT_GROUP_COLLAPSE_KEY,
+  groupState,
   onNavigate,
 }: {
   sections: AppShellNavSection[];
   collapsed: boolean;
-  groupCollapsedStorageKey?: string;
+  groupState: GroupState;
   onNavigate?: () => void;
 }) {
   const { renderLink } = useRouter();
-  const groupState = useGroupCollapsed(groupCollapsedStorageKey);
   return (
     <nav
       className={cn(
