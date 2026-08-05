@@ -33,6 +33,14 @@ export const zIndex = {
   modalStep: 10,
   /** How far above the top modal floating content sits (below the next nest). */
   popoverOverModalOffset: 5,
+  /**
+   * Guided-tour dim/spotlight. Above every app overlay including a modal a step
+   * may point at, and below toasts. Floating content opened *during* a tour
+   * clears the dim via `useFloatingZIndex` (see ./modalStack).
+   */
+  tour: 50000,
+  /** How far above the dim the tour's own step card sits. */
+  tourCardOffset: 10,
   /** Toasts / notifications — always the topmost layer. */
   toast: 100000,
 } as const;
