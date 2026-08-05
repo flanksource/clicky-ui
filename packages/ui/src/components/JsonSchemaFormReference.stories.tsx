@@ -1,13 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 import { JsonSchemaForm } from "./JsonSchemaForm";
-import type { JsonSchemaObject } from "./json-schema-form-types";
+import type {
+  JsonSchemaObject,
+  LookupFetcher,
+} from "./json-schema-form-types";
 
 type ReferenceExampleProps = {
   title: string;
   description: string;
   schema: JsonSchemaObject;
   initialValue: Record<string, unknown>;
+  /** Serves `x-clicky-lookup` fields; omitted, they degrade to free text. */
+  lookupFetcher?: LookupFetcher;
 };
 
 function ReferenceExample({
@@ -15,6 +21,7 @@ function ReferenceExample({
   description,
   schema,
   initialValue,
+  lookupFetcher,
 }: ReferenceExampleProps) {
   const [value, setValue] = useState<Record<string, unknown>>(initialValue);
 
@@ -36,6 +43,7 @@ function ReferenceExample({
             onChange={setValue}
             idPrefix={title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}
             showPreferencesMenu={false}
+            {...(lookupFetcher ? { lookupFetcher } : {})}
           />
           <div className="space-y-1">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -419,4 +427,84 @@ export const DiscriminatorFlow: Story = {
       initialValue={{}}
     />
   ),
+};
+
+// Option labels that encode a hierarchy in their own names — the case a flat
+// dropdown of 50 entries reads badly. `hierarchy.delimiters` says which
+// characters separate levels; everything else stays an ordinary label
+// character, so `remote-debugger` is one segment rather than two.
+const HIERARCHY_OPTIONS = [
+  "http",
+  "jms",
+  "jms.all",
+  "jms.incoming",
+  "jms.incoming.disbursements",
+  "logs.api",
+  "logs.cycle",
+  "remote-debugger.jdbc",
+];
+
+const hierarchicalLookupFetcher: LookupFetcher = async ({ query }) =>
+  HIERARCHY_OPTIONS.filter((name) =>
+    name.toLowerCase().includes(query.toLowerCase()),
+  ).map((name) => ({ value: name, label: name }));
+
+const hierarchicalLookupSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    dest: {
+      type: "string",
+      title: "Destination",
+      description: "Single select: committing closes the picker.",
+      "x-clicky-lookup": {
+        url: "/api/v1/profiles",
+        filter: "profile",
+        hierarchy: { delimiters: "./" },
+      },
+    },
+    imports: {
+      type: "array",
+      title: "Imports",
+      description: "Multi select: committed values stay as chips.",
+      items: { type: "string" },
+      "x-clicky-lookup": {
+        url: "/api/v1/profiles",
+        filter: "profile",
+        multi: true,
+        hierarchy: { delimiters: "./" },
+      },
+    },
+  },
+};
+
+export const HierarchicalLookups: Story = {
+  render: () => (
+    <ReferenceExample
+      title="Hierarchical lookups"
+      description="An x-clicky-lookup whose descriptor declares `hierarchy` browses its options as a tree instead of a flat list. The committed value is always the option's own value — the split is presentation only."
+      schema={hierarchicalLookupSchema}
+      initialValue={{ imports: ["jms"] }}
+      lookupFetcher={hierarchicalLookupFetcher}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Select/ }));
+
+    // The panel is portaled to the body, so it is queried from the document.
+    const panel = await within(document.body).findByRole("tree");
+
+    // A node that is both a folder and a leaf keeps its caret, so its children
+    // stay reachable without committing it.
+    const jms = within(panel).getByText("jms").closest('[role="treeitem"]')!;
+    await userEvent.click(
+      within(jms as HTMLElement).getAllByRole("button", { name: /Expand/ })[0]!,
+    );
+    await userEvent.click(within(panel).getByText("incoming"));
+
+    // The dotted name is committed whole — "jms/incoming" is only the tree key.
+    await expect(
+      canvas.getByRole("button", { name: /jms\.incoming/ }),
+    ).toBeInTheDocument();
+  },
 };

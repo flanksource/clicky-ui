@@ -5,6 +5,7 @@ import { Combobox } from "./Combobox";
 import { DateTimePicker } from "./DateTimePicker";
 import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
 import { GridControl } from "./json-schema-form-grid";
+import { LookupTreeControl } from "./json-schema-form-lookup-tree";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption } from "./json-schema-form-types";
 import {
@@ -454,6 +455,23 @@ export function LookupControl({
     else setOptions([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeKey, onSearch]);
+
+  // A descriptor that declares a hierarchy browses its options as a tree rather
+  // than scrolling one flat list. It owns the multi-value case too, since the
+  // committed value is then an array rather than a single string.
+  if (descriptor?.hierarchy) {
+    return (
+      <LookupTreeControl
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={size}
+        options={options}
+        loading={loading}
+        hierarchy={descriptor.hierarchy}
+      />
+    );
+  }
 
   if (!descriptor || !fetcher) {
     return (

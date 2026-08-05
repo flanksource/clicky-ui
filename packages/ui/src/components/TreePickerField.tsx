@@ -27,6 +27,19 @@ export interface TreePickerFieldProps<T> {
   isSelectable?: (node: T) => boolean;
   /** Fires for a selectable node, then closes the dropdown. */
   onSelect: (node: T) => void;
+  /** Highlights the committed node inside the open tree. */
+  selected?: T | null;
+  /**
+   * Force-opens the `selected` node's ancestors so the current value is always
+   * visible when the panel opens, however deep its branch. Requires `selected`.
+   */
+  revealSelected?: boolean;
+  /** Renders the tree's expand/collapse + filter toolbar. */
+  showControls?: boolean;
+  /** Accessible name for the tree inside the panel. */
+  ariaLabel?: string;
+  /** Empty-state content when `roots` is empty. */
+  empty?: ReactNode;
   /** Current-selection display in the trigger; falls back to `placeholder`. */
   label?: ReactNode;
   placeholder?: string;
@@ -59,6 +72,11 @@ export function TreePickerField<T>({
   defaultOpen,
   isSelectable,
   onSelect,
+  selected,
+  revealSelected,
+  showControls,
+  ariaLabel,
+  empty,
   label,
   placeholder = "Select…",
   disabled,
@@ -184,6 +202,11 @@ export function TreePickerField<T>({
                 renderRow={renderRow}
                 {...(getSearchText ? { getSearchText } : {})}
                 {...(defaultOpen ? { defaultOpen } : {})}
+                {...(selected !== undefined ? { selected } : {})}
+                {...(revealSelected !== undefined ? { revealSelected } : {})}
+                {...(showControls !== undefined ? { showControls } : {})}
+                {...(ariaLabel !== undefined ? { ariaLabel } : {})}
+                {...(empty !== undefined ? { empty } : {})}
                 onSelect={(node) => {
                   if (!isSelectable || isSelectable(node)) {
                     onSelect(node);
