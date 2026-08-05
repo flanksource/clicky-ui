@@ -76,6 +76,33 @@ describe("Captain chat sessions", () => {
     );
   });
 
+  it.each([
+    { sessionsApi: "/api/chat/sessions", endpoint: "/api/chat/sessions/s-1" },
+    { sessionsApi: "/api/chat/sessions/", endpoint: "/api/chat/sessions/s-1" },
+    {
+      sessionsApi: "/api/chat/sessions////",
+      endpoint: "/api/chat/sessions/s-1",
+    },
+    { sessionsApi: "////", endpoint: "/s-1" },
+    { sessionsApi: "", endpoint: "/s-1" },
+  ])(
+    "strips trailing slashes from $sessionsApi without a backtracking regex",
+    async ({ sessionsApi, endpoint }) => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(session), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await getChatSession(sessionsApi, "s-1", fetchMock);
+
+      expect(fetchMock).toHaveBeenCalledWith(endpoint, {
+        headers: { Accept: "application/json" },
+      });
+    },
+  );
+
   it("fails loudly without a session", async () => {
     await expect(
       postToolApproval(

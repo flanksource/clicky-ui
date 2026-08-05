@@ -38,11 +38,13 @@ export function TableArray({
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
-  const columns = orderByClickyOrder(
-    orderByXOrder(
-      Object.entries(itemSchema.properties ?? {}),
-      itemSchema["x-order"],
-    ),
+  // The item schema's explicit `x-order` is the authority for the keys it names:
+  // per-property `x-clicky-order` sorts first (so it still orders everything
+  // `x-order` leaves out, and composes across merged sources), then `x-order`
+  // pulls its listed columns to the front in its own sequence.
+  const columns = orderByXOrder(
+    orderByClickyOrder(Object.entries(itemSchema.properties ?? {})),
+    itemSchema["x-order"],
   );
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
 

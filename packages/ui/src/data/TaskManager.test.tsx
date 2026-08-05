@@ -180,6 +180,56 @@ describe("TaskManager selection", () => {
     });
   });
 
+  it("does not publish the previous listing under a newly-filtered cache key", async () => {
+    const eventSources: { url: string; emit: (type: string, data: unknown) => void }[] = [];
+    class TestEventSource {
+      private readonly listeners = new Map<string, (event: MessageEvent<string>) => void>();
+      readonly close = vi.fn();
+      onerror: (() => void) | null = null;
+
+      constructor(readonly url: string) {
+        eventSources.push(this);
+      }
+
+      addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+        this.listeners.set(type, listener as (event: MessageEvent<string>) => void);
+      }
+
+      emit(type: string, data: unknown) {
+        this.listeners.get(type)?.({ data: JSON.stringify(data) } as MessageEvent<string>);
+      }
+    }
+    vi.stubGlobal("EventSource", TestEventSource);
+    const client = createClient();
+
+    renderManager(client, <TaskManager basePath="/api/v1" kind="sql-fix" />);
+    act(() => eventSources[0]?.emit("runs", [RUN]));
+    await screen.findByText("fix-run");
+
+    const unfiltered = taskQueryKeys.runs({ basePath: "/api/v1", kind: "sql-fix" });
+    const failedOnly = taskQueryKeys.runs({
+      basePath: "/api/v1",
+      kind: "sql-fix",
+      status: "failed",
+    });
+    expect(client.getQueryData(unfiltered)).toEqual([RUN]);
+
+    // Narrow to status=failed. The transport re-subscribes, but the warning run
+    // stays on screen until the new stream delivers — it must not be cached as
+    // if it were the failed-only result.
+    fireEvent.change(screen.getByDisplayValue("Any status"), { target: { value: "failed" } });
+    await waitFor(() => {
+      expect(eventSources.map((source) => source.url)).toContain(
+        "/api/v1/tasks/runs/stream?kind=sql-fix&status=failed",
+      );
+    });
+    expect(client.getQueryData(failedOnly)).toBeUndefined();
+
+    // Once the new subscription delivers, its own result is published.
+    act(() => eventSources[1]?.emit("runs", []));
+    await waitFor(() => expect(client.getQueryData(failedOnly)).toEqual([]));
+  });
+
   it("coalesces matching controls and invalidates only their SSE-backed caches", async () => {
     const client = createClient();
     const runsKey = taskQueryKeys.runs({ basePath: "/api/v1" });

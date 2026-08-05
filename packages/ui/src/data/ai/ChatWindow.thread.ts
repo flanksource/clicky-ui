@@ -71,11 +71,15 @@ export function useChatThreadSetup({
   };
 }
 
+// The thread is created before its first message, so it has nothing to be named
+// after yet. The backend names it from that message (or the model names it), and
+// an unnamed thread reads as "New Chat" until then — a placeholder title here
+// would look like one the user chose and stop the real name from landing.
 async function createHTTPThread(api: string): Promise<ThreadSummary> {
   const response = await fetch(api, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "New conversation" }),
+    body: "{}",
   });
   if (!response.ok) {
     throw new Error(

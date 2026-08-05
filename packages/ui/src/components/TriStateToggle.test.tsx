@@ -53,6 +53,29 @@ describe("TriStateToggle", () => {
     );
   });
 
+  it("lets an external label target the toggle by id", () => {
+    const onChange = vi.fn();
+    render(
+      <>
+        <label htmlFor="intercompany-toggle">Intercompany</label>
+        <TriStateToggle
+          id="intercompany-toggle"
+          value={undefined}
+          label="Intercompany"
+          onChange={onChange}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Intercompany" })).toHaveAttribute(
+      "id",
+      "intercompany-toggle",
+    );
+
+    fireEvent.click(screen.getByText("Intercompany"));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
   it("does not fire while disabled", () => {
     const onChange = vi.fn();
     render(<TriStateToggle value={undefined} label="Intercompany" disabled onChange={onChange} />);

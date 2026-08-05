@@ -12,6 +12,7 @@ import {
 } from "../data/diagnostics/error-diagnostics";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiCopy, UiWarningTriangle } from "../icons";
+import { cn } from "../lib/utils";
 import { Button } from "./button";
 
 export type ErrorWrapperProps = {
@@ -55,6 +56,16 @@ export class ErrorWrapper extends Component<
   }
 }
 
+type CopyState = "idle" | "copied" | "failed";
+
+function copyStatusMessage(copyState: CopyState): string {
+  if (copyState === "copied") return "Error details copied to clipboard.";
+  if (copyState === "failed") {
+    return "Clipboard access failed. Expand the error details to copy individual values.";
+  }
+  return "";
+}
+
 function ErrorFallback({
   error,
   componentStack,
@@ -62,9 +73,7 @@ function ErrorFallback({
   error: Error;
   componentStack: string | null;
 }) {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
-    "idle",
-  );
+  const [copyState, setCopyState] = useState<CopyState>("idle");
   const diagnostics = useMemo(
     () => errorDiagnostics(error, componentStack),
     [componentStack, error],
@@ -115,16 +124,21 @@ function ErrorFallback({
           <Button
             type="button"
             variant="outline"
-            aria-label="Copy error details"
             onClick={() => void copyDetails()}
           >
             <Icon icon={copyState === "copied" ? UiCheck : UiCopy} />
             {copyState === "copied" ? "Copied" : "Copy error details"}
           </Button>
-          <span aria-live="polite" className="text-xs text-destructive">
-            {copyState === "failed"
-              ? "Clipboard access failed. Expand the error details to copy individual values."
-              : ""}
+          <span
+            aria-live="polite"
+            className={cn(
+              "text-xs",
+              copyState === "failed"
+                ? "text-destructive"
+                : "text-muted-foreground",
+            )}
+          >
+            {copyStatusMessage(copyState)}
           </span>
         </div>
 

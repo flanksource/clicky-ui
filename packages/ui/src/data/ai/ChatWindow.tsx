@@ -94,6 +94,7 @@ export function ChatWindow({
     chat?.permissionMode ?? storedPrefs.permissionMode ?? "default",
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
+  const [titleRefresh, setTitleRefresh] = useState(0);
   // Only the modes the user picked in the popover are stored. Everything else
   // is derived, so a surface's declared defaults still reach tools the user has
   // never touched (see effectiveToolPreferences).
@@ -258,6 +259,9 @@ export function ChatWindow({
   const handleUsage = useCallback(
     (snapshot: ChatUsageSummary) => {
       setUsage(snapshot);
+      // A settled turn is also when the backend has named the conversation, so
+      // this is what refreshes the picker's label.
+      setTitleRefresh((value) => value + 1);
       chat?.onUsage?.(snapshot);
     },
     [chat],
@@ -277,6 +281,7 @@ export function ChatWindow({
           threadId={panel.threadId}
           onSelect={(tid) => updatePanel(panel.id, { threadId: tid })}
           onNew={() => updatePanel(panel.id, { threadId: null })}
+          refreshToken={titleRefresh}
           {...(threadsSource
             ? { source: threadsSource }
             : sessionsApi !== null

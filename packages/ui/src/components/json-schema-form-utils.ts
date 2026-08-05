@@ -16,21 +16,34 @@ export function inputClass(size: FormSize): string {
   return cn(INPUT_BASE, inputSizeClass[size]);
 }
 
+// encodeIdPart escapes one path token (or the id prefix) injectively: every
+// character outside [A-Za-z0-9] becomes `_<hex char code>_`, and the empty token
+// — a legal JSON Schema property name — becomes a lone `_`. The escape is
+// self-delimiting (it always starts and ends with `_`, and a literal `_` escapes
+// to `_5f_`), so distinct tokens can never share an encoding and `-` stays free
+// as a segment separator. Percent-encoding was rejected because `%` in an id,
+// while legal HTML, has to be escaped again inside a `#id` CSS selector; this
+// alphabet ([A-Za-z0-9_-]) is safe as-is for `document.querySelector`.
+function encodeIdPart(value: string): string {
+  if (value === "") return "_";
+  return value.replace(/[^A-Za-z0-9]/g, (char) => `_${char.charCodeAt(0).toString(16)}_`);
+}
+
 // fieldInputId derives a control's DOM id from its JSON-pointer instance path,
 // not from its leaf key: a schema that repeats a property name under two parents
 // (e.g. /journalLine1/asset and /journalLine2/asset) must not produce the same
-// id, or every `label[for]` binds to the first control. Path segments join with
-// "-" and any other separator inside a segment collapses to "_", so "/a-b" and
-// "/a/b" stay distinct.
+// id, or every `label[for]` binds to the first control. Each decoded pointer
+// token is escaped with encodeIdPart and joined with "-", so distinct paths
+// always produce distinct ids: "/asset-class", "/asset_class", "/asset.class"
+// and "/asset/class" are four different ids, and an empty token is preserved
+// ("/a//b" ≠ "/a/b"). The prefix is escaped the same way, so prefix "a" + "/b-c"
+// cannot collide with prefix "a-b" + "/c".
 export function fieldInputId(instancePath: string, prefix?: string): string {
-  const safe = instancePath
-    .split("/")
-    .filter(Boolean)
-    .map((token) =>
-      token.replaceAll("~1", "/").replaceAll("~0", "~").replace(/[^a-zA-Z0-9_]/g, "_"),
-    )
+  const tokens = instancePath === "" ? [] : instancePath.replace(/^\//, "").split("/");
+  const safe = tokens
+    .map((token) => encodeIdPart(token.replaceAll("~1", "/").replaceAll("~0", "~")))
     .join("-");
-  return prefix ? `jsf-${prefix}-${safe}` : `jsf-${safe}`;
+  return prefix ? `jsf-${encodeIdPart(prefix)}-${safe}` : `jsf-${safe}`;
 }
 
 // fieldErrorId names the element that holds a field's validation messages, so a

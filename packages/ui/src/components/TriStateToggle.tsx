@@ -27,6 +27,8 @@ export type TriStateToggleProps = {
   label: string;
   /** Per-state wording used in the tooltip and accessible description. */
   labels?: TriStateLabels;
+  /** DOM id of the toggle button, so an external `<label htmlFor>` can target it. */
+  id?: string;
   size?: "sm" | "md";
   disabled?: boolean;
   className?: string;
@@ -49,6 +51,7 @@ export function TriStateToggle({
   onChange,
   label,
   labels,
+  id,
   size = "sm",
   disabled,
   className,
@@ -66,6 +69,7 @@ export function TriStateToggle({
   return (
     <button
       type="button"
+      {...(id !== undefined ? { id } : {})}
       // A tri-state checkbox is the ARIA shape for on/off/unset; "mixed" is the
       // unset state, so screen readers announce it instead of a bare button.
       role="checkbox"

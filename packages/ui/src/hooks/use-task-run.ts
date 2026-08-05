@@ -4,6 +4,7 @@ import {
   type TaskRunMeta,
   type TaskSnapshot,
 } from "../data/TaskSnapshot";
+import { taskQueryKeys } from "../data/task-query-keys";
 
 // use-task-run / use-task-runs are the generic clicky-ui task clients. They are
 // SSE-first: they subscribe to clicky's SSEHandler (event: task / event: done)
@@ -177,9 +178,21 @@ export interface UseTaskRunsOptions extends TaskTransportOptions {
   labels?: Record<string, string> | undefined;
 }
 
+/** The identity of the listing request that produced a given `runs` array. */
+export type TaskRunsKey = ReturnType<typeof taskQueryKeys.runs>;
+
 export interface UseTaskRunsResult {
   runs: TaskRunMeta[];
   status: string;
+  /**
+   * Query key of the request that actually produced `runs`, or null before the
+   * first frame arrives. Changing `kind`/`status`/`labels` re-subscribes but
+   * keeps the previous listing on screen until the new transport delivers, so
+   * this key lags `taskQueryKeys.runs(options)` during that window. A consumer
+   * mirroring `runs` into a cache must compare the two and skip the write while
+   * they differ, or it publishes rows that do not match the requested filters.
+   */
+  runsKey: TaskRunsKey | null;
 }
 
 // useTaskRuns lists all runs (TaskRunMeta) for the manager view. It is SSE-first:
@@ -198,7 +211,12 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     forcePoll = false,
   } = options;
 
-  const [runs, setRuns] = useState<TaskRunMeta[]>([]);
+  // Runs are stored together with the key of the request that delivered them, so
+  // a stale listing can never be mistaken for the current filters' result.
+  const [received, setReceived] = useState<{
+    key: TaskRunsKey | null;
+    runs: TaskRunMeta[];
+  }>({ key: null, runs: [] });
   const [status, setStatus] = useState("idle");
 
   useEffect(() => {
@@ -209,6 +227,8 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     if (statusFilter) params.set("status", statusFilter);
     for (const [k, v] of Object.entries(labels ?? {})) params.append("label", `${k}=${v}`);
     const query = params.toString();
+    const requestKey = taskQueryKeys.runs({ basePath, kind, status: statusFilter, labels });
+    const receive = (next: TaskRunMeta[]) => setReceived({ key: requestKey, runs: next });
 
     // Polling fallback transport.
     if (forcePoll || !hasEventSource()) {
@@ -220,7 +240,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
             headers: { Accept: "application/json" },
           });
           if (res.ok) {
-            setRuns((await res.json()) as TaskRunMeta[]);
+            receive((await res.json()) as TaskRunMeta[]);
             setStatus("polling");
           }
         } catch {
@@ -240,7 +260,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     setStatus("connected");
     es.addEventListener("runs", (e) => {
       try {
-        setRuns(JSON.parse((e as MessageEvent).data) as TaskRunMeta[]);
+        receive(JSON.parse((e as MessageEvent).data) as TaskRunMeta[]);
       } catch {
         /* ignore malformed frame */
       }
@@ -249,5 +269,5 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     return () => es.close();
   }, [kind, statusFilter, JSON.stringify(labels ?? {}), basePath, enabled, pollMs, forcePoll]);
 
-  return { runs, status };
+  return { runs: received.runs, status, runsKey: received.key };
 }

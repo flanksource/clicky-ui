@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
-import { UiComment, UiAdd, UiTrash, UiChevronDown } from "../../icons";
+import {
+  UiComment,
+  UiAdd,
+  UiTrash,
+  UiChevronDown,
+  UiPencilSimpleLine,
+} from "../../icons";
 
 /** One conversation as returned by the sessions endpoint. Only `id` is required;
  *  `title`/cost are rendered when present so the picker works against minimal
@@ -24,6 +30,8 @@ export interface ThreadSource {
   create?: () => Promise<ThreadSummary>;
   /** Deletes a conversation. Omit to hide the delete affordance's effect. */
   remove?: (id: string) => Promise<void>;
+  /** Renames a conversation. Omit to hide the rename affordance. */
+  rename?: (id: string, title: string) => Promise<void>;
 }
 
 export type ThreadPickerProps = {
@@ -31,13 +39,17 @@ export type ThreadPickerProps = {
   threadId: string | null;
   onSelect: (threadId: string) => void;
   onNew: () => void;
-  /** Base endpoint for session CRUD. GET lists, `${api}/${id}` DELETE removes.
-   *  Defaults to Captain's "/api/chat/sessions". Ignored when `source` is set. */
+  /** Base endpoint for session CRUD. GET lists, `${api}/${id}` DELETE removes
+   *  and PATCH renames. Defaults to Captain's "/api/chat/sessions". Ignored when
+   *  `source` is set. */
   api?: string;
-  /** Inject the thread list/delete directly instead of fetching `api`. */
+  /** Inject the thread list/delete/rename directly instead of fetching `api`. */
   source?: ThreadSource;
   /** Optional query string appended to the list request (e.g. a scope id). */
   query?: string;
+  /** Changing this refetches the list, so a title the backend derived during a
+   *  turn appears without reopening the menu. */
+  refreshToken?: number;
   className?: string;
 };
 
@@ -51,10 +63,13 @@ export function ThreadPicker({
   api = "/api/chat/sessions",
   source,
   query,
+  refreshToken,
   className = "",
 }: ThreadPickerProps) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; title: string }>();
+  const canRename = source ? Boolean(source.rename) : Boolean(api);
 
   const listUrl = query ? `${api}?${query}` : api;
 
@@ -76,7 +91,36 @@ export function ThreadPicker({
 
   useEffect(() => {
     void fetchThreads();
-  }, [fetchThreads]);
+  }, [fetchThreads, refreshToken]);
+
+  const commitRename = useCallback(async () => {
+    if (!renaming) return;
+    const { id, title } = renaming;
+    setRenaming(undefined);
+    const trimmed = title.trim();
+    const previous = threads.find((t) => t.id === id)?.title ?? null;
+    if (!trimmed || trimmed === previous) return;
+    setThreads((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)),
+    );
+    try {
+      if (source) {
+        await source.rename?.(id, trimmed);
+      } else {
+        const res = await fetch(`${api}/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: trimmed }),
+        });
+        if (!res.ok) throw new Error(`rename failed with status ${res.status}`);
+      }
+    } catch (err) {
+      console.warn("clicky-ui: failed to rename thread", err);
+      setThreads((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, title: previous } : t)),
+      );
+    }
+  }, [api, renaming, source, threads]);
 
   const handleDelete = useCallback(
     async (id: string, e: React.MouseEvent) => {
@@ -163,11 +207,43 @@ export function ThreadPicker({
               }}
             >
               <Icon icon={UiComment} className="size-3 shrink-0" />
-              <span className="flex-1 truncate">{t.title || "Untitled"}</span>
+              {renaming?.id === t.id ? (
+                <input
+                  autoFocus
+                  aria-label="Conversation title"
+                  className="flex-1 rounded border border-border bg-background px-1 py-0.5 text-xs"
+                  value={renaming.title}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) =>
+                    setRenaming({ id: t.id, title: e.target.value })
+                  }
+                  onBlur={() => setRenaming(undefined)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter") void commitRename();
+                    if (e.key === "Escape") setRenaming(undefined);
+                  }}
+                />
+              ) : (
+                <span className="flex-1 truncate">{t.title || "Untitled"}</span>
+              )}
               {t.totalCostUsd != null && t.totalCostUsd > 0 && (
                 <span className="shrink-0 text-[10px] text-muted-foreground">
                   ${t.totalCostUsd.toFixed(2)}
                 </span>
+              )}
+              {canRename && renaming?.id !== t.id && (
+                <button
+                  type="button"
+                  aria-label="Rename conversation"
+                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground group-hover/thread:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRenaming({ id: t.id, title: t.title ?? "" });
+                  }}
+                >
+                  <Icon icon={UiPencilSimpleLine} className="size-3" />
+                </button>
               )}
               <button
                 type="button"

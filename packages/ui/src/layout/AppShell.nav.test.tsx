@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AppShell, type AppShellNavGroup } from "./AppShell";
 
@@ -105,6 +105,41 @@ describe("AppShell nested nav groups", () => {
       expect(document.querySelector(`a[href="${name}"]`)).toBeTruthy();
     }
     expect(screen.queryByRole("button", { name: /Collapse jms/ })).toBeNull();
+  });
+
+  // The rail stays mounted (`hidden md:flex`) while the drawer is open, so both
+  // NavSections renders are live at once. Group collapse state is owned by
+  // AppShell, not by each NavSections, or a toggle in one would leave the other
+  // stale (and the two would race each other through localStorage).
+  it("shares group collapse state between the rail and the mobile drawer", () => {
+    const { container } = render(
+      <AppShell
+        brand={<span>Brand</span>}
+        navSections={[{ label: "Profiles", groups: [jmsGroup()] }]}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Navigation" }));
+    const rail = container.querySelector<HTMLElement>(
+      '[data-slot="app-shell-sidebar"]',
+    );
+    if (!rail) throw new Error("expected the desktop rail to stay mounted");
+    const drawer = screen.getByRole("dialog", { name: "Navigation" });
+
+    expect(within(rail).getByRole("link", { name: "all" })).toBeTruthy();
+    expect(within(drawer).getByRole("link", { name: "all" })).toBeTruthy();
+
+    fireEvent.click(
+      within(drawer).getByRole("button", { name: /Collapse jms$/ }),
+    );
+
+    expect(within(drawer).queryByRole("link", { name: "all" })).toBeNull();
+    expect(within(rail).queryByRole("link", { name: "all" })).toBeNull();
+    expect(
+      within(rail).getByRole("button", { name: /Expand jms$/ }),
+    ).toBeTruthy();
   });
 
   it("still renders a plain group with no item as a single heading button", () => {

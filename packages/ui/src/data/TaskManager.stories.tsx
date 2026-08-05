@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Decorator } from "@storybook/react-vite";
 import { TaskManager } from "./TaskManager";
 import type { TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
@@ -95,6 +96,23 @@ class FakeEventSource {
   }
 }
 
+// TaskManager mirrors its listing into the react-query cache and issues control
+// actions through useMutation, so it requires a QueryClientProvider from its
+// host. Stories are that host.
+const withQueryClient: Decorator = (Story) => {
+  const [client] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      }),
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <Story />
+    </QueryClientProvider>
+  );
+};
+
 const withFakeStream: Decorator = (Story) => {
   // Patch synchronously during render so the component's EventSource (created in
   // its own effect, after this parent renders) resolves to the fake.
@@ -115,7 +133,7 @@ const withFakeStream: Decorator = (Story) => {
 const meta: Meta<typeof TaskManager> = {
   title: "Data/TaskManager",
   component: TaskManager,
-  decorators: [withFakeStream],
+  decorators: [withFakeStream, withQueryClient],
   parameters: {
     docs: {
       description: {

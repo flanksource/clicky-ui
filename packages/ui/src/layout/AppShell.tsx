@@ -5,7 +5,7 @@ import { UiClose, UiMenu, UiSidebar } from "../icons";
 import { useEscapeLayer } from "../overlay/modalStack";
 import { SplitPane } from "./SplitPane";
 import { AppShellSlotOutlines } from "./AppShell.debug";
-import { NavSections } from "./AppShell.nav";
+import { NavSections, type GroupState } from "./AppShell.nav";
 import {
   contentWidthClassName,
   type ContentWidth,
@@ -164,6 +164,43 @@ function readStored(key: string | undefined): string | null {
   return window.localStorage.getItem(key);
 }
 
+const DEFAULT_GROUP_COLLAPSE_KEY = "clicky-ui:app-shell:groups";
+
+function readGroupState(storageKey: string): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, boolean>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+// Lives here rather than in AppShell.nav so a single instance can be shared by
+// both NavSections renders (rail + mobile drawer).
+function useGroupCollapsed(storageKey: string): GroupState {
+  const [state, setState] = useState<Record<string, boolean>>(() =>
+    readGroupState(storageKey),
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // Rail state is a UX nicety; private-mode storage failures are safe to swallow.
+    }
+  }, [state, storageKey]);
+  return {
+    isCollapsed: (key, fallback) => state[key] ?? fallback,
+    toggle: (key, fallback) =>
+      setState((prev) => ({ ...prev, [key]: !(prev[key] ?? fallback) })),
+  };
+}
+
 export function AppShell(props: AppShellProps) {
   const {
     brand,
@@ -215,6 +252,12 @@ export function AppShell(props: AppShellProps) {
 
   useEscapeLayer(mobileSidebarOpen, () => setMobileSidebarOpen(false));
 
+  // One instance for the rail AND the mobile drawer: both render NavSections,
+  // and per-render state behind a shared storage key would desync.
+  const groupState = useGroupCollapsed(
+    groupCollapsedStorageKey ?? DEFAULT_GROUP_COLLAPSE_KEY,
+  );
+
   const railWidth = collapsed ? collapsedWidth : sidebarWidth;
   const hasTopBar =
     (!hasSidebar && brand !== undefined) ||
@@ -236,7 +279,7 @@ export function AppShell(props: AppShellProps) {
             <NavSections
               sections={navSections}
               collapsed={collapsedValue}
-              {...(groupCollapsedStorageKey ? { groupCollapsedStorageKey } : {})}
+              groupState={groupState}
               {...(onNavigate ? { onNavigate } : {})}
             />
           );
@@ -346,7 +389,7 @@ export function AppShell(props: AppShellProps) {
                 <div
                   data-slot="app-shell-nav"
                   className={cn(
-                    "flex shrink-0 items-center",
+                    "flex min-w-0 items-center",
                     hasSidebar &&
                       "order-3 basis-full overflow-x-auto md:order-none md:basis-auto md:overflow-visible",
                   )}

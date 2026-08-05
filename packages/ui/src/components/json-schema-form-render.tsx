@@ -139,7 +139,7 @@ function buildField(
   fieldId: string;
   label: ReactNode;
   value: ReactNode;
-  errors: JsonSchemaFormError[];
+  messages: JsonSchemaFormError[];
   help: HelpDisplay;
 } | null {
   const base = resolveControl(args);
@@ -163,9 +163,17 @@ function buildField(
   const fieldId = fieldInputId(instancePath, ctx.idPrefix);
   // Resolve this field's errors before rendering its control, so the control can
   // carry aria-invalid / aria-describedby rather than leaving the error text
-  // visually adjacent but programmatically unassociated.
+  // visually adjacent but programmatically unassociated. Host-supplied errors
+  // and the locally-derived soft hint (e.g. "Required" on an empty required
+  // field) are one validation state: either one marks the field invalid and is
+  // rendered into the aria-describedby target, so a locally-invalid field is
+  // never invalid only to sighted users. softError reads value/required/kind —
+  // never `invalid` — so deriving it from `field` here is not circular.
   const errors = errorsAtInstancePath(ctx.errors, instancePath);
-  if (errors.length > 0) field = { ...field, invalid: true };
+  const soft = errors.length === 0 ? softError(field) : undefined;
+  const messages: JsonSchemaFormError[] =
+    errors.length > 0 ? errors : soft ? [{ instancePath, message: soft }] : [];
+  if (messages.length > 0) field = { ...field, invalid: true };
   // A field's own x-help-display wins over the form-level setting; both default
   // to the permanent paragraph every form renders today.
   const help = field.helpDisplay ?? ctx.layout.help ?? "inline";
@@ -193,7 +201,7 @@ function buildField(
     ctx.post,
     postCtx,
   ));
-  return { field, fieldId, label, value, errors, help };
+  return { field, fieldId, label, value, messages, help };
 }
 
 // renderFieldNodes runs the full pipeline and returns the raw {label, value}
@@ -208,10 +216,10 @@ export function renderFieldNodes(
   return {
     label: built.label,
     value:
-      built.errors.length > 0 ? (
+      built.messages.length > 0 ? (
         <div className="flex min-w-0 flex-col gap-0.5">
           {built.value}
-          <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.errors} />
+          <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.messages} />
         </div>
       ) : (
         built.value
@@ -256,7 +264,7 @@ export function renderFieldRow(
       >
         <FieldErrorText
           id={fieldErrorId(built.fieldId)}
-          errors={built.errors}
+          errors={built.messages}
           className="min-w-0 break-words"
         />
         {built.value}
@@ -288,12 +296,12 @@ export function renderFieldRow(
   ) : (
     built.label
   );
+  // One rendering path for both sources, so the soft hint lands in the same
+  // fieldErrorId element the control's aria-describedby already points at.
   const err =
-    built.errors.length > 0 ? (
-      <FieldErrorMessages id={fieldErrorId(built.fieldId)} errors={built.errors} />
-    ) : (
-      softError(field)
-    );
+    built.messages.length > 0 ? (
+      <FieldErrorMessages id={fieldErrorId(built.fieldId)} errors={built.messages} />
+    ) : undefined;
   return (
     <FieldWrapper
       layout={ctx.layout}

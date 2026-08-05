@@ -713,7 +713,11 @@ function OverflowFiltersMenu({
   const stagedFilters = filters.map((filter) =>
     filterWithStagedValue(
       filter,
-      stagedValues[filter.key] ?? filterBarFilterValue(filter),
+      // Key presence, not `??`: a tri-state cycled to unset stages `undefined`,
+      // which must render as unset instead of falling back to the live value.
+      Object.hasOwn(stagedValues, filter.key)
+        ? stagedValues[filter.key]
+        : filterBarFilterValue(filter),
       (next) =>
         setStagedValues((current) => ({
           ...current,
@@ -1037,6 +1041,7 @@ function TriStateFilterValueControl({ filter }: { filter: FilterBarTriStateFilte
   return (
     <div className="flex h-8 items-center">
       <TriStateToggle
+        id={filterInputId(filter)}
         value={filter.value}
         onChange={filter.onChange}
         label={filter.label}

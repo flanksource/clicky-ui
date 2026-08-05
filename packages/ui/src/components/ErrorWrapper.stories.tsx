@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within } from "storybook/test";
 import { ErrorWrapper } from "./ErrorWrapper";
 
 const STORY_ERROR = new Error("The dashboard request failed with HTTP 502", {
@@ -42,4 +43,11 @@ export const Default: Story = {
       <BrokenDashboard />
     </ErrorWrapper>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("alert")).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("heading", { name: "Something went wrong" }),
+    ).toBeInTheDocument();
+  },
 };

@@ -76,6 +76,24 @@ describe("JsonSchemaForm authoritative errors", () => {
     );
   });
 
+  it("announces a locally-derived Required hint through aria-invalid and aria-describedby", () => {
+    renderForm(
+      {
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", title: "Name" } },
+      },
+      { name: "" },
+      []
+    );
+
+    const input = screen.getByRole("textbox", { name: /^Name/ });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBe(`${input.id}-error`);
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Required");
+  });
+
   it("leaves a valid field free of aria-invalid while still marking it required", () => {
     renderForm(
       {
