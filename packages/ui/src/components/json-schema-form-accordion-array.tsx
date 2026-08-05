@@ -62,7 +62,18 @@ export function AccordionArray({
   const itemSchema = field.itemSchema ?? { type: "object" };
   const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
   const emptyCopy = emptyItemsCopy(spec, field.schema);
-  const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
+  // The array's help mode governs its whole subtree. Without this the fields
+  // inside an expanded row keep the form-level default, so an accordion that
+  // resolved to "hover" would still stack a two-line paragraph under every
+  // control — the exact height the summary rows exist to reclaim.
+  const childCtx: RenderContext = {
+    ...ctx,
+    readOnly,
+    depth: ctx.depth + 1,
+    ...(field.helpDisplay
+      ? { layout: { ...ctx.layout, help: field.helpDisplay } }
+      : {}),
+  };
 
   // Which row is open is transient view state, like the form's field filter —
   // it is deliberately local and never persisted. The INDEX is the key, not the
