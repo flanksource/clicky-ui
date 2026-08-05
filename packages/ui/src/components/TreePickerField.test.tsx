@@ -120,4 +120,49 @@ describe("TreePickerField", () => {
     expect(popup!.style.width).toBe("max-content");
     expect(popup!.style.maxWidth).toBe("480px");
   });
+
+  // The picker used to drop these on the floor, so an open panel could neither
+  // show which value was committed nor reveal it under a collapsed branch.
+  it("marks the selected node inside the panel", () => {
+    renderField({ selected: ROOTS[0]!.children![0]!, revealSelected: true });
+    fireEvent.click(screen.getByRole("button"));
+    expect(panel()!.querySelector('[aria-selected="true"]')).toHaveTextContent(
+      "P1",
+    );
+  });
+
+  it("reveals the selected node's ancestors even though they default closed", () => {
+    // defaultOpen returns false for every node, so the committed value would
+    // otherwise sit invisible behind its collapsed parent every time the panel
+    // opens.
+    const { unmount } = render(
+      <TreePickerField<Node>
+        roots={ROOTS}
+        getKey={(n) => n.id}
+        getChildren={(n) => n.children}
+        renderRow={({ node }) => <span>{node.label}</span>}
+        defaultOpen={() => false}
+        onSelect={vi.fn()}
+        selected={ROOTS[0]!.children![1]!}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button"));
+    expect(panel()!.textContent).not.toContain("P2");
+    unmount();
+
+    renderField({ selected: ROOTS[0]!.children![1]!, revealSelected: true });
+    fireEvent.click(screen.getByRole("button"));
+    expect(panel()!.textContent).toContain("P2");
+  });
+
+  it("passes the accessible name and control visibility through to the tree", () => {
+    renderField({ ariaLabel: "Destination profile", showControls: false });
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+    expect(
+      screen.getByRole("tree", { name: "Destination profile" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Expand all/i }),
+    ).not.toBeInTheDocument();
+  });
 });

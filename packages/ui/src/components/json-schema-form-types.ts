@@ -438,6 +438,19 @@ export interface LookupDescriptor {
   // Optional scoping: derive an extra query param from a sibling form field so the
   // lookup is filtered by it (e.g. a connection picker scoped to the provider type).
   scope?: LookupScope;
+  // Optional hierarchy: renders the options as a browsable tree instead of a flat
+  // list, splitting each option's label on any character in `delimiters` (e.g.
+  // "./" turns "jms.incoming" into jms › incoming). Purely presentational — the
+  // committed value is still the option's value, unsplit.
+  hierarchy?: LookupHierarchy;
+}
+
+// LookupHierarchy declares how an option label encodes a hierarchy, so the
+// picker can browse it rather than scroll a long flat list.
+export interface LookupHierarchy {
+  // Characters that separate one level from the next. Every other character is
+  // an ordinary label character — declaring "." leaves "remote-debugger" whole.
+  delimiters: string;
 }
 
 // LookupScope derives an extra query param for a lookup from a sibling field, so
