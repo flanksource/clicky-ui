@@ -1,6 +1,6 @@
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 
-// The selection a runtime control edits is exactly the wire value a catalog row
+// A runtime control edits exactly the wire value a catalog row
 // carries (`reconcileModelCapabilities` copies one onto the other), so it stays
 // one declaration — a field added to the catalog shape cannot drift out of the
 // editable shape.

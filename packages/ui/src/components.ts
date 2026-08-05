@@ -16,6 +16,11 @@ export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
 export {
+  JSONPathField,
+  type JSONPathFieldProps,
+  type JSONPathNode,
+} from "./components/JSONPathField";
+export {
   SegmentedControl,
   type SegmentedControlProps,
   type SegmentedOption,
@@ -115,6 +120,7 @@ export {
 export {
   TreePickerField,
   type TreePickerFieldProps,
+  type TreePickerTriggerProps,
 } from "./components/TreePickerField";
 export {
   WorkloadPicker,
@@ -220,6 +226,10 @@ export {
 } from "./components/json-schema-form-resolve";
 export { rehydrateRefs } from "./components/json-schema-form-refs";
 export { templateValuePre } from "./components/json-schema-form-template";
+export {
+  applyPostExtensions,
+  type FieldNodes,
+} from "./components/json-schema-form-extensions";
 export type {
   TemplateValueOptions,
   TemplateToken,
@@ -236,8 +246,17 @@ export type {
   FieldControlKind,
   FieldOption,
   EnumDisplay,
+  ArrayDisplay,
+  ArrayItemSpec,
+  ArrayItemSummary,
+  ArrayItemSummaryPart,
+  FieldTone,
+  GridColumns,
+  HelpDisplay,
   PreExtension,
+  PreExtensionContext,
   PostExtension,
+  PostExtensionContext,
   LookupDescriptor,
   LookupScope,
   LookupFetcher,

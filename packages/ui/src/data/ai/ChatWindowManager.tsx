@@ -82,6 +82,7 @@ export function ChatWindowManagerProvider({
           maximized: false,
           initialPrompt: opts?.initialPrompt ?? null,
           contextItems: opts?.contextItems ?? [],
+          toolDefaults: opts?.toolDefaults ?? {},
         };
         const updated = reindex([...prev, panel], id);
         scheduleSave(updated);
@@ -143,6 +144,9 @@ export function ChatWindowManagerProvider({
       if (!existing) return openPanel(opts);
       const partial: Partial<ChatWindowState> = {};
       if (opts?.initialPrompt) partial.initialPrompt = opts.initialPrompt;
+      // Reusing a window re-targets it at the surface that just asked, so its
+      // tool defaults replace the previous surface's rather than merging.
+      if (opts?.toolDefaults) partial.toolDefaults = opts.toolDefaults;
       if (opts?.contextItems?.length) {
         partial.contextItems = [
           ...existing.contextItems,

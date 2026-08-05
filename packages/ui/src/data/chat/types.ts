@@ -34,6 +34,22 @@ export interface ChatModelRuntime {
   fallbacks?: ChatModelRuntime[];
 }
 
+export type RuntimeAvailabilityState =
+  | "available"
+  | "disabled"
+  | "missing_credentials"
+  | "not_authenticated"
+  | "missing_executable"
+  | "missing_dependency"
+  | "unsupported"
+  | "unavailable";
+
+export interface RuntimeAvailability {
+  state: RuntimeAvailabilityState;
+  reason?: string;
+  remediation?: string;
+}
+
 export interface ChatModel {
   id: string;
   provider: string;
@@ -50,6 +66,7 @@ export interface ChatModel {
   /** Whether the model honours the temperature sampling control. */
   temperature?: boolean;
   configured?: boolean;
+  availability?: RuntimeAvailability;
   /**
    * The catalog's own declared default — the row a picker seeds with when the
    * caller names no model. At most one row carries it, and a catalog that

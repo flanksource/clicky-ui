@@ -53,7 +53,7 @@ const SAMPLE_MODELS: ChatModel[] = [
 
 function policyRadio(tool: string, mode: string) {
   return within(
-    screen.getByRole("radiogroup", { name: `${tool} policy` }),
+    screen.getByRole("radiogroup", { name: `${tool} policy` })
   ).getByRole("radio", { name: mode });
 }
 
@@ -61,13 +61,13 @@ function openPermissionsAdvanced() {
   fireEvent.click(
     within(screen.getByLabelText("Permissions")).getByRole("button", {
       name: /Advanced/,
-    }),
+    })
   );
 }
 
 function commitPhaseSelect() {
   return within(screen.getByRole("region", { name: "Commit" })).getByRole(
-    "combobox",
+    "combobox"
   );
 }
 
@@ -75,7 +75,7 @@ function openModelAdvanced() {
   fireEvent.click(
     within(screen.getByRole("region", { name: "Model" })).getByRole("button", {
       name: /Advanced/,
-    }),
+    })
   );
 }
 
@@ -94,7 +94,7 @@ describe("SpecRuntimeEditor", () => {
         value={value}
         onChange={onChange}
         secretSelector={{ loadResources, loadKeyPreview }}
-      />,
+      />
     );
 
     for (const label of [
@@ -110,7 +110,7 @@ describe("SpecRuntimeEditor", () => {
     }
     // No cliOptions prop: the CLI flags section stays hidden.
     expect(
-      screen.queryByRole("region", { name: "CLI flags" }),
+      screen.queryByRole("region", { name: "CLI flags" })
     ).not.toBeInTheDocument();
 
     // All sections render without tab switching.
@@ -163,7 +163,7 @@ describe("SpecRuntimeEditor", () => {
     render(<Host />);
 
     expect(screen.getByLabelText("Git URL")).toHaveValue(
-      "https://github.com/flanksource/clicky-ui.git",
+      "https://github.com/flanksource/clicky-ui.git"
     );
     expect(screen.getByLabelText("Keep worktree")).toBeChecked();
 
@@ -179,7 +179,7 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.click(within(worktreeGroup()).getByText("Existing"));
     expect(screen.queryByText("Worktree prefix")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Worktree path")).toHaveValue(
-      ".shell/worktrees/runtime",
+      ".shell/worktrees/runtime"
     );
     fireEvent.click(within(worktreeGroup()).getByText("None"));
     expect(screen.queryByText("Worktree path")).not.toBeInTheDocument();
@@ -189,8 +189,8 @@ describe("SpecRuntimeEditor", () => {
 
     fireEvent.click(
       within(screen.getByRole("radiogroup", { name: "Stash mode" })).getByText(
-        "None",
-      ),
+        "None"
+      )
     );
     expect(screen.getByLabelText("Since")).toHaveValue("");
   });
@@ -253,26 +253,26 @@ describe("SpecRuntimeEditor", () => {
           } as any
         }
         onChange={() => {}}
-      />,
+      />
     );
 
     const prompt = screen.getByLabelText("Prompt");
     expect(within(prompt).queryByText("Source")).not.toBeInTheDocument();
     expect(within(prompt).queryByText("Metadata")).not.toBeInTheDocument();
     expect(
-      within(prompt).queryByText("Prompt schema JSON"),
+      within(prompt).queryByText("Prompt schema JSON")
     ).not.toBeInTheDocument();
 
     fireEvent.click(within(prompt).getByRole("button", { name: /Advanced/ }));
 
     expect(within(prompt).getByLabelText("Prompt schema JSON")).toHaveValue(
-      '{\n  "type": "object"\n}',
+      '{\n  "type": "object"\n}'
     );
     expect(
-      within(prompt).getByRole("radiogroup", { name: "Schema strictness" }),
+      within(prompt).getByRole("radiogroup", { name: "Schema strictness" })
     ).toBeInTheDocument();
     expect(
-      within(prompt).getByRole("radio", { name: "Retry" }),
+      within(prompt).getByRole("radio", { name: "Retry" })
     ).toHaveAttribute("aria-checked", "true");
   });
 
@@ -300,21 +300,21 @@ describe("SpecRuntimeEditor", () => {
     expect(
       within(modelSection).getByRole("button", {
         name: /Advanced · fallbacks, session, caching/,
-      }),
+      })
     ).toHaveAttribute("aria-expanded", "true");
     expect(
-      within(modelSection).getByText("Fallback models"),
+      within(modelSection).getByText("Fallback models")
     ).toBeInTheDocument();
     expect(
-      within(modelSection).getByPlaceholderText("session UUID"),
+      within(modelSection).getByPlaceholderText("session UUID")
     ).toBeInTheDocument();
     expect(
-      within(modelSection).getByText("Disable prompt caching"),
+      within(modelSection).getByText("Disable prompt caching")
     ).toBeInTheDocument();
     expect(
       within(modelSection)
         .getByPlaceholderText("session UUID")
-        .closest('[class~="md:grid-cols-2"]'),
+        .closest('[class~="md:grid-cols-2"]')
     ).toBeNull();
 
     expect(within(modelSection).getByText("GPT-4o")).toBeInTheDocument();
@@ -332,31 +332,31 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.click(
       within(modelSection).getByRole("button", {
         name: "Edit fallback GPT-4o",
-      }),
+      })
     );
     expect(
       within(modelSection).getByRole("group", {
         name: "Fallback model picker",
-      }),
+      })
     ).toBeInTheDocument();
     fireEvent.click(
       within(modelSection).getByRole("button", {
         name: "Edit fallback GPT-4o",
-      }),
+      })
     );
     expect(
       within(modelSection).queryByRole("group", {
         name: "Fallback model picker",
-      }),
+      })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      within(modelSection).getByRole("button", { name: "Remove GPT-4o" }),
+      within(modelSection).getByRole("button", { name: "Remove GPT-4o" })
     );
     expect(within(modelSection).queryByText("GPT-4o")).not.toBeInTheDocument();
 
     fireEvent.click(
-      within(modelSection).getByRole("button", { name: /^Add$/ }),
+      within(modelSection).getByRole("button", { name: /^Add$/ })
     );
 
     const picker = within(modelSection).getByRole("group", {
@@ -364,28 +364,30 @@ describe("SpecRuntimeEditor", () => {
     });
     expect(within(modelSection).getByText("Select model")).toBeInTheDocument();
     expect(
-      within(modelSection).queryByRole("button", { name: "Add fallback" }),
+      within(modelSection).queryByRole("button", { name: "Add fallback" })
     ).not.toBeInTheDocument();
     const bar = within(picker).getByRole("group", { name: "Fallback runtime" });
     expect(within(bar).getByTitle("OpenAI API")).toHaveTextContent("API");
     expect(
-      within(bar).getByTitle("Model — prompt default"),
+      within(bar).getByTitle("Model — prompt default")
     ).toBeInTheDocument();
     // The bar is the whole editor — temperature is no longer part of it.
-    expect(within(picker).queryByLabelText("Temperature")).not.toBeInTheDocument();
+    expect(
+      within(picker).queryByLabelText("Temperature")
+    ).not.toBeInTheDocument();
     // The draft inherits the spec's backend, so its collapsed row shows the mode.
     expect(
       within(
         within(modelSection).getByRole("button", {
           name: "Edit fallback Select model",
-        }),
-      ).getByRole("img", { name: "OpenAI API" }),
+        })
+      ).getByRole("img", { name: "OpenAI API" })
     ).toBeInTheDocument();
 
     fireEvent.click(within(bar).getByTitle("Model — prompt default"));
     fireEvent.click(await screen.findByRole("menuitem", { name: /o4-mini/ }));
     expect(
-      await within(modelSection).findByTitle("Model — openai/o4-mini"),
+      await within(modelSection).findByTitle("Model — openai/o4-mini")
     ).toBeInTheDocument();
 
     const updatedPicker = within(modelSection).getByRole("group", {
@@ -402,7 +404,7 @@ describe("SpecRuntimeEditor", () => {
     expect(
       within(modelSection).getByRole("button", {
         name: "Remove o4-mini",
-      }),
+      })
     ).toBeInTheDocument();
   });
 
@@ -449,14 +451,14 @@ describe("SpecRuntimeEditor", () => {
     expect(policyRadio("Read", "Ask")).toBeChecked();
 
     fireEvent.click(
-      screen.getByRole("radio", { name: "Set Files group to Allow" }),
+      screen.getByRole("radio", { name: "Set Files group to Allow" })
     );
     expect(policyRadio("Read", "Allow")).toBeChecked();
     expect(policyRadio("Write", "Allow")).toBeChecked();
 
     expect(policyRadio("gavel", "Disabled")).toBeChecked();
     fireEvent.click(
-      screen.getByRole("radio", { name: "Set MCP group to Disabled" }),
+      screen.getByRole("radio", { name: "Set MCP group to Disabled" })
     );
     expect(policyRadio("filesystem", "Disabled")).toBeChecked();
   });
@@ -479,19 +481,19 @@ describe("SpecRuntimeEditor", () => {
     openPermissionsAdvanced();
 
     expect(
-      screen.getByRole("radiogroup", { name: "Read policy" }),
+      screen.getByRole("radiogroup", { name: "Read policy" })
     ).toBeInTheDocument();
 
     // Clicking the group's label (part of the header row, not the chevron
     // button) collapses the group and hides its entries.
     fireEvent.click(screen.getByText("Files"));
     expect(
-      screen.queryByRole("radiogroup", { name: "Read policy" }),
+      screen.queryByRole("radiogroup", { name: "Read policy" })
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Files"));
     expect(
-      screen.getByRole("radiogroup", { name: "Read policy" }),
+      screen.getByRole("radiogroup", { name: "Read policy" })
     ).toBeInTheDocument();
   });
 
@@ -515,7 +517,7 @@ describe("SpecRuntimeEditor", () => {
     expect(planPreset).toHaveAttribute("aria-checked", "true");
     openPermissionsAdvanced();
     expect(
-      screen.getByRole("combobox", { name: "Permission mode" }),
+      screen.getByRole("combobox", { name: "Permission mode" })
     ).toHaveValue("plan");
     expect(policyRadio("Read", "Allow")).toBeChecked();
     expect(policyRadio("Bash", "Deny")).toBeChecked();
@@ -523,7 +525,7 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.click(policyRadio("Bash", "Allow"));
     expect(screen.getByRole("radio", { name: /Custom/ })).toHaveAttribute(
       "aria-checked",
-      "true",
+      "true"
     );
   });
 
@@ -549,7 +551,7 @@ describe("SpecRuntimeEditor", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(
-      window.localStorage.getItem(SPEC_PERMISSION_PRESET_STORAGE_KEY),
+      window.localStorage.getItem(SPEC_PERMISSION_PRESET_STORAGE_KEY)
     ).toContain("Locked down");
 
     openPermissionsAdvanced();
@@ -574,7 +576,7 @@ describe("SpecRuntimeEditor", () => {
           },
         }}
         onChange={() => {}}
-      />,
+      />
     );
 
     expect(screen.getByText("clicky-ui · main")).toBeInTheDocument();
@@ -582,10 +584,10 @@ describe("SpecRuntimeEditor", () => {
 
   it("hides the footer without callbacks and wires save/cancel when provided", () => {
     const { rerender } = render(
-      <SpecRuntimeEditor value={{}} onChange={() => {}} />,
+      <SpecRuntimeEditor value={{}} onChange={() => {}} />
     );
     expect(
-      screen.queryByRole("button", { name: /Save & run/ }),
+      screen.queryByRole("button", { name: /Save & run/ })
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Ready to run")).not.toBeInTheDocument();
 
@@ -599,7 +601,7 @@ describe("SpecRuntimeEditor", () => {
         onCancel={onCancel}
         saveLabel="Save spec"
         footerStatus="Draft"
-      />,
+      />
     );
 
     expect(screen.getByText("Draft")).toBeInTheDocument();
@@ -623,11 +625,11 @@ describe("SpecRuntimeEditor", () => {
             },
           },
         }}
-      />,
+      />
     );
 
     expect(
-      screen.getByRole("region", { name: "CLI flags" }),
+      screen.getByRole("region", { name: "CLI flags" })
     ).toBeInTheDocument();
     const input = screen.getByLabelText("Profile");
     expect(input).toHaveValue("dev");
@@ -650,11 +652,11 @@ describe("SpecRuntimeEditor", () => {
 
     fireEvent.click(within(bar).getByTitle("Claude Code CLI"));
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: /^Agent Claude Agent SDK/ }),
+      await screen.findByRole("menuitem", { name: /^Agent Claude Agent SDK/ })
     );
 
     expect(within(bar).getByTitle("Claude Agent SDK")).toHaveTextContent(
-      "Agent",
+      "Agent"
     );
     expect(within(bar).queryByTitle("Claude Code CLI")).not.toBeInTheDocument();
   });
@@ -664,12 +666,67 @@ describe("SpecRuntimeEditor", () => {
 
     const section = screen.getByRole("region", { name: "Model" });
     expect(
-      within(section).getByRole("group", { name: "Runtime" }),
+      within(section).getByRole("group", { name: "Runtime" })
     ).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: /Model/ }));
     expect(
-      within(section).queryByRole("group", { name: "Runtime" }),
+      within(section).queryByRole("group", { name: "Runtime" })
     ).not.toBeInTheDocument();
+  });
+
+  it("shows provider status below the model budget and collapses it by default", () => {
+    render(
+      <SpecRuntimeEditor
+        value={{ backend: "claude-agent" }}
+        onChange={() => {}}
+        models={[
+          {
+            id: "claude-agent/opus",
+            provider: "claude-agent",
+            label: "Claude Opus",
+            reasoning: true,
+            configured: false,
+            availability: {
+              state: "not_authenticated",
+              reason: "Claude Agent is not authenticated.",
+              remediation: "Run claude login, then refresh.",
+            },
+          },
+        ]}
+        families={[
+          {
+            id: "claude",
+            label: "Claude",
+            provider: "claude-agent",
+            modes: [
+              {
+                id: "agent",
+                label: "Agent",
+                backend: "claude-agent",
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const modelSection = screen.getByRole("region", { name: "Model" });
+    const maxCost = within(modelSection).getByLabelText("Max cost (USD)");
+    const providerStatus = within(modelSection).getByRole("button", {
+      name: "Provider status, 1 issue",
+    });
+    expect(providerStatus).toHaveAttribute("aria-expanded", "false");
+    expect(
+      maxCost.compareDocumentPosition(providerStatus) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    fireEvent.click(providerStatus);
+    expect(
+      within(modelSection).getByRole("button", {
+        name: "Claude, needs attention",
+      })
+    ).toBeInTheDocument();
   });
 });

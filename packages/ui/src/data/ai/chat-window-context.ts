@@ -5,6 +5,7 @@
 // and keeping React-Fast-Refresh happy.
 import { createContext, useContext } from "react";
 import type { ChatContextItem } from "./context";
+import type { ToolMode } from "./ToolPreferences";
 import { zIndex } from "../../overlay/zIndex";
 
 /** Live state of one floating chat window. Position/size/maximized are
@@ -23,6 +24,10 @@ export interface ChatWindowState {
    *  detect a fresh request even if the text repeats). */
   initialPrompt: { id: number; text: string } | null;
   contextItems: ChatContextItem[];
+  /** Default tool modes for the surface that opened this window, keyed by tool
+   *  name, `preferenceKey`, or `group`. They override the tool catalog's own
+   *  defaults; a mode the user has explicitly chosen still wins over both. */
+  toolDefaults: Record<string, ToolMode>;
 }
 
 export interface OpenPanelOpts {
@@ -30,6 +35,8 @@ export interface OpenPanelOpts {
   initialModel?: string | null;
   initialPrompt?: { id: number; text: string } | null;
   contextItems?: ChatContextItem[];
+  /** See {@link ChatWindowState.toolDefaults}. */
+  toolDefaults?: Record<string, ToolMode>;
 }
 
 export interface ChatWindowManagerValue {
@@ -84,6 +91,9 @@ export function loadPanels(storageId: string): ChatWindowState[] {
       zIndex: Z_BASE + i,
       initialPrompt: null,
       contextItems: [],
+      // A restored window is not attached to a surface yet, so tools fall back
+      // to the catalog defaults until one reopens it.
+      toolDefaults: {},
     }));
   } catch {
     return [];

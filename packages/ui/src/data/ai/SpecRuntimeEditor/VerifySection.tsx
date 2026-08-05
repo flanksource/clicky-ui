@@ -2,7 +2,7 @@ import { SegmentedControl } from "../../../components/SegmentedControl";
 import { UiRepeat } from "../../../icons";
 import { FixtureEditor } from "../../FixtureEditor";
 import type { ChatModel } from "../../chat/types";
-import type { SpecRuntimeFamily } from "../runtime-mode";
+import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import {
   SPEC_VERIFY_SCOPES,
   type AISpecRuntimeValue,

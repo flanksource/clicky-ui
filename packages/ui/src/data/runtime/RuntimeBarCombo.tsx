@@ -11,23 +11,23 @@ import {
 } from "../chat/effort-icons";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
-import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
+import type { RuntimeBarValue } from "./RuntimeBar";
 import { runtimeFamilyBrand } from "./RuntimeBar.model";
+import { isUnavailable } from "./availability";
 import {
-  runtimeModeOptions,
-  unsupportedModeTitle,
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
 
 export type RuntimeBarComboProps = {
-  value: AISpecRuntimeValue;
+  value: RuntimeBarValue;
   families: SpecRuntimeFamily[];
   family: SpecRuntimeFamily;
   mode: SpecRuntimeModeOption;
   selectedMode: string;
   models: ChatModel[];
   selectedModel: ChatModel | undefined;
+  selectedModelUnavailable: boolean;
   supportedEfforts: string[];
   ariaLabel: string;
   className?: string | undefined;
@@ -46,6 +46,7 @@ export function RuntimeBarCombo({
   selectedMode,
   models,
   selectedModel,
+  selectedModelUnavailable,
   supportedEfforts,
   ariaLabel,
   className,
@@ -56,7 +57,9 @@ export function RuntimeBarCombo({
   onEffortChange,
 }: RuntimeBarComboProps) {
   const brand = runtimeFamilyBrand(family);
-  const modelLabel = selectedModel?.label ?? value.model ?? "Prompt default";
+  const modelLabel = selectedModelUnavailable
+    ? "Unavailable selection"
+    : selectedModel?.label ?? value.model ?? "Prompt default";
   const effortLabel = value.effort ? effortLevelLabel(value.effort) : "None";
   const effortIcon = value.effort ? effortLevelIcon(value.effort) : undefined;
   const summary = `${ariaLabel}: ${family.label}, ${mode.label}, ${modelLabel}, effort ${effortLabel}`;
@@ -96,7 +99,7 @@ export function RuntimeBarCombo({
               icon={effortIcon}
               className={cn(
                 "size-4 shrink-0",
-                value.effort ? effortLevelColor(value.effort) : undefined,
+                value.effort ? effortLevelColor(value.effort) : undefined
               )}
             />
           )}
@@ -116,7 +119,6 @@ export function RuntimeBarCombo({
               onChange={onFamilyChange}
             />
             <ModeSegments
-              families={families}
               family={family}
               value={selectedMode}
               onChange={onModeChange}
@@ -157,25 +159,27 @@ function FamilySegments({
       value={value}
       onChange={onChange}
       className="w-full"
-      options={families.map((family) => {
-        const brand = runtimeFamilyBrand(family);
-        return {
-          id: family.id,
-          label: family.label,
-          ...(brand.icon ? { icon: brand.icon } : {}),
-        };
-      })}
+      options={families
+        .filter((family) =>
+          family.modes.some((mode) => !isUnavailable(mode.availability))
+        )
+        .map((family) => {
+          const brand = runtimeFamilyBrand(family);
+          return {
+            id: family.id,
+            label: family.label,
+            ...(brand.icon ? { icon: brand.icon } : {}),
+          };
+        })}
     />
   );
 }
 
 function ModeSegments({
-  families,
   family,
   value,
   onChange,
 }: {
-  families: SpecRuntimeFamily[];
   family: SpecRuntimeFamily;
   value: string;
   onChange: (modeId: string) => void;
@@ -187,16 +191,14 @@ function ModeSegments({
       value={value}
       onChange={onChange}
       className="w-full"
-      options={runtimeModeOptions(families).map((mode) => {
-        const supported = family.modes.find((entry) => entry.id === mode.id);
-        return {
+      options={family.modes
+        .filter((mode) => !isUnavailable(mode.availability))
+        .map((mode) => ({
           id: mode.id,
-          label: supported?.label ?? mode.label,
-          title: supported?.title ?? unsupportedModeTitle(family),
-          disabled: !supported,
+          label: mode.label,
+          ...(mode.title ? { title: mode.title } : {}),
           ...(mode.icon ? { icon: mode.icon } : {}),
-        };
-      })}
+        }))}
     />
   );
 }
@@ -229,7 +231,6 @@ function ModelChoices({
             label={model.label}
             title={model.id}
             selected={model.id === selectedId}
-            disabled={model.configured === false}
             {...(icon
               ? {
                   icon,
@@ -248,16 +249,16 @@ function ModelChoices({
 function ModelChoice({
   label,
   title,
+  detail,
   selected,
-  disabled = false,
   icon,
   iconColor,
   onClick,
 }: {
   label: string;
   title?: string | undefined;
+  detail?: string | undefined;
   selected: boolean;
-  disabled?: boolean | undefined;
   icon?: NonNullable<ReturnType<typeof providerIcon>>;
   iconColor?: string | undefined;
   onClick: () => void;
@@ -266,11 +267,10 @@ function ModelChoice({
     <Button
       variant="ghost"
       type="button"
-      disabled={disabled}
       onClick={onClick}
-      aria-label={label}
+      aria-label={detail ? `${label}. ${detail}` : label}
       {...(title ? { title } : {})}
-      className="group flex h-8 w-full items-center justify-start gap-2 rounded-md px-2 text-left hover:bg-muted"
+      className="group flex min-h-8 w-full items-center justify-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted"
     >
       {icon ? (
         <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/70 ring-1 ring-border/60 group-hover:bg-background">
@@ -279,19 +279,23 @@ function ModelChoice({
       ) : (
         <span className="size-6 shrink-0" />
       )}
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate text-sm",
-          selected && "font-semibold",
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn("block truncate text-sm", selected && "font-semibold")}
+        >
+          {label}
+        </span>
+        {detail && (
+          <span className="block whitespace-normal text-[11px] leading-4 text-muted-foreground">
+            {detail}
+          </span>
         )}
-      >
-        {label}
       </span>
       <Icon
         icon={UiCheck}
         className={cn(
           "size-3.5 shrink-0 text-primary",
-          !selected && "invisible",
+          !selected && "invisible"
         )}
       />
     </Button>
@@ -360,7 +364,7 @@ function EffortSlider({
             const next = options[Number(event.target.value)];
             if (next === undefined) {
               throw new Error(
-                `Invalid reasoning effort index: ${event.target.value}`,
+                `Invalid reasoning effort index: ${event.target.value}`
               );
             }
             onChange(next);
@@ -378,8 +382,8 @@ function EffortSlider({
               currentIndex < 0
                 ? "border-destructive/25 bg-destructive/10 text-destructive"
                 : current
-                  ? cn("border-current/25 bg-muted", effortLevelColor(current))
-                  : "border-border bg-muted text-muted-foreground",
+                ? cn("border-current/25 bg-muted", effortLevelColor(current))
+                : "border-border bg-muted text-muted-foreground"
             )}
             title={`Effort: ${label}`}
           >
@@ -393,7 +397,7 @@ function EffortSlider({
           icon={lastIcon}
           className={cn(
             "mt-3 size-3.5",
-            effortLevelColor(supported[supported.length - 1]!),
+            effortLevelColor(supported[supported.length - 1]!)
           )}
         />
       ) : (

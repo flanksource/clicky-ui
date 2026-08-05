@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Icon, type StaticIconComponent } from "../Icon";
-import { CodeBlock } from "../CodeBlock";
 import {
   UiCheck,
   UiChevronDown,
@@ -11,8 +10,16 @@ import {
   UiClock,
   UiWrench,
 } from "../../icons";
-import type { AnyToolPart, ToolResultRenderer } from "./types";
+import type { AnyToolPart, ToolMeta, ToolResultRenderer } from "./types";
 import { toolPartName } from "./types";
+import { normalizeToolOutput } from "./tool-render/normalize";
+import { useToolRenderRegistry } from "./tool-render/context";
+import {
+  defaultToolInputView,
+  defaultToolOutputView,
+  type ToolRenderBaseContext,
+} from "./tool-render/defaults";
+import type { ToolRenderRegistry } from "./tool-render/adapter";
 
 export type ToolCallProps = {
   /** The tool part from an assistant message (typed or dynamic). */
@@ -22,8 +29,14 @@ export type ToolCallProps = {
   /** Respond to an approval request (only used when state is
    *  `approval-requested`). Receives the approval id, the decision, and an
    *  optional reason. */
-  onApprove?: ((approvalId: string, approved: boolean, reason?: string) => void) | undefined;
+  onApprove?:
+    | ((approvalId: string, approved: boolean, reason?: string) => void)
+    | undefined;
   renderToolResult?: ToolResultRenderer;
+  /** Catalog entry for this tool. Defaults to the registry's catalog lookup. */
+  tool?: ToolMeta | undefined;
+  /** Renderer registry override. Defaults to the provided context registry. */
+  registry?: ToolRenderRegistry | undefined;
   className?: string;
 };
 
@@ -39,25 +52,68 @@ const STATUS_LABEL: Record<ToolState, string> = {
   "output-error": "Error",
 };
 
-const STATUS_ICON: Record<ToolState, { icon: StaticIconComponent; className: string }> = {
+const STATUS_ICON: Record<
+  ToolState,
+  { icon: StaticIconComponent; className: string }
+> = {
   "approval-requested": { icon: UiClock, className: "text-amber-600" },
   "approval-responded": { icon: UiCheck, className: "text-sky-600" },
-  "input-streaming": { icon: UiCircleOutline, className: "text-muted-foreground" },
-  "input-available": { icon: UiClock, className: "text-muted-foreground animate-pulse" },
+  "input-streaming": {
+    icon: UiCircleOutline,
+    className: "text-muted-foreground",
+  },
+  "input-available": {
+    icon: UiClock,
+    className: "text-muted-foreground animate-pulse",
+  },
   "output-available": { icon: UiCheck, className: "text-emerald-600" },
   "output-denied": { icon: UiCircleX, className: "text-orange-600" },
   "output-error": { icon: UiCircleX, className: "text-destructive" },
 };
 
 /** Generic display of a single AI tool call: a collapsible header showing the
- *  tool name + status, expanding to its JSON input and (once available) output
- *  or error. Renders both clicky `dynamic-tool` parts and typed `tool-<name>`
- *  parts, keyed off `part.state`. */
-export function ToolCall({ part, defaultOpen = false, onApprove, renderToolResult, className }: ToolCallProps) {
+ *  tool name, status and compact input args, expanding to its input params and
+ *  (once available) output or error. Input and output rendering go through the
+ *  tool render registry, so a host can contribute domain views. Renders both
+ *  clicky `dynamic-tool` parts and typed `tool-<name>` parts, keyed off
+ *  `part.state`. */
+export function ToolCall({
+  part,
+  defaultOpen = false,
+  onApprove,
+  renderToolResult,
+  tool,
+  registry: registryProp,
+  className,
+}: ToolCallProps) {
   const needsApproval = part.state === "approval-requested";
   const [open, setOpen] = useState(defaultOpen || needsApproval);
+  const contextRegistry = useToolRenderRegistry();
+  const registry = registryProp ?? contextRegistry;
   const status = STATUS_ICON[part.state];
   const name = toolPartName(part);
+  const meta = tool ?? registry.tool(name);
+
+  // The transport double-encodes tool results as `{output: "<json>"}`; every
+  // surface — including a host's renderToolResult — sees the unwrapped value.
+  const normalized = normalizeToolOutput(
+    part.state === "output-available" ? part.output : undefined,
+  );
+  const base: ToolRenderBaseContext = {
+    part,
+    toolName: name,
+    tool: meta,
+    state: part.state,
+    input: part.input,
+    output: normalized.value,
+    isError: normalized.isError || part.state === "output-error",
+    options: registry.options,
+  };
+
+  const inputView = defaultToolInputView(base);
+  // The header keeps the tool name in its own element; a summary renders beside
+  // it (ToolCall.test.tsx matches the name by exact text).
+  const summary = registry.resolveSummary({ ...base, defaultView: null });
 
   return (
     <div className={cn("not-prose mb-1 w-full", className)}>
@@ -75,17 +131,32 @@ export function ToolCall({ part, defaultOpen = false, onApprove, renderToolResul
             title={STATUS_LABEL[part.state]}
             className={cn("size-3 shrink-0", status.className)}
           />
+          {!open && summary ? (
+            <span className="min-w-0 flex-1 truncate text-xs">{summary}</span>
+          ) : null}
         </span>
         <Icon
           icon={UiChevronDown}
-          className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")}
+          className={cn(
+            "size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
         />
       </button>
 
       {open && (
-        <div className="space-y-1 pl-4 pt-0.5">
-          <ToolInput input={part.input} />
-          <ToolOutput part={part} {...(renderToolResult ? { renderToolResult } : {})} />
+        <div data-slot="tool-call-details" className="space-y-1 pl-4 pt-0.5">
+          {/* An approval-requested call force-opens, so this params table is
+              what the user reads before approving a write. */}
+          {registry.resolveInput({ ...base, defaultView: inputView }) ??
+            inputView}
+          <ToolOutput
+            part={part}
+            base={base}
+            registry={registry}
+            output={normalized.value}
+            {...(renderToolResult ? { renderToolResult } : {})}
+          />
         </div>
       )}
 
@@ -107,7 +178,11 @@ function ApprovalControls({
   if (!approval || !onApprove) return null;
   return (
     <div className="mt-1.5 flex items-center gap-2 pl-4">
-      <Button type="button" size="sm" onClick={() => onApprove(approval.id, true)}>
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => onApprove(approval.id, true)}
+      >
         Approve
       </Button>
       <Button
@@ -122,37 +197,46 @@ function ApprovalControls({
   );
 }
 
-function ToolInput({ input }: { input: AnyToolPart["input"] }) {
-  if (input === undefined || input === null) {
-    return null;
-  }
-  return (
-    <div className="overflow-hidden text-xs">
-      <CodeBlock language="json" source={JSON.stringify(input, null, 2)} />
-    </div>
-  );
-}
-
+/** The output surface. Priority: the host's `renderToolResult` prop (the
+ *  pre-registry API, still supported), then a matching adapter, then the
+ *  built-in shape heuristics. */
 function ToolOutput({
   part,
+  base,
+  registry,
+  output,
   renderToolResult,
 }: {
   part: AnyToolPart;
+  base: ToolRenderBaseContext;
+  registry: ToolRenderRegistry;
+  output: unknown;
   renderToolResult?: ToolResultRenderer | undefined;
 }) {
   const errorText = part.state === "output-error" ? part.errorText : undefined;
-  const output = part.state === "output-available" ? part.output : undefined;
-  if (output === undefined && errorText === undefined) {
+  const hasOutput = part.state === "output-available" && output !== undefined;
+  if (!hasOutput && errorText === undefined) {
     return null;
   }
-  const name = toolPartName(part);
-  const custom = output !== undefined ? renderToolResult?.({ part, toolName: name, output }) : null;
+
+  const defaultView: ReactNode = hasOutput ? defaultToolOutputView(base) : null;
+
+  const custom = hasOutput
+    ? renderToolResult?.({ part, toolName: base.toolName, output })
+    : null;
+  const resolved = hasOutput
+    ? registry.resolveOutput({ ...base, defaultView })
+    : null;
+
   return (
-    <div className={cn("overflow-x-auto text-xs", errorText ? "text-destructive" : "text-muted-foreground")}>
+    <div
+      className={cn(
+        "overflow-x-auto text-xs",
+        errorText ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
       {errorText !== undefined && <div>{errorText}</div>}
-      {custom ?? (output !== undefined && (
-        <CodeBlock language="json" source={typeof output === "string" ? output : JSON.stringify(output, null, 2)} />
-      ))}
+      {custom ?? resolved ?? defaultView}
     </div>
   );
 }

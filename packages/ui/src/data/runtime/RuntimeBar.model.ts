@@ -1,7 +1,7 @@
 import type { StaticIconComponent } from "../Icon";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
-import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
+import type { RuntimeBarValue } from "./RuntimeBar";
 import type { SpecRuntimeFamily } from "./runtime-mode";
 
 export function runtimeFamilyBrand(family: SpecRuntimeFamily): {
@@ -14,7 +14,7 @@ export function runtimeFamilyBrand(family: SpecRuntimeFamily): {
 
 export function runtimeModelMatches(
   model: ChatModel,
-  value: AISpecRuntimeValue,
+  value: RuntimeBarValue,
 ): boolean {
   return (
     (value.id !== undefined &&

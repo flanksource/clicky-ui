@@ -23,13 +23,14 @@ import type {
   AISpecRuntimeModelFallback,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
-import { RuntimeBar } from "../RuntimeBar";
+import { ProviderStatusPanel } from "../../runtime/ProviderStatusPanel";
+import { RuntimeBar } from "../../runtime/RuntimeBar";
 import {
   SPEC_RUNTIME_FAMILIES,
   firstMode,
   modeForBackend,
   type SpecRuntimeFamily,
-} from "../runtime-mode";
+} from "../../runtime/runtime-mode";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 
@@ -107,6 +108,11 @@ export function ModelSection({
           />
         </SpecField>
       </div>
+      <ProviderStatusPanel
+        models={models}
+        families={families ?? SPEC_RUNTIME_FAMILIES}
+        defaultCollapsed
+      />
     </div>
   );
 }
@@ -186,8 +192,8 @@ function FallbackModelsEditor({
   const updateFallback = (index: number, nextFallback: FallbackDraftPatch) => {
     setFallbacks(
       fallbacks.map((fallback, rowIndex) =>
-        rowIndex === index ? compactEditableFallback(nextFallback) : fallback,
-      ),
+        rowIndex === index ? compactEditableFallback(nextFallback) : fallback
+      )
     );
   };
 
@@ -277,7 +283,7 @@ function FallbackModelRow({
             <Glyph
               className={cn(
                 "size-4 shrink-0",
-                meta.provider ? providerIconColor(meta.provider) : undefined,
+                meta.provider ? providerIconColor(meta.provider) : undefined
               )}
             />
           ) : (
@@ -372,7 +378,7 @@ function FallbackModelPicker({
 
 function newFallbackDraft(
   value: AISpecRuntimeValue,
-  families: SpecRuntimeFamily[],
+  families: SpecRuntimeFamily[]
 ): AISpecRuntimeModelFallback {
   const fallback: AISpecRuntimeModelFallback = {};
   const backend = value.backend || defaultFallbackBackend(families);
@@ -390,7 +396,7 @@ function defaultFallbackBackend(families: SpecRuntimeFamily[]): string {
 }
 
 function compactEditableFallback(
-  value: FallbackDraftPatch,
+  value: FallbackDraftPatch
 ): AISpecRuntimeModelFallback {
   const next: AISpecRuntimeModelFallback = {};
   const model = cleanString(value.model);
@@ -410,11 +416,11 @@ function compactEditableFallback(
 
 function fallbackModelMeta(
   fallback: AISpecRuntimeModelFallback,
-  models: ChatModel[],
+  models: ChatModel[]
 ): { label: string; provider?: string | undefined } {
   const modelId = fallback.model ?? "";
   const match = models.find(
-    (model) => model.id === modelId || model.label === modelId,
+    (model) => model.id === modelId || model.label === modelId
   );
   if (match) return { label: match.label, provider: match.provider };
   return {
@@ -424,10 +430,11 @@ function fallbackModelMeta(
 }
 
 function inferProvider(
-  fallback: AISpecRuntimeModelFallback,
+  fallback: AISpecRuntimeModelFallback
 ): string | undefined {
-  const text =
-    `${fallback.backend ?? ""} ${fallback.model ?? ""}`.toLowerCase();
+  const text = `${fallback.backend ?? ""} ${
+    fallback.model ?? ""
+  }`.toLowerCase();
   if (text.includes("anthropic") || text.includes("claude")) return "anthropic";
   if (text.includes("google") || text.includes("gemini")) return "googleai";
   if (

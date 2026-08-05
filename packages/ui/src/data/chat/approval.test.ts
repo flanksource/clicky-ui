@@ -1,59 +1,119 @@
 import { describe, expect, it, vi } from "vitest";
-import { postToolApproval } from "./approval";
+import { getChatSession, postToolApproval } from "./approval";
 
-describe("postToolApproval", () => {
-  it("posts the decision to the approval bound to the active thread", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 204 }));
+const session = {
+  id: "session-1",
+  revision: 4,
+  messages: [
+    {
+      id: "assistant-1",
+      role: "assistant" as const,
+      parts: [{ type: "text" as const, text: "Updated." }],
+    },
+  ],
+};
 
-    await postToolApproval(
-      {
-        approvalApi: "/api/chat/threads/",
-        threadId: "thread/1",
-        approvalId: "call/account/1",
-        approved: true,
-      },
-      fetchMock,
+describe("Captain chat sessions", () => {
+  it("hydrates the canonical session projection", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(session), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
     );
 
+    await expect(
+      getChatSession("/api/chat/sessions/", "session/1", fetchMock),
+    ).resolves.toEqual(session);
+    expect(fetchMock).toHaveBeenCalledWith("/api/chat/sessions/session%2F1", {
+      headers: { Accept: "application/json" },
+    });
+  });
+
+  it("hydrates an empty session when Captain omits messages", async () => {
+    const emptySession = { id: "session-1", revision: 0 };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(emptySession), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(
+      getChatSession("/api/chat/sessions", emptySession.id, fetchMock),
+    ).resolves.toEqual({ ...emptySession, messages: [] });
+  });
+
+  it("returns the canonical session after posting an approval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(session), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(
+      postToolApproval(
+        {
+          sessionsApi: "/api/chat/sessions/",
+          sessionId: "session/1",
+          approvalId: "approval/1",
+          approved: true,
+        },
+        fetchMock,
+      ),
+    ).resolves.toEqual(session);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/chat/threads/thread%2F1/approvals/call%2Faccount%2F1",
+      "/api/chat/sessions/session%2F1/approvals/approval%2F1",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ approved: true }),
       },
     );
   });
 
-  it("fails loudly without a thread or when the backend rejects the decision", async () => {
+  it("fails loudly without a session", async () => {
+    await expect(
+      postToolApproval(
+        {
+          sessionsApi: "/api/chat/sessions",
+          sessionId: "",
+          approvalId: "approval-1",
+          approved: false,
+        },
+        vi.fn(),
+      ),
+    ).rejects.toThrow(
+      new Error("A session id is required to resolve this tool approval."),
+    );
+  });
+
+  it("includes the backend reason when the decision is rejected", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(null, { status: 409 }));
+      .mockResolvedValue(
+        new Response("approval is already resolved", { status: 409 }),
+      );
 
     await expect(
       postToolApproval(
         {
-          approvalApi: "/api/chat/threads",
-          threadId: "",
-          approvalId: "call-account-1",
-          approved: false,
-        },
-        fetchMock,
-      ),
-    ).rejects.toThrow("thread id is required");
-    await expect(
-      postToolApproval(
-        {
-          approvalApi: "/api/chat/threads",
-          threadId: "thread-1",
-          approvalId: "call-account-1",
+          sessionsApi: "/api/chat/sessions",
+          sessionId: "session-1",
+          approvalId: "approval-1",
           approved: false,
           reason: "Wrong account",
         },
         fetchMock,
       ),
-    ).rejects.toThrow("status 409");
+    ).rejects.toThrow(
+      new Error(
+        "Tool approval failed with status 409: approval is already resolved",
+      ),
+    );
   });
 });

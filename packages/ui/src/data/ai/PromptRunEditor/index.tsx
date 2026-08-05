@@ -19,12 +19,12 @@ import {
 } from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
 import type { FileUIPart } from "../../chat/types";
-import { RuntimeBar } from "../RuntimeBar";
+import { RuntimeBar } from "../../runtime/RuntimeBar";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
   labelForBackend,
-} from "../runtime-mode";
+} from "../../runtime/runtime-mode";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
 import type { SpecRuntimeCLIOptions } from "../SpecRuntimeEditor/CLIArgsSection";
 import type {
