@@ -5,8 +5,16 @@ import { UiAdd, UiTrash } from "../icons";
 import { Button } from "./button";
 import { Combobox } from "./Combobox";
 import type { FieldControl, JsonSchemaObject, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
-import { fieldInputId, inputClass, isPlainObject, keyPickerOptions, normalizeColumns } from "./json-schema-form-utils";
-import { FieldsGrid } from "./json-schema-form-fields";
+import {
+  cssLength,
+  DEFAULT_COLUMN_MIN_WIDTH,
+  fieldInputId,
+  inputClass,
+  isPlainObject,
+  keyPickerOptions,
+  normalizeColumns,
+} from "./json-schema-form-utils";
+import { FieldsGrid } from "./json-schema-form-layout";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { controlHeightClass, fieldInnerGapClass, inputSizeClass } from "./json-schema-form-size";
 
@@ -21,7 +29,18 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
     ...(Array.isArray(field.schema["x-order"]) ? { "x-order": field.schema["x-order"] } : {}),
-    ...(typeof field.schema["x-columns"] === "number" ? { "x-columns": field.schema["x-columns"] } : {}),
+    // Every object-level layout keyword must be copied here or it works at the
+    // top level and silently dies one level down — which is exactly where these
+    // matter (an array item's body is a nested object).
+    ...(typeof field.schema["x-columns"] === "number" || field.schema["x-columns"] === "auto"
+      ? { "x-columns": field.schema["x-columns"] }
+      : {}),
+    ...(typeof field.schema["x-column-min-width"] === "string"
+      ? { "x-column-min-width": field.schema["x-column-min-width"] }
+      : {}),
+    ...(typeof field.schema["x-columns-max-width"] === "string"
+      ? { "x-columns-max-width": field.schema["x-columns-max-width"] }
+      : {}),
     ...(typeof field.schema["x-classes"] === "string" ? { "x-classes": field.schema["x-classes"] } : {}),
   };
   // No border/box: nested objects render as flat headed sections (see
@@ -35,6 +54,10 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
       layout={ctx.layout}
       size={ctx.size}
       columns={normalizeColumns(subSchema["x-columns"])}
+      columnMinWidth={cssLength(subSchema["x-column-min-width"], DEFAULT_COLUMN_MIN_WIDTH)}
+      {...(typeof subSchema["x-columns-max-width"] === "string"
+        ? { columnsMaxWidth: subSchema["x-columns-max-width"] }
+        : {})}
       {...(typeof subSchema["x-classes"] === "string" ? { className: subSchema["x-classes"] } : {})}
     >
       {ctx.render.renderObjectFields(subSchema, obj, (next) => field.onChange(next), {

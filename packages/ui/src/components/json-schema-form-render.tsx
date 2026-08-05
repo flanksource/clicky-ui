@@ -6,26 +6,31 @@ import {
   DateControl,
   DisplayControl,
   EnumControl,
-  FieldLabel,
-  FieldWrapper,
   LinkControl,
   LookupControl,
   MarkdownControl,
   NumberControl,
-  ObjectSection,
   ReadOnlyValue,
   StringControl,
   TextareaControl,
 } from "./json-schema-form-fields";
+import {
+  FieldLabel,
+  FieldWrapper,
+  HelpHint,
+  ObjectSection,
+} from "./json-schema-form-layout";
 import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
 import { FieldErrorMessages, FieldErrorText } from "./json-schema-form-error-display";
 import { appendInstancePath, errorsAtInstancePath } from "./json-schema-form-errors";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
+import { applyPostExtensions } from "./json-schema-form-extensions";
 import { effectiveProperties, resolveControl, schemaRendersAsObject } from "./json-schema-form-resolve";
 import type {
   FieldArgs,
   FieldControl,
+  HelpDisplay,
   JsonSchemaObject,
   JsonSchemaProperty,
   RenderApi,
@@ -135,6 +140,7 @@ function buildField(
   label: ReactNode;
   value: ReactNode;
   errors: JsonSchemaFormError[];
+  help: HelpDisplay;
 } | null {
   const base = resolveControl(args);
   let field: FieldControl | null = base;
@@ -145,6 +151,7 @@ function buildField(
       prop: args.prop,
       value: args.value,
       ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
+      ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
     });
   }
   if (!field) return null;
@@ -159,7 +166,12 @@ function buildField(
   // visually adjacent but programmatically unassociated.
   const errors = errorsAtInstancePath(ctx.errors, instancePath);
   if (errors.length > 0) field = { ...field, invalid: true };
-  let label: ReactNode = <FieldLabel field={field} fieldId={fieldId} size={ctx.size} />;
+  // A field's own x-help-display wins over the form-level setting; both default
+  // to the permanent paragraph every form renders today.
+  const help = field.helpDisplay ?? ctx.layout.help ?? "inline";
+  let label: ReactNode = (
+    <FieldLabel field={field} fieldId={fieldId} size={ctx.size} helpDisplay={help} />
+  );
   // A field's `x-layout: inline|stack` overrides the form-level layout for its
   // own value subtree (the field's own row keeps the parent layout). "table" is
   // handled structurally inside the array/string-map controls, not here.
@@ -175,12 +187,13 @@ function buildField(
     ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
     ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
   };
-  for (const ext of ctx.post) {
-    const next = ext(field, { label, value }, postCtx);
-    label = next.label;
-    value = next.value;
-  }
-  return { field, fieldId, label, value, errors };
+  ({ label, value } = applyPostExtensions(
+    field,
+    { label, value },
+    ctx.post,
+    postCtx,
+  ));
+  return { field, fieldId, label, value, errors, help };
 }
 
 // renderFieldNodes runs the full pipeline and returns the raw {label, value}
@@ -223,12 +236,20 @@ export function renderFieldRow(
   // shape, asfile → params) readable as a single column of labelled sections,
   // and gives a `x-layout: "table"` array the full width its columns need
   // instead of cramming it into the inline value column.
-  if (field.kind === "object" || field.layout === "table") {
+  // An accordion joins this list: crammed into the 600px inline value column it
+  // is unusable, and it needs the ObjectSection header to carry the array's own
+  // title, required marker and help.
+  if (
+    field.kind === "object" ||
+    field.layout === "table" ||
+    field.arrayDisplay === "accordion"
+  ) {
     return (
       <ObjectSection
         label={opts?.labelOverride ?? field.label}
         required={field.required}
         size={ctx.size}
+        helpDisplay={built.help}
         {...(field.badge ? { badge: field.badge } : {})}
         {...(field.helper ? { helper: field.helper } : {})}
         {...(field.labelIcon != null ? { labelIcon: field.labelIcon } : {})}
@@ -257,6 +278,12 @@ export function renderFieldRow(
           {field.badge}
         </span>
       )}
+      {/* Without this the `?` silently disappears for relabelled rows (array
+          items), taking the description with it — FieldWrapper has already
+          dropped the paragraph by then. */}
+      {built.help === "hover" && field.helper && (
+        <HelpHint label={opts.labelOverride} helper={field.helper} />
+      )}
     </span>
   ) : (
     built.label
@@ -273,7 +300,8 @@ export function renderFieldRow(
       size={ctx.size}
       label={label}
       value={built.value}
-      {...(field.helper ? { helper: field.helper } : {})}
+      {...(field.colSpan === "full" ? { maxWidth: "none" } : {})}
+      {...(field.helper && built.help !== "hover" ? { helper: field.helper } : {})}
       {...(err ? { error: err } : {})}
     />
   );
@@ -324,10 +352,19 @@ export function renderObjectFields(
       ctx,
     );
     if (!row) return [];
-    if (columns > 1) {
-      const span = rendersFullWidth(prop) ? columns : normalizeColSpan(prop["x-col-span"], columns);
+    if (columns === "auto" || columns > 1) {
+      const span = rendersFullWidth(prop)
+        ? "full"
+        : normalizeColSpan(prop["x-col-span"], columns);
       return [
-        <div key={key} style={{ gridColumn: `span ${span} / span ${span}` }}>
+        <div
+          key={key}
+          // Under "auto" the track count only exists at layout time, so a
+          // full-width field must say `1 / -1` rather than span a number.
+          style={{
+            gridColumn: span === "full" ? "1 / -1" : `span ${span} / span ${span}`,
+          }}
+        >
           {row}
         </div>,
       ];
@@ -347,7 +384,7 @@ function rendersFullWidth(prop: JsonSchemaProperty): boolean {
   if (schemaRendersAsObject(prop) && (prop.properties !== undefined || Object.keys(fixedProperties).length > 0)) {
     return true;
   }
-  return prop["x-layout"] === "table";
+  return prop["x-layout"] === "table" || prop["x-array-display"] === "accordion";
 }
 
 // renderApi is the RenderContext injection bundle: the root form stores it on
