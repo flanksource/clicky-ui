@@ -94,15 +94,24 @@ function isFormElement(target: EventTarget | null): boolean {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
+// Across a shadow boundary `event.target` is retargeted to the shadow HOST, so a
+// key typed into an input inside a shadow root looks like a bare keypress on a
+// <div> and would fire hotkeys that must not fire while typing. The composed
+// path's first entry is the true origin.
+function eventOrigin(event: KeyboardEvent): EventTarget | null {
+  return event.composedPath?.()[0] ?? event.target;
+}
+
 function onKeyDown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return;
 
   // Highest priority wins; ties go to the most recently registered, so a
   // transient surface layered over the page takes precedence over the chrome.
+  const origin = eventOrigin(event);
   let winner: Registration | undefined;
   for (const registration of registrations) {
     if (!matches(event, registration.combo)) continue;
-    if (!registration.enableOnFormElements && isFormElement(event.target)) continue;
+    if (!registration.enableOnFormElements && isFormElement(origin)) continue;
     if (!winner || registration.priority >= winner.priority) winner = registration;
   }
   if (!winner) return;

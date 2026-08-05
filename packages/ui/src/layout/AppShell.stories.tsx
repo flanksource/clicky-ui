@@ -254,6 +254,94 @@ function WithSidebarBody() {
   );
 }
 
+// A backend whose entities encode a hierarchy in their names (`jms.incoming`,
+// `arthas.activity.process`) needs more than one level of nav. Two things here
+// are worth studying: groups nest arbitrarily, and a group can carry its own
+// `item` — so `jms`, which is BOTH a runnable entity and the parent of others,
+// is one row that navigates on the label and expands on the caret.
+export const NestedNavGroups: Story = {
+  render: () => {
+    const router = useMemoryRouter("/jms-incoming");
+    return (
+      <div className="h-[560px]">
+        <RouterProvider adapter={router}>
+          <NestedNavBody />
+        </RouterProvider>
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The folder-and-leaf row exposes both affordances, as siblings.
+    const jms = canvas.getByRole("link", { name: "jms" });
+    await expect(jms).toHaveAttribute("href", "/jms");
+    const caret = canvas.getByRole("button", { name: /Collapse jms$/ });
+    await expect(jms.contains(caret)).toBe(false);
+
+    // Depth 3 renders, and collapsing the root takes the whole subtree with it
+    // while leaving the root's own destination in place.
+    await expect(canvas.getByRole("link", { name: "disbursements" })).toBeTruthy();
+    await userEvent.click(caret);
+    await expect(canvas.queryByRole("link", { name: "disbursements" })).toBeNull();
+    await expect(canvas.getByRole("link", { name: "jms" })).toBeTruthy();
+  },
+};
+
+function NestedNavBody() {
+  const { pathname } = useRouter();
+  const item = (key: string, label: string) => ({
+    key,
+    label,
+    active: pathname === `/${key}`,
+    to: `/${key}`,
+  });
+  return (
+    <AppShell
+      brand={
+        <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground font-bold">
+          q
+        </span>
+      }
+      navSections={[
+        {
+          label: "Profiles",
+          items: [{ ...item("http", "http"), icon: UiDatabase }],
+          groups: [
+            {
+              key: "jms",
+              label: "jms",
+              item: item("jms", "jms"),
+              items: [item("jms-all", "all"), item("jms-failed", "failed")],
+              groups: [
+                {
+                  key: "jms/incoming",
+                  label: "incoming",
+                  item: item("jms-incoming", "incoming"),
+                  items: [item("jms-incoming-disbursements", "disbursements")],
+                },
+              ],
+            },
+            {
+              // A pure folder: no entity is named `logs`, so the heading is a
+              // disclosure only and there is nothing to navigate to.
+              key: "logs",
+              label: "logs",
+              items: [item("logs-api", "api"), item("logs-oipa", "oipa")],
+            },
+          ],
+        },
+      ]}
+      collapsedStorageKey="sb-demo:nested-collapsed"
+      groupCollapsedStorageKey="sb-demo:nested-groups"
+    >
+      <div className="p-density-4 text-sm">
+        Active: {pathname} — the rail nests as deep as the backend declares.
+      </div>
+    </AppShell>
+  );
+}
+
 // The full workbench: nav rail + ⌘K palette in the top bar + a body header with
 // actions, over a table that pages REMOTELY through clicky-rpc. The layout
 // contract worth studying here is that <main> must not scroll — only the

@@ -137,6 +137,24 @@ describe("useHotkey", () => {
     input.remove();
   });
 
+  it("suppresses a bare key typed into a text field inside a shadow root", () => {
+    const handler = vi.fn();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: "open" });
+    const input = document.createElement("input");
+    shadow.appendChild(input);
+    renderHook(() => useHotkey("/", handler));
+
+    fireEvent.keyDown(input, { key: "/", composed: true });
+
+    // The event retargets to the shadow host on its way to document, so reading
+    // `event.target` would see a <div> and let the hotkey swallow ordinary
+    // typing inside any shadow-rendered surface.
+    expect(handler).not.toHaveBeenCalled();
+    host.remove();
+  });
+
   it("still fires a modifier combo while focus is in a text field", () => {
     const handler = vi.fn();
     const input = document.createElement("input");
