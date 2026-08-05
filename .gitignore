@@ -52,3 +52,4 @@ hack/
 .mcp.json
 .handoff/
 .grite/
+packages/ui/src/generated/storybook/
