@@ -60,6 +60,8 @@ import { SessionInspectorDemo } from "./demos/SessionInspectorDemo";
 import { ToastDemo } from "./demos/ToastDemo";
 import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
+import { HierarchicalLookupDemo } from "./demos/HierarchicalLookupDemo";
+import { TourDemo } from "./demos/TourDemo";
 import {
   type StaticIconComponent,
   UiToggleOn,
@@ -256,6 +258,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         icon: UiForm,
       },
       {
+        id: "hierarchical-lookup",
+        label: "Hierarchical lookup",
+        component: HierarchicalLookupDemo,
+        icon: UiListTree,
+      },
+      {
         id: "json-path-field",
         label: "JSONPathField",
         component: JSONPathFieldDemo,
@@ -371,6 +379,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "DropdownMenu",
         component: DropdownMenuDemo,
         icon: UiDotsVertical,
+      },
+      {
+        id: "tour",
+        label: "Tour",
+        component: TourDemo,
+        icon: UiSparkles,
       },
     ],
   },

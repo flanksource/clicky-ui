@@ -20,6 +20,7 @@ export {
   type FormActionsRenderer,
   type SchemaActionFormSlots,
 } from "./rpc/SchemaActionForm";
+export { useOperationLookupFetcher } from "./rpc/operationLookupFetcher";
 export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
 export {
   normalizeParameters,

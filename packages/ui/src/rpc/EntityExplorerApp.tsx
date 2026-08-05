@@ -21,7 +21,7 @@ import {
   type EntityDetailHeaderRenderer,
 } from "./OperationEntityPage";
 import type { FormActionsRenderer } from "./SchemaActionForm";
-import { resolveSurfaceIcon } from "./surfaceIconMap";
+import { surfaceNavSection } from "./surfaceNav";
 import type { ClickySurface } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { useOperations } from "./useOperations";
@@ -123,19 +123,12 @@ export function EntityExplorerApp({
     [],
   );
   const navSections = useMemo<AppShellNavSection[]>(() => {
-    const sections: AppShellNavSection[] = surfaceGroups.map((group) => ({
-      label: group.label,
-      items: group.surfaces.map((surface) => {
-        const icon = resolveSurfaceIcon(surface.icon);
-        return {
-          key: surface.key,
-          label: surface.title,
-          ...(icon ? { icon } : {}),
-          active: isSurfaceRouteActive(resolvedRoute, surface.key),
-          to: withBasePath(basePath, `/${surface.key}`),
-        };
+    const sections: AppShellNavSection[] = surfaceGroups.map((group) =>
+      surfaceNavSection(group.label, group.surfaces, {
+        isActive: (surface) => isSurfaceRouteActive(resolvedRoute, surface.key),
+        hrefFor: (surface) => withBasePath(basePath, `/${surface.key}`),
       }),
-    }));
+    );
     if (showApiExplorer) {
       sections.push({
         items: [

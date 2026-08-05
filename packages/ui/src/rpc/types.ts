@@ -136,6 +136,13 @@ export interface ClickySurface {
   description?: string;
   /** Opaque icon name emitted by the backend (x-clicky-icon), resolved to a glyph in the UI. */
   icon?: string;
+  /**
+   * Hierarchy position within `parent`, "/"-separated (x-clicky-path) — e.g.
+   * "jms/incoming/disbursements". The backend has already applied whatever
+   * delimiter its own naming convention uses, so the UI never guesses one.
+   * Absent — the default — means the parent group renders as a flat list.
+   */
+  path?: string;
 }
 
 export interface ClickyOperationMeta {
