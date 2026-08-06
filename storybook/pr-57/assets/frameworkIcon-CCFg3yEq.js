@@ -1,1 +1,0 @@
-import{ay as a,a1 as r,aK as t,ab as s,b7 as i}from"./iframe-B_YORxVu.js";function c(e){switch(e){case"go test":case"ginkgo":return i;case"jest":case"vitest":return s;case"playwright":return t;case"fixture":return r;case"task":return a;default:return null}}export{c as f};
