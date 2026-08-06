@@ -353,11 +353,15 @@ export const AdvancedConfig: Story = {
     await step("opens the Advanced config tab", async () => {
       const { dialogView } = await openAdvancedDialog(canvasElement);
 
-      await expect(dialogView.getByText("Model")).toBeInTheDocument();
+      await expect(dialogView.getByText("Runtime")).toBeInTheDocument();
       await expect(dialogView.getByText("Generation")).toBeInTheDocument();
       await expect(dialogView.getByText("Budget")).toBeInTheDocument();
-      await expect(dialogView.getByText("Usage")).toBeInTheDocument();
-      await expect(dialogView.getByText("Thread total")).toBeInTheDocument();
+      await expect(
+        dialogView.getByText("Usage (last turn)"),
+      ).toBeInTheDocument();
+      await expect(
+        dialogView.getByText("Conversation total"),
+      ).toBeInTheDocument();
       const select = dialogView.getByRole("combobox", {
         name: "Permission mode",
       });

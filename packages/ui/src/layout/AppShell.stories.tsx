@@ -327,7 +327,7 @@ function NestedNavBody() {
               // disclosure only and there is nothing to navigate to.
               key: "logs",
               label: "logs",
-              items: [item("logs-api", "api"), item("logs-oipa", "oipa")],
+              items: [item("logs-api", "api"), item("logs-core", "core")],
             },
           ],
         },

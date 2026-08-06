@@ -160,11 +160,10 @@ export const Combo: Story = {
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
 
-    // Claude has no API mode: the segment stays visible but inert, worded the
-    // same way the segmented variant words it.
-    const api = within(menu).getByRole("radio", { name: "API" });
-    await expect(api).toBeDisabled();
-    await expect(api).toHaveAttribute("title", "not on Claude");
+    // Claude has no API mode, so the unavailable choice is omitted.
+    await expect(
+      within(menu).queryByRole("radio", { name: "API" }),
+    ).not.toBeInTheDocument();
 
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("menu")).not.toBeInTheDocument();
@@ -220,9 +219,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
   },
 };
 
-export const UnsupportedModesAreDisabled: Story = {
-  // Pinned: the disabled mode is a menuitem here and a radio in combo, which
-  // the Combo story asserts instead.
+export const UnavailableModesAreOmitted: Story = {
   args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
@@ -233,7 +230,7 @@ export const UnsupportedModesAreDisabled: Story = {
 
     await userEvent.click(canvas.getByTitle("Claude Agent SDK"));
     await expect(
-      await body.findByRole("menuitem", { name: /^API not on Claude/ }),
-    ).toBeDisabled();
+      body.queryByRole("menuitem", { name: /^API/ }),
+    ).not.toBeInTheDocument();
   },
 };
