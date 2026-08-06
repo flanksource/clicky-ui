@@ -419,9 +419,9 @@ describe("Chat Captain session projection", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
 
-    expect(
-      await screen.findByText("Updated from Captain."),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Updated from Captain.")).toBeInTheDocument(),
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/chat/sessions/session-1/approvals/approval-1",
       expect.objectContaining({ method: "POST" }),

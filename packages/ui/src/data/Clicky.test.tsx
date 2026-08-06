@@ -606,7 +606,7 @@ describe("Clicky", () => {
       screen.getByRole("button", { name: /time range filter/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
-    expect(screen.queryByText("No data")).not.toBeInTheDocument();
+    expect(screen.getByText("No data")).toBeInTheDocument();
     expect(screen.getByText("0 of 0 rows")).toBeInTheDocument();
   });
 
