@@ -1,5 +1,9 @@
 export { Button, type ButtonProps } from "./components/button";
 export {
+  ErrorWrapper,
+  type ErrorWrapperProps,
+} from "./components/ErrorWrapper";
+export {
   Loading,
   LoadingBar,
   LoadingDots,
