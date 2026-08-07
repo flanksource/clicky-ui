@@ -348,6 +348,12 @@
             "title": "No Lint Cache",
             "type": "boolean"
           },
+          "sandbox": {
+            "default": false,
+            "description": "Run the local agent CLI in an OS-level sandbox",
+            "title": "Sandbox",
+            "type": "boolean"
+          },
           "show-failed": {
             "default": true,
             "description": "Show failing child nodes for this fixture runner step.",
@@ -410,6 +416,7 @@
           "linters",
           "mode",
           "no-lint-cache",
+          "sandbox",
           "since",
           "timeout",
           "work-dir",
@@ -488,7 +495,7 @@
             }
           },
           "failed": {
-            "description": "Path to previous results JSON; re-run only failed tests. Pass without a value to use .gavel/last.json.",
+            "description": "Path to previous results JSON; re-run only failed tests. Pass without a value to use --baseline when set, otherwise .gavel/last.json.",
             "title": "Failed",
             "type": "string",
             "x-help": {
@@ -649,6 +656,14 @@
             "title": "Skip Hooks",
             "type": "boolean"
           },
+          "tags": {
+            "description": "",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "test-timeout": {
             "default": "5m0s",
             "description": "Per-test-package subprocess deadline. Applies to each go test / ginkgo / vitest invocation.",
@@ -717,6 +732,7 @@
           "show-stdout",
           "since",
           "skip-hooks",
+          "tags",
           "test-timeout",
           "timeout",
           "work-dir",
@@ -968,6 +984,705 @@
           "source": "fixtures --help"
         }
       },
+      "record": {
+        "additionalProperties": true,
+        "description": "Recorders capturing ANSI, HTTP and SQL traffic as artifacts under .gavel/recordings. Also accepts the shorthands `record: http` and `record: [ansi, http]`, or `record: none` to opt a fixture out of a file-level or --record default.",
+        "examples": [
+          "http",
+          [
+            "ansi",
+            "http"
+          ],
+          "none"
+        ],
+        "items": {
+          "enum": [
+            "ansi",
+            "http",
+            "sql",
+            "clients",
+            "all",
+            "none"
+          ],
+          "type": "string"
+        },
+        "properties": {
+          "ansi": {
+            "additionalProperties": true,
+            "description": "Asciinema cast recorded from the fixture's PTY. Implies terminal: pty.",
+            "properties": {
+              "height": {
+                "description": "PTY height in rows.",
+                "examples": [
+                  40
+                ],
+                "minimum": 1,
+                "multipleOf": 1,
+                "title": "Height",
+                "type": "integer",
+                "x-help": {
+                  "body": "PTY height.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "interval": {
+                "description": "How often the screen is sampled.",
+                "examples": [
+                  "100ms"
+                ],
+                "title": "Snapshot interval",
+                "type": "string",
+                "x-help": {
+                  "body": "How often the rendered screen is sampled for the duplicate-line analysis.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "maxBytes": {
+                "description": "Cap on the cast size, e.g. 4MiB.",
+                "examples": [
+                  "4MiB"
+                ],
+                "title": "Max bytes",
+                "type": "string",
+                "x-help": {
+                  "body": "Cap on the recorded cast. Accepts humanized sizes.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "width": {
+                "description": "PTY width in columns.",
+                "examples": [
+                  120
+                ],
+                "minimum": 1,
+                "multipleOf": 1,
+                "title": "Width",
+                "type": "integer",
+                "x-help": {
+                  "body": "PTY width, which decides where output wraps.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              }
+            },
+            "type": "object",
+            "x-help": {
+              "body": "Records the terminal as an asciinema v2 cast, replayable with `asciinema play`. There is no ANSI to record from a pipe, so this implies `terminal: pty`.",
+              "section": "Recording",
+              "source": "fixtures --help"
+            },
+            "x-order": [
+              "width",
+              "height",
+              "interval",
+              "maxBytes"
+            ]
+          },
+          "clients": {
+            "additionalProperties": true,
+            "description": "HAR of gavel's own http.Client calls, as opposed to a child process's.",
+            "properties": {
+              "bodies": {
+                "description": "Cap on captured body size, e.g. 64KiB.",
+                "examples": [
+                  "64KiB"
+                ],
+                "title": "Bodies",
+                "type": "string",
+                "x-help": {
+                  "body": "How much of each body is written to the HAR.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "redact": {
+                "description": "Extra header names to blank out.",
+                "examples": [
+                  [
+                    "x-my-token"
+                  ]
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Redact",
+                "type": "array",
+                "x-help": {
+                  "body": "Blanked in addition to the built-in denylist, which is always applied and cannot be disabled.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              }
+            },
+            "type": "object",
+            "x-help": {
+              "body": "Records the HTTP calls gavel itself makes while running the fixture. Separate from `http:` because those clients live all over the gavel process rather than inside a fixture's call stack.",
+              "section": "Recording",
+              "source": "fixtures --help"
+            },
+            "x-order": [
+              "bodies",
+              "redact"
+            ]
+          },
+          "http": {
+            "additionalProperties": true,
+            "description": "HTTP proxy the child process is pointed at, written as a HAR 1.2 document.",
+            "properties": {
+              "bodies": {
+                "description": "Cap on captured body size, e.g. 64KiB. Zero in connect mode — a tunnel has no readable body.",
+                "examples": [
+                  "64KiB"
+                ],
+                "title": "Bodies",
+                "type": "string",
+                "x-help": {
+                  "body": "How much of each request and response body is written to the HAR. Bodies over the cap are truncated and marked.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "hosts": {
+                "description": "Glob patterns limiting what is recorded. Empty records everything.",
+                "examples": [
+                  [
+                    "*.github.com"
+                  ]
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hosts",
+                "type": "array",
+                "x-help": {
+                  "body": "Only matching hosts are recorded, and under `mitm` only matching hosts are decrypted.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "mode": {
+                "default": "connect",
+                "description": "How much of the traffic is visible.",
+                "enum": [
+                  "off",
+                  "connect",
+                  "mitm"
+                ],
+                "examples": [
+                  "connect"
+                ],
+                "title": "Mode",
+                "type": "string",
+                "x-help": {
+                  "body": "`connect` records TLS tunnels without decrypting them. `mitm` terminates TLS with a generated, ephemeral CA — opt-in, because whether a given runtime trusts that CA is best-effort. The CA is never installed into a system trust store.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "redact": {
+                "description": "Extra header names to blank out.",
+                "examples": [
+                  [
+                    "x-my-token"
+                  ]
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Redact",
+                "type": "array",
+                "x-help": {
+                  "body": "Blanked in addition to the built-in denylist (authorization, proxy-authorization, cookie, set-cookie, x-api-key, x-auth-token), which is always applied on disk and cannot be disabled.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "requireEntries": {
+                "description": "Fail the fixture when fewer than N entries were recorded.",
+                "examples": [
+                  1
+                ],
+                "minimum": 0,
+                "multipleOf": 1,
+                "title": "Require entries",
+                "type": "integer",
+                "x-help": {
+                  "body": "Guards against the silent failure: if the child cannot verify the generated CA its TLS handshake fails, nothing is recorded, and the fixture passes with an empty HAR. Set this and that becomes a red test.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "scope": {
+                "default": "file",
+                "description": "Whether the recorder is shared by the whole file or started per test.",
+                "enum": [
+                  "file",
+                  "test"
+                ],
+                "examples": [
+                  "file"
+                ],
+                "title": "Scope",
+                "type": "string",
+                "x-help": {
+                  "body": "Under `file` one recorder serves every test in the document, so attributing an entry to a single test is a time-slice heuristic — the file's tests run concurrently and overlap. `test` gives each test its own recorder at the cost of one listener per test.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              }
+            },
+            "type": "object",
+            "x-help": {
+              "body": "Points the child at a recording proxy through HTTP_PROXY/HTTPS_PROXY and writes what it sees as a HAR, openable in Chrome DevTools. In the default `connect` mode TLS payloads stay encrypted and each tunnel is recorded as one entry with its host, duration and byte counts; plain HTTP is always recorded in full.",
+              "section": "Recording",
+              "source": "fixtures --help"
+            },
+            "x-order": [
+              "mode",
+              "hosts",
+              "bodies",
+              "redact",
+              "requireEntries",
+              "scope"
+            ]
+          },
+          "sql": {
+            "additionalProperties": true,
+            "description": "SQL captured as JSONL.",
+            "properties": {
+              "dsn": {
+                "description": "Upstream postgres the proxy forwards to. Read from the fixture environment when unset.",
+                "examples": [
+                  "$GAVEL_DB_DSN"
+                ],
+                "title": "DSN",
+                "type": "string",
+                "x-help": {
+                  "body": "Upstream database. Left unset the recorder reads it from the fixture's own environment.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "mode": {
+                "default": "proxy",
+                "description": "Where SQL is observed.",
+                "enum": [
+                  "off",
+                  "proxy",
+                  "inprocess"
+                ],
+                "examples": [
+                  "proxy"
+                ],
+                "title": "Mode",
+                "type": "string",
+                "x-help": {
+                  "body": "`proxy` observes a child process; `inprocess` observes gavel's own queries.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "params": {
+                "description": "Keep bind parameter values in the artifact.",
+                "title": "Bind parameters",
+                "type": "boolean",
+                "x-help": {
+                  "body": "Off by default: bind parameters carry the row data, which is the most likely place for a secret.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              },
+              "scope": {
+                "default": "file",
+                "description": "Whether the recorder is shared by the whole file or started per test.",
+                "enum": [
+                  "file",
+                  "test"
+                ],
+                "examples": [
+                  "file"
+                ],
+                "title": "Scope",
+                "type": "string",
+                "x-help": {
+                  "body": "Under `file` one recorder serves every test in the document, so attributing an entry to a single test is a time-slice heuristic — the file's tests run concurrently and overlap. `test` gives each test its own recorder at the cost of one listener per test.",
+                  "section": "Recording",
+                  "source": "fixtures --help"
+                }
+              }
+            },
+            "type": "object",
+            "x-help": {
+              "body": "`proxy` sits between the child process and postgres and requires `sslmode=disable`. `inprocess` hooks gavel's own gorm logger and therefore sees nothing a child process does.",
+              "section": "Recording",
+              "source": "fixtures --help"
+            },
+            "x-order": [
+              "mode",
+              "dsn",
+              "params",
+              "scope"
+            ]
+          }
+        },
+        "type": [
+          "string",
+          "array",
+          "object"
+        ],
+        "x-help": {
+          "body": "`record:` captures evidence a failing fixture would otherwise not have: how the terminal rendered, what HTTP calls the child made, what SQL it issued. Artifacts land in `.gavel/recordings/` and their contents become CEL roots (`cast`, `http`, `sql`) the fixture can assert on. Nothing starts unless a fixture asks for it.",
+          "section": "Recording",
+          "source": "fixtures --help"
+        },
+        "x-order": [
+          "ansi",
+          "http",
+          "sql",
+          "clients"
+        ]
+      },
+      "setup": {
+        "additionalProperties": true,
+        "description": "Environment prepared once per markdown file, before build, and torn down after its last test.",
+        "properties": {
+          "baseDir": {
+            "description": "Where clones and worktrees land, defaulting to a per-file directory under the user cache.",
+            "examples": [
+              ".gavel/fixtures"
+            ],
+            "title": "Base directory",
+            "type": "string",
+            "x-help": {
+              "body": "Clones and worktrees are written here. Defaults to a hash of the markdown path under the user cache directory so runs never write into the repository under test.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            }
+          },
+          "checkout": {
+            "additionalProperties": true,
+            "description": "Git checkout prepared before the file's fixtures run.",
+            "properties": {
+              "connection": {
+                "description": "Stored git credentials, as a `connection://namespace/name` reference.",
+                "examples": [
+                  "connection://git/github"
+                ],
+                "title": "Connection",
+                "type": "string",
+                "x-help": {
+                  "body": "Credentials for a private repository. Resolving a `connection://` reference requires a configured database.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "depth": {
+                "description": "Shallow-clone depth.",
+                "examples": [
+                  1
+                ],
+                "minimum": 0,
+                "multipleOf": 1,
+                "title": "Depth",
+                "type": "integer",
+                "x-help": {
+                  "body": "Shallow-clone depth for remote checkouts.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "mode": {
+                "description": "Checkout source. Inferred from url/path when unset.",
+                "enum": [
+                  "none",
+                  "local",
+                  "remote"
+                ],
+                "examples": [
+                  "local"
+                ],
+                "title": "Mode",
+                "type": "string",
+                "x-help": {
+                  "body": "`local` checks out the repository at `path`; `remote` clones `url`; `none` disables the checkout.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "path": {
+                "description": "Local repository path, with mode: local, resolved relative to the markdown file.",
+                "examples": [
+                  "."
+                ],
+                "title": "Path",
+                "type": "string",
+                "x-help": {
+                  "body": "Local repository to check out, resolved relative to the markdown file.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "ref": {
+                "description": "Branch, tag or commit to check out.",
+                "examples": [
+                  "v1.0.42"
+                ],
+                "title": "Ref",
+                "type": "string",
+                "x-help": {
+                  "body": "Branch, tag or commit to check out.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "since": {
+                "description": "Commit-ish whose merge-base diff against HEAD is folded into the reported changed files.",
+                "examples": [
+                  "main"
+                ],
+                "title": "Since",
+                "type": "string",
+                "x-help": {
+                  "body": "Informational only: widens the reported `dirtyFiles` to include the merge-base diff against this commit. It does not change what the worktree contains.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "url": {
+                "description": "Repository URL, with mode: remote.",
+                "examples": [
+                  "https://github.com/flanksource/gavel"
+                ],
+                "title": "URL",
+                "type": "string",
+                "x-help": {
+                  "body": "Repository to clone in remote mode.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                }
+              },
+              "worktree": {
+                "additionalProperties": true,
+                "description": "Disposable worktree the file's fixtures run in.",
+                "properties": {
+                  "base": {
+                    "default": "HEAD",
+                    "description": "Commit-ish the new worktree branches from.",
+                    "examples": [
+                      "HEAD"
+                    ],
+                    "title": "Base",
+                    "type": "string",
+                    "x-help": {
+                      "body": "Defaults to HEAD so the start commit is the tree you are looking at, independent of `checkout.ref`.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "ignored": {
+                    "default": "clone",
+                    "description": "Whether gitignored content is copied into the new worktree.",
+                    "enum": [
+                      "clone",
+                      "skip"
+                    ],
+                    "examples": [
+                      "clone"
+                    ],
+                    "title": "Ignored files",
+                    "type": "string",
+                    "x-help": {
+                      "body": "`git worktree add` never brings gitignored content, so without `clone` the worktree is missing node_modules/, .env and build caches. Set `skip` in repositories with a very large ignored tree.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "keep": {
+                    "description": "Keep the worktree after the run for post-mortem inspection.",
+                    "title": "Keep",
+                    "type": "boolean",
+                    "x-help": {
+                      "body": "Worktrees are removed on cleanup unless kept.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "mode": {
+                    "description": "Worktree lifecycle.",
+                    "enum": [
+                      "none",
+                      "new",
+                      "existing"
+                    ],
+                    "examples": [
+                      "new"
+                    ],
+                    "title": "Mode",
+                    "type": "string",
+                    "x-help": {
+                      "body": "`new` creates a disposable worktree and removes it afterwards; `existing` reuses the one at `path`; `none` runs in the checkout itself.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "path": {
+                    "description": "Existing worktree path, with mode: existing.",
+                    "title": "Path",
+                    "type": "string",
+                    "x-help": {
+                      "body": "Worktree to reuse in existing mode.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "prefix": {
+                    "description": "Prefix for the generated branch name. Leave unset unless you keep worktrees.",
+                    "title": "Branch prefix",
+                    "type": "string",
+                    "x-help": {
+                      "body": "The branch is disposable and its name is generated. A prefix only helps you recognise leftovers from `keep: true`.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  },
+                  "uncommitted": {
+                    "description": "Whether staged, unstaged and untracked changes are carried into the new worktree. Defaults to `clone` when `base` is HEAD, otherwise `skip` — uncommitted work is a diff against your HEAD, so replaying it onto a worktree branched elsewhere applies to the wrong context.",
+                    "enum": [
+                      "clone",
+                      "skip"
+                    ],
+                    "examples": [
+                      "clone"
+                    ],
+                    "title": "Uncommitted changes",
+                    "type": "string",
+                    "x-help": {
+                      "body": "`clone` carries staged, unstaged and untracked changes across. `skip` gives a pristine tree at `base`. The source repository is never mutated either way.",
+                      "section": "Setup",
+                      "source": "fixtures --help"
+                    }
+                  }
+                },
+                "type": "object",
+                "x-help": {
+                  "body": "A worktree isolates the file from the rest of the repository — not its tests from each other, since every test in the file shares the same tree. Nothing is ever stashed: the source repository is never mutated.",
+                  "section": "Setup",
+                  "source": "fixtures --help"
+                },
+                "x-order": [
+                  "mode",
+                  "base",
+                  "uncommitted",
+                  "ignored",
+                  "prefix",
+                  "path",
+                  "keep"
+                ]
+              }
+            },
+            "type": "object",
+            "x-help": {
+              "body": "Checks out a local or remote repository before the file's fixtures run. With `worktree:` the fixtures run in a disposable tree; the source repository is never mutated.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            },
+            "x-order": [
+              "mode",
+              "url",
+              "path",
+              "connection",
+              "ref",
+              "depth",
+              "since",
+              "worktree"
+            ]
+          },
+          "connections": {
+            "additionalProperties": true,
+            "description": "Cloud and Kubernetes connections whose credentials are injected into the fixture environment.",
+            "type": "object",
+            "x-help": {
+              "body": "Named connections (aws, azure, gcp, kubernetes, …). Each accepts inline credentials or a `connection://namespace/name` reference, which requires a configured database.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            }
+          },
+          "cwd": {
+            "description": "Directory the file's fixtures run in, defaulting to the markdown file's own directory.",
+            "examples": [
+              "."
+            ],
+            "title": "Working directory",
+            "type": "string",
+            "x-help": {
+              "body": "Where the file's fixtures run. Relative paths resolve against the markdown file. A `checkout:` with a worktree overrides this with the prepared tree.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            }
+          },
+          "dotenv": {
+            "description": "`.env` files loaded into the fixture environment, resolved relative to the markdown file.",
+            "examples": [
+              [
+                ".env.test"
+              ]
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Dotenv files",
+            "type": "array",
+            "x-help": {
+              "body": "Dotenv files loaded into the environment of every fixture in the document.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            }
+          },
+          "envVars": {
+            "description": "Environment variables, either literal or sourced from a secret via valueFrom.",
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "name": {
+                  "description": "Variable name.",
+                  "title": "Name",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "Literal value.",
+                  "title": "Value",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "title": "Environment variables",
+            "type": "array",
+            "x-help": {
+              "body": "Environment variables for every fixture in the document. `valueFrom` resolves against a configured secret store.",
+              "section": "Setup",
+              "source": "fixtures --help"
+            }
+          }
+        },
+        "type": "object",
+        "x-help": {
+          "body": "`setup:` prepares dotenv files, environment variables, cloud/Kubernetes connections and a git checkout before any fixture in the document runs. It is file-level only — every test in the file shares one prepared tree.",
+          "section": "Setup",
+          "source": "fixtures --help"
+        },
+        "x-order": [
+          "cwd",
+          "baseDir",
+          "dotenv",
+          "envVars",
+          "checkout",
+          "connections"
+        ]
+      },
       "skip": {
         "description": "Bash command; exit 0 skips the fixture.",
         "examples": [
@@ -1089,6 +1804,8 @@
       "env",
       "cwd",
       "terminal",
+      "setup",
+      "record",
       "files",
       "codeBlocks",
       "timeout",
@@ -1191,7 +1908,7 @@
         "title": "Output options"
       }
     ],
-    "text": "Run fixture-based tests defined in markdown files.\n\nFixtures are markdown files that define test cases using tables or command blocks.\nEach file can have optional YAML front-matter for global configuration.\n\nUSAGE\n  gavel fixtures [flags] <fixture-file-or-glob> [fixture-file-or-glob...]\n\nARGUMENTS\n    fixture-files  One or more markdown fixture files or doublestar glob patterns. At least one is required.\n    Quote globs when you want Gavel to expand them instead of your shell.\n\nFILE STRUCTURE\n  ---\n  build: go build -o myapp           # Shell command run once before all tests\n  daemon: go run ./server --port {{.port}}  # Background command run before tests; stopped after\n  exec: ./myapp                      # Default executable (default: bash)\n  args: [--verbose]                  # Default arguments for exec\n  env:                               # Environment variables for all tests\n    LOG_LEVEL: debug\n  cwd: ./testdir                     # Default working directory\n  terminal: pty                      # Use pseudo-terminal (merges stdout/stderr)\n  files: \"**/*.go\"                   # Glob pattern: replicate tests per matching file\n  codeBlocks: [bash, python]         # Languages to execute (default: [bash])\n  timeout: 30s                       # Total timeout for test execution\n  os: linux                          # Skip on other OSes (prefix ! to negate: !darwin)\n  arch: amd64                        # Skip on other architectures\n  skip: \"! command -v docker\"        # Skip if command exits 0\n  ai:                                # AI verification fixture config\n    model: \"provider/model\"\n    temperature: 0\n    maxTokens: 10000\n    maxConcurrent: 4\n    cacheTTL: 10m\n    noCache: false\n  verify:                            # AI verification scoring options\n    scope: diff\n    threshold: 80\n    disabled: [style]\n  ---\n\nFORMAT 1: MARKDOWN TABLES\n  Each row defines a test. Column headers map to fixture fields:\n\n  | Name | CLI        | Args     | Exit Code | CEL               |\n  |------|------------|----------|-----------|-------------------|\n  | test | ./myapp    | --help   | 0         | stdout.contains() |\n\n  Input columns\n    name, test name  Test name (required)\n    cli, command, exec  Executable to run\n    cli args, args, arguments  Arguments (space-separated)\n    cwd, dir, working directory  Working directory\n    terminal, term  Terminal mode (\"pty\" for pseudo-terminal)\n    os  OS constraint (e.g. \"linux\", \"!darwin\")\n    arch  Architecture constraint (e.g. \"amd64\")\n    skip  Bash command; exit 0 = skip test\n    query  Query string\n\n  Expectation columns\n    exit code, exitcode  Expected exit code (default: 0, \"-\" to skip)\n    expected output, output, stdout  Expected stdout (literal or @file reference)\n    stderr  Expected stderr (literal or @file reference)\n    expected error, error  Expected stderr substring (implies non-zero exit)\n    expected format, format  Output format validation (json, yaml)\n    expected count, count  Expected result count for fixture types that expose counts\n    expected matches, matches  Expected output/result matcher value\n    expected results, results  Expected structured result value\n    expected files, files  Expected file result value\n    template output  Expected templated output value\n    cel, validation, expr  CEL validation expression\n\n  Unrecognized columns become Properties available in CEL.\n\nFORMAT 2: COMMAND BLOCKS\n  Use heading ### command: <test name> followed by code blocks:\n\n  ### command: my test\n  ```yaml\n  cwd: ./testdir\n  exitCode: 0\n  terminal: pty\n  os: linux\n  env:\n    KEY: value\n  ```\n  ```bash\n  echo \"hello world\"\n  ```\n\n  YAML fields: cwd, exitCode, env, timeout, terminal, os, arch, skip\n\n  Validations\n    * cel: stdout.contains(\"hello\")\n    * contains: hello\n    * regex: .*world.*\n    * not: contains: error\n\nFORMAT 3: AI VERIFICATION FIXTURES\n  Add ai: front-matter to turn the markdown document into one AI verification step.\n  The first ```prompt or ```ai block becomes reviewer instructions.\n  GitHub task-list items become scored acceptance criteria.\n\n  Example\n  ---\n  ai:\n    model: \"claude-code-sonnet\"\n  verify:\n    threshold: 80\n  ---\n\n  # Verify feature X\n\n  Some prose describing the expected change.\n\n  ```prompt\n  Focus on the new parser path and acceptance criteria.\n  ```\n\n  ## Acceptance Criteria\n  - [ ] Parser errors are actionable\n  - [ ] Existing fixture formats still pass\n\n  - cel: json.score >= 80\n\n  AI options\n    model  Agent model name (falls back to the default model)\n    temperature  Sampling temperature\n    maxTokens  Maximum response tokens\n    maxConcurrent  Maximum concurrent AI checks\n    cacheTTL  Cache duration for AI calls\n    noCache  Disable AI response cache\n\n  Verify options\n    scope  Review scope, defaulting to the working-tree diff\n    threshold  Minimum passing score, defaulting to 80\n    disabled  Check IDs to disable for this fixture\n\n\nFORMAT 4: TEST / LINT STEPS\n  A ```yaml test or ```yaml lint fence (bare ```test / ```lint also work; the\n  leading yaml is optional and only there for editor highlighting) runs the test / lint\n  engine. The YAML body is unmarshalled directly onto the gavel test / gavel lint options, so\n  every CLI flag is available as a key (kebab-case). Each test / violation becomes a child node.\n\n  Example\n  ## Run the engine tests\n  ```yaml test\n  paths: [./testrunner/...]\n  framework: [go]\n  test-timeout: 2m\n  show-passed: true\n  ```\n\n  ## Lint the changed files\n  ```lint\n  linters: [golangci-lint, ruff]\n  changed: true\n  fix: false\n  ```\n\n  Common test keys\n    (full list: gavel test --help)\n    paths  Package paths to test (empty = discover all)\n    framework  Restrict to jest, vitest, playwright, go, ginkgo\n    changed, since, failed, baseline  Narrow to changed / prior-failed / new-vs-baseline packages\n    extra-args  Arguments forwarded to the underlying runner\n    test-timeout, timeout  Per-package / whole-run deadline (e.g. 2m)\n    lint  Also run linters in parallel with the tests\n\n  Common lint keys\n    (full list: gavel lint --help)\n    linters  Only run these linters (empty = every detected linter)\n    files  Target paths to lint\n    ignore  Glob patterns to exclude\n    fix  Apply auto-fixes\n    changed, since, baseline, failed  Only report new / prior violations\n    timeout  Per-linter timeout (e.g. 5m)\n\n  Rendering\n    show-passed  Add passing tests / clean linters as child nodes (default: only failures)\n    show-failed  Add failing tests / violations as child nodes (default: true)\n\n  UI / detach options (ui, addr, detach) are ignored, and a test step never\n  recurses into fixture discovery.\n\nSUPPORTED LANGUAGES\n    bash, sh, shell  bash -c <content>\n    python, py, python3  python -c <content>\n    typescript, ts  ts-node -e <content>\n    javascript, js  node -e <content>\n    pwsh, powershell  pwsh -Command <content>\n    go  go <content>\n    test, lint (or yaml test/yaml lint)  Run the test / lint engine (see FORMAT 4)\n\n  Non-executable labels (parsed as config): yaml, frontmatter, json\n\nINLINE CODE FENCE ATTRIBUTES\n  Attributes on the opening fence override YAML block values:\n\n    ```bash exitCode=1 timeout=30\n    exit 1\n    ```\n\n  Supported: exitCode=N (integer), timeout=N (seconds).\n\nVALIDATION SHORTHAND\n  Bullet lists after a code block define validations (joined with &&):\n\n    cel: <expr>  Raw CEL expression\n    contains: <text>  stdout.contains(\"<text>\")\n    regex: <pattern>  stdout.matches(\"<pattern>\")\n    not: contains: <text>  !stdout.contains(\"<text>\")\n    not: <expr>  !(<expr>)\n\n\nCEL VALIDATION\n  Expressions must evaluate to true.\n\n  Variables\n    stdout  string    Process stdout\n    output  string    Alias for process stdout\n    stderr  string    Process stderr\n    exitCode  int       Process exit code\n    json  any       Auto-parsed JSON (when stdout starts with { or [)\n    name  string    Test name\n    sourceDir  string    Directory containing the fixture file\n    query  string    Query string\n    expectations  object    Expected values and custom table properties\n    workDir  string    Working directory\n    executablePath  string    Path to the gavel binary\n\n  Auto-injected variables (use as $VAR or {{.VAR}})\n    GIT_ROOT_DIR  string    Nearest parent with .git\n    GO_ROOT_DIR  string    Nearest parent with go.mod\n    ROOT_DIR  string    GIT_ROOT_DIR > GO_ROOT_DIR > workDir\n    CWD  string    Resolved working directory\n    GOOS  string    Go runtime OS (linux, darwin, ...)\n    GOARCH  string    Go runtime arch (amd64, arm64, ...)\n    GOPATH  string    Go workspace path\n\n  ANSI detection\n    ansi.has_color  bool   Output contains ANSI color codes\n    ansi.has_any  bool   Output contains any ANSI escape sequences\n    ansi.has_updates  bool   Output contains cursor movement codes\n\n    ansi.has_cursor_hide  bool   Output hides the cursor\n    ansi.has_cursor_show  bool   Output shows the cursor\n    ansi.has_reset  bool   Output contains an SGR reset\n    ansi.stray_controls  bool   Output contains unexpected control bytes\n    ansi.final_text  string Final settled terminal text\n    ansi.duplicate_lines  list   Duplicate settled terminal lines\n    ansi.has_duplicates  bool   Duplicate settled terminal lines were found\n\n  File expansion variables\n    file  string    Relative path to matched file\n    filename  string    Filename without extension\n    dir  string    Directory containing the file\n    absfile  string    Absolute file path\n    absdir  string    Absolute directory\n    basename  string    Full filename with extension\n    ext  string    File extension\n\n  Temp file variables\n  (when temp_files configured)\n    <name>.path  string    Path to temp file\n    <name>.content  string    File content\n    <name>.ext  string    File extension\n    <name>.detected  string    Detected type (text, json, xml, yaml)\n    <name>.json  any       Parsed JSON (if content is JSON)\n\n  Built-in CEL functions\n    string.contains(s)  startsWith(s)  endsWith(s)  matches(regex)\n    size(list)  list.all(x, pred)  list.exists(x, pred)  list.filter(x, pred)\n    has_color(s)  has_ansi(s)  has_cursor_updates(s)\n  Extended gomplate functions\n    strings.*  math.*  regexp.*  conv.*  coll.*  data.*  file.*  time.*\n\nTEMPLATE VARIABLES\n  The exec, daemon, build, args, and cwd fields support shell-style $VAR and Go template syntax:\n\n    exec: $executablePath\n    daemon: go run ./server --port {{.port}}\n    args: [--file, \"$file\"]\n    build: go build -o $workDir/myapp\n    cwd: $GIT_ROOT_DIR/testdata\n    port  Free TCP port available to daemon commands and fixture templates\n\n\nFILE EXPANSION\n  Set files in front-matter to replicate each test per matching file:\n\n  ---\n  files: \"**/*.go\"\n  exec: golint\n  args: [\"{{.file}}\"]\n  ---\n\nCWD RESOLUTION\n  Working directory is resolved with the following priority:\n\n    1. Test-level CWD (per-test frontmatter or table column)\n    2. File-level CWD (YAML front-matter at top of file)\n    3. SourceDir (directory containing the fixture file)\n    4. --cwd flag or current working directory\n\n  Relative CWD paths are resolved from SourceDir.\n\nEXECUTION\n  Tests run in parallel with a 2-minute default timeout per test\n  and 5-minute timeout for the build step. The build command runs\n  once before any tests. A daemon command, when configured, starts\n  after build, waits for its free port to accept connections, and is\n  stopped after all fixtures finish.\n\nOUTPUT OPTIONS\n    -v  Show passed fixture results\n    -vv  Also show executed commands\n    -vvv  Also show CEL variables and stdout/stderr by default\n    --show-passed  Show passed fixture results without increasing log verbosity\n    --show-stdout  When to show stdout: Never, OnFailure, Always\n    --show-stderr  When to show stderr: Never, OnFailure, Always\n    --update-golden  Rewrite mismatched @file stdout/stderr expectations\n\n\nEXAMPLES\n  gavel fixtures tests.md                  # Run a single fixture file\n  gavel fixtures fixtures/**/*.md          # Run with glob\n  gavel fixtures -v tests.md               # Show passed fixtures\n  gavel fixtures -vv tests.md              # Also show commands\n  gavel fixtures -vvv tests.md             # Also show stdout/stderr\n  gavel fixtures --no-progress tests.md    # Disable progress display\n  gavel fixtures outline tests.md          # Parse and outline without running fixtures\n  gavel fixtures --schema                  # Print the fixture/test JSON schemas and exit\nFLAGS\n  -h, --help  help for fixtures\n  --schema  Print fixture editor JSON schemas and exit\n  --show-passed  Show passed fixture results in output\n  --show-stderr string  When to show stderr: Never, OnFailure, Always (default OnFailure)\n  --show-stdout string  When to show stdout: Never, OnFailure, Always (default OnFailure)\n  --update-golden  Rewrite @file stdout/stderr expectations with actual output instead of failing on mismatch\n\nGLOBAL FLAGS\n  --csv  Output in CSV format\n  --cwd string  Working directory\n  --db-url string  PostgreSQL database URL (overrides environment and db.json)\n  --dump-schema  Dump the schema to stderr for debugging\n  --filter string  CEL expression to filter output data\n  --format string  Output format. Either a single format (pretty|json|yaml|csv|html|markdown|pdf|slack) rendered to stdout, or a comma-separated list of format=file sinks (e.g. 'json=out.json,markdown=summary.md') written to files. A bare format and format=file pairs may be mixed in one spec.\n  --graceful-timeout duration  Timeout for graceful shutdown on interrupt (default 10s)\n  --html  Output in HTML format\n  --json  Output in JSON format\n  --json-logs  Print logs in json format to stderr\n  --log-level string  Set the default log level (default info)\n  --log-to-stderr  Log to stderr instead of stdout (default true)\n  -v, --loglevel count  Increase logging level (default 0)\n  --markdown  Output in Markdown format\n  --max-concurrent int  Maximum concurrent tasks (0 = unlimited) (default 4)\n  --max-retries int  Maximum retry attempts for failed tasks (default 3)\n  --no-color  Disable colored output\n  --no-progress  Disable progress display\n  --pdf  Output in PDF format\n  --pretty  Output in pretty format (default)\n  --report-caller  Report log caller info\n  --retry-delay duration  Base delay between retry attempts (default 1s)\n  --table  Display in table structure (additive with format)\n  --tree  Display in tree structure (additive with format)\n  --yaml  Output in YAML format\n\n"
+    "text": "Run fixture-based tests defined in markdown files.\n\nFixtures are markdown files that define test cases using tables or command blocks.\nEach file can have optional YAML front-matter for global configuration.\n\nUSAGE\n  gavel fixtures [flags] <fixture-file-or-glob> [fixture-file-or-glob...]\n  gavel fixtures --ui checks.fixture.md  # stream the typed execution tree in the test UI\n\nARGUMENTS\n    fixture-files  One or more markdown fixture files or doublestar glob patterns. At least one is required.\n    Quote globs when you want Gavel to expand them instead of your shell.\n\nFILE STRUCTURE\n  ---\n  build: go build -o myapp           # Shell command run once before all tests\n  daemon: go run ./server --port {{.port}}  # Background command run before tests; stopped after\n  exec: ./myapp                      # Default executable (default: bash)\n  args: [--verbose]                  # Default arguments for exec\n  env:                               # Environment variables for all tests\n    LOG_LEVEL: debug\n  cwd: ./testdir                     # Default working directory\n  terminal: pty                      # Use pseudo-terminal (merges stdout/stderr)\n  setup:                             # Environment prepared once per file (see SETUP)\n    dotenv: [.env.test]\n    checkout: {mode: local, worktree: {mode: new}}\n  record: [ansi, http]               # Capture diagnostic artifacts (see RECORDING)\n  files: \"**/*.go\"                   # Glob pattern: replicate tests per matching file\n  codeBlocks: [bash, python]         # Languages to execute (default: [bash])\n  timeout: 30s                       # Total timeout for test execution\n  os: linux                          # Skip on other OSes (prefix ! to negate: !darwin)\n  arch: amd64                        # Skip on other architectures\n  skip: \"! command -v docker\"        # Skip if command exits 0\n  ai:                                # AI verification fixture config\n    model: \"provider/model\"\n    temperature: 0\n    maxTokens: 10000\n    maxConcurrent: 4\n    cacheTTL: 10m\n    noCache: false\n  verify:                            # AI verification scoring options\n    scope: diff\n    threshold: 80\n    disabled: [style]\n  ---\n\nFORMAT 1: MARKDOWN TABLES\n  Each row defines a test. Column headers map to fixture fields:\n\n  | Name | CLI        | Args     | Exit Code | CEL               |\n  |------|------------|----------|-----------|-------------------|\n  | test | ./myapp    | --help   | 0         | stdout.contains() |\n\n  Input columns\n    name, test name  Test name (required)\n    cli, command, exec  Executable to run\n    cli args, args, arguments  Arguments (space-separated)\n    cwd, dir, working directory  Working directory\n    terminal, term  Terminal mode (\"pty\" for pseudo-terminal)\n    os  OS constraint (e.g. \"linux\", \"!darwin\")\n    arch  Architecture constraint (e.g. \"amd64\")\n    skip  Bash command; exit 0 = skip test\n    record, recording  Recorders for this row: ansi, http, sql, clients, all, none\n    query  Query string\n\n  Expectation columns\n    exit code, exitcode  Expected exit code (default: 0, \"-\" to skip)\n    expected output, output, stdout  Expected stdout (literal or @file reference)\n    stderr  Expected stderr (literal or @file reference)\n    expected error, error  Expected stderr substring (implies non-zero exit)\n    expected format, format  Output format validation (json, yaml)\n    expected count, count  Expected result count for fixture types that expose counts\n    expected matches, matches  Expected output/result matcher value\n    expected results, results  Expected structured result value\n    expected files, files  Expected file result value\n    template output  Expected templated output value\n    cel, validation, expr  CEL validation expression\n\n  Unrecognized columns become Properties available in CEL.\n\nFORMAT 2: COMMAND BLOCKS\n  Use heading ### command: <test name> followed by code blocks:\n\n  ### command: my test\n  ```yaml\n  cwd: ./testdir\n  exitCode: 0\n  terminal: pty\n  os: linux\n  env:\n    KEY: value\n  ```\n  ```bash\n  echo \"hello world\"\n  ```\n\n  YAML fields: cwd, exitCode, env, timeout, terminal, os, arch, skip, record\n\n  Validations\n    * cel: stdout.contains(\"hello\")\n    * contains: hello\n    * regex: .*world.*\n    * not: contains: error\n\nFORMAT 3: AI VERIFICATION FIXTURES\n  Add ai: front-matter to turn the markdown document into one AI verification step.\n  The first ```prompt or ```ai block becomes reviewer instructions.\n  GitHub task-list items become scored acceptance criteria.\n\n  Example\n  ---\n  ai:\n    model: \"claude-code-sonnet\"\n  verify:\n    threshold: 80\n  ---\n\n  # Verify feature X\n\n  Some prose describing the expected change.\n\n  ```prompt\n  Focus on the new parser path and acceptance criteria.\n  ```\n\n  ## Acceptance Criteria\n  - [ ] Parser errors are actionable\n  - [ ] Existing fixture formats still pass\n\n  - cel: json.score >= 80\n\n  AI options\n    model  Agent model name (falls back to the default model)\n    temperature  Sampling temperature\n    maxTokens  Maximum response tokens\n    maxConcurrent  Maximum concurrent AI checks\n    cacheTTL  Cache duration for AI calls\n    noCache  Disable AI response cache\n\n  Verify options\n    scope  Review scope, defaulting to the working-tree diff\n    threshold  Minimum passing score, defaulting to 80\n    disabled  Check IDs to disable for this fixture\n\n\nFORMAT 4: TEST / LINT STEPS\n  A ```yaml test or ```yaml lint fence (bare ```test / ```lint also work; the\n  leading yaml is optional and only there for editor highlighting) runs the test / lint\n  engine. The YAML body is unmarshalled directly onto the gavel test / gavel lint options, so\n  every CLI flag is available as a key (kebab-case). Each test / violation becomes a child node.\n\n  Example\n  ## Run the engine tests\n  ```yaml test\n  paths: [./testrunner/...]\n  framework: [go]\n  test-timeout: 2m\n  show-passed: true\n  ```\n\n  ## Lint the changed files\n  ```lint\n  linters: [golangci-lint, ruff]\n  changed: true\n  fix: false\n  ```\n\n  Common test keys\n    (full list: gavel test --help)\n    paths  Package paths to test (empty = discover all)\n    framework  Restrict to jest, vitest, playwright, go, ginkgo\n    changed, since, failed, baseline  Narrow to changed / prior-failed / new-vs-baseline packages\n    extra-args  Arguments forwarded to the underlying runner\n    test-timeout, timeout  Per-package / whole-run deadline (e.g. 2m)\n    lint  Also run linters in parallel with the tests\n\n  Common lint keys\n    (full list: gavel lint --help)\n    linters  Only run these linters (empty = every detected linter)\n    files  Target paths to lint\n    ignore  Glob patterns to exclude\n    fix  Apply auto-fixes\n    changed, since, baseline, failed  Only report new / prior violations\n    timeout  Per-linter timeout (e.g. 5m)\n\n  Rendering\n    show-passed  Add passing tests / clean linters as child nodes (default: only failures)\n    show-failed  Add failing tests / violations as child nodes (default: true)\n\n  UI / detach options (ui, addr, detach) are ignored, and a test step never\n  recurses into fixture discovery.\n\nSUPPORTED LANGUAGES\n    bash, sh, shell  bash -c <content>\n    python, py, python3  python -c <content>\n    typescript, ts  ts-node -e <content>\n    javascript, js  node -e <content>\n    pwsh, powershell  pwsh -Command <content>\n    go  go <content>\n    test, lint (or yaml test/yaml lint)  Run the test / lint engine (see FORMAT 4)\n\n  Non-executable labels (parsed as config): yaml, frontmatter, json\n\nINLINE CODE FENCE ATTRIBUTES\n  Attributes on the opening fence override YAML block values:\n\n    ```bash exitCode=1 timeout=30\n    exit 1\n    ```\n\n  Supported: exitCode=N (integer), timeout=N (seconds).\n\nVALIDATION SHORTHAND\n  Bullet lists after a code block define validations (joined with &&):\n\n    cel: <expr>  Raw CEL expression\n    contains: <text>  stdout.contains(\"<text>\")\n    regex: <pattern>  stdout.matches(\"<pattern>\")\n    not: contains: <text>  !stdout.contains(\"<text>\")\n    not: <expr>  !(<expr>)\n\n\nCEL VALIDATION\n  Expressions must evaluate to true.\n\n  Variables\n    stdout  string    Process stdout\n    output  string    Alias for process stdout\n    stderr  string    Process stderr\n    exitCode  int       Process exit code\n    json  any       Auto-parsed JSON (when stdout starts with { or [)\n    name  string    Test name\n    sourceDir  string    Directory containing the fixture file\n    query  string    Query string\n    expectations  object    Expected values and custom table properties\n    workDir  string    Working directory\n    executablePath  string    Path to the gavel binary\n\n  Auto-injected variables (use as $VAR or {{.VAR}})\n    GIT_ROOT_DIR  string    Nearest parent with .git\n    GO_ROOT_DIR  string    Nearest parent with go.mod\n    ROOT_DIR  string    GIT_ROOT_DIR > GO_ROOT_DIR > workDir\n    CWD  string    Resolved working directory\n    GOOS  string    Go runtime OS (linux, darwin, ...)\n    GOARCH  string    Go runtime arch (amd64, arm64, ...)\n    GOPATH  string    Go workspace path\n\n  ANSI detection\n    ansi.has_color  bool   Output contains ANSI color codes\n    ansi.has_any  bool   Output contains any ANSI escape sequences\n    ansi.has_updates  bool   Output contains cursor movement codes\n\n    ansi.has_cursor_hide  bool   Output hides the cursor\n    ansi.has_cursor_show  bool   Output shows the cursor\n    ansi.has_reset  bool   Output contains an SGR reset\n    ansi.stray_controls  bool   Output contains unexpected control bytes\n    ansi.final_text  string Final settled terminal text\n    ansi.duplicate_lines  list   Duplicate settled terminal lines\n    ansi.has_duplicates  bool   Duplicate settled terminal lines were found\n\n  File expansion variables\n    file  string    Relative path to matched file\n    filename  string    Filename without extension\n    dir  string    Directory containing the file\n    absfile  string    Absolute file path\n    absdir  string    Absolute directory\n    basename  string    Full filename with extension\n    ext  string    File extension\n\n  Temp file variables\n  (when temp_files configured)\n    <name>.path  string    Path to temp file\n    <name>.content  string    File content\n    <name>.ext  string    File extension\n    <name>.detected  string    Detected type (text, json, xml, yaml)\n    <name>.json  any       Parsed JSON (if content is JSON)\n\n  Built-in CEL functions\n    string.contains(s)  startsWith(s)  endsWith(s)  matches(regex)\n    size(list)  list.all(x, pred)  list.exists(x, pred)  list.filter(x, pred)\n    has_color(s)  has_ansi(s)  has_cursor_updates(s)\n  Extended gomplate functions\n    strings.*  math.*  regexp.*  conv.*  coll.*  data.*  file.*  time.*\n\nTEMPLATE VARIABLES\n  The exec, daemon, build, args, and cwd fields support shell-style $VAR and Go template syntax:\n\n    exec: $executablePath\n    daemon: go run ./server --port {{.port}}\n    args: [--file, \"$file\"]\n    build: go build -o $workDir/myapp\n    cwd: $GIT_ROOT_DIR/testdata\n    port  Free TCP port available to daemon commands and fixture templates\n\n\nFILE EXPANSION\n  Set files in front-matter to replicate each test per matching file:\n\n  ---\n  files: \"**/*.go\"\n  exec: golint\n  args: [\"{{.file}}\"]\n  ---\n\nSETUP\n  setup: declares the environment a file's tests need — dotenv files, environment\n  variables, cloud/Kubernetes connections, and a git checkout or worktree to run in.\n\n  It is file-level front-matter only: prepared once, shared by every test in the file,\n  and torn down after the last one finishes. A per-test setup: is an error. Because the\n  file's tests still run concurrently in one group, a worktree isolates the file from the\n  rest of the repository — it does not isolate the file's tests from each other.\n\n  Example\n  ---\n  setup:\n    dotenv: [.env.test]\n    envVars:\n      - name: LOG_LEVEL\n        value: debug\n    checkout:\n      mode: local          # none | local | remote\n      worktree:\n        mode: new          # none | new | existing\n        base: HEAD         # commit-ish to branch from\n        uncommitted: clone # clone | skip — staged + unstaged + untracked\n        ignored: clone     # clone | skip — gitignored content\n        keep: false\n    connections:\n      aws: {connection: \"connection://aws/sandbox\", region: us-east-1}\n  build: go build -o ./bin/app\n  exec: ./bin/app\n  ---\n\n  Options\n    cwd  Where the file's commands run (default: the markdown file's directory)\n    baseDir  Where clones and worktrees land (default: a per-file dir under the user cache)\n    dotenv  Dotenv files to load, resolved relative to the markdown file\n    envVars  Explicit name/value (or valueFrom) environment entries\n    checkout  Git checkout: mode none|local|remote, url, ref, path, connection, since\n    checkout.worktree  Disposable worktree: mode none|new|existing, base, uncommitted, ignored, prefix, keep\n    connections  Named cloud/Kubernetes connections; connection:// refs need a database\n\n  Guarantees\n    * The source repository is never mutated — nothing is stashed, moved, or restored.\n    * Ordering is setup → build → daemon → tests → daemon stop → setup cleanup, so\n      build: compiles the same tree the tests exercise.\n    * worktree.uncommitted defaults to clone only when base is HEAD; branching\n      elsewhere degrades it to skip with a warning, because uncommitted work is a diff\n      against your HEAD. worktree.ignored defaults to clone so node_modules, .env and\n      build caches come along; set ignored: skip when that tree is large.\n    * $SETUP_DIR (template var and child env var) is the prepared directory, and\n      GIT_ROOT_DIR/ROOT_DIR are re-rooted onto it. {{.setup}} carries commit,\n      worktree, path and dirtyFiles.\n    * Golden @file expectations still resolve next to the markdown, never inside the\n      worktree — the commands move, their expectations do not.\n    * Environment precedence, highest first: fixture env: > setup env > injected roots >\n      the inherited process environment. Setup env is additive, not hermetic.\n\nRECORDING\n  record: captures the evidence a failing fixture would otherwise not have: how the\n  terminal rendered, what HTTP calls the child made, what SQL it issued. Artifacts land\n  in .gavel/recordings/ and their contents become CEL roots the fixture can assert on.\n\n  Nothing starts unless a fixture asks for it — no record:, no listeners, no files.\n\n  Surfaces\n  record: http                        # one recorder\n  record: [ansi, http]                # several\n  record: none                        # opt out of a file-level or --record default\n  record:                             # full form\n    http: {mode: connect, hosts: [\"*.github.com\"], bodies: 64KiB, requireEntries: 1}\n    ansi: {width: 120, height: 40}\n    sql:  {mode: proxy, params: false}\n\n  Also settable per test (front-matter or a Record table column) and run-wide with\n  --record. A per-test value replaces the file's outright. record: none is how a single\n  test escapes both.\n\n  Recorders\n    http  Proxies the child through HTTP_PROXY and writes a HAR 1.2 document\n    ansi  Runs the fixture under a PTY and records an asciinema v2 cast\n    sql  Proxies postgres and records every statement as JSONL\n    clients  HAR of gavel's own outbound HTTP calls, which no proxy can see\n\n  A recorder with no implementation fails the fixture rather than silently recording nothing.\n\n  ANSI\n    * Implies terminal: pty — there is no ANSI to record from a pipe. The cast plays\n      with asciinema play; gavel's extras ride in the header's _gavel key.\n    * Recording also tracks the settled screen, so cast.final is what a terminal would\n      show at the end and cast.duplicates names the lines a redraw left behind twice.\n    * maxBytes (4MiB default) caps the recorded event stream, never the fixture's\n      stdout — assertions always see every byte. A cap hit sets cast.truncated.\n\n  HTTP\n    * mode: connect (default) records one entry per TLS tunnel — host, duration, bytes —\n      without decrypting it. Plain HTTP is always recorded in full. mode: mitm terminates\n      TLS with an ephemeral CA and is opt-in, because whether a given runtime trusts\n      that CA is best-effort. The CA is never installed into a system trust store.\n    * requireEntries: N turns \"recorded nothing\" into a red test, which is the only\n      defence against a child that silently failed to trust the CA.\n    * Sensitive headers (authorization, cookie, set-cookie, x-api-key, …) are blanked\n      in the artifact itself. That denylist cannot be disabled; redact: extends it.\n    * scope: file (default) shares one proxy across the file, so attributing an entry\n      to one test is a time-slice heuristic — the file's tests overlap. scope: test\n      gives each test its own proxy.\n\n  SQL\n    * mode: proxy (default) points the child at a local postgres proxy and reads a copy\n      of the wire. The DSN comes from dsn:, else GAVEL_DB_DSN or DATABASE_URL;\n      both are rewritten for the child, along with PGHOST/PGPORT/PGDATABASE.\n    * The proxy refuses TLS, so the upstream must accept unencrypted connections —\n      true of an embedded or local postgres, not of a managed cloud database.\n    * mode: inprocess records gavel's own queries instead of the child's, through the\n      gorm logger. It is the only way to see a fixture step that runs inside gavel,\n      and it sees nothing a child process does. Bind values follow the database\n      logger's own policy there, not params:.\n    * params: true keeps bind values in the artifact. Off by default — bind values carry\n      the row data, which is the likeliest place in a capture for a secret.\n\n  CLIENTS\n    * Records the calls gavel itself makes — GitHub, favicons, a running daemon —\n      as a HAR under the clients root. A child process's traffic is never in it;\n      that is what http is for. The two roots have the same shape.\n    * Like sql: {mode: inprocess} it watches one process, so only one file per run\n      may declare it — a second would capture the first's traffic into its artifact.\n    * Bodies are off unless bodies: asks for them; the header denylist applies here too.\n\n  Asserting\n  cel: http.entries == 2 && http.errors == 0\n  cel: http.requests.filter(r, r.host == \"api.github.com\").size() == 2\n  cel: http.statuses[\"404\"] == 1 && http.methods[\"GET\"] == 2\n  cel: cast.duplicates.size() == 0 && cast.duration_ms < 2000\n  cel: sql.by_op[\"INSERT\"] == 1 && sql.errors == 0\n  cel: clients.hosts.exists(h, h == \"api.github.com\")\n\n  The http root exists only when the recorder ran, so asserting on a recording that\n  never happened fails on the missing variable rather than on a zero that looks like\n  an answer. When it did run every key is present, so http.errors == 0 is legal for a\n  fixture that made no calls. Per-request detail is capped at 200; the counts are exact.\n\nCWD RESOLUTION\n  Working directory is resolved with the following priority:\n\n    1. Test-level CWD (per-test frontmatter or table column)\n    2. File-level CWD (YAML front-matter at top of file)\n    3. Prepared setup (the checkout or worktree from setup:)\n    4. SourceDir (directory containing the fixture file)\n    5. --cwd flag or current working directory\n\n  Relative CWD paths are resolved from the prepared setup when the file declared one,\n  otherwise from SourceDir.\n\nEXECUTION\n  Tests run in parallel with a 2-minute default timeout per test\n  and 5-minute timeout for the build step. Each file's setup: is prepared\n  first, so the build command — which runs once before any tests —\n  compiles inside the prepared tree. A daemon command, when configured,\n  starts after build, waits for its free port to accept connections, and\n  is stopped after all fixtures finish; setups are torn down last.\n\nOUTPUT OPTIONS\n    -v  Show passed fixture results\n    -vv  Also show executed commands\n    -vvv  Also show CEL variables and stdout/stderr by default\n    --show-passed  Show passed fixture results without increasing log verbosity\n    --show-stdout  When to show stdout: Never, OnFailure, Always\n    --show-stderr  When to show stderr: Never, OnFailure, Always\n    --update-golden  Rewrite mismatched @file stdout/stderr expectations\n\n\nEXAMPLES\n  gavel fixtures tests.md                  # Run a single fixture file\n  gavel fixtures fixtures/**/*.md          # Run with glob\n  gavel fixtures -v tests.md               # Show passed fixtures\n  gavel fixtures -vv tests.md              # Also show commands\n  gavel fixtures -vvv tests.md             # Also show stdout/stderr\n  gavel fixtures --no-progress tests.md    # Disable progress display\n  gavel fixtures outline tests.md          # Parse and outline without running fixtures\n  gavel fixtures --schema                  # Print the fixture/test JSON schemas and exit\nFLAGS\n  --addr string  Interface to bind the fixture UI HTTP server (default 0.0.0.0)\n  --auto-stop duration  With --ui --detach, hard deadline for the detached UI server (default 0s)\n  --detach  With --ui, keep serving the completed fixture run in a detached process\n  -h, --help  help for fixtures\n  --idle-timeout duration  With --ui --detach, stop serving after this long without HTTP requests (default 0s)\n  --record string  Record diagnostics for fixtures that declare no `record:` of their own: ansi, http, sql, clients, all (comma-separated)\n  --schema  Print fixture editor JSON schemas and exit\n  --show-passed  Show passed fixture results in output\n  --show-stderr string  When to show stderr: Never, OnFailure, Always (default OnFailure)\n  --show-stdout string  When to show stdout: Never, OnFailure, Always (default OnFailure)\n  --ui  Launch a browser with the live fixture execution tree\n  --update-golden  Rewrite @file stdout/stderr expectations with actual output instead of failing on mismatch\n\nGLOBAL FLAGS\n  --csv  Output in CSV format\n  --cwd string  Working directory\n  --db-url string  PostgreSQL database URL (overrides environment and db.json)\n  --dump-schema  Dump the schema to stderr for debugging\n  --filter string  CEL expression to filter output data\n  --format string  Output format. Either a single format (pretty|json|yaml|csv|html|markdown|pdf|slack) rendered to stdout, or a comma-separated list of format=file sinks (e.g. 'json=out.json,markdown=summary.md') written to files. A bare format and format=file pairs may be mixed in one spec.\n  --graceful-timeout duration  Timeout for graceful shutdown on interrupt (default 10s)\n  --html  Output in HTML format\n  --json  Output in JSON format\n  --json-logs  Print logs in json format to stderr\n  --log-level string  Set the default log level (default info)\n  --log-to-stderr  Log to stderr instead of stdout (default true)\n  -v, --loglevel count  Increase logging level (default 0)\n  --markdown  Output in Markdown format\n  --max-concurrent int  Maximum concurrent tasks (0 = unlimited) (default 4)\n  --max-retries int  Maximum retry attempts for failed tasks (default 3)\n  --no-color  Disable colored output\n  --no-progress  Disable progress display\n  --pdf  Output in PDF format\n  --pretty  Output in pretty format (default)\n  --report-caller  Report log caller info\n  --retry-delay duration  Base delay between retry attempts (default 1s)\n  --table  Display in table structure (additive with format)\n  --tree  Display in tree structure (additive with format)\n  --yaml  Output in YAML format\n\n"
   },
   "schemaVersion": 1,
   "source": "gavel fixtures --schema"
