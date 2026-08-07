@@ -3877,6 +3877,43 @@ function clickyNodeText(node: ClickyNode | null | undefined): string {
       ...node.children.map((child) => clickyNodeText(child)),
     ].join("");
   }
+  // A container's text is its contents. Deriving it here is what lets the
+  // producer stop shipping a second, pre-rendered copy of every container it
+  // sends: a list that carries `plain` still uses it (the check above wins), and
+  // one that does not is walked instead of coming back empty.
+  if (node.kind === "list" && node.items?.length) {
+    return node.items.map((item) => clickyNodeText(item)).join(" ");
+  }
+  if (node.kind === "map" && node.fields?.length) {
+    return node.fields
+      .map((field) => {
+        const value = clickyNodeText(field.value);
+        const label = field.label ?? field.name;
+        return label ? `${label}: ${value}` : value;
+      })
+      .join(" ");
+  }
+  if (node.kind === "tree" && node.roots?.length) {
+    const walk = (branch: ClickyTreeItem): string =>
+      [
+        clickyNodeText(branch.label),
+        ...(branch.children ?? []).map((child) => walk(child)),
+      ]
+        .filter(Boolean)
+        .join(" ");
+    return node.roots.map((root) => walk(root)).join(" ");
+  }
+  if (node.kind === "table" && node.rows?.length) {
+    return node.rows
+      .map((row) =>
+        Object.values(row.cells ?? {})
+          .map((cell) => clickyNodeText(cell))
+          .filter(Boolean)
+          .join(" "),
+      )
+      .filter(Boolean)
+      .join(" ");
+  }
   return "";
 }
 
