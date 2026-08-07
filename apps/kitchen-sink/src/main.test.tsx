@@ -16,6 +16,19 @@ vi.mock("./App", () => ({
   App: () => null,
 }));
 
+// This asserts main.tsx's mount wiring, nothing about the library itself.
+// Importing the real barrel would pull every module in packages/ui/src through
+// the Vite transform (seconds of work, and it tripped the 5s test timeout in
+// CI), so stand in a named ErrorWrapper: main.tsx still has to import that
+// exact export for the assertions below to hold.
+vi.mock("@flanksource/clicky-ui", () => ({
+  ErrorWrapper: function ErrorWrapper() {
+    return null;
+  },
+}));
+
+vi.mock("@flanksource/clicky-ui/styles.css", () => ({}));
+
 describe("kitchen sink runtime", () => {
   beforeEach(() => {
     document.body.innerHTML = '<div id="app"></div>';

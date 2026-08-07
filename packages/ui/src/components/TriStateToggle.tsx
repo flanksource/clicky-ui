@@ -1,13 +1,14 @@
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiCheck, UiClose, UiRemove } from "../icons";
+import { nextTriState, type TriState } from "./tri-state";
 
 // A yes/no value that can also be unset — the shape a nullable boolean field or
 // a boolean filter actually has. One button cycles the three states so it costs
 // a single control in a table row or filter bar, where a pair of radios or a
 // dropdown would not fit.
 
-export type TriState = boolean | undefined;
+export type { TriState };
 
 export type TriStateLabels = {
   /** Label for the unset state. Defaults to "Any". */
@@ -39,12 +40,6 @@ const DEFAULT_LABELS: Required<TriStateLabels> = {
   on: "Yes",
   off: "No",
 };
-
-/** Next state in the cycle: unset → on → off → unset. */
-export function nextTriState(value: TriState): TriState {
-  if (value === undefined) return true;
-  return value ? false : undefined;
-}
 
 export function TriStateToggle({
   value,
