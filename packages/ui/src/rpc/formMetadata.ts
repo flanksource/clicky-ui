@@ -52,12 +52,47 @@ export type ParameterFormConfig = {
   timeRange?: FilterBarRangeProps;
   pagination?: ParameterPagination;
 };
+// LookupSearch fetches the options of one filter matching `query`, server-side.
+// It is what a truncated option set is reachable through: the head the lookup
+// returned is only the first page of a larger distinct set, and everything past
+// it is found by typing rather than by scrolling.
+export type LookupSearch = (
+  filterKey: string,
+  query: string,
+) => Promise<{ value: string; label: string; title?: string }[]>;
+
 export type ParameterFormOptions = {
   includeLocations?: OpenAPIParameter["in"][];
   lookup?: OperationLookupResponse | undefined;
   lockedValues?: ParameterValues | undefined;
   hideLocked?: boolean;
+  // Wired only into filters the server marked truncated: one that fully
+  // enumerated needs no round trip to search what is already in the browser.
+  lookupSearch?: LookupSearch | undefined;
 };
+
+// A truncated set has to say so even where nothing can search it: the footer
+// telling the user 350 values are missing is what stops a partial list reading
+// as the whole answer.
+function truncationProps(filter: OperationLookupFilter) {
+  if (!filter.truncated) return {};
+  return { truncated: true, ...(filter.total !== undefined ? { total: filter.total } : {}) };
+}
+
+// Server-side search applies only when the server said it withheld options. A
+// filter whose set arrived whole is searched in the browser, which is both
+// faster and exactly as complete.
+function searchProps(
+  filter: OperationLookupFilter,
+  key: string,
+  search: LookupSearch | undefined,
+) {
+  if (!filter.truncated) return {};
+  return {
+    ...truncationProps(filter),
+    ...(search ? { onSearch: (query: string) => search(key, query) } : {}),
+  };
+}
 
 export function titleCase(value: string) {
   return value
@@ -304,6 +339,7 @@ export function parametersToFormConfig(
         value: parseMultiFilterValue(value),
         disabled,
         options: lookupOptionsToFieldOptions(lookupFilter),
+        ...searchProps(lookupFilter, param.name, options.lookupSearch),
         onChange: (next) =>
           setValues((current) =>
             rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
@@ -349,6 +385,10 @@ export function parametersToFormConfig(
           value: splitCommaValues(value),
           disabled,
           options: lookupOptionsToFieldOptions(lookupFilter),
+          // Reported, not searched: this control's onSearch hands the query back
+          // to the consumer to refetch and re-feed `options`, which is a
+          // different contract from the one searchProps satisfies.
+          ...truncationProps(lookupFilter),
           ...placeholderProp,
           onChange: (next) =>
             setValues((current) => rewind({ ...current, [param.name]: next.join(",") })),
