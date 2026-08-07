@@ -236,6 +236,11 @@ export {
   type WorkflowPhase,
 } from "./agent-action-icons";
 export {
+  SESSION_TONES,
+  sessionTone,
+  type SessionToneClasses,
+} from "./session-tones";
+export {
   getSessionMetadata,
   getSessionAction,
   normalizeSession,

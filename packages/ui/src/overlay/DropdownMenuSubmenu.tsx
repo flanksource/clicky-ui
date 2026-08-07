@@ -45,8 +45,12 @@ function MenuItemIcon({
 }) {
   if (!icon) return null;
   return (
+    // `text-base` rather than inheriting the row: `Icon` sizes at 1em, so on a
+    // `text-xs` row the glyph came out at 12px — smaller than anything a caller
+    // puts in the label beside it, and too small to identify at a glance. The
+    // row's content box is already 16px tall, so this does not change its height.
     <span
-      className="inline-flex shrink-0"
+      className="inline-flex shrink-0 text-base"
       style={iconColor ? { color: iconColor } : undefined}
     >
       <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />
