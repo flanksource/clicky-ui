@@ -44,6 +44,7 @@ import {
   parametersToFormConfig,
   type ParameterFormOptions,
 } from "./formMetadata";
+import { useOperationFilterSearch } from "./operationFilterSearch";
 import {
   parseMultiFilterValue,
   serializeMultiFilterValue,
@@ -240,15 +241,23 @@ export function OperationCatalog({
     [domainOps, surfaceKey, useSurfaceMetadata],
   );
 
+  const lookupSearch = useOperationFilterSearch(
+    client,
+    listEndpoint,
+    filters,
+    listParameters,
+  );
+
   const filterBarConfig = useMemo(() => {
     const options: ParameterFormOptions = {
       includeLocations: ["query"],
+      lookupSearch,
     };
     if (lookupQuery.data != null) {
       options.lookup = lookupQuery.data;
     }
     return parametersToFormConfig(listParameters, filters, setFilters, options);
-  }, [filters, listParameters, lookupQuery.data]);
+  }, [filters, listParameters, lookupQuery.data, lookupSearch]);
   const dataTablePagination = useMemo(
     () =>
       dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),

@@ -243,9 +243,12 @@ export function createOperationsApiClient(
 
     async lookupFilterOptions(path, method, filterKey, query, extraParams) {
       const upper = method.toUpperCase();
-      const resolved = resolvePathParams(path, {});
+      // Resolved against the supplied params, as lookupFilters does: a lookup on
+      // an operation with a templated path would otherwise request the literal
+      // "{id}" and the sibling values that scope the search would be lost.
+      const resolved = resolvePathParams(path, extraParams ?? {});
       const queryParams = {
-        ...extraParams,
+        ...resolved.params,
         __lookup: "filters",
         __lookup_filter: filterKey,
         __lookup_q: query,
