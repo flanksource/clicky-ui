@@ -27,7 +27,7 @@ import {
 // Implements the semantic groups of the Flanksource "Agent Action Icons" design
 // beyond the per-tool ACTIONS map (which lives in SessionViewer.model.ts). Each
 // entry pairs a generated Ui* glyph with a SessionTone so the disc/text color
-// (DISC_TONE in SessionViewer.rows.tsx) encodes the action's category. Blue
+// (SESSION_TONES in session-tones.ts) encodes the action's category. Blue
 // reasons, green executes, teal confirms; the effort ramp climbs slate → sky →
 // amber → orange → rose → fuchsia; approval clears green / blocks red.
 

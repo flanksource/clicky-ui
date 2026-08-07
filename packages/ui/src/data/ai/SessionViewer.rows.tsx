@@ -13,37 +13,13 @@ import {
   type SessionEvent,
   type SessionTone,
 } from "./SessionViewer.model";
+import { SESSION_TONES } from "./session-tones";
 import type { SessionEventGroup } from "./SessionViewer.grouping";
 import { EventMetadata, RawEventBlock } from "./SessionViewer.row-metadata";
 import { formatEventRange } from "./SessionViewer.row-time";
 import { ToolBody } from "./SessionViewer.tool-row";
 import type { SessionToolDecision } from "./SessionViewer";
 import { Markdown } from "../Markdown";
-
-// Disc colors per tone. The dark variants key off a `[data-theme="dark"]`
-// ancestor (the document attribute set by ThemeProvider, or the component-level
-// override painted on this viewer's root) rather than Tailwind's `dark:` —
-// which this library compiles to `prefers-color-scheme` and so would ignore the
-// `data-theme` attribute. Written as literal class strings so Tailwind scans them.
-const DISC_TONE: Record<SessionTone, string> = {
-  sky: "bg-sky-100 text-sky-700 [[data-theme=dark]_&]:bg-sky-500/15 [[data-theme=dark]_&]:text-sky-300",
-  amber:
-    "bg-amber-100 text-amber-700 [[data-theme=dark]_&]:bg-amber-500/15 [[data-theme=dark]_&]:text-amber-300",
-  violet:
-    "bg-violet-100 text-violet-700 [[data-theme=dark]_&]:bg-violet-500/15 [[data-theme=dark]_&]:text-violet-300",
-  emerald:
-    "bg-emerald-100 text-emerald-700 [[data-theme=dark]_&]:bg-emerald-500/15 [[data-theme=dark]_&]:text-emerald-300",
-  teal: "bg-teal-100 text-teal-700 [[data-theme=dark]_&]:bg-teal-500/15 [[data-theme=dark]_&]:text-teal-300",
-  orange:
-    "bg-orange-100 text-orange-700 [[data-theme=dark]_&]:bg-orange-500/15 [[data-theme=dark]_&]:text-orange-300",
-  rose: "bg-rose-100 text-rose-700 [[data-theme=dark]_&]:bg-rose-500/15 [[data-theme=dark]_&]:text-rose-300",
-  indigo:
-    "bg-indigo-100 text-indigo-700 [[data-theme=dark]_&]:bg-indigo-500/15 [[data-theme=dark]_&]:text-indigo-300",
-  fuchsia:
-    "bg-fuchsia-100 text-fuchsia-700 [[data-theme=dark]_&]:bg-fuchsia-500/15 [[data-theme=dark]_&]:text-fuchsia-300",
-  pink: "bg-pink-100 text-pink-700 [[data-theme=dark]_&]:bg-pink-500/15 [[data-theme=dark]_&]:text-pink-300",
-  slate: "bg-muted text-muted-foreground",
-};
 
 export function SessionRow({
   event,
@@ -89,7 +65,7 @@ export function SessionRow({
       <span
         className={cn(
           "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-          DISC_TONE[visual.tone],
+          SESSION_TONES[visual.tone].disc,
         )}
       >
         <Icon icon={visual.icon} className="h-3 w-3" />
@@ -159,7 +135,7 @@ export function WaitGroupRow({
       <span
         className={cn(
           "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-          DISC_TONE[visual.tone],
+          SESSION_TONES[visual.tone].disc,
         )}
       >
         <Icon icon={visual.icon} className="h-3 w-3" />
@@ -238,7 +214,7 @@ function UserRow({
         <span
           className={cn(
             "relative z-[1] flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full",
-            DISC_TONE.slate,
+            SESSION_TONES.slate.disc,
           )}
         >
           <Icon icon={UiUserCircle} className="h-3 w-3" />

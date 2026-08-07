@@ -96,6 +96,7 @@ export function TourCard(props: TourCardProps) {
       className={cn(
         "w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-border bg-popover p-density-4 text-popover-foreground shadow-xl",
         props.className,
+        step.cardClassName,
       )}
       // One element in one tree position whether or not there is an anchor: a
       // structural switch here would unmount and remount the card the moment a

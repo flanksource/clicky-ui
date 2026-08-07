@@ -96,6 +96,13 @@ export type TourStep = {
   hint?: ReactNode;
   /** Let Next through even while `hint` is showing. */
   hintOptional?: boolean;
+  /**
+   * Extra classes for this step's card, merged after the tour-level `className`.
+   * The intended use is widening the card for a step whose body needs the room
+   * (e.g. `w-[min(30rem,calc(100vw-2rem))]`) — tailwind-merge resolves the
+   * conflict with the default width.
+   */
+  cardClassName?: string;
   /** Evaluated on entry in both directions; a `false` result skips the step. For role/feature-gated UI. */
   enabled?: () => boolean;
   /** Runs on entry once the anchor resolves — e.g. open a panel the next step needs. */
