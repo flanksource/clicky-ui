@@ -299,8 +299,13 @@ export type DataTablePagination = {
    * facts, and only the server knows which one happened.
    */
   hasMore?: boolean;
-  /** Called when the user moves to another page. */
-  onPageChange: (page: number) => void;
+  /**
+   * Called when the user moves to another page. Absent when the surface cannot
+   * name a position past its first page — an operation with no offset or cursor
+   * parameter. Such a table still counts and still resizes; it just has nowhere
+   * to step to, so the step controls are not rendered.
+   */
+  onPageChange?: (page: number) => void;
   /** Called when the page size select changes. */
   onPageSizeChange: (pageSize: number) => void;
   /** Available page sizes. Defaults to [25, 50, 100, 200]. */
@@ -2217,16 +2222,21 @@ function DataTablePaginationFooter({
       ? `${rangeStart}-${rangeEnd} of ${approximate ? `~${total}+` : total}`
       : `${visibleRowCount} row${visibleRowCount === 1 ? "" : "s"}`;
 
+  // A surface with neither a page callback nor a cursor has no second page to
+  // offer. It still reports what it is showing and still resizes — a count is a
+  // fact about the result, not a paging control.
+  const steppable = cursor != null || onPageChange != null;
+
   const goPrevious = () => {
     if (!cursor) {
-      onPageChange(Math.max(0, safePage - 1));
+      onPageChange?.(Math.max(0, safePage - 1));
       return;
     }
     cursor.onCursorChange(trail.previous());
   };
   const goNext = () => {
     if (!cursor) {
-      onPageChange(safePage + 1);
+      onPageChange?.(safePage + 1);
       return;
     }
     if (cursor.next == null) return;
@@ -2252,30 +2262,34 @@ function DataTablePaginationFooter({
             ))}
           </select>
         </label>
-        <span className="min-w-20 text-center">
-          Page {safePage + 1}
-          {totalPages != null ? ` of ${totalPages}` : ""}
-        </span>
-        <button
-          type="button"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Previous page"
-          title="Previous page"
-          disabled={atFirst}
-          onClick={goPrevious}
-        >
-          <Icon icon={UiArrowLeft} />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Next page"
-          title="Next page"
-          disabled={atLast}
-          onClick={goNext}
-        >
-          <Icon icon={UiArrowRight} />
-        </button>
+        {steppable ? (
+          <>
+            <span className="min-w-20 text-center">
+              Page {safePage + 1}
+              {totalPages != null ? ` of ${totalPages}` : ""}
+            </span>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Previous page"
+              title="Previous page"
+              disabled={atFirst}
+              onClick={goPrevious}
+            >
+              <Icon icon={UiArrowLeft} />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Next page"
+              title="Next page"
+              disabled={atLast}
+              onClick={goNext}
+            >
+              <Icon icon={UiArrowRight} />
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );

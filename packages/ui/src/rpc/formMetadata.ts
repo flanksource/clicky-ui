@@ -27,11 +27,16 @@ export type ParameterValuesSetter = Dispatch<SetStateAction<ParameterValues>>;
 // values so the executor sees exactly what the operation declared.
 export type ParameterPagination = {
   limitParam: string; // parameter name on the operation, e.g. "limit"
-  offsetParam: string;
   limitValue: string;
-  offsetValue: string;
   setLimit: (next: string) => void;
-  setOffset: (next: string) => void;
+
+  // Offset paging, when the operation declares an offset parameter. Absent for
+  // a surface that cannot name a position past its first page — a profile with
+  // no total order, say. Such a surface still sizes its page and still reports
+  // how many rows it is showing of how many; it just cannot step.
+  offsetParam?: string;
+  offsetValue?: string;
+  setOffset?: (next: string) => void;
 
   // Cursor paging, when the operation declares a cursor parameter. Present
   // alongside limit/offset rather than instead of them: an operation can serve
@@ -111,6 +116,7 @@ export function dataTablePaginationFromForm(
   const page = Math.floor(offset / pageSize);
   const served = response?.pagination;
   const setCursor = pagination.setCursor;
+  const setOffset = pagination.setOffset;
 
   return {
     page,
@@ -136,25 +142,32 @@ export function dataTablePaginationFromForm(
             onCursorChange: (next: string | undefined) => {
               // Offset and cursor are two disagreeing positions in one request,
               // so taking the cursor means dropping the offset.
-              pagination.setOffset("0");
+              setOffset?.("0");
               setCursor(next ?? "");
             },
           },
         }
       : {}),
-    onPageChange: (next: number) => {
-      if (positiveInt(pagination.limitValue) == null) {
-        pagination.setLimit(String(pageSize));
-      }
-      setCursor?.("");
-      pagination.setOffset(String(Math.max(next, 0) * pageSize));
-    },
+    // Offered only when there is somewhere to step to. A surface with no offset
+    // parameter still counts and still resizes, but naming page two would be
+    // naming a page the server will refuse.
+    ...(setOffset
+      ? {
+          onPageChange: (next: number) => {
+            if (positiveInt(pagination.limitValue) == null) {
+              pagination.setLimit(String(pageSize));
+            }
+            setCursor?.("");
+            setOffset(String(Math.max(next, 0) * pageSize));
+          },
+        }
+      : {}),
     onPageSizeChange: (next: number) => {
       pagination.setLimit(String(next));
       // A cursor names a position in a page of the old size, so resizing the
       // page invalidates it and the walk restarts.
       setCursor?.("");
-      pagination.setOffset("0");
+      setOffset?.("0");
     },
   };
 }
@@ -390,14 +403,24 @@ export function parametersToFormConfig(
       ariaLabel: lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
     };
   }
-  if (limitParam && offsetParam) {
+  // Gated on the limit alone. An operation that caps its rows can report how
+  // many of how many it is showing and can resize the cap, both of which are
+  // independent of being able to step to a second page — and gating the whole
+  // footer on the offset is what made a surface without one report "100 of 100"
+  // while the server was answering with a total of 12,558.
+  if (limitParam) {
     config.pagination = {
       limitParam: limitParam.name,
-      offsetParam: offsetParam.name,
       limitValue: values[limitParam.name] ?? "",
-      offsetValue: values[offsetParam.name] ?? "",
       setLimit: (next) => setValues((current) => ({ ...current, [limitParam.name]: next })),
-      setOffset: (next) => setValues((current) => ({ ...current, [offsetParam.name]: next })),
+      ...(offsetParam
+        ? {
+            offsetParam: offsetParam.name,
+            offsetValue: values[offsetParam.name] ?? "",
+            setOffset: (next: string) =>
+              setValues((current) => ({ ...current, [offsetParam.name]: next })),
+          }
+        : {}),
       ...(cursorParam
         ? {
             cursorParam: cursorParam.name,

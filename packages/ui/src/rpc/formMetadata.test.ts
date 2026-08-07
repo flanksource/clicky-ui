@@ -271,6 +271,45 @@ describe("dataTablePaginationFromForm", () => {
     expect(table?.hasMore).toBe(true);
   });
 
+  // A surface whose operation declares no offset — a profile with no total
+  // order, which serves its first page and refuses every page after it — still
+  // knows how many rows there are and can still resize its page. Dropping the
+  // whole footer for it reported "100 of 100 rows" while the server was
+  // answering X-Total-Count: 12558.
+  it("reports the served total for an operation that cannot step pages", () => {
+    const limitOnly: ParameterPagination = {
+      limitParam: "limit",
+      limitValue: "100",
+      setLimit: () => {},
+    };
+
+    const table = dataTablePaginationFromForm(limitOnly, {
+      pagination: { total: 12_558, totalRelation: "eq", hasMore: false, limit: 100, offset: 0 },
+    });
+
+    expect(table).toBeDefined();
+    expect(table?.total).toBe(12_558);
+    expect(table?.totalRelation).toBe("eq");
+    expect(table?.pageSize).toBe(100);
+    expect(table?.page).toBe(0);
+    // Resizing is still possible; stepping is not, and the footer reads
+    // onPageChange's absence as "render no step controls".
+    expect(table?.onPageSizeChange).toBeTypeOf("function");
+    expect(table?.onPageChange).toBeUndefined();
+  });
+
+  it("still steps when the operation declares an offset", () => {
+    const offsets: string[] = [];
+    const table = dataTablePaginationFromForm(
+      form({ setOffset: (next) => offsets.push(next) }),
+      { pagination: { total: 500, totalRelation: "eq", hasMore: true, limit: 25, offset: 0 } },
+    );
+
+    expect(table?.onPageChange).toBeTypeOf("function");
+    table?.onPageChange?.(3);
+    expect(offsets).toEqual(["75"]);
+  });
+
   it("offers cursor mode only once there is a cursor to send it on", () => {
     const withoutParam = dataTablePaginationFromForm(form({ offsetValue: "20000" }), {
       pagination: { nextCursor: "next-token" },
