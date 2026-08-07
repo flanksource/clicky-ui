@@ -8,13 +8,34 @@ function BrokenPage(): never {
   });
 }
 
+const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(
+  navigator,
+  "clipboard",
+);
+const originalPageUrl = window.location.href;
+
 describe("ErrorWrapper", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalClipboardDescriptor) {
+      Object.defineProperty(
+        navigator,
+        "clipboard",
+        originalClipboardDescriptor,
+      );
+    } else {
+      Reflect.deleteProperty(navigator, "clipboard");
+    }
+    window.history.replaceState({}, "", originalPageUrl);
   });
 
   it("renders a full-page diagnostic fallback and copies a support-ready report", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    window.history.replaceState(
+      {},
+      "",
+      "/accounts?access_token=secret#authorization-code",
+    );
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
@@ -44,11 +65,13 @@ describe("ErrorWrapper", () => {
     expect(report).toEqual(
       expect.stringContaining("Cause: upstream request returned HTTP 502"),
     );
-    expect(report).toEqual(expect.stringContaining("Page: http://localhost"));
+    expect(report).toEqual(
+      expect.stringContaining(`Page: ${window.location.origin}/accounts`),
+    );
+    expect(report).not.toEqual(expect.stringContaining("access_token"));
+    expect(report).not.toEqual(expect.stringContaining("authorization-code"));
     expect(report).toEqual(expect.stringContaining("React component stack:"));
-    expect(
-      screen.getByRole("button", { name: "Copied" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
     expect(liveRegion(fallback)).toHaveTextContent(
       "Error details copied to clipboard.",
     );

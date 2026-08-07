@@ -5,7 +5,7 @@ import {
   UiBrain,
   UiChevronDown,
   UiSparkles,
-  UiUserCircle,
+  UiUser,
   UiWarningTriangle,
 } from "../../icons";
 import {
@@ -241,7 +241,7 @@ function UserRow({
             DISC_TONE.slate,
           )}
         >
-          <Icon icon={UiUserCircle} className="h-3 w-3" />
+          <Icon icon={UiUser} className="h-3 w-3" />
         </span>
       </div>
     </li>
@@ -268,7 +268,7 @@ function eventVisual(event: SessionEvent): EventVisual {
     }
     case "user":
       return {
-        icon: UiUserCircle,
+        icon: UiUser,
         tone: "slate",
         label: "User",
         summaryOnly: false,
