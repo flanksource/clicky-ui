@@ -103,8 +103,25 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     onChange(
       withOptionalRuntimeValue(withoutCatalogModel(value), "model", model)
     );
-  const applyModel = (model: ChatModel) =>
-    onChange(reconcileModelCapabilities(value, model, reasoningEfforts));
+  // A menu row carries the backend of the catalog it was listed under, and one
+  // catalog serves several backends — claude-cli and claude-cmux models are
+  // listed as claude-agent rows. Copying the row's runtime verbatim would let
+  // picking a model silently move the user off the mode they chose, so a row
+  // drawn from the selected mode's own catalog keeps that mode.
+  const applyModel = (model: ChatModel) => {
+    const next = reconcileModelCapabilities(value, model, reasoningEfforts);
+    if (!mode.provider || model.provider !== mode.provider) {
+      onChange(next);
+      return;
+    }
+    onChange(
+      withOptionalRuntimeValue(
+        withOptionalRuntimeValue(next, "backend", mode.backend),
+        "mode",
+        mode.id
+      )
+    );
+  };
   const clearModel = () => onChange(withoutCatalogModel(value));
   const applyEffort = (effort: string) =>
     onChange(withOptionalRuntimeValue(value, "effort", effort));

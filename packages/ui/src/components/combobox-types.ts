@@ -6,6 +6,8 @@ export type ComboboxOption = {
   value: string;
   /** Full label used for searching and in the open option menu. */
   label: string;
+  /** Secondary text rendered below the label and included in local filtering. */
+  description?: string;
   /** Optional compact label used in the closed selection or a selected tag. */
   selectedLabel?: string;
   disabled?: boolean;

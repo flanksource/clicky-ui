@@ -129,7 +129,9 @@ export function Combobox(props: ComboboxProps) {
     if (!q) return options;
     return options.filter(
       (o) =>
-        o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
+        o.label.toLowerCase().includes(q) ||
+        o.description?.toLowerCase().includes(q) ||
+        o.value.toLowerCase().includes(q),
     );
   }, [onSearch, options, query, selectedValues]);
 
