@@ -5,8 +5,151 @@
         "ANTHROPIC_API_KEY"
       ],
       "authenticated": true,
+      "backend": "anthropic",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "label": "Claude Haiku 4.5",
+          "backend": "anthropic",
+          "releaseDate": "2025-10-15",
+          "capabilitiesKnown": true,
+          "temperature": false
+        }
+      ],
+      "models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "gemini",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "gemini-3.6-flash",
+          "label": "Gemini 3.6 Flash",
+          "backend": "gemini",
+          "releaseDate": "2026-07-21",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "backend": "gemini",
+          "releaseDate": "2026-05-19",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "nano-banana-pro-preview",
+          "label": "nano-banana-pro-preview",
+          "backend": "gemini",
+          "capabilitiesKnown": true,
+          "temperature": false
+        }
+      ],
+      "models": [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "nano-banana-pro-preview"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "OPENAI_API_KEY"
+      ],
+      "authenticated": true,
+      "backend": "openai",
+      "kind": "api",
+      "modelDetails": [
+        {
+          "id": "gpt-5.6-sol",
+          "label": "GPT-5.6 Sol",
+          "backend": "openai",
+          "releaseDate": "2026-07-09",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "priority": 1
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "label": "GPT-5.6 Terra",
+          "backend": "openai",
+          "releaseDate": "2026-07-09",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "priority": 2
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "label": "GPT-5.6 Luna",
+          "backend": "openai",
+          "releaseDate": "2026-07-09",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 3
+        }
+      ],
+      "models": [
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna"
+      ],
+      "ready": true
+    },
+    {
+      "authEnvVars": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "authenticated": true,
       "backend": "claude-cli",
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/5F210EBA-83D4-4631-AF0B-AE7D3BA63BDB/claude",
       "kind": "cli",
       "modelDetails": [
         {
@@ -71,7 +214,7 @@
       ],
       "authenticated": true,
       "backend": "claude-agent",
-      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
+      "binary": "/Users/moshe/Library/Caches/captain/claude-agent/node_modules/.bin/tsx",
       "kind": "cli",
       "modelDetails": [
         {
@@ -147,174 +290,7 @@
       "models": [
         "claude-opus-5",
         "claude-fable-5",
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5"
-      ],
-      "ready": true
-    },
-    {
-      "args": {
-        "properties": {
-          "addDir": {
-            "description": "Extra directories tools may access",
-            "items": {
-              "type": "string"
-            },
-            "title": "Additional Dirs",
-            "type": "array",
-            "x-clicky-order": 2
-          },
-          "agent": {
-            "description": "Agent for the current session",
-            "title": "Agent",
-            "type": "string",
-            "x-clicky-order": 10
-          },
-          "appendSystemPrompt": {
-            "description": "Append to the default system prompt",
-            "title": "Append System Prompt",
-            "type": "string",
-            "x-clicky-order": 7
-          },
-          "betas": {
-            "description": "Beta headers to include in API requests",
-            "items": {
-              "type": "string"
-            },
-            "title": "Beta Headers",
-            "type": "array",
-            "x-clicky-order": 8
-          },
-          "excludeDynamicSystemPromptSections": {
-            "description": "Move per-machine sections to the first user message for prompt-cache reuse",
-            "title": "Exclude Dynamic Sections",
-            "type": "boolean",
-            "x-clicky-order": 9
-          },
-          "mcpConfig": {
-            "description": "Load MCP servers from JSON files or strings",
-            "items": {
-              "type": "string"
-            },
-            "title": "MCP Config",
-            "type": "array",
-            "x-clicky-order": 3
-          },
-          "safeMode": {
-            "description": "Start with all customizations disabled",
-            "title": "Safe Mode",
-            "type": "boolean",
-            "x-clicky-order": 11
-          },
-          "settings": {
-            "description": "Path to a settings JSON file or a JSON string",
-            "title": "Settings File/JSON",
-            "type": "string",
-            "x-clicky-order": 5
-          },
-          "strictMcpConfig": {
-            "description": "Only use MCP servers from --mcp-config",
-            "title": "Strict MCP Config",
-            "type": "boolean",
-            "x-clicky-order": 4
-          },
-          "systemPrompt": {
-            "description": "Replace the default system prompt",
-            "title": "System Prompt",
-            "type": "string",
-            "x-clicky-order": 6
-          },
-          "tools": {
-            "description": "Restrict the built-in tool set (e.g. Bash Edit Read)",
-            "items": {
-              "type": "string"
-            },
-            "title": "Built-in Tools",
-            "type": "array",
-            "x-clicky-order": 1
-          }
-        },
-        "type": "object"
-      },
-      "authenticated": true,
-      "backend": "claude-cmux",
-      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E7945789-BAB9-407D-87EE-E28B032AF8F9/claude",
-      "kind": "cli",
-      "modelDetails": [
-        {
-          "id": "claude-sonnet-5",
-          "label": "Claude Sonnet 5",
-          "backend": "claude-cmux",
-          "releaseDate": "2026-06-29",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
-          "id": "claude-fable-5",
-          "label": "Claude Fable 5",
-          "backend": "claude-cmux",
-          "releaseDate": "2026-06-07",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
-          "id": "claude-opus-4-8",
-          "label": "Claude Opus 4.8",
-          "backend": "claude-cmux",
-          "releaseDate": "2026-05-28",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
-          "id": "claude-sonnet-4-6",
-          "label": "Claude Sonnet 4.6",
-          "backend": "claude-cmux",
-          "releaseDate": "2026-02-17",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        },
-        {
-          "id": "claude-haiku-4-5",
-          "label": "Claude Haiku 4.5 (latest)",
-          "backend": "claude-cmux",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        }
-      ],
-      "models": [
-        "claude-sonnet-5",
-        "claude-fable-5",
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5"
+        "claude-opus-4-8"
       ],
       "ready": true
     },
@@ -324,20 +300,17 @@
       ],
       "authenticated": true,
       "backend": "codex-cli",
-      "binaryMissing": "codex",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/5F210EBA-83D4-4631-AF0B-AE7D3BA63BDB/codex",
       "kind": "cli",
       "modelDetails": [
         {
           "id": "gpt-5.6-sol",
-          "label": "GPT-5.6 Sol",
+          "label": "GPT-5.6-Sol",
           "backend": "codex-cli",
           "releaseDate": "2026-07-09",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
-          "inputMediaTypes": [
-            "image/*"
-          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -350,15 +323,12 @@
         },
         {
           "id": "gpt-5.6-luna",
-          "label": "GPT-5.6 Luna",
+          "label": "GPT-5.6-Luna",
           "backend": "codex-cli",
           "releaseDate": "2026-07-09",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
-          "inputMediaTypes": [
-            "image/*"
-          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -373,7 +343,7 @@
         "gpt-5.6-sol",
         "gpt-5.6-luna"
       ],
-      "ready": false
+      "ready": true
     },
     {
       "authEnvVars": [
@@ -381,20 +351,17 @@
       ],
       "authenticated": true,
       "backend": "codex-agent",
-      "binaryMissing": "codex",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/5F210EBA-83D4-4631-AF0B-AE7D3BA63BDB/codex",
       "kind": "cli",
       "modelDetails": [
         {
           "id": "gpt-5.6-sol",
-          "label": "GPT-5.6 Sol",
+          "label": "GPT-5.6-Sol",
           "backend": "codex-agent",
           "releaseDate": "2026-07-09",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
-          "inputMediaTypes": [
-            "image/*"
-          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -407,15 +374,12 @@
         },
         {
           "id": "gpt-5.6-luna",
-          "label": "GPT-5.6 Luna",
+          "label": "GPT-5.6-Luna",
           "backend": "codex-agent",
           "releaseDate": "2026-07-09",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
-          "inputMediaTypes": [
-            "image/*"
-          ],
           "supportedEfforts": [
             "low",
             "medium",
@@ -424,13 +388,30 @@
             "max"
           ],
           "priority": 3
+        },
+        {
+          "id": "gpt-5.3-codex-spark",
+          "label": "GPT-5.3-Codex-Spark",
+          "backend": "codex-agent",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultEffort": "high",
+          "priority": 26
         }
       ],
       "models": [
         "gpt-5.6-sol",
-        "gpt-5.6-luna"
+        "gpt-5.6-luna",
+        "gpt-5.3-codex-spark"
       ],
-      "ready": false
+      "ready": true
     },
     {
       "authEnvVars": [
@@ -439,7 +420,7 @@
       ],
       "authenticated": true,
       "backend": "gemini-cli",
-      "binaryMissing": "gemini",
+      "binary": "/Users/moshe/Library/pnpm/gemini",
       "kind": "cli",
       "modelDetails": [
         {
@@ -460,7 +441,7 @@
       "models": [
         "gemini-3.6-flash"
       ],
-      "ready": false
+      "ready": true
     }
   ],
   "efforts": [
@@ -546,77 +527,84 @@
   },
   "models": [
     {
-      "backend": "claude-cli",
       "backends": [
-        "claude-cli",
-        "claude-agent"
+        "anthropic"
       ],
       "configured": true,
-      "id": "claude-opus-5",
-      "label": "Claude Opus 5",
+      "id": "claude-haiku-4-5-20251001",
+      "label": "Claude Haiku 4.5",
       "provider": "anthropic",
-      "ready": true,
       "reasoning": true,
+      "runtime": {
+        "model": "claude-haiku-4-5-20251001",
+        "backend": "anthropic"
+      }
+    },
+    {
+      "backends": [
+        "gemini"
+      ],
+      "configured": true,
+      "id": "gemini-3.6-flash",
+      "label": "Gemini 3.6 Flash",
+      "provider": "googleai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gemini-3.6-flash",
+        "backend": "gemini"
+      },
       "supportedEfforts": [
         "low",
         "medium",
-        "high",
-        "xhigh",
-        "max"
+        "high"
       ]
     },
     {
-      "backend": "claude-cli",
       "backends": [
-        "claude-cli",
-        "claude-agent"
+        "gemini"
       ],
       "configured": true,
-      "id": "claude-fable-5",
-      "label": "Claude Fable 5",
-      "provider": "anthropic",
-      "ready": true,
+      "id": "gemini-3.5-flash",
+      "label": "Gemini 3.5 Flash",
+      "provider": "googleai",
       "reasoning": true,
+      "runtime": {
+        "model": "gemini-3.5-flash",
+        "backend": "gemini"
+      },
       "supportedEfforts": [
         "low",
         "medium",
-        "high",
-        "xhigh",
-        "max"
+        "high"
       ]
     },
     {
-      "backend": "claude-cli",
       "backends": [
-        "claude-cli",
-        "claude-agent"
+        "gemini"
       ],
       "configured": true,
-      "id": "claude-opus-4-8",
-      "label": "Claude Opus 4.8",
-      "provider": "anthropic",
-      "ready": true,
-      "reasoning": true,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ]
+      "id": "nano-banana-pro-preview",
+      "label": "nano-banana-pro-preview",
+      "provider": "googleai",
+      "reasoning": false,
+      "runtime": {
+        "model": "nano-banana-pro-preview",
+        "backend": "gemini"
+      }
     },
     {
-      "backend": "codex-cli",
       "backends": [
-        "codex-cli",
-        "codex-agent"
+        "openai"
       ],
-      "configured": false,
+      "configured": true,
       "id": "gpt-5.6-sol",
       "label": "GPT-5.6 Sol",
       "provider": "openai",
-      "ready": false,
       "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-sol",
+        "backend": "openai"
+      },
       "supportedEfforts": [
         "low",
         "medium",
@@ -627,17 +615,40 @@
       ]
     },
     {
-      "backend": "codex-cli",
       "backends": [
-        "codex-cli",
-        "codex-agent"
+        "openai"
       ],
-      "configured": false,
+      "configured": true,
+      "id": "gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-terra",
+        "backend": "openai"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ]
+    },
+    {
+      "backends": [
+        "openai"
+      ],
+      "configured": true,
       "id": "gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "provider": "openai",
-      "ready": false,
       "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-luna",
+        "backend": "openai"
+      },
       "supportedEfforts": [
         "low",
         "medium",
@@ -647,16 +658,251 @@
       ]
     },
     {
-      "backend": "gemini-cli",
+      "backends": [
+        "claude-cli"
+      ],
+      "configured": true,
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-opus-5",
+        "backend": "claude-cli"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "claude-cli"
+      ],
+      "configured": true,
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-fable-5",
+        "backend": "claude-cli"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "claude-cli"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-8",
+      "label": "Claude Opus 4.8",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-opus-4-8",
+        "backend": "claude-cli"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "claude-agent"
+      ],
+      "configured": true,
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-opus-5",
+        "backend": "claude-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "claude-agent"
+      ],
+      "configured": true,
+      "id": "claude-fable-5",
+      "label": "Claude Fable 5",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-fable-5",
+        "backend": "claude-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "claude-agent"
+      ],
+      "configured": true,
+      "id": "claude-opus-4-8",
+      "label": "Claude Opus 4.8",
+      "provider": "anthropic",
+      "reasoning": true,
+      "runtime": {
+        "model": "claude-opus-4-8",
+        "backend": "claude-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "codex-cli"
+      ],
+      "configured": true,
+      "id": "gpt-5.6-sol",
+      "label": "GPT-5.6-Sol",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-sol",
+        "backend": "codex-cli"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ]
+    },
+    {
+      "backends": [
+        "codex-cli"
+      ],
+      "configured": true,
+      "id": "gpt-5.6-luna",
+      "label": "GPT-5.6-Luna",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-luna",
+        "backend": "codex-cli"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "codex-agent"
+      ],
+      "configured": true,
+      "id": "gpt-5.6-sol",
+      "label": "GPT-5.6-Sol",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-sol",
+        "backend": "codex-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ]
+    },
+    {
+      "backends": [
+        "codex-agent"
+      ],
+      "configured": true,
+      "id": "gpt-5.6-luna",
+      "label": "GPT-5.6-Luna",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.6-luna",
+        "backend": "codex-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "backends": [
+        "codex-agent"
+      ],
+      "configured": true,
+      "defaultEffort": "high",
+      "id": "gpt-5.3-codex-spark",
+      "label": "GPT-5.3-Codex-Spark",
+      "provider": "openai",
+      "reasoning": true,
+      "runtime": {
+        "model": "gpt-5.3-codex-spark",
+        "backend": "codex-agent"
+      },
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    {
       "backends": [
         "gemini-cli"
       ],
-      "configured": false,
+      "configured": true,
       "id": "gemini-3.6-flash",
       "label": "Gemini 3.6 Flash",
       "provider": "googleai",
-      "ready": false,
       "reasoning": true,
+      "runtime": {
+        "model": "gemini-3.6-flash",
+        "backend": "gemini-cli"
+      },
       "supportedEfforts": [
         "low",
         "medium",
@@ -838,6 +1084,9 @@
       "Resume": {
         "type": "string"
       },
+      "Sandbox": {
+        "type": "boolean"
+      },
       "SkillDirs": {
         "items": {
           "type": "string"
@@ -873,6 +1122,7 @@
       "APIKey",
       "APIURL",
       "Budget",
+      "Sandbox",
       "MaxTokens",
       "MaxTurns",
       "Resume",
@@ -901,12 +1151,26 @@
       "catalogPrefix": "anthropic",
       "modes": [
         {
+          "mode": "api",
+          "backend": "anthropic",
+          "kind": "api",
+          "keyless": false,
+          "defaultModel": "claude-haiku-4-5",
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
+        },
+        {
           "mode": "agent",
           "backend": "claude-agent",
           "kind": "cli",
           "keyless": false,
           "defaultModel": "claude-opus-5",
-          "disabled": false
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
         },
         {
           "mode": "cli",
@@ -914,7 +1178,10 @@
           "kind": "cli",
           "keyless": false,
           "defaultModel": "claude-opus-5",
-          "disabled": false
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
         }
       ]
     },
@@ -924,12 +1191,26 @@
       "catalogPrefix": "openai",
       "modes": [
         {
+          "mode": "api",
+          "backend": "openai",
+          "kind": "api",
+          "keyless": false,
+          "defaultModel": "gpt-5.6-sol",
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
+        },
+        {
           "mode": "agent",
           "backend": "codex-agent",
           "kind": "cli",
           "keyless": false,
           "defaultModel": "gpt-5.6-sol",
-          "disabled": false
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
         },
         {
           "mode": "cli",
@@ -937,7 +1218,10 @@
           "kind": "cli",
           "keyless": false,
           "defaultModel": "gpt-5.6-sol",
-          "disabled": false
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
         }
       ]
     },
@@ -947,12 +1231,26 @@
       "catalogPrefix": "googleai",
       "modes": [
         {
+          "mode": "api",
+          "backend": "gemini",
+          "kind": "api",
+          "keyless": false,
+          "defaultModel": "gemini-3.6-flash",
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
+        },
+        {
           "mode": "cli",
           "backend": "gemini-cli",
           "kind": "cli",
           "keyless": false,
           "defaultModel": "gemini-3.6-flash",
-          "disabled": false
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          }
         }
       ]
     }
@@ -1092,6 +1390,9 @@
             "type": "string"
           },
           "ref": {
+            "type": "string"
+          },
+          "since": {
             "type": "string"
           },
           "url": {
@@ -1423,6 +1724,9 @@
           "backend": {
             "type": "string"
           },
+          "callerTools": {
+            "type": "boolean"
+          },
           "effort": {
             "enum": [
               "",
@@ -1631,6 +1935,9 @@
           "budget": {
             "$ref": "#/$defs/Budget"
           },
+          "callerTools": {
+            "type": "boolean"
+          },
           "cliArgs": {
             "type": "object"
           },
@@ -1740,6 +2047,9 @@
         "additionalProperties": false,
         "properties": {
           "action": {
+            "type": "string"
+          },
+          "approvalId": {
             "type": "string"
           },
           "input": true,
@@ -1892,6 +2202,9 @@
           "base": {
             "type": "string"
           },
+          "ignored": {
+            "type": "string"
+          },
           "keep": {
             "type": "boolean"
           },
@@ -1902,6 +2215,9 @@
             "type": "string"
           },
           "prefix": {
+            "type": "string"
+          },
+          "uncommitted": {
             "type": "string"
           }
         },
@@ -1929,164 +2245,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "claude-sonnet-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-fable-5"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-opus-4-8"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      "",
-                      "low",
-                      "medium",
-                      "high",
-                      "xhigh",
-                      "max"
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-opus-4-7"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-4-6"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-opus-4-6"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
                     "const": "claude-haiku-4-5-20251001"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "claude-sonnet-4-5-20250929"
                   }
                 },
                 "required": [
@@ -2105,7 +2264,12 @@
             }
           ],
           "properties": {
-            "cliArgs": false
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "claude-haiku-4-5-20251001"
+              ]
+            }
           }
         }
       },
@@ -2122,6 +2286,30 @@
         },
         "then": {
           "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gemini-3.6-flash"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  }
+                }
+              }
+            },
             {
               "if": {
                 "properties": {
@@ -2150,553 +2338,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gemini-2.5-pro"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "veo-3.1-lite-generate-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "veo-3.1-generate-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "veo-3.1-fast-generate-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
                     "const": "nano-banana-pro-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "lyria-3-pro-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "lyria-3-clip-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-3-flash-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-2.5-flash"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemma-4-31b-it"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemma-4-26b-a4b-it"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-robotics-er-1.6-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-robotics-er-1.5-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-pro-latest"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-omni-flash-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-flash-lite-latest"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-embedding-2-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-embedding-2"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-embedding-001"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-3.1-pro-preview-customtools"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-3.1-flash-lite-preview"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "gemini-3.1-flash-lite"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "deep-research-pro-preview-12-2025"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "deep-research-preview-04-2026"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "deep-research-max-preview-04-2026"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "aqa"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "antigravity-preview-05-2026"
                   }
                 },
                 "required": [
@@ -2715,7 +2357,14 @@
             }
           ],
           "properties": {
-            "cliArgs": false
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "nano-banana-pro-preview"
+              ]
+            }
           }
         }
       },
@@ -2736,7 +2385,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gpt-5.5"
+                    "const": "gpt-5.6-sol"
                   }
                 },
                 "required": [
@@ -2751,7 +2400,9 @@
                       "low",
                       "medium",
                       "high",
-                      "xhigh"
+                      "xhigh",
+                      "max",
+                      "ultra"
                     ]
                   }
                 }
@@ -2761,7 +2412,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gpt-5.4"
+                    "const": "gpt-5.6-terra"
                   }
                 },
                 "required": [
@@ -2772,7 +2423,13 @@
                 "properties": {
                   "effort": {
                     "enum": [
-                      ""
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
                     ]
                   }
                 }
@@ -2782,7 +2439,7 @@
               "if": {
                 "properties": {
                   "model": {
-                    "const": "gpt-5.2"
+                    "const": "gpt-5.6-luna"
                   }
                 },
                 "required": [
@@ -2793,7 +2450,12 @@
                 "properties": {
                   "effort": {
                     "enum": [
-                      ""
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
                     ]
                   }
                 }
@@ -2801,68 +2463,14 @@
             }
           ],
           "properties": {
-            "cliArgs": false
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "backend": {
-              "const": "deepseek"
+            "cliArgs": false,
+            "model": {
+              "enum": [
+                "gpt-5.6-sol",
+                "gpt-5.6-terra",
+                "gpt-5.6-luna"
+              ]
             }
-          },
-          "required": [
-            "backend"
-          ]
-        },
-        "then": {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "deepseek-v4-pro"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "model": {
-                    "const": "deepseek-v4-flash"
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "effort": {
-                    "enum": [
-                      ""
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "cliArgs": false
           }
         }
       },
@@ -3217,6 +2825,31 @@
                   }
                 }
               }
+            },
+            {
+              "if": {
+                "properties": {
+                  "model": {
+                    "const": "gpt-5.3-codex-spark"
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "effort": {
+                    "enum": [
+                      "",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
             }
           ],
           "properties": {
@@ -3224,7 +2857,8 @@
             "model": {
               "enum": [
                 "gpt-5.6-sol",
-                "gpt-5.6-luna"
+                "gpt-5.6-luna",
+                "gpt-5.3-codex-spark"
               ]
             }
           }
