@@ -406,6 +406,63 @@ describe("RuntimeBar", () => {
     });
   });
 
+  it("keeps the selected mode when one menu row serves several backends", () => {
+    // The served catalog lists claude-cli and claude-cmux models as claude-agent
+    // rows, so the row's own backend must not replace the mode the user picked.
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        value={{ backend: "claude-cli" }}
+        onChange={onChange}
+        families={[
+          {
+            id: "claude",
+            label: "Claude",
+            provider: "anthropic",
+            modes: [
+              {
+                id: "agent",
+                label: "Agent",
+                backend: "claude-agent",
+                provider: "claude-agent",
+              },
+              {
+                id: "cli",
+                label: "CLI",
+                backend: "claude-cli",
+                provider: "claude-agent",
+              },
+            ],
+          },
+        ]}
+        models={[
+          {
+            id: "claude-opus-5",
+            provider: "claude-agent",
+            label: "Opus 5",
+            reasoning: true,
+            configured: true,
+            runtime: {
+              model: "claude-opus-5",
+              backend: "claude-agent",
+              mode: "agent",
+            },
+          },
+        ]}
+      />
+    );
+
+    openSegment("Model — prompt default");
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Opus 5/ }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      model: "claude-opus-5",
+      backend: "claude-cli",
+      mode: "cli",
+      effort: "medium",
+    });
+  });
+
   it("clears the model through the prompt-default entry", () => {
     const onChange = vi.fn();
     render(

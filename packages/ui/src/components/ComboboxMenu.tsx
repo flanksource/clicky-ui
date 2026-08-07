@@ -119,35 +119,43 @@ export function ComboboxMenu({
                 : {})}
               onMouseEnter={() => onHighlight(index)}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                "flex cursor-pointer gap-2 rounded-sm px-2 py-1.5 text-sm",
+                option.description ? "items-start" : "items-center",
                 index === highlighted && "bg-accent",
                 selected && !tristate && "font-medium",
                 option.disabled && "cursor-not-allowed opacity-50",
               )}
             >
               {tristate ? (
-                <FilterPill
-                  mode={mode ?? "neutral"}
-                  togglePosition="right"
-                  interactive={false}
-                  label={option.label}
-                  onModeChange={(next) => onSetMode(option.value, next)}
-                  className="w-full justify-between"
-                />
+                <div className="min-w-0 flex-1">
+                  <FilterPill
+                    mode={mode ?? "neutral"}
+                    togglePosition="right"
+                    interactive={false}
+                    label={option.label}
+                    onModeChange={(next) => onSetMode(option.value, next)}
+                    className="w-full justify-between"
+                  />
+                  <ComboboxOptionDescription description={option.description} />
+                </div>
               ) : (
                 <>
                   <Icon
                     icon={UiCheck}
                     className={cn(
                       "shrink-0 text-xs",
+                      option.description && "mt-1",
                       selected ? "opacity-100" : "opacity-0",
                     )}
                   />
                   <LabelIcon
                     icon={option.icon}
-                    className="text-sm text-muted-foreground"
+                    className={cn(
+                      "text-sm text-muted-foreground",
+                      option.description && "mt-1",
+                    )}
                   />
-                  <span className="min-w-0 truncate">{option.label}</span>
+                  <ComboboxOptionText option={option} />
                 </>
               )}
             </div>
@@ -184,4 +192,21 @@ export function ComboboxMenu({
     </div>,
     document.body,
   );
+}
+
+function ComboboxOptionText({ option }: { option: ComboboxOption }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="block truncate">{option.label}</span>
+      <ComboboxOptionDescription description={option.description} />
+    </span>
+  );
+}
+
+function ComboboxOptionDescription({ description }: { description: string | undefined }) {
+  return description ? (
+    <span className="mt-0.5 block whitespace-pre-line text-xs font-normal leading-4 text-muted-foreground">
+      {description}
+    </span>
+  ) : null;
 }
