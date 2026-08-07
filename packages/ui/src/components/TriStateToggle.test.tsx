@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { TriStateToggle, nextTriState } from "./TriStateToggle";
+import { TriStateToggle } from "./TriStateToggle";
+import { nextTriState } from "./tri-state";
 
 describe("nextTriState", () => {
   it("cycles unset → on → off → unset", () => {

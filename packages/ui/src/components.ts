@@ -28,11 +28,10 @@ export {
 } from "./components/SegmentedControl";
 export {
   TriStateToggle,
-  nextTriState,
-  type TriState,
   type TriStateLabels,
   type TriStateToggleProps,
 } from "./components/TriStateToggle";
+export { nextTriState, type TriState } from "./components/tri-state";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
 export {
