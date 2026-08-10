@@ -304,6 +304,7 @@ export * from "./data/query-browser";
 export {
   type LogEntry,
   type TaskControlAction,
+  type TaskExecDetails,
   type TaskSnapshot,
   type TaskRunMeta,
   isTerminalStatus,

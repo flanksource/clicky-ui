@@ -170,6 +170,35 @@ describe("JsonSchemaForm extension pipeline", () => {
     expect(seen.at(-1)).toEqual({ namespace: "prod", url: "" });
   });
 
+  // With rootValue and onRootChange, the pointer is what lets an extension write
+  // a sibling of its own field — a control whose value only means something
+  // paired with another one has to be able to set both.
+  it("tells a post-extension which field in the root value it is rendering", () => {
+    const seen: Array<string | undefined> = [];
+    const readPath: PostExtension = (field, nodes, ctx) => {
+      if (field.key === "url") seen.push(ctx?.instancePath);
+      return nodes;
+    };
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            endpoints: {
+              type: "array",
+              items: { type: "object", properties: { url: { type: "string" } } },
+            },
+          },
+        }}
+        value={{ endpoints: [{ url: "/a" }, { url: "/b" }] }}
+        onChange={vi.fn()}
+        post={[readPath]}
+      />,
+    );
+    expect(seen).toContain("/endpoints/0/url");
+    expect(seen).toContain("/endpoints/1/url");
+  });
+
   it("lets a post-extension replace the form root value", () => {
     const onChange = vi.fn();
     const replaceRoot: PostExtension = (field, nodes, ctx) =>

@@ -54,6 +54,17 @@ const loadKeyPreview = (_kind: SecretKind, name: string) =>
     setTimeout(() => r(PREVIEWS[name] ?? []), 200),
   );
 const loadServiceAccounts = () => Promise.resolve(SERVICE_ACCOUNTS);
+const onePassword = {
+  loadVaults: async () => [{ id: "vault-prod", name: "prod" }],
+  loadItems: async () => [{ id: "item-postgres", name: "postgres" }],
+  loadFields: async () => [
+    {
+      id: "password",
+      label: "password",
+      reference: "op://prod/postgres/password",
+    },
+  ],
+};
 
 const ALL_SOURCES: SecretValueSource[] = [
   "secret",
@@ -100,6 +111,7 @@ function Playground({
         loadResources={loadResources}
         loadKeyPreview={loadKeyPreview}
         loadServiceAccounts={loadServiceAccounts}
+        onePassword={onePassword}
         allowLiteral={allowLiteral}
         sources={sources}
       />

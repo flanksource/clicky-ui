@@ -248,6 +248,65 @@ describe("parametersToFormConfig", () => {
     expect(updates[1].q).toBe("nut");
     expect(updates[2].since).toBe("2025-01-01");
   });
+
+  // Both edges under one parameter, which is how a column filter carries a time
+  // bound — unlike the from/to pair above, which is two parameters.
+  it("builds a range control from a single date-range parameter", () => {
+    const updates: Array<Record<string, string>> = [];
+    const values = { "filter.updated_at": ">=2026-01-01,<=2026-02-01" };
+    const config = parametersToFormConfig(
+      [{ name: "filter.updated_at", in: "query" }],
+      values,
+      (updater) => {
+        updates.push(typeof updater === "function" ? updater(values) : updater);
+      },
+      {
+        lookup: {
+          filters: {
+            "filter.updated_at": { label: "Updated At", type: "date-range", multi: true },
+          },
+        },
+      },
+    );
+
+    const filter = config.filters[0];
+    expect(filter).toMatchObject({
+      kind: "date-range",
+      label: "Updated At",
+      from: "2026-01-01",
+      to: "2026-02-01",
+    });
+    // The bar's own trailing range stays free: this one is a filter among the
+    // filters, so a surface can carry several.
+    expect(config.timeRange).toBeUndefined();
+
+    if (filter.kind !== "date-range") throw new Error(`unexpected kind ${filter.kind}`);
+    filter.onApply("now-7d", "now");
+    expect(updates[0]["filter.updated_at"]).toBe(">=now-7d,<=now");
+  });
+
+  // A UUID column: exact values, nothing to enumerate. `multi` stays true on the
+  // wire because the grammar still takes several, but the control is typed —
+  // without the "value" type this fell through to a comma-joined lookup-multi.
+  it("renders an exact-value filter with nothing to enumerate as a text input", () => {
+    const updates: Array<Record<string, string>> = [];
+    const values = { "filter.id": "" };
+    const config = parametersToFormConfig(
+      [{ name: "filter.id", in: "query" }],
+      values,
+      (updater) => {
+        updates.push(typeof updater === "function" ? updater(values) : updater);
+      },
+      { lookup: { filters: { "filter.id": { label: "Id", type: "value", multi: true } } } },
+    );
+
+    const filter = config.filters[0];
+    expect(filter).toMatchObject({ kind: "text", label: "Id", value: "" });
+
+    if (filter.kind !== "text") throw new Error(`unexpected kind ${filter.kind}`);
+    filter.onChange("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+    expect(updates[0]["filter.id"]).toBe("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+  });
 });
 
 describe("dataTablePaginationFromForm", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FilterBarMultiFilter, FilterBarNumberFilter } from "./../components/FilterBar";
+import type {
+  FilterBarDateRangeFilter,
+  FilterBarMultiFilter,
+  FilterBarNumberFilter,
+  FilterBarTextFilter,
+} from "./../components/FilterBar";
 import type { DataTableFilterSelection } from "./data-table-filter-values";
 import {
   DATA_TABLE_FILTER_LOOKUP_LIMIT,
@@ -189,18 +194,58 @@ describe("serverFiltersToFilterBar", () => {
       ).toThrow(/both filter through region/);
     });
 
-    it("when a second column declares a time range", () => {
+  });
+
+  describe("time columns", () => {
+    const created = { name: "created", filterKey: "created", filter: { kind: "time" as const } };
+    const updated = { name: "updated", filterKey: "updated", filter: { kind: "time" as const } };
+
+    it("gives the bar's range control to the first time column", () => {
       const { setValues } = capture();
-      expect(() =>
-        serverFiltersToFilterBar(
-          [
-            { name: "created", filterKey: "created", filter: { kind: "time" } },
-            { name: "updated", filterKey: "updated", filter: { kind: "time" } },
-          ],
-          {},
-          setValues,
-        ),
-      ).toThrow(/the filter bar has one/);
+      const config = serverFiltersToFilterBar([created], { created: ">=now-24h" }, setValues);
+      expect(config.timeRange).toMatchObject({ from: "now-24h", timeEnabled: true });
+      expect(config.filters).toHaveLength(0);
     });
+
+    // A raw SELECT commonly returns created_at beside updated_at; refusing the
+    // second one used to throw during render and cost the whole bar.
+    it("renders a second time column as a date-range filter rather than refusing it", () => {
+      const { setValues } = capture();
+      const config = serverFiltersToFilterBar(
+        [created, updated],
+        { updated: ">=2026-01-01,<=2026-02-01" },
+        setValues,
+      );
+      expect(config.timeRange).toBeDefined();
+      expect(config.filters).toHaveLength(1);
+      expect(config.filters[0]).toMatchObject({
+        key: "updated",
+        kind: "date-range",
+        label: "Updated",
+        from: "2026-01-01",
+        to: "2026-02-01",
+      });
+    });
+
+    it("writes a second time column's range back under its own key", () => {
+      const { setValues, state } = capture();
+      const config = serverFiltersToFilterBar([created, updated], {}, setValues);
+      (config.filters[0] as FilterBarDateRangeFilter).onApply("now-7d", "now");
+      expect(state.current).toEqual({ updated: ">=now-7d,<=now" });
+    });
+  });
+
+  // A dropdown that opens empty is a control the user cannot use. This is what
+  // a UUID column gets: exact values, typed rather than picked.
+  it("renders a terms filter with nothing to enumerate as a typed input", () => {
+    const { setValues, state } = capture();
+    const config = serverFiltersToFilterBar(
+      [{ name: "id", filterKey: "id", filter: { kind: "terms", lookup: false } }],
+      {},
+      setValues,
+    );
+    expect(config.filters[0]).toMatchObject({ key: "id", kind: "text", value: "" });
+    (config.filters[0] as FilterBarTextFilter).onChange("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+    expect(state.current).toEqual({ id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8" });
   });
 });

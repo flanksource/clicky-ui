@@ -6,7 +6,9 @@ import { AnsiHtml } from "./AnsiHtml";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
+import { TaskExecDetailsView } from "./TaskExecDetails";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
+import { isTaskExecDetails } from "./task-exec-details";
 import { isTaskProcessDetails } from "./task-process-details";
 import {
   bucketTasks,
@@ -168,6 +170,10 @@ function TaskGroupCard({
         />
       )}
 
+      {!isTaskProcessDetails(g.details) && isTaskExecDetails(g.details) && (
+        <TaskExecDetailsView details={g.details} />
+      )}
+
       {hiddenCompleted > 0 || hiddenPending > 0 ? (
         <button
           type="button"
@@ -209,6 +215,8 @@ function TaskRow({
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
   const hasOutput = !!t.stdout || !!t.stderr;
+  const execDetails = isTaskExecDetails(t.details) ? t.details : undefined;
+  const expandable = hasLogs || hasOutput || execDetails !== undefined;
   // Promote the latest warning message inline so a `warning` row shows its
   // reason without expanding. Suppressed when an error is already shown.
   const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
@@ -224,9 +232,9 @@ function TaskRow({
     <div
       className={cn(
         "flex items-start gap-3 border-b py-2 last:border-0",
-        (hasLogs || hasOutput) && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
+        expandable && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
       )}
-      onClick={hasLogs || hasOutput ? () => setExpanded((v) => !v) : undefined}
+      onClick={expandable ? () => setExpanded((v) => !v) : undefined}
     >
       <Icon
         icon={taskStatusIcon(t.status)}
@@ -242,9 +250,9 @@ function TaskRow({
                 {latestWarn.message}
               </span>
             )}
-            {(hasLogs || hasOutput) && (
+            {expandable && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0)}
+                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0) + (execDetails ? 1 : 0)}
               </span>
             )}
           </span>
@@ -281,6 +289,7 @@ function TaskRow({
             />
           </div>
         )}
+        {expanded && execDetails && <TaskExecDetailsView details={execDetails} />}
         {expanded && hasLogs && (
           <div className="mt-1 ml-1 max-h-48 space-y-0.5 overflow-y-auto border-l-2 pl-2">
             {logs.map((l, i) => (

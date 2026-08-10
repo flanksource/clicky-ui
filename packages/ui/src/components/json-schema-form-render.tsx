@@ -194,6 +194,7 @@ function buildField(
   const postCtx = {
     ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
     ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
+    instancePath,
   };
   ({ label, value } = applyPostExtensions(
     field,

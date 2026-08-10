@@ -156,6 +156,14 @@ export function ComboboxMenu({
                     )}
                   />
                   <ComboboxOptionText option={option} />
+                  {option.trailing != null && (
+                    // Capped and truncating rather than `shrink-0`: in a menu
+                    // clamped by the viewport edge the label is what identifies
+                    // the option, so the preview yields first.
+                    <span className="ml-auto min-w-0 max-w-[55%] truncate pl-2 text-right text-xs text-muted-foreground">
+                      {option.trailing}
+                    </span>
+                  )}
                 </>
               )}
             </div>

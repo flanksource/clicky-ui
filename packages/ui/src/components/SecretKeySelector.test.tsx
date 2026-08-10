@@ -268,22 +268,40 @@ describe("SecretKeySelector service account", () => {
 });
 
 describe("SecretKeySelector 1Password", () => {
-  it("renders a single op:// reference input and emits an onepassword value", () => {
+  it("loads vault, item, and field metadata before emitting an onepassword value", async () => {
     const onChange = vi.fn();
     render(
       <SecretKeySelector
         value={{ kind: "onepassword", ref: "" }}
         sources={["secret", "onepassword"]}
+        onePassword={{
+          loadVaults: async () => [{ id: "vault-prod", name: "Production" }],
+          loadItems: async () => [{ id: "item-db", name: "Database" }],
+          loadFields: async () => [
+            {
+              id: "password",
+              label: "Password",
+              reference: "op://Production/Database/password",
+            },
+          ],
+        }}
         {...baseProps({ onChange })}
       />,
     );
-    const input = screen.getByPlaceholderText(
-      "op://vault/item/field",
-    ) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "op://prod/db/password" } });
-    expect(onChange).toHaveBeenCalledWith({
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "1Password vault" }));
+    fireEvent.mouseDown(
+      await screen.findByRole("option", { name: "Production" }),
+    );
+    fireEvent.focus(screen.getByRole("combobox", { name: "1Password item" }));
+    fireEvent.mouseDown(
+      await screen.findByRole("option", { name: "Database" }),
+    );
+    fireEvent.focus(screen.getByRole("combobox", { name: "1Password field" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "Password" }));
+    expect(onChange).toHaveBeenLastCalledWith({
       kind: "onepassword",
-      ref: "op://prod/db/password",
+      ref: "op://Production/Database/password",
     });
   });
 });

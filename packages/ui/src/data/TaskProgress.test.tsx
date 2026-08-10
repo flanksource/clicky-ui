@@ -237,4 +237,51 @@ describe("TaskProgress", () => {
     expect(screen.getByText("pid 101")).toBeInTheDocument();
     expect(screen.getByText("1 restart")).toBeInTheDocument();
   });
+
+  it("renders child exec argv, process runtime, and domain-specific details", () => {
+    const snapshots: TaskSnapshot[] = [
+      {
+        id: "scans",
+        name: "Scans",
+        type: "group",
+        status: "success",
+        groupId: "scan-run-1",
+        kind: "scan",
+        total: 1,
+        completed: 1,
+      },
+      {
+        id: "scan-task",
+        name: "nuclei-safe-1",
+        type: "task",
+        status: "success",
+        groupId: "scan-run-1",
+        details: {
+          command: "/opt/recon/bin/nuclei",
+          args: ["-target", "api value", "-stats"],
+          pid: 321,
+          status: "success",
+          exitCode: 0,
+          started: "2026-08-10T12:00:00Z",
+          duration: 2_500_000_000,
+          scanId: "scan-1",
+          endpointCount: 3,
+          findings: 4,
+          stats: { requests: 40, total: 60, templates: 18, matched: 4, errors: 2 },
+        },
+      },
+    ];
+
+    render(<TaskProgress snapshots={snapshots} />);
+    fireEvent.click(screen.getByText("nuclei-safe-1"));
+
+    expect(screen.getByText('["/opt/recon/bin/nuclei","-target","api value","-stats"]')).toBeInTheDocument();
+    expect(screen.getByText("pid 321")).toBeInTheDocument();
+    expect(screen.getByText("exit 0")).toBeInTheDocument();
+    expect(screen.getByText("2.5s")).toBeInTheDocument();
+    expect(screen.getByText("scanId")).toBeInTheDocument();
+    expect(screen.getByText('"scan-1"')).toBeInTheDocument();
+    expect(screen.getByText("endpointCount")).toBeInTheDocument();
+    expect(screen.getByText("stats")).toBeInTheDocument();
+  });
 });

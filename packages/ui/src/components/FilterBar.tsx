@@ -299,7 +299,8 @@ export type FilterBarFilter =
   | FilterBarNumberFilter
   | FilterBarEnumFilter
   | FilterBarBooleanFilter
-  | FilterBarTriStateFilter;
+  | FilterBarTriStateFilter
+  | FilterBarDateRangeFilter;
 
 export type FilterBarRangePreset = {
   /** Visible preset label. */
@@ -329,6 +330,25 @@ export type FilterBarRangeProps = {
   toPlaceholder?: string;
   emptyLabel?: string;
   className?: string;
+  disabled?: boolean;
+};
+
+/**
+ * A date range that lives among the filters rather than in the bar's trailing
+ * range slot.
+ *
+ * The trailing slot holds one range, which is right when a result has one
+ * timestamp and the range is the primary way through it. A result with several
+ * — `created_at` and `updated_at`, `@timestamp` and `event.ingested` — has no
+ * such primary, and each of the others is a filter like any other.
+ */
+export type FilterBarDateRangeFilter = FilterBarRangeProps & {
+  key: string;
+  kind: "date-range";
+  label: string;
+  /** Leading glyph shown before the label: a runtime icon name or a node. */
+  icon?: LabelIconSpec;
+  description?: string;
 };
 
 export type FilterBarProps = {
@@ -619,9 +639,30 @@ function FilterBarFilterPanelContent({
       {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
       {filter.kind === "boolean" && <BooleanFilterField filter={filter} />}
       {filter.kind === "tristate" && <TriStateFilterField filter={filter} />}
+      {filter.kind === "date-range" && (
+        <FilterBarRangePanel
+          kind={filter.timeEnabled === false ? "date" : "time"}
+          label={filter.label}
+          {...dateRangeFilterProps(filter)}
+        />
+      )}
       {filter.kind === "text" && <TextFilterField filter={filter} grow />}
     </>
   );
+}
+
+// dateRangeFilterProps strips the filter's identity off, leaving the range the
+// controls take. `key` in particular must not reach a component as a prop.
+function dateRangeFilterProps(filter: FilterBarDateRangeFilter): FilterBarRangeProps {
+  const {
+    key: _key,
+    kind: _kind,
+    label: _label,
+    icon: _icon,
+    description: _description,
+    ...range
+  } = filter;
+  return range;
 }
 
 function renderFilterField(filter: FilterBarFilter, grow: boolean) {
@@ -659,6 +700,16 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 
   if (filter.kind === "tristate") {
     return <TriStateFilterField filter={filter} />;
+  }
+
+  if (filter.kind === "date-range") {
+    return (
+      <RangeControlButton
+        kind={filter.timeEnabled === false ? "date" : "time"}
+        label={filter.label}
+        {...dateRangeFilterProps(filter)}
+      />
+    );
   }
 
   return <TextFilterField filter={filter} grow={grow} />;
@@ -861,6 +912,15 @@ function OverflowFiltersMenu({
 }
 
 function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
+  if (filter.kind === "date-range") {
+    return (
+      <RangeControlButton
+        kind={filter.timeEnabled === false ? "date" : "time"}
+        label={filter.label}
+        {...dateRangeFilterProps(filter)}
+      />
+    );
+  }
   if (filter.kind === "text") {
     return <TextFilterValueControl filter={filter} />;
   }
@@ -1081,6 +1141,7 @@ export function FilterBarRangePanel({
   fromPlaceholder,
   toPlaceholder,
   emptyLabel,
+  disabled,
 }: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
   return (
     <div className="w-72 p-3 text-popover-foreground">
@@ -1091,6 +1152,7 @@ export function FilterBarRangePanel({
         from={from}
         to={to}
         onApply={onApply}
+        {...(disabled !== undefined ? { disabled } : {})}
         {...(presets ? { presets } : {})}
         {...(timeEnabled !== undefined ? { timeEnabled } : {})}
         {...(timeZone ? { timeZone } : {})}
@@ -2058,6 +2120,7 @@ function RangeControlButton({
   toPlaceholder,
   emptyLabel,
   className,
+  disabled,
 }: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
   return (
     <TimeRange
@@ -2066,6 +2129,7 @@ function RangeControlButton({
       from={from}
       to={to}
       onApply={onApply}
+      {...(disabled !== undefined ? { disabled } : {})}
       {...(presets ? { presets } : {})}
       {...(timeEnabled !== undefined ? { timeEnabled } : {})}
       {...(timeZone ? { timeZone } : {})}
@@ -2322,7 +2386,17 @@ function createFilterValueMap(filters: FilterBarFilter[]) {
   return Object.fromEntries(filters.map((filter) => [filter.key, filterBarFilterValue(filter)]));
 }
 
+// A date range applies the moment it is applied in its own panel, exactly as
+// the bar's trailing range control does, so it has no value to stage and
+// nothing here ever writes one back to it.
+function isStageableFilter(
+  filter: FilterBarFilter,
+): filter is Exclude<FilterBarFilter, FilterBarDateRangeFilter> {
+  return filter.kind !== "date-range";
+}
+
 function filterBarFilterValue(filter: FilterBarFilter): FilterBarValue {
+  if (!isStageableFilter(filter)) return undefined;
   return filter.value;
 }
 
@@ -2331,6 +2405,7 @@ function filterWithStagedValue(
   value: FilterBarValue,
   onChange: (value: FilterBarValue) => void,
 ): FilterBarFilter {
+  if (!isStageableFilter(filter)) return filter;
   if (filter.kind === "text") {
     return {
       ...filter,
@@ -2406,6 +2481,7 @@ function applyStagedFilterValues(
   stagedValues: Record<string, FilterBarValue>,
 ) {
   for (const filter of filters) {
+    if (!isStageableFilter(filter)) continue;
     // Key presence, not `??`: undefined is a tri-state filter's "off" value and
     // must still be applied over a live true/false.
     const next = Object.hasOwn(stagedValues, filter.key)
@@ -2417,6 +2493,7 @@ function applyStagedFilterValues(
 }
 
 function applyFilterBarValue(filter: FilterBarFilter, value: FilterBarValue) {
+  if (!isStageableFilter(filter)) return;
   if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
     filter.onChange(String(value ?? ""));
     return;
