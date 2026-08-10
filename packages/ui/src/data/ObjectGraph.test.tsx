@@ -42,22 +42,40 @@ describe("ObjectGraph", () => {
     expect(screen.getByText("bean")).toBeTruthy();
   });
 
-  it("calls onNodeSelect with the clicked node without loading its lazy children", () => {
+  it("calls onNodeSelect with the clicked node without toggling it", () => {
     const onNodeSelect = vi.fn();
-    const loadChildren = vi.fn(async () => []);
     const child: ObjectGraphNode = { id: "r.cycle", label: "cycle", expandable: true };
     render(
       <ObjectGraph
         roots={[{ id: "r", label: "bean", children: [child] }]}
         onNodeSelect={onNodeSelect}
+        loadChildren={async () => []}
+      />,
+    );
+    const label = screen.getByRole("button", { name: "cycle" });
+    const before = label.closest("[role=treeitem]")?.getAttribute("aria-expanded");
+
+    fireEvent.click(label);
+
+    expect(onNodeSelect).toHaveBeenCalledTimes(1);
+    expect(onNodeSelect).toHaveBeenCalledWith(child);
+    expect(label.closest("[role=treeitem]")?.getAttribute("aria-expanded")).toBe(before);
+  });
+
+  // defaultOpenDepth renders this node open without anyone clicking it. Loading
+  // only on the open transition would leave it showing a chevron over nothing
+  // until the operator collapsed and reopened it.
+  it("loads the children of a lazy node that starts open", async () => {
+    const loadChildren = vi.fn(async () => [{ id: "r.cycle.x", label: "resolved" }]);
+    render(
+      <ObjectGraph
+        roots={[{ id: "r", label: "bean", children: [{ id: "r.cycle", label: "cycle", expandable: true }] }]}
         loadChildren={loadChildren}
       />,
     );
-    // Click the child's label button — selecting must not toggle/expand it.
-    fireEvent.click(screen.getByRole("button", { name: "cycle" }));
-    expect(onNodeSelect).toHaveBeenCalledTimes(1);
-    expect(onNodeSelect).toHaveBeenCalledWith(child);
-    expect(loadChildren).not.toHaveBeenCalled();
+
+    expect(await screen.findByText("resolved")).toBeTruthy();
+    expect(loadChildren).toHaveBeenCalledTimes(1);
   });
 
   it("highlights the label whose id matches selectedId", () => {

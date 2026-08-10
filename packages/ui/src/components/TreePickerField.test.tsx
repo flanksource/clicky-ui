@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { useModalStack } from "../overlay/modalStack";
+import { zIndex } from "../overlay/zIndex";
 import { TreePickerField } from "./TreePickerField";
 
 type Node = { id: string; label: string; children?: Node[] };
@@ -32,7 +34,20 @@ function panel(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-slot="tree-picker-popup"]');
 }
 
+// jsdom reports every rect as zeroes, so panel placement is untestable without
+// putting the trigger somewhere specific on the page.
+function stubTriggerRect({ top, bottom }: { top: number; bottom: number }) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    top, bottom, left: 40, right: 340, width: 300, height: bottom - top, x: 40, y: top,
+    toJSON: () => ({}),
+  } as DOMRect);
+}
+
 describe("TreePickerField", () => {
+  // stubTriggerRect patches a prototype; left in place it would follow every
+  // later test in this file.
+  afterEach(() => vi.restoreAllMocks());
+
   it("shows the placeholder when no label is set, and the label when set", () => {
     const { unmount } = render(
       <TreePickerField<Node>
@@ -153,6 +168,55 @@ describe("TreePickerField", () => {
     renderField({ selected: ROOTS[0]!.children![1]!, revealSelected: true });
     fireEvent.click(screen.getByRole("button"));
     expect(panel()!.textContent).toContain("P2");
+  });
+
+  it("lifts the popup above an open modal instead of pinning it to a constant", () => {
+    // The bug this prevents: the popup carried a hardcoded z-50 while a modal
+    // sits at zIndex.modal, so a picker opened inside a dialog — the profile
+    // column editor's JSONPath field — rendered behind it and looked dead.
+    renderHook(() => useModalStack(true));
+    renderField();
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+
+    expect(panel()!.style.zIndex).toBe(
+      String(zIndex.modal + zIndex.popoverOverModalOffset),
+    );
+    expect(panel()!.className).not.toContain("z-50");
+  });
+
+  it("sits at the popover floor with no modal open", () => {
+    renderField();
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+
+    expect(panel()!.style.zIndex).toBe(String(zIndex.popover));
+  });
+
+  // A trigger low on the page used to keep the panel's full height anyway, so
+  // its bottom — and the sticky footer pinned there — landed past the viewport
+  // and could not be clicked at all.
+  it("fits the panel to the room below the trigger", () => {
+    stubTriggerRect({ top: 700, bottom: 730 });
+    renderField({ renderFooter: () => <button type="button">Open playground…</button> });
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+
+    const style = panel()!.style;
+    // 768 viewport - 730 bottom leaves 26px, under the 200px floor, so it flips.
+    expect(Number.parseFloat(style.maxHeight)).toBeLessThanOrEqual(700);
+    expect(Number.parseFloat(style.top) + Number.parseFloat(style.maxHeight)).toBeLessThanOrEqual(
+      window.innerHeight,
+    );
+  });
+
+  it("opens below the trigger when there is room, capped to what is left", () => {
+    stubTriggerRect({ top: 400, bottom: 430 });
+    renderField();
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+
+    const style = panel()!.style;
+    expect(Number.parseFloat(style.top)).toBe(434);
+    expect(Number.parseFloat(style.top) + Number.parseFloat(style.maxHeight)).toBeLessThanOrEqual(
+      window.innerHeight,
+    );
   });
 
   it("passes the accessible name and control visibility through to the tree", () => {

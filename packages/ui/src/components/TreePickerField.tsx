@@ -4,12 +4,19 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiChevronDown } from "../icons";
 import { Tree, type TreeProps } from "../data/Tree";
-import { useEscapeLayer } from "../overlay/modalStack";
+import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
 
 // Upper bound the open panel grows to so wide trees show full labels before
 // truncating; the panel is never narrower than the trigger.
 const PANEL_MAX_WIDTH_PX = 480;
+// Tallest the panel gets when the viewport allows it.
+const PANEL_MAX_HEIGHT_PX = 480;
+// Below this there is not enough room to be worth opening downward, so the panel
+// flips above the trigger instead.
+const PANEL_MIN_HEIGHT_PX = 200;
+// Breathing room kept between the panel and the viewport edge.
+const VIEWPORT_MARGIN_PX = 8;
 
 export interface TreePickerFieldProps<T> {
   /** Root nodes of the tree to browse. */
@@ -49,6 +56,13 @@ export interface TreePickerFieldProps<T> {
   triggerClassName?: string;
   panelClassName?: string;
   renderTrigger?: (props: TreePickerTriggerProps) => ReactNode;
+  /**
+   * Sticky row pinned below the tree inside the open panel — an escape hatch
+   * from a dropdown that has run out of room (a fuller browser, a "create new")
+   * rather than another node. It is handed `close` because acting on it almost
+   * always means leaving the dropdown behind.
+   */
+  renderFooter?: (props: { close: () => void }) => ReactNode;
 }
 
 export interface TreePickerTriggerProps {
@@ -85,11 +99,13 @@ export function TreePickerField<T>({
   triggerClassName,
   panelClassName,
   renderTrigger,
+  renderFooter,
 }: TreePickerFieldProps<T>) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(
-    null,
-  );
+  const floatingZ = useFloatingZIndex();
+  const [pos, setPos] = useState<
+    { top: number; left: number; width: number; maxWidth: number; maxHeight: number } | null
+  >(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -109,9 +125,25 @@ export function TreePickerField<T>({
       const anchor = rootRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
-      const viewportCap = window.innerWidth - rect.left - 8;
+      const viewportCap = window.innerWidth - rect.left - VIEWPORT_MARGIN_PX;
       const maxWidth = Math.max(rect.width, Math.min(PANEL_MAX_WIDTH_PX, viewportCap));
-      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width, maxWidth });
+      // Fit the panel to the room the trigger actually has, and flip it above
+      // when there is more room up there. Without this the panel keeps its full
+      // height wherever the trigger sits, so a trigger low on the page pushes
+      // the panel's bottom past the viewport — taking the sticky footer, and
+      // any escape hatch pinned to it, out of reach entirely.
+      const below = window.innerHeight - rect.bottom - VIEWPORT_MARGIN_PX - 4;
+      const above = rect.top - VIEWPORT_MARGIN_PX - 4;
+      const flip = below < PANEL_MIN_HEIGHT_PX && above > below;
+      const available = Math.max(flip ? above : below, PANEL_MIN_HEIGHT_PX);
+      const maxHeight = Math.min(PANEL_MAX_HEIGHT_PX, available);
+      setPos({
+        top: flip ? Math.max(VIEWPORT_MARGIN_PX, rect.top - 4 - maxHeight) : rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        maxWidth,
+        maxHeight,
+      });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -182,15 +214,24 @@ export function TreePickerField<T>({
               position: "fixed",
               top: pos.top,
               left: pos.left,
+              // Computed rather than constant: the popup has to clear whatever
+              // modal is open, and a modal sits at zIndex.modal (10000). A
+              // hardcoded z-50 renders the tree behind any dialog it is opened
+              // in — see ../overlay/zIndex.
+              zIndex: floatingZ,
               // Grow to fit the widest row/toolbar, but never narrower than the
               // trigger nor wider than maxWidth — so labels show in full and the
               // toolbar's intrinsic-width search input never forces a scrollbar.
               minWidth: pos.width,
               width: "max-content",
               maxWidth: pos.maxWidth,
+              maxHeight: pos.maxHeight,
             }}
             className={cn(
-              "z-50 flex max-h-[60vh] flex-col overflow-hidden rounded-md border border-border bg-popover shadow-md",
+              // Height comes from the measured maxHeight above, not a viewport
+              // fraction: 60vh is the same number wherever the trigger sits, and
+              // a trigger low on the page needs a shorter panel, not an equal one.
+              "flex flex-col overflow-hidden rounded-md border border-border bg-popover shadow-md",
               panelClassName,
             )}
           >
@@ -215,6 +256,11 @@ export function TreePickerField<T>({
                 }}
               />
             </div>
+            {renderFooter && (
+              <div className="shrink-0 border-t border-border bg-popover">
+                {renderFooter({ close: () => setOpen(false) })}
+              </div>
+            )}
           </div>,
           document.body,
         )}

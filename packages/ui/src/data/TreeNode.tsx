@@ -166,6 +166,19 @@ export function TreeNode<T>({
       });
   }
 
+  // A lazy node can be open without ever having been clicked — defaultOpen said
+  // so, expand-all did, or the filter forced it open to reveal a match. Loading
+  // only on the open transition would leave every one of those showing a caret
+  // over nothing.
+  //
+  // A node that already failed is skipped: loadLazyChildren clears its own retry
+  // guard on failure so a re-toggle can try again, and re-running here would
+  // turn that into an unbounded retry loop instead.
+  useEffect(() => {
+    if (isOpen && lazyUnloaded && error === null) loadLazyChildren();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, lazyUnloaded, error]);
+
   function toggle() {
     if (!expandable) return;
     setOpen((o) => {

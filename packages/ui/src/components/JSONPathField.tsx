@@ -1,21 +1,17 @@
-import { useMemo } from "react";
-import { UiListTree } from "../icons";
+import { useMemo, useState } from "react";
+import { UiFullscreen, UiListTree } from "../icons";
+import { Icon } from "../data/Icon";
 import { IconButton } from "./IconButton";
 import { InputField, type InputFieldInputProps } from "./InputField";
+import { buildJSONPathNode, type JSONPathNode } from "./jsonPathTree";
+import {
+  JSONPathPlayground,
+  type JSONPathEvalRequest,
+  type JSONPathEvalResult,
+} from "./JSONPathPlayground";
 import { TreePickerField } from "./TreePickerField";
 
-const MAX_DEPTH = 12;
-const MAX_OBJECT_PROPERTIES = 100;
-const SIMPLE_PROPERTY = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-
-export interface JSONPathNode {
-  key: string;
-  path: string;
-  value: unknown;
-  kind: "array" | "object" | "scalar";
-  summary: string;
-  children?: JSONPathNode[];
-}
+export type { JSONPathNode } from "./jsonPathTree";
 
 export type JSONPathFieldProps = Omit<InputFieldInputProps, "onChange" | "suffix" | "value"> & {
   json?: unknown;
@@ -24,6 +20,26 @@ export type JSONPathFieldProps = Omit<InputFieldInputProps, "onChange" | "suffix
   isSelectable?: (node: JSONPathNode) => boolean;
   getPath?: (node: JSONPathNode) => string;
   pickerLabel?: string;
+  /**
+   * Every sampled row, for the playground's row switcher. Defaults to `json`
+   * alone — a field absent from the first row cannot be browsed otherwise.
+   */
+  rows?: unknown[];
+  /** Enables the playground's live match preview. See JSONPathPlaygroundProps. */
+  evaluate?: (request: JSONPathEvalRequest) => Promise<JSONPathEvalResult>;
+  /**
+   * Commits a picked path together with the column it must be rooted at, set
+   * when the path addresses a decoded JSON-encoded column. Consumers that own
+   * the whole column can write `source` alongside `jsonpath`; the default just
+   * calls `onChange`, leaving the pairing to whoever writes `source` by hand.
+   */
+  onSelectPath?: (path: string, context: { root?: string }) => void;
+  /**
+   * The column the current path is already rooted at — its saved `source`. The
+   * playground browses and evaluates from there, so a column that already pairs
+   * the two does not read as broken.
+   */
+  source?: string;
 };
 
 export function JSONPathField({
@@ -33,79 +49,94 @@ export function JSONPathField({
   isSelectable,
   getPath,
   pickerLabel,
+  rows,
+  evaluate,
+  onSelectPath,
+  source,
   disabled,
   className,
   "aria-label": ariaLabel,
   ...inputProps
 }: JSONPathFieldProps) {
+  const [playgroundOpen, setPlaygroundOpen] = useState(false);
   const roots = useMemo(() => json === undefined ? [] : [buildJSONPathNode(json, "$", 0)], [json]);
+  const playgroundRows = useMemo(
+    () => rows ?? (json === undefined ? [] : [json]),
+    [rows, json],
+  );
   const browseLabel = pickerLabel ?? `Browse ${ariaLabel ?? "JSONPath"} JSON paths`;
   const pickerDisabled = Boolean(disabled) || json === undefined;
+  const commit = onSelectPath ?? ((path: string) => onChange(path));
 
   return (
-    <TreePickerField<JSONPathNode>
-      className="w-full"
-      roots={roots}
-      getKey={(node) => node.key}
-      getChildren={(node) => node.children}
-      getSearchText={(node) => `${node.path} ${node.summary}`}
-      defaultOpen={(_node, depth) => depth < 2}
-      {...(isSelectable ? { isSelectable } : {})}
-      disabled={pickerDisabled}
-      onSelect={(node) => onChange(getPath?.(node) ?? node.path)}
-      renderRow={({ node }) => (
-        <span className="flex min-w-0 flex-1 items-center gap-density-2 font-mono text-xs">
-          <span className="shrink-0 text-primary">{node.path}</span>
-          <span className="truncate text-muted-foreground" title={node.summary}>{node.summary}</span>
-        </span>
-      )}
-      renderTrigger={({ open, triggerRef, toggle }) => (
-        <InputField
-          {...inputProps}
-          {...(disabled !== undefined ? { disabled } : {})}
-          aria-label={ariaLabel}
-          className={className}
+    <>
+      <TreePickerField<JSONPathNode>
+        className="w-full"
+        roots={roots}
+        getKey={(node) => node.key}
+        getChildren={(node) => node.children}
+        getSearchText={(node) => `${node.path} ${node.summary}`}
+        defaultOpen={(_node, depth) => depth < 2}
+        {...(isSelectable ? { isSelectable } : {})}
+        disabled={pickerDisabled}
+        onSelect={(node) => onChange(getPath?.(node) ?? node.path)}
+        // The dropdown caps its walk to open instantly, so it can run out of
+        // room on a document this row happens to be. The playground is where
+        // that document is browsed in full.
+        renderFooter={({ close }) => (
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              setPlaygroundOpen(true);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <Icon icon={UiFullscreen} className="text-xs" />
+            Open playground…
+          </button>
+        )}
+        renderRow={({ node }) => (
+          <span className="flex min-w-0 flex-1 items-center gap-density-2 font-mono text-xs">
+            <span className="shrink-0 text-primary">{node.path}</span>
+            <span className="truncate text-muted-foreground" title={node.summary}>{node.summary}</span>
+          </span>
+        )}
+        renderTrigger={({ open, triggerRef, toggle }) => (
+          <InputField
+            {...inputProps}
+            {...(disabled !== undefined ? { disabled } : {})}
+            aria-label={ariaLabel}
+            className={className}
+            value={value}
+            onChange={onChange}
+            suffix={(
+              <IconButton
+                ref={triggerRef}
+                icon={UiListTree}
+                label={browseLabel}
+                disabled={pickerDisabled}
+                aria-haspopup="tree"
+                aria-expanded={open}
+                onClick={toggle}
+              />
+            )}
+          />
+        )}
+      />
+      {playgroundOpen && (
+        <JSONPathPlayground
+          open
+          onClose={() => setPlaygroundOpen(false)}
+          rows={playgroundRows}
           value={value}
-          onChange={onChange}
-          suffix={(
-            <IconButton
-              ref={triggerRef}
-              icon={UiListTree}
-              label={browseLabel}
-              disabled={pickerDisabled}
-              aria-haspopup="tree"
-              aria-expanded={open}
-              onClick={toggle}
-            />
-          )}
+          onCommit={commit}
+          assignsRoot={onSelectPath !== undefined}
+          {...(source ? { source } : {})}
+          {...(evaluate ? { evaluate } : {})}
+          title={`${ariaLabel ?? "JSONPath"} playground`}
         />
       )}
-    />
+    </>
   );
-}
-
-function buildJSONPathNode(value: unknown, path: string, depth: number): JSONPathNode {
-  const kind = Array.isArray(value) ? "array" : value !== null && typeof value === "object" ? "object" : "scalar";
-  const node: JSONPathNode = { key: path, path, value, kind, summary: summarizeJSON(value) };
-  if (kind === "scalar" || depth >= MAX_DEPTH) return node;
-  const entries = Array.isArray(value)
-    ? value.length > 0 ? [[0, value[0]] as const] : []
-    : Object.entries(value as Record<string, unknown>).slice(0, MAX_OBJECT_PROPERTIES);
-  node.children = entries.map(([key, child]) => buildJSONPathNode(child, appendJSONPath(path, key), depth + 1));
-  return node;
-}
-
-function appendJSONPath(path: string, key: string | number): string {
-  if (typeof key === "number") return `${path}[${key}]`;
-  return SIMPLE_PROPERTY.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`;
-}
-
-function summarizeJSON(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.length} item${value.length === 1 ? "" : "s"}]`;
-  if (value !== null && typeof value === "object") {
-    const count = Object.keys(value).length;
-    return `{${count} ${count === 1 ? "property" : "properties"}}`;
-  }
-  if (typeof value === "string") return JSON.stringify(value.length > 80 ? `${value.slice(0, 77)}…` : value);
-  return String(value);
 }
