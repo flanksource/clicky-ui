@@ -202,9 +202,17 @@ export type OperationLookupFilterType =
   | "bool"
   | "number"
   | "date"
+  /** Both edges of a range under one parameter, as ">=from,<=to". */
+  | "date-range"
   | "from"
   | "to"
-  | "multi-filter";
+  | "multi-filter"
+  /**
+   * An exact-value selection with nothing to enumerate — a UUID column, say.
+   * Same wire grammar as "multi-filter"; typed rather than picked, because a
+   * dropdown over identifiers is a page of the rows.
+   */
+  | "value";
 
 export interface OperationLookupFilter {
   label?: string;

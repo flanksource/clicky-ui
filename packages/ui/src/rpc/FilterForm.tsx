@@ -236,6 +236,26 @@ function ParameterRow({ filter }: { filter: FilterBarFilter }) {
 }
 
 function renderParameterInput(filter: FilterBarFilter, id: string) {
+  if (filter.kind === "date-range") {
+    return (
+      <TimeRange
+        kind={filter.timeEnabled === false ? "date" : "time"}
+        label={filter.label}
+        align="left"
+        from={filter.from ?? ""}
+        to={filter.to ?? ""}
+        onApply={filter.onApply}
+        {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+        {...(filter.presets ? { presets: filter.presets } : {})}
+        {...(filter.timeEnabled !== undefined ? { timeEnabled: filter.timeEnabled } : {})}
+        {...(filter.timeZone ? { timeZone: filter.timeZone } : {})}
+        {...(filter.timeZones ? { timeZones: filter.timeZones } : {})}
+        {...(filter.fromPlaceholder ? { fromPlaceholder: filter.fromPlaceholder } : {})}
+        {...(filter.toPlaceholder ? { toPlaceholder: filter.toPlaceholder } : {})}
+      />
+    );
+  }
+
   if (filter.kind === "enum") {
     return (
       <select

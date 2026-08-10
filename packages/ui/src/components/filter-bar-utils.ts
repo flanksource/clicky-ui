@@ -41,10 +41,18 @@ export function clearFilterBarFilter(filter: FilterBarFilter) {
     return;
   }
 
+  if (filter.kind === "date-range") {
+    filter.onApply("", "");
+    return;
+  }
+
   filter.onChange({});
 }
 
 export function isFilterBarFilterActive(filter: FilterBarFilter) {
+  if (filter.kind === "date-range") {
+    return String(filter.from ?? "").trim() !== "" || String(filter.to ?? "").trim() !== "";
+  }
   if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
     return String(filter.value ?? "").trim() !== "";
   }

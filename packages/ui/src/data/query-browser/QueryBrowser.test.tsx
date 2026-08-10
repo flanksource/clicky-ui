@@ -42,25 +42,39 @@ describe("QueryBrowser", () => {
       limit: 100,
     });
     render(
-      <QueryBrowser id="db-bound" initialQuery="SELECT *" language="sql" execute={execute} />,
+      <QueryBrowser
+        id="db-bound"
+        initialQuery="SELECT *"
+        language="sql"
+        execute={execute}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     expect(await screen.findByText("1 rows+")).toBeInTheDocument();
-    expect(await screen.findByText(/stopped at the console's 100-row bound/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/stopped at the console's 100-row bound/),
+    ).toBeInTheDocument();
   });
 
   it("says nothing about a bound when the read was complete", async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [{ answer: 42 }] });
     render(
-      <QueryBrowser id="db-whole" initialQuery="SELECT 42" language="sql" execute={execute} />,
+      <QueryBrowser
+        id="db-whole"
+        initialQuery="SELECT 42"
+        language="sql"
+        execute={execute}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     expect(await screen.findByText("1 rows")).toBeInTheDocument();
-    expect(screen.queryByText(/stopped at the console/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/stopped at the console/),
+    ).not.toBeInTheDocument();
   });
 
   it("opens result rows in a Properties detail dialog", async () => {
@@ -161,7 +175,9 @@ describe("QueryBrowser", () => {
 
     const content = container.querySelector(".cm-content");
     expect(content).not.toBeNull();
-    fireEvent.input(content as Element, { target: { textContent: "SELECT 2" } });
+    fireEvent.input(content as Element, {
+      target: { textContent: "SELECT 2" },
+    });
 
     rerender(
       <QueryBrowser
@@ -181,7 +197,10 @@ describe("QueryBrowser", () => {
         {
           name: "region",
           filterKey: "region",
-          filter: { kind: "terms" as const, options: [{ value: "us-east" }, { value: "eu" }] },
+          filter: {
+            kind: "terms" as const,
+            options: [{ value: "us-east" }, { value: "eu" }],
+          },
         },
       ],
     };
@@ -224,10 +243,13 @@ describe("QueryBrowser", () => {
       // A server filter binds to its column through filterKey, so the header
       // control and the cell actions address one filter rather than two.
       fireEvent.click(
-        await screen.findByRole("button", { name: /open region column filter/i }),
+        await screen.findByRole("button", {
+          name: /open region column filter/i,
+        }),
       );
       const option = document.querySelector('[data-filter-option="eu"]');
-      if (!option) throw new Error("Expected an eu option in the header filter");
+      if (!option)
+        throw new Error("Expected an eu option in the header filter");
       fireEvent.click(option);
 
       // The columns the result described ride along, so the source binds the
@@ -258,10 +280,13 @@ describe("QueryBrowser", () => {
       fireEvent.click(screen.getByRole("button", { name: "Run" }));
       await screen.findByRole("table");
       fireEvent.click(
-        await screen.findByRole("button", { name: /open region column filter/i }),
+        await screen.findByRole("button", {
+          name: /open region column filter/i,
+        }),
       );
       const option = document.querySelector('[data-filter-option="eu"]');
-      if (!option) throw new Error("Expected an eu option in the header filter");
+      if (!option)
+        throw new Error("Expected an eu option in the header filter");
       fireEvent.click(option);
       await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
 
@@ -300,6 +325,5 @@ describe("QueryBrowser", () => {
       fireEvent.click(screen.getByRole("button", { name: "Run" }));
       expect(await screen.findByRole("table")).toBeInTheDocument();
     });
-
   });
 });

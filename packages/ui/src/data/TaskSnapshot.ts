@@ -46,6 +46,18 @@ export interface TaskProcessDetails {
   tree?: TaskProcessSample[];
 }
 
+export interface TaskExecDetails {
+  command: string;
+  args?: string[];
+  pid?: number;
+  status: string;
+  exitCode: number;
+  started?: string;
+  /** Go time.Duration encoded as nanoseconds. */
+  duration?: number;
+  [key: string]: unknown;
+}
+
 export interface TaskSnapshot {
   id: string;
   name: string;
@@ -84,7 +96,7 @@ export interface TaskSnapshot {
   stderr?: string;
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
-  details?: TaskProcessDetails | Record<string, unknown>;
+  details?: TaskProcessDetails | TaskExecDetails | Record<string, unknown>;
 }
 
 // TaskRunMeta mirrors the Go `task.RunMeta` listing summary returned by

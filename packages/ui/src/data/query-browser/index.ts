@@ -1,12 +1,15 @@
+export { QueryBrowser } from "./QueryBrowser";
 export {
-  QueryBrowser,
+  QueryBrowserExecutionError,
+  type QueryBrowserDiagnostics,
   type QueryBrowserFilterLookup,
   type QueryBrowserFilterLookupRequest,
+  type QueryBrowserPagination,
   type QueryBrowserProps,
   type QueryBrowserRequest,
   type QueryBrowserResult,
   type QueryBrowserResultContext,
-} from "./QueryBrowser";
+} from "./QueryBrowser.types";
 export {
   type QueryBrowserCompletion,
   type QueryBrowserCompletionField,

@@ -40,7 +40,12 @@ export type JotaiFilterBarRangeProps = Omit<FilterBarRangeProps, "from" | "to" |
   onApply?: FilterBarRangeProps["onApply"];
 };
 
-type AtomizedFilter<TFilter extends FilterBarFilter> = Omit<TFilter, "value" | "onChange"> & {
+// Only a filter that holds a value can be backed by an atom. A date range
+// carries two edges it applies together, and is bound through
+// JotaiFilterBarRangeProps instead.
+type ValuedFilterBarFilter = Extract<FilterBarFilter, { value: unknown }>;
+
+type AtomizedFilter<TFilter extends ValuedFilterBarFilter> = Omit<TFilter, "value" | "onChange"> & {
   atom: JotaiWritableAtom<TFilter["value"]>;
   onChange?: TFilter["onChange"];
 };

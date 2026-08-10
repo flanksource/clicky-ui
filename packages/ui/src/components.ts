@@ -21,6 +21,19 @@ export {
   type JSONPathNode,
 } from "./components/JSONPathField";
 export {
+  JSONPathPlayground,
+  type JSONPathPlaygroundProps,
+  type JSONPathEvalRequest,
+  type JSONPathEvalResult,
+} from "./components/JSONPathPlayground";
+export {
+  buildJSONPathNode,
+  createLazyJSONPathTree,
+  literalSegments,
+  type LazyJSONPathTree,
+  type LazyJSONPathTreeOptions,
+} from "./components/jsonPathTree";
+export {
   SegmentedControl,
   type SegmentedControlProps,
   type SegmentedOption,
@@ -127,6 +140,10 @@ export {
 } from "./components/WorkloadPicker";
 export { EndpointSelector } from "./components/EndpointSelector";
 export {
+  parseEndpointValue,
+  serializeEndpointValue,
+} from "./components/EndpointSelector.model";
+export {
   DEFAULT_PREFERRED_ENDPOINT_PORTS,
   preferredEndpointPort,
 } from "./components/endpoint-port";
@@ -168,6 +185,24 @@ export {
   serializeSecretRef,
   parseSecretRef,
 } from "./components/SecretKeySelector.model";
+export {
+  OnePasswordSelector,
+  type OnePasswordSelectorProps,
+} from "./components/OnePasswordSelector";
+export {
+  buildOnePasswordReference,
+  parseOnePasswordReference,
+  type OnePasswordField,
+  type OnePasswordItem,
+  type OnePasswordLoaders,
+  type OnePasswordSelection,
+  type OnePasswordVault,
+} from "./components/OnePasswordSelector.model";
+export {
+  createSecretFormExtensions,
+  type SecretFormExtensionOptions,
+  type SecretFormLoaders,
+} from "./components/secret-form-extension";
 export {
   ThemeSwitcher,
   type ThemeSwitcherProps,

@@ -11,6 +11,8 @@ import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
 import { Combobox, type ComboboxOption } from "./Combobox";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
+import { OnePasswordSelector } from "./OnePasswordSelector";
+import type { OnePasswordLoaders } from "./OnePasswordSelector.model";
 
 // SecretKeySelector picks how a credential is sourced and lowers the choice into
 // a single reference string the consumer persists. It supports Kubernetes
@@ -59,6 +61,8 @@ export type SecretKeySelectorProps = {
    * When omitted, that source's name field accepts freeform entry only.
    */
   loadServiceAccounts?: () => Promise<SecretResource[]>;
+  /** Loads metadata for the cascading 1Password vault, item, and field pickers. */
+  onePassword?: OnePasswordLoaders;
   /**
    * The sources offered in the picker, in order. Defaults to
    * `["secret", "configmap", "value"]` (or drops "value" when `allowLiteral` is
@@ -94,6 +98,7 @@ export function SecretKeySelector({
   loadResources,
   loadKeyPreview,
   loadServiceAccounts,
+  onePassword,
   sources,
   allowLiteral = true,
   strict = false,
@@ -220,7 +225,7 @@ export function SecretKeySelector({
       ? onChange({ kind: refKind, name: selectedName, key })
       : undefined;
   const setLiteral = (v: string) => onChange({ kind: "value", value: v });
-  const setOpRef = (v: string) => onChange({ kind: "onepassword", ref: v });
+  const setOpRef = (ref: string) => onChange({ kind: "onepassword", ref });
 
   const sourceOptions = useMemo<ComboboxOption[]>(
     () =>
@@ -283,13 +288,23 @@ export function SecretKeySelector({
             ariaLabel="Static value"
           />
         ) : isOnePassword ? (
-          <TextField
-            value={opRef}
-            onChange={setOpRef}
-            placeholder="op://vault/item/field"
-            ariaLabel="1Password reference"
-            mono
-          />
+          (() => {
+            if (!onePassword) {
+              throw new Error(
+                "SecretKeySelector onepassword source requires onePassword loaders",
+              );
+            }
+            return (
+              <div className={VALUE_FIELD} data-slot="secret-onepassword-field">
+                <OnePasswordSelector
+                  value={opRef}
+                  onChange={setOpRef}
+                  {...onePassword}
+                  allowCustomValue
+                />
+              </div>
+            );
+          })()
         ) : isServiceAccount ? (
           <div
             className={VALUE_FIELD}
@@ -346,20 +361,16 @@ export function SecretKeySelector({
   );
 }
 
-// TextField is the shared single-input surface for the literal and 1Password
-// sources (no resource list backs either).
 function TextField({
   value,
   onChange,
   placeholder,
   ariaLabel,
-  mono,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   ariaLabel: string;
-  mono?: boolean;
 }) {
   return (
     <div className={VALUE_FIELD} data-slot="secret-value-fields">
@@ -372,7 +383,6 @@ function TextField({
         className={cn(
           "h-control-h w-full min-w-0 rounded border border-input bg-background px-control-px text-sm",
           "outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          mono && "font-mono",
         )}
       />
     </div>

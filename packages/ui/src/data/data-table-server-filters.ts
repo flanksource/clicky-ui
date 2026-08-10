@@ -11,10 +11,13 @@ import type { MultiSelectOption } from "../components/MultiSelect";
 import type { TriState } from "../components/TriStateToggle";
 import type { DataTableColumn, DataTableColumnKind } from "./DataTable";
 import {
+  parseBoundsValue,
   parseMultiFilterValue,
+  serializeBoundsValue,
   serializeMultiFilterValue,
   updateFilterSelection,
   type DataTableFilterSelection,
+  type FilterBoundsValue,
 } from "./data-table-filter-values";
 import { prettifyKey } from "./data-table-utils";
 
@@ -177,12 +180,12 @@ export function serverFiltersToFilterBar(
     claimed.set(filterKey, column.name);
 
     const label = column.label ?? prettifyKey(column.name);
-    if (filter.kind === "time") {
-      if (config.timeRange) {
-        throw new Error(
-          `Columns ${claimed.get(filterKey)} and ${column.name} both declare a time range; the filter bar has one`,
-        );
-      }
+    // The bar's own range control is the primary way through a result, and a
+    // result has one of those — so the first time column takes it and any
+    // others are ranges among the filters. A raw SELECT commonly returns
+    // created_at beside updated_at, and refusing the second one cost the whole
+    // bar rather than just that column's control.
+    if (filter.kind === "time" && !config.timeRange) {
       config.timeRange = buildTimeRange(filterKey, filter, values, setValues);
       continue;
     }
@@ -219,6 +222,16 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
   };
 
   switch (filter.kind) {
+    case "time":
+      return {
+        ...shared,
+        kind: "date-range",
+        ...boundsToRange(parseBoundsValue(raw)),
+        onApply: (from: string, to: string) =>
+          write(serializeBoundsValue({ min: from, max: to })),
+        ...(filter.presets !== undefined ? { presets: filter.presets } : {}),
+        timeEnabled: true,
+      };
     case "range":
       return {
         ...shared,
@@ -255,6 +268,13 @@ function buildTermsFilter(
   write: (serialized: string) => void,
 ): FilterBarFilter {
   const lookupValues = options.lookupValues;
+  // A selection with no options and no type-ahead has nothing to select from,
+  // and a dropdown that opens empty is a control the user cannot use. The
+  // grammar is the wire format either way, so typing "a,b" or "!a" into the
+  // input still means what selecting them would have.
+  if (!filter.lookup && (filter.options?.length ?? 0) === 0) {
+    return { ...shared, kind: "text", value: raw, onChange: (next: string) => write(next) };
+  }
   return {
     ...shared,
     kind: "multi",
@@ -286,10 +306,8 @@ function buildTimeRange(
   values: DataTableFilterSelection,
   setValues: Dispatch<SetStateAction<DataTableFilterSelection>>,
 ): FilterBarRangeProps {
-  const bounds = parseBoundsValue(values[filterKey] ?? "");
   return {
-    ...(bounds.min !== undefined ? { from: bounds.min } : {}),
-    ...(bounds.max !== undefined ? { to: bounds.max } : {}),
+    ...boundsToRange(parseBoundsValue(values[filterKey] ?? "")),
     onApply: (from, to) =>
       setValues((current) =>
         updateFilterSelection(current, filterKey, serializeBoundsValue({ min: from, max: to })),
@@ -299,30 +317,12 @@ function buildTimeRange(
   };
 }
 
-/**
- * Reads the bounded half of the selection grammar: comma-separated tokens, each
- * carrying its own comparison operator. The bar's controls are inclusive on
- * both edges, so that is what they write back — but a bound typed by hand or
- * arriving in a URL keeps whatever operator it came with.
- */
-function parseBoundsValue(raw: string): FilterBarNumberValue {
-  const bounds: FilterBarNumberValue = {};
-  for (const token of raw.split(",")) {
-    const trimmed = token.trim();
-    if (trimmed.startsWith(">")) {
-      bounds.min = trimmed.replace(/^>=?/, "");
-    } else if (trimmed.startsWith("<")) {
-      bounds.max = trimmed.replace(/^<=?/, "");
-    }
-  }
-  return bounds;
-}
-
-function serializeBoundsValue(value: FilterBarNumberValue): string {
-  const tokens: string[] = [];
-  if (value.min) tokens.push(`>=${value.min}`);
-  if (value.max) tokens.push(`<=${value.max}`);
-  return tokens.join(",");
+/** Names a bounded selection's edges the way a range control reads them. */
+function boundsToRange(bounds: FilterBoundsValue): { from?: string; to?: string } {
+  return {
+    ...(bounds.min !== undefined ? { from: bounds.min } : {}),
+    ...(bounds.max !== undefined ? { to: bounds.max } : {}),
+  };
 }
 
 function toMultiSelectOption(option: DataTableFilterOption): MultiSelectOption {

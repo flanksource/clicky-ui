@@ -6,7 +6,9 @@ import type {
 } from "../components/FilterBar";
 import type { DataTablePagination } from "../data/DataTable";
 import {
+  parseBoundsValue,
   parseMultiFilterValue,
+  serializeBoundsValue,
   serializeMultiFilterValue,
   splitCommaValues,
 } from "../data/data-table-filter-values";
@@ -330,6 +332,47 @@ export function parametersToFormConfig(
 
     const schema = param.schema;
     const lookupFilter = lookupFilters[param.name];
+
+    // Both edges of a range travel under one parameter, so the control is built
+    // from that parameter alone rather than from the from/to pair below.
+    if (lookupFilter?.type === "date-range" && param.in === "query") {
+      const bounds = parseBoundsValue(value);
+      emitFilters.push({
+        key: param.name,
+        kind: "date-range",
+        label,
+        disabled,
+        ...(bounds.min !== undefined ? { from: bounds.min } : {}),
+        ...(bounds.max !== undefined ? { to: bounds.max } : {}),
+        ...(lookupFilter.presets ? { presets: lookupFilter.presets } : {}),
+        timeEnabled: lookupFilter.timeEnabled ?? true,
+        ...(lookupFilter.timeZone ? { timeZone: lookupFilter.timeZone } : {}),
+        ...(lookupFilter.timeZones ? { timeZones: lookupFilter.timeZones } : {}),
+        onApply: (from: string, to: string) => {
+          if (disabled) return;
+          setValues((current) =>
+            rewind({ ...current, [param.name]: serializeBoundsValue({ min: from, max: to }) }),
+          );
+        },
+      });
+      continue;
+    }
+
+    // An exact-value selection with nothing to enumerate. It shares the
+    // multi-filter grammar, so the raw string is written through unchanged:
+    // "a,b" is two values and "!a" excludes one, exactly as picking them would.
+    if (lookupFilter?.type === "value" && param.in === "query") {
+      emitFilters.push({
+        key: param.name,
+        kind: "text",
+        label,
+        value,
+        disabled,
+        ...placeholderProp,
+        onChange: (next) => onChange(next),
+      });
+      continue;
+    }
 
     if (lookupFilter?.type === "multi-filter" && param.in === "query") {
       emitFilters.push({

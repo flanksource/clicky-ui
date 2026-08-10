@@ -501,6 +501,15 @@ export type PreExtension = (
 export interface PostExtensionContext {
   rootValue?: Record<string, unknown>;
   onRootChange?: (next: Record<string, unknown>) => void;
+  /**
+   * RFC 6901 pointer to the field being rendered, e.g. `/columns/3/jsonpath`.
+   *
+   * With `rootValue` and `onRootChange` it is what lets an extension write a
+   * *sibling* of its own field — a control whose value only means something
+   * paired with another one has to be able to set both, rather than rendering
+   * an instruction telling the author to go and finish the job by hand.
+   */
+  instancePath?: string;
 }
 
 export type PostExtension = (

@@ -112,6 +112,41 @@ export function splitCommaValues(value: string): string[] {
 }
 
 /**
+ * A bounded selection: both edges under one key, each token carrying its own
+ * comparison operator. It is the other half of the selection grammar, and the
+ * one a range and a time bound share.
+ */
+export type FilterBoundsValue = {
+  min?: string;
+  max?: string;
+};
+
+/**
+ * Reads a bounded selection. The bar's controls are inclusive on both edges, so
+ * that is what they write back — but a bound typed by hand or arriving in a URL
+ * keeps whatever operator it came with.
+ */
+export function parseBoundsValue(raw: string): FilterBoundsValue {
+  const bounds: FilterBoundsValue = {};
+  for (const token of raw.split(",")) {
+    const trimmed = token.trim();
+    if (trimmed.startsWith(">")) {
+      bounds.min = trimmed.replace(/^>=?/, "");
+    } else if (trimmed.startsWith("<")) {
+      bounds.max = trimmed.replace(/^<=?/, "");
+    }
+  }
+  return bounds;
+}
+
+export function serializeBoundsValue(value: FilterBoundsValue): string {
+  const tokens: string[] = [];
+  if (value.min) tokens.push(`>=${value.min}`);
+  if (value.max) tokens.push(`<=${value.max}`);
+  return tokens.join(",");
+}
+
+/**
  * Writes a serialized value into a selection, dropping the key when it is
  * empty. An absent key and a key holding "" would send different query strings
  * for the same "nothing selected", so only one of them is ever built.
