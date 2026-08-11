@@ -112,7 +112,7 @@ function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
 
 function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
   const d = prop["x-array-display"];
-  return d === "filter-pills" || d === "accordion" ? d : undefined;
+  return d === "filter-pills" || d === "accordion" || d === "cards" ? d : undefined;
 }
 
 // helpDisplay reads the per-field `x-help-display` override. Returns undefined
