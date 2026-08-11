@@ -236,6 +236,12 @@ export {
 } from "./components/use-list-menu-selection";
 
 export { JsonSchemaForm } from "./components/JsonSchemaForm";
+export {
+  createUnitFormExtensions,
+  formatUnitAwareValue,
+  parseUnitAwareValue,
+  type UnitInputKind,
+} from "./components/unit-form-extension";
 export { FormLookupProvider } from "./components/FormLookupProvider";
 export {
   useLookupFetcher,
