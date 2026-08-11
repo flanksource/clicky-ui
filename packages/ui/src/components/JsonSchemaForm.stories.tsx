@@ -915,6 +915,83 @@ export const ArrayOfObjects: Story = {
   },
 };
 
+// Cards keep every item open under a header that says what the item IS — the
+// everything-visible counterpart to `x-array-display: "accordion"`. Both read
+// `x-item`, so switching between them is a one-key change.
+const objectArrayCardsSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    routes: {
+      type: "array",
+      title: "Routes",
+      "x-array-display": "cards",
+      "x-item": {
+        title: ["path"],
+        fallback: "New route",
+        summary: [{ property: "method" }, { property: "upstream" }],
+        glyph: "method",
+        flag: "auth",
+        noun: "route",
+        nounPlural: "routes",
+      },
+      items: {
+        type: "object",
+        required: ["path"],
+        properties: {
+          path: { type: "string", title: "Path" },
+          method: {
+            type: "string",
+            title: "Method",
+            enum: ["GET", "POST", "DELETE"],
+            "x-enum-tones": { GET: "teal", POST: "violet", DELETE: "rose" },
+            "x-enum-display": "combobox",
+          },
+          upstream: { type: "string", title: "Upstream" },
+          auth: { type: "boolean", title: "Requires auth" },
+        },
+      },
+    },
+  },
+};
+
+export const ObjectArrayCards: Story = {
+  args: {
+    schema: objectArrayCardsSchema,
+    value: {
+      routes: [
+        { path: "/api/v1/users", method: "GET", upstream: "users-svc:8080", auth: true },
+        { path: "/api/v1/events", method: "POST", upstream: "events-svc:8080", auth: false },
+      ],
+    },
+    title: "Gateway",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`x-array-display: \"cards\"` renders object items as a stack of titled cards, each headed by the item's own summary (from `x-item`) and edged with the tone its glyph property resolves to. Every item stays open; `x-array-display: \"accordion\"` reads the same `x-item` but collapses each item to one line and opens them one at a time. Without either, an object array renders as the *Item N* sub-forms in **ArrayOfObjects**.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The header identifies the item; "Item 1" never appears.
+    await expect(canvas.getByText("/api/v1/users")).toBeInTheDocument();
+    await expect(canvas.queryByText("Item 1")).not.toBeInTheDocument();
+
+    // Every card is editable at once, and the header follows the edit.
+    // `path` is required, so its label reads "Path*" — match the prefix.
+    const paths = canvas.getAllByLabelText(/^Path/);
+    await expect(paths).toHaveLength(2);
+    await userEvent.clear(paths[1]!);
+    await userEvent.type(paths[1]!, "/api/v2/events");
+    await waitFor(() => expect(canvas.getByText("/api/v2/events")).toBeInTheDocument());
+
+    await userEvent.click(canvas.getByRole("button", { name: "Add route" }));
+    await waitFor(() => expect(canvas.getByText("New route")).toBeInTheDocument());
+  },
+};
+
 const nestedObjectSchema: JsonSchemaObject = {
   type: "object",
   properties: {
