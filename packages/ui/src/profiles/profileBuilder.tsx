@@ -14,7 +14,6 @@ import {
   ProfileBuilderWorkspace,
   type ProfileDraft
 } from "./profileBuilderWorkspace";
-import "./profileBuilder.css";
 
 const ProfileBuilderAutoOpenContext = createContext(false);
 

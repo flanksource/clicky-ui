@@ -5,8 +5,17 @@ import { mapTimestampColumn, profileColumnTypeLabel } from "./profileColumnModel
 describe("Build Profile workspace layout", () => {
   it("bounds the modal body and delegates scrolling to its panes", () => {
     expect(profileBuilderModalClassName).toContain("h-[calc(100dvh-2rem)]");
+    // The body must shrink and stop owning scroll, and its panes must share the
+    // height. Asserted as utilities because a stylesheet shipped alongside the
+    // library silently does nothing in a consumer that never imports it.
     expect(profileBuilderModalClassName).toContain(
-      "profile-builder-workspace-dialog",
+      "[&>[data-slot=modal-body]]:min-h-0",
+    );
+    expect(profileBuilderModalClassName).toContain(
+      "[&>[data-slot=modal-body]]:overflow-hidden",
+    );
+    expect(profileBuilderModalClassName).toContain(
+      "[&>[data-slot=modal-body]>*]:flex-1",
     );
   });
 });
