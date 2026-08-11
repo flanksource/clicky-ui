@@ -17,6 +17,7 @@ import {
   type DataTableServerColumn,
 } from "../data-table-server-filters";
 import { ErrorDetails } from "../diagnostics/ErrorDetails";
+import type { ErrorDiagnostics } from "../diagnostics/error-diagnostics";
 import {
   queryBrowserEditorExtensions,
   queryBrowserLanguageExtension,
@@ -64,6 +65,7 @@ export function QueryBrowser({
     message: string;
     query: string;
     diagnostics?: QueryBrowserDiagnostics;
+    errorDetails?: ErrorDiagnostics;
   } | null>(null);
   const [pending, setPending] = useState(false);
   const [debug, setDebug] = useState(false);
@@ -108,6 +110,9 @@ export function QueryBrowser({
           query: request.query,
           ...(err instanceof QueryBrowserExecutionError && err.diagnostics
             ? { diagnostics: err.diagnostics }
+            : {}),
+          ...(err instanceof QueryBrowserExecutionError && err.errorDetails
+            ? { errorDetails: err.errorDetails }
             : {}),
         });
       } finally {
@@ -414,8 +419,12 @@ export function QueryBrowser({
           <div className="space-y-3">
             <ErrorDetails
               diagnostics={{
-                message: error.message,
+                ...(error.errorDetails ?? {
+                  message: error.message,
+                  context: [],
+                }),
                 context: [
+                  ...(error.errorDetails?.context ?? []),
                   ["Query", error.query],
                   ["Language", language],
                 ],

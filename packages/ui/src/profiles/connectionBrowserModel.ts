@@ -8,6 +8,7 @@
 
 import type { ComboboxOption } from "../components/Combobox";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { normalizeErrorDiagnostics } from "../data/diagnostics/error-diagnostics";
 import type { QueryBrowserCompletion } from "../data/query-browser/QueryBrowser.completion";
 import type { QueryBrowserDiagnostics } from "../data/query-browser/QueryBrowser.types";
 import { profileApiPath } from "./profileApi";
@@ -138,7 +139,12 @@ export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> 
         diagnostics?: QueryBrowserDiagnostics;
       };
       if (typeof parsed.error === "string") {
-        throw new QueryBrowserExecutionError(parsed.error, parsed.diagnostics);
+        const errorDetails = normalizeErrorDiagnostics(parsed, parsed.error);
+        throw new QueryBrowserExecutionError(
+          errorDetails?.message ?? parsed.error,
+          parsed.diagnostics,
+          errorDetails ?? undefined,
+        );
       }
     } catch (error) {
       if (error instanceof QueryBrowserExecutionError) throw error;

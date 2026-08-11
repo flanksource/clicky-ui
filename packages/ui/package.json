@@ -92,6 +92,11 @@
       "import": "./dist/monaco-schema.js",
       "require": "./dist/monaco-schema.cjs"
     },
+    "./profiles": {
+      "types": "./dist/profiles.d.ts",
+      "import": "./dist/profiles.js",
+      "require": "./dist/profiles.cjs"
+    },
     "./chat": {
       "types": "./dist/chat.d.ts",
       "import": "./dist/chat.js",

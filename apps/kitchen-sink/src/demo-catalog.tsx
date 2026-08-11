@@ -61,6 +61,8 @@ import { ToastDemo } from "./demos/ToastDemo";
 import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
 import { HierarchicalLookupDemo } from "./demos/HierarchicalLookupDemo";
+import { ProfilesDemo } from "./demos/ProfilesDemo";
+import { QueryBrowserDemo } from "./demos/QueryBrowserDemo";
 import { TourDemo } from "./demos/TourDemo";
 import {
   type StaticIconComponent,
@@ -431,6 +433,8 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Clicky-RPC",
     items: [
+      { id: "query-browser", label: "QueryBrowser", component: QueryBrowserDemo, icon: UiTerminal },
+      { id: "profiles", label: "Profiles", component: ProfilesDemo, icon: UiListTree },
       {
         id: "command-form",
         label: "CommandForm",
