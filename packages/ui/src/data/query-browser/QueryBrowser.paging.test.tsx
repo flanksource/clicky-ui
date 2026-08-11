@@ -195,4 +195,36 @@ describe("QueryBrowser paging and provider diagnostics", () => {
       ),
     ).toBeVisible();
   });
+
+  it("renders Oops context returned with an execution error", async () => {
+    const execute = vi.fn().mockRejectedValue(
+      new QueryBrowserExecutionError("query failed", undefined, {
+        message: "query failed",
+        trace: "trace-query-1",
+        time: "2026-08-11T12:00:00Z",
+        context: [["connection", "tenant-x"]],
+        stacktrace: "query failed\n--- at example/query.go:42 runQuery",
+      }),
+    );
+    render(
+      <QueryBrowser
+        id="oops-error"
+        initialQuery="SELECT broken"
+        language="sql"
+        execute={execute}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    const details = (
+      await screen.findByRole("button", { name: "Copy error details" })
+    ).closest("details");
+    expect(details).not.toBeNull();
+
+    fireEvent.click(within(details!).getByText("More details"));
+    expect(within(details!).getByText("trace-query-1")).toBeVisible();
+    expect(within(details!).getByText("tenant-x")).toBeVisible();
+    expect(within(details!).getByText("SELECT broken")).toBeVisible();
+    expect(within(details!).getByText(/example\/query\.go:42/)).toBeVisible();
+  });
 });

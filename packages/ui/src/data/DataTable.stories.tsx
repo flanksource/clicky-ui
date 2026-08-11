@@ -18,6 +18,7 @@ import {
   DataTable,
   type DataTableColumn,
   type DataTableMenuAction,
+  type DataTableProps,
 } from "./DataTable";
 
 type Row = {
@@ -233,7 +234,7 @@ const wideColumns: DataTableColumn<WideRow>[] = [
   { key: "notes", label: "Notes", grow: true },
 ];
 
-function DataTableShowcase() {
+function DataTableShowcase(args: DataTableProps<Row>) {
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
   const [dateFrom, setDateFrom] = useState("");
@@ -241,10 +242,12 @@ function DataTableShowcase() {
 
   return (
     <DataTable
-      data={rows}
-      columns={columns}
-      autoFilter
-      defaultSort={{ key: "restarts", dir: "asc" }}
+      key={[
+        args.theme ?? "system",
+        args.defaultSort?.key ?? "",
+        args.defaultSort?.dir ?? "",
+      ].join(":")}
+      {...args}
       filterBarProps={{
         timeRange: {
           from: timeFrom,
@@ -944,18 +947,90 @@ function SelectionActionsShowcase() {
 const meta = {
   title: "Data/DataTable",
   component: DataTable,
-  render: () => <DataTableShowcase />,
+  render: (args) => <DataTableShowcase {...args} />,
   args: {
     data: rows,
     columns,
-    autoFilter: false,
+    loading: false,
+    loadingMessage: "Loading services…",
+    loadingRowCount: 8,
+    emptyMessage: "No services",
+    autoFilter: true,
     showGlobalFilter: true,
+    globalFilterPlaceholder: "Search all columns…",
+    defaultSort: { key: "restarts", dir: "asc" },
     resizableColumns: true,
     hideableColumns: true,
     persistColumnWidths: true,
     persistColumnVisibility: true,
+    persistDensity: true,
+    showDensityControl: true,
+    showThemeControl: false,
     showHeaderFilters: true,
     showFullscreenControl: false,
+    fullscreenTitle: "Services",
+    fullscreenButtonLabel: "Open table full screen",
+  },
+  argTypes: {
+    data: { control: false, table: { category: "Data" } },
+    columns: { control: false, table: { category: "Data" } },
+    loading: { control: "boolean", table: { category: "State" } },
+    loadingMessage: { control: "text", table: { category: "State" } },
+    loadingRowCount: {
+      control: { type: "range", min: 1, max: 20, step: 1 },
+      table: { category: "State" },
+    },
+    emptyMessage: { control: "text", table: { category: "State" } },
+    autoFilter: { control: "boolean", table: { category: "Filtering" } },
+    showGlobalFilter: {
+      control: "boolean",
+      table: { category: "Filtering" },
+    },
+    globalFilterPlaceholder: {
+      control: "text",
+      table: { category: "Filtering" },
+    },
+    showHeaderFilters: {
+      control: "boolean",
+      table: { category: "Filtering" },
+    },
+    resizableColumns: {
+      control: "boolean",
+      table: { category: "Columns" },
+    },
+    persistColumnWidths: {
+      control: "boolean",
+      table: { category: "Columns" },
+    },
+    hideableColumns: {
+      control: "boolean",
+      table: { category: "Columns" },
+    },
+    persistColumnVisibility: {
+      control: "boolean",
+      table: { category: "Columns" },
+    },
+    persistDensity: {
+      control: "boolean",
+      table: { category: "Preferences" },
+    },
+    showDensityControl: {
+      control: "boolean",
+      table: { category: "Preferences" },
+    },
+    showThemeControl: {
+      control: "boolean",
+      table: { category: "Preferences" },
+    },
+    showFullscreenControl: {
+      control: "boolean",
+      table: { category: "Fullscreen" },
+    },
+    fullscreenTitle: { control: "text", table: { category: "Fullscreen" } },
+    fullscreenButtonLabel: {
+      control: "text",
+      table: { category: "Fullscreen" },
+    },
   },
   parameters: {
     docs: {
@@ -971,6 +1046,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Playground: Story = {
+  args: {
+    showFullscreenControl: true,
+    fullscreenButtonLabel: "Open controlled table",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("button", { name: "Open controlled table" }),
+    ).toBeVisible();
+  },
+};
 
 export const FewColumns: Story = {
   render: () => <FewColumnsShowcase />,

@@ -20,7 +20,7 @@ import {
 
 describe("profile editor model", () => {
   // The schema is the host's to supply; these tests supply a small one so the
-  // projection assertions below have an oracle that is obvious by inspection.
+  // projection assertions below have an expected result that is obvious by inspection.
   beforeAll(() => configureProfiles({ schema: testProfileSchema }));
 
   it("defines a custom sectioned workspace independent of the schema layout", () => {

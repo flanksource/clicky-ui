@@ -35,9 +35,9 @@ export function normalizeErrorDiagnostics(
   }
   const record = objectRecord(value);
   if (!record) return null;
-  const nested = objectRecord(record.error) ?? objectRecord(record.diagnostics);
-  if (nested && nested !== record) {
-    return normalizeErrorDiagnostics(nested, fallback);
+  const nestedError = objectRecord(record.error);
+  if (nestedError && nestedError !== record) {
+    return normalizeErrorDiagnostics(nestedError, fallback);
   }
   const message =
     firstString(record, ["error", "message", "msg", "reason", "detail", "details"]) ?? fallback;
@@ -45,7 +45,13 @@ export function normalizeErrorDiagnostics(
   const stacktrace = firstString(record, ["stacktrace", "stack_trace", "stackTrace", "stack"]);
   const time = firstString(record, ["time", "timestamp", "created_at"]);
   const context = contextEntries(record.context);
-  if (!message && !trace && !stacktrace && context.length === 0) return null;
+  if (!message && !trace && !stacktrace && !time && context.length === 0) {
+    const nestedDiagnostics = objectRecord(record.diagnostics);
+    if (nestedDiagnostics && nestedDiagnostics !== record) {
+      return normalizeErrorDiagnostics(nestedDiagnostics, fallback);
+    }
+  }
+  if (!message && !trace && !stacktrace && !time && context.length === 0) return null;
   return {
     message: message ?? "Action failed",
     context,

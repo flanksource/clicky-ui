@@ -22,6 +22,7 @@ const entry = {
   rpc: resolve(__dirname, "src/rpc.ts"),
   monaco: resolve(__dirname, "src/monaco.ts"),
   "monaco-schema": resolve(__dirname, "src/monaco-schema.ts"),
+  profiles: resolve(__dirname, "src/profiles.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
