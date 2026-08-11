@@ -9,10 +9,9 @@ import {
   useInspection,
   type BrowserDescriptor,
 } from "./connectionBrowserModel";
-import {
-  ConnectionQueryWorkspace,
-  } from "./connectionQueryWorkspace";
+import { ConnectionQueryWorkspace } from "./connectionQueryWorkspace";
 import { profileApiPath } from "./profileApi";
+import { profileSamplePayload } from "./profileSamplePayload";
 import type { EsSearch } from "./esQueryBuilderModel";
 import {
   profileWizardErrorMessage,
@@ -239,17 +238,7 @@ export function ProfileWizardQueryStep({
           const result = await fetchJSON<SampleResult>(profileApiPath("profile/sample"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              profile: {
-                ...nextDraft,
-                profile: nextDraft.profile || "sample",
-              },
-              params: {},
-              ...(request.pagination
-                ? { pagination: request.pagination }
-                : {}),
-              ...(request.debug ? { debug: true } : {}),
-            }),
+            body: JSON.stringify(profileSamplePayload(nextDraft, request)),
           });
           onSample({
             columns: result.columns ?? [],
