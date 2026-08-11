@@ -247,11 +247,13 @@ export function renderFieldRow(
   // instead of cramming it into the inline value column.
   // An accordion joins this list: crammed into the 600px inline value column it
   // is unusable, and it needs the ObjectSection header to carry the array's own
-  // title, required marker and help.
+  // title, required marker and help. Cards are the same shape of thing — a
+  // full-width stack of item panels — so they join it too.
   if (
     field.kind === "object" ||
     field.layout === "table" ||
-    field.arrayDisplay === "accordion"
+    field.arrayDisplay === "accordion" ||
+    field.arrayDisplay === "cards"
   ) {
     return (
       <ObjectSection
@@ -393,7 +395,11 @@ function rendersFullWidth(prop: JsonSchemaProperty): boolean {
   if (schemaRendersAsObject(prop) && (prop.properties !== undefined || Object.keys(fixedProperties).length > 0)) {
     return true;
   }
-  return prop["x-layout"] === "table" || prop["x-array-display"] === "accordion";
+  return (
+    prop["x-layout"] === "table" ||
+    prop["x-array-display"] === "accordion" ||
+    prop["x-array-display"] === "cards"
+  );
 }
 
 // renderApi is the RenderContext injection bundle: the root form stores it on

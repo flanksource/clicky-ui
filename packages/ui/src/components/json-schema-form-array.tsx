@@ -13,6 +13,8 @@ import {
   type FormSize,
 } from "./json-schema-form-size";
 import { AccordionArray } from "./json-schema-form-accordion-array";
+import { CardsArray } from "./json-schema-form-cards-array";
+import { FieldsGrid } from "./json-schema-form-layout";
 import { isScalarStringItems } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { TableArray } from "./json-schema-form-table-array";
@@ -65,6 +67,11 @@ export function ArrayControl({
   ) {
     return <AccordionArray field={field} ctx={ctx} readOnly={readOnly} />;
   }
+  // Same guard as the accordion, and for the same reason: a card is headed by
+  // the item's own summary, which a list of bare strings cannot supply.
+  if (field.arrayDisplay === "cards" && hasObjectItemProperties(field.itemSchema)) {
+    return <CardsArray field={field} ctx={ctx} readOnly={readOnly} />;
+  }
   if (isScalarStringItems(field.itemSchema)) {
     return (
       <TagArray
@@ -93,7 +100,13 @@ export function ArrayControl({
     >
       {items.map((item, i) => (
         <div key={i} className="grid grid-cols-[1fr_auto] items-start gap-2">
-          <div className="min-w-0">
+          {/* The item's row is a FieldWrapper (or a full-width ObjectSection),
+              both of which are grid children of a FieldsGrid — inline mode's
+              `grid-cols-subgrid` resolves to `none` without one, collapsing
+              every item into a stacked column while the rest of the form stays
+              aligned. Fixed at one column: an item is a single row, and any
+              multi-column layout belongs to the item's own object body. */}
+          <FieldsGrid layout={ctx.layout} size={ctx.size} columns={1} className="min-w-0">
             {ctx.render.renderFieldRow(
               {
                 key: `${field.key}[${i}]`,
@@ -106,7 +119,7 @@ export function ArrayControl({
               childCtx,
               { labelOverride: `Item ${i + 1}` },
             )}
-          </div>
+          </FieldsGrid>
           {!readOnly && (
             <ItemControls
               onUp={

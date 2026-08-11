@@ -71,8 +71,10 @@ export interface JsonSchemaProperty {
   // Force the enum presentation: "combobox" (default), "radio", "grid", or
   // "segmented".
   "x-enum-display"?: EnumDisplay;
-  // Force the presentation for an enum-backed array. "filter-pills" renders
-  // each enum item as a compact toggle; an empty stored array means all options.
+  // Force an array's presentation. "filter-pills" renders each enum item as a
+  // compact toggle (an empty stored array means all options); "accordion" and
+  // "cards" render object items as summary rows or titled cards, both reading
+  // `x-item` for the summary.
   "x-array-display"?: ArrayDisplay;
   // Force how this field's description is presented, overriding the form-level
   // `FormLayout.help`. Defaults to "inline" (a paragraph under the control).
@@ -211,8 +213,11 @@ export type GridColumns = number | "auto";
 // "hover" moves it behind a `?` beside the label, costing no vertical space.
 export type HelpDisplay = "inline" | "hover";
 
-// How an array control renders when the item schema has enum options.
-export type ArrayDisplay = "filter-pills" | "accordion";
+// How an array control renders. "filter-pills" needs enum item options;
+// "accordion" and "cards" both need object items and both read `x-item` — the
+// accordion collapses every item to one line and opens one at a time, cards
+// keep every item open under a titled, hue-edged header.
+export type ArrayDisplay = "filter-pills" | "accordion" | "cards";
 
 // ArrayItemSpec is the `x-item` extension on an ARRAY schema: it says how to
 // summarize one element of this list in a collapsed row. Every value names a
