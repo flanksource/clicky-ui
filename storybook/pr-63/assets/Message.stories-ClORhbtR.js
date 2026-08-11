@@ -1,0 +1,15 @@
+import{j as s}from"./iframe-DQ4bl7_4.js";import{M as t}from"./Message-SZE0lUN9.js";import{S as l}from"./Chat.fixtures-CIS1TBJU.js";import"./preload-helper-Bz0j3TbD.js";import"./utils-CR52uffu.js";import"./Icon-DnY4_zIX.js";import"./Markdown-DDApsYiE.js";import"./CodeBlock-DmsWW9nz.js";import"./CodeDiff-B_zFeLLt.js";import"./SegmentedControl-nX18AODg.js";import"./code-highlight-Ev9vknTQ.js";import"./JsonView-BHIpvIaJ.js";import"./ToolCall-BIay5jMI.js";import"./button-BeRBp0Vq.js";import"./index-0zBpNI7D.js";import"./loading-DLaiJr6O.js";import"./types-B1SOX9si.js";import"./KeyValueList-B1n40_8s.js";import"./DataTable-BIhIWVdv.js";import"./SortableHeader-Bl25FxIR.js";import"./Modal-A8cU230p.js";import"./index-COx9F93F.js";import"./index-CSwS8kWJ.js";import"./modalStack-iZddL8t7.js";import"./zIndex-BGbNBNA8.js";import"./FilterBar-XaiX_XX5.js";import"./floating-ui.react-Dv7k8fxD.js";import"./FilterPill-Dv_PE72E.js";import"./Combobox-CyMFz8Gz.js";import"./json-schema-form-size-DYVq0lph.js";import"./timestamp-format-CIXhO4AH.js";import"./DateTimePicker-DD4D3IeG.js";import"./MultiSelect-M2Un-Ynr.js";import"./RangeSlider-DOxPOVM4.js";import"./TimeRange-DPn6r5BI.js";import"./select-Do8XwOIJ.js";import"./data-table-filter-values-DUyokwAE.js";import"./Timestamp-C0LdJH7o.js";import"./TagList-CwX7ZRct.js";import"./Badge-BQiYcG35.js";import"./HoverCard-rof_d5zl.js";import"./Properties-C41onsKP.js";import"./IconButton-BGaAj_3G.js";import"./DropdownMenu-CwoDXHYK.js";import"./DropdownMenuSubmenu-DGHn6Q5L.js";import"./StatusDot-C19dgJ6r.js";import"./MessageActions-J4FGNK5o.js";import"./Reasoning-ho2lOV6P.js";const{fn:a}=__STORYBOOK_MODULE_TEST__,d=l[0],x=l[1],nr={title:"Chat/Message",component:t,tags:["autodocs"],parameters:{docs:{description:{component:"Renders one chat `UIMessage`. User messages are right-aligned bubbles; assistant messages render text as markdown plus inline reasoning/tool/file parts and a hover action row (copy / regenerate)."}}},argTypes:{message:{control:!1},onRegenerate:{control:!1},onApprove:{control:!1}},args:{onRegenerate:a(),onApprove:a()}},r={args:{message:d},render:o=>s.jsx("div",{className:"max-w-2xl",children:s.jsx(t,{...o})})},e={args:{message:x},render:o=>s.jsx("div",{className:"max-w-2xl",children:s.jsx(t,{...o})})};var m,i,p;r.parameters={...r.parameters,docs:{...(m=r.parameters)==null?void 0:m.docs,source:{originalSource:`{
+  args: {
+    message: USER
+  },
+  render: args => <div className="max-w-2xl">
+      <Message {...args} />
+    </div>
+}`,...(p=(i=r.parameters)==null?void 0:i.docs)==null?void 0:p.source}}};var n,c,g;e.parameters={...e.parameters,docs:{...(n=e.parameters)==null?void 0:n.docs,source:{originalSource:`{
+  args: {
+    message: ASSISTANT
+  },
+  render: args => <div className="max-w-2xl">
+      <Message {...args} />
+    </div>
+}`,...(g=(c=e.parameters)==null?void 0:c.docs)==null?void 0:g.source}}};const cr=["UserMessage","AssistantWithToolCall"];export{e as AssistantWithToolCall,r as UserMessage,cr as __namedExportsOrder,nr as default};
