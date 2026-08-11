@@ -1,6 +1,13 @@
-import { type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../Icon";
-import { UiDebugStepOver, UiMethod, UiChevronRight, UiCopy, UiWarningTriangle } from "../../icons";
+import {
+  UiCheck,
+  UiChevronRight,
+  UiCopy,
+  UiDebugStepOver,
+  UiMethod,
+  UiWarningTriangle,
+} from "../../icons";
 import {
   compactStackPath,
   isApplicationStackFrame,
@@ -19,6 +26,7 @@ export type ErrorDetailsProps = {
 };
 
 export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsProps) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const scalarContext = diagnostics.context.filter(
     ([, value]) => !parseInlineJsonContextValue(value),
   );
@@ -31,6 +39,20 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
     .filter(
       (entry): entry is { label: string; value: string; data: unknown } => entry.data !== null,
     );
+  const copyDiagnostics = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!navigator.clipboard?.writeText) {
+      setCopyState("failed");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(diagnosticReport(diagnostics));
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  };
   return (
     <details className="group rounded-md border border-destructive/30 bg-destructive/5">
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
@@ -41,10 +63,38 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
             {diagnostics.message}
           </div>
         </div>
-        <Icon
-          icon={UiChevronRight}
-          className="mt-0.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
-        />
+        <div className="flex shrink-0 flex-col items-end gap-2 text-xs font-medium text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
+          <button
+            type="button"
+            aria-label={
+              copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed"
+                  : "Copy error details"
+            }
+            title="Copy message, trace, time, context, and stack trace"
+            className="inline-flex items-center gap-1 hover:text-foreground"
+            onClick={(event) => void copyDiagnostics(event)}
+          >
+            <Icon icon={copyState === "copied" ? UiCheck : UiCopy} />
+            <span aria-live="polite">
+              {copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed"
+                  : "Copy"}
+            </span>
+          </button>
+          <span className="inline-flex items-center gap-1 hover:text-foreground">
+            <span className="group-open:hidden">More details</span>
+            <span className="hidden group-open:inline">Less details</span>
+            <Icon
+              icon={UiChevronRight}
+              className="shrink-0 transition-transform group-open:rotate-90"
+            />
+          </span>
+        </div>
       </summary>
       <div className="grid gap-3 border-t border-destructive/20 p-3 pt-2">
         {(diagnostics.trace || diagnostics.time) && (
@@ -114,6 +164,23 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
       </div>
     </details>
   );
+}
+
+function diagnosticReport(diagnostics: ErrorDiagnostics): string {
+  const lines = [`Error: ${diagnostics.message}`];
+  if (diagnostics.trace) lines.push(`Trace: ${diagnostics.trace}`);
+  if (diagnostics.time) lines.push(`Time: ${diagnostics.time}`);
+  if (diagnostics.context.length > 0) {
+    lines.push(
+      "",
+      "Context:",
+      ...diagnostics.context.map(([label, value]) => `${label}: ${value}`),
+    );
+  }
+  if (diagnostics.stacktrace) {
+    lines.push("", "Stack trace:", diagnostics.stacktrace);
+  }
+  return lines.join("\n");
 }
 
 export function PrettyStackTrace({ stacktrace }: { stacktrace: string }) {

@@ -25,6 +25,10 @@ export default defineConfig({
         replacement: resolve(uiSrc, "rpc.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/profiles$/,
+        replacement: resolve(uiSrc, "profiles.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/chat$/,
         replacement: resolve(uiSrc, "chat.ts"),
       },

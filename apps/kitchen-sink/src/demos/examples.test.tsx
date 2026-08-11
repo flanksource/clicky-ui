@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { findDemoEntry } from "../demo-catalog";
 import { HierarchicalLookupDemo } from "./HierarchicalLookupDemo";
+import { ProfilesDemo } from "./ProfilesDemo";
+import { QueryBrowserDemo } from "./QueryBrowserDemo";
 import { TourDemo } from "./TourDemo";
 
 afterEach(cleanup);
@@ -14,6 +16,8 @@ describe("kitchen sink examples", () => {
     expect(findDemoEntry("hierarchical-lookup")?.component).toBe(
       HierarchicalLookupDemo,
     );
+    expect(findDemoEntry("profiles")?.component).toBe(ProfilesDemo);
+    expect(findDemoEntry("query-browser")?.component).toBe(QueryBrowserDemo);
   });
 
   it("starts the provider-managed guided tour from the demo", async () => {
@@ -24,6 +28,14 @@ describe("kitchen sink examples", () => {
     expect(
       await screen.findByRole("dialog", { name: "Choose an environment" }),
     ).toBeTruthy();
+  });
+
+  it("renders the query browser starter SQL as multiple lines", () => {
+    const { container } = render(<QueryBrowserDemo />);
+    const editor = container.querySelector(".cm-content");
+
+    expect(editor?.textContent).toContain("FROM service_health");
+    expect(editor?.textContent).not.toContain("\\n");
   });
 
   it("opens hierarchical lookup options as a tree", async () => {
