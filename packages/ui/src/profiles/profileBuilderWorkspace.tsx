@@ -48,8 +48,13 @@ type SampleResult = QueryBrowserResult & {
 // Modal's body is a flex child. It must be allowed to shrink and must not own
 // scrolling, otherwise QueryBrowser's intrinsic minimum height expands the
 // whole workspace and pushes the editor/results below the dialog viewport.
+//
+// These are utilities rather than a stylesheet on purpose: a library CSS asset
+// only reaches a consumer that remembers to import it, whereas Tailwind scans
+// this source and folds the rules into the dist/styles.css every consumer
+// already loads.
 export const profileBuilderModalClassName =
-  "profile-builder-workspace-dialog h-[calc(100dvh-2rem)]";
+  "h-[calc(100dvh-2rem)] [&>[data-slot=modal-body]]:flex [&>[data-slot=modal-body]]:min-h-0 [&>[data-slot=modal-body]]:overflow-hidden [&>[data-slot=modal-body]>*]:flex-1 [&>[data-slot=modal-body]>*]:h-auto [&>[data-slot=modal-body]>*]:min-h-0";
 
 export function ProfileBuilderWorkspace({
   connectionID,
