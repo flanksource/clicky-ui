@@ -34,7 +34,7 @@ describe("ErrorWrapper", () => {
     ).toBeInTheDocument();
     expect(fallback).toHaveTextContent("Unable to load the account dashboard");
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy error report" }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
     const report = writeText.mock.calls[0]?.[0];
@@ -71,7 +71,7 @@ describe("ErrorWrapper", () => {
     const fallback = screen.getByRole("alert");
     expect(liveRegion(fallback)).toHaveTextContent("");
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy error report" }));
 
     await waitFor(() =>
       expect(liveRegion(fallback)).toHaveTextContent(

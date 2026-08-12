@@ -1,4 +1,5 @@
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { stripSurroundingDashes } from "../lib/string";
 import { profileSchema } from "./profileApi";
 import { validateProfileParams } from "./profileParamModel";
 import type { ProfileColumn, ProfileWizardDraft } from "./profileWizardModel";
@@ -198,16 +199,17 @@ export function profileUpdateConflictTarget(error: string): string | null {
 }
 
 export function profileRoute(name: string): string {
-  const slug = Array.from(name.trim().toLowerCase())
-    .map((character) =>
-      /[a-z0-9]/.test(character)
-        ? character
-        : /[ ._/-]/.test(character)
-          ? "-"
-          : "",
-    )
-    .join("")
-    .replace(/^-+|-+$/g, "");
+  const slug = stripSurroundingDashes(
+    Array.from(name.trim().toLowerCase())
+      .map((character) =>
+        /[a-z0-9]/.test(character)
+          ? character
+          : /[ ._/-]/.test(character)
+            ? "-"
+            : "",
+      )
+      .join(""),
+  );
   return `/profile-${slug}`;
 }
 
