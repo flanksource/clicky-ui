@@ -127,7 +127,11 @@ function ErrorFallback({
             onClick={() => void copyDetails()}
           >
             <Icon icon={copyState === "copied" ? UiCheck : UiCopy} />
-            {copyState === "copied" ? "Copied" : "Copy error details"}
+            {/* Distinct from ErrorDetails' own "Copy error details" control
+                below: this copies the page-level report (URL, user agent,
+                React component stack), and two identically named buttons in
+                one view are ambiguous to assistive tech. */}
+            {copyState === "copied" ? "Copied" : "Copy error report"}
           </Button>
           <span
             aria-live="polite"

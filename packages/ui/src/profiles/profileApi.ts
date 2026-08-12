@@ -18,6 +18,7 @@
  */
 
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { stripTrailingSlashes } from "../lib/string";
 
 /** ProfileSchema is commons-db's profile.json, with its $defs preserved. */
 export type ProfileSchema = JsonSchemaObject & {
@@ -39,7 +40,7 @@ let schema: ProfileSchema | null = null;
  */
 export function configureProfiles(options: { basePath?: string; schema: ProfileSchema }): void {
   if (options.basePath !== undefined) {
-    const trimmed = options.basePath.trim().replace(/\/+$/, "");
+    const trimmed = stripTrailingSlashes(options.basePath.trim());
     if (!trimmed.startsWith("/")) {
       throw new Error(
         `profile API basePath must start with "/", got ${JSON.stringify(options.basePath)}`,
