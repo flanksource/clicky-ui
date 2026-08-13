@@ -84,6 +84,32 @@ describe("Show query on a remote Clicky table", () => {
     expect(within(dialog).getByText(/X-Total-Count: 137/)).toBeInTheDocument();
   });
 
+  it("sits beside Export rather than behind a wall of formats", async () => {
+    stubRemote();
+
+    render(
+      <Clicky
+        url="/api/v1/profile/orders?limit=5"
+        data={tableDocument}
+        download={{ all: true, label: "orders" }}
+      />,
+    );
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+    const actions = within(menu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent ?? "");
+
+    // Three rows, in this order. Ten view formats and five download formats
+    // are behind the first two, so Show query is on screen without scrolling.
+    expect(actions).toHaveLength(3);
+    expect(actions[0]).toMatch(/^View:/);
+    expect(actions[1]).toMatch(/^Export/);
+    expect(actions[2]).toMatch(/^Show query/);
+  });
+
   it("offers nothing to ask when the payload has no URL behind it", () => {
     render(<Clicky data={tableDocument} />);
 

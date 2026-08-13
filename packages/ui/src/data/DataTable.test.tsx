@@ -247,6 +247,45 @@ describe("DataTable", () => {
     expect(screen.getByText("worker")).toBeInTheDocument();
   });
 
+  // The summary is always the label's next sibling; what moves it to the
+  // trailing edge is the label growing to fill the row. So the class is the
+  // behaviour here, not an implementation detail standing in for it.
+  it("stops the group label filling the row when metaAlign is start, so the summary sits next to it", () => {
+    const grouping = {
+      getGroupKey: (row: ServiceRow) => row.status,
+      getGroupLabel: (key: string) => `Status: ${key}`,
+      getGroupMeta: (_key: string, groupRows: ServiceRow[]) =>
+        `${groupRows.length} services`,
+    };
+
+    const { rerender } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={{ ...grouping, metaAlign: "start", metaClassName: "font-mono" }}
+      />,
+    );
+
+    const label = screen.getByRole("button", { name: /Status: healthy/ });
+    expect(label).not.toHaveClass("flex-1");
+    expect(label.nextElementSibling).toHaveTextContent("2 services");
+    expect(label.nextElementSibling).toHaveClass("font-mono");
+
+    rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={grouping}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Status: healthy/ })).toHaveClass(
+      "flex-1",
+    );
+  });
+
   it("selects only the selectable rows of the group whose header checkbox is toggled", () => {
     const onSelectionChange = vi.fn();
     render(
@@ -428,6 +467,37 @@ describe("DataTable", () => {
     expect(screen.queryByText("api")).not.toBeInTheDocument();
     expect(screen.queryByText("Restart selected")).not.toBeInTheDocument();
     expect(screen.queryByText("Page 1 of 1")).not.toBeInTheDocument();
+  });
+
+  // Column widths sized for rows that are no longer rendered stretch the table
+  // past the viewport, taking the error's own copy and expand controls with it.
+  it("stops sizing columns while an error replaces the rows", () => {
+    const sized: DataTableColumn<ServiceRow>[] = [
+      { key: "service", label: "Service", grow: true },
+      { key: "status", label: "Status", shrink: true },
+    ];
+    const { rerender, container } = render(
+      <DataTable data={rows} columns={sized} getRowId={(row) => row.service} />,
+    );
+    expect(
+      Array.from(container.querySelectorAll("col")).map((col) => col.className),
+    ).toEqual(["", "w-px"]);
+
+    rerender(
+      <DataTable
+        data={rows}
+        columns={sized}
+        getRowId={(row) => row.service}
+        error={<span>Plan selection is ambiguous</span>}
+      />,
+    );
+
+    const onError = Array.from(container.querySelectorAll("col"));
+    expect(onError.map((col) => col.className)).toEqual(["", ""]);
+    expect(onError.map((col) => col.getAttribute("style"))).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it("renders native server pagination controls", () => {
@@ -657,6 +727,58 @@ describe("DataTable", () => {
 
     fireEvent.click(actionItem);
     expect(exportPdf).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens a submenu for a menu action with children rather than listing them", () => {
+    const chooseJson = vi.fn();
+    const parent = vi.fn();
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        hideableColumns={false}
+        menuActions={[
+          {
+            id: "view",
+            label: "View: Clicky",
+            section: "",
+            onSelect: parent,
+            children: [
+              { id: "view-clicky", label: "Clicky", disabled: true, onSelect: vi.fn() },
+              { id: "view-json", label: "JSON", onSelect: chooseJson },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+
+    // The children stay behind the trigger — that is the whole point of a
+    // submenu, and what keeps a dozen formats from burying the rows below them.
+    expect(
+      within(menu).queryByRole("menuitem", { name: "JSON" }),
+    ).not.toBeInTheDocument();
+
+    const trigger = within(menu).getByRole("menuitem", { name: /^View: Clicky/ });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(trigger);
+
+    // A trigger opens its flyout instead of firing its own onSelect.
+    expect(parent).not.toHaveBeenCalled();
+    const submenu = screen.getByRole("menu", { name: "View: Clicky" });
+    expect(
+      within(submenu).getByRole("menuitem", { name: "Clicky" }),
+    ).toBeDisabled();
+
+    fireEvent.click(within(submenu).getByRole("menuitem", { name: "JSON" }));
+    expect(chooseJson).toHaveBeenCalledTimes(1);
+    // Choosing a child closes the whole menu, both levels with it.
+    expect(
+      screen.queryByRole("menu", { name: /column menu/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders an initial loading state inside the table shell", () => {

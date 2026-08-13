@@ -303,6 +303,7 @@ export * from "./data/test-runner";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
 export * from "./data/query-info";
+export * from "./data/clicky-export";
 export {
   type LogEntry,
   type TaskControlAction,

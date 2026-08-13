@@ -6,6 +6,7 @@ import {
 import {
   createContext,
   Fragment,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -54,8 +55,6 @@ import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
   UiCheck,
-  UiChevronDown,
-  UiChevronUp,
   UiCloudDownload,
   UiComment,
   UiEllipsis,
@@ -84,6 +83,12 @@ import {
 } from "./cells/tag-utils";
 import { parseClickyData, type ParsedClicky } from "./clicky-parse";
 import { useQueryInfo } from "./query-info/useQueryInfo";
+import { useClickyExport } from "./clicky-export/useClickyExport";
+import {
+  ClickyExportDialog,
+  type ClickyExportFormatOption,
+  type ClickyExportScopeOption,
+} from "./clicky-export/ClickyExportDialog";
 
 export type ClickyStyle = {
   className?: string;
@@ -436,33 +441,41 @@ export function Clicky(props: ClickyProps) {
         },
       }),
   );
-  const [downloadError, setDownloadError] = useState("");
-  const [downloadPending, setDownloadPending] = useState(false);
   // A remote payload knows the URL it came from, so the table can ask that URL
   // what it ran — the one thing rows never show.
   const queryInfo = useQueryInfo({ url: props.url });
+  const exporter = useClickyExport({
+    formats: useMemo(
+      () => exportFormatOptions({ url: props.url, download: props.download }),
+      [props.download, props.url],
+    ),
+    scopes: useMemo(
+      () => exportScopeOptions(props.download),
+      [props.download],
+    ),
+    onDownload: useCallback(
+      ({ format, scope }: { format: string; scope: string | undefined }) =>
+        runClickyDownload({
+          url: props.url ?? "",
+          format: format as ClickyRemoteFormat,
+          scope: scope as ClickyDownloadScope | undefined,
+          download: props.download,
+        }),
+      [props.download, props.url],
+    ),
+  });
   const tableMenuActions = useMemo(
-    () => [
-      ...getDownloadMenuActions({
-        url: props.url,
-        download: props.download,
-        pending: downloadPending,
-        onPending: setDownloadPending,
-        onError: setDownloadError,
-      }),
-      ...(queryInfo.action ? [queryInfo.action] : []),
-    ],
-    [downloadPending, props.download, props.url, queryInfo.action],
+    () =>
+      [exporter.action, queryInfo.action].filter(
+        (action): action is DataTableMenuAction => action !== undefined,
+      ),
+    [exporter.action, queryInfo.action],
   );
 
   const content = (
     <>
-      {downloadError && (
-        <div role="alert" className="text-sm text-destructive">
-          {downloadError}
-        </div>
-      )}
       {queryInfo.dialog}
+      {exporter.dialog}
       <ClickyRuntimeProvider
         {...(props.commandRuntime
           ? { commandRuntime: props.commandRuntime }
@@ -764,20 +777,37 @@ function ClickyRemoteRenderer({
   // surface. Non-table payloads, and the JSON/PDF/HTML previews, keep the bar so
   // the user can always switch back to the table.
   const tableHostsControls = downloadHandledByTable && activeView === "clicky";
+  // One row that opens a flyout, not one row per format: a dozen formats listed
+  // inline is what buried everything below them in this menu.
   const viewMenuActions = useMemo<DataTableMenuAction[]>(() => {
     if (!tableHostsControls || availableViews.length <= 1) return [];
-    return availableViews.map((format) => {
-      const meta = getRemoteFormatMeta(format);
-      return {
-        id: `view-${format}`,
-        label: formatViewLabel(format),
-        icon: meta.icon,
-        ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
-        section: "View",
-        disabled: format === activeView,
-        onSelect: () => setActiveView(format),
-      };
-    });
+    const activeMeta = getRemoteFormatMeta(activeView);
+    return [
+      {
+        id: "view",
+        label: `View: ${formatViewLabel(activeView)}`,
+        icon: activeMeta.icon,
+        ...(activeMeta.iconClassName
+          ? { iconClassName: activeMeta.iconClassName }
+          : {}),
+        section: "",
+        children: availableViews.map((format) => {
+          const meta = getRemoteFormatMeta(format);
+          return {
+            id: `view-${format}`,
+            label: formatViewLabel(format),
+            description: meta.description,
+            icon: meta.icon,
+            ...(meta.iconClassName
+              ? { iconClassName: meta.iconClassName }
+              : {}),
+            disabled: format === activeView,
+            onSelect: () => setActiveView(format),
+          };
+        }),
+        onSelect: () => undefined,
+      },
+    ];
   }, [tableHostsControls, availableViews, activeView]);
   const combinedTableActions = useMemo<DataTableMenuAction[]>(
     () => [...viewMenuActions, ...(runtime.tableMenuActions ?? [])],
@@ -828,10 +858,9 @@ function ClickyRemoteRenderer({
             )}
 
             {canDownload && (
-              <ClickyDownloadMenu
+              <ClickyExportButton
                 url={url}
-                formats={downloadFormats}
-                download={download}
+                {...(download ? { download } : {})}
               />
             )}
           </div>
@@ -1017,140 +1046,56 @@ function ClickyViewMenu({
   );
 }
 
-function ClickyDownloadMenu({
+// ClickyExportButton is the bar's export control for a payload that renders as
+// something other than a table. A table's own overflow menu carries the same
+// dialog, so there is one export interaction rather than two.
+function ClickyExportButton({
   url,
-  formats,
   download,
 }: {
   url: string;
-  formats: ClickyRemoteFormat[];
   download?: ClickyDownloadOptions | undefined;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const primaryFormat: ClickyRemoteFormat = formats.includes("json")
-    ? "json"
-    : formats[0]!;
-  const primaryMeta = getRemoteFormatMeta(primaryFormat);
-  const scopes = getDownloadScopes(download);
-  const primaryScope = scopes[0];
-
-  useDismissablePopup(open, rootRef, triggerRef, () => setOpen(false));
+  const formats = useMemo(
+    () => exportFormatOptions({ url, download }),
+    [download, url],
+  );
+  const scopes = useMemo(() => exportScopeOptions(download), [download]);
+  if (formats.length === 0) return null;
 
   return (
-    <div ref={rootRef} className="relative">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label={
-            download?.label
-              ? `Download ${primaryMeta.label} ${download.label}`
-              : `Download ${primaryMeta.label}`
-          }
-          className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          disabled={pending}
-          onClick={() =>
-            void prepareDownload({
-              url,
-              format: primaryFormat,
-              ...(primaryScope ? { scope: primaryScope } : {}),
-              ...(download ? { download } : {}),
-              onPending: setPending,
-              onError: setError,
-            })
-          }
-        >
-          <Icon icon={UiCloudDownload} className="text-sm" />
-          <span>{`Download ${primaryMeta.label}`}</span>
-        </button>
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-label="Open download menu"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          onClick={() => setOpen((current) => !current)}
-        >
-          <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-sm" />
-        </button>
-      </div>
-
-      {error && (
-        <p role="alert" className="mt-1 text-xs text-destructive">
-          {error}
-        </p>
-      )}
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[18rem] rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
-        >
-          {scopes.map((scope, scopeIndex) => (
-            <div
-              key={scope ?? "legacy"}
-              className={cn(
-                scopeIndex > 0 && "mt-1 border-t border-border pt-1",
-              )}
-            >
-              {scope && (
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  {downloadSection(scope)}
-                </div>
-              )}
-              {formats.map((format) => {
-                const meta = getRemoteFormatMeta(format);
-                const description = downloadDescription(
-                  format,
-                  scope,
-                  download,
-                );
-                return (
-                  <button
-                    key={`${scope ?? "legacy"}-${format}`}
-                    type="button"
-                    role="menuitem"
-                    disabled={pending}
-                    className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
-                    onClick={() => {
-                      void prepareDownload({
-                        url,
-                        format,
-                        ...(scope ? { scope } : {}),
-                        ...(download ? { download } : {}),
-                        onPending: setPending,
-                        onError: setError,
-                      });
-                      setOpen(false);
-                    }}
-                  >
-                    <Icon
-                      icon={meta.icon}
-                      className={cn(
-                        "mt-0.5 shrink-0 text-sm",
-                        meta.iconClassName ?? "text-muted-foreground",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="font-medium">{meta.label}</span>
-                      {description && (
-                        <span className="block text-xs text-muted-foreground">
-                          {description}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <>
+      <button
+        type="button"
+        aria-label={download?.label ? `Export ${download.label}` : "Export"}
+        className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        onClick={() => setOpen(true)}
+      >
+        <Icon icon={UiCloudDownload} className="text-sm" />
+        <span>Export</span>
+      </button>
+      <ClickyExportDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        formats={formats}
+        scopes={scopes}
+        onDownload={({
+          format,
+          scope,
+        }: {
+          format: string;
+          scope: string | undefined;
+        }) =>
+          runClickyDownload({
+            url,
+            format: format as ClickyRemoteFormat,
+            scope: scope as ClickyDownloadScope | undefined,
+            ...(download ? { download } : {}),
+          })
+        }
+      />
+    </>
   );
 }
 
@@ -1516,10 +1461,6 @@ function getDownloadScopes(
   return download?.scopes?.length ? download.scopes : [undefined];
 }
 
-function downloadSection(scope: ClickyDownloadScope) {
-  return scope === "all" ? "Download all rows" : "Download current page";
-}
-
 function downloadDescription(
   format: ClickyRemoteFormat,
   scope: ClickyDownloadScope | undefined,
@@ -1538,46 +1479,74 @@ function downloadDescription(
   return undefined;
 }
 
-function getDownloadMenuActions({
+// exportFormatOptions describes the advertised formats for the export dialog.
+// The dialog is presentational and knows nothing about Clicky's formats, so the
+// labels, icons and blurbs are resolved here, from the same metadata the view
+// switcher reads.
+function exportFormatOptions({
   url,
   download,
-  pending,
-  onPending,
-  onError,
 }: {
   url?: string | undefined;
   download?: ClickyDownloadOptions | undefined;
-  pending?: boolean | undefined;
-  onPending?: ((pending: boolean) => void) | undefined;
-  onError?: ((message: string) => void) | undefined;
-}): DataTableMenuAction[] {
-  const formats = getDownloadFormats({ url, download });
-  if (!url || formats.length === 0) return [];
+}): ClickyExportFormatOption[] {
+  if (!url) return [];
+  return getDownloadFormats({ url, download }).map((format) => {
+    const meta = getRemoteFormatMeta(format);
+    return {
+      format,
+      label: meta.label,
+      description: meta.description,
+      icon: meta.icon,
+      ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
+    };
+  });
+}
 
-  return getDownloadScopes(download).flatMap((scope) =>
-    formats.map((format) => {
-      const meta = getRemoteFormatMeta(format);
-      return {
-        id: `download-${scope ?? "legacy"}-${format}`,
-        label: meta.label,
-        description: downloadDescription(format, scope, download),
-        icon: meta.icon,
-        ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
-        ...(scope ? { section: downloadSection(scope) } : {}),
-        ...(pending ? { disabled: true } : {}),
-        onSelect: () => {
-          void prepareDownload({
-            url,
-            format,
-            ...(scope ? { scope } : {}),
-            ...(download ? { download } : {}),
-            ...(onPending ? { onPending } : {}),
-            ...(onError ? { onError } : {}),
-          });
-        },
-      };
-    }),
-  );
+// exportScopeOptions describes the ranges the endpoint serves. The per-format
+// note is a function rather than a string because a ceiling belongs to a format
+// and a range together: a PDF stops at 1,000 rows, the CSV beside it does not.
+function exportScopeOptions(
+  download?: ClickyDownloadOptions,
+): ClickyExportScopeOption[] {
+  return getDownloadScopes(download).map((scope) => ({
+    scope,
+    label:
+      scope === "all"
+        ? "All rows"
+        : scope === "page"
+          ? "Current page"
+          : "The whole result",
+    note: (format: string) =>
+      downloadDescription(format as ClickyRemoteFormat, scope, download),
+  }));
+}
+
+// runClickyDownload is prepareDownload for a caller that awaits it. The export
+// dialog reports its own failure and stays open on one, so the reason has to
+// come back as a rejection rather than through a callback.
+async function runClickyDownload({
+  url,
+  format,
+  scope,
+  download,
+}: {
+  url: string;
+  format: ClickyRemoteFormat;
+  scope?: ClickyDownloadScope | undefined;
+  download?: ClickyDownloadOptions | undefined;
+}): Promise<void> {
+  let failure = "";
+  await prepareDownload({
+    url,
+    format,
+    ...(scope ? { scope } : {}),
+    ...(download ? { download } : {}),
+    onError: (message) => {
+      failure = message;
+    },
+  });
+  if (failure) throw new Error(failure);
 }
 
 async function prepareDownload({

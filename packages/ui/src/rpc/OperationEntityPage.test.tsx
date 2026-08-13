@@ -256,7 +256,7 @@ describe("OperationEntityPage", () => {
       ),
     );
     expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^download json$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^export$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restart widget" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reconcile widget" })).not.toBeInTheDocument();
 
