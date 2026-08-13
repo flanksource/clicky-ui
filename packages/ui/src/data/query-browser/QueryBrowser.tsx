@@ -6,7 +6,7 @@ import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import { cn } from "../../lib/utils";
 import { SplitPane } from "../../layout/SplitPane";
 import { Icon } from "../Icon";
-import { UiDebug, UiPlay } from "../../icons";
+import { UiPlay } from "../../icons";
 import type { DataTablePagination } from "../DataTable";
 import { inferColumns } from "../data-table-utils";
 import type { DataTableFilterSelection } from "../data-table-filter-values";
@@ -27,6 +27,8 @@ import {
 } from "./QueryBrowser.editor";
 import { QueryBrowserDiagnosticsPanel } from "./QueryBrowserDiagnosticsPanel";
 import { QueryBrowserResults } from "./QueryBrowserResults";
+import { useQueryInfo } from "../query-info/useQueryInfo";
+import type { QueryExecutionInfo } from "../query-info/queryInfo";
 import {
   QueryBrowserExecutionError,
   type QueryBrowserDiagnostics,
@@ -68,7 +70,6 @@ export function QueryBrowser({
     errorDetails?: ErrorDiagnostics;
   } | null>(null);
   const [pending, setPending] = useState(false);
-  const [debug, setDebug] = useState(false);
   const [entries, setEntries] = useState<QueryBrowserHistoryEntry[]>(() =>
     readQueryBrowserHistory(id),
   );
@@ -148,9 +149,8 @@ export function QueryBrowser({
       options,
       ...(Object.keys(carried).length > 0 ? { filters: carried } : {}),
       ...(repeat?.columns ? { columns: repeat.columns } : {}),
-      ...(debug ? { debug: true } : {}),
     });
-  }, [currentQuery, debug, filters, id, options, pending, runRequest]);
+  }, [currentQuery, filters, id, options, pending, runRequest]);
 
   // A filter pill is not a draft the way query text is: it commits a discrete
   // value on selection, and the bar already debounces its free-text fields. So
@@ -170,10 +170,9 @@ export function QueryBrowser({
         ...(result?.pagination
           ? { pagination: { limit: result.pagination.limit } }
           : {}),
-        ...(debug ? { debug: true } : {}),
       });
     },
-    [debug, result?.pagination, runRequest],
+    [result?.pagination, runRequest],
   );
 
   const rerunAt = useCallback(
@@ -184,14 +183,57 @@ export function QueryBrowser({
           "QueryBrowser: pagination changed before any query had run",
         );
       }
-      await runRequest({
-        ...previous,
-        pagination,
-        ...(debug ? { debug: true } : {}),
-      });
+      await runRequest({ ...previous, pagination });
     },
-    [debug, runRequest],
+    [runRequest],
   );
+
+  // "Show query" runs the displayed query again with diagnostics on rather than
+  // reading them off the result: a debug run costs a second execution, and one
+  // paid on every query so the answer is there if asked for is the wrong trade.
+  const loadQueryInfo = useCallback(async (): Promise<QueryExecutionInfo> => {
+    const previous = lastRun.current;
+    if (!previous) {
+      throw new Error("Run a query before asking what it sends");
+    }
+    const pagination = result?.pagination;
+    try {
+      const probe = await execute({
+        ...previous,
+        ...(pagination
+          ? {
+              pagination: {
+                limit: pagination.limit,
+                ...(pagination.offset !== undefined
+                  ? { offset: pagination.offset }
+                  : {}),
+                ...(pagination.cursor ? { cursor: pagination.cursor } : {}),
+              },
+            }
+          : {}),
+        debug: true,
+      });
+      return {
+        ...(probe.diagnostics?.provider
+          ? { provider: probe.diagnostics.provider }
+          : {}),
+        ...(probe.rows ? { rows: probe.rows.length } : {}),
+        ...(probe.durationMs !== undefined
+          ? { durationMs: probe.durationMs }
+          : {}),
+        ...(probe.diagnostics ? { diagnostics: probe.diagnostics } : {}),
+      };
+    } catch (err) {
+      if (err instanceof QueryBrowserExecutionError) {
+        return {
+          error: err.message,
+          ...(err.diagnostics ? { diagnostics: err.diagnostics } : {}),
+        };
+      }
+      throw err;
+    }
+  }, [execute, result?.pagination]);
+  const queryInfo = useQueryInfo({ load: loadQueryInfo, title: queryLabel });
 
   useEffect(() => {
     if (!lastRun.current) return;
@@ -260,7 +302,6 @@ export function QueryBrowser({
     setResult(null);
     setError(null);
     setFilters({});
-    setDebug(false);
     lastRun.current = null;
     executedFilters.current = {};
   }, [id]);
@@ -347,6 +388,7 @@ export function QueryBrowser({
       filterConfig={filterConfig}
       serverFiltered={serverFiltered}
       {...(tablePagination ? { pagination: tablePagination } : {})}
+      {...(queryInfo.action ? { menuActions: [queryInfo.action] } : {})}
     />
   );
 
@@ -380,15 +422,6 @@ export function QueryBrowser({
             ))}
           </select>
         )}
-        <Button
-          size="sm"
-          variant={debug ? "secondary" : "outline"}
-          aria-pressed={debug}
-          onClick={() => setDebug((enabled) => !enabled)}
-        >
-          <Icon icon={UiDebug} className="size-4" />
-          Debug
-        </Button>
         <Button
           size="sm"
           onClick={() => void run()}
@@ -450,6 +483,7 @@ export function QueryBrowser({
       ) : (
         workspace
       )}
+      {queryInfo.dialog}
     </div>
   );
 }

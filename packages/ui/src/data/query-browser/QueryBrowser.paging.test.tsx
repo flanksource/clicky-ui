@@ -15,7 +15,7 @@ import {
 describe("QueryBrowser paging and provider diagnostics", () => {
   beforeEach(() => window.localStorage.clear());
 
-  it("requests provider diagnostics and renders the actual provider exchange", async () => {
+  it("asks the backend what it ran when Show query is chosen, and renders the exchange", async () => {
     const diagnostics: QueryBrowserDiagnostics = {
       provider: "clickhouse",
       request: {
@@ -44,8 +44,17 @@ describe("QueryBrowser paging and provider diagnostics", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Debug" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    // The run itself asks for no diagnostics: they cost a second execution, so
+    // only a user who asked the question pays for the answer.
+    await waitFor(() =>
+      expect(execute).toHaveBeenCalledWith({ query: "SELECT 42", options: {} }),
+    );
+    await screen.findByRole("table");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Show query/ }));
 
     await waitFor(() =>
       expect(execute).toHaveBeenCalledWith({
@@ -184,7 +193,6 @@ describe("QueryBrowser paging and provider diagnostics", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Debug" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     expect(await screen.findByText("query failed")).toBeInTheDocument();
