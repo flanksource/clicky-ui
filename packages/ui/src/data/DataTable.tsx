@@ -98,6 +98,7 @@ import {
   groupRecords,
   isGroupCollapsedByDefault,
   type DataTableGrouping,
+  type DataTableGroupMetaAlign,
 } from "./DataTable.grouping";
 
 export type { TimestampOptions, TagsOptions };
@@ -341,8 +342,15 @@ export type DataTableMenuAction = {
   disabled?: boolean;
   /** Heading the action is grouped under in the overflow menu. Actions with
    * the same section render together below one label; defaults to "Download"
-   * so existing download actions keep their heading. */
+   * so existing download actions keep their heading. An empty string groups
+   * without a heading, for a short list where one would only add noise. */
   section?: string;
+  /**
+   * Nested actions. An action that has them is a submenu trigger: it opens a
+   * flyout of its children and its own `onSelect` never runs. This is what
+   * keeps a menu of a dozen formats to one row.
+   */
+  children?: DataTableMenuAction[];
   onSelect: () => void;
 };
 
@@ -1632,8 +1640,17 @@ function DataTableInner<T extends Record<string, unknown>>({
               {visibleColumns.map((column) => (
                 <col
                   key={column.key}
-                  style={columnStyle(column, columnWidths)}
-                  className={column.shrink && !column.grow ? "w-px" : undefined}
+                  // An error row spans every column and is the only body content
+                  // there is, so the column widths have nothing left to size.
+                  // Keeping them stretches the table far past the viewport and
+                  // carries the error's own controls — copy, expand — out with
+                  // it, reachable only by scrolling sideways.
+                  style={error == null ? columnStyle(column, columnWidths) : undefined}
+                  className={
+                    column.shrink && !column.grow && error == null
+                      ? "w-px"
+                      : undefined
+                  }
                 />
               ))}
             </colgroup>
@@ -1783,6 +1800,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                         key={`group:${item.group.key}`}
                         label={item.group.label}
                         meta={item.group.meta}
+                        metaAlign={grouping?.metaAlign ?? "end"}
+                        {...(grouping?.metaClassName
+                          ? { metaClassName: grouping.metaClassName }
+                          : {})}
                         count={item.group.records.length}
                         colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
                         collapsed={item.group.collapsed}
@@ -2298,6 +2319,8 @@ function DataTablePaginationFooter({
 function DataTableGroupHeaderRow({
   label,
   meta,
+  metaAlign,
+  metaClassName,
   count,
   colSpan,
   collapsed,
@@ -2306,6 +2329,8 @@ function DataTableGroupHeaderRow({
 }: {
   label: ReactNode;
   meta: ReactNode;
+  metaAlign: DataTableGroupMetaAlign;
+  metaClassName?: string;
   count: number;
   colSpan: number;
   collapsed: boolean;
@@ -2347,7 +2372,12 @@ function DataTableGroupHeaderRow({
             type="button"
             aria-expanded={!collapsed}
             onClick={onToggleCollapsed}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary"
+            className={cn(
+              "flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary",
+              // `flex-1` is what pushes the meta to the trailing edge. Dropping
+              // it lets the meta sit right after the count instead.
+              metaAlign === "end" && "flex-1",
+            )}
           >
             <Icon
               icon={collapsed ? UiChevronRight : UiChevronDown}
@@ -2359,7 +2389,14 @@ function DataTableGroupHeaderRow({
             </span>
           </button>
           {meta ? (
-            <div className="shrink-0 text-xs text-muted-foreground">{meta}</div>
+            <div
+              className={cn(
+                "shrink-0 text-xs text-muted-foreground",
+                metaClassName,
+              )}
+            >
+              {meta}
+            </div>
           ) : null}
         </div>
       </td>
@@ -2446,7 +2483,15 @@ function DataTableErrorRow({
         colSpan={Math.max(1, colSpan)}
         className={cn(DATA_TABLE_CELL_DENSITY_CLASS, "p-density-3")}
       >
-        <div role="alert">{error}</div>
+        {/*
+          w-0 min-w-full keeps the error out of the table's width calculation:
+          a cell sizes to its content, so an error carrying a long unbroken
+          line — a response body, a SQL statement — would widen the table
+          itself and push its own copy and expand controls off-screen.
+        */}
+        <div role="alert" className="w-0 min-w-full overflow-hidden">
+          {error}
+        </div>
       </td>
     </tr>
   );
@@ -2752,6 +2797,15 @@ function MenuActionSection({
   onClose: () => void;
 }) {
   const groups = groupMenuActions(actions);
+  // Which submenu is open, if any. One at a time: hovering a sibling takes the
+  // flyout with it, which is what every menu does and what stops two levels
+  // from being open over each other.
+  const [openSubmenu, setOpenSubmenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
   return (
     <>
       {groups.map((group, index) => (
@@ -2761,53 +2815,130 @@ function MenuActionSection({
             (separated || index > 0) && "mt-1 border-t border-border pt-1",
           )}
         >
-          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-            {group.section}
-          </div>
-          {group.actions.map((action) => {
-            const hasDescription = Boolean(action.description);
-            return (
-              <button
-                key={action.id}
-                type="button"
-                role="menuitem"
-                disabled={action.disabled}
-                className={cn(
-                  "flex w-full gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-                  hasDescription ? "items-start" : "items-center",
-                  action.disabled && "cursor-not-allowed opacity-50",
-                )}
-                onClick={() => {
-                  if (action.disabled) return;
-                  action.onSelect();
-                  onClose();
-                }}
-              >
-                {action.icon && (
-                  <Icon
-                    icon={action.icon}
-                    className={cn(
-                      "shrink-0 text-sm",
-                      hasDescription && "mt-0.5",
-                      action.iconClassName ?? "text-muted-foreground",
-                    )}
-                  />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className={cn(hasDescription && "font-medium")}>
-                    {action.label}
-                  </span>
-                  {action.description && (
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {action.description}
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
+          {group.section && (
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+              {group.section}
+            </div>
+          )}
+          {group.actions.map((action) => (
+            <MenuActionItem
+              key={action.id}
+              action={action}
+              submenu={openSubmenu?.id === action.id ? openSubmenu : null}
+              onOpenSubmenu={setOpenSubmenu}
+              onClose={onClose}
+            />
+          ))}
         </div>
       ))}
+    </>
+  );
+}
+
+function MenuActionItem({
+  action,
+  submenu,
+  onOpenSubmenu,
+  onClose,
+  nested = false,
+}: {
+  action: DataTableMenuAction;
+  submenu: { id: string; x: number; y: number } | null;
+  onOpenSubmenu: (state: { id: string; x: number; y: number } | null) => void;
+  onClose: () => void;
+  /** Set for a row inside a flyout, whose hover must not close the flyout. */
+  nested?: boolean;
+}) {
+  const hasDescription = Boolean(action.description);
+  const children = action.children ?? [];
+  const isSubmenu = children.length > 0;
+
+  const openFrom = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    // Flip to the left when the flyout would run off the right edge, using the
+    // same minimum width the panel below is given.
+    const width = 224;
+    const x =
+      rect.right + width > window.innerWidth ? rect.left - width : rect.right;
+    onOpenSubmenu({ id: action.id, x, y: rect.top });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        role="menuitem"
+        aria-haspopup={isSubmenu ? "menu" : undefined}
+        aria-expanded={isSubmenu ? submenu != null : undefined}
+        disabled={action.disabled}
+        className={cn(
+          "flex w-full gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
+          hasDescription ? "items-start" : "items-center",
+          action.disabled && "cursor-not-allowed opacity-50",
+          submenu && "bg-accent text-accent-foreground",
+        )}
+        onMouseEnter={(event) => {
+          if (action.disabled) return;
+          if (isSubmenu) openFrom(event.currentTarget);
+          else if (!nested) onOpenSubmenu(null);
+        }}
+        onClick={(event) => {
+          if (action.disabled) return;
+          if (isSubmenu) {
+            openFrom(event.currentTarget);
+            return;
+          }
+          action.onSelect();
+          onClose();
+        }}
+      >
+        {action.icon && (
+          <Icon
+            icon={action.icon}
+            className={cn(
+              "shrink-0 text-sm",
+              hasDescription && "mt-0.5",
+              action.iconClassName ?? "text-muted-foreground",
+            )}
+          />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className={cn(hasDescription && "font-medium")}>
+            {action.label}
+          </span>
+          {action.description && (
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {action.description}
+            </span>
+          )}
+        </span>
+        {isSubmenu && (
+          <Icon
+            icon={UiChevronRight}
+            className="shrink-0 text-sm text-muted-foreground"
+          />
+        )}
+      </button>
+
+      {isSubmenu && submenu && (
+        <div
+          role="menu"
+          aria-label={typeof action.label === "string" ? action.label : "Submenu"}
+          className="fixed z-50 max-h-[calc(100vh-1rem)] min-w-[14rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
+          style={{ left: submenu.x, top: submenu.y }}
+        >
+          {children.map((child) => (
+            <MenuActionItem
+              key={child.id}
+              action={child}
+              submenu={null}
+              onOpenSubmenu={onOpenSubmenu}
+              onClose={onClose}
+              nested
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

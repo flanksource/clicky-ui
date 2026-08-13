@@ -19,16 +19,6 @@ vi.mock("./code-highlight", () => ({
 import { highlightCode } from "./code-highlight";
 const mockHighlightCode = vi.mocked(highlightCode);
 
-// Returns the menu sub-group introduced by a section heading ("View" /
-// "Download"), so assertions can target one group when labels (JSON, PDF, …)
-// appear in more than one.
-function sectionGroup(menu: HTMLElement, label: string): HTMLElement {
-  const header = within(menu).getByText(label);
-  const group = header.parentElement;
-  if (!group) throw new Error(`no menu group for section "${label}"`);
-  return group;
-}
-
 function createCommandClient() {
   const executeCommand = vi.fn().mockResolvedValue({
     success: true,
@@ -740,10 +730,27 @@ describe("Clicky", () => {
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     const tableMenu = screen.getByRole("menu", { name: /column menu/i });
 
-    // The menu carries a "View" group (every preview format) above the
-    // download-format "Download" group.
-    const viewGroup = sectionGroup(tableMenu, "View");
-    const downloadGroup = sectionGroup(tableMenu, "Download");
+    // Ten view formats and five download formats are two rows, not fifteen:
+    // one submenu trigger naming the active view, and one Export row.
+    expect(
+      within(tableMenu).getByRole("menuitem", { name: /^View: Clicky/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(tableMenu).getByRole("menuitem", { name: /^Export/i }),
+    ).toBeInTheDocument();
+    for (const label of ["PDF", "HTML", "Pretty", "Slack"]) {
+      expect(
+        within(tableMenu).queryByRole("menuitem", {
+          name: new RegExp(`^${label}$`, "i"),
+        }),
+      ).not.toBeInTheDocument();
+    }
+
+    // The formats live behind the submenu, with the active one not re-selectable.
+    fireEvent.click(
+      within(tableMenu).getByRole("menuitem", { name: /^View: Clicky/i }),
+    );
+    const viewMenu = screen.getByRole("menu", { name: /^View: Clicky/i });
     for (const label of [
       "Clicky",
       "JSON",
@@ -757,26 +764,23 @@ describe("Clicky", () => {
       "Slack",
     ]) {
       expect(
-        within(viewGroup).getByRole("menuitem", {
-          name: new RegExp(`^${label}$`, "i"),
+        within(viewMenu).getByRole("menuitem", {
+          name: new RegExp(`^${label}`, "i"),
         }),
       ).toBeInTheDocument();
     }
-    for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
-      expect(
-        within(downloadGroup).getByRole("menuitem", {
-          name: new RegExp(`^${label}$`, "i"),
-        }),
-      ).toBeInTheDocument();
-    }
-    // The active (Clicky) view is shown but not re-selectable.
     expect(
-      within(viewGroup).getByRole("menuitem", { name: /^Clicky$/i }),
+      within(viewMenu).getByRole("menuitem", { name: /^Clicky/i }),
     ).toBeDisabled();
 
-    // Picking a download format triggers the download frame.
+    // Exporting picks format and range in a dialog, then downloads.
     fireEvent.click(
-      within(downloadGroup).getByRole("menuitem", { name: /^JSON$/i }),
+      within(tableMenu).getByRole("menuitem", { name: /^Export/i }),
+    );
+    const exportDialog = await screen.findByRole("dialog");
+    fireEvent.click(within(exportDialog).getByText("JSON"));
+    fireEvent.click(
+      within(exportDialog).getByRole("button", { name: /^Download$/i }),
     );
     const downloadFrame = document.getElementById(
       "clicky-download-frame",
@@ -789,12 +793,13 @@ describe("Clicky", () => {
     // brings the view bar back so the user can switch away from JSON again.
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     fireEvent.click(
-      within(
-        sectionGroup(
-          screen.getByRole("menu", { name: /column menu/i }),
-          "View",
-        ),
-      ).getByRole("menuitem", { name: /^JSON$/i }),
+      screen.getByRole("menuitem", { name: /^View: Clicky/i }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("menu", { name: /^View: Clicky/i })).getByRole(
+        "menuitem",
+        { name: /^JSON/i },
+      ),
     );
     expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
     expect(screen.getByText("service")).toBeInTheDocument();
@@ -853,13 +858,20 @@ describe("Clicky", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     const tableMenu = screen.getByRole("menu", { name: /column menu/i });
-    expect(within(tableMenu).getByText("Download")).toBeInTheDocument();
+    // With no view formats configured there is no View submenu to offer, so
+    // Export is the only action the menu carries.
     expect(
-      within(tableMenu).queryByText(
-        "Portable document for sharing and printing",
-      ),
+      within(tableMenu).queryByRole("menuitem", { name: /^View:/i }),
     ).not.toBeInTheDocument();
-    fireEvent.click(within(tableMenu).getByRole("menuitem", { name: /pdf/i }));
+    fireEvent.click(
+      within(tableMenu).getByRole("menuitem", { name: /^Export/i }),
+    );
+
+    const exportDialog = await screen.findByRole("dialog");
+    fireEvent.click(within(exportDialog).getByText("PDF"));
+    fireEvent.click(
+      within(exportDialog).getByRole("button", { name: /^Download$/i }),
+    );
 
     const downloadFrame = document.getElementById(
       "clicky-download-frame",
@@ -920,35 +932,30 @@ describe("Clicky", () => {
     const densityItem = within(menu).getByRole("menuitemradio", {
       name: /use page density/i,
     });
-    const downloadGroup = sectionGroup(menu, "Download");
-    const downloadHeader = within(menu).getByText("Download");
+    const exportItem = within(menu).getByRole("menuitem", { name: /^Export/i });
 
-    // The download group follows the density control.
+    // Export follows the density control.
     expect(
       Boolean(
-        densityItem.compareDocumentPosition(downloadHeader) &
+        densityItem.compareDocumentPosition(exportItem) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
 
-    // Only the whitelisted download formats appear under Download.
+    fireEvent.click(exportItem);
+    const dialog = await screen.findByRole("dialog");
+
+    // Only the whitelisted download formats are offered.
     for (const label of ["YAML", "JSON", "CSV", "PDF", "Markdown"]) {
-      expect(
-        within(downloadGroup).getByRole("menuitem", {
-          name: new RegExp(`^${label}$`, "i"),
-        }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText(label)).toBeInTheDocument();
     }
     for (const label of ["Clicky", "HTML", "Pretty", "Excel", "Slack"]) {
-      expect(
-        within(downloadGroup).queryByRole("menuitem", {
-          name: new RegExp(`^${label}$`, "i"),
-        }),
-      ).not.toBeInTheDocument();
+      expect(within(dialog).queryByText(label)).not.toBeInTheDocument();
     }
 
+    fireEvent.click(within(dialog).getByText("PDF"));
     fireEvent.click(
-      within(downloadGroup).getByRole("menuitem", { name: /^PDF$/i }),
+      within(dialog).getByRole("button", { name: /^Download$/i }),
     );
 
     const downloadFrame = document.getElementById(
@@ -960,6 +967,69 @@ describe("Clicky", () => {
     expect(downloadFrame.src).toContain("_download=");
 
     fetchSpy.mockRestore();
+  });
+
+  it("prepares a table download before starting the native download", async () => {
+    const prepare = vi.fn().mockResolvedValue({
+      url: "/api/v1/profile/reconciliations/run/export",
+      label: "selected reconciliation",
+    });
+    render(
+      <Clicky
+        data={JSON.stringify(clickyFixture)}
+        url="/api/v1/profile/reconciliations/run/results"
+        download={{ formats: ["csv"], scopes: ["all"], prepare }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Export/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /^Download$/i }),
+    );
+
+    await waitFor(() =>
+      expect(prepare).toHaveBeenCalledWith({ format: "csv", scope: "all" }),
+    );
+    const frame = document.getElementById(
+      "clicky-download-frame",
+    ) as HTMLIFrameElement;
+    await waitFor(() =>
+      expect(frame.src).toContain("/api/v1/profile/reconciliations/run/export"),
+    );
+    expect(frame.src).toContain("format=csv");
+    expect(frame.src).toContain("scope=all");
+    expect(frame.src).toContain("filename=selected-reconciliation.csv");
+  });
+
+  it("surfaces a prepared download failure without starting a download", async () => {
+    render(
+      <Clicky
+        data={JSON.stringify(clickyFixture)}
+        url="/api/v1/profile/reconciliations/run/results"
+        download={{
+          formats: ["csv"],
+          prepare: vi.fn().mockRejectedValue(new Error("snapshot expired")),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const menu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Export/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /^Download$/i }),
+    );
+
+    // The dialog stays open holding the reason, rather than closing onto a
+    // download that never started.
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "snapshot expired",
+    );
+    expect(document.getElementById("clicky-download-frame")).toBeNull();
   });
 
   it("separates current-page and all-row endpoint exports", async () => {
@@ -992,45 +1062,64 @@ describe("Clicky", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    let menu = screen.getByRole("menu", { name: /column menu/i });
-    const pageGroup = sectionGroup(menu, "Download current page");
-    const allGroup = sectionGroup(menu, "Download all rows");
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Export/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    // One range at a time, so the per-format caps describe the range in hand
+    // rather than being listed twice under two headings.
+    expect(within(dialog).getByText("NDJSON")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "All rows" }));
     expect(
-      within(pageGroup).getByRole("menuitem", { name: /^NDJSON$/i }),
-    ).toBeInTheDocument();
-    expect(
-      within(allGroup).getAllByText("Streams rows as they are read"),
+      within(dialog).getAllByText("Streams rows as they are read"),
     ).toHaveLength(3);
     expect(
-      within(allGroup).getByText("Limited to 1,000 rows"),
+      within(dialog).getByText("Limited to 1,000 rows"),
     ).toBeInTheDocument();
 
-    fireEvent.click(within(allGroup).getByRole("menuitem", { name: /^JSON/i }));
-    let frame = document.getElementById(
-      "clicky-download-frame",
-    ) as HTMLIFrameElement;
-    let downloaded = new URL(frame.src);
-    expect(downloaded.searchParams.get("scope")).toBe("all");
-    expect(downloaded.searchParams.get("region")).toBe("EU");
-    expect(downloaded.searchParams.has("limit")).toBe(false);
-    expect(downloaded.searchParams.has("offset")).toBe(false);
+    fireEvent.click(within(dialog).getByRole("radio", { name: "JSON" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /^Download$/i }),
+    );
+    // The download resolves a tick after the click, so read it once it lands.
+    const downloadedUrl = async () => {
+      let params: URLSearchParams | null = null;
+      await waitFor(() => {
+        const frame = document.getElementById(
+          "clicky-download-frame",
+        ) as HTMLIFrameElement | null;
+        expect(frame).not.toBeNull();
+        params = new URL(frame!.src).searchParams;
+        expect(params.get("format")).toBeTruthy();
+      });
+      return params!;
+    };
+
+    let downloaded = await downloadedUrl();
+    expect(downloaded.get("scope")).toBe("all");
+    expect(downloaded.get("region")).toBe("EU");
+    expect(downloaded.has("limit")).toBe(false);
+    expect(downloaded.has("offset")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    menu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Export/i }));
+    const pageDialog = await screen.findByRole("dialog");
     fireEvent.click(
-      within(sectionGroup(menu, "Download current page")).getByRole(
-        "menuitem",
-        { name: /^Excel/i },
-      ),
+      within(pageDialog).getByRole("radio", { name: "Current page" }),
     );
-    frame = document.getElementById(
-      "clicky-download-frame",
-    ) as HTMLIFrameElement;
-    downloaded = new URL(frame.src);
-    expect(downloaded.searchParams.get("scope")).toBe("page");
-    expect(downloaded.searchParams.get("limit")).toBe("25");
-    expect(downloaded.searchParams.get("offset")).toBe("50");
-    expect(downloaded.searchParams.get("format")).toBe("excel");
+    fireEvent.click(within(pageDialog).getByRole("radio", { name: "Excel" }));
+    fireEvent.click(
+      within(pageDialog).getByRole("button", { name: /^Download$/i }),
+    );
+    await waitFor(() => {
+      const frame = document.getElementById(
+        "clicky-download-frame",
+      ) as HTMLIFrameElement;
+      expect(new URL(frame.src).searchParams.get("format")).toBe("excel");
+    });
+    downloaded = await downloadedUrl();
+    expect(downloaded.get("scope")).toBe("page");
+    expect(downloaded.get("limit")).toBe("25");
+    expect(downloaded.get("offset")).toBe("50");
 
     fetchSpy.mockRestore();
   });
