@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { AccordionListDemo } from "./demos/AccordionListDemo";
 import { SwitchersDemo } from "./demos/SwitchersDemo";
 import { ButtonDemo } from "./demos/ButtonDemo";
 import { IconDemo } from "./demos/IconDemo";
@@ -258,6 +259,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "Form fields",
         component: FormFieldsDemo,
         icon: UiForm,
+      },
+      {
+        id: "accordion-list",
+        label: "AccordionList",
+        component: AccordionListDemo,
+        icon: UiRows,
       },
       {
         id: "hierarchical-lookup",

@@ -231,6 +231,20 @@ describe("JsonSchemaForm accordion array", () => {
     expect(next[1]).not.toBe(next[0]);
   });
 
+  it("offers only the actions x-item.actions lists", () => {
+    renderAccordion({ extras: { "x-item": { ...X_ITEM, actions: ["reorder"] } } });
+    expect(screen.getByRole("button", { name: "Move Service down" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Duplicate Service" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove Service" })).toBeNull();
+  });
+
+  it("offers no actions when x-item.actions is empty, and still opens rows", () => {
+    renderAccordion({ extras: { "x-item": { ...X_ITEM, actions: [] } } });
+    expect(screen.queryByRole("button", { name: /^(Move|Duplicate|Remove) / })).toBeNull();
+    fireEvent.click(headerFor("Service"));
+    expect(screen.getByLabelText(/^Field/)).toBeInTheDocument();
+  });
+
   it("keeps the open row open when it moves", () => {
     // The index is the key, so a mutator that forgets to follow the item would
     // silently expand whichever row took its place.
@@ -330,5 +344,28 @@ describe("JsonSchemaForm accordion array", () => {
     // Not a FieldWrapper label crammed into the 600px value column.
     const title = screen.getByText("Params");
     expect(title.closest("label")).toBeNull();
+  });
+
+  // A collapsed row renders none of the controls that would carry a message, so
+  // the row itself has to say an error is hiding in there.
+  it("counts the errors inside a collapsed row on the row itself", () => {
+    render(
+      <JsonSchemaForm
+        schema={schemaWith()}
+        value={{ params: SAMPLE }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+        errors={[
+          { instancePath: "/params/0/name", message: "Already used" },
+          { instancePath: "/params/0/field", message: "Unknown field" },
+        ]}
+      />,
+    );
+    expect(within(headerFor("Service")).getByTitle("2 errors")).toBeInTheDocument();
+    expect(within(headerFor("Since")).queryByTitle(/error/)).toBeNull();
+    // Opening the row hands the messages back to the controls that own them.
+    fireEvent.click(headerFor("Service"));
+    expect(screen.getByText("Already used")).toBeInTheDocument();
+    expect(within(headerFor("Service")).queryByTitle(/error/)).toBeNull();
   });
 });

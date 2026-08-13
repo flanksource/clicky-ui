@@ -124,6 +124,30 @@ describe("x-array-display: cards", () => {
     expect(screen.queryByText("limit")).not.toBeInTheDocument();
   });
 
+  it("offers only the actions x-item.actions lists", () => {
+    const params = CARDS_SCHEMA.properties!.params!;
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        params: {
+          ...params,
+          "x-item": { ...(params["x-item"] as Record<string, unknown>), actions: ["remove"] },
+        },
+      },
+    };
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ params: SAMPLE }}
+        onChange={() => {}}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Remove limit" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move limit up" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Duplicate limit" })).not.toBeInTheDocument();
+  });
+
   it("offers no mutation controls when the form is read-only", () => {
     render(
       <JsonSchemaForm

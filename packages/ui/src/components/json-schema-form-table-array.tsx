@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { isPlainObject, removeIndex, setIndex } from "../lib/collections";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiTrash } from "../icons";
@@ -11,12 +12,9 @@ import {
 import { schemaHelper } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import {
-  isPlainObject,
   orderByClickyOrder,
   orderByXOrder,
-  removeIndex,
   seedFromSchema,
-  setIndex,
 } from "./json-schema-form-utils";
 import type {
   FieldControl,

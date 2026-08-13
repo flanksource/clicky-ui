@@ -1,37 +1,43 @@
-import { type KeyboardEvent } from "react";
+import { moveItem, removeIndex, setIndex } from "../lib/collections";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { FilterPill } from "../data/FilterPill";
-import { UiAdd, UiChevronDown, UiChevronUp, UiClose, UiTrash } from "../icons";
+import { UiAdd } from "../icons";
 import { Button } from "./button";
+import { ItemActions } from "./ItemActions";
 import {
-  controlHeightClass,
   controlMinHeightClass,
   fieldInnerGapClass,
   inputSizeClass,
-  labelSizeClass,
   type FormSize,
 } from "./json-schema-form-size";
 import { AccordionArray } from "./json-schema-form-accordion-array";
 import { CardsArray } from "./json-schema-form-cards-array";
 import { FieldsGrid } from "./json-schema-form-layout";
-import { isScalarStringItems } from "./json-schema-form-resolve";
+import { scalarItemsType } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { TableArray } from "./json-schema-form-table-array";
+import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import {
-  defaultPlaceholder,
   hasObjectItemProperties,
-  moveItem,
-  removeIndex,
   seedFromSchema,
-  setIndex,
+  toStringArray,
 } from "./json-schema-form-utils";
-import type { FieldControl, RenderContext } from "./json-schema-form-types";
+import type {
+  FieldControl,
+  FieldOption,
+  RenderContext,
+} from "./json-schema-form-types";
 
-// ArrayControl is a hybrid: plain string-item arrays keep the compact tag UI;
-// anything richer (objects, numbers, enums, nested arrays) renders one recursive
-// control per item with add / remove / reorder. Recursion goes through
-// ctx.render so this module never imports the renderer (no import cycle).
+// A comma is the second commit key in every tag list, and what a pasted list is
+// split on. Newlines split too — see splitOnComboboxSeparators.
+const TAG_SEPARATORS = [","];
+
+// ArrayControl routes an array to the control its items call for: a flat list of
+// values (choices, scalars) is ONE tag combobox; object items are summary rows,
+// cards or a table; anything else renders a control per item with add / remove /
+// reorder. Recursion goes through ctx.render so this module never imports the
+// renderer (no import cycle).
 export function ArrayControl({
   field,
   fieldId,
@@ -45,10 +51,8 @@ export function ArrayControl({
   // and item inputs disabled (a child the schema marks readOnly still renders as
   // a value span).
   const readOnly = ctx.readOnly || field.readOnly === true;
-  if (
-    field.arrayDisplay === "filter-pills" &&
-    enumItemOptions(field).length > 0
-  ) {
+  const choices = enumItemOptions(field);
+  if (field.arrayDisplay === "filter-pills" && choices.length > 0) {
     return (
       <FilterPillArray
         field={field}
@@ -58,34 +62,58 @@ export function ArrayControl({
       />
     );
   }
-  // Placed before the scalar-string branch: an array of plain strings has no
-  // properties to summarize, so it falls through to the compact tag editor even
-  // if the schema asks for an accordion.
-  if (
-    field.arrayDisplay === "accordion" &&
-    hasObjectItemProperties(field.itemSchema)
-  ) {
-    return <AccordionArray field={field} ctx={ctx} readOnly={readOnly} />;
-  }
-  // Same guard as the accordion, and for the same reason: a card is headed by
-  // the item's own summary, which a list of bare strings cannot supply.
-  if (field.arrayDisplay === "cards" && hasObjectItemProperties(field.itemSchema)) {
-    return <CardsArray field={field} ctx={ctx} readOnly={readOnly} />;
-  }
-  if (isScalarStringItems(field.itemSchema)) {
+  // A list of choices is ONE control, not a stack of them: the enum item schema
+  // makes the whole array a multi-select whose committed values are pills, so
+  // the option set is discoverable in one dropdown instead of repeated per item.
+  // `x-array-display: "stacked"` opts back into a combobox per item.
+  if (field.arrayDisplay !== "stacked" && choices.length > 0) {
     return (
-      <TagArray
+      <TagsComboboxControl
         field={field}
         fieldId={fieldId}
         readOnly={readOnly}
         size={ctx.size}
+        options={choices}
       />
     );
   }
-  // `x-layout: table` renders object-item arrays as compact rows with one column
-  // per item property — a denser alternative to the per-item stacked sub-form.
-  if (field.layout === "table" && hasObjectItemProperties(field.itemSchema)) {
-    return <TableArray field={field} ctx={ctx} readOnly={readOnly} />;
+  // A flat list of scalars is the same gesture as the enum list above — type a
+  // value, get a pill — so it takes the same control, with no options to pick
+  // from and a comma as a second commit key. Numeric items commit numbers.
+  const scalarType = scalarItemsType(field.itemSchema);
+  if (field.arrayDisplay !== "stacked" && scalarType) {
+    return (
+      <TagsComboboxControl
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={ctx.size}
+        options={[]}
+        itemType={scalarType}
+        separators={TAG_SEPARATORS}
+      />
+    );
+  }
+  if (hasObjectItemProperties(field.itemSchema)) {
+    if (field.arrayDisplay === "cards") {
+      return <CardsArray field={field} ctx={ctx} readOnly={readOnly} />;
+    }
+    // The accordion is the DEFAULT for object items: stacked in full, a
+    // ten-property item costs ~700px of screen each and a list of them says
+    // nothing about which item is which. `x-array-display: "stacked"` opts back
+    // into the per-item sub-form below; `x-layout: "table"` into the row grid.
+    // An explicit accordion outranks the table, since it names the renderer.
+    if (
+      field.arrayDisplay === "accordion" ||
+      (field.arrayDisplay !== "stacked" && field.layout !== "table")
+    ) {
+      return <AccordionArray field={field} ctx={ctx} readOnly={readOnly} />;
+    }
+    // `x-layout: table` renders object-item arrays as compact rows with one
+    // column per item property — denser still than the summary rows.
+    if (field.layout === "table") {
+      return <TableArray field={field} ctx={ctx} readOnly={readOnly} />;
+    }
   }
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "string" };
@@ -121,20 +149,14 @@ export function ArrayControl({
             )}
           </FieldsGrid>
           {!readOnly && (
-            <ItemControls
-              onUp={
-                i > 0
-                  ? () => field.onChange(moveItem(items, i, i - 1))
-                  : undefined
-              }
-              onDown={
-                i < items.length - 1
-                  ? () => field.onChange(moveItem(items, i, i + 1))
-                  : undefined
-              }
-              onRemove={() => field.onChange(removeIndex(items, i))}
+            <ItemActions
+              label={`item ${i + 1}`}
               index={i}
+              count={items.length}
               size={ctx.size}
+              reveal={false}
+              onMove={(to) => field.onChange(moveItem(items, i, to))}
+              onRemove={() => field.onChange(removeIndex(items, i))}
             />
           )}
         </div>
@@ -154,9 +176,10 @@ export function ArrayControl({
   );
 }
 
-function enumItemOptions(
-  field: FieldControl,
-): Array<{ value: string; label: string }> {
+// The choices an array of enum items offers, deduped by value. Prefers the
+// resolved `options` (they carry the schema's labels, icons and tones) and falls
+// back to the raw item `enum` for a field a pre-extension built by hand.
+function enumItemOptions(field: FieldControl): FieldOption[] {
   const rawOptions =
     field.options ??
     (Array.isArray(field.itemSchema?.enum)
@@ -166,10 +189,10 @@ function enumItemOptions(
         }))
       : []);
   const seen = new Set<string>();
-  return rawOptions.flatMap((option) => {
-    if (seen.has(option.value)) return [];
+  return rawOptions.filter((option) => {
+    if (seen.has(option.value)) return false;
     seen.add(option.value);
-    return [{ value: option.value, label: option.label }];
+    return true;
   });
 }
 
@@ -239,137 +262,3 @@ function FilterPillArray({
   );
 }
 
-function ItemControls({
-  onUp,
-  onDown,
-  onRemove,
-  index,
-  size,
-}: {
-  onUp: (() => void) | undefined;
-  onDown: (() => void) | undefined;
-  onRemove: () => void;
-  index: number;
-  size: FormSize;
-}) {
-  const actionClassName = cn(
-    "inline-flex aspect-square items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30",
-    controlHeightClass[size],
-  );
-
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        aria-label={`Move item ${index + 1} up`}
-        disabled={!onUp}
-        className={actionClassName}
-        onClick={onUp}
-      >
-        <Icon icon={UiChevronUp} className="text-sm" />
-      </button>
-      <button
-        type="button"
-        aria-label={`Move item ${index + 1} down`}
-        disabled={!onDown}
-        className={actionClassName}
-        onClick={onDown}
-      >
-        <Icon icon={UiChevronDown} className="text-sm" />
-      </button>
-      <button
-        type="button"
-        aria-label={`Remove item ${index + 1}`}
-        className={actionClassName}
-        onClick={onRemove}
-      >
-        <Icon icon={UiTrash} className="text-sm" />
-      </button>
-    </div>
-  );
-}
-
-// TagArray is the compact tag editor for plain string-item arrays.
-function TagArray({
-  field,
-  fieldId,
-  readOnly,
-  size,
-}: {
-  field: FieldControl;
-  fieldId: string;
-  readOnly: boolean;
-  size: FormSize;
-}) {
-  const tags = toStringArray(field.value);
-
-  function commit(raw: string, input: HTMLInputElement) {
-    const next = raw
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (next.length === 0) return;
-    field.onChange([...tags, ...next]);
-    input.value = "";
-  }
-
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    const input = e.currentTarget;
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      commit(input.value, input);
-      return;
-    }
-    if (e.key === "Backspace" && input.value === "" && tags.length > 0) {
-      field.onChange(tags.slice(0, -1));
-    }
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1 shadow-sm",
-        controlMinHeightClass[size],
-      )}
-    >
-      {tags.map((tag, i) => (
-        <span
-          key={`${tag}-${i}`}
-          className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-muted px-2 text-xs"
-        >
-          <span className="truncate">{tag}</span>
-          {!readOnly && (
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground"
-              aria-label={`Remove ${tag}`}
-              onClick={() => field.onChange(tags.filter((_, idx) => idx !== i))}
-            >
-              <Icon icon={UiClose} />
-            </button>
-          )}
-        </span>
-      ))}
-      {!readOnly && (
-        <input
-          id={fieldId}
-          data-jsf-input
-          className={cn(
-            "min-w-32 flex-1 bg-transparent px-1 py-1 outline-none",
-            labelSizeClass[size],
-          )}
-          placeholder={
-            tags.length === 0 ? defaultPlaceholder(field.schema) : ""
-          }
-          onKeyDown={handleKeyDown}
-          onBlur={(e) => commit(e.currentTarget.value, e.currentTarget)}
-        />
-      )}
-    </div>
-  );
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String);
-  return [];
-}
