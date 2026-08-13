@@ -64,6 +64,7 @@ export {
   isGroupCollapsedByDefault,
   type DataTableGroup,
   type DataTableGrouping,
+  type DataTableGroupMetaAlign,
 } from "./data/DataTable.grouping";
 export {
   StatStrip,
@@ -301,6 +302,7 @@ export * from "./data/git";
 export * from "./data/test-runner";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
+export * from "./data/query-info";
 export {
   type LogEntry,
   type TaskControlAction,

@@ -1,12 +1,12 @@
 import {
   DataTable,
   type DataTableColumn,
+  type DataTableMenuAction,
   type DataTablePagination,
 } from "../DataTable";
 import { Properties } from "../Properties";
 import type { serverFiltersToFilterBar } from "../data-table-server-filters";
 import type { QueryBrowserResult } from "./QueryBrowser.types";
-import { QueryBrowserDiagnosticsPanel } from "./QueryBrowserDiagnosticsPanel";
 
 type QueryBrowserResultsProps = {
   result: QueryBrowserResult | null;
@@ -17,6 +17,8 @@ type QueryBrowserResultsProps = {
   filterConfig: ReturnType<typeof serverFiltersToFilterBar>;
   serverFiltered: boolean;
   pagination?: DataTablePagination;
+  /** Extra entries for the table's overflow menu — "Show query" among them. */
+  menuActions?: DataTableMenuAction[];
 };
 
 export function QueryBrowserResults({
@@ -28,6 +30,7 @@ export function QueryBrowserResults({
   filterConfig,
   serverFiltered,
   pagination,
+  menuActions,
 }: QueryBrowserResultsProps) {
   if (!result) {
     return (
@@ -89,15 +92,13 @@ export function QueryBrowserResults({
             />
           )}
           {...(pagination ? { pagination } : {})}
+          {...(menuActions && menuActions.length > 0 ? { menuActions } : {})}
           className="min-h-72 flex-1"
         />
       ) : (
         <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
           {result.message ?? "Statement completed with no rows."}
         </div>
-      )}
-      {result.diagnostics && (
-        <QueryBrowserDiagnosticsPanel diagnostics={result.diagnostics} />
       )}
     </div>
   );

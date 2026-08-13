@@ -143,7 +143,7 @@ export function QueryBrowserDemo() {
     <DemoSection
       id="query-browser"
       title="QueryBrowser"
-      description="Run, filter and page through a provider-neutral SQL workspace. Debug mode exposes the synthetic provider request and response without requiring a backend."
+      description="Run, filter and page through a provider-neutral SQL workspace. The result table's menu answers Show query with the synthetic provider request and response, without requiring a backend."
     >
       <QueryBrowser
         id="kitchen-sink-query-browser"

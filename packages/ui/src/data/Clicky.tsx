@@ -83,6 +83,7 @@ import {
   type TagsValue,
 } from "./cells/tag-utils";
 import { parseClickyData, type ParsedClicky } from "./clicky-parse";
+import { useQueryInfo } from "./query-info/useQueryInfo";
 
 export type ClickyStyle = {
   className?: string;
@@ -297,6 +298,11 @@ export type ClickyDownloadOptions = {
   allRowsMode?: "streaming" | "buffered";
   /** Per-format server row caps, for example `{ pdf: 1000 }`. */
   formatMaxRows?: Partial<Record<ClickyRemoteFormat, number>>;
+  /** Prepare an export-specific resource before the native download starts. */
+  prepare?: (request: {
+    format: ClickyRemoteFormat;
+    scope?: ClickyDownloadScope;
+  }) => Promise<{ url: string; label?: string }>;
 };
 
 export type ClickyDownloadScope = "page" | "all";
@@ -430,47 +436,71 @@ export function Clicky(props: ClickyProps) {
         },
       }),
   );
+  const [downloadError, setDownloadError] = useState("");
+  const [downloadPending, setDownloadPending] = useState(false);
+  // A remote payload knows the URL it came from, so the table can ask that URL
+  // what it ran — the one thing rows never show.
+  const queryInfo = useQueryInfo({ url: props.url });
   const tableMenuActions = useMemo(
-    () => getDownloadMenuActions({ url: props.url, download: props.download }),
-    [props.download, props.url],
+    () => [
+      ...getDownloadMenuActions({
+        url: props.url,
+        download: props.download,
+        pending: downloadPending,
+        onPending: setDownloadPending,
+        onError: setDownloadError,
+      }),
+      ...(queryInfo.action ? [queryInfo.action] : []),
+    ],
+    [downloadPending, props.download, props.url, queryInfo.action],
   );
 
   const content = (
-    <ClickyRuntimeProvider
-      {...(props.commandRuntime
-        ? { commandRuntime: props.commandRuntime }
-        : {})}
-      {...(props.onTableRowClick
-        ? { onTableRowClick: props.onTableRowClick }
-        : {})}
-      {...(props.getTableRowHref
-        ? { getTableRowHref: props.getTableRowHref }
-        : {})}
-      {...(props.isTableRowClickable
-        ? { isTableRowClickable: props.isTableRowClickable }
-        : {})}
-      {...(props.search ? { tableSearch: props.search } : {})}
-      {...(props.timeRange ? { tableTimeRange: props.timeRange } : {})}
-      {...(props.externalFilters
-        ? { tableExternalFilters: props.externalFilters }
-        : {})}
-      {...(props.cellFilters ? { tableCellFilters: props.cellFilters } : {})}
-      {...(props.onCellFilterChange
-        ? { onTableCellFilterChange: props.onCellFilterChange }
-        : {})}
-      {...(props.pagination ? { tablePagination: props.pagination } : {})}
-      {...(props.rowSelection ? { tableRowSelection: props.rowSelection } : {})}
-      {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
-    >
-      {props.url ? (
-        <ClickyRemoteRenderer {...props} url={props.url} />
-      ) : (
-        <ClickyContent
-          data={props.data}
-          {...(props.className ? { className: props.className } : {})}
-        />
+    <>
+      {downloadError && (
+        <div role="alert" className="text-sm text-destructive">
+          {downloadError}
+        </div>
       )}
-    </ClickyRuntimeProvider>
+      {queryInfo.dialog}
+      <ClickyRuntimeProvider
+        {...(props.commandRuntime
+          ? { commandRuntime: props.commandRuntime }
+          : {})}
+        {...(props.onTableRowClick
+          ? { onTableRowClick: props.onTableRowClick }
+          : {})}
+        {...(props.getTableRowHref
+          ? { getTableRowHref: props.getTableRowHref }
+          : {})}
+        {...(props.isTableRowClickable
+          ? { isTableRowClickable: props.isTableRowClickable }
+          : {})}
+        {...(props.search ? { tableSearch: props.search } : {})}
+        {...(props.timeRange ? { tableTimeRange: props.timeRange } : {})}
+        {...(props.externalFilters
+          ? { tableExternalFilters: props.externalFilters }
+          : {})}
+        {...(props.cellFilters ? { tableCellFilters: props.cellFilters } : {})}
+        {...(props.onCellFilterChange
+          ? { onTableCellFilterChange: props.onCellFilterChange }
+          : {})}
+        {...(props.pagination ? { tablePagination: props.pagination } : {})}
+        {...(props.rowSelection
+          ? { tableRowSelection: props.rowSelection }
+          : {})}
+        {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
+      >
+        {props.url ? (
+          <ClickyRemoteRenderer {...props} url={props.url} />
+        ) : (
+          <ClickyContent
+            data={props.data}
+            {...(props.className ? { className: props.className } : {})}
+          />
+        )}
+      </ClickyRuntimeProvider>
+    </>
   );
 
   if (props.url || props.commandRuntime) {
@@ -999,6 +1029,8 @@ function ClickyDownloadMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
   const primaryFormat: ClickyRemoteFormat = formats.includes("json")
     ? "json"
     : formats[0]!;
@@ -1019,15 +1051,16 @@ function ClickyDownloadMenu({
               : `Download ${primaryMeta.label}`
           }
           className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          disabled={pending}
           onClick={() =>
-            triggerDownload(
-              buildDownloadUrl(
-                url,
-                primaryFormat,
-                download?.label,
-                primaryScope,
-              ),
-            )
+            void prepareDownload({
+              url,
+              format: primaryFormat,
+              ...(primaryScope ? { scope: primaryScope } : {}),
+              ...(download ? { download } : {}),
+              onPending: setPending,
+              onError: setError,
+            })
           }
         >
           <Icon icon={UiCloudDownload} className="text-sm" />
@@ -1045,6 +1078,12 @@ function ClickyDownloadMenu({
           <Icon icon={open ? UiChevronUp : UiChevronDown} className="text-sm" />
         </button>
       </div>
+
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
       {open && (
         <div
@@ -1075,11 +1114,17 @@ function ClickyDownloadMenu({
                     key={`${scope ?? "legacy"}-${format}`}
                     type="button"
                     role="menuitem"
+                    disabled={pending}
                     className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
                     onClick={() => {
-                      triggerDownload(
-                        buildDownloadUrl(url, format, download?.label, scope),
-                      );
+                      void prepareDownload({
+                        url,
+                        format,
+                        ...(scope ? { scope } : {}),
+                        ...(download ? { download } : {}),
+                        onPending: setPending,
+                        onError: setError,
+                      });
                       setOpen(false);
                     }}
                   >
@@ -1496,9 +1541,15 @@ function downloadDescription(
 function getDownloadMenuActions({
   url,
   download,
+  pending,
+  onPending,
+  onError,
 }: {
   url?: string | undefined;
   download?: ClickyDownloadOptions | undefined;
+  pending?: boolean | undefined;
+  onPending?: ((pending: boolean) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
 }): DataTableMenuAction[] {
   const formats = getDownloadFormats({ url, download });
   if (!url || formats.length === 0) return [];
@@ -1513,13 +1564,61 @@ function getDownloadMenuActions({
         icon: meta.icon,
         ...(meta.iconClassName ? { iconClassName: meta.iconClassName } : {}),
         ...(scope ? { section: downloadSection(scope) } : {}),
-        onSelect: () =>
-          triggerDownload(
-            buildDownloadUrl(url, format, download?.label, scope),
-          ),
+        ...(pending ? { disabled: true } : {}),
+        onSelect: () => {
+          void prepareDownload({
+            url,
+            format,
+            ...(scope ? { scope } : {}),
+            ...(download ? { download } : {}),
+            ...(onPending ? { onPending } : {}),
+            ...(onError ? { onError } : {}),
+          });
+        },
       };
     }),
   );
+}
+
+async function prepareDownload({
+  url,
+  format,
+  scope,
+  download,
+  onPending,
+  onError,
+}: {
+  url: string;
+  format: ClickyRemoteFormat;
+  scope?: ClickyDownloadScope | undefined;
+  download?: ClickyDownloadOptions | undefined;
+  onPending?: ((pending: boolean) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
+}) {
+  onError?.("");
+  onPending?.(true);
+  try {
+    const prepared = download?.prepare
+      ? await download.prepare({ format, ...(scope ? { scope } : {}) })
+      : { url, ...(download?.label ? { label: download.label } : {}) };
+    if (!prepared.url.trim()) {
+      throw new Error("The prepared download URL is empty");
+    }
+    triggerDownload(
+      buildDownloadUrl(
+        prepared.url,
+        format,
+        prepared.label ?? download?.label,
+        scope,
+      ),
+    );
+  } catch (error) {
+    onError?.(
+      error instanceof Error ? error.message : "Preparing the download failed",
+    );
+  } finally {
+    onPending?.(false);
+  }
 }
 
 function getRemoteFormatMeta(format: ClickyRemoteFormat): {
