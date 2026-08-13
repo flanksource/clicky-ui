@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addItemLabel,
   emptyItemsCopy,
+  itemActionsAllow,
   itemCountLabel,
   itemSummaryFor,
   noItemsLabel,
@@ -107,6 +108,35 @@ describe("resolveItemSpec", () => {
       PARAM_ITEM,
     );
     expect(spec.summary).toEqual(["name"]);
+  });
+
+  it("leaves actions unset when the schema is silent, so every action is offered", () => {
+    const spec = resolveItemSpec({ type: "array" }, PARAM_ITEM);
+    expect(spec.actions).toBeUndefined();
+    expect(itemActionsAllow(spec, "reorder")).toBe(true);
+    expect(itemActionsAllow(spec, "duplicate")).toBe(true);
+    expect(itemActionsAllow(spec, "remove")).toBe(true);
+  });
+
+  it("keeps an explicitly empty actions list, which offers none", () => {
+    const spec = resolveItemSpec(
+      { type: "array", "x-item": { actions: [] } as ArrayItemSpec },
+      PARAM_ITEM,
+    );
+    expect(spec.actions).toEqual([]);
+    expect(itemActionsAllow(spec, "remove")).toBe(false);
+  });
+
+  it("drops actions it does not implement rather than trusting the schema", () => {
+    const spec = resolveItemSpec(
+      {
+        type: "array",
+        "x-item": { actions: ["remove", "launch-missiles", 7] } as unknown as ArrayItemSpec,
+      },
+      PARAM_ITEM,
+    );
+    expect(spec.actions).toEqual(["remove"]);
+    expect(itemActionsAllow(spec, "reorder")).toBe(false);
   });
 });
 

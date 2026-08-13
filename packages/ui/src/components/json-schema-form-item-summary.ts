@@ -1,6 +1,7 @@
+import { isPlainObject } from "../lib/collections";
 import { normalizeTone } from "./json-schema-form-tone";
-import { isPlainObject } from "./json-schema-form-utils";
 import type {
+  ArrayItemAction,
   ArrayItemSpec,
   ArrayItemSummary,
   ArrayItemSummaryPart,
@@ -35,10 +36,28 @@ export function resolveItemSpec(
     ...(glyph ? { glyph } : {}),
     ...(typeof raw.badge === "string" && raw.badge ? { badge: raw.badge } : {}),
     ...(typeof raw.flag === "string" && raw.flag ? { flag: raw.flag } : {}),
+    // Only carried when the schema actually said something: an absent key means
+    // every action, while an explicit empty list means none, and those two
+    // cannot be told apart once the default has been filled in.
+    ...(Array.isArray(raw.actions) ? { actions: itemActions(raw.actions) } : {}),
     noun: firstNonEmpty([raw.noun, itemSchema?.title]) ?? "item",
     nounPlural: firstNonEmpty([raw.nounPlural, arraySchema.title]) ?? "items",
     ...(typeof raw.empty === "string" && raw.empty ? { empty: raw.empty } : {}),
   };
+}
+
+const ITEM_ACTIONS: ArrayItemAction[] = ["reorder", "duplicate", "remove"];
+
+function itemActions(value: unknown[]): ArrayItemAction[] {
+  return value.filter((entry): entry is ArrayItemAction =>
+    ITEM_ACTIONS.includes(entry as ArrayItemAction),
+  );
+}
+
+// itemActionsAllow is the one question every array display asks of `x-item`, so
+// the accordion and the cards never disagree about what a schema permitted.
+export function itemActionsAllow(spec: ArrayItemSpec, action: ArrayItemAction): boolean {
+  return spec.actions ? spec.actions.includes(action) : true;
 }
 
 // autoGlyphKey picks the item property that can colour a row without being told:

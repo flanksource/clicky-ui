@@ -1,9 +1,10 @@
 import {
   effectiveProperties,
-  isScalarStringItems,
   resolveControl,
+  scalarItemsType,
 } from "./json-schema-form-resolve";
-import { isPlainObject, matchesFieldFilter } from "./json-schema-form-utils";
+import { isPlainObject } from "../lib/collections";
+import { matchesFieldFilter } from "./json-schema-form-utils";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import type {
   FieldControl,
@@ -18,6 +19,20 @@ export function appendInstancePath(
 ): string {
   const escaped = String(token).replaceAll("~", "~0").replaceAll("/", "~1");
   return `${base}/${escaped}`;
+}
+
+// How many errors sit at or below a subtree. A collapsed container (an
+// accordion row) renders none of the controls that would show them, so it
+// reports the count on its own header instead.
+export function errorCountUnderInstancePath(
+  errors: JsonSchemaFormError[],
+  instancePath: string
+): number {
+  return errors.filter(
+    (error) =>
+      error.instancePath === instancePath ||
+      error.instancePath.startsWith(`${instancePath}/`)
+  ).length;
 }
 
 export function errorsAtInstancePath(
@@ -169,9 +184,14 @@ function collectArrayPaths(
   paths: Set<string>,
   options: CollectOptions
 ) {
+  // Mirrors ArrayControl's branch order: a flat list of values (pills, choices
+  // or scalars) is ONE control, with no per-item field to hang a message on, so
+  // its item paths stay unmatched and the error surfaces in the form summary
+  // instead of pointing at nothing.
+  if (field.arrayDisplay === "filter-pills") return;
   if (
-    field.arrayDisplay === "filter-pills" ||
-    isScalarStringItems(field.itemSchema)
+    field.arrayDisplay !== "stacked" &&
+    (hasEnumItems(field) || scalarItemsType(field.itemSchema))
   ) {
     return;
   }
@@ -210,6 +230,13 @@ function collectArrayPaths(
       options
     );
   }
+}
+
+// Mirrors ArrayControl's tags branch: resolved options win over the raw item
+// enum, since a pre-extension may have supplied them.
+function hasEnumItems(field: FieldControl): boolean {
+  if (field.options && field.options.length > 0) return true;
+  return Array.isArray(field.itemSchema?.enum) && field.itemSchema.enum.length > 0;
 }
 
 function collectMapPaths(

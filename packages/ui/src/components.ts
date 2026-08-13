@@ -1,3 +1,9 @@
+export {
+  AccordionList,
+  type AccordionListItemContext,
+  type AccordionListProps,
+} from "./components/AccordionList";
+export { ItemActions, type ItemActionsProps } from "./components/ItemActions";
 export { Button, type ButtonProps } from "./components/button";
 export {
   ErrorWrapper,
@@ -287,6 +293,7 @@ export type {
   FieldOption,
   EnumDisplay,
   ArrayDisplay,
+  ArrayItemAction,
   ArrayItemSpec,
   ArrayItemSummary,
   ArrayItemSummaryPart,

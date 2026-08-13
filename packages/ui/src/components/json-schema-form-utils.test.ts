@@ -3,14 +3,11 @@ import {
   fieldInputId,
   isEmptyValue,
   matchesFieldFilter,
-  moveItem,
   normalizeColSpan,
   normalizeColumns,
   orderByPriority,
   orderRequiredFirst,
-  removeIndex,
   seedFromSchema,
-  setIndex,
   softError,
 } from "./json-schema-form-utils";
 import type { FieldControl } from "./json-schema-form-types";
@@ -27,29 +24,6 @@ function field(over: Partial<FieldControl>): FieldControl {
     ...over,
   };
 }
-
-describe("immutable array helpers", () => {
-  it("setIndex replaces one element without mutating the source", () => {
-    const src = [1, 2, 3];
-    const out = setIndex(src, 1, 9);
-    expect(out).toEqual([1, 9, 3]);
-    expect(src).toEqual([1, 2, 3]);
-  });
-
-  it("removeIndex drops one element without mutating the source", () => {
-    const src = ["a", "b", "c"];
-    const out = removeIndex(src, 0);
-    expect(out).toEqual(["b", "c"]);
-    expect(src).toEqual(["a", "b", "c"]);
-  });
-
-  it("moveItem reorders and is a no-op past the boundaries", () => {
-    expect(moveItem([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
-    expect(moveItem([1, 2, 3], 2, 1)).toEqual([1, 3, 2]);
-    expect(moveItem([1, 2, 3], 0, -1)).toEqual([1, 2, 3]);
-    expect(moveItem([1, 2, 3], 2, 3)).toEqual([1, 2, 3]);
-  });
-});
 
 describe("orderRequiredFirst", () => {
   const entries: [string, number][] = [

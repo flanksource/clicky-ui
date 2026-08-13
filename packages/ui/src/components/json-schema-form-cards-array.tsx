@@ -1,24 +1,21 @@
+import { duplicateIndex, moveItem, removeIndex, setIndex } from "../lib/collections";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd } from "../icons";
 import { Button } from "./button";
+import { ItemActions } from "./ItemActions";
 import { appendInstancePath } from "./json-schema-form-errors";
 import {
   addItemLabel,
   emptyItemsCopy,
+  itemActionsAllow,
   itemSummaryFor,
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
-import { ItemBadge, ItemRowActions, RequiredMark } from "./json-schema-form-item-row";
+import { ItemBadge, RequiredMark } from "./json-schema-form-item-row";
 import { inputSizeClass } from "./json-schema-form-size";
 import { TONE_EDGE_CLASS } from "./json-schema-form-tone";
-import {
-  duplicateIndex,
-  moveItem,
-  removeIndex,
-  seedFromSchema,
-  setIndex,
-} from "./json-schema-form-utils";
+import { seedFromSchema } from "./json-schema-form-utils";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
 // CardsArray renders an object-item array as a stack of titled cards: every
@@ -83,16 +80,20 @@ export function CardsArray({
                 </code>
               )}
               {!readOnly && (
-                <ItemRowActions
+                <ItemActions
+                  label={summary.title}
                   index={i}
-                  title={summary.title}
+                  count={items.length}
                   size={ctx.size}
-                  {...(i > 0 ? { onUp: () => commit(moveItem(items, i, i - 1)) } : {})}
-                  {...(i < items.length - 1
-                    ? { onDown: () => commit(moveItem(items, i, i + 1)) }
+                  {...(itemActionsAllow(spec, "reorder")
+                    ? { onMove: (to: number) => commit(moveItem(items, i, to)) }
                     : {})}
-                  onDuplicate={() => commit(duplicateIndex(items, i))}
-                  onRemove={() => commit(removeIndex(items, i))}
+                  {...(itemActionsAllow(spec, "duplicate")
+                    ? { onDuplicate: () => commit(duplicateIndex(items, i)) }
+                    : {})}
+                  {...(itemActionsAllow(spec, "remove")
+                    ? { onRemove: () => commit(removeIndex(items, i)) }
+                    : {})}
                 />
               )}
             </header>

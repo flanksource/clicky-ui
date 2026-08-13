@@ -74,7 +74,8 @@ export interface JsonSchemaProperty {
   // Force an array's presentation. "filter-pills" renders each enum item as a
   // compact toggle (an empty stored array means all options); "accordion" and
   // "cards" render object items as summary rows or titled cards, both reading
-  // `x-item` for the summary.
+  // `x-item` for the summary. Object items default to the accordion, so this is
+  // only needed to say "cards" or to opt out with "stacked".
   "x-array-display"?: ArrayDisplay;
   // Force how this field's description is presented, overriding the form-level
   // `FormLayout.help`. Defaults to "inline" (a paragraph under the control).
@@ -213,11 +214,23 @@ export type GridColumns = number | "auto";
 // "hover" moves it behind a `?` beside the label, costing no vertical space.
 export type HelpDisplay = "inline" | "hover";
 
+// The scalar an array's items hold, when they hold one. A list of scalars is a
+// tag list: type a value, get a pill — whatever the type. Integer/number lists
+// commit numbers, so the control converts on the way in and out.
+export type ScalarItemType = "string" | "integer" | "number";
+
 // How an array control renders. "filter-pills" needs enum item options;
 // "accordion" and "cards" both need object items and both read `x-item` — the
 // accordion collapses every item to one line and opens one at a time, cards
-// keep every item open under a titled, hue-edged header.
-export type ArrayDisplay = "filter-pills" | "accordion" | "cards";
+// keep every item open under a titled, hue-edged header. An object-item array
+// renders as an accordion without being asked; "stacked" is the opt-out back to
+// one full sub-form per item, labelled *Item N*.
+export type ArrayDisplay = "filter-pills" | "accordion" | "cards" | "stacked";
+
+// A per-item editing action an object-array row can offer. "reorder" covers both
+// the up and the down button — a list where only one direction moved would be a
+// list you cannot put back.
+export type ArrayItemAction = "reorder" | "duplicate" | "remove";
 
 // ArrayItemSpec is the `x-item` extension on an ARRAY schema: it says how to
 // summarize one element of this list in a collapsed row. Every value names a
@@ -238,6 +251,11 @@ export interface ArrayItemSpec {
   badge?: string;
   /** Boolean property rendered as the required mark. */
   flag?: string;
+  /**
+   * Which per-item actions the rows offer. Omit for all of them (the default);
+   * `[]` for a list that can only be read and reordered by no one.
+   */
+  actions?: ArrayItemAction[];
   /** Noun for the add row ("Add parameter"). Defaults to `items.title`, then "item". */
   noun?: string;
   /** Plural for the count line ("4 parameters"). Defaults to the array title, then "items". */

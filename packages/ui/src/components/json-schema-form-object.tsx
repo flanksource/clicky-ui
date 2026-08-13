@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { isPlainObject } from "../lib/collections";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd, UiTrash } from "../icons";
@@ -10,7 +11,6 @@ import {
   DEFAULT_COLUMN_MIN_WIDTH,
   fieldInputId,
   inputClass,
-  isPlainObject,
   keyPickerOptions,
   normalizeColumns,
 } from "./json-schema-form-utils";

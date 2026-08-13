@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { findDemoEntry } from "../demo-catalog";
+import { AccordionListDemo } from "./AccordionListDemo";
 import { HierarchicalLookupDemo } from "./HierarchicalLookupDemo";
 import { ProfilesDemo } from "./ProfilesDemo";
 import { QueryBrowserDemo } from "./QueryBrowserDemo";
@@ -18,6 +19,18 @@ describe("kitchen sink examples", () => {
     );
     expect(findDemoEntry("profiles")?.component).toBe(ProfilesDemo);
     expect(findDemoEntry("query-browser")?.component).toBe(QueryBrowserDemo);
+    expect(findDemoEntry("accordion-list")?.component).toBe(AccordionListDemo);
+  });
+
+  it("reorders the accordion list demo through the named row action", () => {
+    render(<AccordionListDemo />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move /api/v1/events up" }));
+
+    const headers = screen
+      .getAllByRole("button")
+      .filter((b) => b.hasAttribute("aria-expanded"));
+    expect(headers[0]?.textContent).toContain("/api/v1/events");
   });
 
   it("starts the provider-managed guided tour from the demo", async () => {

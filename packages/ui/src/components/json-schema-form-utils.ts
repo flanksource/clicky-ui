@@ -92,8 +92,12 @@ export function toText(value: unknown): string {
   return String(value);
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+// toStringArray normalises the committed value of a multi-value control. The
+// schema types it as an array of strings, but a form mid-edit can hold anything,
+// so a non-string entry is dropped rather than rendered as a broken tag.
+export function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 // hasObjectItemProperties reports whether an array's items are objects with a
@@ -141,21 +145,6 @@ export const DEFAULT_COLUMN_MIN_WIDTH = "15rem";
 // declaration the browser will drop.
 export function cssLength(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
-}
-
-// duplicateIndex copies the item at `index` and inserts the copy after it.
-// Plain objects and arrays are cloned one level deep so editing the copy cannot
-// write through to the original.
-export function duplicateIndex<T>(items: T[], index: number): T[] {
-  const source = items[index];
-  const copy = Array.isArray(source)
-    ? ([...source] as T)
-    : isPlainObject(source)
-      ? ({ ...source } as T)
-      : source;
-  const next = [...items];
-  next.splice(index + 1, 0, copy as T);
-  return next;
 }
 
 // withSyntheticValue prepends the current value as an option when it is not in
@@ -283,23 +272,6 @@ export function softError(field: FieldControl): string | undefined {
     if (!known) return "Unknown value (allowed)";
   }
   return undefined;
-}
-
-// Immutable array helpers used by the array control.
-export function setIndex<T>(arr: T[], i: number, v: T): T[] {
-  return arr.map((x, idx) => (idx === i ? v : x));
-}
-
-export function removeIndex<T>(arr: T[], i: number): T[] {
-  return arr.filter((_, idx) => idx !== i);
-}
-
-export function moveItem<T>(arr: T[], from: number, to: number): T[] {
-  if (to < 0 || to >= arr.length) return arr;
-  const next = [...arr];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved as T);
-  return next;
 }
 
 // seedFromSchema produces the initial value for a freshly-added array item or

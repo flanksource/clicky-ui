@@ -8,11 +8,12 @@ import type {
   JsonSchemaObject,
   JsonSchemaProperty,
   LookupDescriptor,
+  ScalarItemType,
 } from "./json-schema-form-types";
+import { isPlainObject } from "../lib/collections";
 import { LabelIcon } from "../data/Icon";
 import { resolveItemSpec } from "./json-schema-form-item-summary";
 import { isFieldTone } from "./json-schema-form-tone";
-import { isPlainObject } from "./json-schema-form-utils";
 
 // isOpenStringMap reports whether a property is an object whose entries are
 // described by a sub-schema in `additionalProperties` (a typed key/value map) or
@@ -112,7 +113,9 @@ function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
 
 function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
   const d = prop["x-array-display"];
-  return d === "filter-pills" || d === "accordion" || d === "cards" ? d : undefined;
+  return d === "filter-pills" || d === "accordion" || d === "cards" || d === "stacked"
+    ? d
+    : undefined;
 }
 
 // helpDisplay reads the per-field `x-help-display` override. Returns undefined
@@ -340,7 +343,10 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       // add row, so a paragraph of the same sentence directly above would be a
       // literal duplicate. The schema can still say otherwise.
       ...(display === "accordion" && !helpMode ? { helpDisplay: "hover" as const } : {}),
-      ...(display && itemSchema && Array.isArray(itemSchema.enum)
+      // An enum item schema makes the whole array a list of choices, whichever
+      // display renders it (tags by default, filter pills on request), so the
+      // options — labels, icons, tones and all — always resolve.
+      ...(itemSchema && Array.isArray(itemSchema.enum)
         ? { options: enumOptions(itemSchema) }
         : {}),
       ...(layout ? { layout } : {}),
@@ -416,23 +422,29 @@ function keyOptionsFor(prop: JsonSchemaProperty): FieldOption[] | undefined {
   return enumOptions(pn);
 }
 
-// isScalarStringItems reports whether an array's item schema is a plain string
-// with no richer shape — the case the array control renders as compact tags.
-// Anything with an enum/const/properties/items/additionalProperties/allOf needs
-// a real per-item control instead.
-export function isScalarStringItems(
+// scalarItemsType returns the scalar type an array's items hold — the case the
+// array renders as ONE tag list rather than a control per item — or undefined
+// when the items need a real per-item control. Anything carrying an
+// enum/const/properties/items/additionalProperties/allOf has a richer shape (an
+// enum array is a list of choices, and takes the option-backed branch instead).
+export function scalarItemsType(
   items: JsonSchemaProperty | undefined,
-): boolean {
-  if (!items) return true; // untyped items default to string tags
-  if (items.type !== undefined && !schemaHasType(items, "string")) return false;
-  return (
-    items.enum === undefined &&
-    items.const === undefined &&
-    items.properties === undefined &&
-    items.items === undefined &&
-    items.additionalProperties === undefined &&
-    items.allOf === undefined
-  );
+): ScalarItemType | undefined {
+  if (!items) return "string"; // untyped items default to string tags
+  if (
+    items.enum !== undefined ||
+    items.const !== undefined ||
+    items.properties !== undefined ||
+    items.items !== undefined ||
+    items.additionalProperties !== undefined ||
+    items.allOf !== undefined
+  ) {
+    return undefined;
+  }
+  if (items.type === undefined || schemaHasType(items, "string")) return "string";
+  if (schemaHasType(items, "integer")) return "integer";
+  if (schemaHasType(items, "number")) return "number";
+  return undefined;
 }
 
 // matchesIf reports whether the `if` sub-schema holds for the current value:
