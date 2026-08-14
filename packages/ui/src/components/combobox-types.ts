@@ -120,6 +120,13 @@ export type ComboboxMultiProps = ComboboxBaseProps & {
   tristate?: false;
   /** Renders selected values as wrapping removable pills instead of a summary. */
   variant?: "default" | "tags";
+  /**
+   * Characters that commit the typed text as a value, alongside Enter — and
+   * that pasted text is split on (newlines always split too). For a list of
+   * short values that is usually typed or pasted comma-separated. Tags variant
+   * only; needs `allowCustomValue`.
+   */
+  separators?: string[];
   value: string[];
   onChange: (value: string[]) => void;
 };
@@ -129,6 +136,12 @@ export type ComboboxTriStateMode = "include" | "exclude";
 export type ComboboxTriStateProps = ComboboxBaseProps & {
   multiple: true;
   tristate: true;
+  /**
+   * Renders each value as a pill carrying its mode (included / excluded) instead
+   * of the `+n -n` summary. The pill cycles include ↔ exclude on click and its
+   * close button returns the value to neutral.
+   */
+  variant?: "default" | "tags";
   value: Record<string, ComboboxTriStateMode>;
   onChange: (value: Record<string, ComboboxTriStateMode>) => void;
 };

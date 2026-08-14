@@ -4,6 +4,7 @@ import type {
   WorkloadResource,
 } from "./workload-picker-utils";
 import type { WorkloadPickerProps } from "./WorkloadPicker";
+import type { NamespacePickerProps } from "./NamespacePicker";
 import {
   parseSecretRef,
   serializeSecretRef,
@@ -49,6 +50,7 @@ export type EndpointSelectorValue =
 
 export type EndpointSelectorDefaults = {
   scheme?: string;
+  port?: string;
   path?: string;
 };
 
@@ -64,6 +66,9 @@ export type EndpointSelectorProps = {
   modes: EndpointMode[];
   defaultMode?: EndpointMode;
   loadWorkloads: WorkloadPickerProps["loadWorkloads"];
+  allowNamespaceSelection?: boolean;
+  loadNamespaces?: NamespacePickerProps["loadNamespaces"];
+  onNamespaceChange?: WorkloadPickerProps["onNamespaceChange"];
   urlSelector?: EndpointUrlSelectorProps;
   modeKinds?: Partial<Record<EndpointWorkloadMode, WorkloadKind[]>>;
   defaults?: EndpointSelectorDefaults;

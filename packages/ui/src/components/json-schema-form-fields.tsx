@@ -6,6 +6,7 @@ import { DateTimePicker } from "./DateTimePicker";
 import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
 import { GridControl } from "./json-schema-form-grid";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
+import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption } from "./json-schema-form-types";
 import {
@@ -469,6 +470,24 @@ export function LookupControl({
         options={options}
         loading={loading}
         hierarchy={descriptor.hierarchy}
+      />
+    );
+  }
+
+  // A multi lookup commits an ARRAY, so it takes the tags picker rather than the
+  // single-value combobox below — which would render the array as an empty box
+  // and then overwrite it with a bare string. Without a fetcher the same control
+  // renders the already-committed values with an empty option set.
+  if (descriptor?.multi) {
+    return (
+      <TagsComboboxControl
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={size}
+        options={options}
+        loading={loading}
+        {...(fetcher ? { onSearch } : {})}
       />
     );
   }

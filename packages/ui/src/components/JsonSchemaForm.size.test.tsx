@@ -99,10 +99,12 @@ describe("JsonSchemaForm size", () => {
   });
 
   it("sizes array action buttons from the form size", () => {
+    // Stacked: the per-item reorder/remove column only exists on that opt-out —
+    // a scalar list is otherwise one tag combobox with no per-item buttons.
     const arraySchema: JsonSchemaObject = {
       type: "object",
       properties: {
-        ports: { type: "array", items: { type: "number" } },
+        ports: { type: "array", "x-array-display": "stacked", items: { type: "number" } },
       },
     };
     render(

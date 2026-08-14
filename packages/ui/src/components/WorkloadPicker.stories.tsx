@@ -10,8 +10,10 @@ import {
 const FIXTURE: Record<WorkloadKind, WorkloadResource[]> = {
   service: [{ name: "demo-svc" }, { name: "activemq-svc" }],
   ingress: [{ name: "demo-ing", hosts: ["demo.example.com"] }],
+  pod: [{ name: "demo-api-abc12" }],
   deployment: [{ name: "demo-web" }, { name: "palette-web" }],
   statefulset: [{ name: "demo-cycle" }, { name: "sqlserver" }],
+  daemonset: [{ name: "node-agent" }],
 };
 
 // makeLoader fakes the consumer's `loadWorkloads` getter: it resolves after
@@ -55,7 +57,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Selects a Kubernetes workload (Service / Ingress / Deployment / StatefulSet) for an endpoint. Options from every kind are merged into one Combobox, grouped by kind via Combobox group headers and labelled with the kind's icon. Fetches nothing itself — the consumer supplies the async `loadWorkloads` getter. An ingress emits its first host (the routable address) as the value, labelled with the ingress name for context; every other kind emits its name.",
+          "Selects a Kubernetes workload for an endpoint or query. Options from every requested kind are merged into one Combobox, grouped by kind via Combobox group headers and labelled with the kind's icon. Fetches nothing itself — the consumer supplies the async `loadWorkloads` getter. An ingress emits its first host (the routable address) as the value, labelled with the ingress name for context; every other kind emits its name.",
       },
     },
   },
@@ -90,6 +92,25 @@ export const Namespaced: Story = {
     },
   },
   render: () => <Playground namespace="demo" loadWorkloads={makeLoader(0)} />,
+};
+
+export const NamespaceSelection: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Opt-in namespace selection scopes workload discovery and emits a fully-qualified namespace/kind/name value.",
+      },
+    },
+  },
+  render: () => (
+    <Playground
+      namespace="demo"
+      loadWorkloads={makeLoader(0)}
+      allowNamespaceSelection
+      loadNamespaces={() => Promise.resolve(["demo", "platform", "search"])}
+    />
+  ),
 };
 
 export const Loading: Story = {

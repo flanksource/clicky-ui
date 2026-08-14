@@ -39,6 +39,7 @@ import type {
 import {
   fieldErrorId,
   fieldInputId,
+  hasObjectItemProperties,
   matchesFieldFilter,
   normalizeColSpan,
   normalizeColumns,
@@ -395,11 +396,13 @@ function rendersFullWidth(prop: JsonSchemaProperty): boolean {
   if (schemaRendersAsObject(prop) && (prop.properties !== undefined || Object.keys(fixedProperties).length > 0)) {
     return true;
   }
-  return (
-    prop["x-layout"] === "table" ||
-    prop["x-array-display"] === "accordion" ||
-    prop["x-array-display"] === "cards"
-  );
+  // An object-item array is a summary-row list (or cards) unless it opts out,
+  // and each of those renderers owns the row — mirrors ArrayControl's own
+  // branching, which decides the same thing from the resolved FieldControl.
+  if (hasObjectItemProperties(prop.items) && prop["x-array-display"] !== "stacked") {
+    return true;
+  }
+  return prop["x-layout"] === "table";
 }
 
 // renderApi is the RenderContext injection bundle: the root form stores it on

@@ -32,29 +32,29 @@ function subgridRowFor(labelText: string): { row: HTMLElement; parent: HTMLEleme
 }
 
 describe("array items in inline layout", () => {
-  it("gives a scalar item row the label/value tracks its subgrid inherits", () => {
-    // Integer items miss the scalar-string TagArray branch, so each item renders
-    // as its own labelled row — the case where a track-less subgrid is visible.
-    const schema: JsonSchemaObject = {
-      type: "object",
-      properties: {
-        ports: { type: "array", title: "Ports", items: { type: "integer" } },
+  // The stacked opt-out is what still renders a row per item — the case where a
+  // track-less subgrid would be visible.
+  const stackedPorts: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      ports: {
+        type: "array",
+        title: "Ports",
+        "x-array-display": "stacked",
+        items: { type: "integer" },
       },
-    };
-    inlineForm(schema, { ports: [8080, 9090] });
+    },
+  };
+
+  it("gives a scalar item row the label/value tracks its subgrid inherits", () => {
+    inlineForm(stackedPorts, { ports: [8080, 9090] });
 
     const { parent } = subgridRowFor("Item 1");
     expect(parent.style.gridTemplateColumns).toBe(INLINE_TEMPLATE);
   });
 
   it("aligns every item on the same tracks, not per-item grids", () => {
-    const schema: JsonSchemaObject = {
-      type: "object",
-      properties: {
-        ports: { type: "array", title: "Ports", items: { type: "integer" } },
-      },
-    };
-    inlineForm(schema, { ports: [8080, 9090] });
+    inlineForm(stackedPorts, { ports: [8080, 9090] });
 
     const first = subgridRowFor("Item 1");
     const second = subgridRowFor("Item 2");
@@ -68,12 +68,16 @@ describe("array items in inline layout", () => {
   });
 
   it("keeps an object item's section inside a grid so col-span-full applies", () => {
+    // Object items render as an accordion unless asked otherwise, and the
+    // accordion owns its own full-width row — the per-item section this covers
+    // only exists on the stacked opt-out.
     const schema: JsonSchemaObject = {
       type: "object",
       properties: {
         servers: {
           type: "array",
           title: "Servers",
+          "x-array-display": "stacked",
           items: {
             type: "object",
             properties: { name: { type: "string", title: "Name" } },

@@ -10,7 +10,7 @@ import { duplicateIndex, moveItem, removeIndex, setIndex } from "../lib/collecti
 import type { SizeToken } from "../lib/size";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiAdd, UiChevronDown, UiChevronRight } from "../icons";
+import { UiAdd, UiChevronDown, UiChevronRight, UiDotsVertical } from "../icons";
 import { ItemActions } from "./ItemActions";
 import { labelSizeClass } from "./json-schema-form-size";
 
@@ -59,12 +59,37 @@ export interface AccordionListProps<T> {
 
   /** Offer the up/down reorder buttons. */
   allowReorder?: boolean;
+  /**
+   * Offer a grab handle at the head of every row, and drag-to-reorder across
+   * the list. Arrow keys on a focused handle move the row too, so the gesture
+   * is not mouse-only.
+   */
+  allowDrag?: boolean;
+  /**
+   * Whether a row takes part in dragging — as a source and as a destination.
+   * Defaults to every row. A list holding rows that have no position of their
+   * own (a filtered-out item, a soft-deleted one) says so here.
+   */
+  canDrag?: (ctx: { item: T; index: number }) => boolean;
+  /**
+   * Commits a completed drag or handle keypress. Defaults to the same move the
+   * reorder buttons perform; a list whose order lives outside `items` (a
+   * filtered view of a longer list) reorders the source through this instead.
+   */
+  onReorder?: (from: number, to: number) => void;
   /** Offer the duplicate button. */
   allowDuplicate?: boolean;
   /** Offer the remove button. */
   allowRemove?: boolean;
   /** Copy override for duplicate. Defaults to a one-level clone. */
   cloneItem?: (item: T) => T;
+  /**
+   * Reveal the per-row actions on hover/focus (the default). Pass false where an
+   * action carries state the row has to show at rest — a visibility toggle whose
+   * glyph says whether the item is hidden answers a question, not just offers a
+   * click.
+   */
+  revealActions?: boolean;
 
   /** Seeds a new item. Supplying it is what adds the trailing add row. */
   onCreate?: () => T;
@@ -105,8 +130,12 @@ export function AccordionList<T>({
   summary,
   itemLabel,
   allowReorder = false,
+  allowDrag = false,
+  canDrag,
+  onReorder,
   allowDuplicate = false,
   allowRemove = false,
+  revealActions = true,
   cloneItem,
   onCreate,
   addLabel = "Add item",
@@ -132,6 +161,10 @@ export function AccordionList<T>({
   const isControlled = expandedProp !== undefined;
   const [innerExpanded, setInnerExpanded] = useState<number | null>(defaultExpanded);
   const expanded = isControlled ? expandedProp : innerExpanded;
+
+  // The in-flight drag: the row being dragged and the row the pointer is over.
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const addRef = useRef<HTMLButtonElement | null>(null);
@@ -205,6 +238,23 @@ export function AccordionList<T>({
     commit(duplicateIndex(items, index, cloneItem));
   }
 
+  /** Where a drag would land, so the row can draw the insertion line. */
+  function dropEdge(index: number): "top" | "bottom" | null {
+    if (dragFrom === null || dragOver !== index || dragFrom === index) return null;
+    return dragFrom < index ? "bottom" : "top";
+  }
+
+  function endDrag() {
+    setDragFrom(null);
+    setDragOver(null);
+  }
+
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    if (onReorder) onReorder(from, to);
+    else move(from, to);
+  }
+
   function move(index: number, to: number) {
     if (to < 0 || to >= items.length) return;
     // Follow the item, not the slot — otherwise moving an open row silently
@@ -247,18 +297,66 @@ export function AccordionList<T>({
           };
           const label = itemLabel?.({ item, index: i }) ?? `Item ${i + 1}`;
           const actions = renderActions?.(slotCtx);
+          const dragEnabled = allowDrag && !readOnly && (canDrag?.({ item, index: i }) ?? true);
+          const droppable = dragEnabled && dragFrom !== null && dragFrom !== i;
+          const edge = droppable ? dropEdge(i) : null;
           return (
             <div key={i} className="group">
               {/* The row is a plain element, NOT a button: the actions beside it
                   are buttons, and nesting interactive content is invalid DOM
                   with undefined click targeting. Only the disclosure toggles. */}
               <div
+                data-accordion-row
+                data-drop-edge={edge ?? undefined}
+                onDragOver={(e) => {
+                  if (!droppable) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOver(i);
+                }}
+                onDrop={(e) => {
+                  if (!droppable || dragFrom === null) return;
+                  e.preventDefault();
+                  reorder(dragFrom, i);
+                  endDrag();
+                }}
                 className={cn(
                   "flex w-full items-center gap-2 px-3 py-2 hover:bg-accent/40",
+                  i % 2 === 0 ? "bg-card" : "bg-muted/20",
                   open && "bg-accent/30",
+                  dragFrom === i && "opacity-40",
+                  edge === "top" && "shadow-[inset_0_2px_0_0_var(--color-primary)]",
+                  edge === "bottom" && "shadow-[inset_0_-2px_0_0_var(--color-primary)]",
                   rowClassName,
                 )}
               >
+                {allowDrag && !readOnly && (
+                  <button
+                    type="button"
+                    aria-label={`Reorder ${label}`}
+                    title={`Reorder ${label}`}
+                    disabled={!dragEnabled}
+                    draggable={dragEnabled}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(i));
+                      // Drag the row, not the handle glyph the pointer grabbed.
+                      const row = e.currentTarget.closest("[data-accordion-row]");
+                      if (row instanceof HTMLElement) e.dataTransfer.setDragImage(row, 12, 12);
+                      setDragFrom(i);
+                    }}
+                    onDragEnd={endDrag}
+                    onKeyDown={(e) => {
+                      const to = e.key === "ArrowUp" ? i - 1 : e.key === "ArrowDown" ? i + 1 : i;
+                      if (to === i || to < 0 || to >= items.length) return;
+                      e.preventDefault();
+                      reorder(i, to);
+                    }}
+                    className="shrink-0 cursor-grab rounded text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
+                  >
+                    <Icon icon={UiDotsVertical} className="text-sm" />
+                  </button>
+                )}
                 <button
                   type="button"
                   id={headerId(i)}
@@ -283,6 +381,7 @@ export function AccordionList<T>({
                     index={i}
                     count={items.length}
                     size={size}
+                    reveal={revealActions}
                     {...(actions ? { leading: actions } : {})}
                     {...(allowReorder ? { onMove: (to: number) => move(i, to) } : {})}
                     {...(allowDuplicate ? { onDuplicate: () => duplicate(i) } : {})}

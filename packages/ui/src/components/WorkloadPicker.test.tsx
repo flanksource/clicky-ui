@@ -13,13 +13,33 @@ import {
 const FIXTURE: Record<WorkloadKind, WorkloadResource[]> = {
   service: [{ name: "demo-svc" }],
   ingress: [{ name: "demo-ing", hosts: ["demo.example.com"] }],
+  pod: [{ name: "demo-api-abc12" }],
   deployment: [{ name: "demo-web" }],
   statefulset: [{ name: "demo-cycle" }],
+  daemonset: [{ name: "node-agent" }],
 };
 
 const loadAll = () => Promise.resolve(FIXTURE);
 
 describe("WorkloadPicker", () => {
+  it("preserves each loaded workload's namespace in a cross-namespace catalog", async () => {
+    const onChange = vi.fn();
+    render(
+      <WorkloadPicker
+        value=""
+        onChange={onChange}
+        kinds={["deployment"]}
+        loadWorkloads={async () => ({
+          deployment: [{ name: "api", namespace: "payments" }],
+        })}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Workload" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "api" }));
+    expect(onChange).toHaveBeenCalledWith("payments/deployment/api");
+  });
+
   it("groups options by kind with one header each", async () => {
     render(<WorkloadPicker value="" onChange={vi.fn()} loadWorkloads={loadAll} />);
     fireEvent.focus(screen.getByRole("combobox"));
@@ -30,7 +50,14 @@ describe("WorkloadPicker", () => {
     const headers = [...listbox.querySelectorAll('[role="presentation"]')]
       .map((h) => h.textContent)
       .filter((t) => t);
-    expect(headers).toEqual(["Service", "Ingress", "Deployment", "StatefulSet"]);
+    expect(headers).toEqual([
+      "Service",
+      "Ingress",
+      "Pod",
+      "Deployment",
+      "StatefulSet",
+      "DaemonSet",
+    ]);
   });
 
   it("annotates an ingress option with its first host", async () => {
@@ -97,14 +124,94 @@ describe("WorkloadPicker", () => {
     expect(onChange).toHaveBeenCalledWith("demo/service/demo-svc");
   });
 
+  it("reloads workloads from a namespace selected by the user", async () => {
+    const onChange = vi.fn();
+    const loadWorkloads = vi.fn(
+      (_kinds: WorkloadKind[], namespace?: string) =>
+        Promise.resolve({
+          service: [{ name: namespace === "search" ? "redis" : "demo-svc" }],
+          ingress: [],
+          pod: [],
+          deployment: [],
+          statefulset: [],
+          daemonset: [],
+        }),
+    );
+    render(
+      <WorkloadPicker
+        value=""
+        namespace="demo"
+        onChange={onChange}
+        loadWorkloads={loadWorkloads}
+        kinds={["service"]}
+        allowNamespaceSelection
+        loadNamespaces={() => Promise.resolve(["demo", "search"])}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "demo"),
+    );
+    fireEvent.focus(screen.getByRole("combobox", { name: "Namespace" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "search" }));
+
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "search"),
+    );
+    expect(onChange).toHaveBeenCalledWith("");
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Workload" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "redis" }));
+    expect(onChange).toHaveBeenLastCalledWith("search/service/redis");
+  });
+
+  it("uses the namespace encoded in the controlled value", async () => {
+    const loadWorkloads = vi.fn(loadAll);
+    render(
+      <WorkloadPicker
+        value="search/service/demo-svc"
+        namespace="demo"
+        onChange={vi.fn()}
+        loadWorkloads={loadWorkloads}
+        kinds={["service"]}
+        allowNamespaceSelection
+        loadNamespaces={() => Promise.resolve(["demo", "search"])}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "search"),
+    );
+    expect(screen.getByRole("combobox", { name: "Namespace" })).toHaveValue(
+      "search",
+    );
+  });
+
+  it("rejects namespace selection without a namespace loader", () => {
+    expect(() =>
+      render(
+        <WorkloadPicker
+          value=""
+          onChange={vi.fn()}
+          loadWorkloads={loadAll}
+          allowNamespaceSelection
+        />,
+      ),
+    ).toThrow(
+      "WorkloadPicker namespace selection requires loadNamespaces",
+    );
+  });
+
   it("disambiguates same-named workloads of different kinds", async () => {
     // A Service and a Deployment both named "demo" yield distinct keyed values.
     const load = () =>
       Promise.resolve({
         service: [{ name: "demo" }],
         ingress: [],
+        pod: [],
         deployment: [{ name: "demo" }],
         statefulset: [],
+        daemonset: [],
       });
     render(<WorkloadPicker value="" onChange={vi.fn()} loadWorkloads={load} />);
     fireEvent.focus(screen.getByRole("combobox"));
@@ -255,6 +362,19 @@ describe("workloadKey / parseWorkloadKey", () => {
     expect(parseWorkloadKey("ingress/h.example.com")).toEqual({
       kind: "ingress",
       name: "h.example.com",
+    });
+  });
+
+  it("round-trips pod and daemonset keys", () => {
+    expect(parseWorkloadKey("default/pod/api-abc12")).toEqual({
+      namespace: "default",
+      kind: "pod",
+      name: "api-abc12",
+    });
+    expect(parseWorkloadKey("observability/daemonset/node-agent")).toEqual({
+      namespace: "observability",
+      kind: "daemonset",
+      name: "node-agent",
     });
   });
 

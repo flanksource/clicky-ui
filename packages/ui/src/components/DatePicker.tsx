@@ -1,11 +1,13 @@
-import { forwardRef, useRef, type InputHTMLAttributes } from "react";
+import { forwardRef, useRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { UiCalendar } from "../icons";
 import { cn } from "../lib/utils";
 
 export type DatePickerProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
-  "type" | "value" | "onChange"
+  // `prefix` is a global HTML attribute typed as string; omit it so our
+  // ReactNode adornment prop below is not intersected down to `string & ReactNode`.
+  "type" | "value" | "onChange" | "prefix"
 > & {
   value?: string;
   onChange?: (value: string) => void;
@@ -13,6 +15,10 @@ export type DatePickerProps = Omit<
   inputClassName?: string;
   buttonClassName?: string;
   openButtonLabel?: string;
+  /** Trailing in-field adornment, rendered left of the calendar button. */
+  suffix?: ReactNode;
+  /** Leading in-field adornment, rendered at the left edge of the input. */
+  prefix?: ReactNode;
 };
 
 export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
@@ -24,6 +30,8 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
       inputClassName,
       buttonClassName,
       openButtonLabel = "Open date picker",
+      suffix,
+      prefix,
       ...props
     },
     ref,
@@ -40,7 +48,8 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
     }
 
     return (
-      <div className={cn("relative", className)}>
+      <div data-jsf-control className={cn("relative", className)}>
+        {prefix && <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>}
         <input
           {...props}
           ref={assignRef}
@@ -49,10 +58,14 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
           className={cn(
             "h-control-h w-full rounded-md border border-input bg-background px-control-px pr-8 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
             "[&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
+            prefix && "pl-8",
             inputClassName,
           )}
           onChange={(event) => onChange?.(event.target.value)}
         />
+        {suffix && (
+          <div className="absolute inset-y-0 right-7 flex items-center">{suffix}</div>
+        )}
         <button
           type="button"
           aria-label={openButtonLabel}

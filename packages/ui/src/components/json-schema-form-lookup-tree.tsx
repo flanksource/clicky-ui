@@ -8,6 +8,7 @@ import {
 } from "../lib/path-tree";
 import { cn } from "../lib/utils";
 import { TreePickerField } from "./TreePickerField";
+import { toStringArray } from "./json-schema-form-utils";
 import type { FormSize } from "./json-schema-form-size";
 import type {
   FieldControl,
@@ -30,14 +31,6 @@ function treeFrom(
   return buildPathTree(options, (option) =>
     splitPath(option.label || option.value, hierarchy.delimiters),
   );
-}
-
-// toValues normalises the committed value of a multi lookup. The schema type is
-// an array of strings, but a form mid-edit can hold anything, so anything that
-// is not a usable string is dropped rather than rendered as a broken chip.
-function toValues(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function OptionRow({ node }: { node: OptionNode }) {
@@ -117,7 +110,7 @@ export function LookupTreeControl({
     );
   }
 
-  const values = toValues(field.value);
+  const values = toStringArray(field.value);
   return (
     <div id={fieldId} data-jsf-input className="flex flex-col gap-1.5">
       {values.length > 0 && (

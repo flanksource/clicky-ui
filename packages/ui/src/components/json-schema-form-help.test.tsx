@@ -119,6 +119,8 @@ describe("JsonSchemaForm help display", () => {
         tags: {
           type: "array",
           title: "Tags",
+          // Stacked: the "Item N" rows this covers are that opt-out's doing.
+          "x-array-display": "stacked",
           items: { type: "number", title: "Tag", description: LABEL_HELP },
         },
       },

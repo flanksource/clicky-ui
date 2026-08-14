@@ -26,7 +26,6 @@ import type {
   EndpointWorkloadValue,
   EndpointWorkloadMode,
 } from "./EndpointSelector.model";
-
 const MODE_LABELS: Record<EndpointMode, string> = {
   url: "URL",
   service: "Service",
@@ -35,7 +34,6 @@ const MODE_LABELS: Record<EndpointMode, string> = {
   ingress: "Ingress",
   "port-forward": "Port-forward",
 };
-
 const DEFAULT_MODE_KINDS: Record<EndpointWorkloadMode, WorkloadKind[]> = {
   service: ["service"],
   "cluster-ip": ["service"],
@@ -43,7 +41,6 @@ const DEFAULT_MODE_KINDS: Record<EndpointWorkloadMode, WorkloadKind[]> = {
   ingress: ["ingress"],
   "port-forward": ["service", "deployment"],
 };
-
 const WORKLOAD_FIELD =
   "max-w-full min-w-0 basis-56 shrink grow";
 const SCHEME_FIELD =
@@ -52,7 +49,6 @@ const PORT_FIELD =
   "max-w-full min-w-0 basis-36 shrink grow-0";
 const PATH_FIELD =
   "max-w-full min-w-0 basis-56 shrink grow";
-
 function isWorkloadValue(
   value: EndpointSelectorValue | undefined,
 ): value is EndpointWorkloadValue {
@@ -116,6 +112,9 @@ export function EndpointSelector({
   modes,
   defaultMode,
   loadWorkloads,
+  allowNamespaceSelection = false,
+  loadNamespaces,
+  onNamespaceChange,
   urlSelector,
   modeKinds,
   defaults,
@@ -137,12 +136,18 @@ export function EndpointSelector({
   if (value && !modes.includes(value.mode)) {
     throw new Error(`EndpointSelector value mode "${value.mode}" is disabled`);
   }
+  if (allowNamespaceSelection && !loadNamespaces) {
+    throw new Error(
+      "EndpointSelector namespace selection requires loadNamespaces",
+    );
+  }
 
   const [activeMode, setActiveMode] = useState<EndpointMode>(
     value?.mode ?? fallbackMode,
   );
   const [resources, setResources] = useState<EndpointResources>({});
   const resourcesRef = useRef<EndpointResources>({});
+  const resourcesNamespaceRef = useRef(namespace);
   const modesKey = modes.join(",");
 
   useEffect(() => {
@@ -161,19 +166,29 @@ export function EndpointSelector({
   );
 
   const rememberingLoader = useCallback(
-    async (kinds: WorkloadKind[]) => {
-      const loaded = await loadWorkloads(kinds);
+    async (kinds: WorkloadKind[], selectedNamespace?: string) => {
+      const workloadNamespace = selectedNamespace ?? namespace;
+      if (resourcesNamespaceRef.current !== workloadNamespace) {
+        resourcesNamespaceRef.current = workloadNamespace;
+        resourcesRef.current = {};
+        setResources({});
+      }
+      const loaded = workloadNamespace
+        ? await loadWorkloads(kinds, workloadNamespace)
+        : await loadWorkloads(kinds);
       const filtered = { ...loaded };
       if (kinds.includes("ingress")) {
         filtered.ingress = (loaded.ingress ?? []).filter(
           (resource) => resource.hosts?.[0],
         );
       }
-      resourcesRef.current = { ...resourcesRef.current, ...filtered };
-      setResources(resourcesRef.current);
+      if (resourcesNamespaceRef.current === workloadNamespace) {
+        resourcesRef.current = { ...resourcesRef.current, ...filtered };
+        setResources(resourcesRef.current);
+      }
       return filtered;
     },
-    [loadWorkloads],
+    [loadWorkloads, namespace],
   );
 
   const selectedResource = useMemo(() => {
@@ -229,6 +244,7 @@ export function EndpointSelector({
   const selectMode = (nextMode: EndpointMode) => {
     setActiveMode(nextMode);
     if (nextMode === "url") {
+      onNamespaceChange?.(undefined);
       if (value?.mode !== "url") onChange(undefined);
       return;
     }
@@ -289,7 +305,7 @@ export function EndpointSelector({
       (previous && sameTarget(previous.target, target) ||
         exposed.includes(currentPort))
       ? currentPort
-      : preferredEndpointPort(resource.ports, preferredPorts);
+      : (preferredEndpointPort(resource.ports, preferredPorts) ?? defaults?.port);
     const next: EndpointWorkloadValue = {
       mode: activeMode as EndpointWorkloadMode,
       target,
@@ -364,6 +380,11 @@ export function EndpointSelector({
                   onChange={selectWorkload}
                   loadWorkloads={rememberingLoader}
                   {...(namespace ? { namespace } : {})}
+                  {...(allowNamespaceSelection
+                    ? { allowNamespaceSelection: true }
+                    : {})}
+                  {...(loadNamespaces ? { loadNamespaces } : {})}
+                  {...(onNamespaceChange ? { onNamespaceChange } : {})}
                   kinds={enabledKinds}
                   strict
                   allowCustomValue={false}

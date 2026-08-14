@@ -508,3 +508,47 @@ export const HierarchicalLookups: Story = {
     ).toBeInTheDocument();
   },
 };
+
+// The same multi lookup WITHOUT `hierarchy`: a flat option list, so it takes the
+// tags combobox — the control an enum-item array uses, with the option set
+// fetched instead of declared.
+const flatLookupSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    imports: {
+      type: "array",
+      title: "Imports",
+      description: "Multi select: every committed value stays as a pill.",
+      items: { type: "string" },
+      "x-clicky-lookup": {
+        url: "/api/v1/profiles",
+        filter: "profile",
+        multi: true,
+      },
+    },
+  },
+};
+
+export const MultiValueLookup: Story = {
+  render: () => (
+    <ReferenceExample
+      title="Multi-value lookup"
+      description="An x-clicky-lookup with `multi: true` on an array field commits a list, so it renders as one tags combobox: the head set loads when the menu opens and typing searches the server (debounced). Add `hierarchy` to browse the same options as a tree instead — see Hierarchical lookups."
+      schema={flatLookupSchema}
+      initialValue={{ imports: ["jms"] }}
+      lookupFetcher={hierarchicalLookupFetcher}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The committed value renders before any option has been fetched.
+    await expect(canvas.getByText("jms")).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole("combobox"));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("option", { name: "logs.api" }));
+    await expect(
+      canvas.getByRole("button", { name: "Remove logs.api" }),
+    ).toBeInTheDocument();
+  },
+};

@@ -47,6 +47,29 @@ export function multipleComboboxLabel(
   return `${labels.length} selected`;
 }
 
+// Splits pasted text into one entry per value. Newlines always separate — a
+// list copied out of a file or a column of cells arrives that way — plus
+// whichever characters the consumer declared. Empty entries are the caller's to
+// drop, so "a,,b" and a trailing comma stay visible here.
+export function splitOnComboboxSeparators(
+  text: string,
+  separators: string[],
+): string[] {
+  const marks = new Set([...separators, "\n", "\r"]);
+  const parts: string[] = [];
+  let current = "";
+  for (const char of text) {
+    if (marks.has(char)) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+  return parts;
+}
+
 export function createComboboxCustomEntry(options: {
   allowCustomValue: boolean;
   query: string;

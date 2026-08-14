@@ -5,9 +5,9 @@ import {
   effectiveProperties,
   enumBranch,
   isOpenStringMap,
-  isScalarStringItems,
   matchesIf,
   resolveControl,
+  scalarItemsType,
 } from "./json-schema-form-resolve";
 import type { JsonSchemaObject, JsonSchemaProperty } from "./json-schema-form-types";
 
@@ -561,18 +561,27 @@ describe("isOpenStringMap", () => {
   });
 });
 
-describe("isScalarStringItems", () => {
-  it("is true for plain string items and for untyped items", () => {
-    expect(isScalarStringItems({ type: "string" })).toBe(true);
-    expect(isScalarStringItems(undefined)).toBe(true);
+describe("scalarItemsType", () => {
+  it("names the scalar an item holds, defaulting untyped items to string", () => {
+    expect(scalarItemsType({ type: "string" })).toBe("string");
+    expect(scalarItemsType(undefined)).toBe("string");
   });
-  it("is false for enum items (need per-item combobox)", () => {
-    expect(isScalarStringItems({ type: "string", enum: ["a", "b"] })).toBe(false);
+  it("carries the numeric types through, so the list can commit numbers", () => {
+    expect(scalarItemsType({ type: "integer" })).toBe("integer");
+    expect(scalarItemsType({ type: "number" })).toBe("number");
   });
-  it("is false for object / array / non-string items", () => {
-    expect(isScalarStringItems({ type: "object", properties: {} })).toBe(false);
-    expect(isScalarStringItems({ type: "array", items: { type: "string" } })).toBe(false);
-    expect(isScalarStringItems({ type: "number" })).toBe(false);
+  it("is undefined for enum items (a list of choices, not free text)", () => {
+    expect(scalarItemsType({ type: "string", enum: ["a", "b"] })).toBeUndefined();
+    expect(scalarItemsType({ type: "integer", enum: [80, 443] })).toBeUndefined();
+    expect(scalarItemsType({ type: "string", const: "a" })).toBeUndefined();
+  });
+  it("is undefined for items that need a control of their own", () => {
+    expect(scalarItemsType({ type: "object", properties: {} })).toBeUndefined();
+    expect(scalarItemsType({ type: "array", items: { type: "string" } })).toBeUndefined();
+    expect(scalarItemsType({ type: "boolean" })).toBeUndefined();
+    expect(
+      scalarItemsType({ type: "string", additionalProperties: { type: "string" } }),
+    ).toBeUndefined();
   });
 });
 

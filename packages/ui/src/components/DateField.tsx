@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
 
@@ -6,7 +6,9 @@ export type DateFieldMode = "date" | "datetime";
 
 export type DateFieldProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
-  "type" | "value" | "onChange"
+  // `prefix` is a global HTML attribute typed as string; omit it so our
+  // ReactNode adornment prop below is not intersected down to `string & ReactNode`.
+  "type" | "value" | "onChange" | "prefix"
 > & {
   /** Selects native date input or date-time input behavior. */
   mode?: DateFieldMode;
@@ -22,6 +24,10 @@ export type DateFieldProps = Omit<
   buttonClassName?: string;
   /** Accessible label for the calendar/open button. */
   openButtonLabel?: string;
+  /** Trailing in-field adornment, rendered left of the calendar button. */
+  suffix?: ReactNode;
+  /** Leading in-field adornment, rendered at the left edge of the input. */
+  prefix?: ReactNode;
 };
 
 export const DateField = forwardRef<HTMLInputElement, DateFieldProps>(

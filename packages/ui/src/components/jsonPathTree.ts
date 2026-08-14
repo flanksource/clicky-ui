@@ -38,8 +38,26 @@ export interface JSONPathNode {
    * `source`, so the two have to be committed together.
    */
   root?: string;
+  /**
+   * The JSON-in-a-string boundaries crossed on the way down to this node,
+   * innermost first. `root` names only the top-level column, because that is
+   * what the backend's `source` takes — which loses the rest of the chain when
+   * the encoded value is nested, and says nothing about what it decoded to.
+   * A caller rebuilding an accessor needs both.
+   */
+  origin?: JSONPathOrigin;
   /** Number of entries the node holds, before any paging. */
   childCount: number;
+}
+
+/** One JSON-in-a-string boundary: where it was, and what came out of it. */
+export interface JSONPathOrigin {
+  /** Path of the string node the document was decoded out of, in its own scope. */
+  path: string;
+  /** Kind of the decoded document — which decoder crosses this boundary. */
+  kind: "array" | "object";
+  /** The boundary enclosing this one, when JSON is encoded inside JSON. */
+  outer?: JSONPathOrigin;
 }
 
 export interface BuildJSONPathNodeOptions {
@@ -188,14 +206,31 @@ export function createLazyJSONPathTree(
   // decoded out of it when it holds JSON as text. An embedded document restarts
   // at `$` because that is where the backend evaluates it from once the column
   // is named as a `source`.
-  function contents(node: JSONPathNode): { value: unknown; path: string; root?: string } {
+  function contents(node: JSONPathNode): {
+    value: unknown;
+    path: string;
+    root?: string;
+    origin?: JSONPathOrigin;
+  } {
     const inner = embedded(node);
-    const scope: { value: unknown; path: string; root?: string } =
+    const scope: { value: unknown; path: string; root?: string; origin?: JSONPathOrigin } =
       inner === undefined
         ? { value: node.value, path: node.path }
         : { value: inner, path: "$" };
     const root = inner === undefined ? node.root : node.root ?? sourceColumn(node.path);
     if (root !== undefined) scope.root = root;
+    // A boundary is only visible here: this is the one place that knows both
+    // which node held the text and what the text decoded to. embedded() has
+    // already rejected anything scalar, so the kind is array or object.
+    const origin =
+      inner === undefined
+        ? node.origin
+        : {
+            path: node.path,
+            kind: jsonPathKind(inner) as "array" | "object",
+            ...(node.origin ? { outer: node.origin } : {}),
+          };
+    if (origin !== undefined) scope.origin = origin;
     return scope;
   }
 
@@ -204,6 +239,7 @@ export function createLazyJSONPathTree(
     path: string,
     key: string,
     root: string | undefined,
+    origin: JSONPathOrigin | undefined,
   ): JSONPathNode {
     const cached = nodes.get(key);
     if (cached) return cached;
@@ -216,6 +252,7 @@ export function createLazyJSONPathTree(
       childCount: entryCount(value),
     };
     if (root !== undefined) created.root = root;
+    if (origin !== undefined) created.origin = origin;
     nodes.set(key, created);
     return created;
   }
@@ -235,7 +272,7 @@ export function createLazyJSONPathTree(
       const path = appendJSONPath(scope.path, key);
       // The key namespaces on the parent so an embedded document — which
       // restarts its paths at `$` — cannot collide with the outer row.
-      return node(value, path, `${parent.key}>${path}`, scope.root);
+      return node(value, path, `${parent.key}>${path}`, scope.root, scope.origin);
     });
     if (limit < entries.length) {
       children.push({
@@ -258,7 +295,7 @@ export function createLazyJSONPathTree(
     return inner !== undefined && entryCount(inner) > 0;
   }
 
-  const rootNode = node(json, "$", `${keyPrefix}$`, undefined);
+  const rootNode = node(json, "$", `${keyPrefix}$`, undefined, undefined);
 
   return {
     roots: json === undefined ? [] : [rootNode],

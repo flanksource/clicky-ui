@@ -16,7 +16,12 @@ export function applyFilterExtensions(
 }
 
 export function clearFilterBarFilter(filter: FilterBarFilter) {
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "workload" ||
+    filter.kind === "enum"
+  ) {
     filter.onChange("");
     return;
   }
@@ -53,7 +58,12 @@ export function isFilterBarFilterActive(filter: FilterBarFilter) {
   if (filter.kind === "date-range") {
     return String(filter.from ?? "").trim() !== "" || String(filter.to ?? "").trim() !== "";
   }
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "workload" ||
+    filter.kind === "enum"
+  ) {
     return String(filter.value ?? "").trim() !== "";
   }
   if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
