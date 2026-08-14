@@ -903,6 +903,40 @@ function DialogTableShowcase() {
   );
 }
 
+// Both alignments side by side, over the same grouping — the difference is only
+// visible in comparison, and the alignment is the whole point of the story.
+function GroupedRowsShowcase() {
+  const grouping = {
+    getGroupKey: (row: Row) => row.owner,
+    getGroupLabel: (key: string) => `Owned by ${key}`,
+    getGroupMeta: (_key: string, groupRows: Row[]) =>
+      `${groupRows.reduce((sum, row) => sum + row.restarts, 0)} restarts`,
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">metaAlign: "end" (default)</h3>
+        <DataTable
+          data={rows}
+          columns={columns}
+          getRowId={(row) => row.service}
+          grouping={grouping}
+        />
+      </section>
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">metaAlign: "start"</h3>
+        <DataTable
+          data={rows}
+          columns={columns}
+          getRowId={(row) => row.service}
+          grouping={{ ...grouping, metaAlign: "start" }}
+        />
+      </section>
+    </div>
+  );
+}
+
 function SelectionActionsShowcase() {
   const [selected, setSelected] = useState<string[]>([]);
   return (
@@ -1168,5 +1202,38 @@ export const FilterDescriptions: Story = {
           "Caller-owned filters that each carry a `description`, shown as helper text in the filter popover (and as the control's tooltip). The filters here actually narrow the rows: status include/exclude, an owner substring match, and a minimum restart count.",
       },
     },
+  },
+};
+
+export const GroupedRows: Story = {
+  render: () => <GroupedRowsShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "`grouping` splits the rendered rows into collapsible groups. It presents what is already on screen — it runs after filtering, sorting and pagination, so it never reorders rows within a group and never pulls in rows from another page.",
+          "",
+          "`getGroupMeta` is a per-group summary rendered inside the header row. `metaAlign` places it: `\"end\"` (the default) pins it to the trailing edge, while `\"start\"` keeps it immediately after the label and count — which is what you want when the summary is an aggregate of the group rather than a status for the row region.",
+        ].join("\n"),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const headers = canvas
+      .getAllByRole("button")
+      .filter((button) => button.hasAttribute("aria-expanded"));
+    // Two groups per table, default table first.
+    const [trailing] = headers;
+    const adjacent = headers[headers.length / 2];
+
+    // The summary is always the label's next sibling; `flex-1` on the label is
+    // what pushes it to the far edge, so that is what the option toggles.
+    await expect(trailing).toHaveClass("flex-1");
+    await expect(adjacent).not.toHaveClass("flex-1");
+    await expect(adjacent?.nextElementSibling).toHaveTextContent("restarts");
+
+    await userEvent.click(adjacent!);
+    await expect(adjacent).toHaveAttribute("aria-expanded", "false");
   },
 };

@@ -36,6 +36,7 @@ export {
   buildJSONPathNode,
   createLazyJSONPathTree,
   literalSegments,
+  type JSONPathOrigin,
   type LazyJSONPathTree,
   type LazyJSONPathTreeOptions,
 } from "./components/jsonPathTree";
@@ -104,6 +105,7 @@ export {
   type FilterBarSearchProps,
   type FilterBarSelectMultiFilter,
   type FilterBarTextFilter,
+  type FilterBarWorkloadFilter,
   TriStateMultiSelect,
   type TriStateMultiSelectProps,
 } from "./components/FilterBar";

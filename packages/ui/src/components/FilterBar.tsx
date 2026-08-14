@@ -205,6 +205,11 @@ export type FilterBarWorkloadFilter = {
     namespace?: string,
   ) => Promise<Partial<Record<WorkloadKind, WorkloadResource[]>>>;
   kinds?: WorkloadKind[];
+  /**
+   * Render the sole loaded workload as plain text rather than a picker. See
+   * {@link WorkloadPickerProps.collapseSingleOption}.
+   */
+  collapseSingleOption?: boolean;
   disabled?: boolean;
   className?: string;
 };
@@ -1006,6 +1011,7 @@ function WorkloadFilterField({
         onChange={filter.onChange}
         loadWorkloads={filter.loadWorkloads}
         {...(filter.kinds ? { kinds: filter.kinds } : {})}
+        {...(filter.collapseSingleOption ? { collapseSingleOption: true } : {})}
         allowCustomValue={false}
         strict
         {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}

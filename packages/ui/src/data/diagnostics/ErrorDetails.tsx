@@ -19,13 +19,16 @@ import {
 
 export type ErrorDetailsProps = {
   diagnostics: ErrorDiagnostics;
+  // Heading above the message. Defaults to "Error"; callers that already know
+  // what failed ("Failed to load /api/v1/profile/…") say so instead.
+  title?: string;
   // Optional renderer for context values that parse as JSON. Defaults to a
   // CopyBadge with the raw string. MC's playbook view passes a richer JsonView
   // here; smaller consumers (plugin iframes) can leave it unset.
   renderJsonContext?: (entry: { label: string; value: string; data: unknown }) => ReactNode;
 };
 
-export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsProps) {
+export function ErrorDetails({ diagnostics, title = "Error", renderJsonContext }: ErrorDetailsProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const scalarContext = diagnostics.context.filter(
     ([, value]) => !parseInlineJsonContextValue(value),
@@ -47,7 +50,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
       return;
     }
     try {
-      await navigator.clipboard.writeText(diagnosticReport(diagnostics));
+      await navigator.clipboard.writeText(diagnosticReport(diagnostics, title));
       setCopyState("copied");
     } catch {
       setCopyState("failed");
@@ -58,7 +61,7 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
         <Icon icon={UiWarningTriangle} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-destructive">Error</div>
+          <div className="text-sm font-semibold text-destructive">{title}</div>
           <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">
             {diagnostics.message}
           </div>
@@ -143,6 +146,28 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
             )}
           </div>
         )}
+        {diagnostics.details?.map((detail) => (
+          <div key={detail.label} className="min-w-0">
+            <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {detail.label}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyText(detail.value)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                <Icon icon={UiCopy} />
+                copy
+              </button>
+            </div>
+            {/* break-all because a response body is one long token as often
+                as not, and pre-wrap alone only breaks on whitespace. */}
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-xs leading-5 text-foreground">
+              {detail.value}
+            </pre>
+          </div>
+        ))}
         {diagnostics.stacktrace && (
           <div className="min-w-0">
             <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3">
@@ -166,8 +191,8 @@ export function ErrorDetails({ diagnostics, renderJsonContext }: ErrorDetailsPro
   );
 }
 
-function diagnosticReport(diagnostics: ErrorDiagnostics): string {
-  const lines = [`Error: ${diagnostics.message}`];
+function diagnosticReport(diagnostics: ErrorDiagnostics, title: string): string {
+  const lines = [`${title}: ${diagnostics.message}`];
   if (diagnostics.trace) lines.push(`Trace: ${diagnostics.trace}`);
   if (diagnostics.time) lines.push(`Time: ${diagnostics.time}`);
   if (diagnostics.context.length > 0) {
@@ -176,6 +201,9 @@ function diagnosticReport(diagnostics: ErrorDiagnostics): string {
       "Context:",
       ...diagnostics.context.map(([label, value]) => `${label}: ${value}`),
     );
+  }
+  for (const detail of diagnostics.details ?? []) {
+    lines.push("", `${detail.label}:`, detail.value);
   }
   if (diagnostics.stacktrace) {
     lines.push("", "Stack trace:", diagnostics.stacktrace);

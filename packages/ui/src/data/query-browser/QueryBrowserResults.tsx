@@ -17,7 +17,7 @@ type QueryBrowserResultsProps = {
   filterConfig: ReturnType<typeof serverFiltersToFilterBar>;
   serverFiltered: boolean;
   pagination?: DataTablePagination;
-  /** Extra entries for the table's overflow menu — "Show query" among them. */
+  /** Extra entries for the table's overflow menu — "Debug" among them. */
   menuActions?: DataTableMenuAction[];
 };
 

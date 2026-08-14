@@ -52,7 +52,7 @@ function stubRemote() {
     });
 }
 
-describe("Show query on a remote Clicky table", () => {
+describe("Debug on a remote Clicky table", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("asks the result URL what it ran and shows the answer", async () => {
@@ -66,7 +66,7 @@ describe("Show query on a remote Clicky table", () => {
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     const menu = screen.getByRole("menu", { name: /column menu/i });
     fireEvent.click(
-      within(menu).getByRole("menuitem", { name: /show query/i }),
+      within(menu).getByRole("menuitem", { name: /^debug$/i }),
     );
 
     // The details come from the same URL the rows came from, marked as a
@@ -103,11 +103,73 @@ describe("Show query on a remote Clicky table", () => {
       .map((item) => item.textContent ?? "");
 
     // Three rows, in this order. Ten view formats and five download formats
-    // are behind the first two, so Show query is on screen without scrolling.
+    // are behind the first two, so Debug is on screen without scrolling.
     expect(actions).toHaveLength(3);
     expect(actions[0]).toMatch(/^View:/);
     expect(actions[1]).toMatch(/^Export/);
-    expect(actions[2]).toMatch(/^Show query/);
+    expect(actions[2]).toMatch(/^Debug$/);
+  });
+
+  it("names the all-rows export by the total the table was given", async () => {
+    stubRemote();
+
+    render(
+      <Clicky
+        url="/api/v1/profile/orders?limit=5"
+        data={tableDocument}
+        download={{ all: true, scopes: ["page", "all"] }}
+        pagination={{
+          page: 0,
+          pageSize: 5,
+          total: 1372,
+          totalRelation: "eq",
+          onPageChange: () => {},
+        }}
+      />,
+    );
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Export/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    // The count is the thing a person needs before starting an export, and the
+    // page in front of them never shows it.
+    expect(
+      within(dialog).getByRole("radio", { name: "All 1,372 rows" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("radio", { name: "All rows" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reports a lower-bound total as a bound rather than a count", async () => {
+    stubRemote();
+
+    render(
+      <Clicky
+        url="/api/v1/profile/orders?limit=5"
+        data={tableDocument}
+        download={{ all: true, scopes: ["page", "all"] }}
+        pagination={{
+          page: 0,
+          pageSize: 5,
+          total: 10000,
+          totalRelation: "gte",
+          onPageChange: () => {},
+        }}
+      />,
+    );
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Export/i }));
+
+    expect(
+      within(await screen.findByRole("dialog")).getByRole("radio", {
+        name: "All 10,000+ rows",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("offers nothing to ask when the payload has no URL behind it", () => {
@@ -117,7 +179,7 @@ describe("Show query on a remote Clicky table", () => {
     expect(
       within(screen.getByRole("menu", { name: /column menu/i })).queryByRole(
         "menuitem",
-        { name: /show query/i },
+        { name: /^debug$/i },
       ),
     ).not.toBeInTheDocument();
   });

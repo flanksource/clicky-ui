@@ -19,6 +19,8 @@ import {
   type RefObject,
 } from "react";
 import { FilterForm } from "../rpc/FilterForm";
+import { errorFromResponse, readResponseBody } from "../rpc/apiClient";
+import { renderOperationError } from "../rpc/operationErrorDiagnostics";
 import { parseJsonBody } from "../rpc/classify";
 import {
   packParameterValues,
@@ -450,8 +452,8 @@ export function Clicky(props: ClickyProps) {
       [props.download, props.url],
     ),
     scopes: useMemo(
-      () => exportScopeOptions(props.download),
-      [props.download],
+      () => exportScopeOptions(props.download, props.pagination),
+      [props.download, props.pagination],
     ),
     onDownload: useCallback(
       ({ format, scope }: { format: string; scope: string | undefined }) =>
@@ -881,24 +883,18 @@ function ClickyRemoteRenderer({
         activeQuery.isPending && effectiveClickyData === undefined ? (
           <ClickyNotice title="Loading Clicky" message={loadingMessage} />
         ) : activeQuery.isError && effectiveClickyData === undefined ? (
-          <ClickyNotice
-            title="Clicky request failed"
-            message={
-              activeQuery.error instanceof Error
-                ? activeQuery.error.message
-                : "Request failed"
-            }
-            tone="destructive"
-          />
+          renderOperationError(
+            activeQuery.error,
+            `Failed to load ${formattedUrl}`,
+          )
         ) : (
           <>
-            {activeQuery.isError && data !== undefined && (
-              <ClickyNotice
-                title="Remote refresh failed"
-                message="Showing the local fallback payload instead."
-                tone="warning"
-              />
-            )}
+            {activeQuery.isError &&
+              data !== undefined &&
+              renderOperationError(
+                activeQuery.error,
+                `Refresh failed: ${formattedUrl}`,
+              )}
             <ClickyRuntimeContext.Provider
               value={{ ...runtime, tableMenuActions: combinedTableActions }}
             >
@@ -913,24 +909,18 @@ function ClickyRemoteRenderer({
         activeQuery.isPending && effectiveJsonData === undefined ? (
           <ClickyNotice title="Loading JSON" message={loadingMessage} />
         ) : activeQuery.isError && effectiveJsonData === undefined ? (
-          <ClickyNotice
-            title="JSON request failed"
-            message={
-              activeQuery.error instanceof Error
-                ? activeQuery.error.message
-                : "Request failed"
-            }
-            tone="destructive"
-          />
+          renderOperationError(
+            activeQuery.error,
+            `Failed to load ${formattedUrl}`,
+          )
         ) : (
           <>
-            {activeQuery.isError && fallbackJsonData !== undefined && (
-              <ClickyNotice
-                title="Remote refresh failed"
-                message="Showing the local fallback payload instead."
-                tone="warning"
-              />
-            )}
+            {activeQuery.isError &&
+              fallbackJsonData !== undefined &&
+              renderOperationError(
+                activeQuery.error,
+                `Refresh failed: ${formattedUrl}`,
+              )}
             <ClickyJsonTree value={effectiveJsonData} />
           </>
         )
@@ -940,15 +930,10 @@ function ClickyRemoteRenderer({
           message={loadingMessage}
         />
       ) : activeQuery.isError ? (
-        <ClickyNotice
-          title={`${formatViewLabel(activeView)} request failed`}
-          message={
-            activeQuery.error instanceof Error
-              ? activeQuery.error.message
-              : "Request failed"
-          }
-          tone="destructive"
-        />
+        renderOperationError(
+          activeQuery.error,
+          `Failed to load ${formatViewLabel(activeView)} from ${formattedUrl}`,
+        )
       ) : (
         <ClickyRemotePreview
           format={activeView as ClickyOverflowViewFormat}
@@ -1136,8 +1121,15 @@ function fetchRemoteFormat(
     },
   }).then(async (response) => {
     if (!response.ok) {
-      throw new Error(
-        `Request failed with ${response.status} ${response.statusText}`.trim(),
+      // Read the failure as JSON whatever the requested format: an excel or
+      // pdf request still fails with the server's error envelope, and throwing
+      // on status alone loses the code, trace and hint that say what actually
+      // went wrong. A body that is not JSON still comes back as raw text.
+      throw errorFromResponse(
+        response,
+        "GET",
+        url,
+        await readResponseBody(response, "json"),
       );
     }
 
@@ -1506,20 +1498,35 @@ function exportFormatOptions({
 // exportScopeOptions describes the ranges the endpoint serves. The per-format
 // note is a function rather than a string because a ceiling belongs to a format
 // and a range together: a PDF stops at 1,000 rows, the CSV beside it does not.
+//
+// The all-rows label carries the count the table was told, because "all" is the
+// one number a person needs before starting an export and the only one the page
+// in front of them does not show.
 function exportScopeOptions(
   download?: ClickyDownloadOptions,
+  pagination?: DataTablePagination,
 ): ClickyExportScopeOption[] {
   return getDownloadScopes(download).map((scope) => ({
     scope,
     label:
-      scope === "all"
-        ? "All rows"
-        : scope === "page"
-          ? "Current page"
-          : "The whole result",
+      scope === "all" || scope === undefined
+        ? allRowsLabel(pagination)
+        : "Current page",
     note: (format: string) =>
       downloadDescription(format as ClickyRemoteFormat, scope, download),
   }));
+}
+
+// allRowsLabel states the total when the backend gave one. A "gte" total is a
+// lower bound a backend stopped counting at, so it is rendered as one rather
+// than as a count nobody promised.
+function allRowsLabel(pagination?: DataTablePagination): string {
+  const total = pagination?.total;
+  if (total === undefined) return "All rows";
+  const count = total.toLocaleString();
+  return pagination?.totalRelation === "gte"
+    ? `All ${count}+ rows`
+    : `All ${count} rows`;
 }
 
 // runClickyDownload is prepareDownload for a caller that awaits it. The export

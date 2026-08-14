@@ -204,9 +204,20 @@ export type OperationLookupFilterType =
   | "date"
   /** Both edges of a range under one parameter, as ">=from,<=to". */
   | "date-range"
+  /** A "date-range" with the clock taken off it: whole days, same grammar. */
+  | "day-range"
+  /**
+   * A numeric range over elapsed time. Same grammar as "number"; the operands
+   * are the column's own unit, which `unit` names.
+   */
+  | "duration"
   | "from"
   | "to"
   | "multi-filter"
+  /** A Kubernetes workload selected inside a profile's target scope. */
+  | "workload"
+  /** Kubernetes label values, grouped by key when options are key=value pairs. */
+  | "labels"
   /**
    * An exact-value selection with nothing to enumerate — a UUID column, say.
    * Same wire grammar as "multi-filter"; typed rather than picked, because a
@@ -230,6 +241,10 @@ export interface OperationLookupFilter {
   timeEnabled?: boolean;
   timeZone?: string;
   timeZones?: string[];
+  /** The unit a "duration" filter's operands are written in ("ms" or "s"), so
+   *  the control labels itself in the numbers the column is stored in. Absent
+   *  means milliseconds. */
+  unit?: string;
 }
 
 export interface OperationLookupResponse {

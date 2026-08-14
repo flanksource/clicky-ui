@@ -6,10 +6,8 @@ import type {
   FilterBarMultiFilter,
   FilterBarRangeProps,
 } from "../components/FilterBar";
+import { Combobox } from "../components/Combobox";
 import { TimeRange } from "../components/TimeRange";
-import { FilterPill, type FilterMode } from "../data/FilterPill";
-import { Icon } from "../data/Icon";
-import { UiSearch } from "../icons";
 import { cn } from "../lib/utils";
 import {
   packParameterValues,
@@ -383,75 +381,33 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
 }
 
 function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id: string }) {
-  const [query, setQuery] = useState("");
-  const showOptionFilter = filter.options.length > 7;
-  const visibleOptions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return filter.options;
-    return filter.options.filter((option) =>
-      multiOptionText(option).toLowerCase().includes(normalized),
-    );
-  }, [filter.options, query]);
-
-  const setMode = (value: string, mode: FilterMode) => {
-    if (filter.disabled) return;
-    const next = { ...filter.value };
-    if (mode === "include" || mode === "exclude") {
-      next[value] = mode;
-    } else {
-      delete next[value];
-    }
-    filter.onChange(next);
-  };
-
+  const moreCount = filter.truncated && filter.total
+    ? Math.max(filter.total - filter.options.length, 0)
+    : 0;
   return (
-    <div
+    <Combobox
+      multiple
       id={id}
-      role="group"
-      aria-label={filter.label}
-      className="rounded-md border border-input bg-background p-2"
-    >
-      {showOptionFilter && (
-        <label className="mb-2 flex items-center gap-2 rounded-md border border-input bg-background px-2">
-          <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
-          <input
-            type="search"
-            aria-label={`Filter ${filter.label} options`}
-            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder={`Filter ${filter.label.toLowerCase()}`}
-            value={query}
-            disabled={filter.disabled}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-      )}
-
-      <div className="max-h-56 space-y-1 overflow-auto">
-        {visibleOptions.map((option) => {
-          const mode: FilterMode = filter.value[option.value] ?? "neutral";
-          return (
-            <FilterPill
-              key={option.value}
-              className="w-full justify-between"
-              label={option.label}
-              mode={mode}
-              title={option.title ?? multiOptionText(option)}
-              togglePosition="right"
-              onModeChange={(next) => setMode(option.value, next)}
-            />
-          );
-        })}
-        {visibleOptions.length === 0 && (
-          <div className="px-2 py-3 text-sm text-muted-foreground">No options found</div>
-        )}
-      </div>
-    </div>
+      ariaLabel={filter.label}
+      value={Object.keys(filter.value)}
+      options={filter.options.map((option) => ({
+        value: option.value,
+        label: typeof option.label === "string" ? option.label : (option.title ?? option.value),
+        ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+        ...(option.title !== undefined ? { title: option.title } : {}),
+      }))}
+      onChange={(values) => {
+        const next: FilterBarMultiFilter["value"] = {};
+        for (const value of values) next[value] = filter.value[value] ?? "include";
+        filter.onChange(next);
+      }}
+      allowCustomValue={filter.allowCustomValue ?? false}
+      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+      {...(filter.className !== undefined ? { className: filter.className } : {})}
+      {...(moreCount > 0 ? { footer: `… and ${moreCount.toLocaleString()} more` } : {})}
+    />
   );
-}
-
-function multiOptionText(option: FilterBarMultiFilter["options"][number]) {
-  const label = typeof option.label === "string" ? option.label : "";
-  return [option.value, label, option.title ?? ""].filter(Boolean).join(" ");
 }
 
 // TimeRangeRow renders the paired from/to parameters as the native TimeRange

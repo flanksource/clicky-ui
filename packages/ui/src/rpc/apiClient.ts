@@ -46,13 +46,16 @@ export class OperationsApiClientError extends Error {
 
   constructor(
     message: string,
+    // Each field mirrors the property it lands on, undefined included: a caller
+    // rebuilding an error from a partial response should not have to spread
+    // conditionally to say "this one is unknown".
     options: {
-      status?: number;
-      method?: string;
-      url?: string;
-      responseBody?: string;
+      status?: number | undefined;
+      method?: string | undefined;
+      url?: string | undefined;
+      responseBody?: string | undefined;
       responseData?: unknown;
-      responseHeaders?: Record<string, string>;
+      responseHeaders?: Record<string, string> | undefined;
     } = {},
   ) {
     super(message);
@@ -280,14 +283,14 @@ function responseKind(accept?: string): "json" | "text" | "blob" {
   return "json";
 }
 
-type ParsedBody = {
+export type ParsedBody = {
   data: unknown;
   text: string;
   blob?: Blob;
   contentType: string;
 };
 
-async function readResponseBody(response: Response, kind: "json" | "text" | "blob"): Promise<ParsedBody> {
+export async function readResponseBody(response: Response, kind: "json" | "text" | "blob"): Promise<ParsedBody> {
   const contentType = response.headers.get("Content-Type") || "";
   if (kind === "blob") {
     const blob = await response.blob();
@@ -349,7 +352,11 @@ function parseExecutionResponse(
   };
 }
 
-function errorFromResponse(
+// Exported because every fetch in the package has to fail the same way: with
+// the status, the URL and the parsed body attached, which is what
+// operationErrorDiagnostics reads back out to render ErrorDetails. A second
+// error-from-Response path would silently drop one of those again.
+export function errorFromResponse(
   response: Response,
   method: string,
   url: string,

@@ -25,18 +25,29 @@ export type QueryBrowserPagination = {
 export type QueryBrowserDiagnostics = {
   provider: string;
   request: {
+    /** The statement the provider issued, with every runtime filter folded in. */
     query?: string;
+    /** The same query before the provider composed the run onto it. */
+    rendered?: string;
+    connection?: string;
     arguments?: unknown[];
     options?: Record<string, unknown>;
     details?: Record<string, unknown>;
+    /** The HTTP exchange the request rode on, for a provider that speaks HTTP. */
+    method?: string;
+    url?: string;
+    headers?: Record<string, string>;
   };
   response?: {
     durationMs?: number;
     returnedRows?: number;
+    pages?: number;
     details?: Record<string, unknown>;
     preview?: string;
     contentType?: string;
     truncated?: boolean;
+    status?: number;
+    headers?: Record<string, string>;
   };
   error?: string;
 };
@@ -100,6 +111,7 @@ export type QueryBrowserProps = {
   language?: QueryBrowserLanguage | undefined;
   initialQuery?: string | undefined;
   queryLabel?: string | undefined;
+  allowEmptyQuery?: boolean | undefined;
   optionsSchema?: JsonSchemaObject | undefined;
   initialOptions?: Record<string, unknown> | undefined;
   completion?: QueryBrowserCompletion | undefined;

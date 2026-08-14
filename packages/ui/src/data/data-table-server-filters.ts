@@ -9,6 +9,7 @@ import type { FilterExtension } from "../components/filter-bar-utils";
 import { applyFilterExtensions } from "../components/filter-bar-utils";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import type { TriState } from "../components/TriStateToggle";
+import { formatUnit } from "../lib/format";
 import type { DataTableColumn, DataTableColumnKind } from "./DataTable";
 import {
   parseBoundsValue,
@@ -29,7 +30,19 @@ import { prettifyKey } from "./data-table-utils";
  * source compiles the selection; nothing about how it does so crosses into the
  * browser.
  */
-export type DataTableFilterKind = "terms" | "range" | "time" | "boolean" | "text";
+export type DataTableFilterKind =
+  | "terms"
+  /** Whole values like "terms", but typed rather than picked — an identifier
+   *  has no list worth offering. */
+  | "exact"
+  | "range"
+  /** A range over elapsed time, labelled in the column's own `unit`. */
+  | "duration"
+  | "time"
+  /** A range over whole days: "time" with the clock taken off it. */
+  | "date"
+  | "boolean"
+  | "text";
 
 export type DataTableFilterOption = {
   /** Value written into the selection. */
@@ -54,6 +67,10 @@ export type DataTableColumnFilter = {
   min?: number;
   max?: number;
   step?: number;
+  /** The unit a kind:"duration" bound is written in ("ms" or "s"), so the
+   *  control labels itself in the numbers the column is stored in. Absent
+   *  means milliseconds. */
+  unit?: string;
   /** Range presets for kind:"time". */
   presets?: FilterBarRangePreset[];
   /** Helper text shown in the filter popover. */
@@ -223,6 +240,9 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
 
   switch (filter.kind) {
     case "time":
+    // A date range is the same two-edged control with the clock taken off it,
+    // so it shares every line below except timeEnabled.
+    case "date":
       return {
         ...shared,
         kind: "date-range",
@@ -230,9 +250,12 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
         onApply: (from: string, to: string) =>
           write(serializeBoundsValue({ min: from, max: to })),
         ...(filter.presets !== undefined ? { presets: filter.presets } : {}),
-        timeEnabled: true,
+        timeEnabled: filter.kind === "time",
       };
     case "range":
+    // A duration is a range that knows what its numbers mean, so it differs
+    // only in how the slider labels them.
+    case "duration":
       return {
         ...shared,
         kind: "number",
@@ -241,7 +264,15 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
         ...(filter.min !== undefined ? { domainMin: filter.min } : {}),
         ...(filter.max !== undefined ? { domainMax: filter.max } : {}),
         ...(filter.step !== undefined ? { step: filter.step } : {}),
+        ...(filter.kind === "duration"
+          ? { formatValue: (value: number) => formatUnit(value, filter.unit || "ms") }
+          : {}),
       };
+    // An exact match has nothing to enumerate, which is what buildTermsFilter
+    // already falls back to for a selection that turned out to have no values.
+    // Declaring it says so up front rather than arriving there by exhaustion.
+    case "exact":
+      return { ...shared, kind: "text", value: raw, onChange: (next: string) => write(next) };
     case "boolean":
       return {
         ...shared,

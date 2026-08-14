@@ -1403,4 +1403,130 @@ describe("Clicky", () => {
     expect(container.querySelector("pre.shiki")).toBeNull();
     expect(within(container).getByText(source)).toBeInTheDocument();
   });
+
+  // The clicky server answers every failure with the ErrorResponse envelope
+  // from entity/errors.go — code, message, trace, hint, details, stacktrace.
+  // A remote view that reduces all of that to "Request failed with 422" is
+  // unactionable, so these cases pin each field to the rendered output.
+  describe("remote failures", () => {
+    const errorPayload = {
+      code: "format_not_exportable",
+      message: "scope=all cannot be rendered as clicky-json",
+      trace: "9f2b1c4d5e6a7b8c",
+      hint: "Request format=csv for a full export",
+      context: { profile: "gavel-sessions", scope: "all" },
+      details: [
+        {
+          label: "Query",
+          value: "SELECT * FROM sessions WHERE started_at > $1",
+          content_type: "text/sql",
+        },
+      ],
+      stacktrace:
+        "format_not_exportable\n--- at profiles/execution.go:212 execHandler.execute",
+    };
+
+    const tableDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "session", label: "Session" }],
+        rows: [
+          {
+            cells: {
+              session: { kind: "text", text: "abc123", plain: "abc123" },
+            },
+          },
+        ],
+      },
+    };
+
+    // A fresh Response per call: the QueryClient retries once (Clicky.tsx sets
+    // `retry: 1`), and a Response body can only be read one time.
+    function mockFailure(body: string, contentType: string, status = 422) {
+      return vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(body, {
+            status,
+            statusText: "Unprocessable Entity",
+            headers: { "Content-Type": contentType },
+          }),
+      );
+    }
+
+    // Long enough to cover the retry plus its backoff.
+    const untilRetried = { timeout: 3_000 };
+
+    it("keeps the loaded rows and reports the server error when a refresh fails", async () => {
+      const fetchSpy = mockFailure(
+        JSON.stringify(errorPayload),
+        "application/json",
+      );
+
+      render(<Clicky url="/api/v1/profile/profile-gavel-sessions" data={tableDocument} />);
+
+      // The server's message replaces the synthesized "Request failed with 422".
+      expect(
+        await screen.findByText(errorPayload.message, undefined, untilRetried),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/showing the local fallback payload instead/i),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText(/more details/i));
+      // getAllByText because several of these legitimately appear twice — the
+      // code as both a badge and the stack-trace headline, for instance.
+      for (const value of [
+        errorPayload.code,
+        errorPayload.trace,
+        errorPayload.hint,
+        errorPayload.details[0]!.value,
+        "422",
+        "/api/v1/profile/profile-gavel-sessions",
+      ]) {
+        expect(screen.getAllByText(value, { exact: false })).not.toHaveLength(0);
+      }
+
+      // A failed *refresh* must not blank the rows the list request already
+      // returned — the error goes above them, it does not replace them.
+      expect(screen.getByRole("table")).toBeInTheDocument();
+      expect(screen.getByText("abc123")).toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("reports the server error when there is no local payload to fall back to", async () => {
+      const fetchSpy = mockFailure(
+        JSON.stringify(errorPayload),
+        "application/json",
+      );
+
+      render(<Clicky url="/api/v1/profile/profile-gavel-sessions" />);
+
+      expect(
+        await screen.findByText(errorPayload.message, undefined, untilRetried),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/request failed with 422/i),
+      ).not.toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("surfaces a non-JSON error body verbatim", async () => {
+      const body = "<html><body>502 Bad Gateway</body></html>";
+      const fetchSpy = mockFailure(body, "text/html", 502);
+
+      render(<Clicky url="/api/v1/profile/profile-gavel-sessions" />);
+
+      // Nothing the server said stays hidden, even when it is not our envelope.
+      // The body reaches both the headline and the stack-trace block, so match
+      // all of them rather than pinning a single node.
+      expect(
+        await screen.findAllByText(/502 Bad Gateway/, undefined, untilRetried),
+      ).not.toHaveLength(0);
+
+      fetchSpy.mockRestore();
+    });
+  });
 });

@@ -12,6 +12,7 @@ import {
 import { resolveSurfaceIcon } from "./surfaceIconMap";
 import { ExecutionResult } from "./ExecutionResult";
 import { OperationActionBar } from "./OperationActionBar";
+import { renderOperationError } from "./operationErrorDiagnostics";
 import { type FormActionsRenderer } from "./SchemaActionForm";
 import type { RenderLink } from "./EndpointList";
 import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
@@ -76,16 +77,6 @@ export type OperationEntityPageProps = {
   entityDetailHeaderRenderer?: EntityDetailHeaderRenderer;
 };
 
-function defaultRenderError(err: unknown, title: string) {
-  const message = err instanceof Error ? err.message : String(err ?? "");
-  return (
-    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-      <div className="font-medium">{title}</div>
-      {message && <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">{message}</div>}
-    </div>
-  );
-}
-
 export function OperationEntityPage({
   id,
   definition,
@@ -99,7 +90,7 @@ export function OperationEntityPage({
   surfaceKey,
   backHref,
   backLabel = "Back",
-  renderError = defaultRenderError,
+  renderError = renderOperationError,
   commandRuntime,
   formPre,
   formPost,
