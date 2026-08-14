@@ -1,0 +1,102 @@
+name: Vendor gomplate languages
+
+# The tokenizers under packages/expressions/src/lang are generated from cel-go's
+# ANTLR grammar, text/template's lexer and gomplate's live function registries.
+# Only a Go toolchain can read any of that, so this job runs gomplate's own
+# generator and opens a PR when the result changes.
+on:
+  schedule:
+    # Weekly. gomplate's function surface moves with releases, not with commits,
+    # so anything more frequent is just noise in the PR list.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: gomplate ref to vendor from
+        required: false
+        default: main
+  pull_request:
+    # Only when the vendored tree is touched. Regenerating needs Go and a clone
+    # of gomplate, which is not worth paying for on every unrelated PR.
+    paths:
+      - packages/expressions/src/lang/**
+      - packages/expressions/VENDOR
+      - packages/expressions/scripts/vendor-lang.ts
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # Catches a hand-edit under src/lang, which would be silently overwritten by
+    # the next scheduled vendoring.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: corepack enable
+      - name: Install Vite+
+        run: curl -fsSL https://vite.plus | bash
+      - name: Add Vite+ to PATH
+        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - run: vp install
+      - name: Check the vendored tree is generated, not hand-edited
+        working-directory: packages/expressions
+        run: pnpm vendor:check
+
+
+  vendor:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # A GitHub App token, matching release.yml: the default GITHUB_TOKEN
+      # cannot open a PR that triggers other workflows.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.FLANKSOURCE_APP_ID }}
+          private-key: ${{ secrets.FLANKSOURCE_APP_SECRET }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - run: corepack enable
+      - name: Install Vite+
+        run: curl -fsSL https://vite.plus | bash
+      - name: Add Vite+ to PATH
+        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - run: vp install
+
+      - name: Vendor
+        working-directory: packages/expressions
+        run: pnpm vendor --ref "${{ inputs.ref || 'main' }}"
+
+      # The vendored tree is source: it has to typecheck and its tests have to
+      # pass before a PR is worth anyone's attention.
+      - name: Verify
+        run: pnpm --filter @flanksource/expressions run check && pnpm --filter @flanksource/expressions run test
+
+      - name: Open a pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: vendor/gomplate-lang
+          title: "chore(expressions): vendor gomplate language definitions"
+          commit-message: "chore(expressions): vendor gomplate language definitions"
+          body: |
+            Regenerated `packages/expressions/src/lang` from gomplate.
+            See `packages/expressions/VENDOR` for the commit it came from.
+          add-paths: |
+            packages/expressions/src/lang
+            packages/expressions/VENDOR

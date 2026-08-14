@@ -7,8 +7,8 @@ const preset: Partial<Config> = {
       screens: {
         "3xl": "1920px",
       },
-      // This preset is only honoured by v3 consumers (and v4 consumers that
-      // `@config` it). Our own stylesheet does not, so the v4 source of truth for
+      // This preset is honoured by v4 consumers that `@config` it. Our own
+      // stylesheet does not, so the v4 source of truth for
       // these scales is the `--container-*` block in styles/tokens.css — add a
       // scale in both places or `max-w-*` silently compiles to nothing.
       containers: {
@@ -98,7 +98,11 @@ const preset: Partial<Config> = {
     },
   },
   plugins: [
-    ({ addVariant }: { addVariant: (name: string, selector: string) => void }) => {
+    ({
+      addVariant,
+    }: {
+      addVariant: (name: string, selector: string) => void;
+    }) => {
       addVariant("density-compact", '[data-density="compact"] &');
       addVariant("density-comfortable", '[data-density="comfortable"] &');
       addVariant("density-spacious", '[data-density="spacious"] &');

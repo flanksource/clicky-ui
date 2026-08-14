@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -13,6 +14,7 @@ const uiSrc = resolve(workspaceRoot, "packages/ui/src");
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     playgroundComments({ dir: resolve(root, ".playground") }),
     playgroundSources({ pagesDir: resolve(root, "src/pages") }),
   ],

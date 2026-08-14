@@ -2891,6 +2891,62 @@
       "outline": "ph:cloud-arrow-up-light",
       "filled": "ph:cloud-arrow-up-fill",
       "note": "Upstream write to an external system"
+    },
+    {
+      "consumerName": "users-four",
+      "group": "people-orgs",
+      "status": "NEW",
+      "outline": "ph:users-four-light",
+      "filled": "ph:users-four-fill",
+      "note": "A group/collective distinct from users-three (a team vs a wider membership)."
+    },
+    {
+      "consumerName": "user-gear",
+      "group": "people-orgs",
+      "status": "NEW",
+      "outline": "ph:user-gear-light",
+      "filled": "ph:user-gear-fill",
+      "note": "An operator/administrator account, as opposed to a subject person (user)."
+    },
+    {
+      "consumerName": "identification-card",
+      "group": "people-orgs",
+      "status": "NEW",
+      "outline": "ph:identification-card-light",
+      "filled": "ph:identification-card-fill",
+      "note": "A role or party assignment held by a person on a record."
+    },
+    {
+      "consumerName": "clipboard-text",
+      "group": "forms-editing",
+      "status": "NEW",
+      "outline": "ph:clipboard-text-light",
+      "filled": "ph:clipboard-text-fill",
+      "note": "A reusable intake/ingest profile: the named form a bulk load is bound to."
+    },
+    {
+      "consumerName": "lock-key",
+      "group": "security-auth",
+      "status": "NEW",
+      "outline": "ph:lock-key-light",
+      "filled": "ph:lock-key-fill",
+      "note": "A security group / permission set, distinct from a plain locked state (lock)."
+    },
+    {
+      "consumerName": "arrows-counter-clockwise",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "ph:arrows-counter-clockwise-light",
+      "filled": "ph:arrows-counter-clockwise-fill",
+      "note": "Undo/restore a bulk state change. The counterpart to refresh (arrows-clockwise), which re-reads."
+    },
+    {
+      "consumerName": "steps",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "ph:steps-light",
+      "filled": "ph:steps-fill",
+      "note": "An ordered stage within a pipeline that must run in sequence."
     }
   ]
 }

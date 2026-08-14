@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../tailwind.config.ts";
+@import "tailwindcss";
 
 /* The AppShell-based kitchen-sink chrome is full-height; let it fill the viewport. */
 html,
