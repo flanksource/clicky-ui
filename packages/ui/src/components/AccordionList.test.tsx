@@ -54,10 +54,23 @@ function headerFor(path: string): HTMLElement {
 }
 
 describe("AccordionList", () => {
-  it("collapses every row and hides the bodies", () => {
+  it("does not auto-expand the first row", () => {
     render(<Harness />);
     expect(headers()).toHaveLength(2);
+    expect(headers().map((header) => header.getAttribute("aria-expanded"))).toEqual([
+      "false",
+      "false",
+    ]);
     expect(screen.queryByLabelText("Upstream for /users")).toBeNull();
+  });
+
+  it("alternates the row backgrounds", () => {
+    const { container } = render(<Harness />);
+    const rows = container.querySelectorAll("[data-accordion-row]");
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveClass("bg-card");
+    expect(rows[1]).toHaveClass("bg-muted/20");
   });
 
   it("expands one row at a time", () => {

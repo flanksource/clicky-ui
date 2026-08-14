@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
 import { cn } from "../lib/utils";
@@ -22,6 +23,7 @@ import type {
 import {
   createComboboxCustomEntry,
   multipleComboboxLabel,
+  splitOnComboboxSeparators,
   withSelectedComboboxOptions,
 } from "./combobox-utils";
 
@@ -60,10 +62,11 @@ export function Combobox(props: ComboboxProps) {
   } = props;
   const multiple = props.multiple === true;
   const tristate = props.multiple === true && props.tristate === true;
-  const tags =
-    props.multiple === true &&
-    props.tristate !== true &&
-    props.variant === "tags";
+  const tags = props.multiple === true && props.variant === "tags";
+  const separators =
+    props.multiple === true && props.tristate !== true
+      ? (props.separators ?? [])
+      : [];
   const modes = useMemo<Record<string, ComboboxTriStateMode>>(
     () =>
       props.multiple === true && props.tristate === true ? props.value : {},
@@ -252,6 +255,35 @@ export function Combobox(props: ComboboxProps) {
     emit([value]);
   }
 
+  // Adds several values at once (a separator key commits one, a paste commits
+  // many). Batched deliberately: emitCustomValue per token would each read the
+  // same stale selectedValues, so only the last would survive.
+  function addValues(raw: string[]) {
+    const next = [...selectedValues];
+    for (const entry of raw) {
+      const trimmed = entry.trim();
+      if (!trimmed || next.includes(trimmed)) continue;
+      const existing = options.find((option) => option.value === trimmed);
+      const candidate = existing ?? onNew?.(trimmed) ?? { value: trimmed, label: trimmed };
+      const created = existing ? existing.value : createOptionValue(candidate);
+      if (created !== null && !next.includes(created)) next.push(created);
+    }
+    if (next.length !== selectedValues.length) emit(next);
+    setQuery("");
+    setHighlighted(-1);
+  }
+
+  // A pasted list arrives as one string; without this it would land as a single
+  // nonsense tag reading "80, 443".
+  function onPaste(e: ClipboardEvent<HTMLInputElement>) {
+    if (!tags || !allowCustomValue || separators.length === 0) return;
+    const text = e.clipboardData.getData("text");
+    const parts = splitOnComboboxSeparators(text, separators);
+    if (parts.length < 2) return;
+    e.preventDefault();
+    addValues(parts);
+  }
+
   function commitAndClose() {
     const trimmed = query.trim();
     if (customEntry) {
@@ -327,8 +359,11 @@ export function Combobox(props: ComboboxProps) {
     inputRef.current?.focus();
   }
 
+  // A tristate pill is removed by returning its value to neutral — there is no
+  // separate "selected" list to splice, the mode record IS the selection.
   function removeTag(value: string) {
-    emit(selectedValues.filter((selected) => selected !== value));
+    if (tristate) setMode(value, "neutral");
+    else emit(selectedValues.filter((selected) => selected !== value));
     inputRef.current?.focus();
   }
 
@@ -340,6 +375,11 @@ export function Combobox(props: ComboboxProps) {
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (tags && allowCustomValue && separators.includes(e.key)) {
+      e.preventDefault();
+      addValues([query]);
+      return;
+    }
     if (
       tags &&
       e.key === "Backspace" &&
@@ -347,7 +387,12 @@ export function Combobox(props: ComboboxProps) {
       selectedValues.length > 0
     ) {
       e.preventDefault();
-      emit(selectedValues.slice(0, -1));
+      const last = selectedValues[selectedValues.length - 1];
+      if (tristate) {
+        if (last) setMode(last, "neutral");
+      } else {
+        emit(selectedValues.slice(0, -1));
+      }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (!open) {
@@ -426,6 +471,7 @@ export function Combobox(props: ComboboxProps) {
         }}
         onKeyDown={onKeyDown}
         onOpen={openMenu}
+        onPaste={onPaste}
         onRemoveTag={removeTag}
         onToggle={() => {
           if (open) {
@@ -441,6 +487,8 @@ export function Combobox(props: ComboboxProps) {
         showClear={showClear}
         size={size}
         suffix={suffix}
+        tagModes={tristate ? modes : undefined}
+        onSetTagMode={setMode}
         tagValues={selectedValues}
         tags={tags}
       />
@@ -450,6 +498,7 @@ export function Combobox(props: ComboboxProps) {
           filtered={filtered}
           floatingZ={floatingZ}
           footer={footer}
+          hasOptions={options.length > 0}
           highlighted={highlighted}
           isSelected={isSelected}
           listId={listId}

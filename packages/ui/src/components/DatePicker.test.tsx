@@ -39,6 +39,37 @@ describe("DatePicker", () => {
     expect(onChange).toHaveBeenCalledWith("2026-04-21");
   });
 
+  // The adornment slots `DateTimePicker` already offers: a consumer owns the
+  // node, the picker only positions it — left of the calendar button, so the
+  // two never sit on top of each other.
+  it("renders a trailing adornment inside the control, clear of the calendar button", () => {
+    render(
+      <DatePicker
+        aria-label="Selected date"
+        value=""
+        onChange={vi.fn()}
+        suffix={<button type="button">Mark</button>}
+      />,
+    );
+
+    const adornment = screen.getByRole("button", { name: "Mark" }).parentElement;
+    expect(adornment?.className).toContain("right-7");
+    expect(adornment?.closest("[data-jsf-control]")).not.toBeNull();
+  });
+
+  it("reserves room for a leading adornment so it cannot overlap the date", () => {
+    render(
+      <DatePicker
+        aria-label="Selected date"
+        value=""
+        onChange={vi.fn()}
+        prefix={<span>UTC</span>}
+      />,
+    );
+
+    expect(screen.getByLabelText("Selected date").className).toContain("pl-8");
+  });
+
   it("opens the native picker affordance", () => {
     render(<DatePicker aria-label="Selected date" value="" onChange={vi.fn()} />);
 

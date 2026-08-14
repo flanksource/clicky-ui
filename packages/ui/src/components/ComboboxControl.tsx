@@ -1,4 +1,9 @@
-import type { KeyboardEvent, ReactNode, RefObject } from "react";
+import type {
+  ClipboardEvent,
+  KeyboardEvent,
+  ReactNode,
+  RefObject,
+} from "react";
 import { cn } from "../lib/utils";
 import {
   controlMinHeightClass,
@@ -6,7 +11,7 @@ import {
   labelSizeClass,
   type FormSize,
 } from "./json-schema-form-size";
-import type { ComboboxOption } from "./combobox-types";
+import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
 import { comboboxLabelPadding } from "./combobox-utils";
 import { ComboboxActions } from "./ComboboxActions";
 import { ComboboxTags } from "./ComboboxTags";
@@ -33,7 +38,9 @@ export function ComboboxControl({
   onInput,
   onKeyDown,
   onOpen,
+  onPaste,
   onRemoveTag,
+  onSetTagMode,
   onToggle,
   open,
   options,
@@ -41,6 +48,7 @@ export function ComboboxControl({
   showClear,
   size,
   suffix,
+  tagModes,
   tagValues,
   tags,
 }: {
@@ -65,7 +73,9 @@ export function ComboboxControl({
   onInput: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onOpen: () => void;
+  onPaste: (event: ClipboardEvent<HTMLInputElement>) => void;
   onRemoveTag: (value: string) => void;
+  onSetTagMode: (value: string, mode: string) => void;
   onToggle: () => void;
   open: boolean;
   options: ComboboxOption[];
@@ -73,6 +83,8 @@ export function ComboboxControl({
   showClear: boolean;
   size: FormSize | undefined;
   suffix: ReactNode;
+  /** Per-value include/exclude modes; set only in tristate mode. */
+  tagModes: Record<string, ComboboxTriStateMode> | undefined;
   tagValues: string[];
   tags: boolean;
 }) {
@@ -118,7 +130,9 @@ export function ComboboxControl({
       {tags && (
         <ComboboxTags
           disabled={disabled}
+          modes={tagModes}
           onRemove={onRemoveTag}
+          onSetMode={onSetTagMode}
           options={options}
           values={tagValues}
         />
@@ -146,6 +160,7 @@ export function ComboboxControl({
         onFocus={onOpen}
         onClick={onOpen}
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
         className={cn(
           tags
             ? "min-w-28 flex-1 bg-transparent px-1 py-1 text-foreground outline-none"

@@ -14,6 +14,7 @@ import type {
   FilterBarSearchProps,
   FilterBarSelectMultiFilter,
   FilterBarTextFilter,
+  FilterBarWorkloadFilter,
 } from "./FilterBar";
 import type { JsonSchemaFormProps } from "./json-schema-form-types";
 
@@ -51,6 +52,7 @@ type AtomizedFilter<TFilter extends ValuedFilterBarFilter> = Omit<TFilter, "valu
 };
 
 export type JotaiFilterBarTextFilter = AtomizedFilter<FilterBarTextFilter>;
+export type JotaiFilterBarWorkloadFilter = AtomizedFilter<FilterBarWorkloadFilter>;
 export type JotaiFilterBarLookupFilter = AtomizedFilter<FilterBarLookupFilter>;
 export type JotaiFilterBarLookupMultiFilter = AtomizedFilter<FilterBarLookupMultiFilter>;
 export type JotaiFilterBarMultiFilter = AtomizedFilter<FilterBarMultiFilter>;
@@ -62,6 +64,7 @@ export type JotaiFilterBarBooleanFilter = AtomizedFilter<FilterBarBooleanFilter>
 
 export type JotaiFilterBarFilter =
   | JotaiFilterBarTextFilter
+  | JotaiFilterBarWorkloadFilter
   | JotaiFilterBarLookupFilter
   | JotaiFilterBarLookupMultiFilter
   | JotaiFilterBarMultiFilter
@@ -201,6 +204,17 @@ function bindJotaiFilter(store: ReturnType<typeof useStore>, filter: JotaiFilter
       };
     }
     case "lookup": {
+      const { atom, onChange, ...rest } = filter;
+      return {
+        ...rest,
+        value: store.get(atom),
+        onChange: (next: string) => {
+          store.set(atom, next);
+          onChange?.(next);
+        },
+      };
+    }
+    case "workload": {
       const { atom, onChange, ...rest } = filter;
       return {
         ...rest,

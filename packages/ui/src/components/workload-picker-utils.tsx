@@ -2,16 +2,24 @@ import { type ComponentType } from "react";
 import {
   K8SService,
   K8SIngress,
+  K8SPod,
   K8SDeployment,
   K8SStatefulset,
 } from "@flanksource/icons/mi";
 import type { ComboboxOption } from "./Combobox";
+import { DaemonSetIcon } from "./DaemonSetIcon";
 
 // Key encoding and option-building for WorkloadPicker: the emitted value is a
 // `[namespace/]kind/name` composite (see workloadKey / parseWorkloadKey) so two
 // workloads of different kinds that share a name don't collide.
 
-export type WorkloadKind = "service" | "ingress" | "deployment" | "statefulset";
+export type WorkloadKind =
+  | "service"
+  | "ingress"
+  | "pod"
+  | "deployment"
+  | "statefulset"
+  | "daemonset";
 
 /** One exposed port of a workload/service. */
 export type WorkloadPort = { name?: string; number: number };
@@ -21,7 +29,12 @@ export type WorkloadPort = { name?: string; number: number };
  * services/deployments/statefulsets may carry the ports a consumer offers when
  * building a connection URL.
  */
-export type WorkloadResource = { name: string; hosts?: string[]; ports?: WorkloadPort[] };
+export type WorkloadResource = {
+  name: string;
+  namespace?: string;
+  hosts?: string[];
+  ports?: WorkloadPort[];
+};
 
 type KindIconProps = { className?: string; title?: string; "aria-label"?: string };
 type KindMeta = { label: string; Icon: ComponentType<KindIconProps> };
@@ -31,15 +44,19 @@ type KindMeta = { label: string; Icon: ComponentType<KindIconProps> };
 export const WORKLOAD_META: Record<WorkloadKind, KindMeta> = {
   service: { label: "Service", Icon: K8SService },
   ingress: { label: "Ingress", Icon: K8SIngress },
+  pod: { label: "Pod", Icon: K8SPod },
   deployment: { label: "Deployment", Icon: K8SDeployment },
   statefulset: { label: "StatefulSet", Icon: K8SStatefulset },
+  daemonset: { label: "DaemonSet", Icon: DaemonSetIcon },
 };
 
 export const ALL_WORKLOAD_KINDS: WorkloadKind[] = [
   "service",
   "ingress",
+  "pod",
   "deployment",
   "statefulset",
+  "daemonset",
 ];
 
 // ingressHost is the first host an ingress routes, or undefined for non-ingress
@@ -57,7 +74,7 @@ function workloadName(kind: WorkloadKind, r: WorkloadResource): string {
 // ParsedWorkloadKey is the structured form of a `[namespace/]kind/name` value.
 export type ParsedWorkloadKey = { namespace?: string; kind?: WorkloadKind; name: string };
 
-const KNOWN_KINDS = new Set<string>(["service", "ingress", "deployment", "statefulset"]);
+const KNOWN_KINDS = new Set<string>(ALL_WORKLOAD_KINDS);
 
 // workloadKey is the value a resource contributes (what onChange emits): a
 // `[namespace/]kind/name` composite so two workloads of different kinds sharing
@@ -68,7 +85,8 @@ export function workloadKey(
   r: WorkloadResource,
 ): string {
   const name = workloadName(kind, r);
-  return namespace ? `${namespace}/${kind}/${name}` : `${kind}/${name}`;
+	const resourceNamespace = r.namespace ?? namespace;
+	return resourceNamespace ? `${resourceNamespace}/${kind}/${name}` : `${kind}/${name}`;
 }
 
 // parseWorkloadKey splits a `[namespace/]kind/name` value back into its parts.
@@ -103,7 +121,7 @@ export function loadedWorkloads(
   const names = new Set<string>();
   for (const kind of kinds) {
     for (const r of byKind[kind] ?? []) {
-      keys.add(workloadKey(namespace, kind, r));
+		keys.add(workloadKey(namespace, kind, r));
       names.add(workloadName(kind, r));
     }
   }
@@ -135,7 +153,7 @@ export function buildWorkloadOptions(
     for (const r of byKind[kind] ?? []) {
       const host = ingressHost(kind, r);
       opts.push({
-        value: workloadKey(namespace, kind, r),
+		value: workloadKey(namespace, kind, r),
         // The label is the human name; an ingress pairs its host with the
         // ingress name for context.
         label: host ? `${host} (${r.name})` : r.name,

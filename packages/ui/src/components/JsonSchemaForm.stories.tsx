@@ -909,7 +909,41 @@ export const ArrayOfObjects: Story = {
     docs: {
       description: {
         story:
-          "When an array's items are objects, each item renders as its own sub-form (labelled *Item N*) with add / remove / reorder controls. Required and range hints apply per item. Plain string arrays still use the compact tag input — see **ScalarArrayTags**.",
+          "When an array's items are objects, each item collapses to one summary row and opens on click — the accordion is the default, with no schema hint required. The row identifies its item from conventional keys (`title`, `name`, `label`, `id`, `key`), falling back to *Item N*; `x-item` says it explicitly (see **ObjectArrayAccordion**). Plain string arrays still use the compact tag input — see **ScalarArrayTags**, and **ArrayOfObjectsStacked** for the full-sub-form opt-out.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Collapsed by default: the item's own fields are not on screen.
+    await expect(canvas.getByText("api")).toBeInTheDocument();
+    await expect(canvas.queryByLabelText(/^Port/)).toBeNull();
+    // `expanded` picks the disclosure out of the row's reorder/remove buttons,
+    // which carry the same item title in their labels.
+    await userEvent.click(canvas.getByRole("button", { name: /api/, expanded: false }));
+    await expect(canvas.getByLabelText(/^Port/)).toHaveValue("8080");
+  },
+};
+
+export const ArrayOfObjectsStacked: Story = {
+  args: {
+    schema: {
+      type: "object",
+      properties: {
+        servers: {
+          ...arrayOfObjectsSchema.properties!.servers,
+          "x-array-display": "stacked",
+        },
+      },
+    } as JsonSchemaObject,
+    value: { servers: [{ name: "api", port: 8080, tls: true }, { name: "worker", port: 0, tls: false }] },
+    title: "Cluster",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`x-array-display: \"stacked\"` opts out of the accordion default: every item renders as its own open sub-form (labelled *Item N*) with add / remove / reorder controls. Worth it for a short list of two- or three-property items, where a collapsed row would hide as much as it saves.",
       },
     },
   },
@@ -969,7 +1003,7 @@ export const ObjectArrayCards: Story = {
     docs: {
       description: {
         story:
-          "`x-array-display: \"cards\"` renders object items as a stack of titled cards, each headed by the item's own summary (from `x-item`) and edged with the tone its glyph property resolves to. Every item stays open; `x-array-display: \"accordion\"` reads the same `x-item` but collapses each item to one line and opens them one at a time. Without either, an object array renders as the *Item N* sub-forms in **ArrayOfObjects**.",
+          "`x-array-display: \"cards\"` renders object items as a stack of titled cards, each headed by the item's own summary (from `x-item`) and edged with the tone its glyph property resolves to. Every item stays open — the everything-visible counterpart to the accordion in **ObjectArrayAccordion**, which reads the same `x-item` but collapses each item to one line.",
       },
     },
   },
@@ -989,6 +1023,50 @@ export const ObjectArrayCards: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Add route" }));
     await waitFor(() => expect(canvas.getByText("New route")).toBeInTheDocument());
+  },
+};
+
+// The same routes, one line each. `x-item` is what makes a collapsed row worth
+// reading: which property titles it, which ones summarize it, which colours its
+// glyph — and the nouns the count, add row and empty state speak in.
+const objectArrayAccordionSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    routes: {
+      ...objectArrayCardsSchema.properties!.routes,
+      "x-array-display": "accordion",
+    },
+  },
+} as JsonSchemaObject;
+
+export const ObjectArrayAccordion: Story = {
+  args: {
+    schema: objectArrayAccordionSchema,
+    value: {
+      routes: [
+        { path: "/api/v1/users", method: "GET", upstream: "users-svc:8080", auth: true },
+        { path: "/api/v1/events", method: "POST", upstream: "events-svc:8080", auth: false },
+      ],
+    },
+    title: "Gateway",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The accordion an object array uses by default, told how to summarize its items. `x-item` names the property that titles the row (`path`), the ones that trail it, the enum whose `x-enum-tones`/`x-enum-icons` colour the glyph, the boolean that flags it, and the noun the count, **Add route** row and empty state speak in. Without `x-item` the same rows fall back to conventional keys and *Item N* — see **ArrayOfObjects**.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("2 routes")).toBeInTheDocument();
+    // One line per route: the item's own fields wait behind the disclosure.
+    await expect(canvas.queryByLabelText(/^Upstream/)).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("button", { name: /\/api\/v1\/events/, expanded: false }),
+    );
+    await expect(canvas.getByLabelText(/^Upstream/)).toHaveValue("events-svc:8080");
   },
 };
 
@@ -1068,9 +1146,22 @@ export const DeepRecursion: Story = {
     docs: {
       description: {
         story:
-          "Array → object → (map + number array). The renderer follows the schema all the way down: editing a port two levels deep, adding an env key, or reordering a service all round-trip through the live JSON below.",
+          "Array → object → (map + number array). The renderer follows the schema all the way down: adding a port two levels deep, adding an env key, or reordering a service all round-trip through the live JSON below. **Ports** is a tag list like any other scalar array, and its `integer` items commit as numbers — `8080`, not `\"8080\"`.",
       },
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /web/, expanded: false }));
+
+    // Ports is one field, and what it commits is typed by the item schema.
+    const ports = canvas.getByRole("combobox");
+    await userEvent.type(ports, "8080{Enter}");
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: "Remove 8080" })).toBeInTheDocument(),
+    );
+    // A quoted 8080 in the JSON below would mean the tag list committed text.
+    await expect(document.body.textContent).not.toContain('"8080"');
   },
 };
 
@@ -1143,7 +1234,7 @@ export const ScalarArrayTags: Story = {
     docs: {
       description: {
         story:
-          "Plain string arrays keep the compact tag editor: type and press Enter or comma to add, Backspace on an empty input to remove the last. This fast-path is chosen only when the item schema is a bare string.",
+          "A list of scalars is the compact tag editor: type and press Enter or comma to add, paste a comma- or newline-separated list to add several at once, Backspace on an empty input to remove the last. Same control as **EnumArray** — it just has no options to offer, so typing is the only way in. Numeric items commit numbers (see **DeepRecursion**).",
       },
     },
   },
@@ -1164,9 +1255,22 @@ export const EnumArray: Story = {
     docs: {
       description: {
         story:
-          "An array whose items carry an `enum` is NOT a tag list — each item gets its own Combobox so values stay constrained to (and discoverable from) the option set, with the usual add / remove / reorder controls.",
+          "An array whose items carry an `enum` is a list of *choices*, so it renders as **one** Combobox in the tags variant rather than a stack of them: every committed value is a removable pill and the whole option set is one dropdown away. Unlike **ScalarArrayTags** the values stay constrained — text matching no option is discarded. `x-array-display: \"filter-pills\"` swaps the field for always-visible toggles; `\"stacked\"` restores a Combobox per item.",
       },
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // One control for the whole array — no per-item rows, no Add item.
+    await expect(canvas.getAllByRole("combobox")).toHaveLength(1);
+    await expect(canvas.queryByRole("button", { name: /add item/i })).toBeNull();
+    await expect(canvas.getByRole("button", { name: "Remove viewer" })).toBeInTheDocument();
+
+    // The option list is portaled to the body, so it is queried from there.
+    await userEvent.click(canvas.getByRole("button", { name: "Toggle options" }));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("option", { name: "editor" }));
+    await waitFor(() => expect(canvas.getByRole("button", { name: "Remove editor" })).toBeInTheDocument());
   },
 };
 
@@ -1269,7 +1373,7 @@ export const TableLayout: Story = {
     docs: {
       description: {
         story:
-          "`x-layout: \"table\"` on an array of objects renders it as a table — a header row of the item's property names and one compact row per item, with a per-row remove and an **Add item** button. Compare with **ArrayOfObjects**, which renders the same data as taller per-item sub-forms. Absent the hint, the stacked form is still the default.",
+          "`x-layout: \"table\"` on an array of objects renders it as a table — a header row of the item's property names and one compact row per item, with a per-row remove and an **Add item** button. Denser still than the summary rows an object array shows by default (**ArrayOfObjects**), at the cost of a column per property.",
       },
     },
   },

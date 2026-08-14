@@ -15,6 +15,7 @@ export function ComboboxMenu({
   filtered,
   floatingZ,
   footer,
+  hasOptions,
   highlighted,
   isSelected,
   listId,
@@ -32,6 +33,8 @@ export function ComboboxMenu({
   filtered: ComboboxOption[];
   floatingZ: number;
   footer: ReactNode;
+  /** Whether the control has an option set at all (before filtering). */
+  hasOptions: boolean;
   highlighted: number;
   isSelected: (value: string) => boolean;
   listId: string | undefined;
@@ -69,7 +72,10 @@ export function ComboboxMenu({
           Loading…
         </div>
       )}
-      {!loading && filtered.length === 0 && !customEntry && (
+      {/* "No results" answers "did my query match anything?" — a control with
+          no option set at all (a free tag list) was never asked the question, so
+          it says nothing rather than reporting an empty search. */}
+      {!loading && filtered.length === 0 && !customEntry && hasOptions && (
         <div className="px-2 py-4 text-center text-sm text-muted-foreground">
           No results
         </div>

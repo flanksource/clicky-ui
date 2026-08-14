@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { Combobox, type ComboboxProps } from "./Combobox";
+import {
+  Combobox,
+  type ComboboxSingleProps,
+  type ComboboxTriStateMode,
+} from "./Combobox";
 import { Modal } from "../overlay/Modal";
 
 const DATABASE_OPTIONS = [
@@ -19,11 +23,42 @@ function ComboboxShowcase() {
   );
 }
 
-function ComboboxPlayground({ value: initialValue, ...args }: ComboboxProps) {
-  const [value, setValue] = useState(initialValue);
+// The playground drives every mode from one panel, so the value has to change
+// SHAPE with the mode: a string, a list of strings, or a record of include /
+// exclude modes. One shared `value` is what used to break this story — flipping
+// `multiple` on left the string behind and the closed label mapped over it.
+type PlaygroundArgs = Omit<
+  ComboboxSingleProps,
+  "value" | "onChange" | "multiple" | "tristate"
+> & {
+  multiple?: boolean;
+  tristate?: boolean;
+  variant?: "default" | "tags";
+};
+
+function ComboboxPlayground({
+  multiple,
+  tristate,
+  variant,
+  ...args
+}: PlaygroundArgs) {
+  const [single, setSingle] = useState("");
+  const [values, setValues] = useState<string[]>([]);
+  const [modes, setModes] = useState<Record<string, ComboboxTriStateMode>>({});
+  // Tristate is inherently multi-valued, so it carries `multiple` along rather
+  // than rendering an impossible combination.
+  const value = tristate ? modes : multiple ? values : single;
+  const variantProp = variant ? { variant } : {};
+
   return (
-    <div className="w-64 space-y-3">
-      <Combobox {...args} value={value} onChange={setValue} />
+    <div className="w-96 space-y-3">
+      {tristate ? (
+        <Combobox {...args} {...variantProp} multiple tristate value={modes} onChange={setModes} />
+      ) : multiple ? (
+        <Combobox {...args} {...variantProp} multiple value={values} onChange={setValues} />
+      ) : (
+        <Combobox {...args} value={single} onChange={setSingle} />
+      )}
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
         value={JSON.stringify(value)}
       </div>
@@ -45,6 +80,15 @@ const meta = {
   },
   argTypes: {
     placeholder: { control: "text", table: { category: "Appearance" } },
+    // The mode props, so the Playground can be driven from the panel (and from
+    // the URL) instead of guessing at undeclared args.
+    multiple: { control: "boolean", table: { category: "Mode" } },
+    tristate: { control: "boolean", table: { category: "Mode" } },
+    variant: {
+      control: "inline-radio",
+      options: ["default", "tags"],
+      table: { category: "Mode" },
+    },
     disabled: { control: "boolean", table: { category: "Behavior" } },
     required: { control: "boolean", table: { category: "Behavior" } },
     loading: { control: "boolean", table: { category: "Behavior" } },
@@ -60,6 +104,14 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Playground: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Every mode from one panel: **Mode → multiple / tristate / variant**. The value shape follows the mode — a string, a `string[]`, or a `Record<value, \"include\" | \"exclude\">` — and the box below shows what the control actually commits.",
+      },
+    },
+  },
   render: (args) => <ComboboxPlayground {...args} />,
 };
 
@@ -255,6 +307,40 @@ export const Tags: Story = {
         />
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
           value={JSON.stringify(value)}
+        </div>
+      </div>
+    );
+  },
+};
+
+export const TriStateTags: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Tristate keeps a `Record<value, \"include\" | \"exclude\">` rather than a list, and `variant: \"tags\"` shows that record in the field: one pill per value, coloured by its mode. Clicking a pill flips include ↔ exclude; its close button returns the value to neutral (dropping it from the record). Without the variant the same control collapses to a `+n -n` summary — what the FilterBar's multi filter uses.",
+      },
+    },
+  },
+  render: () => {
+    const [modes, setModes] = useState<Record<string, ComboboxTriStateMode>>({
+      PrimaryDB: "include",
+      ArchiveDB: "exclude",
+    });
+    return (
+      <div className="w-96 space-y-3">
+        <Combobox
+          multiple
+          tristate
+          variant="tags"
+          label="Databases"
+          placeholder="Include or exclude databases"
+          value={modes}
+          onChange={setModes}
+          options={DATABASE_OPTIONS}
+        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
+          value={JSON.stringify(modes)}
         </div>
       </div>
     );

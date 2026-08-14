@@ -66,6 +66,7 @@ export function NamespacePicker({
       options={options}
       value={value}
       onChange={onChange}
+      ariaLabel="Namespace"
       allowCustomValue
       loading={loading}
       invalid={invalid}

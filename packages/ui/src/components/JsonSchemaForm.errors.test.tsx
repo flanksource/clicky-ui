@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
@@ -168,6 +168,11 @@ describe("JsonSchemaForm authoritative errors", () => {
       { lines: [{ account: "" }] },
       [{ instancePath: "/lines/0/account", message: "Select an account" }]
     );
+
+    // Object items collapse to summary rows by default, so the row reports the
+    // error it is hiding and the message itself waits inside.
+    expect(screen.getByTitle("1 error")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
 
     const account = screen.getByRole("textbox", { name: "Account" });
     expect(account.nextElementSibling).toHaveTextContent("Select an account");

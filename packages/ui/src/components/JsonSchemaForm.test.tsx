@@ -186,6 +186,9 @@ describe("JsonSchemaForm extension pipeline", () => {
           properties: {
             endpoints: {
               type: "array",
+              // Stacked, so every item's fields render at once: a collapsed
+              // accordion row never reaches the extension for item 2.
+              "x-array-display": "stacked",
               items: { type: "object", properties: { url: { type: "string" } } },
             },
           },
@@ -552,6 +555,60 @@ describe("JsonSchemaForm array of objects", () => {
     },
   };
 
+  // Object items collapse to one summary row each without any schema hint:
+  // a full sub-form per item costs hundreds of pixels and says nothing about
+  // which item is which.
+  it("renders each item as a collapsed summary row by default", () => {
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ servers: [{ name: "api", port: 8080 }, { name: "worker" }] }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("2 items")).toBeInTheDocument();
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("edits an item's field through the expanded row", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm schema={schema} value={{ servers: [{ name: "a" }] }} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^a$/ }));
+    const nameInput = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "a");
+    fireEvent.change(nameInput as HTMLElement, { target: { value: "b" } });
+    expect(onChange).toHaveBeenCalledWith({ servers: [{ name: "b" }] });
+  });
+
+  it("adds a seeded object item", () => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={schema} value={{ servers: [] }} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /add item/i }));
+    expect(onChange).toHaveBeenCalledWith({ servers: [{}] });
+  });
+});
+
+// `x-array-display: "stacked"` is the opt-out from that default: one full
+// sub-form per item, labelled *Item N*, with its own reorder/remove column.
+describe("JsonSchemaForm array of objects (stacked)", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      servers: {
+        type: "array",
+        "x-array-display": "stacked",
+        items: {
+          type: "object",
+          properties: { name: { type: "string" }, port: { type: "integer" } },
+          required: ["name"],
+        },
+      },
+    },
+  };
+
   it("adds a seeded object item", () => {
     const onChange = vi.fn();
     render(<JsonSchemaForm schema={schema} value={{ servers: [] }} onChange={onChange} />);
@@ -683,6 +740,9 @@ describe("JsonSchemaForm deep recursion", () => {
     properties: {
       services: {
         type: "array",
+        // Stacked, so the nested array is on screen without expanding a row —
+        // the accordion's own recursion is covered in its test file.
+        "x-array-display": "stacked",
         items: {
           type: "object",
           properties: {
@@ -694,7 +754,7 @@ describe("JsonSchemaForm deep recursion", () => {
     },
   };
 
-  it("edits a value two levels deep and rebuilds the full nested structure", () => {
+  it("commits a value two levels deep and rebuilds the full nested structure", () => {
     const onChange = vi.fn();
     render(
       <JsonSchemaForm
@@ -703,9 +763,11 @@ describe("JsonSchemaForm deep recursion", () => {
         onChange={onChange}
       />,
     );
-    const portInput = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "80");
-    fireEvent.change(portInput as HTMLElement, { target: { value: "8080" } });
-    expect(onChange).toHaveBeenCalledWith({ services: [{ name: "web", ports: [8080] }] });
+    // The nested port list is the only combobox on screen (`name` is a textbox).
+    const ports = screen.getByRole("combobox");
+    fireEvent.change(ports, { target: { value: "8080" } });
+    fireEvent.keyDown(ports, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith({ services: [{ name: "web", ports: [80, 8080] }] });
   });
 });
 
@@ -755,20 +817,86 @@ describe("JsonSchemaForm array item kinds", () => {
         onChange={onChange}
       />,
     );
-    // tag UI has no "Add item" button; it uses a free-text input committed on Enter
+    // The tag UI has no "Add item" button; typing and pressing Enter adds one.
     expect(screen.queryByRole("button", { name: /add item/i })).not.toBeInTheDocument();
-    const input = screen.getByRole("textbox");
+    const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "b" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith({ tags: ["a", "b"] });
   });
 
-  it("renders a combobox per item for enum items (not tags)", () => {
+  // A list of numbers is the same gesture as a list of strings, and must land in
+  // the value as numbers — a tag editor that only spoke strings could not.
+  it("commits numbers from an integer item list", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: { ports: { type: "array", items: { type: "integer" } } } }}
+        value={{ ports: [80] }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Remove 80" })).toBeInTheDocument();
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "443" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith({ ports: [80, 443] });
+  });
+
+  // An enum item schema makes the array a list of choices: ONE combobox whose
+  // committed values are pills, not a stack of comboboxes with an add button.
+  it("renders enum items as a single tags combobox", () => {
+    const onChange = vi.fn();
     render(
       <JsonSchemaForm
         schema={{
           type: "object",
           properties: { roles: { type: "array", items: { type: "string", enum: ["admin", "viewer"] } } },
+        }}
+        value={{ roles: ["admin"] }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getAllByRole("combobox")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /add item/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle options" }));
+    // The menu commits on mousedown, before the input can lose focus.
+    fireEvent.mouseDown(screen.getByRole("option", { name: "viewer" }));
+    expect(onChange).toHaveBeenCalledWith({ roles: ["admin", "viewer"] });
+  });
+
+  it("keeps enum items constrained to the option set", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: { roles: { type: "array", items: { type: "string", enum: ["admin", "viewer"] } } },
+        }}
+        value={{ roles: [] }}
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "root" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("renders a combobox per item when the schema opts out with stacked", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            roles: {
+              type: "array",
+              "x-array-display": "stacked",
+              items: { type: "string", enum: ["admin", "viewer"] },
+            },
+          },
         }}
         value={{ roles: ["admin"] }}
         onChange={vi.fn()}

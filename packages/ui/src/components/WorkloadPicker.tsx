@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { Combobox } from "./Combobox";
+import { Field } from "./Field";
+import { NamespacePicker, type NamespacePickerProps } from "./NamespacePicker";
 import {
   ALL_WORKLOAD_KINDS,
   WORKLOAD_META,
   buildWorkloadOptions,
   kindForValue,
   loadedWorkloads,
+  parseWorkloadKey,
   type WorkloadKind,
   type WorkloadResource,
 } from "./workload-picker-utils";
 
-// WorkloadPicker selects a backing Kubernetes workload (Service / Ingress /
-// Deployment / StatefulSet) for an endpoint. Options from every kind are merged
-// into one Combobox, grouped by kind via the Combobox group-header support and
-// labelled with the kind's icon.
+// WorkloadPicker selects a backing Kubernetes workload for an endpoint or
+// query. Options from every requested kind are merged into one Combobox,
+// grouped by kind via the Combobox group-header support and labelled with the
+// kind's icon.
 //
 // The emitted value is a `[namespace/]kind/name` key (see workloadKey /
 // parseWorkloadKey in workload-picker-utils) so two workloads of different
@@ -38,13 +41,22 @@ export type WorkloadPickerProps = {
    * Async getter the component calls to load the requested kinds' workloads.
    * Returns a map keyed by kind. The consumer owns fetching/caching.
    */
-  loadWorkloads: (kinds: WorkloadKind[]) => Promise<Record<WorkloadKind, WorkloadResource[]>>;
+  loadWorkloads: (
+    kinds: WorkloadKind[],
+    namespace?: string,
+  ) => Promise<Partial<Record<WorkloadKind, WorkloadResource[]>>>;
   /**
    * Namespace the workloads live in. When set it prefixes the emitted key
    * (`namespace/kind/name`), so values stay distinct across namespaces.
    */
   namespace?: string;
-  /** Kinds to offer, in display order. Defaults to all four. */
+  /** Lets the user choose the namespace used to load and key workloads. */
+  allowNamespaceSelection?: boolean;
+  /** Required when namespace selection is enabled. */
+  loadNamespaces?: NamespacePickerProps["loadNamespaces"];
+  /** Reports the namespace independently of workload selection. */
+  onNamespaceChange?: (namespace: string | undefined) => void;
+  /** Kinds to offer, in display order. Defaults to every supported kind. */
   kinds?: WorkloadKind[];
   /**
    * When true, a non-empty value that does not match any loaded workload (once
@@ -58,6 +70,7 @@ export type WorkloadPickerProps = {
    * Defaults to true for the existing free-form workload picker behavior.
    */
   allowCustomValue?: boolean;
+  disabled?: boolean;
   placeholder?: string;
   className?: string;
 };
@@ -67,20 +80,59 @@ export function WorkloadPicker({
   onChange,
   loadWorkloads,
   namespace,
+  allowNamespaceSelection = false,
+  loadNamespaces,
+  onNamespaceChange,
   kinds = ALL_WORKLOAD_KINDS,
   strict = false,
   allowCustomValue = true,
+  disabled = false,
   placeholder = "Select workload / service…",
   className,
 }: WorkloadPickerProps) {
+  const initialNamespace = value
+    ? parseWorkloadKey(value).namespace
+    : undefined;
+  const [selectedNamespace, setSelectedNamespace] = useState(
+    initialNamespace ?? namespace ?? "",
+  );
   const [byKind, setByKind] = useState<Partial<Record<WorkloadKind, WorkloadResource[]>>>({});
   const [loading, setLoading] = useState(false);
+  const defaultNamespaceRef = useRef(namespace);
+  const effectiveNamespace = allowNamespaceSelection
+    ? selectedNamespace || undefined
+    : namespace;
+
+  useEffect(() => {
+    if (!allowNamespaceSelection || !value) return;
+    const valueNamespace = parseWorkloadKey(value).namespace;
+    if (valueNamespace) setSelectedNamespace(valueNamespace);
+  }, [allowNamespaceSelection, value]);
+
+  useEffect(() => {
+    if (
+      !allowNamespaceSelection ||
+      defaultNamespaceRef.current === namespace
+    ) {
+      return;
+    }
+    defaultNamespaceRef.current = namespace;
+    if (!value) setSelectedNamespace(namespace ?? "");
+  }, [allowNamespaceSelection, namespace, value]);
 
   const kindsKey = kinds.join(",");
   useEffect(() => {
+    if (allowNamespaceSelection && !effectiveNamespace) {
+      setByKind({});
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    loadWorkloads(kinds)
+    const request = effectiveNamespace
+      ? loadWorkloads(kinds, effectiveNamespace)
+      : loadWorkloads(kinds);
+    request
       .then((res) => {
         if (!cancelled) setByKind(res);
       })
@@ -93,11 +145,11 @@ export function WorkloadPicker({
     // loadWorkloads is expected to be stable (memoized by the consumer); kindsKey
     // is the joined `kinds` so a changed selection reloads without depending on
     // the array's identity.
-  }, [loadWorkloads, kindsKey]);
+  }, [allowNamespaceSelection, effectiveNamespace, loadWorkloads, kindsKey]);
 
   const options = useMemo(
-    () => buildWorkloadOptions(namespace, byKind, kinds, value),
-    [namespace, byKind, kinds, value],
+    () => buildWorkloadOptions(effectiveNamespace, byKind, kinds, value),
+    [effectiveNamespace, byKind, kinds, value],
   );
 
   // In strict mode a non-empty value is invalid once loading settles unless it
@@ -108,9 +160,9 @@ export function WorkloadPicker({
   // membership against the loaded set, not `options`.
   const invalid = useMemo(() => {
     if (!strict || !value || loading) return false;
-    const { keys, names } = loadedWorkloads(namespace, byKind, kinds);
+    const { keys, names } = loadedWorkloads(effectiveNamespace, byKind, kinds);
     return !keys.has(value) && !names.has(value);
-  }, [strict, value, loading, namespace, byKind, kinds]);
+  }, [strict, value, loading, effectiveNamespace, byKind, kinds]);
 
   // The lead icon reflects the selected workload's kind (read from the value's
   // key), falling back to the first offered kind when nothing is selected or the
@@ -118,8 +170,13 @@ export function WorkloadPicker({
   const selectedKind = kindForValue(kinds, value);
   const leadMeta = WORKLOAD_META[selectedKind];
   const LeadIcon = leadMeta.Icon;
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
+  const control = (
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        !allowNamespaceSelection && className,
+      )}
+    >
       <LeadIcon
         className="h-4 w-4 shrink-0 text-muted-foreground"
         title={leadMeta.label}
@@ -130,12 +187,39 @@ export function WorkloadPicker({
           options={options}
           value={value}
           onChange={onChange}
+          ariaLabel="Workload"
           allowCustomValue={allowCustomValue}
           loading={loading}
           invalid={invalid}
+          disabled={disabled}
           placeholder={placeholder}
         />
       </div>
+    </div>
+  );
+  if (!allowNamespaceSelection) return control;
+  if (!loadNamespaces) {
+    throw new Error(
+      "WorkloadPicker namespace selection requires loadNamespaces",
+    );
+  }
+
+  return (
+    <div className={cn("space-y-density-2", className)}>
+      <Field label="Namespace">
+        <NamespacePicker
+          value={selectedNamespace}
+          onChange={(nextNamespace) => {
+            setSelectedNamespace(nextNamespace);
+            setByKind({});
+            onNamespaceChange?.(nextNamespace || undefined);
+            onChange("");
+          }}
+          loadNamespaces={loadNamespaces}
+          strict
+        />
+      </Field>
+      {control}
     </div>
   );
 }

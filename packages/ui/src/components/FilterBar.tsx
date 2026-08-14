@@ -59,6 +59,8 @@ import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { RangeSlider } from "./RangeSlider";
 import { TimeRange, type TimeRangePresetGroup } from "./TimeRange";
 import { TriStateToggle, type TriState, type TriStateLabels } from "./TriStateToggle";
+import { WorkloadPicker } from "./WorkloadPicker";
+import type { WorkloadKind, WorkloadResource } from "./workload-picker-utils";
 
 const FILTER_BAR_GAP_PX = 8;
 const FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX = 44;
@@ -189,6 +191,24 @@ export type FilterBarNestedMultiFilter = {
   className?: string;
 };
 
+export type FilterBarWorkloadFilter = {
+  key: string;
+  /** Renders the shared Kubernetes workload picker. */
+  kind: "workload";
+  label: string;
+  icon?: LabelIconSpec;
+  description?: string;
+  value: string;
+  onChange: (value: string) => void;
+  loadWorkloads: (
+    kinds: WorkloadKind[],
+    namespace?: string,
+  ) => Promise<Partial<Record<WorkloadKind, WorkloadResource[]>>>;
+  kinds?: WorkloadKind[];
+  disabled?: boolean;
+  className?: string;
+};
+
 export type FilterBarSelectMultiFilter = {
   key: string;
   /** Renders a compact multi-select dropdown. */
@@ -295,6 +315,7 @@ export type FilterBarFilter =
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
   | FilterBarNestedMultiFilter
+  | FilterBarWorkloadFilter
   | FilterBarSelectMultiFilter
   | FilterBarNumberFilter
   | FilterBarEnumFilter
@@ -634,6 +655,7 @@ function FilterBarFilterPanelContent({
       {filter.kind === "lookup-multi" && <LookupMultiFilterField filter={filter} grow />}
       {filter.kind === "multi" && <MultiFilterPanel filter={filter} chrome={chrome} />}
       {filter.kind === "nested-multi" && <NestedMultiFilterPanel filter={filter} chrome={chrome} />}
+      {filter.kind === "workload" && <WorkloadFilterField filter={filter} grow />}
       {filter.kind === "select-multi" && <SelectMultiFilterField filter={filter} grow />}
       {filter.kind === "number" && <NumberFilterPanel filter={filter} chrome={chrome} />}
       {filter.kind === "enum" && <EnumFilterField filter={filter} grow />}
@@ -680,6 +702,10 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 
   if (filter.kind === "nested-multi") {
     return <NestedMultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "workload") {
+    return <WorkloadFilterField filter={filter} grow={grow} />;
   }
 
   if (filter.kind === "select-multi") {
@@ -945,6 +971,9 @@ function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
   if (filter.kind === "nested-multi") {
     return <NestedMultiFilterField filter={filter} grow />;
   }
+  if (filter.kind === "workload") {
+    return <WorkloadFilterField filter={filter} grow />;
+  }
   if (filter.kind === "tristate") {
     return <TriStateFilterValueControl filter={filter} />;
   }
@@ -961,6 +990,29 @@ function lookupOptionsToCombobox(options: FilterBarLookupOption[]): ComboboxOpti
     label: option.label ?? option.value,
     ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
   }));
+}
+
+function WorkloadFilterField({
+  filter,
+  grow,
+}: {
+  filter: FilterBarWorkloadFilter;
+  grow: boolean;
+}) {
+  return (
+    <div className={cn("min-w-[14rem]", grow && "flex-1", filter.className)}>
+      <WorkloadPicker
+        value={filter.value}
+        onChange={filter.onChange}
+        loadWorkloads={filter.loadWorkloads}
+        {...(filter.kinds ? { kinds: filter.kinds } : {})}
+        allowCustomValue={false}
+        strict
+        {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+        placeholder={`Select ${filter.label.toLowerCase()}…`}
+      />
+    </div>
+  );
 }
 
 function valueInputClassName(disabled?: boolean) {
@@ -2420,6 +2472,13 @@ function filterWithStagedValue(
       onChange: (next: string) => onChange(next),
     };
   }
+  if (filter.kind === "workload") {
+    return {
+      ...filter,
+      value: String(value ?? ""),
+      onChange: (next: string) => onChange(next),
+    };
+  }
   if (filter.kind === "lookup-multi") {
     return {
       ...filter,
@@ -2494,7 +2553,12 @@ function applyStagedFilterValues(
 
 function applyFilterBarValue(filter: FilterBarFilter, value: FilterBarValue) {
   if (!isStageableFilter(filter)) return;
-  if (filter.kind === "text" || filter.kind === "lookup" || filter.kind === "enum") {
+  if (
+    filter.kind === "text" ||
+    filter.kind === "lookup" ||
+    filter.kind === "workload" ||
+    filter.kind === "enum"
+  ) {
     filter.onChange(String(value ?? ""));
     return;
   }
@@ -2558,6 +2622,7 @@ function estimateFilterWidth(filter: FilterBarFilter) {
   // its compact trigger button.
   if (filter.kind === "multi") return 176;
   if (filter.kind === "nested-multi") return 136;
+  if (filter.kind === "workload") return 224;
   if (filter.kind === "number") return 152;
   return Math.max(144, filter.label.length * 8 + 96);
 }
