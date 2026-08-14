@@ -21,6 +21,7 @@ export type {
   JotaiFilterBarSearchProps,
   JotaiFilterBarSelectMultiFilter,
   JotaiFilterBarTextFilter,
+  JotaiFilterBarWorkloadFilter,
   JotaiJsonSchemaFormAtom,
   JotaiJsonSchemaFormProps,
   JotaiWritableAtom,

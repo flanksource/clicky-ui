@@ -4,6 +4,10 @@ import type {
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
+import type {
+  WorkloadKind,
+  WorkloadResource,
+} from "../components/workload-picker-utils";
 import type { DataTablePagination } from "../data/DataTable";
 import {
   parseBoundsValue,
@@ -333,10 +337,73 @@ export function parametersToFormConfig(
     const schema = param.schema;
     const lookupFilter = lookupFilters[param.name];
 
+    if (lookupFilter?.type === "workload" && param.in === "query") {
+      emitFilters.push({
+        key: param.name,
+        kind: "workload",
+        label,
+        value,
+        disabled,
+        kinds: ["pod", "deployment", "statefulset", "daemonset"],
+        loadWorkloads: async (kinds) => workloadsFromLookup(lookupFilter, kinds),
+        // A server-generated workload filter is scoped by the operation itself,
+        // so a lookup returning one workload means the scope already picked it.
+        collapseSingleOption: true,
+        onChange: (next) => onChange(next),
+      });
+      continue;
+    }
+
+    if (lookupFilter?.type === "labels" && param.in === "query") {
+      const fieldOptions = lookupOptionsToFieldOptions(lookupFilter);
+      const selection = parseMultiFilterValue(value);
+      const grouped = fieldOptions.some((option) => option.value.includes("=")) ||
+        Object.keys(selection).some((selected) => selected.includes("="));
+      if (grouped) {
+        emitFilters.push({
+          key: param.name,
+          kind: "nested-multi",
+          label,
+          value: selection,
+          disabled,
+          groups: labelOptionGroups(fieldOptions),
+          onChange: (next) =>
+            setValues((current) =>
+              rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+            ),
+        });
+      } else {
+        emitFilters.push({
+          key: param.name,
+          kind: "multi",
+          label,
+          value: selection,
+          disabled,
+          options: fieldOptions,
+          ...searchProps(lookupFilter, param.name, options.lookupSearch),
+          onChange: (next) =>
+            setValues((current) =>
+              rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+            ),
+        });
+      }
+      continue;
+    }
+
     // Both edges of a range travel under one parameter, so the control is built
     // from that parameter alone rather than from the from/to pair below.
-    if (lookupFilter?.type === "date-range" && param.in === "query") {
-      const bounds = parseBoundsValue(value);
+    // A "day-range" is the same control with the clock taken off it, so it
+    // shares this branch and differs only in timeEnabled.
+    if (
+      (lookupFilter?.type === "date-range" || lookupFilter?.type === "day-range") &&
+      param.in === "query"
+    ) {
+      // A server that declares a default applies it to a request that names no
+      // bound, so the control shows that default rather than "any time" — an
+      // empty range control over a bounded query states the wrong query. Only
+      // the display falls back; the value is still whatever was selected, so
+      // nothing is written to the URL on the strength of a default.
+      const bounds = parseBoundsValue(value || String(param.schema?.default ?? ""));
       emitFilters.push({
         key: param.name,
         kind: "date-range",
@@ -345,7 +412,8 @@ export function parametersToFormConfig(
         ...(bounds.min !== undefined ? { from: bounds.min } : {}),
         ...(bounds.max !== undefined ? { to: bounds.max } : {}),
         ...(lookupFilter.presets ? { presets: lookupFilter.presets } : {}),
-        timeEnabled: lookupFilter.timeEnabled ?? true,
+        timeEnabled:
+          lookupFilter.type === "day-range" ? false : (lookupFilter.timeEnabled ?? true),
         ...(lookupFilter.timeZone ? { timeZone: lookupFilter.timeZone } : {}),
         ...(lookupFilter.timeZones ? { timeZones: lookupFilter.timeZones } : {}),
         onApply: (from: string, to: string) => {
@@ -581,6 +649,42 @@ export function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
     value,
     label: meta.label ?? value,
     title: meta.title ?? value,
+  }));
+}
+
+function workloadsFromLookup(
+  filter: OperationLookupFilter,
+  kinds: WorkloadKind[],
+): Partial<Record<WorkloadKind, WorkloadResource[]>> {
+  const requested = new Set(kinds);
+  const result: Partial<Record<WorkloadKind, WorkloadResource[]>> = {};
+  for (const kind of kinds) result[kind] = [];
+  for (const option of lookupOptionsToFieldOptions(filter)) {
+    const parts = option.value.split("/");
+    const name = parts.at(-1);
+    const providerKind = parts.at(-2)?.toLowerCase() as WorkloadKind | undefined;
+    const namespace = parts.length > 2 ? parts.slice(0, -2).join("/") : undefined;
+    if (!name || !providerKind || !requested.has(providerKind)) continue;
+    result[providerKind]?.push({ name, ...(namespace ? { namespace } : {}) });
+  }
+  return result;
+}
+
+function labelOptionGroups(options: ReturnType<typeof lookupOptionsToFieldOptions>) {
+  const grouped = new Map<string, typeof options>();
+  for (const option of options) {
+    const separator = option.value.indexOf("=");
+    if (separator <= 0) continue;
+    const key = option.value.slice(0, separator);
+    const value = option.value.slice(separator + 1);
+    const values = grouped.get(key) ?? [];
+    values.push({ ...option, label: value || option.label });
+    grouped.set(key, values);
+  }
+  return Array.from(grouped, ([groupKey, groupOptions]) => ({
+    groupKey,
+    label: groupKey,
+    options: groupOptions,
   }));
 }
 

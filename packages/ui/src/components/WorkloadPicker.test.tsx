@@ -258,6 +258,70 @@ describe("WorkloadPicker", () => {
   });
 });
 
+describe("WorkloadPicker collapseSingleOption", () => {
+  const loadOne = () => Promise.resolve({ pod: [{ name: "demo-api-abc12", namespace: "demo" }] });
+
+  it("states the sole workload as text instead of offering a choice", async () => {
+    const onChange = vi.fn();
+    render(
+      <WorkloadPicker
+        value=""
+        onChange={onChange}
+        kinds={["pod"]}
+        collapseSingleOption
+        loadWorkloads={loadOne}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("demo-api-abc12")).toBeInTheDocument());
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    // The caller is already scoped to it, so collapsing selects nothing.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the picker while the single option is still loading", () => {
+    render(
+      <WorkloadPicker
+        value=""
+        onChange={vi.fn()}
+        collapseSingleOption
+        loadWorkloads={() => new Promise(() => {})}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("keeps the picker when more than one workload is offered", async () => {
+    render(
+      <WorkloadPicker value="" onChange={vi.fn()} collapseSingleOption loadWorkloads={loadAll} />,
+    );
+    await waitFor(() => expect(screen.getByRole("combobox")).toBeInTheDocument());
+  });
+
+  // A value the scope did not return is what strict mode exists to surface;
+  // collapsing would hide the control that reports it.
+  it("keeps the picker when the selection is not the sole option", async () => {
+    render(
+      <WorkloadPicker
+        value="demo/pod/ghost"
+        onChange={vi.fn()}
+        kinds={["pod"]}
+        strict
+        collapseSingleOption
+        loadWorkloads={loadOne}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox")).toHaveAttribute("aria-invalid", "true"),
+    );
+  });
+
+  it("offers the picker as usual when collapsing is not asked for", async () => {
+    render(<WorkloadPicker value="" onChange={vi.fn()} kinds={["pod"]} loadWorkloads={loadOne} />);
+    await waitFor(() => expect(screen.getByRole("combobox")).toBeInTheDocument());
+  });
+});
+
 describe("WorkloadPicker strict mode", () => {
   it("flags a value that matches no loaded workload once loaded", async () => {
     render(

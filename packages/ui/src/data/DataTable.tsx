@@ -2840,14 +2840,11 @@ function MenuActionItem({
   submenu,
   onOpenSubmenu,
   onClose,
-  nested = false,
 }: {
   action: DataTableMenuAction;
   submenu: { id: string; x: number; y: number } | null;
   onOpenSubmenu: (state: { id: string; x: number; y: number } | null) => void;
   onClose: () => void;
-  /** Set for a row inside a flyout, whose hover must not close the flyout. */
-  nested?: boolean;
 }) {
   const hasDescription = Boolean(action.description);
   const children = action.children ?? [];
@@ -2877,15 +2874,13 @@ function MenuActionItem({
           action.disabled && "cursor-not-allowed opacity-50",
           submenu && "bg-accent text-accent-foreground",
         )}
-        onMouseEnter={(event) => {
-          if (action.disabled) return;
-          if (isSubmenu) openFrom(event.currentTarget);
-          else if (!nested) onOpenSubmenu(null);
-        }}
         onClick={(event) => {
           if (action.disabled) return;
+          // Click, never hover: a flyout that opens on the way past is one the
+          // user did not ask for, and it covers the rows they were reaching for.
           if (isSubmenu) {
-            openFrom(event.currentTarget);
+            if (submenu) onOpenSubmenu(null);
+            else openFrom(event.currentTarget);
             return;
           }
           action.onSelect();
@@ -2934,7 +2929,6 @@ function MenuActionItem({
               submenu={null}
               onOpenSubmenu={onOpenSubmenu}
               onClose={onClose}
-              nested
             />
           ))}
         </div>

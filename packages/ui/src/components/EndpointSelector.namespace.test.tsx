@@ -93,7 +93,7 @@ describe("EndpointSelector namespace selection", () => {
       <EndpointSelector
         value={undefined}
         onChange={onChange}
-        namespace="oipa"
+        namespace="acme"
         modes={["service", "url"]}
         defaultMode="service"
         loadWorkloads={(kinds) =>
@@ -114,7 +114,7 @@ describe("EndpointSelector namespace selection", () => {
     fireEvent.mouseDown(await screen.findByRole("option", { name: "redis" }));
     expect(onChange).toHaveBeenLastCalledWith({
       mode: "service",
-      target: { kind: "service", name: "redis", namespace: "oipa" },
+      target: { kind: "service", name: "redis", namespace: "acme" },
       scheme: "redis",
       port: "6379",
     });

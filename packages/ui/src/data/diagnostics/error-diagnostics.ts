@@ -8,7 +8,16 @@ export type ErrorDiagnostics = {
   time?: string;
   stacktrace?: string;
   context: Array<[string, string]>;
+  // details carries values too long for a context badge — a failing SQL
+  // statement, a response body. They render as labeled preformatted blocks and
+  // are part of the copied report.
+  details?: ErrorDetailBlock[];
   raw?: unknown;
+};
+
+export type ErrorDetailBlock = {
+  label: string;
+  value: string;
 };
 
 export type ParsedErrorStackTrace = {
@@ -44,7 +53,14 @@ export function normalizeErrorDiagnostics(
   const trace = firstString(record, ["trace", "trace_id", "traceId", "traceID"]);
   const stacktrace = firstString(record, ["stacktrace", "stack_trace", "stackTrace", "stack"]);
   const time = firstString(record, ["time", "timestamp", "created_at"]);
-  const context = contextEntries(record.context);
+  const hint = firstString(record, ["hint"]);
+  // The hint leads the context badges: of everything the server attaches it is
+  // the one field that says what to do next.
+  const context: Array<[string, string]> = [
+    ...(hint ? ([["Hint", hint]] as Array<[string, string]>) : []),
+    ...contextEntries(record.context),
+  ];
+  const details = detailBlocks(record.details);
   if (!message && !trace && !stacktrace && !time && context.length === 0) {
     const nestedDiagnostics = objectRecord(record.diagnostics);
     if (nestedDiagnostics && nestedDiagnostics !== record) {
@@ -59,7 +75,23 @@ export function normalizeErrorDiagnostics(
     ...(trace !== undefined ? { trace } : {}),
     ...(time !== undefined ? { time } : {}),
     ...(stacktrace !== undefined ? { stacktrace } : {}),
+    ...(details.length > 0 ? { details } : {}),
   };
+}
+
+// `details` is overloaded on the wire: our own envelope sends an array of
+// {label, value} blocks (entity.ErrorResponse), while third-party bodies use a
+// bare string that firstString already reads as the message. Only the array
+// form produces blocks; content_type is dropped because every block renders as
+// preformatted text either way.
+function detailBlocks(value: unknown): ErrorDetailBlock[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const record = objectRecord(entry);
+    const label = firstString(record ?? {}, ["label"]);
+    const detail = firstString(record ?? {}, ["value"]);
+    return label && detail ? [{ label, value: detail }] : [];
+  });
 }
 
 export function parseDiagnosticsStackTrace(stacktrace: string): ParsedErrorStackTrace {

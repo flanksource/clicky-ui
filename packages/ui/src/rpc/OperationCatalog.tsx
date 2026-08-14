@@ -17,6 +17,8 @@ import type {
 import type { CellFilterChange } from "../data/cells/CellFilterActions";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { OperationActionBar } from "./OperationActionBar";
+import { OperationsApiClientError } from "./apiClient";
+import { renderOperationError } from "./operationErrorDiagnostics";
 import {
   OperationResultView,
   type OperationResultFilterConfig,
@@ -91,20 +93,6 @@ export type OperationCatalogProps = {
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
 
-function defaultRenderError(err: unknown, title: string) {
-  const message = err instanceof Error ? err.message : String(err ?? "");
-  return (
-    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-      <div className="font-medium">{title}</div>
-      {message && (
-        <div className="mt-1 whitespace-pre-wrap text-xs opacity-80">
-          {message}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function OperationCatalog({
   definition,
   entities,
@@ -114,7 +102,7 @@ export function OperationCatalog({
   surfaceKey,
   filterPre,
   getCommandHref = defaultCommandHref,
-  renderError = defaultRenderError,
+  renderError = renderOperationError,
   commandRuntime,
   formPre,
   formPost,
@@ -343,11 +331,21 @@ export function OperationCatalog({
     if (listQuery.isError) {
       listError = listQuery.error;
     } else if (listQuery.data?.success === false) {
-      listError = new Error(
+      // A non-2xx that still carries a clicky envelope never throws, so this
+      // branch has to rebuild the error the client would have raised — with the
+      // request identity and raw body intact, not just the message.
+      listError = new OperationsApiClientError(
         listQuery.data.error ||
           listQuery.data.message ||
           listQuery.data.stderr ||
           `Command failed with exit code ${listQuery.data.exit_code}`,
+        {
+          method: listEndpoint?.method,
+          url: listQuery.data.requestUrl,
+          responseBody: listQuery.data.stdout,
+          responseData: listQuery.data.parsed,
+          responseHeaders: listQuery.data.responseHeaders,
+        },
       );
     }
   }

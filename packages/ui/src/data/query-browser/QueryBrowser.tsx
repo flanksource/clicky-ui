@@ -43,6 +43,7 @@ export function QueryBrowser({
   language = "text",
   initialQuery = "",
   queryLabel = "Query",
+  allowEmptyQuery = false,
   optionsSchema,
   initialOptions,
   completion,
@@ -134,8 +135,8 @@ export function QueryBrowser({
 
   const run = useCallback(async () => {
     const query = currentQuery().trim();
-    if (!query || pending) return;
-    setEntries(rememberQueryBrowserQuery(id, query));
+    if ((!query && !allowEmptyQuery) || pending) return;
+    if (query) setEntries(rememberQueryBrowserQuery(id, query));
     // A different statement is a different result set, so neither its filters
     // nor the columns they bind to survive: both name columns the new query may
     // not return.
@@ -150,7 +151,7 @@ export function QueryBrowser({
       ...(Object.keys(carried).length > 0 ? { filters: carried } : {}),
       ...(repeat?.columns ? { columns: repeat.columns } : {}),
     });
-  }, [currentQuery, filters, id, options, pending, runRequest]);
+  }, [allowEmptyQuery, currentQuery, filters, id, options, pending, runRequest]);
 
   // A filter pill is not a draft the way query text is: it commits a discrete
   // value on selection, and the bar already debounces its free-text fields. So
@@ -188,7 +189,7 @@ export function QueryBrowser({
     [runRequest],
   );
 
-  // "Show query" runs the displayed query again with diagnostics on rather than
+  // "Debug" runs the displayed query again with diagnostics on rather than
   // reading them off the result: a debug run costs a second execution, and one
   // paid on every query so the answer is there if asked for is the wrong trade.
   const loadQueryInfo = useCallback(async (): Promise<QueryExecutionInfo> => {

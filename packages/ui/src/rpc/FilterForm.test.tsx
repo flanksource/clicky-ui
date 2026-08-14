@@ -94,3 +94,57 @@ describe("FilterForm placeholders", () => {
     expect(policyInput.placeholder).not.toBe("Policy number");
   });
 });
+
+describe("FilterForm multi-value filters", () => {
+  it("renders a standard multi-select combobox without tristate option controls", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const multiFilterLookup: OperationLookupResponse = {
+      filters: {
+        status: {
+          label: "Status",
+          type: "multi-filter",
+          multi: true,
+          options: {
+            ready: { kind: "text", text: "Ready" },
+            failed: { kind: "text", text: "Failed" },
+          },
+        },
+      },
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FilterForm
+          client={{
+            getOpenAPISpec: vi.fn(),
+            executeCommand: vi.fn(),
+            lookupFilters: vi.fn(async () => multiFilterLookup),
+          }}
+          path="/jobs"
+          method="GET"
+          parameters={[{ name: "status", in: "query" }]}
+          onSubmit={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    const combobox = await screen.findByRole("combobox", { name: "Status" });
+    expect(screen.queryByRole("group", { name: "Status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Ready" })).not.toBeInTheDocument();
+
+    fireEvent.click(combobox);
+
+    const readyOption = await screen.findByRole("option", { name: "Ready" });
+    expect(readyOption.querySelector("[data-tristate-region]")).toBeNull();
+    expect(screen.getByRole("option", { name: "Failed" })).toBeInTheDocument();
+
+    fireEvent.mouseDown(readyOption);
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("Ready"),
+    );
+    expect(screen.getByRole("combobox", { name: "Status" })).not.toHaveValue("+1");
+  });
+});

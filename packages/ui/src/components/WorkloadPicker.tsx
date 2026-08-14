@@ -70,6 +70,16 @@ export type WorkloadPickerProps = {
    * Defaults to true for the existing free-form workload picker behavior.
    */
   allowCustomValue?: boolean;
+  /**
+   * Render the sole loaded workload as plain text instead of a picker.
+   *
+   * A dropdown whose only entry is the one already in effect asks a question
+   * with one answer. This is for a scope that leaves nothing to choose — a
+   * Deployment with a single pod — where the workload is a fact to state rather
+   * than a selection to make. No value is emitted: the caller is already scoped
+   * to it, so writing it back would only add a filter that changes nothing.
+   */
+  collapseSingleOption?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -86,6 +96,7 @@ export function WorkloadPicker({
   kinds = ALL_WORKLOAD_KINDS,
   strict = false,
   allowCustomValue = true,
+  collapseSingleOption = false,
   disabled = false,
   placeholder = "Select workload / service…",
   className,
@@ -170,6 +181,14 @@ export function WorkloadPicker({
   const selectedKind = kindForValue(kinds, value);
   const leadMeta = WORKLOAD_META[selectedKind];
   const LeadIcon = leadMeta.Icon;
+  // Only once loading settles, and only while the sole option is not contested
+  // by a selection that named something else — a value the load did not return
+  // is exactly the case `strict` exists to surface, and hiding the control
+  // would hide it too.
+  const soleOption =
+    collapseSingleOption && !loading && options.length === 1 && (!value || value === options[0]!.value)
+      ? options[0]!
+      : undefined;
   const control = (
     <div
       className={cn(
@@ -183,17 +202,27 @@ export function WorkloadPicker({
         aria-label={leadMeta.label}
       />
       <div className="min-w-0 flex-1">
-        <Combobox
-          options={options}
-          value={value}
-          onChange={onChange}
-          ariaLabel="Workload"
-          allowCustomValue={allowCustomValue}
-          loading={loading}
-          invalid={invalid}
-          disabled={disabled}
-          placeholder={placeholder}
-        />
+        {soleOption ? (
+          <span
+            className="block truncate text-sm text-foreground"
+            title={soleOption.label}
+            aria-label="Workload"
+          >
+            {soleOption.label}
+          </span>
+        ) : (
+          <Combobox
+            options={options}
+            value={value}
+            onChange={onChange}
+            ariaLabel="Workload"
+            allowCustomValue={allowCustomValue}
+            loading={loading}
+            invalid={invalid}
+            disabled={disabled}
+            placeholder={placeholder}
+          />
+        )}
       </div>
     </div>
   );

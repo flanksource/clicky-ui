@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, getDefaultNormalizer, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ErrorDetails } from "./ErrorDetails";
 import type { ErrorDiagnostics } from "./error-diagnostics";
@@ -58,6 +58,38 @@ describe("ErrorDetails", () => {
     );
     expect(details).not.toHaveAttribute("open");
     expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+  });
+
+  it("renders long detail values as preformatted blocks and copies them with the report", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const sql = "SELECT scheme, premum\nFROM policies\nWHERE start >= $1";
+    render(
+      <ErrorDetails
+        title="Failed to load /api/v1/profile/profile-om-malawi-scheme"
+        diagnostics={{ ...diagnostics, details: [{ label: "Query", value: sql }] }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Failed to load /api/v1/profile/profile-om-malawi-scheme"),
+    ).toBeInTheDocument();
+    const block = screen.getByText(sql, {
+      normalizer: getDefaultNormalizer({ collapseWhitespace: false }),
+    });
+    expect(block.tagName).toBe("PRE");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    const report = writeText.mock.calls[0]?.[0] as string;
+    expect(report).toContain(sql);
+    expect(report.startsWith("Failed to load /api/v1/profile/profile-om-malawi-scheme: ")).toBe(
+      true,
+    );
   });
 
   it("surfaces clipboard failures without expanding the details", async () => {

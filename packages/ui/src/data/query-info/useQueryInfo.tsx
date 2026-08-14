@@ -14,14 +14,14 @@ export type UseQueryInfoOptions = {
 };
 
 export type UseQueryInfoResult = {
-  /** "Show query" for the table's overflow menu; absent with nothing to ask. */
+  /** "Debug" for the table's overflow menu; absent with nothing to ask. */
   action: DataTableMenuAction | undefined;
   /** Render alongside the table — the dialog the action opens. */
   dialog: ReactNode;
 };
 
 /**
- * useQueryInfo puts "Show query" in a result table's overflow menu.
+ * useQueryInfo puts "Debug" in a result table's overflow menu.
  *
  * The details are read when the menu item is chosen, never before: asking costs
  * a second execution against the same backend, which is a price only a user who
@@ -46,10 +46,12 @@ export function useQueryInfo({
       loader
         ? {
             id: "show-query",
-            label: "Show query",
-            description: "What this table ran, and what the backend answered",
+            label: "Debug",
             icon: UiDebug,
-            section: "Debug",
+            // No heading and no description: one word under a "Debug" heading
+            // beside a one-line gloss of itself is three ways of saying the
+            // same thing in a menu with room for one.
+            section: "",
             onSelect: () => setOpen(true),
           }
         : undefined,

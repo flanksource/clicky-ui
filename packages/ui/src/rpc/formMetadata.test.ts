@@ -30,6 +30,81 @@ describe("packParameterValues", () => {
 });
 
 describe("parametersToFormConfig", () => {
+  it("maps a workload lookup to the shared Kubernetes workload picker", async () => {
+    const values = { workload: "payments/Deployment/api" };
+    const config = parametersToFormConfig(
+      [{ name: "workload", in: "query" }],
+      values,
+      () => {},
+      {
+        lookup: {
+          filters: {
+            workload: {
+              label: "Workload",
+              type: "workload",
+              options: {
+                "payments/Deployment/api": { kind: "text", text: "api" },
+                "platform/DaemonSet/agent": { kind: "text", text: "agent" },
+              },
+            },
+          },
+        },
+      },
+    );
+
+    const filter = config.filters[0];
+    expect(filter.kind).toBe("workload");
+    if (filter.kind !== "workload") throw new Error("expected workload filter");
+    await expect(filter.loadWorkloads(["deployment", "daemonset"])).resolves.toEqual({
+      deployment: [{ name: "api", namespace: "payments" }],
+      daemonset: [{ name: "agent", namespace: "platform" }],
+    });
+  });
+
+  it("groups generic Kubernetes labels and keeps explicit label-key values flat", () => {
+    const config = parametersToFormConfig(
+      [
+        { name: "labels", in: "query" },
+        { name: "applications", in: "query" },
+      ],
+      { labels: "app=api,!tier=worker", applications: "api,!worker" },
+      () => {},
+      {
+        lookup: {
+          filters: {
+            labels: {
+              label: "Labels",
+              type: "labels",
+              options: {
+                "app=api": { kind: "text", text: "api" },
+                "tier=worker": { kind: "text", text: "worker" },
+              },
+            },
+            applications: {
+              label: "Applications",
+              type: "labels",
+              options: {
+                api: { kind: "text", text: "api" },
+                worker: { kind: "text", text: "worker" },
+              },
+            },
+          },
+        },
+      },
+    );
+
+    const grouped = config.filters[0];
+    expect(grouped.kind).toBe("nested-multi");
+    if (grouped.kind !== "nested-multi") throw new Error("expected grouped labels");
+    expect(grouped.groups.map((group) => group.groupKey)).toEqual(["app", "tier"]);
+    expect(grouped.value).toEqual({ "app=api": "include", "tier=worker": "exclude" });
+
+    const explicit = config.filters[1];
+    expect(explicit.kind).toBe("multi");
+    if (explicit.kind !== "multi") throw new Error("expected explicit label values");
+    expect(explicit.value).toEqual({ api: "include", worker: "exclude" });
+  });
+
   it("uses explicit multi-filter lookup metadata for tri-state filter values", () => {
     const updates: Array<Record<string, string>> = [];
     const values = { status: "ready,!failed" };
@@ -283,6 +358,33 @@ describe("parametersToFormConfig", () => {
     if (filter.kind !== "date-range") throw new Error(`unexpected kind ${filter.kind}`);
     filter.onApply("now-7d", "now");
     expect(updates[0]["filter.updated_at"]).toBe(">=now-7d,<=now");
+  });
+
+  // A generated control whose absence is not a sensible query — Kubernetes log
+  // reads default to the last hour — declares its bound in the schema. An empty
+  // range control over a bounded query would state the wrong query.
+  it("shows a date-range parameter's declared default when nothing is selected", () => {
+    const values = { time: "" };
+    const config = parametersToFormConfig(
+      [{ name: "time", in: "query", schema: { type: "string", default: ">=now-1h" } }],
+      values,
+      () => {},
+      { lookup: { filters: { time: { label: "Time", type: "date-range" } } } },
+    );
+
+    expect(config.filters[0]).toMatchObject({ kind: "date-range", label: "Time", from: "now-1h" });
+  });
+
+  it("prefers a selected range over the declared default", () => {
+    const values = { time: ">=now-15m,<=now" };
+    const config = parametersToFormConfig(
+      [{ name: "time", in: "query", schema: { type: "string", default: ">=now-1h" } }],
+      values,
+      () => {},
+      { lookup: { filters: { time: { label: "Time", type: "date-range" } } } },
+    );
+
+    expect(config.filters[0]).toMatchObject({ kind: "date-range", from: "now-15m", to: "now" });
   });
 
   // A UUID column: exact values, nothing to enumerate. `multi` stays true on the

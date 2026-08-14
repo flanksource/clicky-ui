@@ -15,7 +15,7 @@ import {
 describe("QueryBrowser paging and provider diagnostics", () => {
   beforeEach(() => window.localStorage.clear());
 
-  it("asks the backend what it ran when Show query is chosen, and renders the exchange", async () => {
+  it("asks the backend what it ran when Debug is chosen, and renders the exchange", async () => {
     const diagnostics: QueryBrowserDiagnostics = {
       provider: "clickhouse",
       request: {
@@ -54,7 +54,7 @@ describe("QueryBrowser paging and provider diagnostics", () => {
     await screen.findByRole("table");
 
     fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: /Show query/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Debug$/ }));
 
     await waitFor(() =>
       expect(execute).toHaveBeenCalledWith({

@@ -33,6 +33,40 @@ describe("QueryBrowser", () => {
     ).toContain("SELECT 42");
   });
 
+  it("runs an option-only request when an empty query is allowed", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    render(
+      <QueryBrowser
+        id="kubernetes-logs"
+        initialOptions={{
+          kind: "Pod",
+          namespace: "payments",
+          name: "api-abc12",
+        }}
+        allowEmptyQuery
+        execute={execute}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await waitFor(() =>
+      expect(execute).toHaveBeenCalledWith({
+        query: "",
+        options: {
+          kind: "Pod",
+          namespace: "payments",
+          name: "api-abc12",
+        },
+      }),
+    );
+    expect(
+      window.localStorage.getItem(
+        "clicky-ui:query-browser:kubernetes-logs:history",
+      ),
+    ).toBeNull();
+  });
+
   // A trailing "+" says there is more without saying the console stopped, which
   // reads as a small table rather than a bounded read.
   it("names the bound a truncated console read stopped at", async () => {

@@ -764,6 +764,14 @@ describe("DataTable", () => {
 
     const trigger = within(menu).getByRole("menuitem", { name: /^View: Clicky/ });
     expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+
+    // Hovering past the row must not open it: a flyout nobody asked for covers
+    // the rows they were reaching for.
+    fireEvent.mouseEnter(trigger);
+    expect(
+      screen.queryByRole("menu", { name: "View: Clicky" }),
+    ).not.toBeInTheDocument();
+
     fireEvent.click(trigger);
 
     // A trigger opens its flyout instead of firing its own onSelect.
@@ -773,7 +781,19 @@ describe("DataTable", () => {
       within(submenu).getByRole("menuitem", { name: "Clicky" }),
     ).toBeDisabled();
 
-    fireEvent.click(within(submenu).getByRole("menuitem", { name: "JSON" }));
+    // Clicking the trigger again closes it, so the same gesture undoes itself.
+    fireEvent.click(trigger);
+    expect(
+      screen.queryByRole("menu", { name: "View: Clicky" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+
+    fireEvent.click(
+      within(screen.getByRole("menu", { name: "View: Clicky" })).getByRole(
+        "menuitem",
+        { name: "JSON" },
+      ),
+    );
     expect(chooseJson).toHaveBeenCalledTimes(1);
     // Choosing a child closes the whole menu, both levels with it.
     expect(
