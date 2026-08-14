@@ -20,6 +20,7 @@ export {
   type ChatContextPickerRenderProps,
 } from "./ChatWindow";
 export { ChatFab, type ChatFabProps } from "./ChatFab";
+export { ChatButton, type ChatButtonProps } from "./ChatButton";
 export {
   ThreadPicker,
   type ThreadPickerProps,

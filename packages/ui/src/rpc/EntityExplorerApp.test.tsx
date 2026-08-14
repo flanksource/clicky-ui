@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
 import type { OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import { EntityExplorerApp } from "./EntityExplorerApp";
@@ -33,22 +34,25 @@ function makeClient(): OperationsApiClient {
   };
 }
 
-function Harness() {
+function Harness({ actions }: { actions?: ReactNode }) {
   const adapter = useMemoryRouter("/widgets");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
         <RouterProvider adapter={adapter}>
-          <EntityExplorerApp client={makeClient()} />
+          <EntityExplorerApp
+            client={makeClient()}
+            {...(actions ? { actions } : {})}
+          />
         </RouterProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
 }
 
-function renderApp() {
-  return render(<Harness />);
+function renderApp(actions?: ReactNode) {
+  return render(<Harness {...(actions ? { actions } : {})} />);
 }
 
 describe("EntityExplorerApp", () => {
@@ -83,5 +87,11 @@ describe("EntityExplorerApp", () => {
         .querySelector('[data-slot="app-shell-content"]')
         ?.getAttribute("data-content-width"),
     ).toBe("full");
+  });
+
+  it("forwards host actions into the AppShell top bar", async () => {
+    const { container } = renderApp(<button type="button">Open assistant</button>);
+    const action = await screen.findByRole("button", { name: "Open assistant" });
+    expect(container.querySelector('[data-slot="app-shell-actions"]')).toContainElement(action);
   });
 });

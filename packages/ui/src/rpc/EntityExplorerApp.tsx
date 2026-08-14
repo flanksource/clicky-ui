@@ -32,6 +32,8 @@ export type EntityExplorerAppProps = {
   client: OperationsApiClient;
   basePath?: string;
   showApiExplorer?: boolean;
+  /** Right-aligned top-bar cluster forwarded to AppShell's actions slot. */
+  actions?: ReactNode;
   /**
    * Custom JsonSchemaForm field extensions applied to every create/edit form the
    * explorer renders — e.g. a SecretKeySelector widget keyed on an
@@ -75,6 +77,7 @@ export function EntityExplorerApp({
   client,
   basePath = "",
   showApiExplorer = true,
+  actions,
   formExtensions,
   formActions,
   surfaceActionLabels,
@@ -163,6 +166,7 @@ export function EntityExplorerApp({
       }
       navSections={navSections}
       sidebarFooter={<ThemeSwitcher />}
+      {...(actions ? { actions } : {})}
       // The page header belongs to the host, not to OperationCatalog — the
       // catalog renders only its results. OperationEntityPage still titles
       // itself, so this covers the collection route only.

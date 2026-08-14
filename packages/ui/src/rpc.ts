@@ -7,6 +7,7 @@ export {
   type EntityExplorerAppProps,
   type SurfaceActionLabels,
 } from "./rpc/EntityExplorerApp";
+export { ChatLayer, type ChatLayerProps } from "./rpc/ChatLayer";
 export {
   ACCEPT_OPTIONS,
   VIEW_OPTIONS,
