@@ -1,6 +1,6 @@
 import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
-import { UiComment } from "../../icons";
+import { UiSparkles } from "../../icons";
 import { useChatWindowManager } from "./chat-window-context";
 import { zIndex } from "../../overlay/zIndex";
 
@@ -9,14 +9,21 @@ export type ChatFabProps = {
   icon?: string | StaticIconComponent;
   /** Accessible label / tooltip. */
   label?: string;
+  /** Keep navbar chrome visible and focus an existing window when clicked. */
+  persistent?: boolean;
   className?: string;
 };
 
-/** A fixed bottom-right launch button that opens the first chat window. It
- *  hides itself once any window is open (the windows carry their own controls). */
-export function ChatFab({ icon = UiComment, label = "Open chat", className }: ChatFabProps) {
-  const { panels, openPanel } = useChatWindowManager();
-  if (panels.length > 0) return null;
+/** A fixed bottom-right chat launcher. By default it hides while a window is
+ * open; persistent launchers remain visible and focus the existing window. */
+export function ChatFab({
+  icon = UiSparkles,
+  label = "Open chat",
+  persistent = false,
+  className,
+}: ChatFabProps) {
+  const { panels, openPanel, findOrCreatePanel } = useChatWindowManager();
+  if (!persistent && panels.length > 0) return null;
 
   return (
     <button
@@ -24,8 +31,8 @@ export function ChatFab({ icon = UiComment, label = "Open chat", className }: Ch
       data-testid="chat-fab"
       title={label}
       aria-label={label}
-      onClick={() => openPanel()}
-      style={{ zIndex: zIndex.chatFab }}
+      onClick={() => (persistent ? findOrCreatePanel() : openPanel())}
+      {...(!persistent ? { style: { zIndex: zIndex.chatFab } } : {})}
       className={cn(
         "fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center",
         "rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90",
