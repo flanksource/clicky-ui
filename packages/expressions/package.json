@@ -1,0 +1,65 @@
+{
+  "name": "@flanksource/expressions",
+  "version": "0.1.0",
+  "description": "Monaco language support and a playground for the expression languages gomplate evaluates — CEL, Go templates and JSONPath.",
+  "homepage": "https://github.com/flanksource/clicky-ui#readme",
+  "bugs": "https://github.com/flanksource/clicky-ui/issues",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flanksource/clicky-ui.git",
+    "directory": "packages/expressions"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./playground": {
+      "types": "./dist/playground.d.ts",
+      "import": "./dist/playground.js",
+      "require": "./dist/playground.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build && vite build --mode cjs",
+    "vendor": "tsx scripts/vendor-lang.ts",
+    "vendor:check": "tsx scripts/vendor-lang.ts --check",
+    "test": "vitest run",
+    "lint": "oxlint src scripts --deny-warnings",
+    "typecheck": "tsc -b --noEmit",
+    "check": "pnpm run typecheck && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@flanksource/clicky-ui": ">=0.3.19",
+    "monaco-editor": ">=0.48 <1",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@flanksource/clicky-ui": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "monaco-editor": "catalog:",
+    "oxlint": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsx": "^4.7.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-dts": "catalog:",
+    "vitest": "catalog:"
+  }
+}
