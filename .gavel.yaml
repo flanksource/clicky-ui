@@ -23,6 +23,8 @@ lint:
 pre:
 - name: build
   run: pnpm --filter @flanksource/clicky-ui run build
+- name: build-expressions
+  run: pnpm --filter @flanksource/expressions run build
 - name: install-storybook-browser
   run: pnpm --filter storybook exec playwright install chromium
 procfile: {}

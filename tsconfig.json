@@ -6,6 +6,7 @@
   "include": [],
   "references": [
     { "path": "./packages/ui" },
+    { "path": "./packages/expressions" },
     { "path": "./apps/storybook" },
     { "path": "./apps/kitchen-sink" },
     { "path": "./apps/playground" },

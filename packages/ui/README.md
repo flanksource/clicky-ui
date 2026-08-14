@@ -85,13 +85,20 @@ Markdown and code highlighting use optional peer dependencies (`marked`, `shiki`
 
 ## Tailwind preset
 
+Tailwind CSS v4 consumers can load the preset through its compatibility directive:
+
+```css
+/* src/styles.css */
+@config "../tailwind.config.ts";
+@import "tailwindcss";
+```
+
 ```ts
 // tailwind.config.ts
 import preset from "@flanksource/clicky-ui/tailwind-preset";
 
 export default {
   presets: [preset],
-  content: ["./src/**/*.{ts,tsx}"],
 };
 ```
 

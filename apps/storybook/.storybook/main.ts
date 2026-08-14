@@ -1,4 +1,5 @@
 import type { StorybookConfig } from "@storybook/react-vite";
+import tailwindcss from "@tailwindcss/vite";
 
 const config: StorybookConfig = {
   stories: ["../../../packages/ui/src/**/*.stories.@(ts|tsx|mdx)"],
@@ -8,7 +9,7 @@ const config: StorybookConfig = {
   addons: [
     "@storybook/addon-docs",
     "@chromatic-com/storybook",
-    "@storybook/addon-vitest"
+    "@storybook/addon-vitest",
   ],
   framework: {
     name: "@storybook/react-vite",
@@ -29,6 +30,7 @@ const config: StorybookConfig = {
     if (process.env.STORYBOOK_BASE_PATH) {
       viteConfig.base = process.env.STORYBOOK_BASE_PATH;
     }
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss()];
     // Force a single React instance across the storybook app and the linked
     // packages/ui source it renders (their react resolves via different
     // node_modules paths in the pnpm workspace) — otherwise stories hit

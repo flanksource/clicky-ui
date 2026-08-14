@@ -7,6 +7,10 @@ import { cn } from "./utils";
 // consumer override, so the base (e.g. Button's fixed `h-control-h`) wins and the
 // override is silently dropped — that's the bug these guard against.
 describe("cn — design-token overrides", () => {
+  it("merges Tailwind 4 inset shadow scale utilities", () => {
+    expect(cn("inset-shadow-sm", "inset-shadow-md")).toBe("inset-shadow-md");
+  });
+
   it.each([
     // [inputs, the class that must remain, the class that must be dropped]
     [["h-control-h", "h-auto"], "h-auto", "h-control-h"],

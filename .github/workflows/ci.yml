@@ -54,6 +54,8 @@ jobs:
       - run: vp install
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
+      - name: Build expressions
+        run: pnpm --filter @flanksource/expressions run build
       - name: Build Storybook
         run: pnpm --filter storybook exec storybook build --disable-telemetry
       - name: Build kitchen-sink

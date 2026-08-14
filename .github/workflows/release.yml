@@ -13,6 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     # Skip the auto-bump commit so the workflow doesn't loop on itself.
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    strategy:
+      # Serially: each package commits its own version bump to main, and two
+      # jobs pushing to the same protected branch would race.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include:
+          - name: "@flanksource/clicky-ui"
+            directory: packages/ui
+            tag: clicky-ui
+          - name: "@flanksource/expressions"
+            directory: packages/expressions
+            tag: expressions
     steps:
       # Authenticate as a GitHub App so the bump commit/tag can be pushed to the
       # protected main branch. The App must be on the branch ruleset's bypass list
@@ -50,51 +63,62 @@ jobs:
 
       - name: Bump patch version
         id: bump
-        working-directory: packages/ui
+        working-directory: ${{ matrix.directory }}
         # Derive the next version from the highest version already published on
         # npm, not from package.json/git — they can drift when a prior release
         # publishes but its bump commit never lands back on main.
+        env:
+          TAG_PREFIX: ${{ matrix.tag }}
         run: |
           name=$(node -p "require('./package.json').name")
-          published=$(npm view "$name" versions --json \
+          published=$(npm view "$name" versions --json 2>/dev/null \
             | jq -r 'if type == "array" then .[] else . end' \
             | sort -V | tail -1)
           if [ -z "$published" ]; then
-            echo "Could not determine the highest published version for $name" >&2
-            exit 1
+            # Never published. The version in package.json is the intended
+            # first release, so take it as-is rather than bumping past it.
+            new_version="v$(node -p "require('./package.json').version")"
+            echo "First publish of $name at ${new_version#v}"
+          else
+            echo "Highest published version: $published"
+            npm version "$published" --no-git-tag-version --allow-same-version >/dev/null
+            new_version=$(npm version patch --no-git-tag-version)
           fi
-          echo "Highest published version: $published"
-          npm version "$published" --no-git-tag-version --allow-same-version >/dev/null
-          new_version=$(npm version patch --no-git-tag-version)
           echo "version=${new_version#v}" >> "$GITHUB_OUTPUT"
-          echo "tag=clicky-ui@${new_version#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_PREFIX}@${new_version#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build library
-        run: pnpm --filter @flanksource/clicky-ui run build
+        run: pnpm --filter ${{ matrix.name }} run build
 
       - name: Publish to npm
-        working-directory: packages/ui
+        working-directory: ${{ matrix.directory }}
         env:
           NPM_CONFIG_PROVENANCE: "true"
         run: pnpm publish --access public --no-git-checks
 
       - name: Commit, tag, and push
         env:
+          NAME: ${{ matrix.name }}
+          DIRECTORY: ${{ matrix.directory }}
           VERSION: ${{ steps.bump.outputs.version }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          git add packages/ui/package.json
-          git commit -m "chore(release): @flanksource/clicky-ui@${VERSION}"
+          git add "${DIRECTORY}/package.json"
+          git commit -m "chore(release): ${NAME}@${VERSION}"
           git tag "${TAG}"
+          # Rebase before pushing: an earlier matrix entry may have landed its
+          # own bump commit on main since this job checked out.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           git push origin "${TAG}"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NAME: ${{ matrix.name }}
           VERSION: ${{ steps.bump.outputs.version }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
           gh release create "${TAG}" \
-            --title "@flanksource/clicky-ui@${VERSION}" \
+            --title "${NAME}@${VERSION}" \
             --generate-notes
