@@ -34,6 +34,8 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   families?: SpecRuntimeFamily[] | undefined;
   /** Effort tiers offered when the catalog does not describe the model. */
   reasoningEfforts?: string[] | undefined;
+  /** Locks model identity (family, backend, and model) while leaving effort editable. */
+  locked?: boolean | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
 };
@@ -46,6 +48,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
+  locked = false,
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
@@ -59,23 +62,22 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     (entry) =>
       isSelectableModel(entry) &&
       entry.runtime?.backend === value.backend &&
-      runtimeModelMatches(entry, value)
+      runtimeModelMatches(entry, value),
   );
   const resolvedModel =
     selectedModel ??
     models.find(
-      (entry) => isSelectableModel(entry) && runtimeModelMatches(entry, value)
+      (entry) => isSelectableModel(entry) && runtimeModelMatches(entry, value),
     );
   const selectedModelUnavailable = Boolean(
     value.model &&
-      models.some(
-        (entry) =>
-          !isSelectableModel(entry) && runtimeModelMatches(entry, value)
-      )
+    models.some(
+      (entry) => !isSelectableModel(entry) && runtimeModelMatches(entry, value),
+    ),
   );
   const supportedEfforts = effortOptionsForModel(
     resolvedModel,
-    reasoningEfforts
+    reasoningEfforts,
   );
 
   const applyBackend = (familyId: string, modeId: string) => {
@@ -84,14 +86,14 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     let next = withOptionalRuntimeValue(
       withRuntimeValue(value, { backend }),
       "cliArgs",
-      undefined
+      undefined,
     );
     if (
       !modelBelongsToFamily(
         value.model,
         models,
         familyById(families, familyId),
-        backend
+        backend,
       )
     ) {
       next = withoutCatalogModel(next);
@@ -101,7 +103,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
 
   const applyCustomModel = (model: string) =>
     onChange(
-      withOptionalRuntimeValue(withoutCatalogModel(value), "model", model)
+      withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
     );
   // A menu row carries the backend of the catalog it was listed under, and one
   // catalog serves several backends — claude-cli and claude-cmux models are
@@ -118,8 +120,8 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       withOptionalRuntimeValue(
         withOptionalRuntimeValue(next, "backend", mode.backend),
         "mode",
-        mode.id
-      )
+        mode.id,
+      ),
     );
   };
   const clearModel = () => onChange(withoutCatalogModel(value));
@@ -138,6 +140,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
         selectedModel={resolvedModel}
         selectedModelUnavailable={selectedModelUnavailable}
         supportedEfforts={supportedEfforts}
+        locked={locked}
         ariaLabel={ariaLabel}
         className={className}
         onFamilyChange={(familyId) => applyBackend(familyId, selection.mode)}
@@ -162,6 +165,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       selectedMode={selection.mode}
       reasoningEfforts={reasoningEfforts}
       supportedEfforts={supportedEfforts}
+      locked={locked}
       ariaLabel={ariaLabel}
       className={className}
       onBackendChange={applyBackend}
@@ -177,13 +181,13 @@ function withoutCatalogModel<T extends RuntimeBarValue>(value: T): T {
   return withOptionalRuntimeValue(
     withOptionalRuntimeValue(value, "model", undefined),
     "id",
-    undefined
+    undefined,
   );
 }
 
 function withRuntimeValue<T extends RuntimeBarValue>(
   value: T,
-  patch: Partial<RuntimeBarValue>
+  patch: Partial<RuntimeBarValue>,
 ): T {
   return { ...value, ...patch };
 }
@@ -191,7 +195,7 @@ function withRuntimeValue<T extends RuntimeBarValue>(
 function withOptionalRuntimeValue<T extends RuntimeBarValue>(
   value: T,
   key: keyof RuntimeBarValue,
-  next: unknown
+  next: unknown,
 ): T {
   const updated = { ...value } as Record<string, unknown>;
   if (next === undefined || next === "") {

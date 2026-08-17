@@ -37,6 +37,42 @@ function openSegment(title: string) {
 }
 
 describe("RuntimeBar", () => {
+  it("locks model identity while keeping reasoning effort editable", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{
+          backend: "codex-cli",
+          model: "codex-cli/gpt-5",
+          effort: "high",
+        }}
+        onChange={onChange}
+        models={MODELS}
+        locked
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Model and backend are locked for this conversation/,
+      }),
+    );
+    expect(
+      screen.getByText(/Fork this conversation to change them/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Claude" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "GPT-5" })).toBeDisabled();
+    const effort = screen.getByRole("slider", { name: "Reasoning effort" });
+    expect(effort).not.toBeDisabled();
+    fireEvent.change(effort, { target: { value: "1" } });
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cli",
+      model: "codex-cli/gpt-5",
+      effort: "low",
+    });
+  });
+
   it("renders the combo summary and direct runtime controls", () => {
     render(
       <RuntimeBar
@@ -48,7 +84,7 @@ describe("RuntimeBar", () => {
         }}
         onChange={vi.fn()}
         models={MODELS}
-      />
+      />,
     );
 
     const trigger = screen.getByRole("button", {
@@ -60,10 +96,10 @@ describe("RuntimeBar", () => {
     const menu = screen.getByRole("menu");
     expect(menu).toHaveAttribute("aria-label", "Runtime controls");
     expect(
-      within(menu).getByRole("radiogroup", { name: "Family" })
+      within(menu).getByRole("radiogroup", { name: "Family" }),
     ).toBeInTheDocument();
     expect(
-      within(menu).getByRole("radiogroup", { name: "Runtime mode" })
+      within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
     ).toBeInTheDocument();
     expect(within(menu).queryByLabelText("Model id")).not.toBeInTheDocument();
     const modelChoice = within(menu).getByRole("button", {
@@ -73,7 +109,7 @@ describe("RuntimeBar", () => {
     expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5");
     expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5");
     expect(
-      within(menu).getByRole("slider", { name: "Reasoning effort" })
+      within(menu).getByRole("slider", { name: "Reasoning effort" }),
     ).toHaveAttribute("aria-valuetext", "High");
   });
 
@@ -89,13 +125,13 @@ describe("RuntimeBar", () => {
         }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     fireEvent.click(
       screen.getByRole("button", {
         name: "Runtime: Codex, CLI, GPT-5, effort High",
-      })
+      }),
     );
     const menu = screen.getByRole("menu");
     expect(menu).toHaveAttribute("aria-label", "Runtime controls");
@@ -117,7 +153,7 @@ describe("RuntimeBar", () => {
 
     fireEvent.change(
       within(menu).getByRole("slider", { name: "Reasoning effort" }),
-      { target: { value: "1" } }
+      { target: { value: "1" } },
     );
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cli",
@@ -134,7 +170,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "claude-cli" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Family — Claude");
@@ -150,7 +186,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "claude-agent", model: "claude-agent/sonnet" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Family — Claude");
@@ -170,7 +206,7 @@ describe("RuntimeBar", () => {
         }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Family — Claude");
@@ -190,7 +226,7 @@ describe("RuntimeBar", () => {
         }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Model — codex-cli/gpt-5");
@@ -211,7 +247,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "codex-cli", model: "codex-cli/gpt-5" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Codex CLI");
@@ -230,12 +266,12 @@ describe("RuntimeBar", () => {
         value={{ backend: "claude-agent" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Claude Agent SDK");
     expect(
-      screen.queryByRole("menuitem", { name: /^API/ })
+      screen.queryByRole("menuitem", { name: /^API/ }),
     ).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -247,12 +283,12 @@ describe("RuntimeBar", () => {
         value={{ backend: "gemini" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Model — prompt default");
     expect(
-      screen.getAllByRole("menuitem").map((item) => item.textContent)
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
     ).toEqual(["Prompt defaultno override"]);
 
     fireEvent.change(screen.getByLabelText("Model id"), {
@@ -271,7 +307,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "codex-cli" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Model — prompt default");
@@ -318,12 +354,12 @@ describe("RuntimeBar", () => {
             ],
           },
         ]}
-      />
+      />,
     );
 
     openSegment("Runtime mode");
     expect(
-      screen.queryByRole("menuitem", { name: /cmux/ })
+      screen.queryByRole("menuitem", { name: /cmux/ }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/Disabled by mode cmux/)).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
@@ -338,7 +374,7 @@ describe("RuntimeBar", () => {
         }}
         onChange={vi.fn()}
         models={MODELS}
-      />
+      />,
     );
 
     const bar = screen.getByRole("group", { name: "Runtime" });
@@ -357,18 +393,18 @@ describe("RuntimeBar", () => {
         value={{ backend: "codex-cli" }}
         onChange={vi.fn()}
         models={MODELS}
-      />
+      />,
     );
 
     fireEvent.click(
       screen.getByRole("button", {
         name: "Runtime: Codex, CLI, Prompt default, effort None",
-      })
+      }),
     );
 
     expect(screen.getByRole("button", { name: "GPT-5" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "GPT-5 mini" })
+      screen.queryByRole("button", { name: "GPT-5 mini" }),
     ).not.toBeInTheDocument();
   });
 
@@ -392,7 +428,7 @@ describe("RuntimeBar", () => {
             },
           },
         ]}
-      />
+      />,
     );
 
     openSegment("Model — prompt default");
@@ -449,7 +485,7 @@ describe("RuntimeBar", () => {
             },
           },
         ]}
-      />
+      />,
     );
 
     openSegment("Model — prompt default");
@@ -470,7 +506,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "codex-cli", model: "codex-cli/gpt-5" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Model — codex-cli/gpt-5");
@@ -486,7 +522,7 @@ describe("RuntimeBar", () => {
         value={{ backend: "codex-cli", effort: "high" }}
         onChange={onChange}
         models={MODELS}
-      />
+      />,
     );
 
     openSegment("Reasoning effort");
@@ -502,12 +538,12 @@ describe("RuntimeBar", () => {
         onChange={vi.fn()}
         models={MODELS}
         reasoningEfforts={["low", "high"]}
-      />
+      />,
     );
 
     openSegment("Reasoning effort");
     expect(
-      screen.getAllByRole("menuitem").map((item) => item.textContent)
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
     ).toEqual(["Nonesingle pass", "Low", "High", "Minimalunsupported"]);
   });
 });

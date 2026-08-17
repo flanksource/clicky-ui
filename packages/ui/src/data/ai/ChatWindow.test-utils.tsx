@@ -10,14 +10,19 @@ export const CHAT_WINDOW_TEST_TOOLS: ToolMeta[] = [
 export function OpenChatWindowOnMount({
   children,
   initialPrompt,
+  threadId,
 }: {
   children: ReactNode;
   initialPrompt?: { id: number; text: string } | null;
+  threadId?: string | null;
 }): ReactNode {
   const { openPanel } = useChatWindowManager();
   useEffect(() => {
-    openPanel(initialPrompt === undefined ? undefined : { initialPrompt });
-  }, [initialPrompt, openPanel]);
+    openPanel({
+      ...(initialPrompt !== undefined ? { initialPrompt } : {}),
+      ...(threadId !== undefined ? { threadId } : {}),
+    });
+  }, [initialPrompt, openPanel, threadId]);
   return <>{children}</>;
 }
 

@@ -29,6 +29,7 @@ export type RuntimeBarComboProps = {
   selectedModel: ChatModel | undefined;
   selectedModelUnavailable: boolean;
   supportedEfforts: string[];
+  locked: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onFamilyChange: (familyId: string) => void;
@@ -48,6 +49,7 @@ export function RuntimeBarCombo({
   selectedModel,
   selectedModelUnavailable,
   supportedEfforts,
+  locked,
   ariaLabel,
   className,
   onFamilyChange,
@@ -59,10 +61,10 @@ export function RuntimeBarCombo({
   const brand = runtimeFamilyBrand(family);
   const modelLabel = selectedModelUnavailable
     ? "Unavailable selection"
-    : selectedModel?.label ?? value.model ?? "Prompt default";
+    : (selectedModel?.label ?? value.model ?? "Prompt default");
   const effortLabel = value.effort ? effortLevelLabel(value.effort) : "None";
   const effortIcon = value.effort ? effortLevelIcon(value.effort) : undefined;
-  const summary = `${ariaLabel}: ${family.label}, ${mode.label}, ${modelLabel}, effort ${effortLabel}`;
+  const summary = `${ariaLabel}: ${family.label}, ${mode.label}, ${modelLabel}, effort ${effortLabel}${locked ? ". Model and backend are locked for this conversation; fork it to change them" : ""}`;
 
   return (
     <DropdownMenu
@@ -99,7 +101,7 @@ export function RuntimeBarCombo({
               icon={effortIcon}
               className={cn(
                 "size-4 shrink-0",
-                value.effort ? effortLevelColor(value.effort) : undefined
+                value.effort ? effortLevelColor(value.effort) : undefined,
               )}
             />
           )}
@@ -113,14 +115,22 @@ export function RuntimeBarCombo({
       {() => (
         <div className="p-1 text-xs">
           <div className="space-y-2 border-b border-border px-2 pb-3 pt-2">
+            {locked && (
+              <div className="rounded bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+                Model and backend are locked. Fork this conversation to change
+                them.
+              </div>
+            )}
             <FamilySegments
               families={families}
               value={family.id}
+              locked={locked}
               onChange={onFamilyChange}
             />
             <ModeSegments
               family={family}
               value={selectedMode}
+              locked={locked}
               onChange={onModeChange}
             />
             <EffortSlider
@@ -133,6 +143,7 @@ export function RuntimeBarCombo({
             models={models}
             familyBrand={brand}
             selectedId={selectedModel?.id ?? value.model}
+            locked={locked}
             onSelect={onModelSelect}
             onClear={onModelClear}
           />
@@ -145,10 +156,12 @@ export function RuntimeBarCombo({
 function FamilySegments({
   families,
   value,
+  locked,
   onChange,
 }: {
   families: SpecRuntimeFamily[];
   value: string;
+  locked: boolean;
   onChange: (familyId: string) => void;
 }) {
   return (
@@ -161,13 +174,14 @@ function FamilySegments({
       className="w-full"
       options={families
         .filter((family) =>
-          family.modes.some((mode) => !isUnavailable(mode.availability))
+          family.modes.some((mode) => !isUnavailable(mode.availability)),
         )
         .map((family) => {
           const brand = runtimeFamilyBrand(family);
           return {
             id: family.id,
             label: family.label,
+            disabled: locked,
             ...(brand.icon ? { icon: brand.icon } : {}),
           };
         })}
@@ -178,10 +192,12 @@ function FamilySegments({
 function ModeSegments({
   family,
   value,
+  locked,
   onChange,
 }: {
   family: SpecRuntimeFamily;
   value: string;
+  locked: boolean;
   onChange: (modeId: string) => void;
 }) {
   return (
@@ -196,6 +212,7 @@ function ModeSegments({
         .map((mode) => ({
           id: mode.id,
           label: mode.label,
+          disabled: locked,
           ...(mode.title ? { title: mode.title } : {}),
           ...(mode.icon ? { icon: mode.icon } : {}),
         }))}
@@ -207,12 +224,14 @@ function ModelChoices({
   models,
   familyBrand,
   selectedId,
+  locked,
   onSelect,
   onClear,
 }: {
   models: ChatModel[];
   familyBrand: ReturnType<typeof runtimeFamilyBrand>;
   selectedId?: string | undefined;
+  locked: boolean;
   onSelect: (model: ChatModel) => void;
   onClear: () => void;
 }) {
@@ -221,6 +240,7 @@ function ModelChoices({
       <ModelChoice
         label="Prompt default"
         selected={!selectedId}
+        disabled={locked}
         onClick={onClear}
       />
       {models.map((model) => {
@@ -231,6 +251,7 @@ function ModelChoices({
             label={model.label}
             title={model.id}
             selected={model.id === selectedId}
+            disabled={locked}
             {...(icon
               ? {
                   icon,
@@ -251,6 +272,7 @@ function ModelChoice({
   title,
   detail,
   selected,
+  disabled,
   icon,
   iconColor,
   onClick,
@@ -259,6 +281,7 @@ function ModelChoice({
   title?: string | undefined;
   detail?: string | undefined;
   selected: boolean;
+  disabled: boolean;
   icon?: NonNullable<ReturnType<typeof providerIcon>>;
   iconColor?: string | undefined;
   onClick: () => void;
@@ -267,6 +290,7 @@ function ModelChoice({
     <Button
       variant="ghost"
       type="button"
+      disabled={disabled}
       onClick={onClick}
       aria-label={detail ? `${label}. ${detail}` : label}
       {...(title ? { title } : {})}
@@ -295,7 +319,7 @@ function ModelChoice({
         icon={UiCheck}
         className={cn(
           "size-3.5 shrink-0 text-primary",
-          !selected && "invisible"
+          !selected && "invisible",
         )}
       />
     </Button>
@@ -364,7 +388,7 @@ function EffortSlider({
             const next = options[Number(event.target.value)];
             if (next === undefined) {
               throw new Error(
-                `Invalid reasoning effort index: ${event.target.value}`
+                `Invalid reasoning effort index: ${event.target.value}`,
               );
             }
             onChange(next);
@@ -382,8 +406,8 @@ function EffortSlider({
               currentIndex < 0
                 ? "border-destructive/25 bg-destructive/10 text-destructive"
                 : current
-                ? cn("border-current/25 bg-muted", effortLevelColor(current))
-                : "border-border bg-muted text-muted-foreground"
+                  ? cn("border-current/25 bg-muted", effortLevelColor(current))
+                  : "border-border bg-muted text-muted-foreground",
             )}
             title={`Effort: ${label}`}
           >
@@ -397,7 +421,7 @@ function EffortSlider({
           icon={lastIcon}
           className={cn(
             "mt-3 size-3.5",
-            effortLevelColor(supported[supported.length - 1]!)
+            effortLevelColor(supported[supported.length - 1]!),
           )}
         />
       ) : (

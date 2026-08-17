@@ -7,7 +7,12 @@ import { PromptInput } from "./PromptInput";
 import { Suggestions } from "./Suggestion";
 import { DEFAULT_REASONING_EFFORTS } from "./effort-icons";
 import { defaultChatModelId } from "./models";
-import { getChatSession, postToolApproval } from "./approval";
+import {
+  getChatSession,
+  postToolApproval,
+  type CaptainChatSession,
+} from "./approval";
+import { isForkSeedMessage } from "./fork-seed";
 import {
   hasStructuredRuntime,
   resolveChatRuntime,
@@ -99,6 +104,13 @@ export type ChatProps = {
   /** Canonical Captain session endpoint used to hydrate messages and resolve
    *  approvals. The session and approval ids are appended to this URL. */
   sessionsApi?: string | null;
+  /** Prevents changing model/backend for an existing Captain session. Effort
+   *  and other per-turn generation settings remain editable. */
+  runtimeLocked?: boolean;
+  /** Reports the number of real (non-fork-seed) persisted/UI messages. */
+  onMessageCountChange?: (count: number) => void;
+  /** Reports the authoritative Captain session after detail hydration. */
+  onSessionHydrated?: (session: CaptainChatSession) => void;
   /** Optional host renderer for recognized completed tool outputs. Takes
    *  priority over `toolRenderers` on the output surface. */
   renderToolResult?: ToolResultRenderer;
@@ -154,6 +166,9 @@ export function Chat({
   attachmentLimits,
   threadId,
   sessionsApi = null,
+  runtimeLocked = false,
+  onMessageCountChange,
+  onSessionHydrated,
   renderToolResult,
   tools,
   toolRenderers,
@@ -190,6 +205,12 @@ export function Chat({
   );
   const lastDefaultModel = useRef(defaultModel);
   const sentInitialPromptId = useRef<number | null>(null);
+  const activeThreadRef = useRef(threadId);
+  const onMessageCountChangeRef = useRef(onMessageCountChange);
+  const onSessionHydratedRef = useRef(onSessionHydrated);
+  activeThreadRef.current = threadId;
+  onMessageCountChangeRef.current = onMessageCountChange;
+  onSessionHydratedRef.current = onSessionHydrated;
   const runtime = controlledRuntime ?? internalRuntime;
 
   // Provided once here; <ToolCall> reads it from context, so no tool-render
@@ -327,6 +348,7 @@ export function Chat({
         }
         setMessagesRef.current(session.messages as ChatUIMessage[]);
         setHydratedSessionId(session.id);
+        onSessionHydratedRef.current?.(session);
       })
       .catch((cause) => {
         if (cancelled) return;
@@ -338,6 +360,12 @@ export function Chat({
       cancelled = true;
     };
   }, [sessionsApi, threadId]);
+
+  useEffect(() => {
+    onMessageCountChangeRef.current?.(
+      messages.filter((message) => !isForkSeedMessage(message)).length,
+    );
+  }, [messages]);
 
   useEffect(() => {
     if (!initialPrompt || status !== "ready") return;
@@ -394,6 +422,7 @@ export function Chat({
     approved: boolean,
     reason?: string,
   ) => {
+    const approvalThreadId = threadId;
     setApprovalError(undefined);
     try {
       if (!sessionsApi) {
@@ -403,18 +432,20 @@ export function Chat({
       }
       const session = await postToolApproval({
         sessionsApi,
-        sessionId: threadId ?? "",
+        sessionId: approvalThreadId ?? "",
         approvalId: id,
         approved,
         ...(reason ? { reason } : {}),
       });
-      if (session.id !== threadId) {
+      if (activeThreadRef.current !== approvalThreadId) return;
+      if (session.id !== approvalThreadId) {
         throw new Error(
-          `Captain chat session response ID "${session.id}" does not match active session "${threadId ?? ""}".`,
+          `Captain chat session response ID "${session.id}" does not match active session "${approvalThreadId ?? ""}".`,
         );
       }
       setMessages(session.messages as ChatUIMessage[]);
     } catch (cause) {
+      if (activeThreadRef.current !== approvalThreadId) return;
       setApprovalError(
         cause instanceof Error ? cause : new Error(String(cause)),
       );
@@ -430,6 +461,7 @@ export function Chat({
       selectedModel={selectedModel}
       usage={usage}
       threadId={threadId}
+      locked={runtimeLocked}
       onRuntimeChange={handleRuntimeChange}
     />
   );

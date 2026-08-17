@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { Chat } from "./Chat";
@@ -364,6 +370,55 @@ describe("Chat Captain session projection", () => {
     fetchMock.mockRestore();
   });
 
+  it("reports authoritative runtime hydration and excludes fork seeds from the message count", async () => {
+    const onSessionHydrated = vi.fn();
+    const onMessageCountChange = vi.fn();
+    const session = {
+      id: "session-1",
+      revision: 2,
+      runtime: { model: "gpt-5", backend: "openai" },
+      messages: [
+        {
+          id: "fork-seed",
+          role: "user",
+          parts: [
+            {
+              type: "data-fork-seed",
+              data: { forkedFrom: "source-1", title: "Source" },
+            },
+            { type: "text", text: "Prior transcript" },
+          ],
+        },
+        {
+          id: "user-1",
+          role: "user",
+          parts: [{ type: "text", text: "Continue here" }],
+        },
+      ],
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json(session));
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport()}
+        threadId="session-1"
+        sessionsApi="/api/chat/sessions"
+        onSessionHydrated={onSessionHydrated}
+        onMessageCountChange={onMessageCountChange}
+      />,
+    );
+
+    expect(await screen.findByText("Continue here")).toBeInTheDocument();
+    expect(screen.getByText("Forked from Source")).toBeInTheDocument();
+    expect(onSessionHydrated).toHaveBeenCalledWith(session);
+    expect(onMessageCountChange).toHaveBeenLastCalledWith(1);
+    fetchMock.mockRestore();
+  });
+
   it("replaces local messages with the session returned by approval", async () => {
     const sendMessages = vi.fn();
     const fetchMock = vi
@@ -470,6 +525,74 @@ describe("Chat Captain session projection", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    fetchMock.mockRestore();
+  });
+
+  it("does not let an approval response overwrite a newly selected thread", async () => {
+    let resolveApproval: ((response: Response) => void) | undefined;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/session-1")) {
+          return Promise.resolve(
+            Response.json({
+              id: "session-1",
+              messages: [pendingMessage()],
+            }),
+          );
+        }
+        if (url.includes("/session-1/approvals/")) {
+          return new Promise<Response>((resolve) => {
+            resolveApproval = resolve;
+          });
+        }
+        if (url.endsWith("/session-2")) {
+          return Promise.resolve(
+            Response.json({
+              id: "session-2",
+              messages: [
+                {
+                  id: "thread-2-user",
+                  role: "user",
+                  parts: [{ type: "text", text: "Thread two history" }],
+                },
+              ],
+            }),
+          );
+        }
+        throw new Error(`unexpected request ${url}`);
+      });
+    const props = {
+      models: [],
+      modelsApi: null,
+      transport: recordingTransport(),
+      sessionsApi: "/api/chat/sessions",
+    } as const;
+    const { rerender } = render(<Chat {...props} threadId="session-1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(resolveApproval).toBeTypeOf("function"));
+    rerender(<Chat {...props} threadId="session-2" />);
+    expect(await screen.findByText("Thread two history")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveApproval?.(
+        Response.json({
+          id: "session-1",
+          messages: [
+            {
+              id: "old-thread-assistant",
+              role: "assistant",
+              parts: [{ type: "text", text: "Old approval response" }],
+            },
+          ],
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Thread two history")).toBeInTheDocument();
+    expect(screen.queryByText("Old approval response")).not.toBeInTheDocument();
     fetchMock.mockRestore();
   });
 });
