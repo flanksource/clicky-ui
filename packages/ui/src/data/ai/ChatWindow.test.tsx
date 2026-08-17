@@ -293,7 +293,9 @@ describe("ChatWindow", () => {
       </ChatWindowManagerProvider>,
     );
 
-    expect(await screen.findByText("Source question")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Source question")).toBeInTheDocument(),
+    );
     expect(
       screen.getByRole("button", {
         name: /Model and backend are locked for this conversation/,
@@ -324,5 +326,110 @@ describe("ChatWindow", () => {
         backend: "codex-agent",
       });
     });
+  });
+
+  it("ignores a fork response after the source panel switches threads", async () => {
+    let resolveFork!: (response: Response) => void;
+    const pendingFork = new Promise<Response>((resolve) => {
+      resolveFork = resolve;
+    });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/chat/sessions" && !init?.method) {
+          return Response.json([
+            { id: "source-1", title: "Source" },
+            { id: "other-1", title: "Other" },
+          ]);
+        }
+        if (url === "/api/chat/sessions/source-1" && !init?.method) {
+          return Response.json({
+            id: "source-1",
+            messages: [
+              {
+                id: "source-user",
+                role: "user",
+                parts: [{ type: "text", text: "Source question" }],
+              },
+            ],
+          });
+        }
+        if (url === "/api/chat/sessions/other-1" && !init?.method) {
+          return Response.json({
+            id: "other-1",
+            messages: [
+              {
+                id: "other-user",
+                role: "user",
+                parts: [{ type: "text", text: "Other question" }],
+              },
+            ],
+          });
+        }
+        if (
+          url === "/api/chat/sessions/source-1/fork" &&
+          init?.method === "POST"
+        ) {
+          return pendingFork;
+        }
+        if (url === "/api/chat/sessions/fork-1" && !init?.method) {
+          throw new Error("stale fork must not be opened");
+        }
+        throw new Error(`unexpected request ${url}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ChatWindowManagerProvider storageId="stale-fork-window">
+        <OpenChatWindowOnMount threadId="source-1">
+          <ChatWindowLayer
+            toolsApi={null}
+            chat={{ modelsApi: null, transport: recordingTransport() }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Source question")).toBeInTheDocument(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Fork conversation into a new window",
+      }),
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/chat/sessions/source-1/fork",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    fireEvent.click(await screen.findByText("Other"));
+    await waitFor(() =>
+      expect(screen.getByText("Other question")).toBeInTheDocument(),
+    );
+
+    resolveFork(
+      Response.json(
+        { id: "fork-1", forkedFrom: "source-1", messages: [] },
+        { status: 201 },
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Fork conversation into a new window",
+        }),
+      ).toBeEnabled(),
+    );
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          String(input) === "/api/chat/sessions/fork-1" && !init?.method,
+      ),
+    ).toBe(false);
   });
 });

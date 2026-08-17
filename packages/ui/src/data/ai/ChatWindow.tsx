@@ -143,6 +143,8 @@ export function ChatWindow({
   const [forking, setForking] = useState(false);
   const runtimeLocked = runtimeBound || messageCount > 0;
   const preferredRuntimeRef = useRef(runtime);
+  const threadIdRef = useRef(panel.threadId);
+  threadIdRef.current = panel.threadId;
 
   useEffect(() => {
     if (!runtimeLocked) preferredRuntimeRef.current = runtime;
@@ -316,9 +318,11 @@ export function ChatWindow({
   const handleFork = useCallback(async () => {
     if (!sessionsApi || !panel.threadId || messageCount === 0 || forking)
       return;
+    const sourceThreadId = panel.threadId;
     setForking(true);
     try {
-      const fork = await forkChatSession(sessionsApi, panel.threadId);
+      const fork = await forkChatSession(sessionsApi, sourceThreadId);
+      if (threadIdRef.current !== sourceThreadId) return;
       openPanel({ threadId: fork.id });
     } catch (error) {
       console.warn("clicky-ui: failed to fork chat session", error);
