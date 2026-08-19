@@ -119,7 +119,9 @@ export function MultiSelect({
         className={cn(
           "w-fit max-w-[15rem] min-w-0 justify-between gap-3 text-left font-normal",
           triggerClassName,
-          value.length === 0 && "text-muted-foreground",
+          // Empty means the trigger is showing its placeholder, so it reads at
+          // placeholder weight rather than at helper-text weight.
+          value.length === 0 && "text-placeholder",
         )}
         {...getReferenceProps()}
       >

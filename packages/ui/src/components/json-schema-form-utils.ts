@@ -10,7 +10,7 @@ import type {
 // Non-size styling shared by every text-like input box; the size token supplies
 // height, horizontal padding, and text size (see inputSizeClass).
 const INPUT_BASE =
-  "w-full min-w-0 rounded-md border border-input bg-background text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring";
+  "w-full min-w-0 rounded-md border border-input bg-background text-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed disabled:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring";
 
 export function inputClass(size: FormSize): string {
   return cn(INPUT_BASE, inputSizeClass[size]);

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNod
 import { cn } from "../lib/utils";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
-import { DateTimePicker } from "./DateTimePicker";
+import { DateField } from "./DateField";
 import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
 import { GridControl } from "./json-schema-form-grid";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
@@ -233,7 +233,8 @@ export function NumberSliderControl({
 
 // DateControl edits a `format: date`/`date-time` string. Read-only, it shows the
 // human-readable absolute + relative form (e.g. "Apr 15, 2026, 12:00 PM (2h
-// ago)"); editable, a DateTimePicker. The raw string is committed unchanged so a
+// ago)"); editable, a DateField in the schema's date or datetime mode. The raw
+// string is committed unchanged so a
 // consumer-permitted template token in the field is preserved.
 export function DateControl({
   field,
@@ -260,7 +261,8 @@ export function DateControl({
     );
   }
   return (
-    <DateTimePicker
+    <DateField
+      mode={field.dateFormat === "date-time" ? "datetime" : "date"}
       id={fieldId}
       aria-label={field.label}
       data-jsf-input

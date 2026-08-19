@@ -1,4 +1,8 @@
-import type { FilterBarFilter } from "./FilterBar";
+import type {
+  FilterBarDateRangeFilter,
+  FilterBarFilter,
+  FilterBarRangeProps,
+} from "./FilterBar";
 
 // FilterExtension decorates a resolved filter before it renders — the FilterBar
 // analogue of JsonSchemaForm's PreExtension. Consumers compose these in array
@@ -13,6 +17,24 @@ export function applyFilterExtensions(
 ): FilterBarFilter {
   if (!extensions || extensions.length === 0) return filter;
   return extensions.reduce((current, ext) => ext(current), filter);
+}
+
+// dateRangeFilterProps strips the filter's identity off, leaving the range the
+// controls take. `key` in particular must not reach a component as a prop.
+//
+// It is also how a date-range filter is promoted out of the filter list into a
+// bar's trailing range slot, which is why it lives here rather than beside the
+// controls that spread it.
+export function dateRangeFilterProps(filter: FilterBarDateRangeFilter): FilterBarRangeProps {
+  const {
+    key: _key,
+    kind: _kind,
+    label: _label,
+    icon: _icon,
+    description: _description,
+    ...range
+  } = filter;
+  return range;
 }
 
 export function clearFilterBarFilter(filter: FilterBarFilter) {

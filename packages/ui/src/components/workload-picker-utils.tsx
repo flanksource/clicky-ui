@@ -72,9 +72,20 @@ function workloadName(kind: WorkloadKind, r: WorkloadResource): string {
 }
 
 // ParsedWorkloadKey is the structured form of a `[namespace/]kind/name` value.
+// An empty `name` is the namespace-only form: a namespace is in scope but no
+// workload within it has been picked.
 export type ParsedWorkloadKey = { namespace?: string; kind?: WorkloadKind; name: string };
 
 const KNOWN_KINDS = new Set<string>(ALL_WORKLOAD_KINDS);
+
+// namespaceKey is the value a namespace alone contributes: `namespace/`, the
+// kind and name left empty. It keeps a namespace-with-no-workload expressible in
+// the same single value the picker emits, so a consumer that persists the value
+// (a profile query, say) round-trips the namespace instead of dropping it the
+// moment there is no workload to pair it with.
+export function namespaceKey(namespace: string | undefined): string {
+  return namespace ? `${namespace}/` : "";
+}
 
 // workloadKey is the value a resource contributes (what onChange emits): a
 // `[namespace/]kind/name` composite so two workloads of different kinds sharing
@@ -92,7 +103,8 @@ export function workloadKey(
 // parseWorkloadKey splits a `[namespace/]kind/name` value back into its parts.
 // The trailing segment is always the name (a host may itself contain no slash);
 // the segment before it is the kind when it is a known workload kind, and any
-// remaining leading segment is the namespace. A bare value (no recognised
+// remaining leading segment is the namespace. `namespace/` parses as that
+// namespace with an empty name (see namespaceKey). A bare value (no recognised
 // kind/name shape) is returned as just its name so freeform input survives.
 export function parseWorkloadKey(value: string): ParsedWorkloadKey {
   const parts = value.split("/");
@@ -103,6 +115,11 @@ export function parseWorkloadKey(value: string): ParsedWorkloadKey {
     const parsed: ParsedWorkloadKey = { kind: maybeKind as WorkloadKind, name };
     if (namespace) parsed.namespace = namespace;
     return parsed;
+  }
+  // A single trailing slash and nothing after it is a namespace on its own —
+  // distinguishable from freeform input, which carries no slash.
+  if (name === "" && parts.length === 2 && parts[0]) {
+    return { namespace: parts[0], name: "" };
   }
   return { name: value };
 }
