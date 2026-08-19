@@ -281,7 +281,7 @@ function PreferencesMenu({
                 // Keep arrow/space/enter keys inside the input instead of driving
                 // the menu's list navigation or closing it.
                 onKeyDown={(e) => e.stopPropagation()}
-                className="w-full rounded-md border border-input bg-background py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-md border border-input bg-background py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-placeholder focus-visible:ring-2 focus-visible:ring-ring"
               />
               {filterActive && (
                 <button

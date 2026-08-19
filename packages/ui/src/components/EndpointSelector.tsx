@@ -261,11 +261,15 @@ export function EndpointSelector({
   };
 
   const selectWorkload = (key: string) => {
-    if (!key) {
+    const parsed = key ? parseWorkloadKey(key) : undefined;
+    // A namespace-only key (empty name) means a namespace is in scope with no
+    // workload picked in it. An endpoint needs a workload to address, so there
+    // is nothing to report yet — the namespace reaches the consumer through
+    // onNamespaceChange instead.
+    if (!parsed || !parsed.name) {
       onChange(undefined);
       return;
     }
-    const parsed = parseWorkloadKey(key);
     const kind = parsed.kind;
     if (!kind || !enabledKinds.includes(kind)) {
       throw new Error(

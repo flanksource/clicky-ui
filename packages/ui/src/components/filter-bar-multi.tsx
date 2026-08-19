@@ -261,7 +261,7 @@ export function MultiFilterPanel({
           <input
             type="search"
             aria-label={`Filter ${filter.label} options`}
-            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-placeholder"
             placeholder={`Filter ${filter.label.toLowerCase()}`}
             value={optionQuery}
             onChange={(event) => setOptionQuery(event.target.value)}

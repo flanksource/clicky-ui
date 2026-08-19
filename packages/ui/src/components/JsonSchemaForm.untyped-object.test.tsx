@@ -73,7 +73,7 @@ describe("JsonSchemaForm untyped object composition", () => {
     expect(screen.getByRole("combobox", { name: /^Asset category/ })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /^Asset identifier/ })).toHaveValue("asset-1");
     expect(screen.getByLabelText(/^Acquisition date/)).toHaveValue("2026-07-28");
-    expect(screen.getByRole("button", { name: "Open time picker" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open date picker" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /^Useful life/ })).toHaveValue("5");
     expect(screen.getByRole("textbox", { name: /^Useful life/ })).toHaveAttribute("inputmode", "decimal");
     expect(screen.queryByRole("textbox", { name: /^account dimensions/ })).not.toBeInTheDocument();

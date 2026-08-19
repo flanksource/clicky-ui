@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { WorkloadPicker } from "./WorkloadPicker";
 import {
   kindForValue,
   loadedWorkloads,
+  namespaceKey,
   parseWorkloadKey,
   workloadKey,
   type WorkloadKind,
@@ -158,7 +159,9 @@ describe("WorkloadPicker", () => {
     await waitFor(() =>
       expect(loadWorkloads).toHaveBeenCalledWith(["service"], "search"),
     );
-    expect(onChange).toHaveBeenCalledWith("");
+    // The workload cannot survive the move, but the new namespace is reported
+    // as a namespace-only key so a consumer can persist it on its own.
+    expect(onChange).toHaveBeenCalledWith("search/");
 
     fireEvent.focus(screen.getByRole("combobox", { name: "Workload" }));
     fireEvent.mouseDown(await screen.findByRole("option", { name: "redis" }));
@@ -185,6 +188,91 @@ describe("WorkloadPicker", () => {
     expect(screen.getByRole("combobox", { name: "Namespace" })).toHaveValue(
       "search",
     );
+  });
+
+  it("shows the namespace of a namespace-only value, with no workload picked", async () => {
+    const loadWorkloads = vi.fn(loadAll);
+    render(
+      <WorkloadPicker
+        value="search/"
+        onChange={vi.fn()}
+        loadWorkloads={loadWorkloads}
+        kinds={["service"]}
+        strict
+        allowNamespaceSelection
+        loadNamespaces={() => Promise.resolve(["demo", "search"])}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "search"),
+    );
+    expect(screen.getByRole("combobox", { name: "Namespace" })).toHaveValue(
+      "search",
+    );
+    // The namespace is not a workload: the workload stays empty rather than
+    // showing "search/", and strict mode does not flag it as a missing workload.
+    const workload = screen.getByRole("combobox", { name: "Workload" });
+    expect(workload).toHaveValue("");
+    expect(workload).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("keeps the namespace when the workload is cleared", async () => {
+    const onChange = vi.fn();
+    const loadWorkloads = vi.fn(loadAll);
+    render(
+      <WorkloadPicker
+        value="search/service/demo-svc"
+        onChange={onChange}
+        loadWorkloads={loadWorkloads}
+        kinds={["service"]}
+        allowNamespaceSelection
+        loadNamespaces={() => Promise.resolve(["demo", "search"])}
+      />,
+    );
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "search"),
+    );
+
+    // Scoped to the workload's own control — the namespace combobox carries a
+    // Clear of its own.
+    const workload = screen
+      .getByRole("combobox", { name: "Workload" })
+      .closest("[data-jsf-control]") as HTMLElement;
+    fireEvent.click(within(workload).getByRole("button", { name: "Clear" }));
+    expect(onChange).toHaveBeenCalledWith("search/");
+  });
+
+  it("lays the namespace out on the workload's row, taking the smaller share", async () => {
+    const loadWorkloads = vi.fn(loadAll);
+    render(
+      <WorkloadPicker
+        value=""
+        namespace="demo"
+        onChange={vi.fn()}
+        loadWorkloads={loadWorkloads}
+        kinds={["service"]}
+        allowNamespaceSelection
+        loadNamespaces={() => Promise.resolve(["demo", "search"])}
+      />,
+    );
+    await waitFor(() =>
+      expect(loadWorkloads).toHaveBeenCalledWith(["service"], "demo"),
+    );
+
+    const namespace = screen.getByRole("combobox", { name: "Namespace" });
+    const workload = screen.getByRole("combobox", { name: "Workload" });
+    // Same flex row, rather than the stacked labelled Fields they used to be.
+    const row = namespace.closest("div.flex-nowrap");
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(workload);
+    // The namespace is the fixed-width half; the workload takes the remainder,
+    // since `[kind/]name` labels are the ones that need the width.
+    expect(namespace.closest("div.basis-28")).not.toBeNull();
+    expect(workload.closest("div.flex-1")).not.toBeNull();
+    // The stacked "Namespace" <Field> label is gone — the placeholder names it.
+    expect(screen.queryByText("Namespace")).toBeNull();
+    expect(namespace).toHaveAttribute("placeholder", "Select namespace…");
   });
 
   it("rejects namespace selection without a namespace loader", () => {
@@ -446,6 +534,17 @@ describe("workloadKey / parseWorkloadKey", () => {
     expect(parseWorkloadKey("legacy-svc")).toEqual({ name: "legacy-svc" });
     // 'foo' is not a known kind, so the whole value is the name.
     expect(parseWorkloadKey("foo/bar")).toEqual({ name: "foo/bar" });
+  });
+
+  it("round-trips a namespace with no workload picked in it", () => {
+    expect(namespaceKey("payments")).toBe("payments/");
+    expect(parseWorkloadKey(namespaceKey("payments"))).toEqual({
+      namespace: "payments",
+      name: "",
+    });
+    // No namespace means nothing is in scope, not a stray "/".
+    expect(namespaceKey(undefined)).toBe("");
+    expect(namespaceKey("")).toBe("");
   });
 });
 

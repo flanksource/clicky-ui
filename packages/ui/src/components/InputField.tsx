@@ -49,6 +49,12 @@ type InputFieldSharedProps<
   hotkey?: string | undefined;
   /** Called before the field is focused when the shortcut is pressed. */
   onShortcut?: (() => void) | undefined;
+  /**
+   * Marks the control as invalid: renders a destructive border and sets
+   * aria-invalid on the native element. Purely presentational — the consumer
+   * decides what invalid means, exactly as `Combobox`'s own `invalid` does.
+   */
+  invalid?: boolean | undefined;
   /** Classes applied to the outer control. */
   className?: string | undefined;
   /** Classes applied to the native input. */
@@ -88,6 +94,7 @@ export const InputField = forwardRef<
     shortcutKey,
     hotkey,
     onShortcut,
+    invalid,
     className,
     inputClassName,
     shortcutClassName,
@@ -126,6 +133,13 @@ export const InputField = forwardRef<
         as === "textarea"
           ? "min-h-control-h items-start py-density-1"
           : "h-control-h items-center",
+        // Same pair ComboboxControl uses, so an invalid text field and an
+        // invalid combobox read identically in the same form.
+        invalid && "border-destructive focus-within:ring-destructive",
+        // The border lives out here while `disabled` lands on the inner
+        // element, so the chrome can only see it through :has(). Without this
+        // a disabled field is indistinguishable from an editable one.
+        "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50",
         className,
       )}
     >
@@ -148,9 +162,11 @@ export const InputField = forwardRef<
           }
           className={cn(
             "min-w-0 flex-1 resize-y border-none bg-transparent text-sm text-foreground outline-none",
-            "placeholder:text-muted-foreground",
+            "placeholder:text-placeholder",
+            "disabled:cursor-not-allowed",
             inputClassName,
           )}
+          {...(invalid ? { "aria-invalid": true } : {})}
           {...(rest as NativeTextareaProps)}
         />
       ) : (
@@ -170,11 +186,14 @@ export const InputField = forwardRef<
           }
           className={cn(
             "min-w-0 flex-1 border-none bg-transparent text-sm text-foreground outline-none",
-            "placeholder:text-muted-foreground",
+            "placeholder:text-placeholder",
+            "disabled:cursor-not-allowed",
             type === "search" &&
               "[&::-webkit-search-cancel-button]:appearance-none",
             inputClassName,
           )}
+          // Spread last so a caller passing its own aria-invalid still wins.
+          {...(invalid ? { "aria-invalid": true } : {})}
           {...(rest as NativeInputProps)}
         />
       )}
