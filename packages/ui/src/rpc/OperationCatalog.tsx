@@ -464,6 +464,9 @@ export function OperationCatalog({
                 {...(dataTablePagination
                   ? { pagination: dataTablePagination }
                   : {})}
+                {...(filterBarConfig.sort
+                  ? { sort: filterBarConfig.sort }
+                  : {})}
                 {...(download ? { download } : {})}
                 {...walkProps}
               />
@@ -481,6 +484,9 @@ export function OperationCatalog({
                   // rows the moment page two arrives.
                   ...(dataTablePagination
                     ? { pagination: dataTablePagination }
+                    : {}),
+                  ...(filterBarConfig.sort
+                    ? { sort: filterBarConfig.sort }
                     : {}),
                   ...(download ? { download } : {}),
                   ...(surfaceKey ? { surfaceKey } : {}),

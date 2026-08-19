@@ -23,6 +23,7 @@ import { ExecutionResult } from "./ExecutionResult";
 import { mergeExecutionPages } from "./executionPages";
 import { useRowDetailNavigation } from "./rowNavigation";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
+import type { ParameterSort } from "./formMetadata";
 
 // ResultRenderContext is handed to a host-supplied resultRenderer so it can
 // replace the default result surface for selected entities (e.g. render a
@@ -39,6 +40,7 @@ export type ResultRenderContext = {
   // replacement surface is still a page of a server-paged result, so it is
   // handed the same controls rather than left to present one page as the whole.
   pagination?: DataTablePagination;
+  sort?: ParameterSort;
   download?: ClickyDownloadOptions;
   /**
    * Every page fetched in the current cursor walk, oldest first — `response` is
@@ -89,6 +91,7 @@ export type OperationResultViewProps = {
   detailOperation?: ResolvedOperation | undefined;
   filterConfig?: OperationResultFilterConfig;
   pagination?: DataTablePagination;
+  sort?: ParameterSort;
   download?: ClickyDownloadOptions;
   /**
    * Every page of the current cursor walk, oldest first, with `response` as the
@@ -133,6 +136,7 @@ export function OperationResultView({
   detailOperation,
   filterConfig,
   pagination,
+  sort,
   download,
   pages,
   infinite,
@@ -211,6 +215,7 @@ export function OperationResultView({
         ? { onCellFilterChange: filterConfig.onCellFilterChange }
         : {})}
       {...(pagination ? { pagination } : {})}
+      {...(sort ? { sort: sort.value, onSortChange: sort.onChange } : {})}
       {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
     />

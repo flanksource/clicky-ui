@@ -8,7 +8,13 @@
 // page it has fetched into one continuous table.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OperationCatalog } from "./OperationCatalog";
 import { OperationsApiClientError } from "./apiClient";
@@ -26,7 +32,10 @@ beforeEach(() => {
 
 function renderWidgets() {
   const executeSpy = vi.fn(FAKE_CLIENT.executeCommand);
-  const client: OperationsApiClient = { ...FAKE_CLIENT, executeCommand: executeSpy };
+  const client: OperationsApiClient = {
+    ...FAKE_CLIENT,
+    executeCommand: executeSpy,
+  };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -34,7 +43,11 @@ function renderWidgets() {
   render(
     <QueryClientProvider client={queryClient}>
       <OperationCatalog
-        definition={{ key: "widgets", title: "Widgets", description: "Remote-paged widgets." }}
+        definition={{
+          key: "widgets",
+          title: "Widgets",
+          description: "Remote-paged widgets.",
+        }}
         entities={["widget"]}
         surfaceKey="widgets"
         client={client}
@@ -47,9 +60,15 @@ function renderWidgets() {
 }
 
 /** Query params of the most recent list call. */
-function lastListParams(spy: ReturnType<typeof vi.fn>): Record<string, string> | undefined {
-  const listCalls = spy.mock.calls.filter((call) => call[0] === "/api/v1/widgets");
-  return listCalls[listCalls.length - 1]?.[2] as Record<string, string> | undefined;
+function lastListParams(
+  spy: ReturnType<typeof vi.fn>,
+): Record<string, string> | undefined {
+  const listCalls = spy.mock.calls.filter(
+    (call) => call[0] === "/api/v1/widgets",
+  );
+  return listCalls[listCalls.length - 1]?.[2] as
+    | Record<string, string>
+    | undefined;
 }
 
 describe("OperationCatalog — remote pagination", () => {
@@ -60,7 +79,9 @@ describe("OperationCatalog — remote pagination", () => {
     const total = WIDGETS_FIXTURE.listRows.length;
     const expectedPages = Math.ceil(total / 25);
     await waitFor(() =>
-      expect(screen.getByText(`Page 1 of ${expectedPages}`)).toBeInTheDocument(),
+      expect(
+        screen.getByText(`Page 1 of ${expectedPages}`),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -78,7 +99,9 @@ describe("OperationCatalog — remote pagination", () => {
   it("re-executes the operation with a new offset when the page advances", async () => {
     const { executeSpy } = renderWidgets();
 
-    await waitFor(() => expect(screen.getByText(/Page 1 of/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Page 1 of/)).toBeInTheDocument(),
+    );
     const firstPageParams = lastListParams(executeSpy);
     expect(firstPageParams?.offset ?? "0").toBe("0");
 
@@ -87,7 +110,155 @@ describe("OperationCatalog — remote pagination", () => {
     // The offset moving is what proves paging is remote: a client-side slice
     // would never touch the backend again.
     await waitFor(() => expect(lastListParams(executeSpy)?.offset).toBe("25"));
-    await waitFor(() => expect(screen.getByText(/Page 2 of/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Page 2 of/)).toBeInTheDocument(),
+    );
+  });
+});
+
+const SORTABLE_SPEC: OpenAPISpec = {
+  openapi: "3.0.0",
+  info: { title: "Sortable records", version: "1" },
+  "x-clicky": {
+    surfaces: [{ key: "sortable-records", entity: "record", title: "Records" }],
+  },
+  paths: {
+    "/api/v1/records": {
+      get: {
+        operationId: "record_list",
+        tags: ["record"],
+        "x-clicky": {
+          surface: "sortable-records",
+          verb: "list",
+          scope: "collection",
+        },
+        parameters: [
+          {
+            name: "sort",
+            in: "query",
+            schema: { type: "string", enum: ["name", "updated"] },
+            "x-clicky": { role: "sort" },
+          },
+          {
+            name: "order",
+            in: "query",
+            schema: { type: "string", enum: ["asc", "desc"] },
+            "x-clicky": { role: "order" },
+          },
+          {
+            name: "offset",
+            in: "query",
+            schema: { type: "integer" },
+            "x-clicky": { role: "offset" },
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 25 },
+            "x-clicky": { role: "limit" },
+          },
+        ],
+        responses: {},
+      },
+    },
+  },
+};
+
+function renderSortableRecords() {
+  const document = {
+    version: 1 as const,
+    node: {
+      kind: "table" as const,
+      columns: [
+        { name: "name", label: "Name", sortKey: "name" },
+        { name: "updated", label: "Updated", sortKey: "updated" },
+        { name: "id", label: "ID" },
+      ],
+      rows: [
+        {
+          cells: {
+            name: { kind: "text" as const, text: "Zulu" },
+            updated: { kind: "text" as const, text: "2026-08-19" },
+            id: { kind: "text" as const, text: "id-2" },
+          },
+        },
+        {
+          cells: {
+            name: { kind: "text" as const, text: "Alpha" },
+            updated: { kind: "text" as const, text: "2026-08-18" },
+            id: { kind: "text" as const, text: "id-1" },
+          },
+        },
+      ],
+    },
+  };
+  const executeMock = vi.fn(async () => ({
+    success: true,
+    exit_code: 0,
+    contentType: "application/json+clicky",
+    parsed: document,
+    stdout: JSON.stringify(document),
+    requestUrl: "/api/v1/records",
+    pagination: { total: 2, limit: 25, offset: 0, hasMore: false },
+  }));
+  const client: OperationsApiClient = {
+    getOpenAPISpec: async () => SORTABLE_SPEC,
+    executeCommand: executeMock,
+  };
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <OperationCatalog
+        definition={{
+          key: "sortable-records",
+          title: "Records",
+          description: "Server-sorted records.",
+        }}
+        entities={["record"]}
+        surfaceKey="sortable-records"
+        client={client}
+        renderLink={anchorLink}
+      />
+    </QueryClientProvider>,
+  );
+  return executeMock;
+}
+
+describe("OperationCatalog — server sorting", () => {
+  it("re-executes the whole query from sortable columns and clears back to the backend default", async () => {
+    const executeMock = renderSortableRecords();
+    await waitFor(() => expect(screen.getByText("Zulu")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /^id/i })).toBeNull();
+
+    const nameHeader = screen.getByRole("button", { name: /name/i });
+    fireEvent.click(nameHeader);
+    await waitFor(() =>
+      expect(executeMock.mock.calls.at(-1)?.[2]).toMatchObject({
+        sort: "name",
+        order: "asc",
+        offset: "0",
+      }),
+    );
+
+    fireEvent.click(nameHeader);
+    await waitFor(() =>
+      expect(executeMock.mock.calls.at(-1)?.[2]).toMatchObject({
+        sort: "name",
+        order: "desc",
+      }),
+    );
+
+    fireEvent.click(nameHeader);
+    await waitFor(() => {
+      const params = executeMock.mock.calls.at(-1)?.[2] as
+        | Record<string, string>
+        | undefined;
+      expect(params?.sort).toBeUndefined();
+      expect(params?.order).toBeUndefined();
+    });
   });
 });
 
@@ -103,7 +274,9 @@ const EVENT_PAGE_SIZE = 2;
 const EVENTS_SPEC: OpenAPISpec = {
   openapi: "3.0.0",
   info: { title: "Events", version: "1" },
-  "x-clicky": { surfaces: [{ key: "events", entity: "event", title: "Events" }] },
+  "x-clicky": {
+    surfaces: [{ key: "events", entity: "event", title: "Events" }],
+  },
   paths: {
     "/api/v1/events": {
       get: {
@@ -138,10 +311,10 @@ const EVENTS_SPEC: OpenAPISpec = {
 
 /** The page starting at `offset`, with the cursor that resumes after it. */
 function eventPage(offset: number, limit: number): ExecutionResponse {
-  const names = Array.from({ length: EVENT_COUNT }, (_, index) => `Event ${index + 1}`).slice(
-    offset,
-    offset + limit,
-  );
+  const names = Array.from(
+    { length: EVENT_COUNT },
+    (_, index) => `Event ${index + 1}`,
+  ).slice(offset, offset + limit);
   const next = offset + names.length;
   const document = {
     version: 1 as const,
@@ -178,12 +351,16 @@ function staleCursorError() {
 
 /** A backend that pages by opaque cursor. `after-N` decodes to an offset here
  *  only so the fake can serve a page; the UI never reads inside the token. */
-function makeEventsClient(): OperationsApiClient & { executeMock: ReturnType<typeof vi.fn> } {
-  const executeMock = vi.fn(async (_path: string, _method: string, params: Record<string, string>) => {
-    const cursor = params.cursor ?? "";
-    const offset = cursor ? Number(cursor.replace("after-", "")) : 0;
-    return eventPage(offset, Number(params.limit || EVENT_PAGE_SIZE));
-  });
+function makeEventsClient(): OperationsApiClient & {
+  executeMock: ReturnType<typeof vi.fn>;
+} {
+  const executeMock = vi.fn(
+    async (_path: string, _method: string, params: Record<string, string>) => {
+      const cursor = params.cursor ?? "";
+      const offset = cursor ? Number(cursor.replace("after-", "")) : 0;
+      return eventPage(offset, Number(params.limit || EVENT_PAGE_SIZE));
+    },
+  );
   return {
     executeMock,
     getOpenAPISpec: async () => EVENTS_SPEC,
@@ -206,7 +383,11 @@ function renderEvents(client: OperationsApiClient) {
   render(
     <QueryClientProvider client={queryClient}>
       <OperationCatalog
-        definition={{ key: "events", title: "Events", description: "Cursor-paged events." }}
+        definition={{
+          key: "events",
+          title: "Events",
+          description: "Cursor-paged events.",
+        }}
         entities={["event"]}
         surfaceKey="events"
         client={client}
@@ -215,7 +396,10 @@ function renderEvents(client: OperationsApiClient) {
           seen.context = context;
           return (
             <>
-              <button type="button" onClick={() => context.infinite?.onLoadMore()}>
+              <button
+                type="button"
+                onClick={() => context.infinite?.onLoadMore()}
+              >
                 Load more
               </button>
               {context.defaultView}
@@ -229,8 +413,12 @@ function renderEvents(client: OperationsApiClient) {
   return seen;
 }
 
-function cursorOf(spy: ReturnType<typeof vi.fn>, call: number): string | undefined {
-  return (spy.mock.calls[call]?.[2] as Record<string, string> | undefined)?.cursor;
+function cursorOf(
+  spy: ReturnType<typeof vi.fn>,
+  call: number,
+): string | undefined {
+  return (spy.mock.calls[call]?.[2] as Record<string, string> | undefined)
+    ?.cursor;
 }
 
 describe("OperationCatalog — cursor walk", () => {
@@ -238,7 +426,9 @@ describe("OperationCatalog — cursor walk", () => {
     const client = makeEventsClient();
     renderEvents(client);
 
-    await waitFor(() => expect(screen.getByText("Event 1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 1")).toBeInTheDocument(),
+    );
     expect(cursorOf(client.executeMock, 0)).toBeUndefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -251,12 +441,16 @@ describe("OperationCatalog — cursor walk", () => {
     const client = makeEventsClient();
     renderEvents(client);
 
-    await waitFor(() => expect(screen.getByText("Event 2")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 2")).toBeInTheDocument(),
+    );
     expect(screen.queryByText("Event 3")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
 
-    await waitFor(() => expect(screen.getByText("Event 4")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 4")).toBeInTheDocument(),
+    );
     // The first page is still on screen — that is the whole point of the walk.
     expect(screen.getByText("Event 1")).toBeInTheDocument();
   });
@@ -281,12 +475,18 @@ describe("OperationCatalog — cursor walk", () => {
     const client = makeEventsClient();
     renderEvents(client);
 
-    await waitFor(() => expect(screen.getByText("Event 1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 1")).toBeInTheDocument(),
+    );
     expect(screen.getByText("1-2 of 6")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next page" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await waitFor(() => expect(screen.getByText("1-4 of 6")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("1-4 of 6")).toBeInTheDocument(),
+    );
   });
 
   // The cursor deliberately excludes the page size from what it fingerprints, so
@@ -296,14 +496,25 @@ describe("OperationCatalog — cursor walk", () => {
     const client = makeEventsClient();
     renderEvents(client);
 
-    await waitFor(() => expect(screen.getByText("Event 1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 1")).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await waitFor(() => expect(screen.getByText("Event 4")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 4")).toBeInTheDocument(),
+    );
 
-    fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Rows per page"), {
+      target: { value: "10" },
+    });
 
-    await waitFor(() => expect(screen.getByText("Event 6")).toBeInTheDocument());
-    const restart = client.executeMock.mock.calls.at(-1)?.[2] as Record<string, string>;
+    await waitFor(() =>
+      expect(screen.getByText("Event 6")).toBeInTheDocument(),
+    );
+    const restart = client.executeMock.mock.calls.at(-1)?.[2] as Record<
+      string,
+      string
+    >;
     expect(restart.limit).toBe("10");
     expect(restart.cursor).toBeUndefined();
   });
@@ -319,13 +530,19 @@ describe("OperationCatalog — cursor walk", () => {
       .mockResolvedValueOnce(eventPage(0, EVENT_PAGE_SIZE));
     renderEvents(client);
 
-    await waitFor(() => expect(screen.getByText("Event 1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Event 1")).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(3));
     expect(cursorOf(client.executeMock, 2)).toBeUndefined();
-    await waitFor(() => expect(screen.getByText("Event 1")).toBeInTheDocument());
-    expect(screen.queryByText("Failed to load /api/v1/events")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Event 1")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("Failed to load /api/v1/events"),
+    ).not.toBeInTheDocument();
   });
 
   // Restarting a walk that never started would spin: refuse, restart, refuse.
@@ -335,7 +552,9 @@ describe("OperationCatalog — cursor walk", () => {
     renderEvents(client);
 
     await waitFor(() =>
-      expect(screen.getByText("Failed to load /api/v1/events")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Failed to load /api/v1/events"),
+      ).toBeInTheDocument(),
     );
     expect(client.executeMock).toHaveBeenCalledTimes(1);
   });
@@ -353,7 +572,11 @@ describe("OperationCatalog — cursor walk", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OperationCatalog
-          definition={{ key: "widgets", title: "Widgets", description: "Remote-paged widgets." }}
+          definition={{
+            key: "widgets",
+            title: "Widgets",
+            description: "Remote-paged widgets.",
+          }}
           entities={["widget"]}
           surfaceKey="widgets"
           client={client}

@@ -426,6 +426,9 @@ export function OperationCommandPage({
           {...(isGet && effectiveAutoRun && dataTablePagination
             ? { pagination: dataTablePagination }
             : {})}
+          {...(isGet && effectiveAutoRun && formConfig.sort
+            ? { sort: formConfig.sort }
+            : {})}
         />
       ) : null}
     </div>

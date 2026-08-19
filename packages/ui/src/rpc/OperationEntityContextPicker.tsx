@@ -533,6 +533,12 @@ export function OperationEntityContextPicker({
                 ? { externalFilters: filterConfig.filters }
                 : {})}
               {...(pagination ? { pagination } : {})}
+              {...(filterConfig.sort
+                ? {
+                    sort: filterConfig.sort.value,
+                    onSortChange: filterConfig.sort.onChange,
+                  }
+                : {})}
             />
           ) : null}
 
