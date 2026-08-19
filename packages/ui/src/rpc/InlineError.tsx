@@ -1,11 +1,16 @@
+import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
-import { UiChevronRight } from "../icons";
+import { UiChevronRight, UiPlay } from "../icons";
 import { cn } from "../lib/utils";
 
 export type InlineErrorProps = {
   title: string;
   error: unknown;
   className?: string;
+  runNow?: {
+    onClick: () => void;
+    loading?: boolean;
+  };
 };
 
 type ErrorDetails = {
@@ -15,7 +20,7 @@ type ErrorDetails = {
   responseBody?: string;
 };
 
-export function InlineError({ title, error, className }: InlineErrorProps) {
+export function InlineError({ title, error, className, runNow }: InlineErrorProps) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const details = getErrorDetails(error);
   const hasDetails = Boolean(details.responseBody || details.status || details.url);
@@ -25,6 +30,21 @@ export function InlineError({ title, error, className }: InlineErrorProps) {
       <div className="text-center">
         <div className="font-medium text-red-600">{title}</div>
         {message && <div className="mt-1 text-muted-foreground">{message}</div>}
+        {runNow && (
+          <div className="mt-3 flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={runNow.onClick}
+              loading={runNow.loading ?? false}
+              loadingLabel={runNow.loading ? "Running…" : undefined}
+            >
+              <Icon icon={UiPlay} />
+              Run now
+            </Button>
+          </div>
+        )}
       </div>
       {hasDetails && (
         <details className="group mt-3">

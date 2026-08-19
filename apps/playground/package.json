@@ -20,6 +20,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@iconify-icons/ph": "1.2.5",
     "@tailwindcss/vite": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "catalog:",

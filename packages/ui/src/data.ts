@@ -305,7 +305,12 @@ export {
   type VersionInfo,
 } from "./data/version-info";
 export { Tree, type TreeProps } from "./data/Tree";
-export { ObjectGraph, type ObjectGraphNode, type ObjectGraphProps } from "./data/ObjectGraph";
+export { ObjectGraph, type ObjectGraphProps } from "./data/ObjectGraph";
+export {
+  countObjectGraphNodes,
+  pruneNullNodes,
+  type ObjectGraphNode,
+} from "./data/object-graph-nodes";
 export { ExecutionTree, type ExecutionNode, type ExecutionTreeProps } from "./data/ExecutionTree";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
