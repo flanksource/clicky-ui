@@ -58,6 +58,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-placeholder: var(--placeholder);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-popover: var(--popover);
@@ -96,6 +97,11 @@
     --secondary-foreground: var(--fs-fg-1);
     --muted: var(--fs-bg-muted);
     --muted-foreground: var(--fs-fg-muted);
+    /* Placeholders mean ABSENCE, so they cannot share --muted-foreground with
+       helper text, which means content. At #666666 the two rendered 3.17:1
+       apart and operators read placeholder examples as filled values. This is
+       the token fs-tokens.css already earmarks for placeholders. */
+    --placeholder: var(--fs-fg-subtle);
     --accent: var(--fs-bg-muted);
     --accent-foreground: var(--fs-fg-1);
     --destructive: var(--fs-error);
@@ -137,10 +143,6 @@
     --control-height: 2.75rem;
     --control-padding-x: 1rem;
     --font-size-base: 1rem;
-  }
-
-  * {
-    border-color: var(--border);
   }
 
   body {
@@ -214,6 +216,21 @@
 
   .clicky-mdx-editor-content :where(code, pre) {
     font-family: var(--fs-font-mono);
+  }
+}
+
+/* Tailwind v3's preflight defaulted every border to gray-200; v4 dropped it, so
+ * this restores it for elements that set a border width and no colour.
+ *
+ * It MUST live in @layer base rather than in clicky-tokens above. Cascade layers
+ * beat specificity outright, and clicky-tokens is declared after Tailwind's
+ * utilities layer — so from there this `*` rule silently overrode every
+ * border-colour utility in every consuming app. `border-destructive` on an
+ * invalid field and `border-primary` on a selected card both resolved to the
+ * default border and looked like nothing had been applied. */
+@layer base {
+  * {
+    border-color: var(--border);
   }
 }
 

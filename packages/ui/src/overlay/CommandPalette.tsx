@@ -275,7 +275,7 @@ export function CommandPalette({
             placeholder={placeholder}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-placeholder"
           />
         </div>
 

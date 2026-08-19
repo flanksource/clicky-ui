@@ -250,7 +250,7 @@ export const MentionTextarea = forwardRef<
         placeholder={placeholder}
         data-testid={dataTestId}
         className={cn(
-          "w-full resize-none bg-transparent text-sm leading-snug outline-none placeholder:text-muted-foreground/60",
+          "w-full resize-none bg-transparent text-sm leading-snug outline-none placeholder:text-placeholder",
           className,
         )}
         onChange={(e) => {

@@ -44,6 +44,7 @@ const preset: Partial<Config> = {
           DEFAULT: "var(--muted)",
           foreground: "var(--muted-foreground)",
         },
+        placeholder: "var(--placeholder)",
         accent: {
           DEFAULT: "var(--accent)",
           foreground: "var(--accent-foreground)",

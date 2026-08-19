@@ -18,16 +18,37 @@ export type LogsTableRow = {
 
 const JSON_PARSE_FAILED = Symbol("json-parse-failed");
 
+/**
+ * normalizeLogsTableRows flattens raw log input — newline-delimited text or
+ * already-parsed records — into the flat row shape LogsTable renders.
+ *
+ * A row's `id` is its content, not its position: the digest of the record as it
+ * arrived. Identity has to survive appending, because that is what infinite
+ * scroll does — a caller re-normalizes a run that grew at the end, and a
+ * position-derived id would hand every row already on screen a new key, so React
+ * would remount them and any expansion or selection would slide onto whichever
+ * line now occupies that index. Content-derived ids stay attached to the line.
+ *
+ * Records that produce the same digest — the same line logged twice, or the rare
+ * digest collision — are separated by the count of times that digest has already
+ * been seen in this run. That discriminator is positional, and so is only as
+ * stable as the ordering, which is why it is spent on actual collisions rather
+ * than on every row.
+ */
 export function normalizeLogsTableRows(logs: string | LogsTableInput[]): LogsTableRow[] {
   const entries = typeof logs === "string" ? splitLogLines(logs) : logs;
-  return entries.map((entry, index) => normalizeLogEntry(entry, index));
+  const seenIdentities = new Map<string, number>();
+  return entries.map((entry) => normalizeLogEntry(entry, seenIdentities));
 }
 
 function splitLogLines(logs: string): string[] {
   return logs.split(/\r?\n/).filter((line) => line.length > 0);
 }
 
-function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
+function normalizeLogEntry(
+  entry: LogsTableInput,
+  seenIdentities: Map<string, number>,
+): LogsTableRow {
   const parsedOuterValue = typeof entry === "string" ? tryParseJson(entry) : entry;
   const parsedOuter = parsedOuterValue === JSON_PARSE_FAILED ? entry : parsedOuterValue;
   const outer = asRecord(parsedOuter);
@@ -102,7 +123,7 @@ function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
   });
 
   return {
-    id: `${index}:${timestamp || pod || message || stableString(entry)}`,
+    id: rowIdentity(entry, seenIdentities),
     timestamp,
     level,
     pod,
@@ -114,6 +135,30 @@ function normalizeLogEntry(entry: LogsTableInput, index: number): LogsTableRow {
     raw: parsedOuter,
     ...(parsedLine !== undefined ? { parsedLine } : {}),
   };
+}
+
+// The digest, not the record itself, is the id: a log line runs to kilobytes and
+// the id is carried on every row, held in selection sets and written into an
+// aria-label, so keeping the whole line would cost a second copy of the log for
+// nothing. Collisions are handled the same way duplicate lines are, by counting
+// occurrences, so shortening identity costs correctness nothing.
+function rowIdentity(entry: LogsTableInput, seenIdentities: Map<string, number>): string {
+  const digest = digestString(stableString(entry));
+  const seen = seenIdentities.get(digest) ?? 0;
+  seenIdentities.set(digest, seen + 1);
+  return seen === 0 ? digest : `${digest}#${seen}`;
+}
+
+// FNV-1a, 32-bit. Chosen for being a handful of lines with no dependency and no
+// allocation per character — this runs once per log line, and a logs view opens
+// on tens of thousands of them.
+function digestString(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function buildTags({

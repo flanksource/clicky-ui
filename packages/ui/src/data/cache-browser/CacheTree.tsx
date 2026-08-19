@@ -78,7 +78,7 @@ export function CacheTree({
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search keys"
           aria-label="Search cache keys"
-          className="h-5 w-full border-0 bg-transparent p-0 text-xs outline-none placeholder:text-muted-foreground"
+          className="h-5 w-full border-0 bg-transparent p-0 text-xs outline-none placeholder:text-placeholder"
         />
         {searchInput && (
           <button

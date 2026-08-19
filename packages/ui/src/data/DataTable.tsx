@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type RefObject,
   type TdHTMLAttributes,
 } from "react";
 import { useSort, type SortDir, type SortState } from "../hooks/use-sort";
@@ -33,6 +34,7 @@ import {
 } from "../components/FilterBar";
 import {
   clearFilterBarFilter,
+  dateRangeFilterProps,
   isFilterBarFilterActive,
 } from "../components/filter-bar-utils";
 import {
@@ -40,9 +42,9 @@ import {
   getFilterTokens,
   prettifyKey,
   resolveColumnValue,
-  resolvePath,
 } from "./data-table-utils";
 import { assertDataTableFilterProps } from "./data-table-server-filters";
+import { useInfiniteRows } from "./use-infinite-rows";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -162,6 +164,8 @@ const DEFAULT_COLUMN_MIN_WIDTH = 64;
 const DEFAULT_COLUMN_WIDTH = 160;
 const DEFAULT_GROW_COLUMN_WIDTH = 224;
 const DEFAULT_SHRINK_COLUMN_WIDTH = 96;
+const DEFAULT_CELL_MAX_WIDTH = 288;
+const DEFAULT_SHRINK_CELL_MAX_WIDTH = 256;
 const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
 const COLUMN_VISIBILITY_STORAGE_PREFIX =
   "clicky-ui-data-table-column-visibility";
@@ -333,6 +337,31 @@ export type DataTableCursorPagination = {
   onCursorChange: (cursor: string | undefined) => void;
 };
 
+/**
+ * DataTableInfinite turns a server-paged table into one continuous list: the
+ * caller accumulates the pages it has fetched and hands the whole run in as
+ * `data`, and the table asks for the next one as the reader reaches the end.
+ *
+ * It is distinct from `clientReveal`, which windows rows the caller already
+ * holds. Here the rows do not exist yet, so the two facts that matter are the
+ * server's — whether more follow, and whether the request for them is already
+ * in flight. Inferring either from `data.length` is what turns a slow page into
+ * a duplicate request, and the end of the data into a spinner that never stops.
+ *
+ * Passing this alongside `pagination` is the normal case rather than a
+ * conflict: the footer keeps reporting the count and page size, and only the
+ * step controls are withdrawn, because a position nobody can step back to is
+ * not one worth rendering a button for.
+ */
+export type DataTableInfinite = {
+  /** The server's answer for whether rows follow what has been loaded. */
+  hasMore: boolean;
+  /** A request for the next page is in flight; the table must not ask again. */
+  loading: boolean;
+  /** Fetch and append the next page. */
+  onLoadMore: () => void;
+};
+
 export type DataTableMenuAction = {
   id: string;
   label: ReactNode;
@@ -490,6 +519,20 @@ type DataTableInnerProps<
    * `onPageSizeChange` fires.
    */
   pagination?: DataTablePagination;
+  /**
+   * Server-driven infinite scroll. The caller owns the accumulated rows; this
+   * only says when to ask for more. Combines with `pagination` — see
+   * DataTableInfinite.
+   */
+  infinite?: DataTableInfinite;
+  /**
+   * Handle on the scrollable table region, for a caller that has to drive the
+   * scroll position itself — pinning a live tail to the bottom, say. The table
+   * never writes through it; it is exposed because a follow mode has to be able
+   * to keep the newest row in view, and nothing outside the component can reach
+   * that element otherwise.
+   */
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
   /** Stable row id extractor. Defaults to the row index. */
   getRowId?: (row: T, index: number) => string;
   /** Controlled checkbox selection for entity/bulk-action tables. */
@@ -635,6 +678,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   cellFilters,
   onCellFilterChange,
   pagination,
+  infinite,
+  scrollContainerRef,
   getRowId,
   rowSelection,
   selectionActions,
@@ -882,23 +927,35 @@ function DataTableInner<T extends Record<string, unknown>>({
     hasMenuActions;
   const densityOverride = densityControlled ? density : localDensityOverride;
 
-  // The first kind:"timestamp" column (with autoRangeFilter not disabled) gets
-  // the auto-mounted FilterBar time-range picker. The user can override by
-  // supplying their own filterBarProps.timeRange.
-  const timeRangeColumn = useMemo(() => {
-    // A column-derived range narrows rows here, so it must not mount when the
-    // caller owns the range: the header control would quietly re-filter rows
-    // the source already filtered.
-    if (manualFilter || externalTimeRange || filterBarProps?.timeRange) return null;
-    return (
+  // The first kind:"timestamp" column (with autoRangeFilter not disabled) owns
+  // the FilterBar's trailing range slot — filled either by the column's own
+  // server filter or, when nothing backs it, by a locally narrowed picker.
+  const rangeCapableColumn = useMemo(
+    () =>
       effectiveColumns.find(
         (column) =>
           column.kind === "timestamp" &&
           column.filterable !== false &&
           column.timestamp?.autoRangeFilter !== false,
-      ) ?? null
-    );
-  }, [effectiveColumns, externalTimeRange, filterBarProps?.timeRange, manualFilter]);
+      ) ?? null,
+    [effectiveColumns],
+  );
+  // The auto range narrows rows here, so it only mounts where DataTable owns
+  // filtering. On a source-filtered table the picker would re-filter rows the
+  // source already answered with — and the timestamp cell it reads is often a
+  // rendered node rather than a value, so it would silently empty the table.
+  const timeRangeColumn = useMemo(() => {
+    if (!autoFilter || manualFilter || externalTimeRange || filterBarProps?.timeRange) {
+      return null;
+    }
+    return rangeCapableColumn;
+  }, [
+    autoFilter,
+    externalTimeRange,
+    filterBarProps?.timeRange,
+    manualFilter,
+    rangeCapableColumn,
+  ]);
 
   const filterableColumns = useMemo(
     () =>
@@ -1081,6 +1138,20 @@ function DataTableInner<T extends Record<string, unknown>>({
     () => new Map((externalFilters ?? []).map((filter) => [filter.key, filter])),
     [externalFilters],
   );
+  // The timestamp column's own bound, when the caller supplies one, IS the
+  // bar's range — so it is hoisted out of the filter list into the trailing
+  // slot. Leaving it among the chips and mounting the column-derived picker
+  // beside it would put two controls on one filter, and only one of them
+  // reaches the source.
+  //
+  // Keyed on the FilterBar kind rather than any upstream control name: a
+  // whole-day bound ("day-range" on the wire) is normalized to the same
+  // "date-range" kind with timeEnabled off, and belongs in the same slot.
+  const serverTimeRangeFilter = useMemo(() => {
+    const key = rangeCapableColumn?.filterKey;
+    const filter = key ? serverFilterByKey.get(key) : undefined;
+    return filter?.kind === "date-range" ? filter : null;
+  }, [rangeCapableColumn, serverFilterByKey]);
   // A header filter button comes from whichever pipeline owns the column:
   // autoFilter's generated filter (keyed by column.key) or a caller-supplied
   // server filter bound through the column's `filterKey` — the same key
@@ -1095,10 +1166,12 @@ function DataTableInner<T extends Record<string, unknown>>({
         continue;
       }
       const server = column.filterKey ? serverFilterByKey.get(column.filterKey) : undefined;
-      if (server) bound.set(column.key, server);
+      // The hoisted range is rendered as a range in this column's header, not
+      // as a chip, so it must not be bound here as well.
+      if (server && server !== serverTimeRangeFilter) bound.set(column.key, server);
     }
     return bound;
-  }, [effectiveColumns, nativeFilters, serverFilterByKey]);
+  }, [effectiveColumns, nativeFilters, serverFilterByKey, serverTimeRangeFilter]);
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
     filterBarProps?.children ||
@@ -1129,6 +1202,28 @@ function DataTableInner<T extends Record<string, unknown>>({
     }
     return next;
   }, [timeRangeColumn, timeRangeFilter.from, timeRangeFilter.to]);
+  // The one range a column owns, and which column's header renders it. The
+  // hoisted server bound wins over the local picker; a caller-supplied range
+  // belongs to no column and so wins over both, in the bar only.
+  const columnTimeRange = useMemo<{ key: string; range: FilterBarRangeProps } | null>(() => {
+    if (serverTimeRangeFilter && rangeCapableColumn) {
+      return {
+        key: rangeCapableColumn.key,
+        range: dateRangeFilterProps(serverTimeRangeFilter),
+      };
+    }
+    if (autoTimeRange && timeRangeColumn) {
+      return { key: timeRangeColumn.key, range: autoTimeRange };
+    }
+    return null;
+  }, [autoTimeRange, rangeCapableColumn, serverTimeRangeFilter, timeRangeColumn]);
+  const barTimeRange = externalTimeRange ?? columnTimeRange?.range ?? null;
+  const barFilters = useMemo(() => {
+    const external = (externalFilters ?? []).filter(
+      (filter) => filter !== serverTimeRangeFilter,
+    );
+    return external.length > 0 ? [...external, ...nativeFilters] : nativeFilters;
+  }, [externalFilters, nativeFilters, serverTimeRangeFilter]);
   // The built-in search narrows rows here, so it mounts by default only where
   // DataTable already owns filtering. An explicit value still wins, which is
   // what lets a source-filtered table search its own page.
@@ -1143,9 +1238,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   const showFilterBar =
     resolvedShowGlobalFilter ||
     nativeFilters.length > 0 ||
-    !!autoTimeRange ||
+    !!barTimeRange ||
     !!externalSearch ||
-    !!externalTimeRange ||
     (externalFilters && externalFilters.length > 0) ||
     hasCustomFilterBarContent ||
     showTablePreferencesControl;
@@ -1164,7 +1258,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     filterBarProps?.trailing
   );
   const showHeaderFilterControls =
-    showHeaderFilters && (headerFilterByColumn.size > 0 || !!autoTimeRange);
+    showHeaderFilters && (headerFilterByColumn.size > 0 || !!columnTimeRange);
 
   const filteredRows = useMemo(() => {
     // The source already applied every filter, so applying them again here
@@ -1178,12 +1272,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     const rangeToDate = timeRangeColumn
       ? resolveDateMath(timeRangeFilter.to, now)
       : null;
-    const rangeColumnKey = timeRangeColumn?.key;
-
     return rows.filter(({ row }) => {
-      if (rangeColumnKey && (rangeFromDate || rangeToDate)) {
-        const raw = resolvePath(row, rangeColumnKey);
-        const ts = parseTimestamp(raw);
+      if (timeRangeColumn && (rangeFromDate || rangeToDate)) {
+        // Through the column, not the raw path: a cell is often a rendered
+        // node (clicky results address `cells.<name>` and carry a ClickyNode
+        // there), which parses to null and would drop every row.
+        const ts = parseTimestamp(getFilterCandidate(row, timeRangeColumn));
         if (!ts) return false;
         if (rangeFromDate && ts.getTime() < rangeFromDate.getTime())
           return false;
@@ -1304,7 +1398,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   // Client-side incremental reveal: when `clientReveal` is set (and the caller
   // is not doing server pagination), only the first `visibleCount` sorted rows
   // are rendered; a trailing sentinel grows the window as it scrolls into view.
-  const revealEnabled = !!clientReveal && !pagination;
+  // `infinite` is the same gesture aimed at the server rather than at memory, so
+  // it takes the sentinel outright: windowing rows the caller just paid a
+  // request for would hide them again the moment they arrived.
+  const revealEnabled = !!clientReveal && !pagination && !infinite;
   const revealBatchSize = clientReveal?.batchSize ?? 0;
   const [visibleCount, setVisibleCount] = useState(revealBatchSize);
   const revealObserver = useRef<IntersectionObserver | null>(null);
@@ -1317,6 +1414,21 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   const visibleSorted = revealEnabled ? sorted.slice(0, visibleCount) : sorted;
   const hasMoreRows = revealEnabled && visibleCount < sorted.length;
+
+  // Server-driven infinite scroll shares the sentinel and the observer with
+  // `clientReveal`; only what an intersection means differs. Unlike the reveal
+  // window it is not gated on `pagination` — a table paging the server is
+  // precisely the one that has more to fetch — and it has no window to reset,
+  // because the caller owns the accumulation and it only ever grows.
+  const requestMoreRows = useInfiniteRows(infinite, data.length);
+  const infiniteEnabled = !!infinite;
+  const sentinelActive = infinite ? infinite.hasMore : hasMoreRows;
+  // The sentinel names what it is waiting on. Client reveal holds the rows and
+  // only has to paint them, so it is always mid-load; the server variant sits
+  // idle until the reader reaches it, and announcing a fetch that has not
+  // started reads as a table that is permanently busy.
+  const sentinelLabel =
+    !infinite || infinite.loading ? "Loading more…" : "Scroll to load more…";
   const selectedRowIDs = useMemo(
     () => new Set(rowSelection?.selectedRowIds ?? []),
     [rowSelection?.selectedRowIds],
@@ -1409,7 +1521,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         : footer
       : pagination
         ? null
-        : loading
+        : loading && sorted.length === 0
           ? loadingMessage
           : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`;
 
@@ -1475,20 +1587,29 @@ function DataTableInner<T extends Record<string, unknown>>({
   const revealSentinelRef = useCallback(
     (node: HTMLTableRowElement | null) => {
       if (revealObserver.current) revealObserver.current.disconnect();
-      if (!node || !hasMoreRows) return;
+      if (!node || !sentinelActive) return;
       revealObserver.current = new IntersectionObserver(
         (entries) => {
-          if (entries[0]?.isIntersecting) {
-            setVisibleCount((current) =>
-              Math.min(current + revealBatchSize, sorted.length),
-            );
+          if (!entries[0]?.isIntersecting) return;
+          if (infiniteEnabled) {
+            requestMoreRows();
+            return;
           }
+          setVisibleCount((current) =>
+            Math.min(current + revealBatchSize, sorted.length),
+          );
         },
         { rootMargin: "200px" },
       );
       revealObserver.current.observe(node);
     },
-    [hasMoreRows, revealBatchSize, sorted.length],
+    [
+      infiniteEnabled,
+      requestMoreRows,
+      revealBatchSize,
+      sentinelActive,
+      sorted.length,
+    ],
   );
 
   const startColumnResize = (
@@ -1609,17 +1730,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                     },
                   }
                 : {})}
-            {...(externalTimeRange
-              ? { timeRange: externalTimeRange }
-              : autoTimeRange
-                ? { timeRange: autoTimeRange }
-                : {})}
+            {...(barTimeRange ? { timeRange: barTimeRange } : {})}
             trailing={filterBarTrailing}
-            filters={
-              externalFilters && externalFilters.length > 0
-                ? [...externalFilters, ...nativeFilters]
-                : nativeFilters
-            }
+            filters={barFilters}
           />
         )}
 
@@ -1628,6 +1741,12 @@ function DataTableInner<T extends Record<string, unknown>>({
             <LoadingBar data-testid="data-table-loading-bar" className="rounded-t-md" />
           ) : null}
           <div
+            // The prop is spelled the React 19 way — RefObject<T | null>, which
+            // is what useRef<T | null>(null) returns there — while the package
+            // still type-checks against @types/react 18, where RefObject's
+            // parameter is compared by variance rather than structurally. The
+            // two shapes are the same object; the cast is what says so.
+            ref={scrollContainerRef as RefObject<HTMLDivElement> | undefined}
             className={cn(
               "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border bg-background",
               scrollContainerClassName,
@@ -1726,8 +1845,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                       </span>
                       {showHeaderFilterControls &&
                         (headerFilterByColumn.has(column.key) ||
-                          (autoTimeRange &&
-                            timeRangeColumn?.key === column.key)) && (
+                          columnTimeRange?.key === column.key) && (
                           <HeaderFilterButton
                             column={column}
                             active={
@@ -1736,7 +1854,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                                     headerFilterByColumn.get(column.key)!,
                                   )
                                 : Boolean(
-                                    timeRangeFilter.from || timeRangeFilter.to,
+                                    columnTimeRange?.range.from ||
+                                      columnTimeRange?.range.to,
                                   )
                             }
                             onOpen={(event) =>
@@ -1975,13 +2094,12 @@ function DataTableInner<T extends Record<string, unknown>>({
                                 alignmentClass(column.align),
                                 column.cellClassName,
                               )}
+                              style={cellSizingStyle(
+                                column,
+                                columnWidths[column.key],
+                              )}
                             >
-                              <CellContent
-                                column={column}
-                                {...(columnWidths[column.key] !== undefined
-                                  ? { width: columnWidths[column.key] }
-                                  : {})}
-                              >
+                              <CellContent column={column}>
                                 {href && index === 0
                                   ? // One real <a href> per row whose ::after
                                     // overlay stretches across the whole (relative)
@@ -2027,13 +2145,13 @@ function DataTableInner<T extends Record<string, unknown>>({
                   );
                 })
               )}
-              {error == null && hasMoreRows && (
+              {error == null && sentinelActive && (
                 <tr ref={revealSentinelRef} aria-hidden>
                   <td
                     colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
                     className="p-density-2 text-center text-xs text-muted-foreground"
                   >
-                    Loading more…
+                    {sentinelLabel}
                   </td>
                 </tr>
               )}
@@ -2061,8 +2179,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           <DataTablePaginationFooter
             pagination={pagination}
             visibleRowCount={sorted.length}
-            loading={loading}
-            loadingMessage={loadingMessage}
+            infinite={infiniteEnabled}
           />
         ) : null}
         {detailStyle === "dialog" && renderExpandedRow && (
@@ -2110,9 +2227,8 @@ function DataTableInner<T extends Record<string, unknown>>({
         {headerFilterMenu && (
           <HeaderFilterMenu
             filter={headerFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
-            {...(autoTimeRange &&
-            timeRangeColumn?.key === headerFilterMenu.columnKey
-              ? { timeRange: autoTimeRange }
+            {...(columnTimeRange && columnTimeRange.key === headerFilterMenu.columnKey
+              ? { timeRange: columnTimeRange.range }
               : {})}
             anchor={headerFilterMenu}
             onClose={() => setHeaderFilterMenu(null)}
@@ -2197,13 +2313,12 @@ function useCursorTrail(cursor: DataTableCursorPagination | undefined) {
 function DataTablePaginationFooter({
   pagination,
   visibleRowCount,
-  loading,
-  loadingMessage,
+  infinite = false,
 }: {
   pagination: DataTablePagination;
   visibleRowCount: number;
-  loading: boolean;
-  loadingMessage: ReactNode;
+  /** Infinite scroll owns the paging; see `steppable` and `rangeStart` below. */
+  infinite?: boolean;
 }) {
   const { page, pageSize, total, totalRelation, cursor, onPageChange, onPageSizeChange } =
     pagination;
@@ -2232,8 +2347,12 @@ function DataTablePaginationFooter({
         ? safePage >= totalPages - 1
         : visibleRowCount < pageSize;
   const hasVisibleRows = visibleRowCount > 0;
+  // Under infinite scroll every page fetched so far is stacked on screen, so the
+  // run starts at the first row rather than at the offset the most recent
+  // request happened to use — quoting that offset would report a window the
+  // reader is not looking at.
   const rangeStart =
-    total === 0 || !hasVisibleRows ? 0 : safePage * pageSize + 1;
+    total === 0 || !hasVisibleRows ? 0 : infinite ? 1 : safePage * pageSize + 1;
   const rangeEnd =
     total != null && hasVisibleRows
       ? Math.min(approximate ? Infinity : total, rangeStart + Math.max(visibleRowCount - 1, 0))
@@ -2245,8 +2364,10 @@ function DataTablePaginationFooter({
 
   // A surface with neither a page callback nor a cursor has no second page to
   // offer. It still reports what it is showing and still resizes — a count is a
-  // fact about the result, not a paging control.
-  const steppable = cursor != null || onPageChange != null;
+  // fact about the result, not a paging control. Infinite scroll lands in the
+  // same place from the other direction: the pages are all still on screen, and
+  // a position nobody can step back to is not worth a button.
+  const steppable = !infinite && (cursor != null || onPageChange != null);
 
   const goPrevious = () => {
     if (!cursor) {
@@ -2267,7 +2388,7 @@ function DataTablePaginationFooter({
 
   return (
     <div className="flex min-h-9 shrink-0 flex-row items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div aria-live="polite">{loading ? loadingMessage : rangeLabel}</div>
+      <div aria-live="polite">{rangeLabel}</div>
       <div className="flex flex-wrap  items-center gap-2 sm:gap-3">
         <label className="flex items-center gap-1.5">
           <span>Rows per page</span>
@@ -2452,6 +2573,7 @@ function DataTableLoadingRows<T extends Record<string, unknown>>({
                 alignmentClass(column.align),
                 column.cellClassName,
               )}
+              style={cellSizingStyle(column, undefined)}
             >
               <CellContent column={column}>
                 <span
@@ -3060,20 +3182,17 @@ function ThemeMenuSection({
 
 function CellContent<T extends Record<string, unknown>>({
   column,
-  width,
   children,
 }: {
   column: DataTableColumn<T>;
-  width?: number;
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        cellContentClassName(column, width),
+        cellContentClassName(column),
         alignmentClass(column.align),
       )}
-      style={cellContentStyle(width)}
     >
       {children}
     </div>
@@ -3735,23 +3854,36 @@ function loadingSkeletonWidth(index: number) {
   return ["w-24", "w-40", "w-28", "w-56", "w-32", "w-48"][index % 6];
 }
 
-function cellContentStyle(
+// An auto-layout column is only ever as wide as its widest cell, so the width a
+// cell is allowed to ask for has to be bounded somewhere or one long value
+// pins the column to its own text and pushes the table sideways. It belongs on
+// the cell rather than on the content: max-width bounds what a column asks for
+// without clipping what it is finally given, so the content can fill a column
+// that leftover space made wider instead of truncating with room to spare.
+// A grow column asks for nothing and lives on the leftovers, with the minimum
+// keeping it from collapsing when the other columns already fill the table.
+function cellSizingStyle<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
   width: number | undefined,
-): CSSProperties | undefined {
-  return width ? { maxWidth: `${width}px` } : undefined;
+): CSSProperties {
+  if (width !== undefined) return { maxWidth: `${width}px` };
+  if (column.grow) {
+    return {
+      maxWidth: "0px",
+      minWidth: column.minWidth ?? DEFAULT_GROW_COLUMN_WIDTH,
+    };
+  }
+  return {
+    maxWidth:
+      column.maxWidth ??
+      (column.shrink ? DEFAULT_SHRINK_CELL_MAX_WIDTH : DEFAULT_CELL_MAX_WIDTH),
+  };
 }
 
 function cellContentClassName<T extends Record<string, unknown>>(
   column: DataTableColumn<T>,
-  width?: number,
 ): TdHTMLAttributes<HTMLTableCellElement>["className"] {
-  const resized = width !== undefined;
-  const base = "w-full truncate";
-  if (column.grow)
-    return cn(base, resized ? "min-w-0" : "min-w-56 max-w-[36rem]");
-  if (column.shrink)
-    return cn(base, "min-w-0 whitespace-nowrap", !resized && "max-w-[16rem]");
-  return cn(base, "min-w-0", !resized && "max-w-[18rem]");
+  return cn("w-full min-w-0 truncate", column.shrink && "whitespace-nowrap");
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -3763,6 +3895,7 @@ export function DataTable<T extends Record<string, unknown>>({
   fullscreenButtonLabel = "Open table full screen",
   className,
   filterBarProps,
+  scrollContainerRef,
   ...inner
 }: DataTableProps<T>) {
   const themeControlled = onThemeChange !== undefined;
@@ -3792,9 +3925,16 @@ export function DataTable<T extends Record<string, unknown>>({
           ),
         }
       : filterBarProps;
+    // Both copies stay mounted while the modal is open, so exactly one of them
+    // may hold the caller's scroll ref: handing it to both makes the last one
+    // mounted the winner and nulls it when the modal unmounts, which leaves a
+    // caller pinning a live tail writing to an element nobody is looking at.
+    // The visible copy is the fullscreen one precisely when the modal is open.
+    const ownsScroll = inFullscreen === fullscreenOpen;
     return (
       <DataTableInner
         {...(inner as DataTableInnerProps<T>)}
+        {...(ownsScroll && scrollContainerRef ? { scrollContainerRef } : {})}
         {...(mergedFilterBarProps
           ? { filterBarProps: mergedFilterBarProps }
           : {})}
