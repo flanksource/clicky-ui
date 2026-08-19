@@ -24,8 +24,10 @@ const WORKLOADS: Record<WorkloadKind, WorkloadResource[]> = {
       hosts: ["search.example.com"],
     },
   ],
+  pod: [],
   deployment: [{ name: "opensearch" }],
   statefulset: [],
+  daemonset: [],
 };
 
 const loadWorkloads = async (kinds: WorkloadKind[]) =>
