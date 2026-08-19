@@ -72,7 +72,7 @@ export type ProfileProvider = {
 };
 
 /** The parameter types the profile schema accepts. */
-export type ParamDraftType = "string" | "number" | "boolean" | "date" | "enum" | "list";
+export type ParamDraftType = "string" | "number" | "boolean" | "date" | "datetime" | "duration" | "enum" | "list";
 
 /** filter, limit, offset, time-from or time-to; empty behaves as filter. */
 export type ParamDraftRole = "filter" | "limit" | "offset" | "time-from" | "time-to";

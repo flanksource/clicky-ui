@@ -130,11 +130,17 @@ export function ProfileFieldEditorForm({
       <EnumField
         label="Role"
         icon={<UiTableProperties />}
-        help="Optional table behavior, independent of Type."
+        help="Optional table behavior. Timestamp also types the field as datetime, since it is the column the date-range control reads."
         value={field.kind ?? ""}
         options={profileRoleOptions}
         placeholder="Standard field"
-        onChange={(next) => onChange({ kind: next })}
+        // Naming the time column and leaving it typed as a string is a state
+        // nobody wants: the header drives a date range while the cell renders
+        // raw. The wizard already couples the two (mapTimestampColumn); doing
+        // it here too is what keeps the per-field editor from undoing it.
+        onChange={(next) =>
+          onChange(next === "timestamp" ? { kind: next, type: "datetime" } : { kind: next })
+        }
       />
       <EnumField
         label="Format"

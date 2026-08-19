@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("ProcessorPipeline", () => {
-  it("ports the ordered rail, helpers, resolved config and paging warning", () => {
+  it("ports the ordered rail, helpers and resolved config without a paging warning", () => {
     renderPipeline({ steps: [{ use: "java.stacktrace" }] });
 
     expect(screen.getByText("Java stack trace merge")).toBeInTheDocument();
@@ -39,8 +39,8 @@ describe("ProcessorPipeline", () => {
       screen.queryByRole("combobox", { name: "Processor type" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("This profile can no longer be paged"),
-    ).toBeInTheDocument();
+      screen.queryByText("This profile can no longer be paged"),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "Resolved" }));
     expect(screen.getAllByText("preset").length).toBeGreaterThan(0);

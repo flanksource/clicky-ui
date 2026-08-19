@@ -385,7 +385,7 @@ function WorkspaceMessage({
   );
 }
 
-function sampleParamSchema(params: ParamDraft[]): JsonSchemaObject {
+export function sampleParamSchema(params: ParamDraft[]): JsonSchemaObject {
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
   for (const param of params) {
@@ -404,6 +404,10 @@ function sampleParamSchema(params: ParamDraft[]): JsonSchemaObject {
         property.type = "boolean";
         break;
       case "date":
+        property.type = "string";
+        property.format = "date";
+        break;
+      case "datetime":
         property.type = "string";
         property.format = "date-time";
         break;
