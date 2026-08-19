@@ -33,6 +33,12 @@ export type TreeProps<T> = Omit<
   /** Classes applied to the search/control toolbar. */
   toolbarClassName?: string;
   /**
+   * Extra controls rendered in the toolbar's right-hand group, before Expand
+   * all / Collapse all. Providing actions shows the toolbar even when the tree
+   * is too small for the filter and `showControls` is off.
+   */
+  actions?: ReactNode;
+  /**
    * Override the text the filter matches against for a given node.
    * Defaults to a recursive walk of the node's own fields (excluding
    * its `children` and any secondary children), which works for
@@ -250,6 +256,7 @@ export function Tree<T>({
   expandAll: controlledExpandAll,
   onExpandAllChange,
   toolbarClassName,
+  actions,
   getSearchText,
   revealSelected = false,
   ...nodeProps
@@ -310,7 +317,7 @@ export function Tree<T>({
     empty
   );
   const showControlButtons = showControls && roots.length > 0;
-  const showVirtualRow = showFilter || showControlButtons;
+  const showVirtualRow = showFilter || showControlButtons || actions != null;
   const setExpandAll = (next: boolean | null) => {
     if (isControlled) onExpandAllChange?.(next);
     else setInternalExpandAll(next);
@@ -366,8 +373,11 @@ export function Tree<T>({
               <span className="flex-1" />
             )}
 
-            {showControlButtons && (
+            {(showControlButtons || actions != null) && (
               <div className="ml-auto flex items-center gap-1">
+                {actions}
+                {showControlButtons && (
+                  <>
                 <button
                   type="button"
                   onClick={() => setExpandAll(true)}
@@ -396,6 +406,8 @@ export function Tree<T>({
                 >
                   <Icon icon={UiCollapseAll} className="text-sm" />
                 </button>
+                  </>
+                )}
               </div>
             )}
           </div>

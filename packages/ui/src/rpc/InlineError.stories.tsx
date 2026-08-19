@@ -43,3 +43,16 @@ export const MessageOnly: Story = {
     </div>
   ),
 };
+
+export const WithRecoveryAction: Story = {
+  args: {
+    title: "Could not preview this clone",
+    error: new Error("The target is missing required stored procedures."),
+    runNow: { onClick: () => {} },
+  },
+  render: (args) => (
+    <div className="max-w-lg">
+      <InlineError {...args} />
+    </div>
+  ),
+};
