@@ -347,7 +347,7 @@ export function Tree<T>({
                   value={filterQuery}
                   onChange={(event) => setFilterQuery(event.target.value)}
                   placeholder="Filter tree"
-                  className="h-5 w-full min-w-0 border-0 bg-transparent p-0 text-xs outline-none placeholder:text-muted-foreground"
+                  className="h-5 w-full min-w-0 border-0 bg-transparent p-0 text-xs outline-none placeholder:text-placeholder"
                   aria-label="Filter tree nodes"
                 />
                 {filterQuery && (

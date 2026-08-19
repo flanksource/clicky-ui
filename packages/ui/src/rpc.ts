@@ -112,6 +112,8 @@ export {
 export { RouterProvider } from "./rpc/RouterProvider";
 export {
   type ClickyOperationMeta,
+  type ClickyFilterShape,
+  type ClickyParameterLookup,
   type ClickySpecMeta,
   type ClickySurface,
   isPositionalParam,

@@ -1,5 +1,6 @@
 import {
   QueryClient,
+  QueryClientContext,
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
@@ -38,6 +39,7 @@ import { cn } from "../lib/utils";
 import {
   DataTable,
   type DataTableColumn,
+  type DataTableInfinite,
   type DataTableMenuAction,
   type DataTablePagination,
   type DataTableRowSelection,
@@ -51,6 +53,7 @@ import type {
   CellFilterChange,
   CellFilterMode,
 } from "./cells/CellFilterActions";
+import { calloutVariantStyles, type CalloutVariant } from "./callout-tones";
 import { Tree } from "./Tree";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
@@ -319,6 +322,13 @@ export type ClickyProps = {
   data?: ClickyDocument | ClickyNode | string;
   /** Remote URL to fetch when `data` is not provided. */
   url?: string;
+  /**
+   * The format `data` is already in, when the caller fetched it from `url`
+   * itself. That view then renders the payload in hand instead of asking the
+   * endpoint for the same bytes a second time; every other view still fetches.
+   * Without it `data` is a fallback that a fresh fetch replaces.
+   */
+  dataFormat?: ClickyRemoteFormat;
   /** Enabled remote view/download formats. */
   view?: ClickyViewConfig;
   /** Download menu configuration. */
@@ -345,8 +355,16 @@ export type ClickyProps = {
   timeRange?: FilterBarRangeProps;
   /** Pagination footer configuration for the first embedded table. */
   pagination?: DataTablePagination;
+  /**
+   * Server-driven infinite scroll for the first embedded table. `data` is
+   * expected to already hold every page fetched so far, so this carries only
+   * the question of whether to ask for another.
+   */
+  infinite?: DataTableInfinite;
   /** Controlled multi-row selection for the first embedded table. */
   rowSelection?: ClickyTableRowSelection;
+  /** Shows the first embedded table's loading bar without replacing its rows. */
+  loading?: boolean;
 };
 
 export type ClickyNodeViewProps = {
@@ -377,10 +395,14 @@ export type ClickyTableProps = {
   onCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   /** Pagination footer configuration. */
   pagination?: DataTablePagination | undefined;
+  /** Server-driven infinite scroll over rows the caller has accumulated. */
+  infinite?: DataTableInfinite | undefined;
   /** Controlled multi-row selection. */
   rowSelection?: ClickyTableRowSelection | undefined;
   /** Extra actions rendered in the table menu. */
   menuActions?: DataTableMenuAction[] | undefined;
+  /** Shows the table loading bar without replacing existing rows. */
+  loading?: boolean | undefined;
 };
 
 export type ClickyTableRowSelection = DataTableRowSelection<ClickyRow> & {
@@ -416,8 +438,10 @@ type ClickyRuntimeContextValue = {
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
+  tableLoading?: boolean | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
 };
@@ -432,7 +456,14 @@ const ClickyRuntimeContext = createContext<ClickyRuntimeContextValue>(
 );
 
 export function Clicky(props: ClickyProps) {
-  const [queryClient] = useState(
+  // A host that already runs react-query owns the cache: sharing it is what
+  // lets its invalidations reach these queries, and stops a catalog the host
+  // has already loaded being fetched a second time here. The private client is
+  // only for a Clicky standing on its own — and stays per-instance, because
+  // the keys it would share (["openapi-spec"]) carry no client identity, so
+  // two standalone Clickys pointed at different servers must not pool them.
+  const hostQueryClient = useContext(QueryClientContext);
+  const [fallbackQueryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
@@ -501,8 +532,12 @@ export function Clicky(props: ClickyProps) {
           ? { onTableCellFilterChange: props.onCellFilterChange }
           : {})}
         {...(props.pagination ? { tablePagination: props.pagination } : {})}
+        {...(props.infinite ? { tableInfinite: props.infinite } : {})}
         {...(props.rowSelection
           ? { tableRowSelection: props.rowSelection }
+          : {})}
+        {...(props.loading !== undefined
+          ? { tableLoading: props.loading }
           : {})}
         {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
       >
@@ -518,9 +553,11 @@ export function Clicky(props: ClickyProps) {
     </>
   );
 
-  if (props.url || props.commandRuntime) {
+  if (!hostQueryClient && (props.url || props.commandRuntime)) {
     return (
-      <QueryClientProvider client={queryClient}>{content}</QueryClientProvider>
+      <QueryClientProvider client={fallbackQueryClient}>
+        {content}
+      </QueryClientProvider>
     );
   }
 
@@ -538,8 +575,10 @@ function ClickyRuntimeProvider({
   tableCellFilters,
   onTableCellFilterChange,
   tablePagination,
+  tableInfinite,
   tableRowSelection,
   tableMenuActions,
+  tableLoading,
   children,
 }: {
   commandRuntime?: ClickyCommandRuntime | undefined;
@@ -552,8 +591,10 @@ function ClickyRuntimeProvider({
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
+  tableLoading?: boolean | undefined;
   children: ReactNode;
 }) {
   if (!commandRuntime) {
@@ -567,8 +608,10 @@ function ClickyRuntimeProvider({
       tableCellFilters ||
       onTableCellFilterChange ||
       tablePagination ||
+      tableInfinite ||
       tableRowSelection ||
-      tableMenuActions;
+      tableMenuActions ||
+      tableLoading;
     return (
       <ClickyRuntimeContext.Provider
         value={
@@ -584,8 +627,10 @@ function ClickyRuntimeProvider({
                 tableCellFilters,
                 onTableCellFilterChange,
                 tablePagination,
+                tableInfinite,
                 tableRowSelection,
                 tableMenuActions,
+                tableLoading,
               }
             : clickyRuntimeContextDefault
         }
@@ -607,8 +652,10 @@ function ClickyRuntimeProvider({
       {...(tableCellFilters ? { tableCellFilters } : {})}
       {...(onTableCellFilterChange ? { onTableCellFilterChange } : {})}
       {...(tablePagination ? { tablePagination } : {})}
+      {...(tableInfinite ? { tableInfinite } : {})}
       {...(tableRowSelection ? { tableRowSelection } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
+      {...(tableLoading !== undefined ? { tableLoading } : {})}
     >
       {children}
     </ClickyCommandRuntimeProvider>
@@ -626,8 +673,10 @@ function ClickyCommandRuntimeProvider({
   tableCellFilters,
   onTableCellFilterChange,
   tablePagination,
+  tableInfinite,
   tableRowSelection,
   tableMenuActions,
+  tableLoading,
   children,
 }: {
   commandRuntime: ClickyCommandRuntime;
@@ -640,8 +689,10 @@ function ClickyCommandRuntimeProvider({
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
+  tableLoading?: boolean | undefined;
   children: ReactNode;
 }) {
   const { operations, isLoading } = useOperations(commandRuntime.client);
@@ -657,8 +708,10 @@ function ClickyCommandRuntimeProvider({
       tableCellFilters,
       onTableCellFilterChange,
       tablePagination,
+      tableInfinite,
       tableRowSelection,
       tableMenuActions,
+      tableLoading,
       operations,
       operationsLoading: isLoading,
     }),
@@ -675,8 +728,10 @@ function ClickyCommandRuntimeProvider({
       tableCellFilters,
       onTableCellFilterChange,
       tablePagination,
+      tableInfinite,
       tableRowSelection,
       tableMenuActions,
+      tableLoading,
     ],
   );
 
@@ -719,6 +774,7 @@ function ClickyContent({
 
 function ClickyRemoteRenderer({
   data,
+  dataFormat,
   url,
   view,
   download,
@@ -751,19 +807,27 @@ function ClickyRemoteRenderer({
   }, [activeView, availableViews]);
 
   const formattedUrl = buildFormatUrl(url, activeView);
+  // The view whose bytes the caller already holds — asking the endpoint for
+  // them again returns the same payload it just handed over.
+  const suppliedView = data !== undefined ? dataFormat : undefined;
   const activeQuery = useQuery({
     queryKey: ["clicky", activeView, formattedUrl],
-    enabled: shouldFetchRemoteView(activeView),
+    enabled: shouldFetchRemoteView(activeView) && activeView !== suppliedView,
     queryFn: async () => fetchRemoteFormat(formattedUrl, activeView),
   });
-  const effectiveClickyData =
-    activeView === "clicky" && activeQuery.data?.kind === "text"
+  // Read through to the cache only for views this render actually fetches: a
+  // shared client can hold an older response for this URL, and the payload in
+  // hand is the newer one.
+  const remoteText =
+    activeView !== suppliedView && activeQuery.data?.kind === "text"
       ? activeQuery.data.text
-      : data;
+      : undefined;
+  const effectiveClickyData =
+    activeView === "clicky" && remoteText !== undefined ? remoteText : data;
   const fallbackJsonData = useMemo(() => parseJsonValue(data), [data]);
   const effectiveJsonData =
-    activeView === "json" && activeQuery.data?.kind === "text"
-      ? parseJsonValue(activeQuery.data.text)
+    activeView === "json" && remoteText !== undefined
+      ? parseJsonValue(remoteText)
       : fallbackJsonData;
   const activeOverflowView = isOverflowViewFormat(activeView)
     ? activeView
@@ -2742,39 +2806,22 @@ function normalizeAdmonitionSeverity(severity: string | undefined) {
   return "note";
 }
 
+/**
+ * Clicky's severity names against the Callout tone table, so the two renderers
+ * cannot drift. A severity of `note` is the untinted aside — Clicky's `info` is
+ * the one that carries the blue.
+ */
+const ADMONITION_VARIANTS: Record<string, CalloutVariant> = {
+  info: "note",
+  tip: "tip",
+  warning: "warning",
+  danger: "caution",
+  note: "default",
+};
+
 function admonitionToneClassName(severity: string) {
-  switch (severity) {
-    case "info":
-      return {
-        container: "border-sky-500/30 bg-sky-500/5",
-        title: "text-sky-800 dark:text-sky-300",
-        body: "text-sky-950/80 dark:text-sky-100/80",
-      };
-    case "tip":
-      return {
-        container: "border-emerald-500/30 bg-emerald-500/5",
-        title: "text-emerald-800 dark:text-emerald-300",
-        body: "text-emerald-950/80 dark:text-emerald-100/80",
-      };
-    case "warning":
-      return {
-        container: "border-yellow-500/40 bg-yellow-500/10",
-        title: "text-yellow-800 dark:text-yellow-300",
-        body: "text-yellow-950/80 dark:text-yellow-100/80",
-      };
-    case "danger":
-      return {
-        container: "border-destructive/40 bg-destructive/10",
-        title: "text-destructive",
-        body: "text-destructive/90",
-      };
-    default:
-      return {
-        container: "border-border bg-muted/30",
-        title: "text-foreground",
-        body: "text-muted-foreground",
-      };
-  }
+  const styles = calloutVariantStyles(ADMONITION_VARIANTS[severity] ?? "default");
+  return { container: styles.subtle, title: styles.title, body: styles.content };
 }
 
 function ClickyFootnoteRef({ node }: { node: ClickyNode }) {
@@ -3005,8 +3052,10 @@ export function ClickyTable({
   cellFilters,
   onCellFilterChange,
   pagination,
+  infinite,
   rowSelection,
   menuActions,
+  loading,
 }: ClickyTableProps) {
   const runtime = useContext(ClickyRuntimeContext);
   const rowClick = onTableRowClick ?? runtime.onTableRowClick;
@@ -3020,8 +3069,10 @@ export function ClickyTable({
   const effectiveCellFilterChange =
     onCellFilterChange ?? runtime.onTableCellFilterChange;
   const effectivePagination = pagination ?? runtime.tablePagination;
+  const effectiveInfinite = infinite ?? runtime.tableInfinite;
   const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
+  const effectiveLoading = loading ?? runtime.tableLoading;
 
   if (columns.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
@@ -3147,7 +3198,9 @@ export function ClickyTable({
         ? { onCellFilterChange: effectiveCellFilterChange }
         : {})}
       {...(effectivePagination ? { pagination: effectivePagination } : {})}
+      {...(effectiveInfinite ? { infinite: effectiveInfinite } : {})}
       {...(effectiveMenuActions ? { menuActions: effectiveMenuActions } : {})}
+      {...(effectiveLoading !== undefined ? { loading: effectiveLoading } : {})}
     />
   );
 }

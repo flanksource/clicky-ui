@@ -123,6 +123,17 @@ export {
   type SelectProps,
   type SelectOption,
 } from "./components/select";
+export { ConnectionLoggingPolicy } from "./components/ConnectionLoggingPolicy";
+export {
+  CONNECTION_LOG_LEVELS,
+  isConnectionLoggingCapability,
+  visibleConnectionLogEvents,
+  type ConnectionLogLevel,
+  type ConnectionLoggingCapability,
+  type ConnectionLoggingEvent,
+  type ConnectionLoggingFamily,
+  type ConnectionLoggingPolicyProps,
+} from "./components/ConnectionLoggingPolicy.model";
 export {
   Combobox,
   type ComboboxProps,
@@ -312,6 +323,10 @@ export type {
   LookupFetcher,
 } from "./components/json-schema-form-types";
 export type { JsonSchemaFormError } from "./components/json-schema-form-error-types";
+export {
+  FieldErrorText,
+  FormErrorSummary,
+} from "./components/json-schema-form-error-display";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {

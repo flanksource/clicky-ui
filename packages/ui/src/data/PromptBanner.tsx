@@ -125,7 +125,7 @@ export function PromptBanner({
                   <label className="flex min-w-0 flex-col gap-1 text-xs">
                     <span className="font-medium">{inlineSpec.commentLabel ?? "Comment"}</span>
                     <textarea
-                      className="min-h-16 w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="min-h-16 w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       placeholder="Add a short note"
                       value={comment}
                       onChange={(event) => setComment(event.target.value)}

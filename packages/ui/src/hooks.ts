@@ -44,3 +44,24 @@ export {
   type UseHotkeyOptions,
   type ParsedHotkey,
 } from "./hooks/use-hotkey";
+export {
+  useLogTail,
+  stopLogSession,
+  appendTailEvent,
+  emptyLogTailBuffer,
+  encodeTailParams,
+  isTerminalSessionState,
+  type UseLogTailOptions,
+  type UseLogTailResult,
+  type LogSessionInfo,
+  type LogSessionState,
+  type LogTailBuffer,
+  type LogTailError,
+  type LogTailEvent,
+  type LogTailStatus,
+} from "./hooks/use-log-tail";
+// The pinning predicates live with the SessionViewer's windowing hook because
+// that is where the math is exercised hardest, but any surface that pins a
+// stream to its newest row needs the same two answers — so they are published
+// here rather than copied into each caller.
+export { isPinnedToBottom, isNearTop } from "./data/ai/use-session-scroll";

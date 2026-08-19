@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createRef } from "react";
+import { afterEach, beforeEach, vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
 import { RouterProvider } from "../rpc/RouterProvider";
 import type { RouterAdapter } from "../rpc/router";
@@ -831,6 +832,12 @@ describe("DataTable", () => {
         columns={columns}
         loading
         loadingMessage="Refreshing…"
+        pagination={{
+          page: 0,
+          pageSize: 2,
+          total: 2,
+          onPageSizeChange: vi.fn(),
+        }}
       />,
     );
 
@@ -839,9 +846,10 @@ describe("DataTable", () => {
     expect(screen.getByText("worker")).toBeInTheDocument();
     // The indeterminate bar rides the table's top border.
     expect(screen.getByTestId("data-table-loading-bar")).toBeInTheDocument();
-    // No skeleton block means the message shows only once — in the footer, not
-    // repeated in the table body.
-    expect(screen.getAllByText("Refreshing…")).toHaveLength(1);
+    // Refetching has one loading affordance: the bar. The stable page range is
+    // more useful than replacing it with a second loading message.
+    expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
+    expect(screen.getByText("1-2 of 2")).toBeInTheDocument();
   });
 
   it("renders each row as a real stretched anchor and routes plain clicks client-side", () => {
@@ -1108,10 +1116,45 @@ describe("DataTable", () => {
     expect(screen.getAllByText("healthy")[0]).toHaveClass("whitespace-nowrap");
     expect(screen.getByText("Production API service")).toHaveClass(
       "w-full",
-      "min-w-56",
-      "max-w-[36rem]",
+      "min-w-0",
       "truncate",
     );
+    expect(screen.getAllByText("healthy")[0].closest("td")).toHaveStyle({
+      maxWidth: "256px",
+    });
+  });
+
+  // A cap on the content truncates against empty space once the column is wider
+  // than the cap, so every cap sits on the cell: it bounds what the column asks
+  // for without clipping what the column is finally given.
+  it("caps the cell rather than its content, so text fills the width the column gets", () => {
+    const sized: DataTableColumn<ServiceRow>[] = [
+      { key: "service", label: "Service", grow: true, minWidth: 360 },
+      { key: "status", label: "Status", shrink: true },
+      { key: "notes", label: "Notes" },
+      { key: "restarts", label: "Restarts", maxWidth: 400 },
+    ];
+    render(<DataTable data={rows} columns={sized} />);
+
+    // A grow column asks for nothing and lives on the leftover width.
+    expect(screen.getByText("api").closest("td")).toHaveStyle({
+      maxWidth: "0px",
+      minWidth: "360px",
+    });
+    expect(screen.getAllByText("healthy")[0].closest("td")).toHaveStyle({
+      maxWidth: "256px",
+    });
+    expect(screen.getByText("Production API service").closest("td")).toHaveStyle(
+      { maxWidth: "288px" },
+    );
+    expect(screen.getByText("0").closest("td")).toHaveStyle({
+      maxWidth: "400px",
+    });
+    // Nothing left on the content to stop it filling the cell.
+    for (const text of ["api", "healthy", "Production API service", "0"]) {
+      expect(screen.getAllByText(text)[0]).not.toHaveAttribute("style");
+      expect(screen.getAllByText(text)[0].className).not.toMatch(/max-w-/);
+    }
   });
 
   it("uses max-content auto table layout without handle padding by default", () => {
@@ -1237,8 +1280,10 @@ describe("DataTable", () => {
     fireEvent.mouseUp(document);
 
     const notesContent = screen.getByText("Production API service");
-    expect(notesContent).not.toHaveClass("max-w-[36rem]");
-    expect(notesContent).toHaveStyle({ maxWidth: "524px" });
+    // The resized width is what the column asks for now, replacing the default
+    // cap; the content still fills whatever the column ends up with.
+    expect(notesContent.closest("td")).toHaveStyle({ maxWidth: "524px" });
+    expect(notesContent).not.toHaveAttribute("style");
   });
 
   it("auto-fits a column when double-clicking a resize handle", () => {
@@ -1712,7 +1757,7 @@ describe("DataTable", () => {
     vi.useRealTimers();
   });
 
-  it("auto-mounts a Time range picker for kind:'timestamp' columns without enabling generated filters", () => {
+  it("auto-mounts a Time range picker for kind:'timestamp' columns under autoFilter", () => {
     type LogRow = { ts: string; service: string };
     const data: LogRow[] = [
       { ts: "2026-04-15T12:00:00Z", service: "api" },
@@ -1729,7 +1774,7 @@ describe("DataTable", () => {
       { key: "service", label: "Service" },
     ];
 
-    render(<DataTable data={data} columns={cols} />);
+    render(<DataTable data={data} columns={cols} autoFilter />);
 
     expect(
       screen.getByRole("button", { name: /time range filter/i }),
@@ -1758,6 +1803,125 @@ describe("DataTable", () => {
       expect.stringContaining("worker"),
       expect.stringContaining("cron"),
     ]);
+  });
+
+  it("resolves the auto range through the column accessor, not the raw row path", () => {
+    // A clicky result's row is { cells: { <name>: ClickyNode } } and the column
+    // addresses it as "cells.<name>" with an accessor. Reading the path
+    // directly hands the range a node object rather than a timestamp, which
+    // parses to null and silently drops every row.
+    type Cell = { plain: string };
+    type ClickyRow = { cells: Record<string, Cell> };
+    const cell = (plain: string): Cell => ({ plain });
+    const data: ClickyRow[] = [
+      { cells: { ts: cell("2026-04-15T12:00:00Z"), service: cell("api") } },
+      { cells: { ts: cell("2026-04-08T12:00:00Z"), service: cell("cron") } },
+    ];
+    const cols: DataTableColumn<ClickyRow>[] = [
+      {
+        key: "cells.ts",
+        label: "Timestamp",
+        kind: "timestamp",
+        accessor: (row) => row.cells.ts,
+        sortValue: (value) => (value as Cell).plain,
+        filterValue: (value) => (value as Cell).plain,
+        timestamp: { defaultRange: { from: "2026-04-13T00:00:00Z", to: "" } },
+      },
+      {
+        key: "cells.service",
+        label: "Service",
+        accessor: (row) => row.cells.service,
+        render: (value) => (value as Cell).plain,
+        filterValue: (value) => (value as Cell).plain,
+      },
+    ];
+
+    render(<DataTable data={data} columns={cols} autoFilter />);
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("api");
+  });
+
+  it("leaves rows alone and mounts no client time range when autoFilter is off", () => {
+    type LogRow = { ts: string; service: string };
+    const data: LogRow[] = [
+      { ts: "2026-04-15T12:00:00Z", service: "api" },
+      { ts: "2026-04-08T12:00:00Z", service: "cron" },
+    ];
+    const cols: DataTableColumn<LogRow>[] = [
+      {
+        key: "ts",
+        label: "Timestamp",
+        kind: "timestamp",
+        timestamp: { defaultRange: { from: "2026-04-13T00:00:00Z", to: "" } },
+      },
+      { key: "service", label: "Service" },
+    ];
+
+    render(<DataTable data={data} columns={cols} />);
+
+    expect(
+      screen.queryByRole("button", { name: /time range filter/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("row").slice(1)).toHaveLength(2);
+  });
+
+  it("hoists the timestamp column's server date-range into the bar's range slot", () => {
+    type LogRow = { ts: string; service: string };
+    const data: LogRow[] = [
+      { ts: "2026-04-15T12:00:00Z", service: "api" },
+      { ts: "2026-04-08T12:00:00Z", service: "cron" },
+    ];
+    const cols: DataTableColumn<LogRow>[] = [
+      {
+        key: "ts",
+        label: "Timestamp",
+        kind: "timestamp",
+        filterKey: "filter.ts",
+        // A default the source has already applied. The bar must show it
+        // without re-applying it to rows the source already answered with.
+        timestamp: { defaultRange: { from: "2026-04-13T00:00:00Z", to: "" } },
+      },
+      { key: "service", label: "Service", filterKey: "filter.service" },
+    ];
+
+    const onApply = vi.fn();
+    render(
+      <DataTable
+        data={data}
+        columns={cols}
+        externalFilters={[
+          {
+            key: "filter.ts",
+            kind: "date-range",
+            label: "Timestamp",
+            from: "now-7d",
+            to: "now",
+            onApply,
+          },
+        ]}
+      />,
+    );
+
+    // One control for one filter: the range lives in the bar's trailing slot,
+    // not also as a chip among the filters.
+    expect(
+      screen.getAllByRole("button", { name: /time range filter/i }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: /^timestamp filter$/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
+    fireEvent.change(screen.getByLabelText("Time range from"), {
+      target: { value: "now-30d" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+
+    expect(onApply).toHaveBeenCalledWith("now-30d", "now");
+    // The source owns filtering, so nothing was narrowed locally.
+    expect(screen.getAllByRole("row").slice(1)).toHaveLength(2);
   });
 
   it("defers to a user-supplied timeRange when one is provided via filterBarProps", () => {
@@ -2220,5 +2384,224 @@ describe("DataTable caller-owned FilterBar inputs", () => {
 
     expect(screen.getByText("svc-10")).toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+
+  describe("server-driven infinite scroll", () => {
+    // The mock stands in for the browser's observer: it records the callback the
+    // table registered so a test can deliver intersections deliberately, one at
+    // a time or in the burst a real scroll produces.
+    let latestCallback: IntersectionObserverCallback | null = null;
+
+    class MockIntersectionObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        latestCallback = callback;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+
+    function intersect(times = 1) {
+      act(() => {
+        for (let index = 0; index < times; index += 1) {
+          latestCallback?.(
+            [{ isIntersecting: true } as IntersectionObserverEntry],
+            {} as IntersectionObserver,
+          );
+        }
+      });
+    }
+
+    function pageRows(from: number, count: number): ServiceRow[] {
+      return Array.from({ length: count }, (_, index) => ({
+        service: `svc-${from + index}`,
+        status: "healthy",
+        restarts: from + index,
+        notes: "",
+        tags: [],
+      }));
+    }
+
+    beforeEach(() => {
+      latestCallback = null;
+      vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("asks for exactly one page however many intersections a scroll delivers", () => {
+      const onLoadMore = vi.fn();
+
+      render(
+        <DataTable
+          data={pageRows(0, 3)}
+          columns={columns}
+          infinite={{ hasMore: true, loading: false, onLoadMore }}
+        />,
+      );
+
+      expect(screen.getByText("Scroll to load more…")).toBeInTheDocument();
+
+      intersect(4);
+
+      expect(onLoadMore).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays silent while the page it already asked for is in flight", () => {
+      const onLoadMore = vi.fn();
+
+      render(
+        <DataTable
+          data={pageRows(0, 3)}
+          columns={columns}
+          infinite={{ hasMore: true, loading: true, onLoadMore }}
+        />,
+      );
+
+      expect(screen.getByText("Loading more…")).toBeInTheDocument();
+
+      intersect(3);
+
+      expect(onLoadMore).not.toHaveBeenCalled();
+    });
+
+    it("withdraws the sentinel once the server says nothing follows", () => {
+      const onLoadMore = vi.fn();
+
+      render(
+        <DataTable
+          data={pageRows(0, 3)}
+          columns={columns}
+          infinite={{ hasMore: false, loading: false, onLoadMore }}
+        />,
+      );
+
+      expect(screen.queryByText(/load more/i)).not.toBeInTheDocument();
+      intersect(2);
+      expect(onLoadMore).not.toHaveBeenCalled();
+    });
+
+    it("asks again only after the page it requested has landed", () => {
+      const onLoadMore = vi.fn();
+      const infinite = { hasMore: true, loading: false, onLoadMore };
+
+      const view = render(
+        <DataTable data={pageRows(0, 3)} columns={columns} infinite={infinite} />,
+      );
+
+      intersect(2);
+      expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+      // The request is in flight: the burst that follows must not duplicate it.
+      view.rerender(
+        <DataTable
+          data={pageRows(0, 3)}
+          columns={columns}
+          infinite={{ ...infinite, loading: true }}
+        />,
+      );
+      intersect(2);
+      expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+      // The page landed and the rows grew, so the next intersection is a new
+      // request rather than a repeat of the one already answered.
+      view.rerender(
+        <DataTable data={pageRows(0, 6)} columns={columns} infinite={infinite} />,
+      );
+      intersect(1);
+      expect(onLoadMore).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps every accumulated row on screen instead of windowing them", () => {
+      // clientReveal windows rows the caller already holds; under infinite
+      // scroll the caller owns the accumulation, so the window would hide rows
+      // it just paid the server for.
+      render(
+        <DataTable
+          data={pageRows(0, 25)}
+          columns={columns}
+          clientReveal={{ batchSize: 10 }}
+          infinite={{ hasMore: true, loading: false, onLoadMore: vi.fn() }}
+        />,
+      );
+
+      expect(screen.getByText("svc-0")).toBeInTheDocument();
+      expect(screen.getByText("svc-24")).toBeInTheDocument();
+    });
+
+    it("drops the pager step controls but keeps the count and the page size", () => {
+      const onPageSizeChange = vi.fn();
+
+      render(
+        <DataTable
+          data={pageRows(0, 50)}
+          columns={columns}
+          pagination={{
+            page: 1,
+            pageSize: 25,
+            total: 140,
+            onPageChange: vi.fn(),
+            onPageSizeChange,
+          }}
+          infinite={{ hasMore: true, loading: false, onLoadMore: vi.fn() }}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Previous page" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Page /)).not.toBeInTheDocument();
+
+      // The accumulated run starts at the top, not at the offset the most
+      // recent page happened to be fetched from.
+      expect(screen.getByText("1-50 of 140")).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText("Rows per page"), {
+        target: { value: "50" },
+      });
+      expect(onPageSizeChange).toHaveBeenCalledWith(50);
+    });
+  });
+
+  it("exposes the scrollable region through scrollContainerRef", () => {
+    const ref = createRef<HTMLDivElement>();
+
+    render(<DataTable data={rows} columns={columns} scrollContainerRef={ref} />);
+
+    expect(ref.current).not.toBeNull();
+    expect(ref.current).toHaveClass("overflow-auto");
+    expect(ref.current).toContainElement(screen.getByRole("table"));
+  });
+
+  it("hands scrollContainerRef to whichever copy of the table is on screen", async () => {
+    // Fullscreen renders a second table inside a modal while the first stays
+    // mounted behind it. If both wrote the ref, the last one mounted would win
+    // and closing the modal would null it — leaving a caller that pins a live
+    // tail scrolling an element nobody is looking at.
+    const ref = createRef<HTMLDivElement>();
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        scrollContainerRef={ref}
+        showFullscreenControl
+        fullscreenTitle="Logs"
+      />,
+    );
+    const inline = ref.current;
+    expect(inline).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /full screen/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(ref.current).not.toBe(inline);
+    expect(dialog).toContainElement(ref.current);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(ref.current).toBe(inline));
   });
 });

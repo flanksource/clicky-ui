@@ -298,4 +298,46 @@ describe("LogsTable", () => {
     });
     vi.useRealTimers();
   });
+
+  // A tail reads oldest-first and is ordered by the server that streamed it, so
+  // both halves of that have to survive the trip through LogsTable's own
+  // defaults — which are newest-first and client-sorted.
+  describe("sort pass-through", () => {
+    // Deliberately handed over newest-first, so an ascending render can only
+    // come from LogsTable re-sorting and an unchanged one only from it not.
+    const descendingLogs = [otherEnvelopeLine, envelopeLine];
+    const policyPod = "policy-api-644b55c866-mg7tg";
+    const billingPod = "billing-api-7f9c5d4b8-xk2pq";
+
+    function podOrder(): string[] {
+      const [, ...bodyRows] = within(screen.getByRole("table")).getAllByRole("row");
+      return bodyRows.map((row) =>
+        row.textContent?.includes(policyPod) ? policyPod : billingPod,
+      );
+    }
+
+    it("sorts newest-first by default", () => {
+      render(<LogsTable logs={descendingLogs} />);
+
+      expect(podOrder()).toEqual([billingPod, policyPod]);
+    });
+
+    it("honours an ascending defaultSort from the caller", () => {
+      render(<LogsTable logs={descendingLogs} defaultSort={{ key: "timestamp", dir: "asc" }} />);
+
+      expect(podOrder()).toEqual([policyPod, billingPod]);
+    });
+
+    it("leaves the server's ordering alone when manualSort is set", () => {
+      render(
+        <LogsTable
+          logs={descendingLogs}
+          manualSort
+          defaultSort={{ key: "timestamp", dir: "asc" }}
+        />,
+      );
+
+      expect(podOrder()).toEqual([billingPod, policyPod]);
+    });
+  });
 });

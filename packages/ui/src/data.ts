@@ -50,6 +50,7 @@ export {
   type DataTableColumnKind,
   type DataTableCursorPagination,
   type DataTableFooterContext,
+  type DataTableInfinite,
   type DataTableMenuAction,
   type DataTablePagination,
   type DataTableProps,
@@ -174,6 +175,17 @@ export {
 } from "./data/LogsTable";
 export { normalizeLogsTableRows } from "./data/logs-normalize";
 export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
+export { Callout, type CalloutProps } from "./data/Callout";
+export {
+  assertCalloutValue,
+  CALLOUT_TONES,
+  CALLOUT_VARIANT_LABELS,
+  CALLOUT_VARIANTS,
+  calloutVariantStyles,
+  type CalloutTone,
+  type CalloutVariant,
+  type CalloutVariantStyle,
+} from "./data/callout-tones";
 export { Markdown, type MarkdownProps } from "./data/Markdown";
 export { MarkdownEditor, type MarkdownEditorProps } from "./data/MarkdownEditor";
 export * from "./data/FixtureEditor";

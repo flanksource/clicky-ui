@@ -124,7 +124,7 @@ export function PromptInput({
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+          className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-placeholder"
         />
         {inputAccessory}
         {isGenerating && onStop && (

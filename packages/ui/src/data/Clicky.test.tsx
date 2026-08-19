@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { beforeEach, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Clicky, type ClickyDocument } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
 
@@ -881,6 +882,165 @@ describe("Clicky", () => {
     expect(downloadFrame.src).toContain("filename=report.pdf");
     expect(downloadFrame.src).toContain("_download=");
 
+    fetchSpy.mockRestore();
+  });
+
+  // A caller that fetched the payload itself hands over both the bytes and the
+  // URL they came from — the URL so the view switcher and export have a target,
+  // not as an instruction to fetch the same bytes again.
+  describe("with the supplied payload declared as a format", () => {
+    const suppliedDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "pod", label: "Pod" }],
+        rows: [
+          { cells: { pod: { kind: "text", text: "api-0", plain: "api-0" } } },
+        ],
+      },
+    };
+    const remoteDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "pod", label: "Pod" }],
+        rows: [
+          { cells: { pod: { kind: "text", text: "cron-9", plain: "cron-9" } } },
+        ],
+      },
+    };
+
+    function mockRemote() {
+      return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.includes("format=json")) {
+          return new Response(JSON.stringify({ pod: "cron-9" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify(remoteDocument), {
+          status: 200,
+          headers: { "Content-Type": "application/json+clicky" },
+        });
+      });
+    }
+
+    it("renders it without asking the endpoint for the same bytes", async () => {
+      const fetchSpy = mockRemote();
+
+      render(
+        <Clicky
+          url="/api/v1/profile/pods"
+          data={suppliedDocument}
+          dataFormat="clicky"
+        />,
+      );
+
+      expect(await screen.findByText("api-0")).toBeInTheDocument();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it("still fetches the other views the switcher offers", async () => {
+      const fetchSpy = mockRemote();
+      // A non-table payload keeps the standalone view bar; a table folds the
+      // same switcher into its overflow menu.
+      const suppliedText: ClickyDocument = {
+        version: 1,
+        node: { kind: "text", text: "api-0", plain: "api-0" },
+      };
+
+      render(
+        <Clicky
+          url="/api/v1/profile/pods"
+          data={suppliedText}
+          dataFormat="clicky"
+          view={["clicky", "json"]}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("radio", { name: /^JSON$/i }));
+
+      expect(await screen.findByLabelText("JSON tree")).toBeInTheDocument();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/v1/profile/pods?format=json",
+        expect.anything(),
+      );
+      fetchSpy.mockRestore();
+    });
+
+    // A shared client can already hold this URL's clicky response from an
+    // earlier render. The payload in hand is the newer one.
+    it("prefers the supplied payload over an older response cached for the same URL", async () => {
+      const fetchSpy = mockRemote();
+      const client = new QueryClient();
+      client.setQueryData(
+        ["clicky", "clicky", "/api/v1/profile/pods?format=clicky-json"],
+        {
+          kind: "text",
+          text: JSON.stringify(remoteDocument),
+          contentType: "application/json+clicky",
+        },
+      );
+
+      render(
+        <QueryClientProvider client={client}>
+          <Clicky
+            url="/api/v1/profile/pods"
+            data={suppliedDocument}
+            dataFormat="clicky"
+          />
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText("api-0")).toBeInTheDocument();
+      expect(screen.queryByText("cron-9")).not.toBeInTheDocument();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    // Without the declaration the payload is a fallback, and the refresh that
+    // replaces it is the documented behaviour.
+    it("keeps refreshing when the format is not declared", async () => {
+      const fetchSpy = mockRemote();
+
+      render(<Clicky url="/api/v1/profile/pods" data={suppliedDocument} />);
+
+      expect(await screen.findByText("cron-9")).toBeInTheDocument();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/v1/profile/pods?format=clicky-json",
+        expect.anything(),
+      );
+      fetchSpy.mockRestore();
+    });
+  });
+
+  // The host owns the cache when it has one: a catalog it already loaded must
+  // not be fetched again inside Clicky.
+  it("runs its queries on the host QueryClient when one is provided", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(clickyFixture), {
+        status: 200,
+        headers: { "Content-Type": "application/json+clicky" },
+      }),
+    );
+    const client = new QueryClient();
+
+    render(
+      <QueryClientProvider client={client}>
+        <Clicky url="/api/clicky/report" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("Cluster Status")).toBeInTheDocument();
+    expect(
+      client.getQueryData([
+        "clicky",
+        "clicky",
+        "/api/clicky/report?format=clicky-json",
+      ]),
+    ).toBeDefined();
     fetchSpy.mockRestore();
   });
 
