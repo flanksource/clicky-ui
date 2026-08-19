@@ -138,9 +138,10 @@ export const Columns: Story = {
       canvas.getByRole("button", { name: /^Columns Fields, labels, expressions/ }),
     );
     await expect(canvas.findByText("3 of 3 included")).resolves.toBeVisible();
-    await expect(
-      canvas.findByRole("textbox", { name: "Label for observed_at" }),
-    ).resolves.toBeVisible();
+    const observedAt = within(
+      await canvas.findByRole("region", { name: /^observed_at / }),
+    );
+    await expect(observedAt.getByRole("textbox", { name: "Display label" })).toBeVisible();
     await userEvent.selectOptions(
       canvas.getByRole("combobox", { name: "CEL examples" }),
       "row.observed_at / 1000.0",

@@ -140,8 +140,13 @@ export const Tables: Story = {
       const head = canvasElement.querySelector("thead") as HTMLElement;
       expect(getComputedStyle(head).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
       expect(getComputedStyle(head).borderBottomWidth).not.toBe("0px");
-      const rows = canvasElement.querySelectorAll<HTMLElement>("tbody tr");
-      expect(getComputedStyle(rows[1] as HTMLElement).borderTopWidth).not.toBe("0px");
+      expect(
+        tables
+          .flatMap((table) => [
+            ...table.querySelectorAll<HTMLElement>("tbody tr:not(:last-child)"),
+          ])
+          .every((row) => getComputedStyle(row).borderBottomWidth !== "0px"),
+      ).toBe(true);
     });
 
     await step("the delimiter row still drives column alignment", async () => {
