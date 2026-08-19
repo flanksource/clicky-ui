@@ -43,7 +43,11 @@ import {
   MultiFilterPanel,
   type FilterBarMultiFilter,
 } from "./filter-bar-multi";
-import { clearFilterBarFilter, isFilterBarFilterActive } from "./filter-bar-utils";
+import {
+  clearFilterBarFilter,
+  dateRangeFilterProps,
+  isFilterBarFilterActive,
+} from "./filter-bar-utils";
 
 export { TriStateMultiSelect, type TriStateMultiSelectProps } from "./filter-bar-multi";
 export type { FilterBarMultiFilter, FilterBarMultiFilterMode };
@@ -678,20 +682,6 @@ function FilterBarFilterPanelContent({
   );
 }
 
-// dateRangeFilterProps strips the filter's identity off, leaving the range the
-// controls take. `key` in particular must not reach a component as a prop.
-function dateRangeFilterProps(filter: FilterBarDateRangeFilter): FilterBarRangeProps {
-  const {
-    key: _key,
-    kind: _kind,
-    label: _label,
-    icon: _icon,
-    description: _description,
-    ...range
-  } = filter;
-  return range;
-}
-
 function renderFilterField(filter: FilterBarFilter, grow: boolean) {
   if (filter.kind === "lookup") {
     return <LookupFilterField filter={filter} grow={grow} />;
@@ -1023,7 +1013,7 @@ function WorkloadFilterField({
 
 function valueInputClassName(disabled?: boolean) {
   return cn(
-    "h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring",
+    "h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-placeholder focus-visible:ring-2 focus-visible:ring-ring",
     disabled && "cursor-not-allowed opacity-60",
   );
 }
@@ -1306,7 +1296,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
         <input
           type="search"
           aria-label={search.ariaLabel ?? search.placeholder ?? "Search"}
-          className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+          className="w-full bg-transparent outline-none placeholder:text-placeholder"
           placeholder={search.placeholder ?? "Search…"}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -1333,7 +1323,7 @@ function TextFilterField({ filter, grow }: { filter: FilterBarTextFilter; grow: 
       <input
         type="text"
         aria-label={filter.label}
-        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed"
         {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
         value={draft}
         disabled={filter.disabled}
@@ -1390,7 +1380,7 @@ function LookupFilterField({ filter, grow }: { filter: FilterBarLookupFilter; gr
           <input
             type="number"
             aria-label={filter.label}
-            className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed"
             placeholder={filter.placeholder}
             value={draft}
             disabled={filter.disabled}

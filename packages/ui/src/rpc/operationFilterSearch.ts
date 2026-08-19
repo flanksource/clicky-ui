@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import {
   lookupOptionsToFieldOptions,
-  packParameterValues,
+  packLookupParameterValues,
   type LookupSearch,
   type ParameterValues,
 } from "./formMetadata";
@@ -38,7 +38,7 @@ export function useOperationFilterSearch(
         endpoint.method,
         filterKey,
         query,
-        packParameterValues(values, parameters),
+        packLookupParameterValues(values, parameters),
       );
       return lookupOptionsToFieldOptions(filter);
     };

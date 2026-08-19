@@ -7,6 +7,7 @@ import type {
 import {
   DataTable,
   type DataTableColumn,
+  type DataTableInfinite,
   type DataTablePagination,
 } from "../data/DataTable";
 import {
@@ -47,6 +48,10 @@ export type CommandOutputProps = {
   cellFilters?: Record<string, Record<string, CellFilterMode>>;
   onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
+  // Server-driven infinite scroll for the embedded table. The caller owns the
+  // accumulation — `response` already holds every page it has stacked — so this
+  // only carries the question of whether to ask for another.
+  infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
 };
@@ -83,6 +88,7 @@ export function CommandOutput({
   cellFilters,
   onCellFilterChange,
   pagination,
+  infinite,
   rowSelection,
   download,
 }: CommandOutputProps) {
@@ -99,6 +105,20 @@ export function CommandOutput({
       return null;
     }
   }, [response, text]);
+  const rendersClicky = useMemo(() => {
+    const contentType = (ct.split(";")[0] ?? "").trim();
+    if (
+      contentType === "application/clicky+json" ||
+      contentType === "application/json+clicky"
+    ) {
+      return true;
+    }
+    const payload =
+      typeof parsed === "string" || (parsed != null && typeof parsed === "object")
+        ? (parsed as ClickyNode | ClickyDocument)
+        : text;
+    return payload !== "" && parseClickyData(payload).ok;
+  }, [ct, parsed, text]);
 
   let output: ReactNode;
   if (response) {
@@ -120,8 +140,10 @@ export function CommandOutput({
         {...(cellFilters ? { cellFilters } : {})}
         {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
+        loading={loading}
       />
     );
   } else if (loading) {
@@ -131,7 +153,7 @@ export function CommandOutput({
   }
 
   const pending =
-    loading && response ? (
+    loading && response && !rendersClicky ? (
       <div
         role="status"
         className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground"
@@ -215,8 +237,10 @@ function OutputBody({
   cellFilters,
   onCellFilterChange,
   pagination,
+  infinite,
   rowSelection,
   download,
+  loading,
 }: {
   text: string;
   parsed: unknown;
@@ -234,8 +258,10 @@ function OutputBody({
   cellFilters?: Record<string, Record<string, CellFilterMode>>;
   onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
+  infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
+  loading: boolean;
 }) {
   const ct = (contentType.split(";")[0] ?? "").trim();
 
@@ -250,11 +276,14 @@ function OutputBody({
   const parsedClicky =
     clickyPayload === "" ? null : parseClickyData(clickyPayload);
 
-  if (
-    parsedClicky?.ok ||
-    ct === "application/clicky+json" ||
-    ct === "application/json+clicky"
-  ) {
+  // The server already served the clicky representation, so this payload IS
+  // what re-requesting the endpoint as clicky returns. A payload that merely
+  // parses as clicky came from some other representation, and the clicky view
+  // still has to ask for its own.
+  const servedAsClicky =
+    ct === "application/clicky+json" || ct === "application/json+clicky";
+
+  if (parsedClicky?.ok || servedAsClicky) {
     const clicky = (
       <Clicky
         data={
@@ -263,6 +292,7 @@ function OutputBody({
             : ((parsed as Parameters<typeof Clicky>[0]["data"]) ?? text)
         }
         {...(url ? { url } : {})}
+        {...(url && servedAsClicky ? { dataFormat: "clicky" as const } : {})}
         {...(commandRuntime ? { commandRuntime } : {})}
         {...(onTableRowClick ? { onTableRowClick } : {})}
         {...(getTableRowHref ? { getTableRowHref } : {})}
@@ -273,8 +303,10 @@ function OutputBody({
         {...(cellFilters ? { cellFilters } : {})}
         {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
+        loading={loading}
         className="flex min-h-0 flex-1 flex-col"
       />
     );

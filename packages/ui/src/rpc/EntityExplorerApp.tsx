@@ -198,6 +198,11 @@ export function EntityExplorerApp({
       {resolvedRoute.kind === "surface" ? (
           resolvedRoute.surface ? (
             <OperationCatalog
+              // Filter state is seeded from the URL when the catalog mounts and
+              // written back to it, so one instance spanning two surfaces would
+              // carry the first surface's filters onto the second's URL. Keying
+              // on the surface makes each one start from its own query string.
+              key={resolvedRoute.surface.key}
               definition={makeSurfaceDefinition(resolvedRoute.surface)}
               entities={[resolvedRoute.surface.entity]}
               client={client}

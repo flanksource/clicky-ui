@@ -8,9 +8,24 @@ import type { OperationsApiClient } from "./useOperations";
 // A list operation with the paired from/to date params plus one ordinary
 // text param -- mirrors a policy list command's query surface.
 const parameters: OpenAPIParameter[] = [
-  { name: "from", in: "query", description: "Start date", schema: { type: "string" } },
-  { name: "to", in: "query", description: "End date", schema: { type: "string" } },
-  { name: "policy", in: "query", description: "Policy number", schema: { type: "string" } },
+  {
+    name: "from",
+    in: "query",
+    description: "Start date",
+    schema: { type: "string" },
+  },
+  {
+    name: "to",
+    in: "query",
+    description: "End date",
+    schema: { type: "string" },
+  },
+  {
+    name: "policy",
+    in: "query",
+    description: "Policy number",
+    schema: { type: "string" },
+  },
 ];
 
 // The backend types `from`/`to` so formMetadata pairs them into a timeRange.
@@ -51,7 +66,9 @@ describe("FilterForm time range", () => {
     const { container } = renderFilterForm();
 
     // The TimeRange popover trigger appears once the lookup pairs from/to.
-    const trigger = await screen.findByRole("button", { name: /time range filter/i });
+    const trigger = await screen.findByRole("button", {
+      name: /time range filter/i,
+    });
     expect(trigger).toBeInTheDocument();
 
     // No bare text input is rendered for the from/to fields in the form body.
@@ -63,7 +80,9 @@ describe("FilterForm time range", () => {
   it("applies a from/to selection through the TimeRange popover", async () => {
     renderFilterForm();
 
-    const trigger = await screen.findByRole("button", { name: /time range filter/i });
+    const trigger = await screen.findByRole("button", {
+      name: /time range filter/i,
+    });
     fireEvent.click(trigger);
 
     fireEvent.change(screen.getByLabelText("Time range from"), {
@@ -75,9 +94,9 @@ describe("FilterForm time range", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent(
-        "2026-04-01",
-      ),
+      expect(
+        screen.getByRole("button", { name: /time range filter/i }),
+      ).toHaveTextContent("2026-04-01"),
     );
   });
 });
@@ -86,7 +105,9 @@ describe("FilterForm placeholders", () => {
   it("renders no placeholder when the field has a label and none is explicit", async () => {
     renderFilterForm();
 
-    const policyInput = (await screen.findByLabelText("Policy")) as HTMLInputElement;
+    const policyInput = (await screen.findByLabelText(
+      "Policy",
+    )) as HTMLInputElement;
     // `policy` declares description "Policy number" but no explicit placeholder.
     // The field already carries the "Policy" label, so no placeholder is
     // synthesized — not the description, not the label, not generic junk.
@@ -131,8 +152,12 @@ describe("FilterForm multi-value filters", () => {
     );
 
     const combobox = await screen.findByRole("combobox", { name: "Status" });
-    expect(screen.queryByRole("group", { name: "Status" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Ready" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Status" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Ready" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(combobox);
 
@@ -142,9 +167,65 @@ describe("FilterForm multi-value filters", () => {
 
     fireEvent.mouseDown(readyOption);
 
+    // A multi-select stays open after a pick so the next one can be made, and an
+    // open combobox shows its search draft rather than the selection. The
+    // closed-state label is what this asserts, so close it first — this used to
+    // pass without closing only because the refetch behind the picker tore the
+    // whole control down mid-selection and it came back closed.
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("Ready"),
+      expect(screen.getByRole("option", { name: "Ready" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
     );
-    expect(screen.getByRole("combobox", { name: "Status" })).not.toHaveValue("+1");
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Status" }), {
+      key: "Escape",
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
+        "Ready",
+      ),
+    );
+    expect(screen.getByRole("combobox", { name: "Status" })).not.toHaveValue(
+      "+1",
+    );
+  });
+
+  it("excludes pagination transport values from lookup requests", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const lookupFilters = vi.fn(async () => ({ filters: {} }));
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FilterForm
+          client={{
+            getOpenAPISpec: vi.fn(),
+            executeCommand: vi.fn(),
+            lookupFilters,
+          }}
+          path="/jobs"
+          method="GET"
+          parameters={[
+            { name: "status", in: "query", "x-clicky": { role: "filter" } },
+            { name: "pageSize", in: "query", "x-clicky": { role: "limit" } },
+            { name: "startAt", in: "query", "x-clicky": { role: "offset" } },
+          ]}
+          initialValues={{ status: "ready", pageSize: "50", startAt: "100" }}
+          onSubmit={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(lookupFilters).toHaveBeenCalledWith(
+        "/jobs",
+        "GET",
+        { status: "ready" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
   });
 });

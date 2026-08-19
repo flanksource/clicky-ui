@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import type {
   FilterBarFilter,
@@ -10,7 +10,7 @@ import { Combobox } from "../components/Combobox";
 import { TimeRange } from "../components/TimeRange";
 import { cn } from "../lib/utils";
 import {
-  packParameterValues,
+  packLookupParameterValues,
   parametersToFormConfig,
   pruneParameterValues,
   buildInitialParameterValues,
@@ -19,7 +19,7 @@ import {
   type ParameterValues,
 } from "./formMetadata";
 import type { OpenAPIParameter } from "./types";
-import type { OperationsApiClient } from "./useOperations";
+import { useOpenAPI, type OperationsApiClient } from "./useOperations";
 
 export type FilterFormProps = {
   client: OperationsApiClient;
@@ -57,42 +57,66 @@ export function FilterForm({
   onSubmit,
 }: FilterFormProps) {
   const resetKey = useMemo(
-    () => `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
+    () =>
+      `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
     [initialValues, lockedValues, method, path],
   );
   const [values, setValues] = useState<ParameterValues>(() =>
-    buildInitialParameterValues(parameters, method, lockedValues, initialValues),
+    buildInitialParameterValues(
+      parameters,
+      method,
+      lockedValues,
+      initialValues,
+    ),
   );
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
   const lastAutoSubmitted = useRef<string | null>(null);
+  const lookupParameters = useMemo(
+    () => packLookupParameterValues(debouncedValues, parameters),
+    [debouncedValues, parameters],
+  );
 
   const lookupQuery = useQuery({
-    queryKey: ["filter-form-lookup", method, path, debouncedValues],
+    queryKey: ["filter-form-lookup", method, path, lookupParameters],
     queryFn: async () =>
-      (await client.lookupFilters?.(
-        path,
-        method,
-        packParameterValues(debouncedValues, parameters),
-        { Accept: "application/json+clicky" },
-      )) ?? { filters: {} },
+      (await client.lookupFilters?.(path, method, lookupParameters, {
+        Accept: "application/json+clicky",
+      })) ?? { filters: {} },
     enabled:
-      enableLookup && !!client.lookupFilters && parameters.some((param) => param.in === "query"),
+      enableLookup &&
+      !!client.lookupFilters &&
+      parameters.some((param) => param.in === "query"),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
+
+  // Shapes come from the spec so a control keeps its identity while the lookup
+  // that fills it is in flight; see parametersToFormConfig.
+  const { data: spec } = useOpenAPI(client);
+  const filterShapes = spec?.components?.["x-clicky-filters"];
 
   const formConfig = useMemo(
     () =>
       parametersToFormConfig(parameters, values, setValues, {
         lookup: lookupQuery.data,
+        components: filterShapes,
         lockedValues,
         hideLocked,
       }),
-    [hideLocked, lockedValues, lookupQuery.data, parameters, values],
+    [
+      filterShapes,
+      hideLocked,
+      lockedValues,
+      lookupQuery.data,
+      parameters,
+      values,
+    ],
   );
 
-  const hasFields = formConfig.filters.length > 0 || formConfig.timeRange != null;
+  const hasFields =
+    formConfig.filters.length > 0 || formConfig.timeRange != null;
 
   async function handleSubmit(event?: FormEvent) {
     event?.preventDefault();
@@ -115,7 +139,14 @@ export function FilterForm({
   }
 
   useEffect(() => {
-    setValues(buildInitialParameterValues(parameters, method, lockedValues, initialValues));
+    setValues(
+      buildInitialParameterValues(
+        parameters,
+        method,
+        lockedValues,
+        initialValues,
+      ),
+    );
     setError("");
     lastAutoSubmitted.current = null;
   }, [resetKey]);
@@ -127,7 +158,8 @@ export function FilterForm({
 
     const missingRequired = parameters.filter((param) => {
       if (!param.required) return false;
-      const value = lockedValues[param.name] ?? debouncedValues[param.name] ?? "";
+      const value =
+        lockedValues[param.name] ?? debouncedValues[param.name] ?? "";
       return value.trim() === "";
     });
     if (missingRequired.length > 0) {
@@ -243,13 +275,21 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
         from={filter.from ?? ""}
         to={filter.to ?? ""}
         onApply={filter.onApply}
-        {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+        {...(filter.disabled !== undefined
+          ? { disabled: filter.disabled }
+          : {})}
         {...(filter.presets ? { presets: filter.presets } : {})}
-        {...(filter.timeEnabled !== undefined ? { timeEnabled: filter.timeEnabled } : {})}
+        {...(filter.timeEnabled !== undefined
+          ? { timeEnabled: filter.timeEnabled }
+          : {})}
         {...(filter.timeZone ? { timeZone: filter.timeZone } : {})}
         {...(filter.timeZones ? { timeZones: filter.timeZones } : {})}
-        {...(filter.fromPlaceholder ? { fromPlaceholder: filter.fromPlaceholder } : {})}
-        {...(filter.toPlaceholder ? { toPlaceholder: filter.toPlaceholder } : {})}
+        {...(filter.fromPlaceholder
+          ? { fromPlaceholder: filter.fromPlaceholder }
+          : {})}
+        {...(filter.toPlaceholder
+          ? { toPlaceholder: filter.toPlaceholder }
+          : {})}
       />
     );
   }
@@ -299,7 +339,9 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
           type={filter.inputType === "number" ? "number" : "text"}
           aria-label={filter.label}
           className={inputClassName}
-          {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+          {...(filter.placeholder !== undefined
+            ? { placeholder: filter.placeholder }
+            : {})}
           value={filter.value}
           list={listId}
           disabled={filter.disabled}
@@ -328,11 +370,15 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
           type="text"
           aria-label={filter.label}
           className={inputClassName}
-          {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+          {...(filter.placeholder !== undefined
+            ? { placeholder: filter.placeholder }
+            : {})}
           value={filter.value.join(", ")}
           list={listId}
           disabled={filter.disabled}
-          onChange={(event) => filter.onChange(splitCommaValues(event.target.value))}
+          onChange={(event) =>
+            filter.onChange(splitCommaValues(event.target.value))
+          }
         />
         <datalist id={listId}>
           {filter.options.map((option) => (
@@ -359,7 +405,9 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
         type="text"
         aria-label={filter.label}
         className={inputClassName}
-        {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+        {...(filter.placeholder !== undefined
+          ? { placeholder: filter.placeholder }
+          : {})}
         value={filter.value}
         disabled={filter.disabled}
         onChange={(event) => filter.onChange(event.target.value)}
@@ -380,10 +428,17 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
   );
 }
 
-function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id: string }) {
-  const moreCount = filter.truncated && filter.total
-    ? Math.max(filter.total - filter.options.length, 0)
-    : 0;
+function MultiParameterInput({
+  filter,
+  id,
+}: {
+  filter: FilterBarMultiFilter;
+  id: string;
+}) {
+  const moreCount =
+    filter.truncated && filter.total
+      ? Math.max(filter.total - filter.options.length, 0)
+      : 0;
   return (
     <Combobox
       multiple
@@ -392,20 +447,30 @@ function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id:
       value={Object.keys(filter.value)}
       options={filter.options.map((option) => ({
         value: option.value,
-        label: typeof option.label === "string" ? option.label : (option.title ?? option.value),
+        label:
+          typeof option.label === "string"
+            ? option.label
+            : (option.title ?? option.value),
         ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
         ...(option.title !== undefined ? { title: option.title } : {}),
       }))}
       onChange={(values) => {
         const next: FilterBarMultiFilter["value"] = {};
-        for (const value of values) next[value] = filter.value[value] ?? "include";
+        for (const value of values)
+          next[value] = filter.value[value] ?? "include";
         filter.onChange(next);
       }}
       allowCustomValue={filter.allowCustomValue ?? false}
-      {...(filter.placeholder !== undefined ? { placeholder: filter.placeholder } : {})}
+      {...(filter.placeholder !== undefined
+        ? { placeholder: filter.placeholder }
+        : {})}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
-      {...(filter.className !== undefined ? { className: filter.className } : {})}
-      {...(moreCount > 0 ? { footer: `… and ${moreCount.toLocaleString()} more` } : {})}
+      {...(filter.className !== undefined
+        ? { className: filter.className }
+        : {})}
+      {...(moreCount > 0
+        ? { footer: `… and ${moreCount.toLocaleString()} more` }
+        : {})}
     />
   );
 }
@@ -416,7 +481,9 @@ function MultiParameterInput({ filter, id }: { filter: FilterBarMultiFilter; id:
 function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
   return (
     <div className="grid grid-cols-1 gap-2 py-2 sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] sm:items-center">
-      <div className="text-sm font-medium text-muted-foreground">Time range</div>
+      <div className="text-sm font-medium text-muted-foreground">
+        Time range
+      </div>
       <div className="min-w-0">
         <TimeRange
           kind={timeRange.timeEnabled ? "time" : "date"}
@@ -426,11 +493,17 @@ function TimeRangeRow({ timeRange }: { timeRange: FilterBarRangeProps }) {
           to={timeRange.to ?? ""}
           onApply={timeRange.onApply}
           {...(timeRange.presets ? { presets: timeRange.presets } : {})}
-          {...(timeRange.timeEnabled !== undefined ? { timeEnabled: timeRange.timeEnabled } : {})}
+          {...(timeRange.timeEnabled !== undefined
+            ? { timeEnabled: timeRange.timeEnabled }
+            : {})}
           {...(timeRange.timeZone ? { timeZone: timeRange.timeZone } : {})}
           {...(timeRange.timeZones ? { timeZones: timeRange.timeZones } : {})}
-          {...(timeRange.fromPlaceholder ? { fromPlaceholder: timeRange.fromPlaceholder } : {})}
-          {...(timeRange.toPlaceholder ? { toPlaceholder: timeRange.toPlaceholder } : {})}
+          {...(timeRange.fromPlaceholder
+            ? { fromPlaceholder: timeRange.fromPlaceholder }
+            : {})}
+          {...(timeRange.toPlaceholder
+            ? { toPlaceholder: timeRange.toPlaceholder }
+            : {})}
         />
       </div>
     </div>
@@ -445,4 +518,4 @@ function splitCommaValues(value: string) {
 }
 
 const inputClassName =
-  "h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring";
+  "h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed disabled:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring";

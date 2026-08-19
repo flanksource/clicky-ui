@@ -63,7 +63,7 @@ export function EndpointList({
         placeholder={`Search ${definition.title.toLowerCase()}...`}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-lg rounded-lg border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+        className="w-full max-w-lg rounded-lg border bg-background px-3 py-2 text-sm outline-none placeholder:text-placeholder focus:ring-2 focus:ring-ring"
       />
       <div className="space-y-2">
         {filtered.map((op) => {

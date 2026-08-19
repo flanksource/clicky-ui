@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import { MethodBadge } from "../data/MethodBadge";
 import { stripTrailingSlashes } from "../lib/string";
@@ -9,6 +9,7 @@ import type { RenderLink } from "./EndpointList";
 import {
   buildInitialParameterValues,
   dataTablePaginationFromForm,
+  packLookupParameterValues,
   packParameterValues,
   parametersToFormConfig,
   pruneParameterValues,
@@ -16,6 +17,7 @@ import {
   useDebouncedRecord,
   type ParameterValues,
 } from "./formMetadata";
+import { useCursorStaleRecovery } from "./cursorStale";
 import { InlineError } from "./InlineError";
 import { OperationActionDialog } from "./OperationActionDialog";
 import { OperationResultView } from "./OperationResultView";
@@ -144,12 +146,17 @@ export function OperationCommandPage({
     writeQueryParameterValuesToUrl(debouncedValues, parameters);
   }, [isGet, operationKey, debouncedValues, parameterSignature]);
 
+  const lookupParameters = useMemo(
+    () => packLookupParameterValues(debouncedValues, parameters),
+    [debouncedValues, parameters],
+  );
+
   const lookupQuery = useQuery({
     queryKey: [
       "operation-query-lookup",
       operation?.method,
       operation?.path,
-      debouncedValues,
+      lookupParameters,
     ],
     queryFn: async () => {
       if (!operation) return { filters: {} };
@@ -157,7 +164,7 @@ export function OperationCommandPage({
         (await client.lookupFilters?.(
           operation.path,
           operation.method,
-          packParameterValues(debouncedValues, parameters),
+          lookupParameters,
           { Accept: "application/json+clicky" },
         )) ?? { filters: {} }
       );
@@ -167,14 +174,20 @@ export function OperationCommandPage({
       !!operation &&
       !!client.lookupFilters &&
       parameters.some((param) => param.in === "query"),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
+
+  // Shapes come from the spec so a control keeps its identity while the lookup
+  // that fills it is in flight; see parametersToFormConfig.
+  const filterShapes = lookup.spec?.components?.["x-clicky-filters"];
 
   const formConfig = useMemo(() => {
     if (!isGet) return { filters: [] };
     return parametersToFormConfig(parameters, values, setValues, {
       lookup: lookupQuery.data,
+      components: filterShapes,
       lockedValues: lockedPathValues,
       hideLocked: hideLockedPathFilters,
     });
@@ -183,6 +196,7 @@ export function OperationCommandPage({
     parameters,
     values,
     lookupQuery.data,
+    filterShapes,
     lockedPathValues,
     hideLockedPathFilters,
   ]);
@@ -219,6 +233,8 @@ export function OperationCommandPage({
       setIsExecuting(false);
     }
   }
+
+  useCursorStaleRecovery({ error, parameters, values, setValues });
 
   useEffect(() => {
     setHasAutoRun(false);

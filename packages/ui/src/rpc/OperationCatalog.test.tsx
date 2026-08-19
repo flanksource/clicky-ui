@@ -1,9 +1,19 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationCatalog } from "./OperationCatalog";
 import type { RenderLink } from "./EndpointList";
-import type { ExecutionResponse, OpenAPISpec, OperationLookupResponse } from "./types";
+import type {
+  ExecutionResponse,
+  OpenAPISpec,
+  OperationLookupResponse,
+} from "./types";
 import type { OperationsApiClient } from "./useOperations";
 
 function makeSpec(): OpenAPISpec {
@@ -43,7 +53,11 @@ function makeSpec(): OpenAPISpec {
             },
             { name: "team", in: "query", schema: { type: "string" } },
             { name: "tags", in: "query", schema: { type: "string" } },
-            { name: "include-archived", in: "query", schema: { type: "boolean" } },
+            {
+              name: "include-archived",
+              in: "query",
+              schema: { type: "boolean" },
+            },
             { name: "from", in: "query", schema: { type: "string" } },
             { name: "to", in: "query", schema: { type: "string" } },
           ],
@@ -52,7 +66,11 @@ function makeSpec(): OpenAPISpec {
         post: {
           operationId: "widget_create",
           tags: ["widget"],
-          "x-clicky": { surface: "widgets", verb: "create", scope: "collection" },
+          "x-clicky": {
+            surface: "widgets",
+            verb: "create",
+            scope: "collection",
+          },
           responses: {},
         },
       },
@@ -60,7 +78,12 @@ function makeSpec(): OpenAPISpec {
         get: {
           operationId: "widget_get",
           tags: ["widget"],
-          "x-clicky": { surface: "widgets", verb: "get", scope: "entity", idParam: "id" },
+          "x-clicky": {
+            surface: "widgets",
+            verb: "get",
+            scope: "entity",
+            idParam: "id",
+          },
           parameters: [{ name: "id", in: "path" }],
           responses: {},
         },
@@ -68,7 +91,12 @@ function makeSpec(): OpenAPISpec {
           operationId: "widget_update",
           tags: ["widget"],
           summary: "Update a widget",
-          "x-clicky": { surface: "widgets", verb: "update", scope: "entity", idParam: "id" },
+          "x-clicky": {
+            surface: "widgets",
+            verb: "update",
+            scope: "entity",
+            idParam: "id",
+          },
           parameters: [{ name: "id", in: "path" }],
           responses: {},
         },
@@ -76,7 +104,12 @@ function makeSpec(): OpenAPISpec {
           operationId: "widget_delete",
           tags: ["widget"],
           summary: "Delete a widget",
-          "x-clicky": { surface: "widgets", verb: "delete", scope: "entity", idParam: "id" },
+          "x-clicky": {
+            surface: "widgets",
+            verb: "delete",
+            scope: "entity",
+            idParam: "id",
+          },
           parameters: [{ name: "id", in: "path" }],
           responses: {},
         },
@@ -164,6 +197,7 @@ function clickyTablePageResponse(
   rowCount: number,
   pagination: NonNullable<ExecutionResponse["pagination"]>,
 ): ExecutionResponse {
+  const offset = pagination.offset ?? 0;
   return {
     ...clickyTableResponse,
     stdout: JSON.stringify({
@@ -183,13 +217,13 @@ function clickyTablePageResponse(
                 cells: {
                   ID: {
                     kind: "text",
-                    text: `widget-${index + 1}`,
-                    plain: `widget-${index + 1}`,
+                    text: `widget-${offset + index + 1}`,
+                    plain: `widget-${offset + index + 1}`,
                   },
                   Name: {
                     kind: "text",
-                    text: `Widget ${index + 1}`,
-                    plain: `Widget ${index + 1}`,
+                    text: `Widget ${offset + index + 1}`,
+                    plain: `Widget ${offset + index + 1}`,
                   },
                 },
               })),
@@ -200,9 +234,18 @@ function clickyTablePageResponse(
             value: {
               kind: "map",
               fields: [
-                { name: "Limit", value: { kind: "text", text: String(pagination.limit) } },
-                { name: "Offset", value: { kind: "text", text: String(pagination.offset) } },
-                { name: "Total", value: { kind: "text", text: String(pagination.total) } },
+                {
+                  name: "Limit",
+                  value: { kind: "text", text: String(pagination.limit) },
+                },
+                {
+                  name: "Offset",
+                  value: { kind: "text", text: String(pagination.offset) },
+                },
+                {
+                  name: "Total",
+                  value: { kind: "text", text: String(pagination.total) },
+                },
               ],
             },
           },
@@ -211,6 +254,14 @@ function clickyTablePageResponse(
     }),
     pagination,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 function makeClient(
@@ -236,7 +287,11 @@ function makeLookupResponse(): OperationLookupResponse {
       team: {
         label: "Team",
         options: {
-          "team/platform": { kind: "text", text: "Platform", plain: "Platform" },
+          "team/platform": {
+            kind: "text",
+            text: "Platform",
+            plain: "Platform",
+          },
           "team/core": { kind: "text", text: "Core", plain: "Core" },
         },
       },
@@ -272,13 +327,22 @@ function makeLookupResponse(): OperationLookupResponse {
   };
 }
 
-const renderFakeLink: RenderLink = ({ to, className, children, title, key }) => (
+const renderFakeLink: RenderLink = ({
+  to,
+  className,
+  children,
+  title,
+  key,
+}) => (
   <a key={key} href={to} className={className} title={title}>
     {children}
   </a>
 );
 
-function renderCatalog(client: OperationsApiClient, actionLabels?: Record<string, string>) {
+function renderCatalog(
+  client: OperationsApiClient,
+  actionLabels?: Record<string, string>,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -304,9 +368,13 @@ describe("OperationCatalog", () => {
   it("bounds the result pipeline so table rows scroll between the header and pager", async () => {
     renderCatalog(makeClient());
 
-    const region = await screen.findByRole("region", { name: "Widgets results" });
+    const region = await screen.findByRole("region", {
+      name: "Widgets results",
+    });
     const catalog = document.querySelector('[data-slot="operation-catalog"]');
-    const results = document.querySelector('[data-slot="operation-catalog-results"]');
+    const results = document.querySelector(
+      '[data-slot="operation-catalog-results"]',
+    );
 
     expect(catalog).toHaveClass("h-full", "min-h-0", "flex-col");
     expect(results).toHaveClass("min-h-0", "flex-1");
@@ -369,6 +437,64 @@ describe("OperationCatalog", () => {
     );
   });
 
+  // A filter's options are refetched on every selection, but the control they
+  // fill is described by the spec, which is fetched once. Reading the control's
+  // identity from the in-flight lookup instead collapsed every chip in the bar
+  // into a plain text input for the length of that fetch.
+  it("keeps a lookup-backed control while the next option set is in flight", async () => {
+    const spec = makeSpec();
+    spec.components = {
+      "x-clicky-filters": {
+        widget_workload: { type: "workload", label: "Workload" },
+      },
+    };
+    spec.paths["/api/v1/widgets"]!.get!.parameters!.push({
+      name: "workload",
+      in: "query",
+      schema: { type: "string" },
+      "x-clicky": { role: "filter" },
+      "x-clicky-lookup": {
+        $ref: "#/components/x-clicky-filters/widget_workload",
+        url: "/api/v1/widgets",
+        filter: "workload",
+        searchParam: "__lookup_q",
+      },
+    });
+
+    const client = makeClient();
+    client.getOpenAPISpec = async () => spec;
+    // Every lookup hangs, including the first: this holds open the window the
+    // bar used to degrade in, and covers first paint, where there is no earlier
+    // option set to fall back on and only the spec can describe the control.
+    client.lookupMock.mockReturnValue(new Promise(() => {}));
+
+    window.history.replaceState(
+      null,
+      "",
+      "/?workload=payments%2FDeployment%2Fapi",
+    );
+    renderCatalog(client);
+
+    // The picker renders from the spec alone, before any options exist. A plain
+    // text input here is the bug: it is what the bar decayed into.
+    const value = await screen.findByText("First");
+    expect(screen.getByLabelText("Workload")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Workload" })).toBeNull();
+
+    fireEvent.mouseEnter(value.closest("span.relative")!);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Include First" }),
+    );
+
+    await waitFor(() =>
+      expect(client.lookupMock.mock.calls.length).toBeGreaterThan(1),
+    );
+    // …and it still is one after a filter change, the window the reported bug
+    // was seen in.
+    expect(screen.getByLabelText("Workload")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Workload" })).toBeNull();
+  });
+
   it("renders a resolved Clicky command failure as a table error", async () => {
     renderCatalog(makeClient(ambiguousPlanResponse));
 
@@ -415,10 +541,9 @@ describe("OperationCatalog", () => {
       target: { value: "11111111-1111-1111-1111-111111111111" },
     });
 
-    await waitFor(
-      () => expect(client.executeMock).toHaveBeenCalledTimes(2),
-      { timeout: 2_000 },
-    );
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), {
+      timeout: 2_000,
+    });
     expect(await screen.findByText("First")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -429,22 +554,34 @@ describe("OperationCatalog", () => {
 
     // Collection-scoped actions belong on the list: create + the bulk pause
     // (which acts on the filtered set).
-    expect(await screen.findByRole("button", { name: "Create" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Create" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
 
     // Entity-scoped actions require an {id} and live on the detail page; they
     // must not leak onto the list action bar.
-    expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Update" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restart" }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses host-provided surface action labels", async () => {
     const client = makeClient();
     renderCatalog(client, { create: "Add Widget" });
 
-    expect(await screen.findByRole("button", { name: "Add Widget" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Add Widget" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Create" }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses a wide modal for schema actions and places controls in its footer", async () => {
@@ -454,11 +591,19 @@ describe("OperationCatalog", () => {
     renderCatalog(client);
 
     fireEvent.click(await screen.findByRole("button", { name: "Create" }));
-    await waitFor(() => expect(document.querySelector('[data-slot="modal-footer"]')).not.toBeNull());
-    expect(screen.getByRole("dialog", { name: "Create" })).toHaveClass("max-w-6xl");
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-slot="modal-footer"]'),
+      ).not.toBeNull(),
+    );
+    expect(screen.getByRole("dialog", { name: "Create" })).toHaveClass(
+      "max-w-6xl",
+    );
     const footer = document.querySelector('[data-slot="modal-footer"]');
     const body = document.querySelector('[data-slot="modal-body"]');
-    const submit = within(footer as HTMLElement).getByRole("button", { name: "Create" });
+    const submit = within(footer as HTMLElement).getByRole("button", {
+      name: "Create",
+    });
     expect(body).not.toContainElement(submit);
     expect(footer).toContainElement(submit);
   });
@@ -472,7 +617,11 @@ describe("OperationCatalog", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OperationCatalog
-          definition={{ key: "widgets", title: "Widgets", description: "All widgets" }}
+          definition={{
+            key: "widgets",
+            title: "Widgets",
+            description: "All widgets",
+          }}
           entities={["widget"]}
           surfaceKey="widgets"
           client={client}
@@ -483,11 +632,15 @@ describe("OperationCatalog", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Add Widget" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Execute request" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Execute request" }),
+    );
 
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ["openapi-spec"] });
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["logs-entity-names"] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ["logs-entity-names"],
+      });
     });
   });
 
@@ -502,7 +655,11 @@ describe("OperationCatalog", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OperationCatalog
-          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          definition={{
+            key: "widgets",
+            title: "Widgets",
+            description: "All the widgets.",
+          }}
           entities={["widget"]}
           surfaceKey="widgets"
           client={client}
@@ -517,7 +674,9 @@ describe("OperationCatalog", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("custom-result")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("custom-result")).toBeInTheDocument(),
+    );
     // The renderer is re-invoked once the list response resolves.
     await waitFor(() => expect(seenSuccess).toBe(true));
     // The default clicky table cell must not render — the override replaced it.
@@ -534,7 +693,11 @@ describe("OperationCatalog", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OperationCatalog
-          definition={{ key: "widgets", title: "Widgets", description: "All the widgets." }}
+          definition={{
+            key: "widgets",
+            title: "Widgets",
+            description: "All the widgets.",
+          }}
           entities={["widget"]}
           surfaceKey="widgets"
           client={client}
@@ -548,22 +711,42 @@ describe("OperationCatalog", () => {
   });
 
   it("paginates list tables through native table controls", async () => {
-    const client = makeClient(
-      clickyTablePageResponse(5, {
-        total: 14,
-        limit: 5,
-        offset: 0,
-      }),
-    );
+    const firstPage = clickyTablePageResponse(5, {
+      total: 14,
+      limit: 5,
+      offset: 0,
+    });
+    const secondPage = deferred<ExecutionResponse>();
+    const client = makeClient();
+    client.lookupMock
+      .mockResolvedValueOnce(makeLookupResponse())
+      .mockReturnValue(new Promise(() => {}));
+    client.executeMock
+      .mockResolvedValueOnce(firstPage)
+      .mockReturnValueOnce(secondPage.promise)
+      .mockResolvedValueOnce(
+        clickyTablePageResponse(10, {
+          total: 14,
+          limit: 10,
+          offset: 0,
+        }),
+      );
     renderCatalog(client);
 
     expect(await screen.findByText("1-5 of 14")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Team")).toHaveRole("combobox");
+    expect(client.lookupMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
     expect(screen.queryByText("Total")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Widget 1")).toBeInTheDocument();
+    expect(screen.getByText("1-5 of 14")).toBeInTheDocument();
+    expect(screen.getByTestId("data-table-loading-bar")).toBeInTheDocument();
+    expect(screen.getByLabelText("Team")).toHaveRole("combobox");
+    expect(client.lookupMock).toHaveBeenCalledTimes(1);
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",
@@ -571,9 +754,26 @@ describe("OperationCatalog", () => {
       { Accept: "application/json+clicky" },
     );
 
-    fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "10" } });
+    secondPage.resolve(
+      clickyTablePageResponse(5, {
+        total: 14,
+        limit: 5,
+        offset: 5,
+      }),
+    );
+    expect(await screen.findByText("Widget 6")).toBeInTheDocument();
+    expect(screen.queryByText("Widget 1")).not.toBeInTheDocument();
+    expect(screen.getByText("6-10 of 14")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("data-table-loading-bar"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Rows per page"), {
+      target: { value: "10" },
+    });
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(3));
+    expect(client.lookupMock).toHaveBeenCalledTimes(1);
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",
@@ -595,9 +795,13 @@ describe("OperationCatalog", () => {
     fireEvent.change(search, { target: { value: "foobar" } });
 
     // No Apply button exists.
-    expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /apply/i }),
+    ).not.toBeInTheDocument();
 
-    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), { timeout: 2_000 });
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), {
+      timeout: 2_000,
+    });
     expect(client.executeMock).toHaveBeenLastCalledWith(
       "/api/v1/widgets",
       "get",
@@ -618,7 +822,9 @@ describe("OperationCatalog", () => {
     const search = await screen.findByLabelText("Q");
     fireEvent.change(search, { target: { value: "scoped" } });
 
-    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), { timeout: 2_000 });
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), {
+      timeout: 2_000,
+    });
     const params = new URLSearchParams(window.location.search);
     expect(params.get("__entity")).toBe("entity-1");
     expect(params.get("q")).toBe("scoped");
@@ -636,8 +842,13 @@ describe("OperationCatalog", () => {
     expect(await screen.findByLabelText(/kind/i)).toHaveRole("combobox");
     expect(screen.getByLabelText("Team")).toHaveRole("combobox");
     expect(screen.getByLabelText("Tags")).toHaveRole("combobox");
-    expect(screen.getByLabelText("Include archived")).toHaveAttribute("type", "checkbox");
-    expect(screen.getByRole("button", { name: /date range filter/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Include archived")).toHaveAttribute(
+      "type",
+      "checkbox",
+    );
+    expect(
+      screen.getByRole("button", { name: /date range filter/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
   });

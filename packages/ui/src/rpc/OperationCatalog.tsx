@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useOperationPages } from "./useOperationPages";
 import { filterOperationsByDomain } from "./classify";
 import {
   filterOperationsBySurface,
@@ -35,22 +42,23 @@ import type {
 } from "../components/json-schema-form-types";
 import {
   type DomainDefinition,
-  type ExecutionResponse,
   type OperationLookupResponse,
   type ResolvedOperation,
 } from "./types";
 import { useOperations, type OperationsApiClient } from "./useOperations";
 import {
   dataTablePaginationFromForm,
-  packParameterValues,
+  packLookupParameterValues,
   parametersToFormConfig,
   type ParameterFormOptions,
 } from "./formMetadata";
+import { cursorParameterName, useCursorStaleRecovery } from "./cursorStale";
 import { useOperationFilterSearch } from "./operationFilterSearch";
 import {
   parseMultiFilterValue,
   serializeMultiFilterValue,
 } from "../data/data-table-filter-values";
+import { Loading } from "../components/loading";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -111,7 +119,8 @@ export function OperationCatalog({
   resultRenderer,
   actionsContainer,
 }: OperationCatalogProps) {
-  const { operations, isLoading } = useOperations(client);
+  const { operations, spec, isLoading } = useOperations(client);
+  const filterShapes = spec?.components?.["x-clicky-filters"];
 
   const surfaceOps = useMemo(
     () => filterOperationsBySurface(operations, surfaceKey),
@@ -150,6 +159,10 @@ export function OperationCatalog({
     readFiltersFromUrl(),
   );
   const listParameters = listEndpoint?.operation.parameters ?? [];
+  const lookupParameters = useMemo(
+    () => packLookupParameterValues(filters, listParameters),
+    [filters, listParameters],
+  );
   const download = useMemo<ClickyDownloadOptions | undefined>(() => {
     const meta = listEndpoint?.operation["x-clicky"]?.export;
     if (!meta) return undefined;
@@ -174,26 +187,21 @@ export function OperationCatalog({
     writeFiltersToUrl(filters);
   }, [filters]);
 
-  const listQuery = useQuery<ExecutionResponse>({
-    queryKey: [
-      "operation-list",
-      listEndpoint?.method,
-      listEndpoint?.path,
-      filters,
-    ],
-    queryFn: () =>
-      client.executeCommand(
-        listEndpoint!.path,
-        listEndpoint!.method,
-        packParameterValues(filters, listEndpoint!.operation.parameters ?? []),
-        {
-          Accept: "application/json+clicky",
-        },
-      ),
-    enabled: !!listEndpoint,
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-    retry: 0,
+  const list = useOperationPages({
+    client,
+    endpoint: listEndpoint,
+    parameters: listParameters,
+    filters,
+  });
+
+  // Only reaches a cursor the form itself holds — an offset-mode surface that
+  // stepped onto a cursor near the depth limit. A walk keeps its position in the
+  // query rather than in the form, and restarts itself from inside the hook.
+  useCursorStaleRecovery({
+    error: list.error,
+    parameters: listParameters,
+    values: filters,
+    setValues: setFilters,
   });
 
   const lookupQuery = useQuery<OperationLookupResponse>({
@@ -201,16 +209,20 @@ export function OperationCatalog({
       "operation-lookup",
       listEndpoint?.method,
       listEndpoint?.path,
-      filters,
+      lookupParameters,
     ],
     queryFn: async () =>
       (await client.lookupFilters?.(
         listEndpoint!.path,
         listEndpoint!.method,
-        packParameterValues(filters, listParameters),
+        lookupParameters,
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
     enabled: !!listEndpoint && !!client.lookupFilters,
+    // Options are the answer to "what can this filter be set to now", so the
+    // previous answer stays on screen while the next one is fetched rather than
+    // the dropdowns emptying and refilling on every selection.
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
@@ -240,16 +252,16 @@ export function OperationCatalog({
     const options: ParameterFormOptions = {
       includeLocations: ["query"],
       lookupSearch,
+      components: filterShapes,
     };
     if (lookupQuery.data != null) {
       options.lookup = lookupQuery.data;
     }
     return parametersToFormConfig(listParameters, filters, setFilters, options);
-  }, [filters, listParameters, lookupQuery.data, lookupSearch]);
+  }, [filters, filterShapes, listParameters, lookupQuery.data, lookupSearch]);
   const dataTablePagination = useMemo(
-    () =>
-      dataTablePaginationFromForm(filterBarConfig.pagination, listQuery.data),
-    [filterBarConfig.pagination, listQuery.data],
+    () => dataTablePaginationFromForm(filterBarConfig.pagination, list.response),
+    [filterBarConfig.pagination, list.response],
   );
   const decoratedFilters = useMemo(
     () =>
@@ -278,7 +290,9 @@ export function OperationCatalog({
             parameter.name === key && parameter["x-clicky"]?.role === "filter",
         )
       ) {
-        throw new Error(`Clicky table column references unknown filter parameter ${key}`);
+        throw new Error(
+          `Clicky table column references unknown filter parameter ${key}`,
+        );
       }
 
       setFilters((current) => {
@@ -297,10 +311,15 @@ export function OperationCatalog({
           delete next[key];
         }
 
+        // Both positions go, for the reason rewind gives: filtering from a cell
+        // changes which rows exist, so an offset names different rows and a
+        // cursor minted under the old filters is refused outright.
         const offset = listParameters.find(
           (parameter) => parameter["x-clicky"]?.role === "offset",
         );
         if (offset) next[offset.name] = "0";
+        const cursor = cursorParameterName(listParameters);
+        if (cursor) next[cursor] = "";
         return next;
       });
     },
@@ -327,37 +346,40 @@ export function OperationCatalog({
 
   const showTable = !!listEndpoint;
   let listError: unknown;
-  if (!listQuery.isFetching) {
-    if (listQuery.isError) {
-      listError = listQuery.error;
-    } else if (listQuery.data?.success === false) {
+  if (!list.isFetching) {
+    if (list.isError) {
+      listError = list.error;
+    } else if (list.response?.success === false) {
       // A non-2xx that still carries a clicky envelope never throws, so this
       // branch has to rebuild the error the client would have raised — with the
       // request identity and raw body intact, not just the message.
       listError = new OperationsApiClientError(
-        listQuery.data.error ||
-          listQuery.data.message ||
-          listQuery.data.stderr ||
-          `Command failed with exit code ${listQuery.data.exit_code}`,
+        list.response.error ||
+          list.response.message ||
+          list.response.stderr ||
+          `Command failed with exit code ${list.response.exit_code}`,
         {
           method: listEndpoint?.method,
-          url: listQuery.data.requestUrl,
-          responseBody: listQuery.data.stdout,
-          responseData: listQuery.data.parsed,
-          responseHeaders: listQuery.data.responseHeaders,
+          url: list.response.requestUrl,
+          responseBody: list.response.stdout,
+          responseData: list.response.parsed,
+          responseHeaders: list.response.responseHeaders,
         },
       );
     }
   }
   const tableError =
     listError !== undefined
-      ? renderError(
-          listError,
-          `Failed to load ${listEndpoint?.path ?? ""}`,
-        )
+      ? renderError(listError, `Failed to load ${listEndpoint?.path ?? ""}`)
       : undefined;
   const tableResponse =
-    listQuery.data?.success === false ? null : (listQuery.data ?? null);
+    list.response?.success === false ? null : list.response;
+  // The walk is handed on only while there is one. Outside cursor mode `pages`
+  // would be a one-element array restating `response`, and a renderer reading
+  // it as "the surface is accumulating" would be wrong.
+  const walkProps = list.infinite
+    ? { pages: list.pages, infinite: list.infinite }
+    : {};
   // Lock the current list filters into a bulk action (supportsFilterMode), so a
   // collection action like "pause" runs against the same set the table shows.
   // Entity-scoped actions never reach here (they live on the detail page).
@@ -394,15 +416,9 @@ export function OperationCatalog({
     return locked;
   }
 
-  if (isLoading) {
+  if (isLoading || (showTable && list.isPending && list.response == null)) {
     return (
-      <div className="space-y-3">
-        <SkeletonBlock className="h-10 w-72" />
-        <SkeletonBlock className="h-4 w-[32rem]" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <SkeletonBlock key={i} className="h-12" />
-        ))}
-      </div>
+      <Loading variant="centered" label={`Loading ${definition.title}…`} />
     );
   }
 
@@ -411,7 +427,7 @@ export function OperationCatalog({
       actions={actionOps}
       client={client}
       getLockedValues={getActionLockedValues}
-      onExecuted={() => void listQuery.refetch()}
+      onExecuted={() => list.refetch()}
       {...(commandRuntime ? { commandRuntime } : {})}
       {...(formPre ? { formPre } : {})}
       {...(formPost ? { formPost } : {})}
@@ -431,15 +447,12 @@ export function OperationCatalog({
       {actionsContainer ? createPortal(actionBar, actionsContainer) : actionBar}
 
       {showTable ? (
-        <div
-          className="min-h-0 flex-1"
-          data-slot="operation-catalog-results"
-        >
+        <div className="min-h-0 flex-1" data-slot="operation-catalog-results">
           {(() => {
             const defaultView = (
               <OperationResultView
                 response={tableResponse}
-                loading={listQuery.isFetching}
+                loading={list.isFetching}
                 loadingMessage={`Loading ${definition.title} results…`}
                 emptyMessage="No records returned"
                 ariaLabel={`${definition.title} results`}
@@ -452,20 +465,26 @@ export function OperationCatalog({
                   ? { pagination: dataTablePagination }
                   : {})}
                 {...(download ? { download } : {})}
+                {...walkProps}
               />
             );
             return resultRenderer
               ? resultRenderer({
-                  response: listQuery.data ?? null,
+                  response: list.response,
+                  loading: list.isFetching,
                   defaultView,
                   filterConfig: resultFilterConfig,
                   // A renderer that replaces the table owns the whole surface,
                   // pager and download menu included. Without these it can only
                   // drop them, which is how a replaced view silently loses the
-                  // ability to reach page two.
-                  ...(dataTablePagination ? { pagination: dataTablePagination } : {}),
+                  // ability to reach page two — or, under a walk, page one's
+                  // rows the moment page two arrives.
+                  ...(dataTablePagination
+                    ? { pagination: dataTablePagination }
+                    : {}),
                   ...(download ? { download } : {}),
                   ...(surfaceKey ? { surfaceKey } : {}),
+                  ...walkProps,
                 })
               : defaultView;
           })()}
@@ -491,14 +510,6 @@ function readFiltersFromUrl(): Record<string, string> {
     if (value !== "") values[key] = value;
   }
   return values;
-}
-
-function SkeletonBlock({ className }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-muted ${className ?? ""}`.trim()}
-    />
-  );
 }
 
 function writeFiltersToUrl(filters: Record<string, string>) {

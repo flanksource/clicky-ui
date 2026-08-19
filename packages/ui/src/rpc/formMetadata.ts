@@ -16,7 +16,9 @@ import {
   serializeMultiFilterValue,
   splitCommaValues,
 } from "../data/data-table-filter-values";
+import { filterShapesByName } from "./filterShapes";
 import type {
+  ClickyFilterShape,
   ExecutionResponse,
   OpenAPIParameter,
   OperationLookupFilter,
@@ -75,6 +77,12 @@ export type ParameterFormOptions = {
   // Wired only into filters the server marked truncated: one that fully
   // enumerated needs no round trip to search what is already in the browser.
   lookupSearch?: LookupSearch | undefined;
+  // The spec's `components["x-clicky-filters"]` map, which every filter
+  // parameter names via its `$ref`. It is what a control's identity is read
+  // from, so that identity survives a filter change: `lookup` carries the same
+  // answer but is refetched per selection, and reading shape from it is what
+  // used to collapse every chip into a text box for the length of that fetch.
+  components?: Record<string, ClickyFilterShape> | undefined;
 };
 
 // A truncated set has to say so even where nothing can search it: the footer
@@ -82,7 +90,10 @@ export type ParameterFormOptions = {
 // as the whole answer.
 function truncationProps(filter: OperationLookupFilter) {
   if (!filter.truncated) return {};
-  return { truncated: true, ...(filter.total !== undefined ? { total: filter.total } : {}) };
+  return {
+    truncated: true,
+    ...(filter.total !== undefined ? { total: filter.total } : {}),
+  };
 }
 
 // Server-side search applies only when the server said it withheld options. A
@@ -108,8 +119,15 @@ export function titleCase(value: string) {
     .join(" ");
 }
 
-export function defaultValueForParameter(param: OpenAPIParameter, method: string): string {
-  if (method.toUpperCase() === "GET" && param.in === "query" && !param.required) {
+export function defaultValueForParameter(
+  param: OpenAPIParameter,
+  method: string,
+): string {
+  if (
+    method.toUpperCase() === "GET" &&
+    param.in === "query" &&
+    !param.required
+  ) {
     return "";
   }
   const fallback = param.in === "path" ? "" : undefined;
@@ -133,7 +151,10 @@ export function buildInitialParameterValues(
   initialValues: ParameterValues = {},
 ): ParameterValues {
   const values = Object.fromEntries(
-    parameters.map((param) => [param.name, defaultValueForParameter(param, method)]),
+    parameters.map((param) => [
+      param.name,
+      defaultValueForParameter(param, method),
+    ]),
   );
   return { ...values, ...initialValues, ...lockedValues };
 }
@@ -152,8 +173,13 @@ export function dataTablePaginationFromForm(
 ): DataTablePagination | undefined {
   if (!pagination) return undefined;
 
-  const pageSize = positiveInt(pagination.limitValue) ?? response?.pagination?.limit ?? 25;
-  const offset = nonNegativeInt(pagination.offsetValue) ?? response?.pagination?.offset ?? 0;
+  // The footer describes the rows currently rendered, not the request that is
+  // replacing them. During keepPreviousData refetches the form already holds
+  // the next offset while the response still holds the retained page.
+  const pageSize =
+    response?.pagination?.limit ?? positiveInt(pagination.limitValue) ?? 25;
+  const offset =
+    response?.pagination?.offset ?? nonNegativeInt(pagination.offsetValue) ?? 0;
   const page = Math.floor(offset / pageSize);
   const served = response?.pagination;
   const setCursor = pagination.setCursor;
@@ -163,7 +189,9 @@ export function dataTablePaginationFromForm(
     page,
     pageSize,
     ...(served?.total !== undefined ? { total: served.total } : {}),
-    ...(served?.totalRelation !== undefined ? { totalRelation: served.totalRelation } : {}),
+    ...(served?.totalRelation !== undefined
+      ? { totalRelation: served.totalRelation }
+      : {}),
     ...(served?.hasMore !== undefined ? { hasMore: served.hasMore } : {}),
     // Cursor mode needs both halves: a parameter to send the cursor on, and a
     // cursor to send. An operation that declares one without the server minting
@@ -175,10 +203,13 @@ export function dataTablePaginationFromForm(
     // refused anyway.
     ...(setCursor &&
     (pagination.cursorValue ||
-      (served?.nextCursor && offset + pageSize >= OFFSET_DEPTH_LIMIT))
+      (served?.nextCursor &&
+        (!setOffset || offset + pageSize >= OFFSET_DEPTH_LIMIT)))
       ? {
           cursor: {
-            ...(pagination.cursorValue ? { current: pagination.cursorValue } : {}),
+            ...(pagination.cursorValue
+              ? { current: pagination.cursorValue }
+              : {}),
             ...(served?.nextCursor ? { next: served.nextCursor } : {}),
             onCursorChange: (next: string | undefined) => {
               // Offset and cursor are two disagreeing positions in one request,
@@ -214,9 +245,20 @@ export function dataTablePaginationFromForm(
 }
 
 export function pruneParameterValues(values: ParameterValues) {
-  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== ""),
+  );
 }
 
+/**
+ * Packs form/filter state into the request the operation actually describes.
+ *
+ * Values a parameter list does not name are dropped rather than forwarded.
+ * Filter state outlives a single surface — the explorer seeds it from the URL
+ * and carries it across routes — and a server asked for a filter it does not
+ * have rejects the whole request rather than the one value, so a leftover
+ * `filter.*` from another profile turns a working table into an error.
+ */
 export function packParameterValues(
   values: ParameterValues,
   parameters: OpenAPIParameter[],
@@ -226,11 +268,13 @@ export function packParameterValues(
       .filter((param) => param.in !== "path" && isPositionalParam(param))
       .map((p) => p.name),
   );
+  const declaredNames = new Set(parameters.map((param) => param.name));
   const params: ParameterValues = {};
   const args: string[] = [];
 
   for (const [key, value] of Object.entries(values)) {
     if (!value) continue;
+    if (!declaredNames.has(key)) continue;
     if (positionalNames.has(key)) {
       args.push(value);
     } else {
@@ -245,6 +289,21 @@ export function packParameterValues(
   return params;
 }
 
+export function packLookupParameterValues(
+  values: ParameterValues,
+  parameters: OpenAPIParameter[],
+): ParameterValues {
+  return packParameterValues(
+    values,
+    parameters.filter(
+      (parameter) =>
+        parameter["x-clicky"]?.role !== "limit" &&
+        parameter["x-clicky"]?.role !== "offset" &&
+        parameter["x-clicky"]?.role !== "cursor",
+    ),
+  );
+}
+
 export function parametersToFormConfig(
   parameters: OpenAPIParameter[],
   values: ParameterValues,
@@ -253,7 +312,14 @@ export function parametersToFormConfig(
 ): ParameterFormConfig {
   const emitFilters: FilterBarFilter[] = [];
   const lookupFilters = options.lookup?.filters ?? {};
-  const includeLocations = new Set(options.includeLocations ?? ["path", "query", "header"]);
+  // Shape comes from the spec, values from the lookup. The lookup answers both
+  // questions, but only the values half of its answer can change, so a control
+  // that reads its identity from the spec keeps that identity while the values
+  // half is being refetched.
+  const shapes = filterShapesByName(parameters, options.components);
+  const includeLocations = new Set(
+    options.includeLocations ?? ["path", "query", "header"],
+  );
   const lockedValues = options.lockedValues ?? {};
   const hideLocked = options.hideLocked ?? false;
 
@@ -292,15 +358,21 @@ export function parametersToFormConfig(
 
   // Time-range first looks for server-stamped roles, then falls back to the
   // existing lookup-driven "from"/"to" detection so older specs keep working.
-  const roleRangeStart = parameters.find((p) => p["x-clicky"]?.role === "time-from");
-  const roleRangeEnd = parameters.find((p) => p["x-clicky"]?.role === "time-to");
+  const roleRangeStart = parameters.find(
+    (p) => p["x-clicky"]?.role === "time-from",
+  );
+  const roleRangeEnd = parameters.find(
+    (p) => p["x-clicky"]?.role === "time-to",
+  );
+  const edgeType = (param: OpenAPIParameter) =>
+    shapes.get(param.name)?.type ?? lookupFilters[param.name]?.type;
   const rangeStart =
     roleRangeStart ??
     parameters.find(
       (param) =>
         includeLocations.has(param.in) &&
         param.in === "query" &&
-        lookupFilters[param.name]?.type === "from",
+        edgeType(param) === "from",
     );
   const rangeEnd =
     roleRangeEnd ??
@@ -308,21 +380,31 @@ export function parametersToFormConfig(
       (param) =>
         includeLocations.has(param.in) &&
         param.in === "query" &&
-        lookupFilters[param.name]?.type === "to",
+        edgeType(param) === "to",
     );
   const hasTimeRange = rangeStart != null && rangeEnd != null;
 
   for (const param of parameters) {
     if (!includeLocations.has(param.in)) continue;
     if (omitNames.has(param.name)) continue;
-    if (hasTimeRange && (param.name === rangeStart?.name || param.name === rangeEnd?.name)) {
+    if (
+      hasTimeRange &&
+      (param.name === rangeStart?.name || param.name === rangeEnd?.name)
+    ) {
       continue;
     }
 
-    const disabled = Object.prototype.hasOwnProperty.call(lockedValues, param.name);
+    const disabled = Object.prototype.hasOwnProperty.call(
+      lockedValues,
+      param.name,
+    );
     if (disabled && hideLocked) continue;
-    const value = disabled ? (lockedValues[param.name] ?? "") : (values[param.name] ?? "");
-    const label = lookupFilters[param.name]?.label ?? titleCase(param.name);
+    const value = disabled
+      ? (lockedValues[param.name] ?? "")
+      : (values[param.name] ?? "");
+    const shape = shapes.get(param.name);
+    const label =
+      shape?.label ?? lookupFilters[param.name]?.label ?? titleCase(param.name);
     // Only an explicit placeholder is rendered — never synthesize one. The
     // field already carries `label`, so a fallback placeholder is redundant
     // and generic defaults (e.g. "value-1, value-2") read as fake data.
@@ -330,14 +412,17 @@ export function parametersToFormConfig(
     const placeholderProp = placeholder !== undefined ? { placeholder } : {};
     const onChange = (next: string | boolean) => {
       if (disabled) return;
-      const stringValue = typeof next === "boolean" ? (next ? "true" : "false") : next;
+      const stringValue =
+        typeof next === "boolean" ? (next ? "true" : "false") : next;
       setValues((current) => rewind({ ...current, [param.name]: stringValue }));
     };
 
     const schema = param.schema;
     const lookupFilter = lookupFilters[param.name];
+    // The spec's answer wins: it is the one that is still there mid-refetch.
+    const filterType = shape?.type ?? lookupFilter?.type;
 
-    if (lookupFilter?.type === "workload" && param.in === "query") {
+    if (filterType === "workload" && param.in === "query") {
       emitFilters.push({
         key: param.name,
         kind: "workload",
@@ -345,7 +430,8 @@ export function parametersToFormConfig(
         value,
         disabled,
         kinds: ["pod", "deployment", "statefulset", "daemonset"],
-        loadWorkloads: async (kinds) => workloadsFromLookup(lookupFilter, kinds),
+        loadWorkloads: async (kinds) =>
+          lookupFilter ? workloadsFromLookup(lookupFilter, kinds) : {},
         // A server-generated workload filter is scoped by the operation itself,
         // so a lookup returning one workload means the scope already picked it.
         collapseSingleOption: true,
@@ -354,10 +440,13 @@ export function parametersToFormConfig(
       continue;
     }
 
-    if (lookupFilter?.type === "labels" && param.in === "query") {
-      const fieldOptions = lookupOptionsToFieldOptions(lookupFilter);
+    if (filterType === "labels" && param.in === "query") {
+      const fieldOptions = lookupFilter
+        ? lookupOptionsToFieldOptions(lookupFilter)
+        : [];
       const selection = parseMultiFilterValue(value);
-      const grouped = fieldOptions.some((option) => option.value.includes("=")) ||
+      const grouped =
+        fieldOptions.some((option) => option.value.includes("=")) ||
         Object.keys(selection).some((selected) => selected.includes("="));
       if (grouped) {
         emitFilters.push({
@@ -369,7 +458,10 @@ export function parametersToFormConfig(
           groups: labelOptionGroups(fieldOptions),
           onChange: (next) =>
             setValues((current) =>
-              rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+              rewind({
+                ...current,
+                [param.name]: serializeMultiFilterValue(next),
+              }),
             ),
         });
       } else {
@@ -380,10 +472,15 @@ export function parametersToFormConfig(
           value: selection,
           disabled,
           options: fieldOptions,
-          ...searchProps(lookupFilter, param.name, options.lookupSearch),
+          ...(lookupFilter
+            ? searchProps(lookupFilter, param.name, options.lookupSearch)
+            : {}),
           onChange: (next) =>
             setValues((current) =>
-              rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+              rewind({
+                ...current,
+                [param.name]: serializeMultiFilterValue(next),
+              }),
             ),
         });
       }
@@ -395,7 +492,7 @@ export function parametersToFormConfig(
     // A "day-range" is the same control with the clock taken off it, so it
     // shares this branch and differs only in timeEnabled.
     if (
-      (lookupFilter?.type === "date-range" || lookupFilter?.type === "day-range") &&
+      (filterType === "date-range" || filterType === "day-range") &&
       param.in === "query"
     ) {
       // A server that declares a default applies it to a request that names no
@@ -403,7 +500,9 @@ export function parametersToFormConfig(
       // empty range control over a bounded query states the wrong query. Only
       // the display falls back; the value is still whatever was selected, so
       // nothing is written to the URL on the strength of a default.
-      const bounds = parseBoundsValue(value || String(param.schema?.default ?? ""));
+      const bounds = parseBoundsValue(
+        value || String(param.schema?.default ?? ""),
+      );
       emitFilters.push({
         key: param.name,
         kind: "date-range",
@@ -411,15 +510,20 @@ export function parametersToFormConfig(
         disabled,
         ...(bounds.min !== undefined ? { from: bounds.min } : {}),
         ...(bounds.max !== undefined ? { to: bounds.max } : {}),
-        ...(lookupFilter.presets ? { presets: lookupFilter.presets } : {}),
+        ...(lookupFilter?.presets ? { presets: lookupFilter.presets } : {}),
         timeEnabled:
-          lookupFilter.type === "day-range" ? false : (lookupFilter.timeEnabled ?? true),
-        ...(lookupFilter.timeZone ? { timeZone: lookupFilter.timeZone } : {}),
-        ...(lookupFilter.timeZones ? { timeZones: lookupFilter.timeZones } : {}),
+          filterType === "day-range" ? false : (lookupFilter?.timeEnabled ?? true),
+        ...(lookupFilter?.timeZone ? { timeZone: lookupFilter.timeZone } : {}),
+        ...(lookupFilter?.timeZones
+          ? { timeZones: lookupFilter.timeZones }
+          : {}),
         onApply: (from: string, to: string) => {
           if (disabled) return;
           setValues((current) =>
-            rewind({ ...current, [param.name]: serializeBoundsValue({ min: from, max: to }) }),
+            rewind({
+              ...current,
+              [param.name]: serializeBoundsValue({ min: from, max: to }),
+            }),
           );
         },
       });
@@ -429,7 +533,7 @@ export function parametersToFormConfig(
     // An exact-value selection with nothing to enumerate. It shares the
     // multi-filter grammar, so the raw string is written through unchanged:
     // "a,b" is two values and "!a" excludes one, exactly as picking them would.
-    if (lookupFilter?.type === "value" && param.in === "query") {
+    if (filterType === "value" && param.in === "query") {
       emitFilters.push({
         key: param.name,
         kind: "text",
@@ -442,18 +546,23 @@ export function parametersToFormConfig(
       continue;
     }
 
-    if (lookupFilter?.type === "multi-filter" && param.in === "query") {
+    if (filterType === "multi-filter" && param.in === "query") {
       emitFilters.push({
         key: param.name,
         kind: "multi",
         label,
         value: parseMultiFilterValue(value),
         disabled,
-        options: lookupOptionsToFieldOptions(lookupFilter),
-        ...searchProps(lookupFilter, param.name, options.lookupSearch),
+        options: lookupFilter ? lookupOptionsToFieldOptions(lookupFilter) : [],
+        ...(lookupFilter
+          ? searchProps(lookupFilter, param.name, options.lookupSearch)
+          : {}),
         onChange: (next) =>
           setValues((current) =>
-            rewind({ ...current, [param.name]: serializeMultiFilterValue(next) }),
+            rewind({
+              ...current,
+              [param.name]: serializeMultiFilterValue(next),
+            }),
           ),
       });
       continue;
@@ -475,7 +584,7 @@ export function parametersToFormConfig(
       continue;
     }
 
-    if (lookupFilter?.type === "bool" || schema?.type === "boolean") {
+    if (filterType === "bool" || schema?.type === "boolean") {
       emitFilters.push({
         key: param.name,
         kind: "boolean",
@@ -487,22 +596,24 @@ export function parametersToFormConfig(
       continue;
     }
 
-    if (lookupFilter != null && param.in === "query") {
-      if (lookupFilter.multi) {
+    if ((shape != null || lookupFilter != null) && param.in === "query") {
+      if (shape?.multi ?? lookupFilter?.multi) {
         emitFilters.push({
           key: param.name,
           kind: "lookup-multi",
           label,
           value: splitCommaValues(value),
           disabled,
-          options: lookupOptionsToFieldOptions(lookupFilter),
+          options: lookupFilter ? lookupOptionsToFieldOptions(lookupFilter) : [],
           // Reported, not searched: this control's onSearch hands the query back
           // to the consumer to refetch and re-feed `options`, which is a
           // different contract from the one searchProps satisfies.
-          ...truncationProps(lookupFilter),
+          ...(lookupFilter ? truncationProps(lookupFilter) : {}),
           ...placeholderProp,
           onChange: (next) =>
-            setValues((current) => rewind({ ...current, [param.name]: next.join(",") })),
+            setValues((current) =>
+              rewind({ ...current, [param.name]: next.join(",") }),
+            ),
         });
         continue;
       }
@@ -513,12 +624,12 @@ export function parametersToFormConfig(
         label,
         value,
         disabled,
-        options: lookupOptionsToFieldOptions(lookupFilter),
+        options: lookupFilter ? lookupOptionsToFieldOptions(lookupFilter) : [],
         ...placeholderProp,
         inputType:
-          lookupFilter.type === "number"
+          filterType === "number"
             ? "number"
-            : lookupFilter.type === "date"
+            : filterType === "date"
               ? "date"
               : "text",
         onChange: (next) => onChange(next),
@@ -539,7 +650,10 @@ export function parametersToFormConfig(
 
   const config: ParameterFormConfig = { filters: emitFilters };
   if (searchParam) {
-    const searchDisabled = Object.prototype.hasOwnProperty.call(lockedValues, searchParam.name);
+    const searchDisabled = Object.prototype.hasOwnProperty.call(
+      lockedValues,
+      searchParam.name,
+    );
     const searchValue = searchDisabled
       ? (lockedValues[searchParam.name] ?? "")
       : (values[searchParam.name] ?? "");
@@ -548,10 +662,13 @@ export function parametersToFormConfig(
       value: searchValue,
       onChange: (next) => {
         if (searchDisabled) return;
-        setValues((current) => rewind({ ...current, [searchParam.name]: next }));
+        setValues((current) =>
+          rewind({ ...current, [searchParam.name]: next }),
+        );
       },
       ...(searchPlaceholder ? { placeholder: searchPlaceholder } : {}),
-      ariaLabel: lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
+      ariaLabel:
+        lookupFilters[searchParam.name]?.label ?? titleCase(searchParam.name),
     };
   }
   // Gated on the limit alone. An operation that caps its rows can report how
@@ -563,13 +680,17 @@ export function parametersToFormConfig(
     config.pagination = {
       limitParam: limitParam.name,
       limitValue: values[limitParam.name] ?? "",
-      setLimit: (next) => setValues((current) => ({ ...current, [limitParam.name]: next })),
+      setLimit: (next) =>
+        setValues((current) => ({ ...current, [limitParam.name]: next })),
       ...(offsetParam
         ? {
             offsetParam: offsetParam.name,
             offsetValue: values[offsetParam.name] ?? "",
             setOffset: (next: string) =>
-              setValues((current) => ({ ...current, [offsetParam.name]: next })),
+              setValues((current) => ({
+                ...current,
+                [offsetParam.name]: next,
+              })),
           }
         : {}),
       ...(cursorParam
@@ -577,7 +698,10 @@ export function parametersToFormConfig(
             cursorParam: cursorParam.name,
             cursorValue: values[cursorParam.name] ?? "",
             setCursor: (next: string) =>
-              setValues((current) => ({ ...current, [cursorParam.name]: next })),
+              setValues((current) => ({
+                ...current,
+                [cursorParam.name]: next,
+              })),
           }
         : {}),
     };
@@ -586,6 +710,8 @@ export function parametersToFormConfig(
     const rangeStartMeta = lookupFilters[rangeStart.name];
     const rangeEndMeta = lookupFilters[rangeEnd.name];
     const rangeMeta = rangeStartMeta ?? rangeEndMeta;
+    const explicitTimeEnabled =
+      rangeStartMeta?.timeEnabled ?? rangeEndMeta?.timeEnabled;
     config.timeRange = {
       from: values[rangeStart.name] ?? "",
       to: values[rangeEnd.name] ?? "",
@@ -594,10 +720,15 @@ export function parametersToFormConfig(
           rewind({ ...current, [rangeStart.name]: from, [rangeEnd.name]: to }),
         ),
       ...(rangeMeta?.presets ? { presets: rangeMeta.presets } : {}),
-      timeEnabled: rangeMeta?.timeEnabled ?? false,
+      timeEnabled:
+        explicitTimeEnabled ??
+        (rangeStart.schema?.format === "date-time" ||
+          rangeEnd.schema?.format === "date-time"),
       ...(rangeMeta?.timeZone ? { timeZone: rangeMeta.timeZone } : {}),
       ...(rangeMeta?.timeZones ? { timeZones: rangeMeta.timeZones } : {}),
-      ...(rangeStart.description ? { fromPlaceholder: rangeStart.description } : {}),
+      ...(rangeStart.description
+        ? { fromPlaceholder: rangeStart.description }
+        : {}),
       ...(rangeEnd.description ? { toPlaceholder: rangeEnd.description } : {}),
     };
   }
@@ -662,15 +793,20 @@ function workloadsFromLookup(
   for (const option of lookupOptionsToFieldOptions(filter)) {
     const parts = option.value.split("/");
     const name = parts.at(-1);
-    const providerKind = parts.at(-2)?.toLowerCase() as WorkloadKind | undefined;
-    const namespace = parts.length > 2 ? parts.slice(0, -2).join("/") : undefined;
+    const providerKind = parts.at(-2)?.toLowerCase() as
+      | WorkloadKind
+      | undefined;
+    const namespace =
+      parts.length > 2 ? parts.slice(0, -2).join("/") : undefined;
     if (!name || !providerKind || !requested.has(providerKind)) continue;
     result[providerKind]?.push({ name, ...(namespace ? { namespace } : {}) });
   }
   return result;
 }
 
-function labelOptionGroups(options: ReturnType<typeof lookupOptionsToFieldOptions>) {
+function labelOptionGroups(
+  options: ReturnType<typeof lookupOptionsToFieldOptions>,
+) {
   const grouped = new Map<string, typeof options>();
   for (const option of options) {
     const separator = option.value.indexOf("=");
@@ -695,9 +831,13 @@ type PlainTextClickyNode = {
   tooltip?: { plain?: string; text?: string };
 };
 
-function clickyNodeToPlainText(node: PlainTextClickyNode | null | undefined): string {
+function clickyNodeToPlainText(
+  node: PlainTextClickyNode | null | undefined,
+): string {
   if (node == null) return "";
   if (node.plain) return node.plain;
   if (node.text) return node.text;
-  return (node.children ?? []).map((child) => clickyNodeToPlainText(child)).join("");
+  return (node.children ?? [])
+    .map((child) => clickyNodeToPlainText(child))
+    .join("");
 }

@@ -11,6 +11,9 @@ import type { OperationsApiClient } from "./useOperations";
 
 type MaybePromise<T> = T | Promise<T>;
 
+/** Operation catalog: an OpenAPI document whose response schemas may be stubs. */
+export const CLICKY_OPENAPI_MEDIA_TYPE = "application/vnd.clicky.openapi+json";
+
 export type OperationApiClientContext = {
   path: string;
   method: string;
@@ -126,7 +129,13 @@ export function createOperationsApiClient(
 
   async function getOpenAPISpec(): Promise<OpenAPISpec> {
     const response = await request(openApiPath, "GET", {
-      headers: { Accept: "application/json" },
+      // Prefer the catalog projection — the same document with each operation's
+      // response schemas stubbed, which nothing here reads and which is over
+      // half the bytes. A server that does not serve it answers with the
+      // complete document, which parses the same.
+      headers: {
+        Accept: `${CLICKY_OPENAPI_MEDIA_TYPE}, application/json;q=0.9`,
+      },
     });
     const parsed = await readResponseBody(response, "json");
     if (!response.ok) {

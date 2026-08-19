@@ -191,7 +191,7 @@ describe("OperationCommandPage", () => {
     await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(1));
   });
 
-  it("keeps lookup date range filters with an auto-run GET result", async () => {
+  it("keeps lookup-enhanced filters with an auto-run GET result while paging", async () => {
     const spec: OpenAPISpec = {
       openapi: "3.0.0",
       info: { title: "test", version: "1" },
@@ -204,21 +204,31 @@ describe("OperationCommandPage", () => {
             parameters: [
               { name: "entity", in: "query", required: false },
               { name: "account", in: "query", required: false },
+              { name: "status", in: "query", required: false },
               { name: "since", in: "query", required: false },
               { name: "to", in: "query", required: false },
+              { name: "limit", in: "query", "x-clicky": { role: "limit" } },
+              { name: "offset", in: "query", "x-clicky": { role: "offset" } },
             ],
             responses: {},
           },
         },
       },
     };
-    const executeMock = vi.fn(async () =>
-      clickyResponse({
-        version: 1,
-        node: {
-          kind: "table",
-          columns: [{ name: "reference", label: "Reference" }],
-          rows: [],
+    const executeMock = vi.fn(
+      async (_path: string, _method: string, params: ParameterValues) => ({
+        ...clickyResponse({
+          version: 1,
+          node: {
+            kind: "table",
+            columns: [{ name: "reference", label: "Reference" }],
+            rows: [],
+          },
+        }),
+        pagination: {
+          total: 2,
+          limit: 1,
+          offset: Number(params.offset ?? 0),
         },
       }),
     );
@@ -226,6 +236,12 @@ describe("OperationCommandPage", () => {
       filters: {
         entity: { label: "Entity" },
         account: { label: "Account" },
+        status: {
+          label: "Status",
+          options: {
+            ready: { kind: "text" as const, text: "Ready", plain: "Ready" },
+          },
+        },
         since: { label: "Since", type: "from" as const },
         to: { label: "To", type: "to" as const },
       },
@@ -252,6 +268,17 @@ describe("OperationCommandPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Since")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Status")).toHaveRole("combobox");
+    expect(lookupMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+    await waitFor(() => expect(executeMock).toHaveBeenCalledTimes(2));
+    expect(
+      screen.getByRole("button", { name: "Date range filter" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Status")).toHaveRole("combobox");
+    expect(lookupMock).toHaveBeenCalledTimes(1);
   });
 
   it("writes transaction lookup filter changes back to the route", async () => {

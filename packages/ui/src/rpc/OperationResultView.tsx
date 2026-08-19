@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type {
   FilterBarFilter,
   FilterBarRangeProps,
@@ -7,6 +7,7 @@ import type {
 import {
   DataTable,
   type DataTableColumn,
+  type DataTableInfinite,
   type DataTablePagination,
 } from "../data/DataTable";
 import type {
@@ -19,6 +20,7 @@ import type {
 } from "../data/cells/CellFilterActions";
 import { cn } from "../lib/utils";
 import { ExecutionResult } from "./ExecutionResult";
+import { mergeExecutionPages } from "./executionPages";
 import { useRowDetailNavigation } from "./rowNavigation";
 import type { ExecutionResponse, ResolvedOperation } from "./types";
 
@@ -29,6 +31,8 @@ import type { ExecutionResponse, ResolvedOperation } from "./types";
 export type ResultRenderContext = {
   surfaceKey?: string;
   response: ExecutionResponse | null;
+  /** True while the current surface is refreshing its retained response. */
+  loading: boolean;
   defaultView: ReactNode;
   filterConfig?: OperationResultFilterConfig;
   // The pager and download menu the default view would have rendered. A
@@ -36,6 +40,24 @@ export type ResultRenderContext = {
   // handed the same controls rather than left to present one page as the whole.
   pagination?: DataTablePagination;
   download?: ClickyDownloadOptions;
+  /**
+   * Every page fetched in the current cursor walk, oldest first — `response` is
+   * the last of them. Present only while the surface is scrolling infinitely;
+   * a renderer that ignores it still shows the newest page and stays correct.
+   *
+   * The pages arrive unmerged because merging them is a domain decision this
+   * layer cannot make: a page is a rendered document, and what concatenating
+   * two of them means depends on what the renderer will do with the result. The
+   * logs surface flattens each page's table rows and appends; something
+   * rendering a summary block would have to do something else entirely, and
+   * would be wrong to inherit the logs answer by default.
+   */
+  pages?: ExecutionResponse[];
+  /**
+   * Load-more handle for that walk, to hand to a DataTable. Absent when the
+   * surface cannot page forward.
+   */
+  infinite?: DataTableInfinite;
 };
 
 // ResultRenderer lets the host app swap the result presentation per surface. It
@@ -68,6 +90,15 @@ export type OperationResultViewProps = {
   filterConfig?: OperationResultFilterConfig;
   pagination?: DataTablePagination;
   download?: ClickyDownloadOptions;
+  /**
+   * Every page of the current cursor walk, oldest first, with `response` as the
+   * last. Given both, the default table renders the whole run rather than the
+   * newest page — the same accumulation a replacement renderer gets, so a
+   * surface does not have to be overridden to scroll.
+   */
+  pages?: ExecutionResponse[];
+  /** Load-more handle for that walk, forwarded to the table's sentinel. */
+  infinite?: DataTableInfinite;
 };
 
 type ErrorResultRow = {
@@ -103,9 +134,21 @@ export function OperationResultView({
   filterConfig,
   pagination,
   download,
+  pages,
+  infinite,
 }: OperationResultViewProps) {
   const rowNav = useRowDetailNavigation(detailOperation);
   const filters = filterConfig?.filters;
+  // A walk of one page is the page, so the common case costs nothing and the
+  // document identity is preserved. `response` gating it keeps a failed newest
+  // page from being rendered as a successful run of the pages before it.
+  const walked = useMemo(
+    () =>
+      pages && pages.length > 1 && response != null
+        ? mergeExecutionPages(pages)
+        : response,
+    [pages, response],
+  );
 
   if (error != null) {
     return (
@@ -142,7 +185,7 @@ export function OperationResultView({
 
   return (
     <ExecutionResult
-      response={response}
+      response={walked}
       {...(loading !== undefined ? { loading } : {})}
       {...(loadingMessage ? { loadingMessage } : {})}
       {...(emptyMessage ? { emptyMessage } : {})}
@@ -168,6 +211,7 @@ export function OperationResultView({
         ? { onCellFilterChange: filterConfig.onCellFilterChange }
         : {})}
       {...(pagination ? { pagination } : {})}
+      {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
     />
   );
