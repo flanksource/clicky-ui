@@ -71,6 +71,11 @@ function commitPhaseSelect() {
   );
 }
 
+function chooseCommitPhase(name: string) {
+  fireEvent.focus(commitPhaseSelect());
+  fireEvent.mouseDown(screen.getByRole("option", { name }));
+}
+
 function openModelAdvanced() {
   fireEvent.click(
     within(screen.getByRole("region", { name: "Model" })).getByRole("button", {
@@ -119,7 +124,7 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByText("Verify fixture")).toBeInTheDocument();
     // The commit phase select is the section's always-present control; the
     // message and dry-run fields belong to a policy that does not exist yet.
-    expect(commitPhaseSelect()).toHaveValue("none");
+    expect(commitPhaseSelect()).toHaveValue("Never");
     expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Static value…"), {
@@ -216,7 +221,7 @@ describe("SpecRuntimeEditor", () => {
 
     render(<Host />);
 
-    fireEvent.change(commitPhaseSelect(), { target: { value: "turn" } });
+    chooseCommitPhase("Every turn");
     expect(onChange).toHaveBeenLastCalledWith({
       workflow: { commits: [{ on: "turn" }] },
     });
@@ -233,7 +238,7 @@ describe("SpecRuntimeEditor", () => {
       },
     });
 
-    fireEvent.change(commitPhaseSelect(), { target: { value: "none" } });
+    chooseCommitPhase("Never");
     expect(onChange).toHaveBeenLastCalledWith({ workflow: { commits: [] } });
     expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
   });

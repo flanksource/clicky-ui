@@ -112,23 +112,23 @@ export function PermissionsAdvanced({
 }) {
   return (
     <div className="grid gap-density-3">
-      <SpecField label="Mode">
+      <SpecField label="Mode" composite>
         <SpecSelect
           ariaLabel="Permission mode"
-          icon={PERMISSION_MODE_ICONS[value.permissions?.mode || "default"].icon}
+          icon={
+            PERMISSION_MODE_ICONS[value.permissions?.mode || "default"].icon
+          }
           value={value.permissions?.mode || "default"}
           onChange={(mode) =>
             onChange(
               withPermissions(value, { mode: mode as SpecPermissionMode }),
             )
           }
-        >
-          {SPEC_PERMISSION_MODES.map((mode) => (
-            <option key={mode} value={mode}>
-              {mode}
-            </option>
-          ))}
-        </SpecSelect>
+          options={SPEC_PERMISSION_MODES.map((mode) => ({
+            value: mode,
+            label: mode,
+          }))}
+        />
       </SpecField>
       <div className="grid gap-density-2 sm:grid-cols-2 md:grid-cols-3">
         <CheckboxField
@@ -362,12 +362,13 @@ function PermissionPolicyList({
             ariaLabel="Permission kind"
             value={addDomain}
             onChange={(domain) => setAddDomain(domain as PermissionDomain)}
-          >
-            <option value="tools">Tool</option>
-            <option value="mcp">MCP</option>
-            <option value="plugins">Plugin</option>
-            <option value="skills">Skill</option>
-          </SpecSelect>
+            options={[
+              { value: "tools", label: "Tool" },
+              { value: "mcp", label: "MCP" },
+              { value: "plugins", label: "Plugin" },
+              { value: "skills", label: "Skill" },
+            ]}
+          />
           <SpecInput
             value={addValue}
             onChange={setAddValue}

@@ -58,7 +58,30 @@ export {
   type SpecRuntimeSecretSelectorConfig,
   type AISpecRuntimeValue,
 } from "./SpecRuntimeEditor";
-export type { SpecSectionId } from "./SpecRuntimeEditor/types";
+export {
+  SandboxCreateWizard,
+  type SandboxCreateWizardProps,
+} from "./SandboxCreateWizard";
+export {
+  SandboxConnectionsSection,
+  type SandboxConnectionsSectionProps,
+} from "./SandboxConnectionsSection";
+export {
+  buildSandboxCreateInput,
+  emptySandboxCreateDraft,
+  toggleSandboxCredential,
+  type SpecRuntimeSandboxCreateConfig,
+  type SpecRuntimeSandboxCreateDraft,
+  type SpecRuntimeSandboxCreateInput,
+  type SpecRuntimeSandboxCredential,
+} from "./SandboxCreateWizard.model";
+export type {
+  SpecRuntimeSandboxAgent,
+  SpecRuntimeSandboxBackend,
+  SpecRuntimeSandboxCatalog,
+  SpecRuntimeSandboxKind,
+  SpecSectionId,
+} from "./SpecRuntimeEditor/types";
 export {
   buildAISpecRuntimePayload,
   compactAISpecRuntime,
@@ -88,6 +111,9 @@ export {
   type AISpecRuntimePermissions,
   type AISpecRuntimePrompt,
   type AISpecRuntimeResourcePolicies,
+  type AISpecRuntimeSandbox,
+  type AISpecRuntimeSandboxPolicy,
+  type SpecSandboxCapability,
   type AISpecRuntimeSetup,
   type AISpecRuntimeSpec,
   type AISpecRuntimeToolPolicies,

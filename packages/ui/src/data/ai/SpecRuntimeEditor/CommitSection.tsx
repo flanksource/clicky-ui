@@ -20,7 +20,7 @@ export function CommitSection({
   const commit = value.workflow?.commits?.[0];
   return (
     <div className="grid gap-density-2 md:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(0,1fr)]">
-      <SpecField label="Commit">
+      <SpecField label="Commit" composite>
         <SpecSelect
           ariaLabel="Commit"
           value={phase}
@@ -28,12 +28,13 @@ export function CommitSection({
             onChange(withCommitPhase(value, next as SpecCommitPhase | "none"))
           }
           icon={UiGitCommit}
-        >
-          <option value="none">Never</option>
-          <option value="turn">Every turn</option>
-          <option value="agent">After the loop</option>
-          <option value="run">End of run</option>
-        </SpecSelect>
+          options={[
+            { value: "none", label: "Never" },
+            { value: "turn", label: "Every turn" },
+            { value: "agent", label: "After the loop" },
+            { value: "run", label: "End of run" },
+          ]}
+        />
       </SpecField>
       {phase !== "none" && (
         <>

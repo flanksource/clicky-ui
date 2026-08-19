@@ -7,10 +7,7 @@ import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
 import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
-import {
-  AttachmentButton,
-  AttachmentList,
-} from "../../chat/Attachment";
+import { AttachmentButton, AttachmentList } from "../../chat/Attachment";
 import {
   createAttachmentUploadAdapter,
   type AttachmentFilePart,
@@ -26,18 +23,16 @@ import {
   labelForBackend,
 } from "../../runtime/runtime-mode";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import type { SpecRuntimeCLIOptions } from "../SpecRuntimeEditor/CLIArgsSection";
+import type { SpecRuntimeSandboxCatalog } from "../SpecRuntimeEditor/types";
 import type {
   SpecRuntimeSecretSelectorConfig,
   SpecSectionId,
 } from "../SpecRuntimeEditor/types";
 import { withPrompt } from "../SpecRuntimeEditor/update";
 import type { AISpecRuntimePermissionCatalog } from "../SpecRuntimeEditor.model";
-import {
-  runtimeRows,
-  withRuntimeRows,
-  type AIPromptRunValue,
-} from "./model";
+import { runtimeRows, withRuntimeRows, type AIPromptRunValue } from "./model";
 
 export type PromptRunEditorProps = {
   value: AIPromptRunValue;
@@ -48,6 +43,10 @@ export type PromptRunEditorProps = {
   permissionCatalog?: AISpecRuntimePermissionCatalog | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   cliOptions?: SpecRuntimeCLIOptions | undefined;
+  /** Sandbox adapter catalog; enables the spec editor's Sandbox section. */
+  sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
+  /** Host-owned sandbox creation and credential-reference adapter. */
+  sandboxCreate?: SpecRuntimeSandboxCreateConfig | undefined;
   reasoningEfforts?: string[] | undefined;
 
   /** Schema-driven variables form; omit to render a raw-JSON editor. */
@@ -89,6 +88,8 @@ export function PromptRunEditor({
   permissionCatalog,
   secretSelector,
   cliOptions,
+  sandboxCatalog,
+  sandboxCreate,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   variablesSchema,
   onVariablesValidityChange,
@@ -198,7 +199,11 @@ export function PromptRunEditor({
               <Icon icon={UiAdd} className="size-4" />
               Add runtime
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setSpecOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSpecOpen(true)}
+            >
               <Icon icon={UiGearSix} className="size-4" />
               {editSpecLabel}
             </Button>
@@ -301,6 +306,8 @@ export function PromptRunEditor({
           {...(permissionCatalog ? { permissionCatalog } : {})}
           {...(secretSelector ? { secretSelector } : {})}
           {...(cliOptions ? { cliOptions } : {})}
+          {...(sandboxCatalog ? { sandboxCatalog } : {})}
+          {...(sandboxCreate ? { sandboxCreate } : {})}
           {...(specSections ? { sections: specSections } : {})}
           onSave={() => setSpecOpen(false)}
           onCancel={() => setSpecOpen(false)}
