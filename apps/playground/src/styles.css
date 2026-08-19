@@ -1,6 +1,15 @@
 @config "../tailwind.config.ts";
 @import "tailwindcss";
 
+/*
+ * `src/pages/` is gitignored on purpose — every page but `welcome.tsx` is local
+ * scratch. Tailwind's scanner skips gitignored files, so without this a page can
+ * only use utilities some tracked file already happens to use: a class like
+ * `grid-cols-5` silently generates nothing and the layout collapses to one
+ * column with no error anywhere. An explicit `@source` is scanned regardless.
+ */
+@source "./pages";
+
 /* The AppShell-based playground chrome is full-height; let it fill the viewport. */
 html,
 body,

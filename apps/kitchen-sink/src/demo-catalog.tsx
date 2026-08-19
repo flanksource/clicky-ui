@@ -9,6 +9,7 @@ import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { JSONPathFieldDemo } from "./demos/JSONPathFieldDemo";
 import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
+import { ConnectionLoggingPolicyDemo } from "./demos/ConnectionLoggingPolicyDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { ProgressBarsDemo } from "./demos/ProgressBarsDemo";
 import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
@@ -19,6 +20,7 @@ import { ClickyNativeDemo } from "./demos/ClickyNativeDemo";
 import { CodeBlocksDemo } from "./demos/CodeBlocksDemo";
 import { LogViewerDemo } from "./demos/LogViewerDemo";
 import { LogsTableDemo } from "./demos/LogsTableDemo";
+import { CalloutDemo } from "./demos/CalloutDemo";
 import { MarkdownDemo } from "./demos/MarkdownDemo";
 import { MarkdownEditorDemo } from "./demos/MarkdownEditorDemo";
 import { PropertiesDemo } from "./demos/PropertiesDemo";
@@ -226,6 +228,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         icon: UiMarkdown,
       },
       {
+        id: "callout",
+        label: "Callout",
+        component: CalloutDemo,
+        icon: UiMarkdown,
+      },
+      {
         id: "cells",
         label: "Table cells",
         component: CellsDemo,
@@ -282,6 +290,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         id: "endpoint-selector",
         label: "EndpointSelector",
         component: EndpointSelectorDemo,
+        icon: UiNetwork,
+      },
+      {
+        id: "connection-logging-policy",
+        label: "Connection logging",
+        component: ConnectionLoggingPolicyDemo,
         icon: UiNetwork,
       },
       {
@@ -440,8 +454,18 @@ export const DEMO_GROUPS: DemoGroup[] = [
   {
     title: "Clicky-RPC",
     items: [
-      { id: "query-browser", label: "QueryBrowser", component: QueryBrowserDemo, icon: UiTerminal },
-      { id: "profiles", label: "Profiles", component: ProfilesDemo, icon: UiListTree },
+      {
+        id: "query-browser",
+        label: "QueryBrowser",
+        component: QueryBrowserDemo,
+        icon: UiTerminal,
+      },
+      {
+        id: "profiles",
+        label: "Profiles",
+        component: ProfilesDemo,
+        icon: UiListTree,
+      },
       {
         id: "command-form",
         label: "CommandForm",
@@ -472,8 +496,17 @@ export const DEMO_GROUPS: DemoGroup[] = [
       },
       { id: "search-input", label: "SearchInput", component: SearchInputDemo },
       { id: "timeline", label: "Timeline", component: TimelineDemo },
-      { id: "session-viewer", label: "SessionViewer", component: SessionViewerDemo },
-      { id: "session-inspector", label: "SessionInspector", component: SessionInspectorDemo, icon: UiRobotAi },
+      {
+        id: "session-viewer",
+        label: "SessionViewer",
+        component: SessionViewerDemo,
+      },
+      {
+        id: "session-inspector",
+        label: "SessionInspector",
+        component: SessionInspectorDemo,
+        icon: UiRobotAi,
+      },
       { id: "toast", label: "Toast", component: ToastDemo },
       {
         id: "gavel-styling-comparison",
