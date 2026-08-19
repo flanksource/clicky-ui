@@ -1,12 +1,17 @@
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import { Button } from "../../components/button";
-import type { JsonSchemaObject, JsonSchemaProperty } from "../../components/json-schema-form-types";
 import { Icon } from "../../data/Icon";
 import type { QueryBrowserResult } from "../../data/query-browser/QueryBrowser.types";
 import { Modal } from "../../overlay/Modal";
 import { UiCheck, UiColumns, UiSqlColumn } from "../../icons";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   browserBaseUrl,
   fetchJSON,
@@ -21,9 +26,17 @@ import {
   ColumnPicker,
   type ProfileColumn,
 } from "../fields/profileColumnPicker";
-import { withProfileLimits, type ParamDraft, type ProfileProvider } from "../wizard/profileWizardModel";
-import { defaultParamValues, paramRoles } from "../elasticsearch/esQueryBuilderForm";
+import {
+  withProfileLimits,
+  type ParamDraft,
+  type ProfileProvider,
+} from "../wizard/profileWizardModel";
+import {
+  defaultParamValues,
+  paramRoles,
+} from "../elasticsearch/esQueryBuilderForm";
 import { mapTimestampColumn } from "../fields/profileColumnModel";
+import { sampleParamSchema } from "./profileBuilderModel";
 
 // Same story as ProfileColumn: one ProfileProvider, defined with the draft
 // model. The copy here had drifted to carry `role`, which the canonical type's
@@ -383,46 +396,6 @@ function WorkspaceMessage({
       {children}
     </div>
   );
-}
-
-export function sampleParamSchema(params: ParamDraft[]): JsonSchemaObject {
-  const properties: Record<string, JsonSchemaProperty> = {};
-  const required: string[] = [];
-  for (const param of params) {
-    const name = param.name?.trim();
-    if (!name) continue;
-    const property: JsonSchemaProperty = {
-      title: param.label || name,
-      ...(param.description ? { description: param.description } : {}),
-      ...(param.default !== undefined ? { default: param.default } : {}),
-    };
-    switch (param.type) {
-      case "number":
-        property.type = "number";
-        break;
-      case "boolean":
-        property.type = "boolean";
-        break;
-      case "date":
-        property.type = "string";
-        property.format = "date";
-        break;
-      case "datetime":
-        property.type = "string";
-        property.format = "date-time";
-        break;
-      default:
-        property.type = "string";
-    }
-    if (param.options?.length) property.enum = param.options;
-    properties[name] = property;
-    if (param.required) required.push(name);
-  }
-  return {
-    type: "object",
-    properties,
-    ...(required.length ? { required } : {}),
-  };
 }
 
 function errorMessage(error: unknown, fallback: string): string {
