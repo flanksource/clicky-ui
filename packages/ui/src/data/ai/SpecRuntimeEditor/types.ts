@@ -4,7 +4,10 @@ import type {
   SecretResource,
 } from "../../../components/SecretKeySelector";
 import type { StaticIconComponent } from "../../Icon";
+import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
+import type { SpecSandboxCapability } from "../SpecRuntimeEditor.model";
 import {
+  UiBox,
   UiBraces,
   UiFileText,
   UiGitCommit,
@@ -14,6 +17,60 @@ import {
   UiShield,
   UiTerminal,
 } from "../../../icons";
+
+/**
+ * The sandbox surface a host serves alongside the spec schema (captain:
+ * `GET /api/captain/ai/prompt/schema` → `sandboxes`, also
+ * `GET /api/captain/sandboxes`). It is a projection of the adapter descriptor
+ * table, so the editor can explain each choice and refuse invalid pairings
+ * instead of failing at dispatch.
+ */
+export type SpecRuntimeSandboxCatalog = {
+  /** The configured `sandbox.default` selector, when one is set. */
+  default?: string | undefined;
+  kinds?: SpecRuntimeSandboxKind[] | undefined;
+  /**
+   * Configured backends whose declared kind does not resolve to an adapter.
+   * Reported rather than dropped, so a misconfigured backend reads as wrong
+   * instead of missing — but never offered as a selectable choice.
+   */
+  invalid?: SpecRuntimeSandboxBackend[] | undefined;
+};
+
+export type SpecRuntimeSandboxKind = {
+  kind: string;
+  description?: string | undefined;
+  /** Host-owned schema for a named backend's adapter-specific options. */
+  configSchema?: JsonSchemaObject | undefined;
+  /** True when `sandbox.default` names this bare kind. */
+  default?: boolean | undefined;
+  capabilities?: SpecSandboxCapability[] | undefined;
+  /** Runtime modes this adapter can serve; a pairing outside it is an error. */
+  modes?: string[] | undefined;
+  backends?: SpecRuntimeSandboxBackend[] | undefined;
+};
+
+export type SpecRuntimeSandboxBackend = {
+  name: string;
+  kind?: string | undefined;
+  /** True when `sandbox.default` names this backend. */
+  default?: boolean | undefined;
+  /** The endpoint a git-agent backend dispatches through. */
+  url?: string | undefined;
+  agents?: SpecRuntimeSandboxAgent[] | undefined;
+  /** Why this backend cannot be selected; set only on `invalid` entries. */
+  error?: string | undefined;
+};
+
+export type SpecRuntimeSandboxAgent = {
+  name: string;
+  /** "enrolled", or "pending until <expiry>" for an unclaimed join token. */
+  status?: string | undefined;
+  /** The host has every transport-specific credential needed to run here. */
+  dispatchable: boolean;
+  /** Safe diagnostic for a non-dispatchable agent; never a credential path. */
+  dispatchIssue?: string | undefined;
+};
 
 export type SpecRuntimeSecretSelectorConfig = {
   loadResources: (kind: SecretKind) => Promise<SecretResource[]>;
@@ -26,6 +83,7 @@ export type SpecSectionId =
   | "model"
   | "prompt"
   | "workspace"
+  | "sandbox"
   | "permissions"
   | "environment"
   | "verify"
@@ -63,6 +121,16 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
     hint: "Where the agent checks out code and runs.",
     icon: UiGitBranch,
     iconClassName: "text-sky-500",
+  },
+  // Adjacent to Workspace on purpose: a sandbox declaring `isolate-workspace`
+  // materializes its own tree, so it conflicts with a worktree or checkout set
+  // in the section directly above.
+  {
+    id: "sandbox",
+    label: "Sandbox",
+    hint: "What confines the run, and where it executes.",
+    icon: UiBox,
+    iconClassName: "text-amber-500",
   },
   {
     id: "permissions",

@@ -5,6 +5,7 @@ import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
+import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import { CLIArgsSection, type SpecRuntimeCLIOptions } from "./CLIArgsSection";
 import { CommitSection } from "./CommitSection";
 import { EnvironmentAdvanced, EnvironmentSection } from "./EnvironmentSection";
@@ -13,6 +14,7 @@ import { ModelAdvanced, ModelSection } from "./ModelSection";
 import { PermissionsAdvanced, PermissionsSection } from "./PermissionsSection";
 import { PromptAdvanced, PromptSection } from "./PromptSection";
 import { Rail } from "./Rail";
+import { SandboxSection } from "./SandboxSection";
 import { SectionCard } from "./SectionCard";
 import { VerifySection } from "./VerifySection";
 import { WorkspaceSection } from "./WorkspaceSection";
@@ -26,6 +28,7 @@ import { summarizeTarget } from "./summaries";
 import {
   SPEC_RUNTIME_SECTIONS,
   sectionNumber,
+  type SpecRuntimeSandboxCatalog,
   type SpecRuntimeSecretSelectorConfig,
   type SpecSectionId,
 } from "./types";
@@ -33,7 +36,13 @@ import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import { useScrollSpy } from "./use-scrollspy";
 
 export type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
-export type { SpecRuntimeSecretSelectorConfig } from "./types";
+export type {
+  SpecRuntimeSandboxAgent,
+  SpecRuntimeSandboxBackend,
+  SpecRuntimeSandboxCatalog,
+  SpecRuntimeSandboxKind,
+  SpecRuntimeSecretSelectorConfig,
+} from "./types";
 export type { SpecRuntimeCLIOptions } from "./CLIArgsSection";
 export {
   SPEC_RUNTIME_FAMILIES,
@@ -52,6 +61,10 @@ export type SpecRuntimeEditorProps = {
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   /** Schema for the backend's extra CLI args; enables the CLI flags section. */
   cliOptions?: SpecRuntimeCLIOptions | undefined;
+  /** Sandbox adapter catalog; enables the Sandbox section. */
+  sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
+  /** Host-owned sandbox creation and credential-reference adapter. */
+  sandboxCreate?: SpecRuntimeSandboxCreateConfig | undefined;
   /** Optional section allow-list for embedded editors that only need part of the runtime spec. */
   sections?: readonly SpecSectionId[] | undefined;
   className?: string | undefined;
@@ -90,6 +103,8 @@ export function SpecRuntimeEditor({
   permissionCatalog,
   secretSelector,
   cliOptions,
+  sandboxCatalog,
+  sandboxCreate,
   sections: sectionFilter,
   className,
   title = "Runtime Spec",
@@ -116,9 +131,12 @@ export function SpecRuntimeEditor({
     () => (sectionFilter ? new Set(sectionFilter) : undefined),
     [sectionFilter],
   );
+  // "cli" and "sandbox" describe host-supplied catalogs; without one there is
+  // nothing to choose from, so the section is omitted rather than rendered empty.
   const sections = SPEC_RUNTIME_SECTIONS.filter(
     (section) =>
       (section.id !== "cli" || cliOptions) &&
+      (section.id !== "sandbox" || sandboxCatalog) &&
       (allowedSections == null || allowedSections.has(section.id)),
   );
   const collapsedSections = useMemo(
@@ -163,6 +181,16 @@ export function SpecRuntimeEditor({
             secretSelector={secretSelector}
           />
         );
+      case "sandbox":
+        return sandboxCatalog ? (
+          <SandboxSection
+            value={value}
+            onChange={onChange}
+            catalog={sandboxCatalog}
+            {...(families ? { families } : {})}
+            {...(sandboxCreate ? { createConfig: sandboxCreate } : {})}
+          />
+        ) : null;
       case "permissions":
         return (
           <PermissionsSection

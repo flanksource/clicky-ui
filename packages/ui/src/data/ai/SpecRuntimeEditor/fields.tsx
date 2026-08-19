@@ -1,29 +1,43 @@
 import { useState, type ReactNode } from "react";
+import { Combobox, type ComboboxOption } from "../../../components/Combobox";
 import { InputField } from "../../../components/InputField";
 import { Switch } from "../../../components/Switch";
 import { Icon, type StaticIconComponent } from "../../Icon";
 import { UiChevronDown, UiChevronRight } from "../../../icons";
 import { cn } from "../../../lib/utils";
 
-const controlClassName =
-  "h-control-h w-full rounded-md border border-border bg-background px-density-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+const EMPTY_SELECT_VALUE = "__clicky_spec_select_empty__";
 
 export function SpecField({
   label,
   hint,
   children,
+  composite = false,
 }: {
   label: string;
   hint?: string | undefined;
   children: ReactNode;
+  composite?: boolean | undefined;
 }) {
-  return (
-    <label className="block min-w-0 space-y-1 text-xs text-muted-foreground">
+  const content = (
+    <>
       <span>
         {label}
         {hint && <span className="text-muted-foreground/70"> ({hint})</span>}
       </span>
       {children}
+    </>
+  );
+  if (composite) {
+    return (
+      <div className="block min-w-0 space-y-1 text-xs text-muted-foreground">
+        {content}
+      </div>
+    );
+  }
+  return (
+    <label className="block min-w-0 space-y-1 text-xs text-muted-foreground">
+      {content}
     </label>
   );
 }
@@ -65,33 +79,42 @@ export function SpecSelect({
   onChange,
   ariaLabel,
   icon,
-  children,
+  options,
 }: {
   value: string;
   onChange: (value: string) => void;
-  ariaLabel?: string | undefined;
+  ariaLabel: string;
   icon?: StaticIconComponent | undefined;
-  children: ReactNode;
+  options: ComboboxOption[];
 }) {
-  const select = (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className={cn(controlClassName, icon && "pl-8")}
-    >
-      {children}
-    </select>
+  if (options.some((option) => option.value === EMPTY_SELECT_VALUE)) {
+    throw new Error(
+      `SpecSelect option value ${JSON.stringify(EMPTY_SELECT_VALUE)} is reserved`,
+    );
+  }
+  const hasEmptyOption = options.some((option) => option.value === "");
+  const comboboxOptions = options.map((option) =>
+    option.value === "" ? { ...option, value: EMPTY_SELECT_VALUE } : option,
   );
-  if (!icon) return select;
   return (
-    <div className="relative">
-      <Icon
-        icon={icon}
-        className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
-      />
-      {select}
-    </div>
+    <Combobox
+      ariaLabel={ariaLabel}
+      value={value === "" && hasEmptyOption ? EMPTY_SELECT_VALUE : value}
+      options={comboboxOptions}
+      onChange={(next) =>
+        onChange(next === EMPTY_SELECT_VALUE && hasEmptyOption ? "" : next)
+      }
+      allowCustomValue={false}
+      required
+      className="bg-background"
+      {...(icon
+        ? {
+            prefix: (
+              <Icon icon={icon} className="size-4 text-muted-foreground/70" />
+            ),
+          }
+        : {})}
+    />
   );
 }
 

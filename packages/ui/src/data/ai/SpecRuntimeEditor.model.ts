@@ -20,6 +20,20 @@ export type SpecResourceMode = (typeof SPEC_RESOURCE_MODES)[number];
 export const SPEC_CHECKOUT_MODES = ["none", "remote", "local"] as const;
 export type SpecCheckoutMode = (typeof SPEC_CHECKOUT_MODES)[number];
 
+/**
+ * Sandbox capabilities an adapter may declare. Mirrors captain's
+ * registry.SandboxCapability: the editor reads these to decide what to offer —
+ * an agent picker needs `remote-exec`, and `isolate-workspace` conflicts with a
+ * worktree or setup checkout.
+ */
+export const SPEC_SANDBOX_CAPABILITIES = [
+  "wrap-command",
+  "remote-exec",
+  "isolate-workspace",
+  "egress-proxy",
+] as const;
+export type SpecSandboxCapability = (typeof SPEC_SANDBOX_CAPABILITIES)[number];
+
 export const SPEC_WORKTREE_MODES = ["none", "new", "existing"] as const;
 export type SpecWorktreeMode = (typeof SPEC_WORKTREE_MODES)[number];
 
@@ -147,10 +161,39 @@ export type AISpecRuntimeBudget = ChatBudgetConfig & {
   timeout?: string;
 };
 
+/**
+ * Bounds what a dispatched run may touch. Mirrors captain's api.SandboxPolicy;
+ * zero values inherit the backend's configured policy.
+ */
+export type AISpecRuntimeSandboxPolicy = {
+  /** Path allow/deny list, gitignore syntax with `!` negating. */
+  paths?: string[];
+  /** Bound on submit cycles per task. */
+  maxAttempts?: number;
+};
+
+/**
+ * The object form of captain's api.SandboxRef. `backend` names a configured
+ * sandbox backend or a bare adapter kind; `agent` pins one enrolled agent of a
+ * git-agent backend.
+ */
+export type AISpecRuntimeSandbox = {
+  backend?: string;
+  agent?: string;
+  policy?: AISpecRuntimeSandboxPolicy;
+};
+
 export type AISpecRuntimeSpec = {
   model?: string;
   id?: string;
   backend?: string;
+  /**
+   * Sandbox the run executes under. Accepts a bare selector or the object form,
+   * exactly as api.SandboxRef marshals: a ref carrying only a backend
+   * round-trips as a scalar so `sandbox: git-agent` in a .prompt is not
+   * rewritten into a mapping on save.
+   */
+  sandbox?: string | AISpecRuntimeSandbox;
   temperature?: number;
   effort?: string;
   noCache?: boolean;
@@ -287,8 +330,58 @@ export function compactAISpecRuntime(
   if (workflow) spec.workflow = workflow;
   const sessionId = cleanString(value.sessionId);
   if (sessionId) spec.sessionId = sessionId;
+  const sandbox = compactSandbox(value.sandbox);
+  if (sandbox !== undefined) spec.sandbox = sandbox;
   if (value.cliArgs && hasKeys(value.cliArgs)) spec.cliArgs = value.cliArgs;
   return spec;
+}
+
+/**
+ * Narrows a sandbox ref to what the Go side will accept, and collapses it back
+ * to the scalar form when only a backend is set — the same rule as
+ * api.SandboxRef.isScalar. Emitting `{backend: "git-agent"}` for a prompt
+ * written as `sandbox: git-agent` would rewrite the user's frontmatter on every
+ * save, so the shorthand has to survive the round-trip.
+ *
+ * An overrides-only ref (agent/policy with no backend) resolves to nothing and
+ * is dropped: api.SandboxRef.Validate rejects it outright.
+ */
+function compactSandbox(
+  value: string | AISpecRuntimeSandbox | undefined,
+): string | AISpecRuntimeSandbox | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    return cleanString(value) || undefined;
+  }
+  const backend = cleanString(value.backend);
+  if (!backend) return undefined;
+  const agent = cleanString(value.agent);
+  const policy = compactSandboxPolicy(value.policy);
+  if (!agent && !policy) return backend;
+  const sandbox: AISpecRuntimeSandbox = { backend };
+  if (agent) sandbox.agent = agent;
+  if (policy) sandbox.policy = policy;
+  return sandbox;
+}
+
+function compactSandboxPolicy(
+  value: AISpecRuntimeSandboxPolicy | undefined,
+): AISpecRuntimeSandboxPolicy | undefined {
+  if (!value) return undefined;
+  const policy: AISpecRuntimeSandboxPolicy = {};
+  const paths = value.paths
+    ?.map((path) => cleanString(path))
+    .filter((path) => path !== "");
+  if (paths?.length) policy.paths = paths;
+  // Validate rejects a negative bound, and 0 means "inherit the backend's".
+  if (
+    value.maxAttempts != null &&
+    Number.isFinite(value.maxAttempts) &&
+    value.maxAttempts > 0
+  ) {
+    policy.maxAttempts = Math.floor(value.maxAttempts);
+  }
+  return hasKeys(policy) ? policy : undefined;
 }
 
 function compactWorkflow(
