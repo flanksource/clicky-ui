@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { profileBuilderModalClassName, sampleParamSchema } from "./profileBuilderWorkspace";
-import { mapTimestampColumn, profileColumnTypeLabel } from "../fields/profileColumnModel";
+import { sampleParamSchema } from "./profileBuilderModel";
+import { profileBuilderModalClassName } from "./profileBuilderWorkspace";
+import {
+  mapTimestampColumn,
+  profileColumnTypeLabel,
+} from "../fields/profileColumnModel";
 
 describe("Build Profile workspace layout", () => {
   it("bounds the modal body and delegates scrolling to its panes", () => {

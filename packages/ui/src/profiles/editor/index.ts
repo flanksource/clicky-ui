@@ -1,5 +1,6 @@
 export * from "./profileBuilder";
 export * from "./profileBuilderExtension";
+export * from "./profileBuilderModel";
 export * from "./profileBuilderWorkspace";
 export * from "./profileEditor";
 export * from "./profileEditorModel";
