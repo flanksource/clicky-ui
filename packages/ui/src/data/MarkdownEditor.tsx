@@ -346,7 +346,7 @@ export function MarkdownEditor({
             spellCheck
             onChange={(event) => updateMarkdown(event.currentTarget.value)}
             className={cn(
-              "block w-full resize-y border-0 bg-transparent px-density-3 py-density-3 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60",
+              "block w-full resize-y border-0 bg-transparent px-density-3 py-density-3 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed disabled:opacity-60",
               editorClassName,
             )}
             style={contentStyle}

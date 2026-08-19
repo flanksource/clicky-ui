@@ -1,7 +1,9 @@
 import { createElement } from "react";
+import { calloutJsxDescriptor } from "./mdx-editor-callout";
 import type {
   MdxEditorCodeBlockEditorDescriptor,
   MdxEditorDiffModeOptions,
+  MdxEditorJsxComponentDescriptor,
   MdxEditorPluginOptions,
 } from "./mdx-editor-options";
 import { MdxEditorToolbar } from "./MdxEditorToolbar";
@@ -78,6 +80,20 @@ function codeBlockEditorDescriptors(
   }));
 }
 
+/**
+ * The registered JSX blocks: the built-in callout when `callouts` is on, plus
+ * whatever the consumer registers. They share one `jsxPlugin` because MDXEditor
+ * keeps a single descriptor list — a second call would replace the first.
+ */
+function jsxComponentDescriptors(mdx: MdxEditorModule, options: MdxEditorPluginOptions) {
+  const descriptors: MdxEditorJsxComponentDescriptor[] = [];
+  if (isEnabled(options.callouts, false)) {
+    descriptors.push(calloutJsxDescriptor(mdx, optionObject(options.callouts) ?? {}));
+  }
+  if (options.jsxComponents?.length) descriptors.push(...options.jsxComponents);
+  return descriptors;
+}
+
 export function createMdxEditorPlugins(
   mdx: MdxEditorModule,
   options: MdxEditorPluginOptions = {},
@@ -135,6 +151,10 @@ export function createMdxEditorPlugins(
         }),
       );
     }
+  }
+  const jsxDescriptors = jsxComponentDescriptors(mdx, options);
+  if (jsxDescriptors.length) {
+    plugins.push(mdx.jsxPlugin({ jsxComponentDescriptors: jsxDescriptors as never }));
   }
   if (isEnabled(options.frontmatter)) plugins.push(mdx.frontmatterPlugin());
   if (isEnabled(options.admonitions)) {

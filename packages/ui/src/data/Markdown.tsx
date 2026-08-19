@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
+import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 
 export type MarkdownProps = {
@@ -14,6 +15,15 @@ export type MarkdownProps = {
   text: string;
   /** Classes applied to the rendered markdown wrapper. */
   className?: string;
+  /**
+   * Render `<CalloutBox …>` authored inline in the markdown as a
+   * {@link Callout}.
+   *
+   * Off by default. It admits exactly one extra tag with exactly the callout's
+   * own attributes — no other markup in `text` becomes live — so it is safe to
+   * turn on wherever callouts are wanted.
+   */
+  callouts?: boolean | undefined;
 };
 
 // Streamdown routes a fenced code block to the `code` override with a `data-block`
@@ -36,8 +46,11 @@ type MarkdownElementProps = {
 
 type StreamdownComponent = ComponentType<{
   children: string;
-  className?: string;
-  parseIncompleteMarkdown?: boolean;
+  className?: string | undefined;
+  parseIncompleteMarkdown?: boolean | undefined;
+  // Tag name -> the attribute names it may carry. Streamdown drops every other
+  // raw tag, so this is an allowlist rather than raw-HTML passthrough.
+  allowedTags?: Record<string, string[]> | undefined;
   components?: {
     code?: ComponentType<MarkdownCodeProps>;
     ul?: ComponentType<MarkdownElementProps>;
@@ -47,6 +60,9 @@ type StreamdownComponent = ComponentType<{
     tbody?: ComponentType<MarkdownElementProps>;
     th?: ComponentType<MarkdownElementProps>;
     td?: ComponentType<MarkdownElementProps>;
+    // Streamdown lowercases every tag name, so an authored `<CalloutBox>`
+    // arrives here as `calloutbox`.
+    calloutbox?: ComponentType<CalloutProps & { node?: unknown }>;
   };
 }>;
 
@@ -177,12 +193,38 @@ const markdownComponents = {
   td: MarkdownTableCell,
 };
 
+// The tag arrives lowercased with every attribute as a string, and carries the
+// source hast node too — listing the props drops that rather than spreading it
+// onto the element.
+function MarkdownCallout({ badge, children, className, emphasis, icon, label, source, title, variant }: CalloutProps) {
+  return (
+    <Callout
+      badge={badge}
+      className={className}
+      emphasis={emphasis}
+      icon={icon}
+      label={label}
+      source={source}
+      title={title}
+      variant={variant}
+    >
+      {children}
+    </Callout>
+  );
+}
+
+const calloutComponents = { ...markdownComponents, calloutbox: MarkdownCallout };
+
+const CALLOUT_ALLOWED_TAGS = {
+  calloutbox: ["variant", "label", "badge", "source", "icon", "emphasis", "title"],
+};
+
 /** Renders markdown with Streamdown, which is purpose-built for streaming LLM
  *  output (it gracefully handles incomplete markdown mid-stream). Fenced code
  *  blocks render via the library CodeBlock, and lists and tables are styled
  *  here rather than by Streamdown. Falls back to preformatted text until
  *  Streamdown loads or when it is not installed. */
-export function Markdown({ text, className }: MarkdownProps) {
+export function Markdown({ text, className, callouts = false }: MarkdownProps) {
   const [Streamdown, setStreamdown] = useState<StreamdownComponent | null>(null);
 
   useEffect(() => {
@@ -201,7 +243,11 @@ export function Markdown({ text, className }: MarkdownProps) {
 
   return (
     <div className={cn("prose prose-sm max-w-none dark:prose-invert", className)}>
-      <Streamdown parseIncompleteMarkdown components={markdownComponents}>
+      <Streamdown
+        parseIncompleteMarkdown
+        components={callouts ? calloutComponents : markdownComponents}
+        allowedTags={callouts ? CALLOUT_ALLOWED_TAGS : undefined}
+      >
         {text}
       </Streamdown>
     </div>

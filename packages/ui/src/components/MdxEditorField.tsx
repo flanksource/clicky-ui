@@ -9,6 +9,7 @@ type MdxEditorModule = typeof import("@mdxeditor/editor");
 
 export type {
   MdxEditorAdmonitionOptions,
+  MdxEditorCalloutOptions,
   MdxEditorCodeBlockEditorContext,
   MdxEditorCodeBlockEditorDescriptor,
   MdxEditorCodeBlockEditorProps,
@@ -21,9 +22,15 @@ export type {
   MdxEditorImageOptions,
   MdxEditorImagePreviewHandler,
   MdxEditorImageUploadHandler,
+  MdxEditorInsertJsx,
+  MdxEditorJsxAttribute,
+  MdxEditorJsxComponentDescriptor,
+  MdxEditorJsxEditorProps,
+  MdxEditorJsxNode,
   MdxEditorLinkOptions,
   MdxEditorPlugin,
   MdxEditorPluginOptions,
+  MdxEditorRuntime,
   MdxEditorToolbarOptions,
   MdxEditorViewMode,
 } from "./mdx-editor-options";
