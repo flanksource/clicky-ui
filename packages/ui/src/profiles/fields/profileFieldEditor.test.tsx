@@ -74,6 +74,39 @@ describe("ProfileFieldEditorForm enum controls", () => {
     expect(onChange).toHaveBeenLastCalledWith({ type: "duration" });
   });
 
+  it("types a field as datetime when the timestamp role is chosen", () => {
+    // The timestamp role names the column the table's date-range control reads.
+    // Leaving the type behind renders the cell as whatever it was — a raw
+    // string — under a header the table treats as time.
+    const onChange = vi.fn();
+    render(
+      <ProfileFieldEditorForm
+        field={{ name: "created_at" }}
+        columns={1}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Role" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Timestamp" }));
+    expect(onChange).toHaveBeenLastCalledWith({ kind: "timestamp", type: "datetime" });
+  });
+
+  it("leaves the type alone for the roles that only say how a cell renders", () => {
+    const onChange = vi.fn();
+    render(
+      <ProfileFieldEditorForm
+        field={{ name: "level", type: "string" }}
+        columns={1}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Role" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Status" }));
+    expect(onChange).toHaveBeenLastCalledWith({ kind: "status" });
+  });
+
   it("gives every declared type and filter kind a glyph, so no option renders bare", () => {
     expect(
       profileTypeOptions

@@ -25,6 +25,30 @@ describe("kubernetes workload target", () => {
     expect(withKubernetesWorkloadTarget("")).toBe("");
   });
 
+  it("saves a namespace chosen without a workload as a namespace-scoped query", () => {
+    expect(withKubernetesWorkloadTarget("payments/")).toBe(
+      "namespace=payments",
+    );
+  });
+
+  it("shows the namespace of a namespace-scoped query in the picker", () => {
+    expect(kubernetesWorkloadTargetValue("namespace=payments")).toBe(
+      "payments/",
+    );
+  });
+
+  it("round-trips a namespace-only target through the query grammar", () => {
+    const value = "observability/";
+    expect(
+      kubernetesWorkloadTargetValue(withKubernetesWorkloadTarget(value)),
+    ).toBe(value);
+  });
+
+  it("has no picker value for a query naming no namespace", () => {
+    expect(kubernetesWorkloadTargetValue("")).toBe("");
+    expect(kubernetesWorkloadTargetValue("kind=Pod")).toBe("");
+  });
+
   it("rejects values that cannot identify a supported namespaced workload", () => {
     expect(() =>
       withKubernetesWorkloadTarget("deployment/api"),

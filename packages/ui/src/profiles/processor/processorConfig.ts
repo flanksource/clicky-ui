@@ -221,20 +221,6 @@ export function validateProcessor(
 export function pagingBlock(
   type: string,
 ): { kind: "inherent" | "gap"; reason: string } | undefined {
-  if (type === "cel.dedupe") {
-    return {
-      kind: "inherent",
-      reason:
-        "Groups across the whole result, so no row is final until the last page has been read.",
-    };
-  }
-  if (type === "cel.batch") {
-    return {
-      kind: "gap",
-      reason:
-        "Groups runs of adjacent rows and is incremental by construction — it blocks paging only because the per-page interface is unimplemented.",
-    };
-  }
   if (type === "sqlite.merge" || type === "sqlite.recon") {
     return {
       kind: "inherent",

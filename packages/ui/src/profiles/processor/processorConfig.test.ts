@@ -75,9 +75,10 @@ describe("processor configuration", () => {
     });
   });
 
-  it("distinguishes inherent whole-result stages from paging gaps", () => {
-    expect(pagingBlock("cel.dedupe")?.kind).toBe("inherent");
-    expect(pagingBlock("cel.batch")?.kind).toBe("gap");
+  it("reports only processors that still require a whole result", () => {
+    expect(pagingBlock("cel.dedupe")).toBeUndefined();
+    expect(pagingBlock("cel.batch")).toBeUndefined();
+    expect(pagingBlock("sqlite.merge")?.kind).toBe("inherent");
     expect(pagingBlock("logs.parse")).toBeUndefined();
   });
 

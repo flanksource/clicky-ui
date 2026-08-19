@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileBuilderModalClassName } from "./profileBuilderWorkspace";
+import { profileBuilderModalClassName, sampleParamSchema } from "./profileBuilderWorkspace";
 import { mapTimestampColumn, profileColumnTypeLabel } from "../fields/profileColumnModel";
 
 describe("Build Profile workspace layout", () => {
@@ -43,5 +43,28 @@ describe("Build Profile structured type labels", () => {
     expect(profileColumnTypeLabel("key_values")).toBe("[]KeyValue");
     expect(profileColumnTypeLabel("json")).toBe("JSON");
     expect(profileColumnTypeLabel("duration")).toBe("duration");
+  });
+});
+
+describe("Build Profile sample parameter schemas", () => {
+  it("distinguishes date, datetime, and duration inputs", () => {
+    expect(
+      sampleParamSchema([
+        { name: "day", type: "date" },
+        { name: "started_at", type: "datetime" },
+        { name: "window", type: "duration" },
+      ]),
+    ).toEqual({
+      type: "object",
+      properties: {
+        day: { title: "day", type: "string", format: "date" },
+        started_at: {
+          title: "started_at",
+          type: "string",
+          format: "date-time",
+        },
+        window: { title: "window", type: "string" },
+      },
+    });
   });
 });
