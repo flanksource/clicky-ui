@@ -1,10 +1,15 @@
 import type { ConditionalContentsOption, EditorInFocus, FallbackOption, ViewMode } from "@mdxeditor/editor";
+import { calloutToolbarButton } from "./mdx-editor-callout";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
 
 type MdxEditorModule = typeof import("@mdxeditor/editor");
 
 function isEnabled<T extends object>(value: boolean | T | undefined, defaultValue = true): boolean {
   return value === undefined ? defaultValue : value !== false;
+}
+
+function optionObject<T extends object>(value: boolean | T | undefined): T | undefined {
+  return typeof value === "object" && value !== null ? value : undefined;
 }
 
 function diffViewOptions(diffMode: MdxEditorPluginOptions["diffMode"]): ViewMode[] | undefined {
@@ -62,6 +67,8 @@ function DefaultToolbarContents({
     Separator,
     UndoRedo,
   } = mdx;
+  const InsertCallout = calloutToolbarButton(mdx, optionObject(options.callouts) ?? {});
+  const extra = typeof options.toolbar === "object" ? options.toolbar.extra : undefined;
   const controls = (
     <>
       <UndoRedo />
@@ -86,9 +93,13 @@ function DefaultToolbarContents({
       {isEnabled(options.tables) && <InsertTable />}
       {isEnabled(options.thematicBreak) && <InsertThematicBreak />}
       {isEnabled(options.codeBlocks) && <InsertCodeBlock />}
-      {(isEnabled(options.frontmatter) || isEnabled(options.admonitions)) && <Separator />}
+      {(isEnabled(options.frontmatter) || isEnabled(options.admonitions) || isEnabled(options.callouts, false)) && (
+        <Separator />
+      )}
       {isEnabled(options.frontmatter) && <InsertFrontmatter />}
       {isEnabled(options.admonitions) && <InsertAdmonition />}
+      {isEnabled(options.callouts, false) && <InsertCallout />}
+      {extra}
     </>
   );
 

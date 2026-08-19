@@ -36,3 +36,37 @@ describe("Markdown code blocks", () => {
     expect(container.querySelector('[data-streamdown="code-block"]')).toBeNull();
   });
 });
+
+const CALLOUT_SOURCE = [
+  '<CalloutBox variant="caution" badge="BCR-08" label="Gap" source="Policy Owner">',
+  "",
+  "Recovery times are not yet evidenced.",
+  "",
+  "</CalloutBox>",
+].join("\n");
+
+describe("Markdown callouts", () => {
+  it("renders an authored <CalloutBox> as a Callout when callouts is on", async () => {
+    render(<Markdown callouts text={CALLOUT_SOURCE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Recovery times are not yet evidenced.")).toBeInTheDocument();
+    });
+    // The attributes survive rehype-raw's lowercasing and reach the component.
+    for (const text of ["BCR-08", "Gap", "Policy Owner"]) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+  });
+
+  // Off by default because enabling it turns on raw-HTML passthrough for the
+  // whole document — a sanitization decision the caller has to make explicitly.
+  it("leaves the raw tag alone when callouts is off", async () => {
+    const { container } = render(<Markdown text={CALLOUT_SOURCE} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Recovery times are not yet evidenced.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Gap")).toBeNull();
+    expect(container.querySelector("[data-callout-editor]")).toBeNull();
+  });
+});
