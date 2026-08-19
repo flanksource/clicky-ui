@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import type { ReactNode } from "react";
@@ -34,7 +34,13 @@ function makeClient(): OperationsApiClient {
   };
 }
 
-function Harness({ actions }: { actions?: ReactNode }) {
+function Harness({
+  actions,
+  client = makeClient(),
+}: {
+  actions?: ReactNode;
+  client?: OperationsApiClient;
+}) {
   const adapter = useMemoryRouter("/widgets");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
@@ -42,7 +48,7 @@ function Harness({ actions }: { actions?: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <RouterProvider adapter={adapter}>
           <EntityExplorerApp
-            client={makeClient()}
+            client={client}
             {...(actions ? { actions } : {})}
           />
         </RouterProvider>
@@ -51,8 +57,13 @@ function Harness({ actions }: { actions?: ReactNode }) {
   );
 }
 
-function renderApp(actions?: ReactNode) {
-  return render(<Harness {...(actions ? { actions } : {})} />);
+function renderApp(actions?: ReactNode, client?: OperationsApiClient) {
+  return render(
+    <Harness
+      {...(actions ? { actions } : {})}
+      {...(client ? { client } : {})}
+    />,
+  );
 }
 
 describe("EntityExplorerApp", () => {
@@ -93,5 +104,88 @@ describe("EntityExplorerApp", () => {
     const { container } = renderApp(<button type="button">Open assistant</button>);
     const action = await screen.findByRole("button", { name: "Open assistant" });
     expect(container.querySelector('[data-slot="app-shell-actions"]')).toContainElement(action);
+  });
+
+  it("hides the previous profile body behind a centered loader while switching profiles", async () => {
+    let resolveGadgets!: (value: Awaited<ReturnType<OperationsApiClient["executeCommand"]>>) => void;
+    const gadgets = new Promise<Awaited<ReturnType<OperationsApiClient["executeCommand"]>>>(
+      (resolve) => {
+        resolveGadgets = resolve;
+      },
+    );
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "test", version: "1" },
+      "x-clicky": {
+        surfaces: [
+          { key: "widgets", entity: "widget", title: "Widgets" },
+          { key: "gadgets", entity: "gadget", title: "Gadgets" },
+        ],
+      },
+      paths: {
+        "/api/v1/widgets": {
+          get: {
+            operationId: "widget_list",
+            responses: {},
+            "x-clicky": { surface: "widgets", verb: "list", scope: "collection" },
+          },
+          post: {
+            operationId: "widget_create",
+            responses: {},
+            "x-clicky": { surface: "widgets", verb: "create", scope: "collection" },
+          },
+        },
+        "/api/v1/gadgets": {
+          get: {
+            operationId: "gadget_list",
+            responses: {},
+            "x-clicky": { surface: "gadgets", verb: "list", scope: "collection" },
+          },
+          post: {
+            operationId: "gadget_create",
+            responses: {},
+            "x-clicky": { surface: "gadgets", verb: "create", scope: "collection" },
+          },
+        },
+      },
+    };
+    const response = (label: string) => {
+      const parsed = {
+        version: 1 as const,
+        node: {
+          kind: "table" as const,
+          columns: [{ name: "Name", label: "Name" }],
+          rows: [{ cells: { Name: { kind: "text" as const, plain: label } } }],
+        },
+      };
+      return {
+        success: true,
+        exit_code: 0,
+        contentType: "application/json+clicky",
+        stdout: JSON.stringify(parsed),
+        parsed,
+      };
+    };
+    const client: OperationsApiClient = {
+      getOpenAPISpec: () => Promise.resolve(spec),
+      executeCommand: (path) =>
+        path === "/api/v1/gadgets" ? gadgets : Promise.resolve(response("Widget one")),
+    };
+
+    renderApp(undefined, client);
+    expect(await screen.findByRole("button", { name: "Create" })).toBeInTheDocument();
+
+    fireEvent.click((await screen.findAllByRole("link", { name: "Gadgets" }))[0]!);
+
+    expect(await screen.findByRole("heading", { name: "Gadgets" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Widgets" }).length).toBeGreaterThan(0);
+
+    resolveGadgets(response("Gadget one"));
+    expect(await screen.findByRole("button", { name: "Create" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument(),
+    );
   });
 });

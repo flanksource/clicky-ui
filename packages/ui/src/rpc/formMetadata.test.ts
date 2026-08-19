@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dataTablePaginationFromForm,
   OFFSET_DEPTH_LIMIT,
+  packLookupParameterValues,
   packParameterValues,
   parametersToFormConfig,
   type ParameterPagination,
@@ -26,6 +27,47 @@ describe("packParameterValues", () => {
       id: "stk-001",
       events: "3",
     });
+  });
+
+  it("drops a value the operation declares no parameter for", () => {
+    // Filter state outlives a surface — the explorer seeds it from the URL and
+    // carries it across routes. Forwarding another surface's `filter.*` makes
+    // the server reject the whole request ("column filter is not supported by
+    // profile"), so the table shows an error instead of the rows it has.
+    expect(
+      packParameterValues({ "filter.tenant": "acme", "filter.stale": "x" }, [
+        { name: "filter.tenant", in: "query" },
+      ]),
+    ).toEqual({ "filter.tenant": "acme" });
+  });
+});
+
+describe("packLookupParameterValues", () => {
+  it("excludes pagination roles while preserving lookup context and positional arguments", () => {
+    expect(
+      packLookupParameterValues(
+        {
+          pageSize: "50",
+          startAt: "100",
+          resumeFrom: "opaque-cursor",
+          status: "ready",
+          query: "api",
+          target: "payments",
+        },
+        [
+          { name: "pageSize", in: "query", "x-clicky": { role: "limit" } },
+          { name: "startAt", in: "query", "x-clicky": { role: "offset" } },
+          { name: "resumeFrom", in: "query", "x-clicky": { role: "cursor" } },
+          { name: "status", in: "query", "x-clicky": { role: "filter" } },
+          { name: "query", in: "query", "x-clicky": { role: "search" } },
+          {
+            name: "target",
+            in: "query",
+            description: "Positional argument from command",
+          },
+        ],
+      ),
+    ).toEqual({ status: "ready", query: "api", args: "payments" });
   });
 });
 
@@ -55,7 +97,9 @@ describe("parametersToFormConfig", () => {
     const filter = config.filters[0];
     expect(filter.kind).toBe("workload");
     if (filter.kind !== "workload") throw new Error("expected workload filter");
-    await expect(filter.loadWorkloads(["deployment", "daemonset"])).resolves.toEqual({
+    await expect(
+      filter.loadWorkloads(["deployment", "daemonset"]),
+    ).resolves.toEqual({
       deployment: [{ name: "api", namespace: "payments" }],
       daemonset: [{ name: "agent", namespace: "platform" }],
     });
@@ -95,13 +139,21 @@ describe("parametersToFormConfig", () => {
 
     const grouped = config.filters[0];
     expect(grouped.kind).toBe("nested-multi");
-    if (grouped.kind !== "nested-multi") throw new Error("expected grouped labels");
-    expect(grouped.groups.map((group) => group.groupKey)).toEqual(["app", "tier"]);
-    expect(grouped.value).toEqual({ "app=api": "include", "tier=worker": "exclude" });
+    if (grouped.kind !== "nested-multi")
+      throw new Error("expected grouped labels");
+    expect(grouped.groups.map((group) => group.groupKey)).toEqual([
+      "app",
+      "tier",
+    ]);
+    expect(grouped.value).toEqual({
+      "app=api": "include",
+      "tier=worker": "exclude",
+    });
 
     const explicit = config.filters[1];
     expect(explicit.kind).toBe("multi");
-    if (explicit.kind !== "multi") throw new Error("expected explicit label values");
+    if (explicit.kind !== "multi")
+      throw new Error("expected explicit label values");
     expect(explicit.value).toEqual({ api: "include", worker: "exclude" });
   });
 
@@ -338,7 +390,11 @@ describe("parametersToFormConfig", () => {
       {
         lookup: {
           filters: {
-            "filter.updated_at": { label: "Updated At", type: "date-range", multi: true },
+            "filter.updated_at": {
+              label: "Updated At",
+              type: "date-range",
+              multi: true,
+            },
           },
         },
       },
@@ -355,7 +411,8 @@ describe("parametersToFormConfig", () => {
     // filters, so a surface can carry several.
     expect(config.timeRange).toBeUndefined();
 
-    if (filter.kind !== "date-range") throw new Error(`unexpected kind ${filter.kind}`);
+    if (filter.kind !== "date-range")
+      throw new Error(`unexpected kind ${filter.kind}`);
     filter.onApply("now-7d", "now");
     expect(updates[0]["filter.updated_at"]).toBe(">=now-7d,<=now");
   });
@@ -366,25 +423,45 @@ describe("parametersToFormConfig", () => {
   it("shows a date-range parameter's declared default when nothing is selected", () => {
     const values = { time: "" };
     const config = parametersToFormConfig(
-      [{ name: "time", in: "query", schema: { type: "string", default: ">=now-1h" } }],
+      [
+        {
+          name: "time",
+          in: "query",
+          schema: { type: "string", default: ">=now-1h" },
+        },
+      ],
       values,
       () => {},
       { lookup: { filters: { time: { label: "Time", type: "date-range" } } } },
     );
 
-    expect(config.filters[0]).toMatchObject({ kind: "date-range", label: "Time", from: "now-1h" });
+    expect(config.filters[0]).toMatchObject({
+      kind: "date-range",
+      label: "Time",
+      from: "now-1h",
+    });
   });
 
   it("prefers a selected range over the declared default", () => {
     const values = { time: ">=now-15m,<=now" };
     const config = parametersToFormConfig(
-      [{ name: "time", in: "query", schema: { type: "string", default: ">=now-1h" } }],
+      [
+        {
+          name: "time",
+          in: "query",
+          schema: { type: "string", default: ">=now-1h" },
+        },
+      ],
       values,
       () => {},
       { lookup: { filters: { time: { label: "Time", type: "date-range" } } } },
     );
 
-    expect(config.filters[0]).toMatchObject({ kind: "date-range", from: "now-15m", to: "now" });
+    expect(config.filters[0]).toMatchObject({
+      kind: "date-range",
+      from: "now-15m",
+      to: "now",
+    });
   });
 
   // A UUID column: exact values, nothing to enumerate. `multi` stays true on the
@@ -399,20 +476,149 @@ describe("parametersToFormConfig", () => {
       (updater) => {
         updates.push(typeof updater === "function" ? updater(values) : updater);
       },
-      { lookup: { filters: { "filter.id": { label: "Id", type: "value", multi: true } } } },
+      {
+        lookup: {
+          filters: { "filter.id": { label: "Id", type: "value", multi: true } },
+        },
+      },
     );
 
     const filter = config.filters[0];
     expect(filter).toMatchObject({ kind: "text", label: "Id", value: "" });
 
-    if (filter.kind !== "text") throw new Error(`unexpected kind ${filter.kind}`);
+    if (filter.kind !== "text")
+      throw new Error(`unexpected kind ${filter.kind}`);
     filter.onChange("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-    expect(updates[0]["filter.id"]).toBe("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+    expect(updates[0]["filter.id"]).toBe(
+      "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    );
+  });
+});
+
+// A control's identity comes from the spec, which is fetched once, and not from
+// the lookup response, which is refetched on every selection. Reading it from
+// the lookup is what used to collapse every chip into a plain text box for the
+// length of that refetch — on first paint, and again on each filter change.
+describe("parametersToFormConfig — shape without live lookup data", () => {
+  const shapeParam = (name: string, ref: string) => ({
+    name,
+    in: "query" as const,
+    "x-clicky-lookup": { $ref: `#/components/x-clicky-filters/${ref}` },
+  });
+
+  it("keeps the workload picker while its options are in flight", async () => {
+    const config = parametersToFormConfig(
+      [shapeParam("workload", "wl")],
+      { workload: "payments/Deployment/api" },
+      () => {},
+      { components: { wl: { type: "workload", label: "Workload" } } },
+    );
+
+    const filter = config.filters[0];
+    expect(filter.kind).toBe("workload");
+    if (filter.kind !== "workload") throw new Error("expected workload filter");
+    expect(filter.label).toBe("Workload");
+    expect(filter.value).toBe("payments/Deployment/api");
+    // No options yet is an empty set, not a failure: the picker pins the current
+    // value itself, so the chip still reads back what is selected.
+    await expect(filter.loadWorkloads(["deployment"])).resolves.toEqual({});
+  });
+
+  it("keeps the labels control and its selection while options are in flight", () => {
+    const config = parametersToFormConfig(
+      [shapeParam("labels", "lb")],
+      { labels: "app=api,!tier=worker" },
+      () => {},
+      { components: { lb: { type: "labels", label: "Labels", multi: true } } },
+    );
+
+    const filter = config.filters[0];
+    expect(filter.kind).toBe("nested-multi");
+    if (filter.kind !== "nested-multi") throw new Error("expected nested-multi");
+    expect(filter.value).toEqual({ "app=api": "include", "tier=worker": "exclude" });
+  });
+
+  it("keeps the range control and its server default while options are in flight", () => {
+    const config = parametersToFormConfig(
+      [
+        {
+          ...shapeParam("time", "tm"),
+          schema: { type: "string", default: ">=now-1h" },
+        },
+      ],
+      {},
+      () => {},
+      { components: { tm: { type: "date-range", label: "Time" } } },
+    );
+
+    const filter = config.filters[0];
+    expect(filter.kind).toBe("date-range");
+    if (filter.kind !== "date-range") throw new Error("expected date-range");
+    expect(filter.from).toBe("now-1h");
+  });
+
+  it("prefers live options once the lookup resolves, without changing the control", () => {
+    const config = parametersToFormConfig(
+      [shapeParam("workload", "wl")],
+      { workload: "payments/Deployment/api" },
+      () => {},
+      {
+        components: { wl: { type: "workload", label: "Workload" } },
+        lookup: {
+          filters: {
+            workload: {
+              type: "workload",
+              options: {
+                "payments/Deployment/api": { kind: "text", text: "api" },
+              },
+            },
+          },
+        },
+      },
+    );
+
+    expect(config.filters[0].kind).toBe("workload");
+  });
+
+  it("still classifies from the lookup when a parameter names no shape", () => {
+    const config = parametersToFormConfig(
+      [{ name: "workload", in: "query" }],
+      {},
+      () => {},
+      { lookup: { filters: { workload: { type: "workload" } } } },
+    );
+
+    expect(config.filters[0].kind).toBe("workload");
+  });
+
+  it("renders a parameter with neither shape nor lookup as the text input it is", () => {
+    const config = parametersToFormConfig(
+      [{ name: "namespace", in: "query" }],
+      { namespace: "payments" },
+      () => {},
+      { components: { wl: { type: "workload" } } },
+    );
+
+    expect(config.filters[0].kind).toBe("text");
+    expect(config.filters[0].label).toBe("Namespace");
+  });
+
+  it("ignores a ref that resolves to nothing rather than failing the whole bar", () => {
+    const config = parametersToFormConfig(
+      [shapeParam("workload", "missing"), { name: "namespace", in: "query" }],
+      {},
+      () => {},
+      { components: { wl: { type: "workload" } } },
+    );
+
+    expect(config.filters.map((filter) => filter.kind)).toEqual(["text", "text"]);
   });
 });
 
 describe("dataTablePaginationFromForm", () => {
-  const form = (overrides: Partial<ParameterPagination> = {}): ParameterPagination => ({
+  const form = (
+    overrides: Partial<ParameterPagination> = {},
+  ): ParameterPagination => ({
     limitParam: "limit",
     offsetParam: "offset",
     limitValue: "25",
@@ -424,7 +630,13 @@ describe("dataTablePaginationFromForm", () => {
 
   it("carries the server's own answers rather than inferring them from the page", () => {
     const table = dataTablePaginationFromForm(form(), {
-      pagination: { total: 10_000, totalRelation: "gte", hasMore: true, limit: 25, offset: 0 },
+      pagination: {
+        total: 10_000,
+        totalRelation: "gte",
+        hasMore: true,
+        limit: 25,
+        offset: 0,
+      },
     });
 
     expect(table?.total).toBe(10_000);
@@ -445,7 +657,13 @@ describe("dataTablePaginationFromForm", () => {
     };
 
     const table = dataTablePaginationFromForm(limitOnly, {
-      pagination: { total: 12_558, totalRelation: "eq", hasMore: false, limit: 100, offset: 0 },
+      pagination: {
+        total: 12_558,
+        totalRelation: "eq",
+        hasMore: false,
+        limit: 100,
+        offset: 0,
+      },
     });
 
     expect(table).toBeDefined();
@@ -463,7 +681,15 @@ describe("dataTablePaginationFromForm", () => {
     const offsets: string[] = [];
     const table = dataTablePaginationFromForm(
       form({ setOffset: (next) => offsets.push(next) }),
-      { pagination: { total: 500, totalRelation: "eq", hasMore: true, limit: 25, offset: 0 } },
+      {
+        pagination: {
+          total: 500,
+          totalRelation: "eq",
+          hasMore: true,
+          limit: 25,
+          offset: 0,
+        },
+      },
     );
 
     expect(table?.onPageChange).toBeTypeOf("function");
@@ -472,19 +698,45 @@ describe("dataTablePaginationFromForm", () => {
   });
 
   it("offers cursor mode only once there is a cursor to send it on", () => {
-    const withoutParam = dataTablePaginationFromForm(form({ offsetValue: "20000" }), {
-      pagination: { nextCursor: "next-token" },
-    });
+    const withoutParam = dataTablePaginationFromForm(
+      form({ offsetValue: "20000" }),
+      {
+        pagination: { nextCursor: "next-token" },
+      },
+    );
     expect(withoutParam?.cursor).toBeUndefined();
 
     const withParam = dataTablePaginationFromForm(
-      form({ offsetValue: "20000", cursorParam: "cursor", setCursor: () => {} }),
+      form({
+        offsetValue: "20000",
+        cursorParam: "cursor",
+        setCursor: () => {},
+      }),
       { pagination: { nextCursor: "next-token" } },
     );
     expect(withParam?.cursor).toEqual({
       next: "next-token",
       onCursorChange: expect.any(Function),
     });
+  });
+
+  it("uses the first cursor returned by an operation with no offset", () => {
+    const cursors: string[] = [];
+    const table = dataTablePaginationFromForm(
+      form({
+        offsetParam: undefined,
+        offsetValue: undefined,
+        setOffset: undefined,
+        cursorParam: "cursor",
+        setCursor: (next) => cursors.push(next),
+      }),
+      { pagination: { nextCursor: "next-token", hasMore: true } },
+    );
+
+    expect(table?.onPageChange).toBeUndefined();
+    expect(table?.cursor?.next).toBe("next-token");
+    table?.cursor?.onCursorChange("next-token");
+    expect(cursors).toEqual(["next-token"]);
   });
 
   // Page-number jumps are worth keeping while they still work, so the mode is
@@ -511,7 +763,11 @@ describe("dataTablePaginationFromForm", () => {
   // is no offset to fall back to, whatever depth the page happens to be at.
   it("keeps cursoring once a walk has started", () => {
     const table = dataTablePaginationFromForm(
-      form({ cursorParam: "cursor", cursorValue: "current-token", setCursor: () => {} }),
+      form({
+        cursorParam: "cursor",
+        cursorValue: "current-token",
+        setCursor: () => {},
+      }),
       { pagination: { nextCursor: "next-token" } },
     );
     expect(table?.cursor?.current).toBe("current-token");
@@ -561,5 +817,41 @@ describe("dataTablePaginationFromForm", () => {
     table?.onPageSizeChange(100);
     expect(limits).toEqual(["100"]);
     expect(cursors).toEqual([""]);
+  });
+
+  // Under an infinite walk the footer describes an accumulation rather than a
+  // window, and the DataTable withdraws the step controls on the strength of its
+  // own `infinite` prop. What it still needs from here are the counting facts —
+  // and they come from the newest page, whose total covers the whole result and
+  // whose limit is the size of one request, not of the run on screen.
+  it("reports the newest page's counts and request size across an accumulated walk", () => {
+    const walk: ParameterPagination = {
+      limitParam: "limit",
+      limitValue: "25",
+      setLimit: () => {},
+      cursorParam: "cursor",
+      // The cursor of a walk lives in the query, not in the form — the form's
+      // copy stays empty, and the footer must not read that as "first page of
+      // an offset run" and start quoting positions.
+      cursorValue: "",
+      setCursor: () => {},
+    };
+
+    const table = dataTablePaginationFromForm(walk, {
+      pagination: {
+        total: 12_558,
+        totalRelation: "eq",
+        hasMore: true,
+        limit: 25,
+        nextCursor: "page-4",
+      },
+    });
+
+    expect(table?.total).toBe(12_558);
+    expect(table?.totalRelation).toBe("eq");
+    expect(table?.pageSize).toBe(25);
+    expect(table?.hasMore).toBe(true);
+    expect(table?.onPageChange).toBeUndefined();
+    expect(table?.onPageSizeChange).toBeTypeOf("function");
   });
 });

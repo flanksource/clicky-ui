@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import type {
   ExecutionResponse,
@@ -56,14 +57,19 @@ export function useOpenAPI(client: OperationsApiClient) {
 export function useOperations(client: OperationsApiClient) {
   const { data: spec, ...rest } = useOpenAPI(client);
 
-  const operations: ResolvedOperation[] = [];
-  if (spec) {
+  // Flattening a hundred operations is cheap once and wasteful on every render
+  // of every page that reads the catalog — and callers memoize off this array,
+  // so a fresh identity re-runs their work too.
+  const operations = useMemo<ResolvedOperation[]>(() => {
+    if (!spec) return [];
+    const resolved: ResolvedOperation[] = [];
     for (const [path, methods] of Object.entries(spec.paths)) {
       for (const [method, operation] of Object.entries(methods)) {
-        operations.push({ path, method, operation });
+        resolved.push({ path, method, operation });
       }
     }
-  }
+    return resolved;
+  }, [spec]);
 
   return { operations, spec, ...rest };
 }

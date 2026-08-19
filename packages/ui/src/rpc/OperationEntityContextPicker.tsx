@@ -10,6 +10,7 @@ import { Modal } from "../overlay/Modal";
 import { CommandOutput } from "./CommandOutput";
 import {
   dataTablePaginationFromForm,
+  packLookupParameterValues,
   packParameterValues,
   parametersToFormConfig,
   useDebouncedRecord,
@@ -168,18 +169,22 @@ export function OperationEntityContextPicker({
     () => packParameterValues(debouncedFilters, parameters),
     [debouncedFilters, parameters],
   );
+  const packedLookupFilters = useMemo(
+    () => packLookupParameterValues(debouncedFilters, parameters),
+    [debouncedFilters, parameters],
+  );
 
   const lookupQuery = useQuery({
     queryKey: [
       "entity-context-lookup",
       selected?.listOperation.path,
-      packedFilters,
+      packedLookupFilters,
     ],
     queryFn: async () =>
       (await client.lookupFilters?.(
         selected!.listOperation.path,
         selected!.listOperation.method,
-        packedFilters,
+        packedLookupFilters,
         { Accept: "application/json+clicky" },
       )) ?? { filters: {} },
     enabled:
@@ -187,6 +192,7 @@ export function OperationEntityContextPicker({
       !!selected &&
       !!client.lookupFilters &&
       parameters.some((parameter) => parameter.in === "query"),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
@@ -210,13 +216,17 @@ export function OperationEntityContextPicker({
     retry: 0,
   });
 
+  // Shapes come from the spec so a control keeps its identity while the lookup
+  // that fills it is in flight; see parametersToFormConfig.
+  const filterShapes = spec?.components?.["x-clicky-filters"];
   const filterConfig = useMemo(
     () =>
       parametersToFormConfig(parameters, filters, setFilters, {
         includeLocations: ["query"],
         lookup: lookupQuery.data,
+        components: filterShapes,
       }),
-    [filters, lookupQuery.data, parameters],
+    [filters, filterShapes, lookupQuery.data, parameters],
   );
   const pagination = useMemo(
     () => dataTablePaginationFromForm(filterConfig.pagination, listQuery.data),

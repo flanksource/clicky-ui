@@ -245,15 +245,13 @@ describe("OperationEntityPage", () => {
         "First widget",
       ),
     );
-    await waitFor(() =>
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "/api/v1/widgets/one?format=clicky-json",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Accept: expect.stringContaining("application/json+clicky"),
-          }),
-        }),
-      ),
+    // The detail request already returned the clicky document, so the renderer
+    // shows it rather than asking the same endpoint for the same bytes again.
+    // The URL still travels with it — that is what the view switcher and the
+    // export menu below act on.
+    expect(fetchSpy).not.toHaveBeenCalledWith(
+      "/api/v1/widgets/one?format=clicky-json",
+      expect.anything(),
     );
     expect(screen.getByRole("radiogroup", { name: /clicky view mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^export$/i })).toBeInTheDocument();

@@ -82,6 +82,40 @@ export interface ClickyParameterMeta {
   role?: ClickyParameterRole;
 }
 
+/**
+ * A parameter's pointer to its filter control, set server-side.
+ *
+ * `$ref` names the control's SHAPE — which control this is — and is present on
+ * every generated filter, because a control's identity never varies with the
+ * values currently selected. `url`/`filter`/`searchParam` are the separate
+ * question of where its OPTIONS come from, and are present only when the
+ * backend can enumerate them: a range has no list to offer.
+ */
+export interface ClickyParameterLookup {
+  /** JSON pointer into `components["x-clicky-filters"]`. */
+  $ref?: string;
+  url?: string;
+  filter?: string;
+  searchParam?: string;
+  multi?: boolean;
+}
+
+/**
+ * One entry of `components["x-clicky-filters"]`: a filter control's shape,
+ * published once per spec and invariant for the life of it.
+ *
+ * Distinct from OperationLookupFilter, which is the per-request answer to "what
+ * values can this filter take right now" and may legitimately narrow as other
+ * filters are selected. Reading shape from here rather than from a lookup
+ * response is what keeps a control from decaying into a text box while its
+ * options are in flight.
+ */
+export interface ClickyFilterShape {
+  label?: string;
+  type?: OperationLookupFilterType;
+  multi?: boolean;
+}
+
 export interface OpenAPIParameter {
   name: string;
   in: "query" | "path" | "header";
@@ -92,6 +126,7 @@ export interface OpenAPIParameter {
    *  which is help text and must NOT be used as a placeholder. */
   placeholder?: string;
   "x-clicky"?: ClickyParameterMeta;
+  "x-clicky-lookup"?: ClickyParameterLookup;
   /** Vendor-extension placeholder, set server-side by clicky's converter.
    *  Takes precedence over `placeholder` when both are present. */
   "x-clicky-placeholder"?: string;
@@ -115,7 +150,10 @@ export interface OpenAPIOperation {
   requestBody?: {
     content?: Record<string, { schema?: OpenAPISchema }>;
   };
-  responses: Record<string, unknown>;
+  // Optional because nothing here reads it, and a server may serve this catalog
+  // with the response schemas reduced to a stub — they are over half the bytes
+  // of a spec whose only job here is to describe what can be called.
+  responses?: Record<string, unknown>;
   "x-clicky"?: ClickyOperationMeta;
 }
 
@@ -124,6 +162,9 @@ export interface OpenAPISpec {
   info: { title: string; description?: string; version: string };
   paths: Record<string, Record<string, OpenAPIOperation>>;
   tags?: Array<{ name: string; description?: string }>;
+  components?: {
+    "x-clicky-filters"?: Record<string, ClickyFilterShape>;
+  };
   "x-clicky"?: ClickySpecMeta;
 }
 

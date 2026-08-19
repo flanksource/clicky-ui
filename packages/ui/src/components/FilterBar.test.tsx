@@ -1343,3 +1343,81 @@ describe("FilterBar date lookup rendering", () => {
     expect(title).toMatch(/\(.+\)$/);
   });
 });
+
+// A filter's options arrive separately from the control that shows them, and a
+// control built from the spec exists before its first option does. Each of these
+// must still read back the current selection with nothing loaded, or the caller
+// is forced back into deferring the control until its options land — which is
+// what used to turn the whole bar into plain text inputs.
+describe("FilterBar controls with no options loaded", () => {
+  it("shows a workload's current selection before any workload loads", async () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "workload",
+            kind: "workload",
+            label: "Workload",
+            value: "payments/Deployment/api",
+            kinds: ["pod", "deployment", "statefulset", "daemonset"],
+            // How parametersToFormConfig builds this filter: a server-scoped
+            // workload that resolves to one answer states it rather than
+            // offering a list of one.
+            collapseSingleOption: true,
+            loadWorkloads: async () => ({}),
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    // The picker pins an unmatched current value as its own first option, so
+    // the chip reads back the selection instead of looking empty or invalid.
+    // Until the workloads load it can only show the key it was given; the
+    // display name replaces it once the option it belongs to arrives.
+    expect(await screen.findByLabelText("Workload")).toHaveValue(
+      "payments/Deployment/api",
+    );
+    expect(screen.queryByRole("textbox", { name: "Workload" })).toBeNull();
+  });
+
+  it("keeps a multi filter's selection summary with an empty option list", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: { healthy: "include", degraded: "exclude" },
+            options: [],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Status")).toHaveValue("+1 -1");
+  });
+
+  it("keeps a nested-multi filter's selection summary with empty groups", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "labels",
+            kind: "nested-multi",
+            label: "Labels",
+            value: { "app=api": "include" },
+            groups: [],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /labels filter/i }),
+    ).toHaveTextContent("+1");
+  });
+});

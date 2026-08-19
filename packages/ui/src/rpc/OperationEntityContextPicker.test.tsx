@@ -43,6 +43,7 @@ function spec(withDetail = true): OpenAPISpec {
           operationId: "widgets",
           parameters: [
             { name: "q", in: "query", "x-clicky": { role: "search" } },
+            { name: "status", in: "query", "x-clicky": { role: "filter" } },
             { name: "limit", in: "query", "x-clicky": { role: "limit" } },
             { name: "offset", in: "query", "x-clicky": { role: "offset" } },
           ],
@@ -98,7 +99,11 @@ const listResponse: ExecutionResponse = {
 function multiGroupSpec(): OpenAPISpec {
   const listOp = (surface: string) => ({
     operationId: surface,
-    "x-clicky": { surface, verb: "list" as const, scope: "collection" as const },
+    "x-clicky": {
+      surface,
+      verb: "list" as const,
+      scope: "collection" as const,
+    },
     responses: {},
   });
   return {
@@ -106,7 +111,12 @@ function multiGroupSpec(): OpenAPISpec {
     info: { title: "test", version: "1" },
     "x-clicky": {
       surfaces: [
-        { key: "accounts", entity: "account", title: "Accounts", parent: "xero" },
+        {
+          key: "accounts",
+          entity: "account",
+          title: "Accounts",
+          parent: "xero",
+        },
         { key: "offers", entity: "offer", title: "Offers", parent: "takealot" },
       ],
     },
@@ -341,13 +351,27 @@ describe("OperationEntityContextPicker", () => {
       async (_path: string, _method: string, params: Record<string, unknown>) =>
         pageResponse(Number(params?.offset ?? 0)),
     );
+    const lookupFilters = vi.fn(async () => ({
+      filters: {
+        status: {
+          label: "Status",
+          options: {
+            ready: text("Ready"),
+            pending: text("Pending"),
+          },
+        },
+      },
+    }));
     const api: OperationsApiClient = {
       getOpenAPISpec: async () => spec(false),
       executeCommand,
+      lookupFilters,
     };
     renderPicker(api);
 
     await openWidgets();
+    expect(await screen.findByLabelText("Status")).toHaveRole("combobox");
+    expect(lookupFilters).toHaveBeenCalledTimes(1);
     // Page 1: pick a row, then page forward.
     fireEvent.click(await screen.findByText("Quarterly close"));
     expect(
@@ -356,6 +380,8 @@ describe("OperationEntityContextPicker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     fireEvent.click(await screen.findByText("Q1 forecast"));
+    expect(screen.getByLabelText("Status")).toHaveRole("combobox");
+    expect(lookupFilters).toHaveBeenCalledTimes(1);
 
     // The page-1 selection survives — the running count is 2, not 1.
     expect(
@@ -383,7 +409,9 @@ describe("OperationEntityContextPicker", () => {
     // are hidden until a provider is opened.
     const xero = await screen.findByRole("menuitem", { name: /xero/i });
     expect(xero).toHaveAttribute("aria-haspopup", "menu");
-    expect(screen.getByRole("menuitem", { name: /takealot/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /takealot/i }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: "Accounts" }),
     ).not.toBeInTheDocument();
