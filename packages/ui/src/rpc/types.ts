@@ -66,6 +66,8 @@ export interface OpenAPISchema {
 //   "limit"     — feed into DataTable pagination's pageSize
 //   "offset"    — feed into DataTable pagination's page (or skip)
 //   "cursor"    — carry the opaque position the previous page returned
+//   "sort"      — select a public server-side sort key from a table header
+//   "order"     — carry that sort's asc/desc direction
 //   "time-from" — left edge of a time-range picker
 //   "time-to"   — right edge of a time-range picker
 // Set server-side by clicky's converter (see paramRole in clicky/rpc/openapi.go).
@@ -75,6 +77,8 @@ export type ClickyParameterRole =
   | "limit"
   | "offset"
   | "cursor"
+  | "sort"
+  | "order"
   | "time-from"
   | "time-to";
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SetStateAction } from "react";
 import {
   dataTablePaginationFromForm,
   OFFSET_DEPTH_LIMIT,
@@ -72,6 +73,39 @@ describe("packLookupParameterValues", () => {
 });
 
 describe("parametersToFormConfig", () => {
+  it("maps sort roles to controlled server sorting and rewinds both paging modes", () => {
+    let values: Record<string, string> = {
+      sortBy: "updated",
+      direction: "desc",
+      startAt: "50",
+      resumeFrom: "opaque-cursor",
+    };
+    const setValues = (update: SetStateAction<Record<string, string>>) => {
+      values = typeof update === "function" ? update(values) : update;
+    };
+    const parameters = [
+      { name: "sortBy", in: "query", "x-clicky": { role: "sort" } },
+      { name: "direction", in: "query", "x-clicky": { role: "order" } },
+      { name: "startAt", in: "query", "x-clicky": { role: "offset" } },
+      { name: "resumeFrom", in: "query", "x-clicky": { role: "cursor" } },
+    ];
+
+    const config = parametersToFormConfig(parameters, values, setValues);
+    expect(config.filters).toEqual([]);
+    expect(config.sort?.value).toEqual({ key: "updated", dir: "desc" });
+
+    config.sort?.onChange({ key: "name", dir: "asc" });
+    expect(values).toEqual({
+      sortBy: "name",
+      direction: "asc",
+      startAt: "0",
+      resumeFrom: "",
+    });
+
+    config.sort?.onChange(null);
+    expect(values).toEqual({ startAt: "0", resumeFrom: "" });
+  });
+
   it("maps a workload lookup to the shared Kubernetes workload picker", async () => {
     const values = { workload: "payments/Deployment/api" };
     const config = parametersToFormConfig(
@@ -534,8 +568,12 @@ describe("parametersToFormConfig — shape without live lookup data", () => {
 
     const filter = config.filters[0];
     expect(filter.kind).toBe("nested-multi");
-    if (filter.kind !== "nested-multi") throw new Error("expected nested-multi");
-    expect(filter.value).toEqual({ "app=api": "include", "tier=worker": "exclude" });
+    if (filter.kind !== "nested-multi")
+      throw new Error("expected nested-multi");
+    expect(filter.value).toEqual({
+      "app=api": "include",
+      "tier=worker": "exclude",
+    });
   });
 
   it("keeps the range control and its server default while options are in flight", () => {
@@ -611,7 +649,10 @@ describe("parametersToFormConfig — shape without live lookup data", () => {
       { components: { wl: { type: "workload" } } },
     );
 
-    expect(config.filters.map((filter) => filter.kind)).toEqual(["text", "text"]);
+    expect(config.filters.map((filter) => filter.kind)).toEqual([
+      "text",
+      "text",
+    ]);
   });
 });
 

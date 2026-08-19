@@ -11,7 +11,12 @@ const SAMPLE_SPEC: OpenAPISpec = {
   info: { title: "Widget Service", version: "1.0.0" },
   "x-clicky": {
     surfaces: [
-      { key: "widgets", entity: "widget", title: "Widgets", description: "Demo widget surface." },
+      {
+        key: "widgets",
+        entity: "widget",
+        title: "Widgets",
+        description: "Demo widget surface.",
+      },
     ],
   },
   paths: {
@@ -21,12 +26,45 @@ const SAMPLE_SPEC: OpenAPISpec = {
         summary: "List widgets",
         tags: ["widget"],
         parameters: [
-          { name: "q", in: "query", schema: { type: "string" }, description: "Search query" },
+          {
+            name: "q",
+            in: "query",
+            schema: { type: "string" },
+            description: "Search query",
+          },
           {
             name: "kind",
             in: "query",
             schema: { type: "string", enum: ["big", "small"] },
             description: "Widget kind",
+          },
+          {
+            name: "sort",
+            in: "query",
+            schema: {
+              type: "string",
+              enum: ["name", "updated"],
+              default: "updated",
+            },
+            "x-clicky": { role: "sort" },
+          },
+          {
+            name: "order",
+            in: "query",
+            schema: { type: "string", enum: ["asc", "desc"], default: "desc" },
+            "x-clicky": { role: "order" },
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 2 },
+            "x-clicky": { role: "limit" },
+          },
+          {
+            name: "offset",
+            in: "query",
+            schema: { type: "integer", default: 0 },
+            "x-clicky": { role: "offset" },
           },
         ],
         responses: { "200": { description: "OK" } },
@@ -45,62 +83,108 @@ const SAMPLE_SPEC: OpenAPISpec = {
         operationId: "widget_get",
         summary: "Get widget",
         tags: ["widget"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
         responses: { "200": { description: "OK" } },
-        "x-clicky": { surface: "widgets", verb: "get", scope: "entity", idParam: "id" },
+        "x-clicky": {
+          surface: "widgets",
+          verb: "get",
+          scope: "entity",
+          idParam: "id",
+        },
       },
       delete: {
         operationId: "widget_delete",
         summary: "Delete widget",
         tags: ["widget"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
         responses: { "204": { description: "Deleted" } },
-        "x-clicky": { surface: "widgets", verb: "delete", scope: "entity", idParam: "id" },
+        "x-clicky": {
+          surface: "widgets",
+          verb: "delete",
+          scope: "entity",
+          idParam: "id",
+        },
       },
     },
   },
 };
 
-const SAMPLE_LIST_RESPONSE: ExecutionResponse = {
-  success: true,
-  exit_code: 0,
-  contentType: "application/json",
-  stdout: JSON.stringify({
+const SAMPLE_ROWS = [
+  { id: "wgt_42", name: "Hex bolt", kind: "small", updated: "2026-08-17" },
+  { id: "wgt_77", name: "Flange gasket", kind: "big", updated: "2026-08-19" },
+  { id: "wgt_13", name: "Anchor plate", kind: "big", updated: "2026-08-18" },
+  { id: "wgt_91", name: "Lock washer", kind: "small", updated: "2026-08-16" },
+];
+
+function sampleListResponse(params: Record<string, string>): ExecutionResponse {
+  const sort = params.sort || "updated";
+  const order = params.order || "desc";
+  const limit = Number(params.limit || 2);
+  const offset = Number(params.offset || 0);
+  const rows = [...SAMPLE_ROWS]
+    .sort((left, right) => {
+      const comparison = left[sort as "name" | "updated"].localeCompare(
+        right[sort as "name" | "updated"],
+      );
+      return order === "desc" ? -comparison : comparison;
+    })
+    .slice(offset, offset + limit);
+  const document = {
     version: 1,
     node: {
       kind: "table",
       columns: [
         { name: "id", label: "ID" },
-        { name: "name", label: "Name" },
+        { name: "name", label: "Name", sortKey: "name" },
         { name: "kind", label: "Kind" },
+        { name: "updated", label: "Updated", sortKey: "updated" },
       ],
-      rows: [
-        {
-          cells: {
-            id: { kind: "text", text: "wgt_42", plain: "wgt_42" },
-            name: { kind: "text", text: "Hex bolt", plain: "Hex bolt" },
-            kind: { kind: "text", text: "small", plain: "small" },
-          },
-        },
-        {
-          cells: {
-            id: { kind: "text", text: "wgt_77", plain: "wgt_77" },
-            name: { kind: "text", text: "Flange gasket", plain: "Flange gasket" },
-            kind: { kind: "text", text: "big", plain: "big" },
-          },
-        },
-      ],
+      rows: rows.map((row) => ({
+        cells: Object.fromEntries(
+          Object.entries(row).map(([key, value]) => [
+            key,
+            { kind: "text", text: value, plain: value },
+          ]),
+        ),
+      })),
     },
-  }),
-};
+  } as const;
+  return {
+    success: true,
+    exit_code: 0,
+    contentType: "application/json+clicky",
+    parsed: document,
+    stdout: JSON.stringify(document),
+    pagination: {
+      total: SAMPLE_ROWS.length,
+      limit,
+      offset,
+      hasMore: offset + rows.length < SAMPLE_ROWS.length,
+    },
+  };
+}
 
 const FAKE_CLIENT: OperationsApiClient = {
   async getOpenAPISpec(): Promise<OpenAPISpec> {
     return SAMPLE_SPEC;
   },
-  async executeCommand(path, method): Promise<ExecutionResponse> {
+  async executeCommand(path, method, params): Promise<ExecutionResponse> {
     if (method === "get" && path === "/api/v1/widgets") {
-      return SAMPLE_LIST_RESPONSE;
+      return sampleListResponse(params);
     }
     return {
       success: true,
@@ -111,7 +195,13 @@ const FAKE_CLIENT: OperationsApiClient = {
   },
 };
 
-const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => (
+const renderDemoLink: RenderLink = ({
+  to,
+  className,
+  children,
+  title,
+  key,
+}) => (
   <a
     key={key}
     href={to}
@@ -125,7 +215,10 @@ const renderDemoLink: RenderLink = ({ to, className, children, title, key }) => 
 
 function CatalogShowcase(args: ComponentProps<typeof OperationCatalog>) {
   const queryClient = useMemo(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      }),
     [],
   );
   return (

@@ -94,6 +94,7 @@ import {
   type ClickyExportFormatOption,
   type ClickyExportScopeOption,
 } from "./clicky-export/ClickyExportDialog";
+import type { SortState } from "../hooks/use-sort";
 
 export type ClickyStyle = {
   className?: string;
@@ -126,6 +127,8 @@ export type ClickyColumn = {
   header?: ClickyNode;
   align?: "left" | "right" | "center";
   sortable?: boolean;
+  /** Public server-side sort key for this column. */
+  sortKey?: string;
   filterable?: boolean;
   filterKey?: string;
   grow?: boolean;
@@ -355,6 +358,9 @@ export type ClickyProps = {
   timeRange?: FilterBarRangeProps;
   /** Pagination footer configuration for the first embedded table. */
   pagination?: DataTablePagination;
+  /** Controlled public server sort state for the first embedded table. */
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
   /**
    * Server-driven infinite scroll for the first embedded table. `data` is
    * expected to already hold every page fetched so far, so this carries only
@@ -395,6 +401,8 @@ export type ClickyTableProps = {
   onCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   /** Pagination footer configuration. */
   pagination?: DataTablePagination | undefined;
+  sort?: SortState | null | undefined;
+  onSortChange?: ((sort: SortState | null) => void) | undefined;
   /** Server-driven infinite scroll over rows the caller has accumulated. */
   infinite?: DataTableInfinite | undefined;
   /** Controlled multi-row selection. */
@@ -438,6 +446,8 @@ type ClickyRuntimeContextValue = {
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableSort?: SortState | null | undefined;
+  onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -532,6 +542,10 @@ export function Clicky(props: ClickyProps) {
           ? { onTableCellFilterChange: props.onCellFilterChange }
           : {})}
         {...(props.pagination ? { tablePagination: props.pagination } : {})}
+        {...(props.sort !== undefined ? { tableSort: props.sort } : {})}
+        {...(props.onSortChange
+          ? { onTableSortChange: props.onSortChange }
+          : {})}
         {...(props.infinite ? { tableInfinite: props.infinite } : {})}
         {...(props.rowSelection
           ? { tableRowSelection: props.rowSelection }
@@ -575,6 +589,8 @@ function ClickyRuntimeProvider({
   tableCellFilters,
   onTableCellFilterChange,
   tablePagination,
+  tableSort,
+  onTableSortChange,
   tableInfinite,
   tableRowSelection,
   tableMenuActions,
@@ -591,6 +607,8 @@ function ClickyRuntimeProvider({
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableSort?: SortState | null | undefined;
+  onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -608,6 +626,8 @@ function ClickyRuntimeProvider({
       tableCellFilters ||
       onTableCellFilterChange ||
       tablePagination ||
+      tableSort !== undefined ||
+      onTableSortChange ||
       tableInfinite ||
       tableRowSelection ||
       tableMenuActions ||
@@ -627,6 +647,8 @@ function ClickyRuntimeProvider({
                 tableCellFilters,
                 onTableCellFilterChange,
                 tablePagination,
+                tableSort,
+                onTableSortChange,
                 tableInfinite,
                 tableRowSelection,
                 tableMenuActions,
@@ -652,6 +674,8 @@ function ClickyRuntimeProvider({
       {...(tableCellFilters ? { tableCellFilters } : {})}
       {...(onTableCellFilterChange ? { onTableCellFilterChange } : {})}
       {...(tablePagination ? { tablePagination } : {})}
+      {...(tableSort !== undefined ? { tableSort } : {})}
+      {...(onTableSortChange ? { onTableSortChange } : {})}
       {...(tableInfinite ? { tableInfinite } : {})}
       {...(tableRowSelection ? { tableRowSelection } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
@@ -673,6 +697,8 @@ function ClickyCommandRuntimeProvider({
   tableCellFilters,
   onTableCellFilterChange,
   tablePagination,
+  tableSort,
+  onTableSortChange,
   tableInfinite,
   tableRowSelection,
   tableMenuActions,
@@ -689,6 +715,8 @@ function ClickyCommandRuntimeProvider({
   tableCellFilters?: Record<string, Record<string, CellFilterMode>> | undefined;
   onTableCellFilterChange?: ((change: CellFilterChange) => void) | undefined;
   tablePagination?: DataTablePagination | undefined;
+  tableSort?: SortState | null | undefined;
+  onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
@@ -708,6 +736,8 @@ function ClickyCommandRuntimeProvider({
       tableCellFilters,
       onTableCellFilterChange,
       tablePagination,
+      tableSort,
+      onTableSortChange,
       tableInfinite,
       tableRowSelection,
       tableMenuActions,
@@ -728,6 +758,8 @@ function ClickyCommandRuntimeProvider({
       tableCellFilters,
       onTableCellFilterChange,
       tablePagination,
+      tableSort,
+      onTableSortChange,
       tableInfinite,
       tableRowSelection,
       tableMenuActions,
@@ -3052,6 +3084,8 @@ export function ClickyTable({
   cellFilters,
   onCellFilterChange,
   pagination,
+  sort,
+  onSortChange,
   infinite,
   rowSelection,
   menuActions,
@@ -3069,6 +3103,8 @@ export function ClickyTable({
   const effectiveCellFilterChange =
     onCellFilterChange ?? runtime.onTableCellFilterChange;
   const effectivePagination = pagination ?? runtime.tablePagination;
+  const effectiveSort = sort !== undefined ? sort : runtime.tableSort;
+  const effectiveSortChange = onSortChange ?? runtime.onTableSortChange;
   const effectiveInfinite = infinite ?? runtime.tableInfinite;
   const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
@@ -3095,7 +3131,11 @@ export function ClickyTable({
         column.label || prettifyName(column.name)
       ),
       ...(column.align ? { align: column.align } : {}),
-      ...(column.sortable !== undefined ? { sortable: column.sortable } : {}),
+      ...(effectiveSortChange
+        ? { sortable: Boolean(column.sortKey) }
+        : column.sortable !== undefined
+          ? { sortable: column.sortable }
+          : {}),
       ...(column.filterable !== undefined
         ? { filterable: column.filterable }
         : {}),
@@ -3152,7 +3192,44 @@ export function ClickyTable({
   });
 
   const defaultSortColumn =
-    columns.find((column) => column.sortable !== false) ?? columns[0];
+    effectivePagination || effectiveSortChange
+      ? undefined
+      : (columns.find((column) => column.sortable !== false) ?? columns[0]);
+  const controlledTableSort = effectiveSort
+    ? (() => {
+        const column = columns.find(
+          (candidate) => candidate.sortKey === effectiveSort.key,
+        );
+        if (!column) {
+          throw new Error(
+            `Server sort key ${effectiveSort.key} does not match a Clicky column`,
+          );
+        }
+        return { key: `cells.${column.name}`, dir: effectiveSort.dir };
+      })()
+    : effectiveSort === null
+      ? null
+      : undefined;
+  const onControlledTableSortChange = effectiveSortChange
+    ? (next: SortState | null) => {
+        if (!next) {
+          effectiveSortChange(null);
+          return;
+        }
+        const columnName = next.key.startsWith("cells.")
+          ? next.key.slice("cells.".length)
+          : next.key;
+        const column = columns.find(
+          (candidate) => candidate.name === columnName,
+        );
+        if (!column?.sortKey) {
+          throw new Error(
+            `Clicky column ${columnName} does not declare a server sort key`,
+          );
+        }
+        effectiveSortChange({ key: column.sortKey, dir: next.dir });
+      }
+    : undefined;
 
   // Fill a bounded flex-column parent (e.g. a scrollBody=false modal) so the
   // table's own scroll region scrolls rather than the whole dialog; `flex-1` is
@@ -3170,6 +3247,12 @@ export function ClickyTable({
               dir: "asc" as const,
             },
           }
+        : {})}
+      {...(controlledTableSort !== undefined
+        ? { sort: controlledTableSort }
+        : {})}
+      {...(onControlledTableSortChange
+        ? { onSortChange: onControlledTableSortChange, manualSort: true }
         : {})}
       getRowId={(row, index) =>
         effectiveRowSelection?.getRowId(row, index) ??

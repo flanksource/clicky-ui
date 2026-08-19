@@ -29,6 +29,7 @@ import { parseClickyData } from "../data/clicky-parse";
 import { JsonView } from "../data/JsonView";
 import { cn } from "../lib/utils";
 import type { ExecutionResponse } from "./types";
+import type { SortState } from "../hooks/use-sort";
 
 export type CommandOutputProps = {
   response?: ExecutionResponse | null;
@@ -48,6 +49,8 @@ export type CommandOutputProps = {
   cellFilters?: Record<string, Record<string, CellFilterMode>>;
   onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
   // Server-driven infinite scroll for the embedded table. The caller owns the
   // accumulation — `response` already holds every page it has stacked — so this
   // only carries the question of whether to ask for another.
@@ -88,6 +91,8 @@ export function CommandOutput({
   cellFilters,
   onCellFilterChange,
   pagination,
+  sort,
+  onSortChange,
   infinite,
   rowSelection,
   download,
@@ -114,7 +119,8 @@ export function CommandOutput({
       return true;
     }
     const payload =
-      typeof parsed === "string" || (parsed != null && typeof parsed === "object")
+      typeof parsed === "string" ||
+      (parsed != null && typeof parsed === "object")
         ? (parsed as ClickyNode | ClickyDocument)
         : text;
     return payload !== "" && parseClickyData(payload).ok;
@@ -140,6 +146,8 @@ export function CommandOutput({
         {...(cellFilters ? { cellFilters } : {})}
         {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(sort !== undefined ? { sort } : {})}
+        {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
@@ -237,6 +245,8 @@ function OutputBody({
   cellFilters,
   onCellFilterChange,
   pagination,
+  sort,
+  onSortChange,
   infinite,
   rowSelection,
   download,
@@ -258,6 +268,8 @@ function OutputBody({
   cellFilters?: Record<string, Record<string, CellFilterMode>>;
   onCellFilterChange?: (change: CellFilterChange) => void;
   pagination?: DataTablePagination;
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
@@ -303,6 +315,8 @@ function OutputBody({
         {...(cellFilters ? { cellFilters } : {})}
         {...(onCellFilterChange ? { onCellFilterChange } : {})}
         {...(pagination ? { pagination } : {})}
+        {...(sort !== undefined ? { sort } : {})}
+        {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
@@ -312,9 +326,7 @@ function OutputBody({
     );
 
     const detailOutput = (
-      <div className="detail-output flex min-h-0 flex-1 flex-col">
-        {clicky}
-      </div>
+      <div className="detail-output flex min-h-0 flex-1 flex-col">{clicky}</div>
     );
     if (bare) return detailOutput;
 

@@ -9,6 +9,7 @@ import type {
   WorkloadResource,
 } from "../components/workload-picker-utils";
 import type { DataTablePagination } from "../data/DataTable";
+import type { SortState } from "../hooks/use-sort";
 import {
   parseBoundsValue,
   parseMultiFilterValue,
@@ -59,6 +60,12 @@ export type ParameterFormConfig = {
   search?: FilterBarSearchProps;
   timeRange?: FilterBarRangeProps;
   pagination?: ParameterPagination;
+  sort?: ParameterSort;
+};
+
+export type ParameterSort = {
+  value: SortState | null;
+  onChange: (sort: SortState | null) => void;
 };
 // LookupSearch fetches the options of one filter matching `query`, server-side.
 // It is what a truncated option set is reachable through: the head the lookup
@@ -299,7 +306,9 @@ export function packLookupParameterValues(
       (parameter) =>
         parameter["x-clicky"]?.role !== "limit" &&
         parameter["x-clicky"]?.role !== "offset" &&
-        parameter["x-clicky"]?.role !== "cursor",
+        parameter["x-clicky"]?.role !== "cursor" &&
+        parameter["x-clicky"]?.role !== "sort" &&
+        parameter["x-clicky"]?.role !== "order",
     ),
   );
 }
@@ -333,10 +342,17 @@ export function parametersToFormConfig(
   // A cursor is an opaque server-minted token, so it is never a filter chip a
   // user could type into — it is only ever echoed back from a previous page.
   const cursorParam = parameters.find((p) => p["x-clicky"]?.role === "cursor");
+  const sortParam = parameters.find((p) => p["x-clicky"]?.role === "sort");
+  const orderParam = parameters.find((p) => p["x-clicky"]?.role === "order");
+  if ((sortParam == null) !== (orderParam == null)) {
+    throw new Error("Server sorting requires both sort and order parameters");
+  }
   const paginationOmitNames = new Set<string>();
   if (limitParam) paginationOmitNames.add(limitParam.name);
   if (offsetParam) paginationOmitNames.add(offsetParam.name);
   if (cursorParam) paginationOmitNames.add(cursorParam.name);
+  if (sortParam) paginationOmitNames.add(sortParam.name);
+  if (orderParam) paginationOmitNames.add(orderParam.name);
 
   // The search-role param drives the FilterBar's dedicated search input rather
   // than a filter chip; pull it out of the chip loop the same way pagination is.
@@ -649,6 +665,28 @@ export function parametersToFormConfig(
   }
 
   const config: ParameterFormConfig = { filters: emitFilters };
+  if (sortParam && orderParam) {
+    const key = values[sortParam.name] ?? "";
+    const direction = values[orderParam.name] || "asc";
+    if (direction !== "asc" && direction !== "desc") {
+      throw new Error(`Unsupported server sort direction ${direction}`);
+    }
+    config.sort = {
+      value: key ? { key, dir: direction } : null,
+      onChange: (next) =>
+        setValues((current) => {
+          const updated = { ...current };
+          if (next) {
+            updated[sortParam.name] = next.key;
+            updated[orderParam.name] = next.dir;
+          } else {
+            delete updated[sortParam.name];
+            delete updated[orderParam.name];
+          }
+          return rewind(updated);
+        }),
+    };
+  }
   if (searchParam) {
     const searchDisabled = Object.prototype.hasOwnProperty.call(
       lockedValues,

@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Clicky, type ClickyDocument } from "./Clicky";
+import { Clicky, ClickyTable, type ClickyDocument } from "./Clicky";
 import { clickyFixture } from "./Clicky.fixtures";
 
 // Mock the Shiki wrapper so the dynamic `import("shiki")` never executes
@@ -252,6 +252,60 @@ describe("Clicky", () => {
     const rows = screen.getAllByRole("row");
     expect(rows[1]).toHaveTextContent("worker");
     expect(rows[2]).toHaveTextContent("api");
+  });
+
+  it("maps server sort keys to controlled headers without sorting one fetched page", () => {
+    const onSortChange = vi.fn();
+    render(
+      <ClickyTable
+        columns={[
+          { name: "name", label: "Name", sortKey: "name" },
+          { name: "id", label: "ID" },
+        ]}
+        rows={[
+          {
+            cells: {
+              name: { kind: "text", text: "Zulu" },
+              id: { kind: "text", text: "2" },
+            },
+          },
+          {
+            cells: {
+              name: { kind: "text", text: "Alpha" },
+              id: { kind: "text", text: "1" },
+            },
+          },
+        ]}
+        sort={{ key: "name", dir: "asc" }}
+        onSortChange={onSortChange}
+        pagination={{ page: 0, pageSize: 25 }}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Zulu");
+    expect(rows[2]).toHaveTextContent("Alpha");
+    expect(screen.queryByRole("button", { name: /^id/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /name/i }));
+    expect(onSortChange).toHaveBeenCalledWith({ key: "name", dir: "desc" });
+  });
+
+  it("preserves backend row order for a paged table without server sort metadata", () => {
+    render(
+      <ClickyTable
+        columns={[{ name: "name", label: "Name" }]}
+        rows={[
+          { cells: { name: { kind: "text", text: "Zulu" } } },
+          { cells: { name: { kind: "text", text: "Alpha" } } },
+        ]}
+        pagination={{ page: 0, pageSize: 25 }}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Zulu");
+    expect(rows[2]).toHaveTextContent("Alpha");
   });
 
   it("passes raw table rows to the row click handler", () => {
@@ -793,9 +847,7 @@ describe("Clicky", () => {
     // Picking a View format switches the inline preview; leaving the table
     // brings the view bar back so the user can switch away from JSON again.
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
-    fireEvent.click(
-      screen.getByRole("menuitem", { name: /^View: Clicky/i }),
-    );
+    fireEvent.click(screen.getByRole("menuitem", { name: /^View: Clicky/i }));
     fireEvent.click(
       within(screen.getByRole("menu", { name: /^View: Clicky/i })).getByRole(
         "menuitem",
@@ -1623,7 +1675,12 @@ describe("Clicky", () => {
         "application/json",
       );
 
-      render(<Clicky url="/api/v1/profile/profile-gavel-sessions" data={tableDocument} />);
+      render(
+        <Clicky
+          url="/api/v1/profile/profile-gavel-sessions"
+          data={tableDocument}
+        />,
+      );
 
       // The server's message replaces the synthesized "Request failed with 422".
       expect(
@@ -1644,7 +1701,9 @@ describe("Clicky", () => {
         "422",
         "/api/v1/profile/profile-gavel-sessions",
       ]) {
-        expect(screen.getAllByText(value, { exact: false })).not.toHaveLength(0);
+        expect(screen.getAllByText(value, { exact: false })).not.toHaveLength(
+          0,
+        );
       }
 
       // A failed *refresh* must not blank the rows the list request already
