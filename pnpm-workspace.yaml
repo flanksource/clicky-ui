@@ -62,7 +62,7 @@ catalog:
   clsx: ^2.1.1
   cmdk: ^1.0.4
   country-flag-icons: ^1.6.20
-  dompurify: ^3.4.11
+  dompurify: ^3.4.13
   jotai: ^2.20.1
   jsdom: ^26.0.0
   marked: ^15.0.0
