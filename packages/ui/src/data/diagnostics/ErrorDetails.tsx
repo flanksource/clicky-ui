@@ -279,30 +279,55 @@ function StackFrameRow({ frame, index }: { frame: ErrorStackFrame; index: number
   );
 }
 
+/** Wrapping keeps the whole value on screen, so the label block has to stretch to match it. */
+const COPY_BADGE_LAYOUT = {
+  clipped: { frame: "items-center overflow-hidden", label: "", value: "truncate", icon: "" },
+  wrapped: {
+    frame: "items-stretch",
+    label: "flex items-center",
+    value: "whitespace-normal break-all",
+    icon: "self-center",
+  },
+} as const;
+
 export function CopyBadge({
   label,
   value,
   className = "",
+  wrap = false,
 }: {
   label: string;
   value: string;
   className?: string;
+  /** Lets a long value run onto further lines instead of being clipped to one. */
+  wrap?: boolean;
 }) {
+  const layout = COPY_BADGE_LAYOUT[wrap ? "wrapped" : "clipped"];
   return (
     <button
       type="button"
       onClick={() => copyText(value)}
       title={`Copy ${label}`}
       className={[
-        "inline-flex max-w-full items-center overflow-hidden rounded-md border border-border bg-background/80 text-left text-xs hover:border-primary/40 hover:bg-background",
+        "inline-flex max-w-full rounded-md border border-border bg-background/80 text-left text-xs hover:border-primary/40 hover:bg-background",
+        layout.frame,
         className,
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <span className="shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate px-2 py-1 font-mono text-foreground">{value}</span>
-      <Icon icon={UiCopy} className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
+      <span
+        className={["shrink-0 bg-muted px-2 py-1 font-medium text-muted-foreground", layout.label]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {label}
+      </span>
+      <span className={["min-w-0 px-2 py-1 font-mono text-foreground", layout.value].join(" ")}>{value}</span>
+      <Icon
+        icon={UiCopy}
+        className={["mr-1.5 h-3 w-3 shrink-0 text-muted-foreground", layout.icon].filter(Boolean).join(" ")}
+      />
     </button>
   );
 }

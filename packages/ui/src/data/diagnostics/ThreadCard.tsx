@@ -1,4 +1,5 @@
 import { JvmStackTrace, type JvmFrameSourceResolver } from "./JvmStackTrace";
+import type { StackFrameActions } from "./StackFrameRow";
 import type { ParsedThread } from "./jvm-stacktrace";
 import { threadStateBadge, threadStateDot } from "./state-styles";
 
@@ -7,9 +8,16 @@ export type ThreadCardProps = {
   search: string;
   hideRuntimeOnly: boolean;
   resolveSource?: JvmFrameSourceResolver;
+  frameActions?: StackFrameActions;
 };
 
-export function ThreadCard({ thread, search, hideRuntimeOnly, resolveSource }: ThreadCardProps) {
+export function ThreadCard({
+  thread,
+  search,
+  hideRuntimeOnly,
+  resolveSource,
+  frameActions,
+}: ThreadCardProps) {
   const frames = hideRuntimeOnly
     ? thread.frames.filter((f) => f.kind !== "frame" || !f.runtime)
     : thread.frames;
@@ -47,6 +55,7 @@ export function ThreadCard({ thread, search, hideRuntimeOnly, resolveSource }: T
         frames={frames}
         className="space-y-0.5 py-1 pl-3"
         {...(resolveSource ? { resolveSource } : {})}
+        {...(frameActions ? { frameActions } : {})}
       />
     </details>
   );

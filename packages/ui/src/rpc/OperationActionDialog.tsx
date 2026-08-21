@@ -3,7 +3,7 @@ import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
 import { UiPlay } from "../icons";
 import { Modal } from "../overlay/Modal";
-import { CommandForm } from "./CommandForm";
+import { CommandForm, type CommandFormSubmission } from "./CommandForm";
 import { CommandOutput } from "./CommandOutput";
 import { pathParamNames } from "./command-form-utils";
 import { InlineError } from "./InlineError";
@@ -33,9 +33,9 @@ export function OperationActionDialog({
   const [response, setResponse] = useState<ExecutionResponse | null>(null);
   const [error, setError] = useState<unknown>(null);
 
-  async function handleExecute(params: Record<string, string>, headers: Record<string, string>) {
+  async function handleExecute({ values, request, headers }: CommandFormSubmission) {
     if (onNavigateAction) {
-      const href = hrefForOperationAction(operation.path, params);
+      const href = hrefForOperationAction(operation.path, values);
       if (!href) return;
       const separator = href.includes("?") ? "&" : "?";
       onNavigateAction(`${href}${separator}autoRun=1`);
@@ -46,7 +46,7 @@ export function OperationActionDialog({
     setError(null);
     setResponse(null);
     try {
-      const result = await client.executeCommand(operation.path, operation.method, params, headers);
+      const result = await client.executeCommand(operation.path, operation.method, request, headers);
       setResponse(result);
     } catch (err) {
       setError(err);

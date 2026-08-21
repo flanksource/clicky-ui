@@ -1,15 +1,13 @@
-import { Icon } from "../Icon";
-import { UiChip, UiDebugStepOver, UiLock, UiSync, UiMethod, UiWatch } from "../../icons";
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
-import { FrameSourceWindow } from "./FrameSourceWindow";
-import { frameHasSource } from "./FrameSourceWindow.utils";
+import type { FrameSource } from "./FrameSourceWindow.utils";
+import { StackFrameRow, type StackFrameActions } from "./StackFrameRow";
 
 // JvmFrameSourceResolver returns a source window for a frame, or undefined when
 // no source is available (a missing class must never blank out the frame). Used
-// to augment the rendered thread dump with decompiled source in place.
-export type JvmFrameSourceResolver = (frame: ParsedThreadFrame) =>
-  | { sourceLines: string[]; sourceLineNumbers?: number[]; sourceStartLine?: number }
-  | undefined;
+// to augment the rendered thread dump with decompiled source in place. Shares
+// its return shape with StackTraceSourceResolver so one resolver can serve both
+// the thread-dump and the exception surfaces.
+export type JvmFrameSourceResolver = (frame: ParsedThreadFrame) => FrameSource | undefined;
 
 export type JvmStackTraceProps = {
   frames: ParsedThreadFrame[];
@@ -17,13 +15,21 @@ export type JvmStackTraceProps = {
   className?: string;
   /** Optional resolver that supplies inline source under each frame. */
   resolveSource?: JvmFrameSourceResolver;
+  /** Trailing per-frame actions, revealed on hover/focus. */
+  frameActions?: StackFrameActions;
 };
 
+// JvmStackTrace renders a parsed thread dump: frames plus the lock/monitor
+// annotation entries interleaved with them. It is a bare frame list — the
+// thread's own header, state badge and controls belong to the surrounding card
+// (see ThreadCard / DiagnosticsDetailPanel). Frames render through the shared
+// StackFrameRow, so they match an exception stack trace exactly.
 export function JvmStackTrace({
   frames,
   hideRuntimeOnly = false,
   className,
   resolveSource,
+  frameActions,
 }: JvmStackTraceProps) {
   const visibleFrames = hideRuntimeOnly
     ? frames.filter((frame) => frame.kind !== "frame" || !frame.runtime)
@@ -35,54 +41,19 @@ export function JvmStackTrace({
     <div className={className}>
       {visibleFrames.map((frame, index) => {
         const resolved = resolveSource?.(frame);
-        const withSource = resolved ? { ...frame, ...resolved } : frame;
+        // `line` stays the frame's own — see the note in RenderedStackTrace.
+        const withSource = resolved
+          ? { ...frame, ...(({ line: _ignored, ...rest }) => rest)(resolved) }
+          : frame;
         return (
-          <JvmStackFrameRow key={`${frame.functionName}-${index}`} frame={withSource} />
+          <StackFrameRow
+            key={`${frame.functionName}-${index}`}
+            frame={withSource}
+            index={index}
+            {...(frameActions ? { frameActions } : {})}
+          />
         );
       })}
-    </div>
-  );
-}
-
-export function JvmStackFrameRow({ frame }: { frame: ParsedThreadFrame }) {
-  const isAnno = frame.kind !== "frame";
-  const icon = isAnno
-    ? frame.kind === "locked"
-      ? UiLock
-      : frame.kind === "waiting_to_lock"
-        ? UiSync
-        : UiWatch
-    : frame.nativeMethod
-      ? UiChip
-      : frame.runtime
-        ? UiDebugStepOver
-        : UiMethod;
-
-  return (
-    <div className={frame.runtime ? "text-muted-foreground" : "text-foreground"}>
-      <div className="flex items-start gap-1.5">
-        <Icon icon={icon} className="mt-0.5 shrink-0 text-[11px]" />
-        <div className="min-w-0">
-          <div className="break-all font-mono text-[11px] font-semibold leading-4">
-            {isAnno ? (
-              <>
-                <span className="opacity-70">{frame.functionName}</span>
-                {frame.annotationText && (
-                  <span className="ml-2 font-normal opacity-80">{frame.annotationText}</span>
-                )}
-              </>
-            ) : (
-              <>
-                {frame.displayName}
-                {frame.location && (
-                  <span className="ml-2 text-[10px] font-normal opacity-80">{frame.location}</span>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      {!isAnno && frameHasSource(frame) && <FrameSourceWindow frame={frame} />}
     </div>
   );
 }

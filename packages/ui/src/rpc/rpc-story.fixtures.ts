@@ -43,8 +43,10 @@ for (const fixture of FIXTURES) {
 
 /** Parses a query parameter the executor sent as a string. Returns undefined for
  *  absent/blank/non-numeric values so `listPage` applies its own default. */
-function intParam(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw.trim() === "") return undefined;
+function intParam(raw: string | string[] | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  if (Array.isArray(raw)) throw new Error("pagination parameter must be a scalar value");
+  if (raw.trim() === "") return undefined;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined;
 }
@@ -68,7 +70,9 @@ export const FAKE_CLIENT: OperationsApiClient = {
       }
       const detailFixture = detailFixtureByPath[path];
       if (detailFixture) {
-        const id = params?.id ?? "";
+        const rawID = params?.id ?? "";
+        if (Array.isArray(rawID)) throw new Error("entity id must be a scalar value");
+        const id = rawID;
         const detail = detailFixture.detailById[id] ?? Object.values(detailFixture.detailById)[0];
         if (!detail) throw new Error(`No detail fixture for ${path} (id=${id})`);
         return detail;

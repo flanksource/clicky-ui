@@ -2,16 +2,19 @@ import { useReducer, type FormEvent, type KeyboardEvent, type ReactNode } from "
 import { Button } from "../components/button";
 import { Icon } from "../data/Icon";
 import { UiClose } from "../icons";
-import {
-  isPositionalParam,
-  parameterPlaceholder,
-  type OpenAPIParameter,
-} from "./types";
+import { parameterPlaceholder, type OpenAPIParameter, type OperationRequestValues } from "./types";
 import { normalizeParameters, pathParamNames, submitValue } from "./command-form-utils";
+import { packParameterValues, type ParameterValues } from "./formMetadata";
+
+export type CommandFormSubmission = {
+  values: ParameterValues;
+  request: OperationRequestValues;
+  headers: Record<string, string>;
+};
 
 export type CommandFormProps = {
   parameters: OpenAPIParameter[];
-  onExecute: (params: Record<string, string>, headers: Record<string, string>) => void;
+  onExecute: (submission: CommandFormSubmission) => void;
   isPending: boolean;
   method: string;
   path: string;
@@ -44,24 +47,21 @@ export function CommandForm({
 
   const formParameters = normalizeParameters(parameters, path);
   const visibleParams = formParameters.filter((p) => !(p.in === "path" && initialValues?.[p.name]));
-  const positionalNames = new Set(formParameters.filter(isPositionalParam).map((p) => p.name));
   const inlineLayout = visibleParams.length >= INLINE_LAYOUT_THRESHOLD;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const params: Record<string, string> = {};
-    const args: string[] = [];
+    const submittedValues: ParameterValues = {};
     for (const param of formParameters) {
       const value = submitValue(param, values[param.name]);
       if (value == null) continue;
-      if (positionalNames.has(param.name)) {
-        args.push(...splitArgsValue(value));
-      } else {
-        params[param.name] = value;
-      }
+      submittedValues[param.name] = value;
     }
-    if (args.length > 0) params.args = args.join(",");
-    onExecute(params, { Accept: accept });
+    onExecute({
+      values: submittedValues,
+      request: packParameterValues(submittedValues, formParameters),
+      headers: { Accept: accept },
+    });
   }
 
   return (
@@ -359,19 +359,6 @@ function sanitizeInitialValue(param: OpenAPIParameter, value: string): string {
   if (trimmed === "[]" || trimmed === "null") return "";
   if (isDateParam(param) && isZeroDate(trimmed)) return "";
   return value;
-}
-
-function splitArgsValue(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-  } catch {
-    // Use comma splitting below.
-  }
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
 }
 
 function isMultiValueParam(param: OpenAPIParameter): boolean {

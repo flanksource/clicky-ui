@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { SegmentedControl, type SegmentedOption } from "../components/SegmentedControl";
 import { UiColumns, UiFile, UiRows } from "../icons";
@@ -9,7 +9,8 @@ import {
   type DiffLine,
   type DiffLineType,
 } from "./code-diff";
-import { highlightToLines, type HighlightedLine, type HighlightedToken } from "./code-highlight";
+import { highlightToLines, type HighlightedLine } from "./code-highlight";
+import { HighlightedTokens } from "./HighlightedTokens";
 
 export type CodeDiffView = "unified" | "split";
 
@@ -213,7 +214,7 @@ function UnifiedHunk({ hunk, showLineNumbers }: { hunk: ResolvedHunk; showLineNu
             )}
             <Marker type={line.type} />
             <code className="whitespace-pre pl-1 pr-3">
-              <DiffTokens tokens={tokens} content={line.content} />
+              <HighlightedTokens tokens={tokens} content={line.content} />
             </code>
           </div>
         );
@@ -285,7 +286,7 @@ function SplitCell({
       {showLineNumbers && <Gutter value={number} />}
       <Marker type={type} />
       <code className="min-w-0 whitespace-pre pl-1 pr-3">
-        <DiffTokens tokens={tokens} content={line.content} />
+        <HighlightedTokens tokens={tokens} content={line.content} />
       </code>
     </div>
   );
@@ -323,33 +324,4 @@ function Marker({ type }: { type: DiffLineType }) {
       {MARKER[type]}
     </span>
   );
-}
-
-function DiffTokens({
-  tokens,
-  content,
-}: {
-  tokens: HighlightedLine | undefined;
-  content: string;
-}) {
-  if (!tokens || tokens.length === 0) return <>{content}</>;
-  return (
-    <>
-      {tokens.map((token, index) => (
-        <span key={index} style={tokenStyle(token)}>
-          {token.content}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function tokenStyle(token: HighlightedToken): CSSProperties {
-  const style: CSSProperties = {};
-  if (token.color) style.color = token.color;
-  const fontStyle = token.fontStyle ?? 0;
-  if (fontStyle & 1) style.fontStyle = "italic";
-  if (fontStyle & 2) style.fontWeight = 700;
-  if (fontStyle & 4) style.textDecorationLine = "underline";
-  return style;
 }

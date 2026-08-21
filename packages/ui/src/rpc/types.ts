@@ -6,6 +6,8 @@ export interface ExecutionRequest {
   flags?: Record<string, string>;
 }
 
+export type OperationRequestValues = Record<string, string | string[]>;
+
 export interface ExecutionPagination {
   total?: number;
   limit?: number;

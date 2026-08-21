@@ -32,6 +32,7 @@ import {
   type ExecutionResponse,
   isPositionalParam,
   type OpenAPIParameter,
+  type OperationRequestValues,
   type ResolvedOperation,
 } from "../rpc/types";
 import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
@@ -3995,12 +3996,15 @@ function buildCommandExecutionHref(
   return url;
 }
 
-function substituteOperationPath(path: string, params: Record<string, string>) {
+function substituteOperationPath(path: string, params: OperationRequestValues) {
   const url = new URL(path, "http://localhost");
   const remaining = { ...params };
 
   for (const [key, value] of Object.entries(params)) {
     if (url.pathname.includes(`{${key}}`)) {
+      if (Array.isArray(value)) {
+        throw new Error(`Path parameter ${key} must be a scalar value`);
+      }
       url.pathname = url.pathname.replace(
         `{${key}}`,
         encodeURIComponent(value),
@@ -4010,7 +4014,7 @@ function substituteOperationPath(path: string, params: Record<string, string>) {
   }
 
   for (const [key, value] of Object.entries(remaining)) {
-    url.searchParams.set(key, value);
+    url.searchParams.set(key, Array.isArray(value) ? value.join(",") : value);
   }
 
   return `${url.pathname}${url.search}`;

@@ -65,6 +65,10 @@ export {
   isGroupCollapsedByDefault,
   type DataTableGroup,
   type DataTableGrouping,
+  type DataTableGroupingColumnMode,
+  type DataTableGroupingCustomMode,
+  type DataTableGroupingMode,
+  type DataTableGroupingNoneMode,
   type DataTableGroupMetaAlign,
 } from "./data/DataTable.grouping";
 export {
@@ -387,10 +391,20 @@ export {
 } from "./data/diagnostics/jvm-stacktrace";
 export {
   JvmStackTrace,
-  JvmStackFrameRow,
   type JvmStackTraceProps,
   type JvmFrameSourceResolver,
 } from "./data/diagnostics/JvmStackTrace";
+export {
+  StackFrameRow,
+  type StackFrameActions,
+  type StackFrameRowProps,
+} from "./data/diagnostics/StackFrameRow";
+export {
+  RUNTIME_PREFIXES,
+  isRuntimeFrame,
+  shortFrameName,
+  frameLocation,
+} from "./data/diagnostics/frame-heuristics";
 export {
   FrameSourceWindow,
 } from "./data/diagnostics/FrameSourceWindow";

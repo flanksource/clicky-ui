@@ -6,6 +6,7 @@ import type {
   OpenAPISpec,
   OperationLookupFilter,
   OperationLookupResponse,
+  OperationRequestValues,
   ResolvedOperation,
 } from "./types";
 
@@ -14,13 +15,13 @@ export interface OperationsApiClient {
   executeCommand(
     path: string,
     method: string,
-    params: Record<string, string>,
+    params: OperationRequestValues,
     headers?: Record<string, string>,
   ): Promise<ExecutionResponse>;
   lookupFilters?(
     path: string,
     method: string,
-    params: Record<string, string>,
+    params: OperationRequestValues,
     headers?: Record<string, string>,
   ): Promise<OperationLookupResponse>;
   lookupFilterOptions?(
@@ -31,7 +32,7 @@ export interface OperationsApiClient {
     // Extra query params merged into the lookup request (e.g. a scope filter
     // derived from a sibling form field). Lets a form-field lookup narrow the
     // option set beyond the search term.
-    extraParams?: Record<string, string>,
+    extraParams?: OperationRequestValues,
   ): Promise<OperationLookupFilter>;
   // getSchema fetches a resource's JSON Schema via content negotiation; undefined
   // when the resource exposes none. submitForm sends a nested JSON body (create

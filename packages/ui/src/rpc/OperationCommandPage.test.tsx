@@ -521,6 +521,56 @@ describe("OperationCommandPage", () => {
     );
   });
 
+  it("executes all positional form values once as an ordered argument array", async () => {
+    const operation = {
+      path: "/api/v1/3mf/diff",
+      method: "post",
+      operation: {
+        operationId: "3mf_diff",
+        summary: "Compare archives",
+        tags: ["3mf"],
+        parameters: [
+          {
+            name: "left",
+            in: "query",
+            description: "Positional argument from command",
+            required: true,
+          },
+          {
+            name: "right",
+            in: "query",
+            description: "Positional argument from command",
+            required: true,
+          },
+        ],
+        responses: {},
+      },
+    };
+    const client = makeClient(() => jsonResponse({ equal: true }));
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCommandPage client={client} operation={operation} />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("heading", { name: "Compare archives" });
+    fireEvent.change(screen.getByLabelText(/left/), { target: { value: "first.3mf" } });
+    fireEvent.change(screen.getByLabelText(/right/), { target: { value: "second.3mf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenCalledWith(
+        "/api/v1/3mf/diff",
+        "post",
+        { args: ["first.3mf", "second.3mf"] },
+        { Accept: "application/clicky+json" },
+      ),
+    );
+  });
+
   it("strips runner flags before executing", async () => {
     const client = makeClient((params) =>
       clickyResponse(

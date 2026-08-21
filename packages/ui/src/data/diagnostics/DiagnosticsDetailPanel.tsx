@@ -7,6 +7,7 @@ import { formatBytes, processLabel, processStateColor, processStateIcon } from "
 import { countStackByState, parseStackDump, type ParsedStack } from "./stacktrace";
 import { GoroutineCard } from "./GoroutineCard";
 import { ThreadCard } from "./ThreadCard";
+import type { StackFrameActions } from "./StackFrameRow";
 import { goroutineStateDot, threadStateDot } from "./state-styles";
 import type { JvmFrameSourceResolver } from "./JvmStackTrace";
 
@@ -45,6 +46,12 @@ export type DiagnosticsDetailPanelProps = {
    */
   resolveSource?: JvmFrameSourceResolver;
   /**
+   * Optional trailing actions rendered on each stack frame, revealed on hover.
+   * Lets a host app hang per-frame affordances (trace/watch/decompile) off the
+   * rendered thread dump.
+   */
+  frameActions?: StackFrameActions;
+  /**
    * Caller-supplied action buttons rendered right-aligned in the header row,
    * next to the title and Refresh. Use for download/decompile-style actions.
    */
@@ -64,6 +71,7 @@ export function DiagnosticsDetailPanel({
   onCollectStack,
   runMeta,
   resolveSource,
+  frameActions,
   headerActions,
   singleItem,
 }: DiagnosticsDetailPanelProps) {
@@ -148,6 +156,7 @@ export function DiagnosticsDetailPanel({
           singleItem={singleItem ?? false}
           {...(onCollectStack ? { onCollectStack } : {})}
           {...(resolveSource ? { resolveSource } : {})}
+          {...(frameActions ? { frameActions } : {})}
         />
       </PanelSection>
     </div>
@@ -222,6 +231,7 @@ type StackBlockProps = {
   collectBusy?: boolean;
   onCollectStack?: (pid: number) => void | Promise<void>;
   resolveSource?: JvmFrameSourceResolver;
+  frameActions?: StackFrameActions;
   singleItem?: boolean;
 };
 
@@ -256,6 +266,7 @@ function StackBlock(props: StackBlockProps) {
     collectBusy,
     onCollectStack,
     resolveSource,
+    frameActions,
     singleItem,
   } = props;
   const stack = process.stack_capture;
@@ -416,6 +427,7 @@ function StackBlock(props: StackBlockProps) {
                   search={search}
                   hideRuntimeOnly={hideRuntimeOnly}
                   {...(resolveSource ? { resolveSource } : {})}
+                  {...(frameActions ? { frameActions } : {})}
                 />
               ))}
           {parsed.format === "go" &&

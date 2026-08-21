@@ -1,7 +1,8 @@
 import type { ParsedThreadFrame } from "./jvm-stacktrace";
+import { frameLocation, isRuntimeFrame, shortFrameName } from "./frame-heuristics";
 
 // ParsedStackFrame is the React mirror of Go's clicky api.StackFrame. We reuse
-// ParsedThreadFrame so the existing JvmStackFrameRow renderer can display it.
+// ParsedThreadFrame so the shared StackFrameRow renderer can display it.
 export type ParsedStackFrame = ParsedThreadFrame;
 
 export interface ParsedStackTrace {
@@ -15,7 +16,6 @@ export interface ParsedStackTrace {
 const frameRe = /^\s*at\s+([\w$.]+)\.([\w$<>]+)\(([^)]+)\)/;
 const continuationRe = /^\.\.\.\s+\d+\s+more$/;
 
-const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];
 
 // parseJavaStackTrace decodes a free-form Java exception dump (the body that
 // printStackTrace() emits, optionally wrapped by EclipseLink "Internal
@@ -116,18 +116,12 @@ function buildFrame(cls: string, method: string, locRaw: string): ParsedStackFra
     }
   }
   const functionName = `${cls}.${method}`;
-  const location = file
-    ? line
-      ? `${file}:${line}`
-      : file
-    : nativeMethod
-      ? "Native Method"
-      : undefined;
+  const location = frameLocation(file, line) ?? (nativeMethod ? "Native Method" : undefined);
   const frame: ParsedStackFrame = {
     functionName,
-    displayName: shortDisplay(cls, method),
+    displayName: shortFrameName(cls, method),
     kind: "frame",
-    runtime: runtimePrefixes.some((p) => cls.startsWith(p)),
+    runtime: isRuntimeFrame(cls),
     nativeMethod,
     class: cls,
     method,
@@ -136,10 +130,4 @@ function buildFrame(cls: string, method: string, locRaw: string): ParsedStackFra
   if (line !== undefined) frame.line = line;
   if (location !== undefined) frame.location = location;
   return frame;
-}
-
-function shortDisplay(cls: string, method: string): string {
-  const parts = cls.split(".");
-  const last = parts[parts.length - 1] ?? cls;
-  return `${last}.${method}`;
 }

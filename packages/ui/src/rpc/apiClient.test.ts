@@ -35,6 +35,23 @@ describe("createOperationsApiClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends positional arguments as a JSON array without comma splitting", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createOperationsApiClient().executeCommand(
+      "/api/v1/3mf/diff",
+      "POST",
+      { args: ["first,version.3mf", "second.3mf"] },
+      { Accept: "application/json" },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init!.body as string)).toEqual({
+      args: ["first,version.3mf", "second.3mf"],
+    });
+  });
+
   it("returns non-2xx Clicky failure envelopes as renderable execution responses", async () => {
     const body = clickyFailure("tenant not found");
     const fetchMock = vi.fn(async () =>

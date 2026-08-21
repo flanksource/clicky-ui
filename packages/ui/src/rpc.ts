@@ -22,7 +22,11 @@ export {
   type SchemaActionFormSlots,
 } from "./rpc/SchemaActionForm";
 export { useOperationLookupFetcher } from "./rpc/operationLookupFetcher";
-export { CommandForm, type CommandFormProps } from "./rpc/CommandForm";
+export {
+  CommandForm,
+  type CommandFormProps,
+  type CommandFormSubmission,
+} from "./rpc/CommandForm";
 export {
   normalizeParameters,
   pathParamNames,
@@ -124,6 +128,7 @@ export {
   type OperationLookupFilter,
   type OperationLookupFilterType,
   type OperationLookupResponse,
+  type OperationRequestValues,
   type OpenAPIParameter,
   type OpenAPISchema,
   type OpenAPISpec,

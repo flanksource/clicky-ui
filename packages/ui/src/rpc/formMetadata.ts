@@ -24,6 +24,7 @@ import type {
   OpenAPIParameter,
   OperationLookupFilter,
   OperationLookupResponse,
+  OperationRequestValues,
 } from "./types";
 import { isPositionalParam, parameterPlaceholder } from "./types";
 
@@ -269,28 +270,22 @@ export function pruneParameterValues(values: ParameterValues) {
 export function packParameterValues(
   values: ParameterValues,
   parameters: OpenAPIParameter[],
-): ParameterValues {
-  const positionalNames = new Set(
-    parameters
-      .filter((param) => param.in !== "path" && isPositionalParam(param))
-      .map((p) => p.name),
-  );
-  const declaredNames = new Set(parameters.map((param) => param.name));
-  const params: ParameterValues = {};
+): OperationRequestValues {
+  const params: OperationRequestValues = {};
   const args: string[] = [];
 
-  for (const [key, value] of Object.entries(values)) {
+  for (const parameter of parameters) {
+    const value = values[parameter.name];
     if (!value) continue;
-    if (!declaredNames.has(key)) continue;
-    if (positionalNames.has(key)) {
+    if (parameter.in !== "path" && isPositionalParam(parameter)) {
       args.push(value);
     } else {
-      params[key] = value;
+      params[parameter.name] = value;
     }
   }
 
   if (args.length > 0) {
-    params.args = args.join(",");
+    params.args = args;
   }
 
   return params;
@@ -299,7 +294,7 @@ export function packParameterValues(
 export function packLookupParameterValues(
   values: ParameterValues,
   parameters: OpenAPIParameter[],
-): ParameterValues {
+): OperationRequestValues {
   return packParameterValues(
     values,
     parameters.filter(
