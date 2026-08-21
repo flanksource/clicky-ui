@@ -141,6 +141,17 @@ export {
   type ComboboxSingleProps,
   type ComboboxMultiProps,
 } from "./components/Combobox";
+export { CountryFlag, type CountryFlagProps } from "./components/CountryFlag";
+export {
+  CountryPicker,
+  type CountryPickerProps,
+} from "./components/CountryPicker";
+export {
+  COUNTRY_OPTIONS,
+  getCountryOption,
+  isCountryCode,
+  type CountryOption,
+} from "./components/country-options";
 export { Field, type FieldProps } from "./components/Field";
 export {
   useForm,
@@ -327,6 +338,10 @@ export {
   FieldErrorText,
   FormErrorSummary,
 } from "./components/json-schema-form-error-display";
+// The marks a collapsed array row is made of. Public because `AccordionList` is:
+// a consumer building a list by hand could otherwise not draw a row that matches
+// the schema-driven ones, and would copy the tone palette to try.
+export { ItemBadge, ItemGlyph } from "./components/json-schema-form-item-row";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
 export {

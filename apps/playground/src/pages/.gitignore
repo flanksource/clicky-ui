@@ -1,0 +1,7 @@
+*
+!.gitignore
+!welcome.tsx
+!sandbox-runtime.tsx
+!flanksource.tsx
+!flanksource/
+!flanksource/**/*.tsx

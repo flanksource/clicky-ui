@@ -1,10 +1,14 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import type { StaticIconComponent } from "@flanksource/clicky-ui";
 
-/** Optional per-page metadata. Everything here is derivable from the filename. */
+/** Optional per-page presentation metadata layered over filename-derived defaults. */
 export type PageMeta = {
   title?: string;
   description?: string;
   group?: string;
+  icon?: StaticIconComponent;
+  navOrder?: number;
+  groupOrder?: number;
 };
 
 export type PageModule = {
@@ -73,7 +77,10 @@ export const PAGES: PageEntry[] = buildRegistry(
   import.meta.glob("./pages/**/*.tsx") as Record<string, PageLoader>,
 );
 
-export const DEFAULT_PAGE_SLUG = PAGES[0]?.slug ?? "";
+export const DEFAULT_PAGE_SLUG = "flanksource";
+if (!PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)) {
+  throw new Error(`The default playground page "${DEFAULT_PAGE_SLUG}" is not registered.`);
+}
 
 export function findPage(slug: string | null | undefined): PageEntry | undefined {
   if (!slug) return undefined;
@@ -119,6 +126,10 @@ export function pageGroup(entry: PageEntry): string {
 
 export function pageDescription(entry: PageEntry): string | undefined {
   return metaCache.get(entry.slug)?.description;
+}
+
+export function pageMeta(entry: PageEntry): PageMeta | undefined {
+  return metaCache.get(entry.slug);
 }
 
 /** Warms `meta` for every page once the browser is idle, so nav labels settle. */
