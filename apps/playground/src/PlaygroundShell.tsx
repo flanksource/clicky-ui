@@ -12,10 +12,12 @@ import {
   AppShell,
   CommentSidePanel,
   DensitySwitcher,
+  SplitButton,
   ThemeSwitcher,
   cn,
   useCommentContext,
   type AppShellNavSection,
+  type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
 import { UiCode2, UiComment } from "@flanksource/clicky-ui/icons";
 
@@ -30,7 +32,8 @@ const SourceEditor = lazy(() =>
   import("./editor/SourceEditor").then((module) => ({ default: module.SourceEditor })),
 );
 import { resolveAnchor } from "./comments/dom-anchor";
-import { commentsToMarkdown } from "./comments/markdown";
+import { commentsToMarkdown, groupByPage, type CommentPageSection } from "./comments/markdown";
+import { fetchComments } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
   PAGES,
@@ -94,6 +97,7 @@ export function PlaygroundShell({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [commentMode, setCommentMode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
   const source = useSource(active?.slug, editing);
@@ -162,15 +166,60 @@ export function PlaygroundShell({
   // Leaving a page must not leave the picker armed on the next one.
   useEffect(() => setCommentMode(false), [active?.slug]);
 
-  const copyFeedback = useCallback(() => {
-    if (!active) return;
-    void navigator.clipboard
-      .writeText(commentsToMarkdown(active.slug, ctx.comments, labels))
-      .then(() => {
+  /**
+   * Every copy action funnels through here so a failed fetch or a refused
+   * clipboard surfaces as a banner instead of looking like "there was nothing
+   * to copy". `labels` only describe the live page; other pages fall back to
+   * their raw anchors.
+   */
+  const copyMarkdown = useCallback(
+    async (load: () => CommentPageSection[] | Promise<CommentPageSection[]>) => {
+      try {
+        await navigator.clipboard.writeText(commentsToMarkdown(await load(), labels));
+        setCopyError(null);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
-      });
-  }, [active, ctx.comments, labels]);
+      } catch (cause) {
+        setCopyError(cause instanceof Error ? cause.message : String(cause));
+      }
+    },
+    [labels],
+  );
+
+  const copyFeedback = useCallback(() => {
+    if (!active) return;
+    void copyMarkdown(() => [{ page: active.slug, comments: ctx.comments }]);
+  }, [active, copyMarkdown, ctx.comments]);
+
+  // The dropdown actions re-read from the backend rather than filtering the
+  // provider's list: only the server knows the pages this session never opened.
+  const copyActions = useMemo<DropdownMenuItem[]>(
+    () => [
+      {
+        label: "Copy open comments (this page)",
+        title: "Unresolved notes on the page you are looking at",
+        disabled: active === undefined,
+        onSelect: () => {
+          if (!active) return;
+          void copyMarkdown(async () => [
+            { page: active.slug, comments: await fetchComments({ page: active.slug, unresolved: true }) },
+          ]);
+        },
+      },
+      {
+        label: "Copy all open comments",
+        title: "Unresolved notes from every artifact page",
+        onSelect: () =>
+          void copyMarkdown(async () => groupByPage(await fetchComments({ unresolved: true }))),
+      },
+      {
+        label: "Copy all comments",
+        title: "Every note from every artifact page, resolved ones included",
+        onSelect: () => void copyMarkdown(async () => groupByPage(await fetchComments())),
+      },
+    ],
+    [active, copyMarkdown],
+  );
 
   const PageComponent = active ? lazyPage(active) : null;
   const railVisible = ctx.railMode !== "closed" || ctx.comments.length > 0;
@@ -243,15 +292,17 @@ export function PlaygroundShell({
             <UiComment className="size-3.5" />
             {commentMode ? "Pick an element…" : "Comment"}
           </button>
-          <button
-            type="button"
+          <SplitButton
+            label={copied ? "Copied" : "Copy feedback"}
             onClick={copyFeedback}
-            disabled={ctx.comments.length === 0}
-            title="Copy this page's feedback as markdown for an agent"
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-          >
-            {copied ? "Copied" : "Copy feedback"}
-          </button>
+            items={copyActions}
+            variant="outline"
+            size="sm"
+            // Only the primary half depends on this page having notes — the
+            // cross-page actions stay reachable from an empty artifact.
+            primaryDisabled={ctx.comments.length === 0}
+            title="More copy actions"
+          />
           <ThemeSwitcher />
           <DensitySwitcher />
         </>
@@ -302,6 +353,7 @@ export function PlaygroundShell({
           <div ref={contentRef} className="min-w-0 p-density-4">
             {creating && <NewArtifactForm onCancel={() => setCreating(false)} />}
             {commentsError && <Banner tone="danger">{commentsError}</Banner>}
+            {copyError && <Banner tone="danger">Nothing was copied — {copyError}</Banner>}
             {orphans.length > 0 && (
               <Banner tone="warning">
                 {orphans.length} comment anchor{orphans.length === 1 ? " no longer matches" : "s no longer match"}{" "}

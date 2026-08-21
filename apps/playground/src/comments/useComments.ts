@@ -19,6 +19,9 @@ export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
 };
 
+/** A comment as the API returns it: tagged with the page it was left on. */
+export type PageComment = Comment & { page: string };
+
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
@@ -38,6 +41,25 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return payload;
 }
 
+/**
+ * One-shot listing across every page. Used by the toolbar's cross-page copy
+ * actions, which need pages the provider has never loaded — deliberately not a
+ * hook, so a copy never adds provider state.
+ */
+export async function fetchComments(
+  filter: { page?: string; unresolved?: boolean } = {},
+): Promise<PageComment[]> {
+  const params = new URLSearchParams();
+  if (filter.page !== undefined) params.set("page", filter.page);
+  if (filter.unresolved) params.set("unresolved", "true");
+
+  const query = params.toString();
+  const { comments } = await request<{ comments: PageComment[] }>(
+    query === "" ? COMMENTS_ROUTE : `${COMMENTS_ROUTE}?${query}`,
+  );
+  return comments;
+}
+
 export type PlaygroundComments = {
   comments: Comment[];
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
@@ -54,7 +76,7 @@ export function useComments(page: string): PlaygroundComments {
 
   const refresh = useCallback(async () => {
     try {
-      setComments(await request<Comment[]>(`${COMMENTS_ROUTE}?page=${encodeURIComponent(page)}`));
+      setComments(await fetchComments({ page }));
       setError(null);
     } catch (cause) {
       setError(describeError(cause));
@@ -80,43 +102,35 @@ export function useComments(page: string): PlaygroundComments {
   );
 
   const post = useCallback(
-    (comment: Record<string, unknown>) =>
-      request(COMMENTS_ROUTE, {
+    (url: string, payload: Record<string, unknown>) =>
+      request(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, comment }),
+        body: JSON.stringify(payload),
       }),
-    [page],
-  );
-
-  const entityUrl = useCallback(
-    (id: string) =>
-      `${COMMENTS_ROUTE}/${encodeURIComponent(id)}?page=${encodeURIComponent(page)}`,
-    [page],
+    [],
   );
 
   const create = useCallback(
     (input: CommentCreateInput) =>
       mutate(() =>
-        post({
+        post(COMMENTS_ROUTE, {
+          page,
           body: input.body,
           author: AUTHOR,
           status: DEFAULT_STATUS,
           anchor: input.anchor ?? null,
-          parentId: null,
         }),
       ),
-    [mutate, post],
+    [mutate, page, post],
   );
 
   const reply = useCallback(
     (input: CommentReplyInput) =>
       mutate(() =>
-        post({
+        post(`${COMMENTS_ROUTE}/${encodeURIComponent(input.parentId)}/replies`, {
           body: input.body,
           author: AUTHOR,
-          anchor: input.anchor ?? null,
-          parentId: input.parentId,
         }),
       ),
     [mutate, post],
@@ -125,18 +139,19 @@ export function useComments(page: string): PlaygroundComments {
   const updateStatus = useCallback(
     (id: string, status: string) =>
       mutate(() =>
-        request(entityUrl(id), {
+        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
         }),
       ),
-    [entityUrl, mutate],
+    [mutate],
   );
 
   const remove = useCallback(
-    (id: string) => mutate(() => request(entityUrl(id), { method: "DELETE" })),
-    [entityUrl, mutate],
+    (id: string) =>
+      mutate(() => request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, { method: "DELETE" })),
+    [mutate],
   );
 
   return { comments, error, create, reply, updateStatus, remove };
