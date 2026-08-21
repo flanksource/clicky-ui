@@ -1,0 +1,1 @@
+const n=["java.","javax.","sun.","jdk.","com.sun.","oracle.jrockit."];function a(t,o=[]){return n.some(r=>t.startsWith(r))||o.some(r=>t.startsWith(r))}function s(t,o){return[t.split(".").filter(Boolean).pop()??t,o].filter(Boolean).join(".")}function i(t,o){if(t)return o?`${t}:${o}`:t}export{i as f,a as i,s};
