@@ -175,7 +175,16 @@ export function PlaygroundShell({
   const copyMarkdown = useCallback(
     async (load: () => CommentPageSection[] | Promise<CommentPageSection[]>) => {
       try {
-        await navigator.clipboard.writeText(commentsToMarkdown(await load(), labels));
+        // The dropdown actions fetch before they have anything to copy, and in
+        // Safari and Firefox the click's transient user activation is already
+        // spent by the time that await resolves — `writeText` would then be
+        // refused. `write` accepts a *pending* blob, so the clipboard is
+        // claimed inside the activation and filled once the fetch lands.
+        await writeClipboard(
+          Promise.resolve(load()).then((sections) =>
+            commentsToMarkdown(sections, labels),
+          ),
+        );
         setCopyError(null);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
