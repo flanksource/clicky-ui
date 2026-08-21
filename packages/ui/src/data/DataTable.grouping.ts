@@ -61,13 +61,33 @@ export type DataTableGroupingMode<T> =
   | DataTableGroupingColumnMode<T>
   | DataTableGroupingNoneMode;
 
-/** Converts an automatic column-group value to the stable string key DataTable requires. */
-export function dataTableGroupKey(
-  value: unknown,
-  emptyGroupLabel = "(empty)",
+/**
+ * Internal group key for null/undefined/empty column values. It is deliberately
+ * not the `emptyGroupLabel`: a row whose column literally reads "Unassigned"
+ * must not be bucketed with the rows that have no value at all. Rendered through
+ * `dataTableGroupLabel`, so readers still see the configured label.
+ */
+export const DATA_TABLE_EMPTY_GROUP_KEY = "\u0000empty";
+
+/** Header label for the empty group when a mode does not configure its own. */
+export const DATA_TABLE_EMPTY_GROUP_LABEL = "(empty)";
+
+/**
+ * Maps an automatic group key back to its header label: the internal empty key
+ * becomes the configured label, every other key is already its own label.
+ */
+export function dataTableGroupLabel(
+  key: string,
+  emptyGroupLabel?: string,
 ): string {
+  if (key !== DATA_TABLE_EMPTY_GROUP_KEY) return key;
+  return emptyGroupLabel ?? DATA_TABLE_EMPTY_GROUP_LABEL;
+}
+
+/** Converts an automatic column-group value to the stable string key DataTable requires. */
+export function dataTableGroupKey(value: unknown): string {
   if (value === null || value === undefined || value === "") {
-    return emptyGroupLabel;
+    return DATA_TABLE_EMPTY_GROUP_KEY;
   }
   switch (typeof value) {
     case "string":

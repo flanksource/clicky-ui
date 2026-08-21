@@ -42,9 +42,8 @@ export function JvmStackTrace({
       {visibleFrames.map((frame, index) => {
         const resolved = resolveSource?.(frame);
         // `line` stays the frame's own — see the note in RenderedStackTrace.
-        const withSource = resolved
-          ? { ...frame, ...(({ line: _ignored, ...rest }) => rest)(resolved) }
-          : frame;
+        const { line: _ignored, ...source } = resolved ?? {};
+        const withSource = resolved ? { ...frame, ...source } : frame;
         return (
           <StackFrameRow
             key={`${frame.functionName}-${index}`}

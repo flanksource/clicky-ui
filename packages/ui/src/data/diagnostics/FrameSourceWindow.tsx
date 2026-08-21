@@ -26,7 +26,11 @@ export function FrameSourceWindow({
   const start = frame.sourceStartLine ?? 0;
   const numbers = frame.sourceLineNumbers;
   const focal = frame.line ?? -1;
-  const language = frame.sourceLanguage ?? "java";
+  // No default language: this renderer is shared by JVM frames, exception frames
+  // and frameless callers, so a Go dump or a template error must not be coloured
+  // with Java grammar. `highlightToLines` returns null without a language and
+  // `HighlightedTokens` then paints the plain source.
+  const language = frame.sourceLanguage;
 
   const [tokens, setTokens] = useState<HighlightedLine[] | null>(null);
 

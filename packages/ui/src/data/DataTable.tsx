@@ -98,6 +98,7 @@ import { normalizeStatus } from "./cells/status-mapping";
 import type { BadgeStatus } from "./Badge";
 import {
   dataTableGroupKey,
+  dataTableGroupLabel,
   groupRecords,
   isGroupCollapsedByDefault,
   type DataTableGrouping,
@@ -994,11 +995,16 @@ function DataTableInner<T extends Record<string, unknown>>({
     }
     return {
       ...activeGroupingMode,
-      getGroupKey: (row) =>
-        dataTableGroupKey(
-          resolveColumnValue(row, column),
-          activeGroupingMode.emptyGroupLabel,
-        ),
+      getGroupKey: (row) => dataTableGroupKey(resolveColumnValue(row, column)),
+      // `emptyGroupLabel` is a header label, never a key — resolving it here
+      // keeps rows with no value apart from rows whose value happens to read
+      // like the label.
+      getGroupLabel: (key, rows) => {
+        const custom = activeGroupingMode.getGroupLabel?.(key, rows);
+        return custom !== undefined
+          ? custom
+          : dataTableGroupLabel(key, activeGroupingMode.emptyGroupLabel);
+      },
     };
   }, [activeGroupingMode, effectiveColumns, grouping]);
 

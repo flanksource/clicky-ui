@@ -37,7 +37,9 @@ export function shortFrameName(className: string, method: string): string {
 
 // frameLocation renders the `File.java:42` badge, degrading to the bare file
 // when no line was captured and to undefined when there is no file at all.
+// Line 0 is a captured location, not an absent one, so the check is against
+// undefined rather than falsiness.
 export function frameLocation(file?: string, line?: number): string | undefined {
   if (!file) return undefined;
-  return line ? `${file}:${line}` : file;
+  return line === undefined ? file : `${file}:${line}`;
 }

@@ -76,7 +76,10 @@ function loadHighlighter(): Promise<HighlighterCore> {
 }
 
 export type HighlightOptions = {
-  lang: string;
+  /** Highlighter language. Undefined when the caller has none, in which case
+   *  both entry points return null and the caller renders plain text — better
+   *  than guessing a grammar and mis-colouring the source. */
+  lang: string | undefined;
   theme?: string;
   transformers?: ShikiTransformer[];
 };
