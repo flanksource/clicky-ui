@@ -90,6 +90,9 @@ catalogs:
     ai:
       specifier: ^6.0.199
       version: 6.0.199
+    country-flag-icons:
+      specifier: ^1.6.20
+      version: 1.6.20
     jotai:
       specifier: ^2.20.1
       version: 2.20.1
@@ -476,6 +479,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      country-flag-icons:
+        specifier: 'catalog:'
+        version: 1.6.20
       dompurify:
         specifier: ^3.4.11
         version: 3.4.11
@@ -3606,6 +3612,9 @@ packages:
 
   cose-base@2.2.0:
     resolution: {integrity: sha512-AzlgcsCbUMymkADOJtQm3wO9S3ltPfYOFD5033keQn9NJzIbtnZj+UdBJe7DYml/8TdbtHJW3j58SOnKhWY/5g==}
+
+  country-flag-icons@1.6.20:
+    resolution: {integrity: sha512-py8JiEKzjhYw6HPJ0L7SxLgCYim36UPRTZX43/kqGueUCZLSvnrqAiwW8HtQibur7mdkFQUkjOgdK+o/9FBtaw==}
 
   crelt@1.0.7:
     resolution: {integrity: sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==}
@@ -9406,6 +9415,8 @@ snapshots:
   cose-base@2.2.0:
     dependencies:
       layout-base: 2.0.1
+
+  country-flag-icons@1.6.20: {}
 
   crelt@1.0.7: {}
 
