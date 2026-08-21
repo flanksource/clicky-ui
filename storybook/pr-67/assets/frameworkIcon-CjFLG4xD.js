@@ -1,1 +1,0 @@
-import{aA as a,a3 as r,aM as t,ad as s,b8 as i}from"./iframe-scM6jv7l.js";function c(e){switch(e){case"go test":case"ginkgo":return i;case"jest":case"vitest":return s;case"playwright":return t;case"fixture":return r;case"task":return a;default:return null}}export{c as f};
