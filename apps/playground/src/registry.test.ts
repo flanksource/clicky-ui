@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_PAGE_SLUG,
+  PAGES,
   buildRegistry,
   groupFromSlug,
   humanizeSlug,
   isPlaygroundPage,
   slugFromGlobKey,
 } from "./registry";
+
+describe("default page", () => {
+  it("opens the Flanksource design-system hub independently of glob order", () => {
+    expect(DEFAULT_PAGE_SLUG).toBe("flanksource");
+    expect(PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)).toBe(true);
+  });
+});
 
 const noop = () => Promise.resolve({});
 

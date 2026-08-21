@@ -15,7 +15,6 @@ import {
   ThemeSwitcher,
   cn,
   useCommentContext,
-  type AppShellNavItem,
   type AppShellNavSection,
 } from "@flanksource/clicky-ui";
 import { UiCode2, UiComment } from "@flanksource/clicky-ui/icons";
@@ -23,6 +22,7 @@ import { UiCode2, UiComment } from "@flanksource/clicky-ui/icons";
 import { CommentOverlay } from "./comments/CommentOverlay";
 import { NewArtifactForm } from "./editor/NewArtifactForm";
 import { useSource } from "./editor/useSource";
+import { buildPlaygroundNavSections } from "./navigation";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -38,6 +38,7 @@ import {
   lazyPage,
   pageDescription,
   pageGroup,
+  pageMeta,
   pageTitle,
   subscribeMeta,
   type PageEntry,
@@ -107,21 +108,11 @@ export function PlaygroundShell({
   const metaVersion = useSyncExternalStore(subscribeMeta, getMetaVersion, getMetaVersion);
 
   const navSections = useMemo<AppShellNavSection[]>(() => {
-    const needle = query.trim().toLowerCase();
-    const grouped = new Map<string, AppShellNavItem[]>();
-    for (const entry of PAGES) {
-      const title = pageTitle(entry);
-      if (needle && !title.toLowerCase().includes(needle) && !entry.slug.includes(needle)) continue;
-      const items = grouped.get(pageGroup(entry)) ?? [];
-      items.push({
-        key: entry.slug,
-        label: title,
-        active: entry.slug === active?.slug,
-        to: `?page=${encodeURIComponent(entry.slug)}`,
-      });
-      grouped.set(pageGroup(entry), items);
-    }
-    return [...grouped.entries()].map(([label, items]) => ({ label, items }));
+    return buildPlaygroundNavSections(PAGES, {
+      activeSlug: active?.slug,
+      query,
+      metaFor: pageMeta,
+    });
   }, [active?.slug, metaVersion, query]);
 
   // `contentRef` comes from the provider as a read-only RefObject; a callback

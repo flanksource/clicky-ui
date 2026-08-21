@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { composeStories } from "@storybook/react-vite";
 import * as comboboxStories from "./Combobox.stories";
+import * as countryStories from "./CountryPicker.stories";
 import * as workloadStories from "./WorkloadPicker.stories";
 import * as namespaceStories from "./NamespacePicker.stories";
 import * as secretStories from "./SecretKeySelector.stories";
@@ -13,6 +14,7 @@ import * as endpointStories from "./EndpointSelector.stories";
 
 describe.each([
   ["Combobox", comboboxStories],
+  ["CountryPicker", countryStories],
   ["WorkloadPicker", workloadStories],
   ["NamespacePicker", namespaceStories],
   ["SecretKeySelector", secretStories],

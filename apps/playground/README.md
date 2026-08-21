@@ -4,6 +4,8 @@ A scratch surface for one-page TSX artifacts — try a layout, show it to someon
 
 Where `apps/kitchen-sink` is a curated catalog of shipped components (every demo hand-registered in `demo-catalog.tsx`), the playground has **no registration step at all**.
 
+The default `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
+
 ```bash
 pnpm run dev:playground     # http://localhost:5274
 ```
@@ -25,10 +27,10 @@ It appears in the sidebar immediately — `import.meta.glob` is HMR-aware, so no
 
 - **Slug** comes from the path: `src/pages/nested/thing.tsx` → `?page=nested/thing`.
 - **Group** comes from the folder: root files land under "Pages", `src/pages/dashboards/*.tsx` under "Dashboards".
-- **`meta`** is optional; without it the title is derived from the filename.
+- **`meta`** is optional; without it the title is derived from the filename. Canonical pages can also provide a generated `Ui*` icon plus explicit `groupOrder` and `navOrder` values.
 - Files and folders prefixed with `_`, plus `*.test.tsx` / `*.stories.tsx`, are skipped — use them for shared helpers.
 
-Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens, plain Tailwind, or any Iconify icon via `<iconify-icon icon="…" />`. Pages are type-checked by `pnpm run typecheck` at the repo root, so scratch code still has to compile.
+Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens, plain Tailwind, and offline generated icons imported from `@flanksource/clicky-ui/icons`. Pages are type-checked by `pnpm run typecheck` at the repo root, so scratch code still has to compile.
 
 ## Editing in the browser
 
