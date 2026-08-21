@@ -49,6 +49,13 @@ export type ContextMeterProps = {
   messageCount?: number | undefined;
   /** Session identifier exposed as a click-to-copy value in the popover. */
   sessionId?: string | undefined;
+  /** Terminal chat identities, kept distinct from the generic session id. */
+  captainSessionId?: string | undefined;
+  providerSessionId?: string | undefined;
+  threadId?: string | undefined;
+  turnId?: string | undefined;
+  /** Resolved backend that produced the terminal chat turn. */
+  backend?: string | undefined;
   /** Runtime mechanism used to execute the session, such as api or cmux. */
   executionMode?: string | undefined;
   /** Model id/label and its brand glyph. */
@@ -110,6 +117,12 @@ type BucketRow = {
   label: string;
   tokens?: number | undefined;
   cost?: number | undefined;
+};
+
+type CopyableIdentity = {
+  key: string;
+  label: string;
+  value: string;
 };
 
 /** One row per token/cost bucket, kept only when it carries a token or cost
@@ -199,9 +212,9 @@ function UsageTable({
 
 /** Unified context-window meter. Renders as a compact progress `bar` or a
  *  circular `gauge`; hovering or focusing it opens a popover with the model, the
- *  copyable session id, execution mode, context-window breakdown, per-bucket
- *  token usage and the cost + budget detail. Domain-agnostic — callers feed
- *  plain values. */
+ *  runtime and copyable identities, context-window breakdown, per-bucket token
+ *  usage and the cost + budget detail. Domain-agnostic — callers feed plain
+ *  values. */
 export function ContextMeter({
   mode = "bar",
   usedPercent,
@@ -209,6 +222,11 @@ export function ContextMeter({
   windowTokens,
   messageCount,
   sessionId,
+  captainSessionId,
+  providerSessionId,
+  threadId,
+  turnId,
+  backend,
   executionMode,
   model,
   modelIcon: Glyph,
@@ -220,7 +238,11 @@ export function ContextMeter({
   className,
 }: ContextMeterProps) {
   const [copyResult, setCopyResult] = useState<
-    { sessionId: string; status: "copied" | "failed" } | undefined
+    {
+      identity: string;
+      value: string;
+      status: "copied" | "failed";
+    } | undefined
   >();
   const copyResetTimer = useRef<number | undefined>(undefined);
   useEffect(
@@ -236,22 +258,44 @@ export function ContextMeter({
   const totalCost = cost?.total ?? 0;
   const EffortGlyph = effort ? effortLevelIcon(effort) : undefined;
   const effortColor = effort ? effortLevelColor(effort) : undefined;
-  const copyStatus =
-    copyResult && copyResult.sessionId === sessionId
-      ? copyResult.status
-      : undefined;
+  const identities = [
+    sessionId ? { key: "session", label: "Session", value: sessionId } : undefined,
+    captainSessionId
+      ? {
+          key: "captain-session",
+          label: "Captain session",
+          value: captainSessionId,
+        }
+      : undefined,
+    providerSessionId
+      ? {
+          key: "provider-session",
+          label: "Provider session",
+          value: providerSessionId,
+        }
+      : undefined,
+    threadId ? { key: "thread", label: "Thread", value: threadId } : undefined,
+    turnId ? { key: "turn", label: "Turn", value: turnId } : undefined,
+  ].filter((identity): identity is CopyableIdentity => identity !== undefined);
   // The status is transient feedback for the click that produced it — without
-  // this it would greet every later hover of the same session.
-  const copySessionId = async () => {
-    if (!sessionId) return;
+  // this it would greet every later hover of the same identity.
+  const copyIdentity = async (identity: CopyableIdentity) => {
     if (copyResetTimer.current !== undefined) {
       window.clearTimeout(copyResetTimer.current);
     }
     try {
-      await navigator.clipboard.writeText(sessionId);
-      setCopyResult({ sessionId, status: "copied" });
+      await navigator.clipboard.writeText(identity.value);
+      setCopyResult({
+        identity: identity.key,
+        value: identity.value,
+        status: "copied",
+      });
     } catch {
-      setCopyResult({ sessionId, status: "failed" });
+      setCopyResult({
+        identity: identity.key,
+        value: identity.value,
+        status: "failed",
+      });
     }
     copyResetTimer.current = window.setTimeout(
       () => setCopyResult(undefined),
@@ -386,35 +430,50 @@ export function ContextMeter({
           </div>
         )}
 
-        {(sessionId || executionMode) && (
+        {(identities.length > 0 || backend || executionMode) && (
           <div className="space-y-1.5 border-b border-border pb-2">
-            {sessionId ? (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Session</span>
-                <button
-                  type="button"
-                  aria-label={
-                    copyStatus === "copied"
-                      ? "Session ID copied"
-                      : copyStatus === "failed"
-                        ? "Session ID copy failed"
-                        : "Copy session ID"
-                  }
-                  title={sessionId}
-                  className={cn(
-                    "flex min-w-0 max-w-48 items-center gap-1.5 font-medium hover:text-foreground",
-                    copyStatus === "failed" && "text-destructive",
-                  )}
-                  onClick={() => void copySessionId()}
+            {identities.map((identity) => {
+              const copyStatus =
+                copyResult?.identity === identity.key &&
+                copyResult.value === identity.value
+                  ? copyResult.status
+                  : undefined;
+              return (
+                <div
+                  key={identity.key}
+                  className="flex items-center justify-between gap-4"
                 >
-                  <span className="truncate font-mono">{sessionId}</span>
-                  <Icon
-                    icon={copyStatus === "copied" ? UiCheck : UiCopy}
-                    className="size-3.5 shrink-0"
-                  />
-                </button>
-              </div>
-            ) : null}
+                  <span className="text-muted-foreground">
+                    {identity.label}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={
+                      copyStatus === "copied"
+                        ? `${identity.label} ID copied`
+                        : copyStatus === "failed"
+                          ? `${identity.label} ID copy failed`
+                          : `Copy ${identity.label.toLowerCase()} ID`
+                    }
+                    title={identity.value}
+                    className={cn(
+                      "flex min-w-0 max-w-48 items-center gap-1.5 font-medium hover:text-foreground",
+                      copyStatus === "failed" && "text-destructive",
+                    )}
+                    onClick={() => void copyIdentity(identity)}
+                  >
+                    <span className="truncate font-mono">
+                      {identity.value}
+                    </span>
+                    <Icon
+                      icon={copyStatus === "copied" ? UiCheck : UiCopy}
+                      className="size-3.5 shrink-0"
+                    />
+                  </button>
+                </div>
+              );
+            })}
+            {backend ? <Row label="Backend" value={backend} /> : null}
             {executionMode ? <Row label="Mode" value={executionMode} /> : null}
           </div>
         )}

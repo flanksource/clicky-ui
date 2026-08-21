@@ -37,9 +37,9 @@ export function ChatRuntimeToolbar({
   const showContextMeter = Boolean(threadId || selectedModel || usage);
   if (!showRuntimeBar && !showContextMeter) return null;
 
-  const contextWindow = selectedModel?.contextWindow ?? usage?.maxTokens ?? 0;
+  const contextWindow = usage?.maxTokens ?? 0;
   const usedTokens = usage?.usedTokens ?? 0;
-  const ModelGlyph = providerIcon(selectedModel?.provider);
+  const ModelGlyph = providerIcon(usage?.backend);
 
   return (
     <div className="flex flex-1 items-center gap-2">
@@ -70,18 +70,28 @@ export function ChatRuntimeToolbar({
               ? { messageCount: usage.messageCount }
               : {})}
             {...(usage?.cost != null ? { cost: { total: usage.cost } } : {})}
-            {...(threadId ? { sessionId: threadId } : {})}
-            {...(selectedModel?.label
-              ? { model: selectedModel.label }
+            {...(usage?.backend ? { backend: usage.backend } : {})}
+            {...(usage?.executionMode
+              ? { executionMode: usage.executionMode }
+              : {})}
+            {...(usage?.model
+              ? { model: usage.model }
               : usage?.modelLabel
                 ? { model: usage.modelLabel }
                 : {})}
+            {...(usage?.captainSessionId
+              ? { captainSessionId: usage.captainSessionId }
+              : {})}
+            {...(usage?.providerSessionId
+              ? { providerSessionId: usage.providerSessionId }
+              : {})}
+            {...(usage?.threadId ? { threadId: usage.threadId } : {})}
+            {...(usage?.turnId ? { turnId: usage.turnId } : {})}
             {...(runtime.effort ? { effort: runtime.effort } : {})}
-            {...(runtime.mode ? { executionMode: runtime.mode } : {})}
             {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
-            {...(selectedModel?.provider
+            {...(usage?.backend
               ? {
-                  modelIconClassName: providerIconColor(selectedModel.provider),
+                  modelIconClassName: providerIconColor(usage.backend),
                 }
               : {})}
           />
