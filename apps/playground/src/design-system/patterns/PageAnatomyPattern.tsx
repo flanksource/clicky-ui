@@ -42,7 +42,20 @@ export function PageAnatomyPattern() {
                   <p className="text-sm font-medium text-foreground">{name}</p>
                   <p className="text-xs text-muted-foreground">platform / production</p>
                 </div>
-                <span className={index === 1 ? "size-2 rounded-full bg-amber-500" : "size-2 rounded-full bg-emerald-500"} />
+                {/* Colour alone cannot carry the state: the label names it for
+                    screen readers and for anyone who cannot tell the two
+                    circles apart. */}
+                <span className="flex items-center gap-density-2 text-xs text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className={
+                      index === 1
+                        ? "size-2 rounded-full bg-amber-500"
+                        : "size-2 rounded-full bg-emerald-500"
+                    }
+                  />
+                  {index === 1 ? "Degraded" : "Healthy"}
+                </span>
               </div>
             ))}
             {resources.length === 0 && (

@@ -182,9 +182,14 @@ function handle(dir: string, req: IncomingMessage, res: ServerResponse): Promise
 
     case "update":
       return readJsonBody(req).then((body) => {
+        // A non-string field is a caller bug, not an omission: naming it in a
+        // 400 (as every other route does) beats a 200 that silently wrote
+        // nothing but `updatedAt`.
+        const nextBody = optionalText(body, "body");
+        const nextStatus = optionalText(body, "status");
         const patch: CommentPatch = {
-          ...(typeof body["body"] === "string" ? { body: body["body"] } : {}),
-          ...(typeof body["status"] === "string" ? { status: body["status"] } : {}),
+          ...(nextBody === undefined ? {} : { body: nextBody }),
+          ...(nextStatus === undefined ? {} : { status: nextStatus }),
           updatedAt: new Date().toISOString(),
         };
         sendJson(res, 200, patchComment(dir, id, patch));

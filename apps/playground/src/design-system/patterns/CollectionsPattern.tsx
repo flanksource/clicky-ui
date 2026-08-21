@@ -5,6 +5,7 @@ import {
   Panel,
   type DataTableColumn,
 } from "@flanksource/clicky-ui";
+import type { SortState } from "@flanksource/clicky-ui/hooks";
 
 interface ServiceRow extends Record<string, unknown> {
   service: string;
@@ -26,20 +27,49 @@ const SERVICES: ServiceRow[] = [
 ];
 
 const COLUMNS: DataTableColumn<ServiceRow>[] = [
-  { key: "service", label: "Service", grow: true, sortable: true, filterable: true },
-  { key: "namespace", label: "Namespace", filterable: true },
-  { key: "status", label: "Status", kind: "status", filterable: true },
-  { key: "owner", label: "Owner", filterable: true },
+  { key: "service", label: "Service", grow: true, sortable: true },
+  { key: "namespace", label: "Namespace", sortable: true },
+  { key: "status", label: "Status", kind: "status", sortable: true },
+  { key: "owner", label: "Owner", sortable: true },
   { key: "checked", label: "Last checked", align: "right" },
 ];
+
+function matches(row: ServiceRow, query: string): boolean {
+  return Object.values(row).some((value) =>
+    String(value).toLowerCase().includes(query),
+  );
+}
 
 export function CollectionsPattern() {
   const [selected, setSelected] = useState(SERVICES[0]!);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(4);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortState | null>(null);
+
+  /*
+   * `pagination` is DataTable's server-side contract: the table searches and
+   * sorts only the rows it is handed. Slicing first would therefore search one
+   * page while the footer counted the whole collection, so this pattern owns
+   * search and sort over every row and takes the page slice last — the same
+   * order a real backend would use.
+   */
+  const matching = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = needle
+      ? SERVICES.filter((row) => matches(row, needle))
+      : SERVICES;
+    if (!sort) return filtered;
+    const direction = sort.dir === "desc" ? -1 : 1;
+    return [...filtered].sort(
+      (a, b) =>
+        String(a[sort.key]).localeCompare(String(b[sort.key])) * direction,
+    );
+  }, [query, sort]);
+
   const rows = useMemo(
-    () => SERVICES.slice(page * pageSize, (page + 1) * pageSize),
-    [page, pageSize],
+    () => matching.slice(page * pageSize, (page + 1) * pageSize),
+    [matching, page, pageSize],
   );
 
   return (
@@ -48,7 +78,13 @@ export function CollectionsPattern() {
         <DataTable
           data={rows}
           columns={COLUMNS}
-          autoFilter
+          globalFilter={query}
+          onGlobalFilterChange={(next) => {
+            setQuery(next);
+            setPage(0);
+          }}
+          sort={sort}
+          onSortChange={setSort}
           globalFilterPlaceholder="Search services…"
           getRowId={(row) => row.service}
           onRowClick={setSelected}
@@ -57,7 +93,7 @@ export function CollectionsPattern() {
           pagination={{
             page,
             pageSize,
-            total: SERVICES.length,
+            total: matching.length,
             onPageChange: setPage,
             onPageSizeChange: (next) => {
               setPage(0);

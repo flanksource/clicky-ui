@@ -30,7 +30,7 @@ It appears in the sidebar immediately — `import.meta.glob` is HMR-aware, so no
 - **`meta`** is optional; without it the title is derived from the filename. Canonical pages can also provide a generated `Ui*` icon plus explicit `groupOrder` and `navOrder` values.
 - Files and folders prefixed with `_`, plus `*.test.tsx` / `*.stories.tsx`, are skipped — use them for shared helpers.
 
-Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens, plain Tailwind, and offline generated icons imported from `@flanksource/clicky-ui/icons`. Pages are type-checked by `pnpm run typecheck` at the repo root, so scratch code still has to compile.
+Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens, plain Tailwind, and offline-generated icons imported from `@flanksource/clicky-ui/icons`. Pages are type-checked by `pnpm run typecheck` at the repo root, so scratch code still has to compile.
 
 ## Editing in the browser
 

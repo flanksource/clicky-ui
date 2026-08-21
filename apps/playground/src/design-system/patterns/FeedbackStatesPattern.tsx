@@ -8,7 +8,13 @@ export function FeedbackStatesPattern() {
   return (
     <div className="grid gap-density-4 lg:grid-cols-2">
       <Panel title="Loading" padded>
-        <div aria-label="Loading configuration checks" className="space-y-density-3 animate-pulse">
+        {/* The skeleton bars carry no text, so the state exists for a screen
+            reader only through the status role plus its accessible name. */}
+        <div
+          role="status"
+          aria-label="Loading configuration checks"
+          className="space-y-density-3 animate-pulse"
+        >
           <div className="h-4 w-2/5 rounded bg-muted" />
           <div className="h-10 rounded bg-muted" />
           <div className="h-10 rounded bg-muted" />

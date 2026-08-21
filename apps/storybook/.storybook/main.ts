@@ -77,6 +77,10 @@ const config: StorybookConfig = {
       "@flanksource/clicky-ui > @tanstack/react-query",
       "@flanksource/clicky-ui > jotai",
       "@flanksource/clicky-ui > dompurify",
+      // Both entry points CountryPicker/CountryFlag reach for — the bare package
+      // (country list) and the 3x2 React flag components.
+      "@flanksource/clicky-ui > country-flag-icons",
+      "@flanksource/clicky-ui > country-flag-icons/react/3x2",
       "@flanksource/clicky-ui > @mdxeditor/editor",
       "@flanksource/clicky-ui > @flanksource/icons/mi",
       "@flanksource/clicky-ui > recharts",
