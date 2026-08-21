@@ -26,11 +26,38 @@ export type StoredComment = {
 /** Page slug → the comments left on that page. */
 export type CommentsFile = Record<string, StoredComment[]>;
 
+/** A comment plus the page it lives on, for listings that span pages. */
+export type ListedComment = StoredComment & { page: string };
+
 export type CommentPatch = {
   body?: string;
   status?: string;
   updatedAt?: string;
 };
+
+/** Narrows a listing. An absent field means "no restriction". */
+export type CommentFilter = {
+  page?: string;
+  /** Matched against thread roots; a matching root brings its replies. */
+  statuses?: readonly string[];
+};
+
+/**
+ * Mirrors `DEFAULT_COMMENT_STATUSES` in the library's `comment-types.ts`. It has
+ * to be re-stated here for the same reason `StoredComment` does — the config
+ * bundler cannot follow the package alias. `comments-store.test.ts` asserts the
+ * two stay identical, so drift fails the suite rather than reaching the UI.
+ */
+export const COMMENT_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
+
+/** The subset the library flags `unresolved: true`. */
+export const UNRESOLVED_STATUSES = ["open", "in_progress"] as const;
+
+/** Status a comment moves to when an agent resolves it. */
+export const RESOLVED_STATUS = "resolved";
+
+/** Status a root is treated as when it was stored without one. */
+const IMPLICIT_STATUS = "open";
 
 export const COMMENTS_FILENAME = "comments.json";
 
@@ -82,6 +109,16 @@ export function assertPage(page: unknown): string {
   return page;
 }
 
+/** Keeps an agent from writing a status the comment rail cannot render. */
+export function assertStatus(status: unknown): string {
+  if (typeof status !== "string" || !COMMENT_STATUSES.includes(status as never)) {
+    throw new Error(
+      `status ${JSON.stringify(status)} is not one of ${COMMENT_STATUSES.join(", ")}`,
+    );
+  }
+  return status;
+}
+
 export function assertComment(input: unknown): StoredComment {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("comment payload must be an object");
@@ -96,7 +133,109 @@ export function assertComment(input: unknown): StoredComment {
   if (!("author" in candidate) || (candidate["author"] !== null && typeof candidate["author"] !== "object")) {
     throw new Error('comment payload requires an "author" object or null');
   }
+  if (candidate["status"] !== undefined) assertStatus(candidate["status"]);
   return input as StoredComment;
+}
+
+/**
+ * Reads a listing request off the query string. Pure and exported so the query
+ * vocabulary an agent has to get right is unit-tested, leaving the middleware a
+ * thin HTTP shell.
+ */
+export function parseCommentFilter(params: URLSearchParams): CommentFilter {
+  const filter: CommentFilter = {};
+
+  const page = params.get("page");
+  if (page !== null) filter.page = assertPage(page);
+
+  const statuses = params
+    .getAll("status")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter((value) => value !== "")
+    .map(assertStatus);
+
+  const unresolved = params.get("unresolved");
+  if (unresolved !== null) {
+    if (unresolved !== "true" && unresolved !== "false") {
+      throw new Error(`"unresolved" must be "true" or "false", got ${JSON.stringify(unresolved)}`);
+    }
+    if (unresolved === "true") statuses.push(...UNRESOLVED_STATUSES);
+  }
+
+  if (statuses.length > 0) filter.statuses = [...new Set(statuses)];
+  return filter;
+}
+
+/** Roots matching `statuses`, each followed by every comment beneath it. */
+function selectThreads(list: StoredComment[], statuses: readonly string[]): StoredComment[] {
+  const kept = new Set(
+    list
+      .filter((entry) => !entry.parentId && statuses.includes(entry.status ?? IMPLICIT_STATUS))
+      .map((entry) => entry.id),
+  );
+
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const entry of list) {
+      if (entry.parentId && kept.has(entry.parentId) && !kept.has(entry.id)) {
+        kept.add(entry.id);
+        grew = true;
+      }
+    }
+  }
+  return list.filter((entry) => kept.has(entry.id));
+}
+
+/**
+ * Every comment the filter admits, tagged with its page. Pages come out in slug
+ * order; within a page the stored (creation) order is preserved so a thread
+ * reads root-first.
+ */
+export function listComments(dir: string, filter: CommentFilter = {}): ListedComment[] {
+  const data = readAll(dir);
+  const pages = filter.page === undefined ? Object.keys(data).sort() : [filter.page];
+
+  return pages.flatMap((page) => {
+    const list = data[page] ?? [];
+    const selected = filter.statuses === undefined ? list : selectThreads(list, filter.statuses);
+    return selected.map((comment) => ({ ...comment, page }));
+  });
+}
+
+/** Ids are UUIDs, so a comment is addressable without knowing its page. */
+export function findComment(
+  dir: string,
+  id: string,
+): { page: string; comment: StoredComment } | undefined {
+  for (const [page, list] of Object.entries(readAll(dir))) {
+    const comment = list.find((entry) => entry.id === id);
+    if (comment) return { page, comment };
+  }
+  return undefined;
+}
+
+function requireComment(dir: string, id: string): { page: string; comment: StoredComment } {
+  const found = findComment(dir, id);
+  if (!found) throw new Error(`comment "${id}" not found`);
+  return found;
+}
+
+/** Walks up to the thread root so replies never nest more than one level. */
+function rootOf(dir: string, id: string): { page: string; comment: StoredComment } {
+  const found = requireComment(dir, id);
+  const list = readPage(dir, found.page);
+
+  let current = found.comment;
+  const seen = new Set([current.id]);
+  while (current.parentId) {
+    const parent = list.find((entry) => entry.id === current.parentId);
+    if (!parent || seen.has(parent.id)) break;
+    seen.add(parent.id);
+    current = parent;
+  }
+  return { page: found.page, comment: current };
 }
 
 export function addComment(dir: string, page: string, comment: StoredComment): StoredComment {
@@ -113,40 +252,46 @@ export function addComment(dir: string, page: string, comment: StoredComment): S
   return comment;
 }
 
-export function patchComment(
-  dir: string,
-  page: string,
-  id: string,
-  patch: CommentPatch,
-): StoredComment {
-  assertPage(page);
+/**
+ * Attaches a reply to `parentId`'s thread root, inheriting the root's page and
+ * anchor — a caller only has to know the id it is answering.
+ */
+export function addReply(dir: string, parentId: string, reply: StoredComment): StoredComment {
+  const root = rootOf(dir, parentId);
+  return addComment(dir, root.page, {
+    ...reply,
+    parentId: root.comment.id,
+    anchor: root.comment.anchor ?? null,
+  });
+}
 
+export function patchComment(dir: string, id: string, patch: CommentPatch): StoredComment {
+  if (patch.status !== undefined) assertStatus(patch.status);
+
+  const { page } = requireComment(dir, id);
   const data = readAll(dir);
   const list = data[page] ?? [];
-  const index = list.findIndex((entry) => entry.id === id);
-  if (index === -1) throw new Error(`comment "${id}" not found on page "${page}"`);
 
-  const current = list[index] as StoredComment;
-  const next: StoredComment = {
-    ...current,
-    ...(patch.body !== undefined ? { body: patch.body } : {}),
-    ...(patch.status !== undefined ? { status: patch.status } : {}),
-    ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
-  };
-  data[page] = list.map((entry, position) => (position === index ? next : entry));
+  const next = list.map((entry) =>
+    entry.id === id
+      ? {
+          ...entry,
+          ...(patch.body !== undefined ? { body: patch.body } : {}),
+          ...(patch.status !== undefined ? { status: patch.status } : {}),
+          ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
+        }
+      : entry,
+  );
+  data[page] = next;
   writeAll(dir, data);
-  return next;
+  return next.find((entry) => entry.id === id) as StoredComment;
 }
 
 /** Removes a comment and, when it is a thread root, every reply beneath it. */
-export function removeComment(dir: string, page: string, id: string): number {
-  assertPage(page);
-
+export function removeComment(dir: string, id: string): number {
+  const { page } = requireComment(dir, id);
   const data = readAll(dir);
   const list = data[page] ?? [];
-  if (!list.some((entry) => entry.id === id)) {
-    throw new Error(`comment "${id}" not found on page "${page}"`);
-  }
 
   const doomed = new Set([id]);
   let grew = true;

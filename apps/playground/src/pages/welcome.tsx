@@ -60,7 +60,11 @@ export default function Welcome() {
 
         <Step n={4} title="Hand the notes over">
           <span className="font-medium text-foreground">Copy feedback</span> puts every note on this
-          page — anchor, status, author and replies — on the clipboard as markdown.
+          page — anchor, status, author and replies — on the clipboard as markdown. Its dropdown
+          widens that to the unresolved notes on this page, or to every page at once. An agent can
+          also skip the clipboard entirely and call{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">/__playground/comments</code> to
+          list, reply to and resolve notes directly — see the playground README.
         </Step>
       </ol>
 

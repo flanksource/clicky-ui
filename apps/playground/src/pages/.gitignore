@@ -5,3 +5,9 @@
 !flanksource.tsx
 !flanksource/
 !flanksource/**/*.tsx
+!makerprint/
+!makerprint/**
+!supply-chain-posture.tsx
+!supply-chain-posture.test.tsx
+!_supply-chain-posture/
+!_supply-chain-posture/**

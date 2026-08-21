@@ -53,3 +53,4 @@ hack/
 .handoff/
 .grite/
 packages/ui/src/generated/storybook/
+apps/playground/src/pages/makerprint/
