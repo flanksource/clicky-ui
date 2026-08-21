@@ -307,7 +307,9 @@ describe("ChatWindow", () => {
       }),
     );
 
-    expect(await screen.findByText("Forked from Source")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Forked from Source")).toBeInTheDocument(),
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/chat/sessions/source-1/fork",
       expect.objectContaining({ method: "POST" }),
