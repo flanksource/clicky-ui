@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { FrameSourceWindow } from "./FrameSourceWindow";
+import { highlightToLines } from "../code-highlight";
 
 vi.mock("../code-highlight", () => ({
   // One token per line, coloured — enough to assert that highlighting ran and
@@ -10,7 +11,13 @@ vi.mock("../code-highlight", () => ({
   ),
 }));
 
+const mockHighlight = vi.mocked(highlightToLines);
+
 describe("FrameSourceWindow", () => {
+  beforeEach(() => {
+    mockHighlight.mockClear();
+  });
+
   // arthas `jad` returns bytecode-keyed line numbers with gaps, so the gutter is
   // painted from sourceLineNumbers rather than counted from sourceStartLine. A
   // renderer that assumed a contiguous run would silently renumber these.
@@ -63,5 +70,25 @@ describe("FrameSourceWindow", () => {
   it("renders nothing without source lines", () => {
     const { container } = render(<FrameSourceWindow frame={{ line: 42 }} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  // This window is shared by JVM frames, exception frames and frameless callers.
+  // Defaulting an absent language to "java" coloured Go dumps and template errors
+  // with Java grammar — wrong rather than merely absent.
+  it("passes the frame's language through and never substitutes a default", async () => {
+    const { rerender } = render(
+      <FrameSourceWindow frame={{ sourceLines: ["func main() {}"], sourceStartLine: 1 }} />,
+    );
+    await waitFor(() => expect(mockHighlight).toHaveBeenCalled());
+    expect(mockHighlight.mock.calls[0]?.[1]).toEqual({ lang: undefined });
+
+    mockHighlight.mockClear();
+    rerender(
+      <FrameSourceWindow
+        frame={{ sourceLines: ["func main() {}"], sourceStartLine: 1, sourceLanguage: "go" }}
+      />,
+    );
+    await waitFor(() => expect(mockHighlight).toHaveBeenCalled());
+    expect(mockHighlight.mock.calls[0]?.[1]).toEqual({ lang: "go" });
   });
 });

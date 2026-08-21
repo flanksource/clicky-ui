@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  DATA_TABLE_EMPTY_GROUP_KEY,
   dataTableGroupKey,
+  dataTableGroupLabel,
   groupRecords,
   isGroupCollapsedByDefault,
   type DataTableGroup,
@@ -12,19 +14,36 @@ describe("dataTableGroupKey", () => {
     [0, "0"],
     [false, "false"],
     [12n, "12"],
-    [null, "(empty)"],
-    [undefined, "(empty)"],
-    ["", "(empty)"],
+    [null, DATA_TABLE_EMPTY_GROUP_KEY],
+    [undefined, DATA_TABLE_EMPTY_GROUP_KEY],
+    ["", DATA_TABLE_EMPTY_GROUP_KEY],
   ])("normalizes the scalar value %s", (value, expected) => {
     expect(dataTableGroupKey(value)).toBe(expected);
   });
 
-  it("uses the configured empty label and rejects non-scalar column values", () => {
-    expect(dataTableGroupKey(null, "Unassigned")).toBe("Unassigned");
+  it("keeps an absent value in its own bucket, apart from a value that reads like the empty label", () => {
+    expect(dataTableGroupKey(null)).not.toBe(dataTableGroupKey("Unassigned"));
+    expect(dataTableGroupKey("Unassigned")).toBe("Unassigned");
+    expect(dataTableGroupKey("(empty)")).toBe("(empty)");
+    expect(dataTableGroupKey("(empty)")).not.toBe(DATA_TABLE_EMPTY_GROUP_KEY);
+  });
+
+  it("rejects non-scalar column values", () => {
     expect(() => dataTableGroupKey(["api"])).toThrow(/scalar values.*array/i);
     expect(() => dataTableGroupKey({ service: "api" })).toThrow(
       /scalar values.*object/i,
     );
+  });
+});
+
+describe("dataTableGroupLabel", () => {
+  it("renders the configured empty label for absent values only", () => {
+    expect(dataTableGroupLabel(DATA_TABLE_EMPTY_GROUP_KEY, "Unassigned")).toBe(
+      "Unassigned",
+    );
+    expect(dataTableGroupLabel(DATA_TABLE_EMPTY_GROUP_KEY)).toBe("(empty)");
+    expect(dataTableGroupLabel("Unassigned", "Unassigned")).toBe("Unassigned");
+    expect(dataTableGroupLabel("api", "Unassigned")).toBe("api");
   });
 });
 

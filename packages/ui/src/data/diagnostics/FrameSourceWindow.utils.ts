@@ -7,7 +7,8 @@ export interface FrameSource {
   sourceStartLine?: number;
   /** The frame's focal line, highlighted when it falls inside the window. */
   line?: number;
-  /** Highlighter language for the window's contents. Defaults to `java`. */
+  /** Highlighter language for the window's contents. Omit when unknown: the
+   *  window then renders plain, un-tokenized source rather than guessing. */
   sourceLanguage?: string;
 }
 
