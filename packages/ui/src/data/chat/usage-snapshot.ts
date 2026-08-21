@@ -16,7 +16,11 @@ import type { ChatMessageMetadata, ChatUsageSummary } from "./types";
  */
 export function usageSnapshotFromMetadata(
   metadata: ChatMessageMetadata,
-  options: { contextWindow?: number | undefined; modelLabel?: string | undefined; messageCount: number },
+  options: {
+    contextWindow?: number | undefined;
+    modelLabel?: string | undefined;
+    messageCount: number;
+  },
 ): ChatUsageSummary {
   const cost =
     metadata.threadCostUsd ?? metadata.costBreakdown?.totalUsd ?? metadata.cost;
@@ -27,6 +31,25 @@ export function usageSnapshotFromMetadata(
     ...(cost != null ? { cost } : {}),
     ...(metadata.usage ? { usage: metadata.usage } : {}),
     ...(metadata.costBreakdown ? { costBreakdown: metadata.costBreakdown } : {}),
-    ...(options.modelLabel ? { modelLabel: options.modelLabel } : {}),
+    ...(metadata.backend !== undefined ? { backend: metadata.backend } : {}),
+    ...(metadata.executionMode !== undefined
+      ? { executionMode: metadata.executionMode }
+      : {}),
+    ...(metadata.model !== undefined ? { model: metadata.model } : {}),
+    ...(metadata.model !== undefined && options.modelLabel
+      ? { modelLabel: options.modelLabel }
+      : {}),
+    ...(metadata.captainSessionId !== undefined
+      ? { captainSessionId: metadata.captainSessionId }
+      : {}),
+    ...(metadata.providerSessionId !== undefined
+      ? { providerSessionId: metadata.providerSessionId }
+      : {}),
+    ...(metadata.threadId !== undefined ? { threadId: metadata.threadId } : {}),
+    ...(metadata.turnId !== undefined ? { turnId: metadata.turnId } : {}),
+    ...(metadata.success !== undefined ? { success: metadata.success } : {}),
+    ...(metadata.interrupted !== undefined
+      ? { interrupted: metadata.interrupted }
+      : {}),
   };
 }

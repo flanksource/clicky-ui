@@ -293,7 +293,7 @@ describe("Chat context meter", () => {
     expect(screen.getByLabelText("Context 0% used")).toBeInTheDocument();
   });
 
-  it("shows the selected runtime execution mode", async () => {
+  it("shows terminal metadata instead of selected runtime identity", async () => {
     const runtimeModel: ChatModel = {
       ...RESOLVED_MODEL,
       runtime: {
@@ -307,13 +307,46 @@ describe("Chat context meter", () => {
         modelsApi={null}
         defaultModel={runtimeModel.id}
         transport={recordingTransport()}
+        threadId="request-thread"
+        initialMessages={[
+          {
+            id: "assistant-terminal",
+            role: "assistant",
+            parts: [],
+            metadata: {
+              backend: "claude-cmux",
+              executionMode: "cmux",
+              model: "claude-opus-terminal",
+              captainSessionId: "captain-session",
+              providerSessionId: "provider-session",
+              threadId: "terminal-thread",
+              turnId: "terminal-turn",
+            },
+          },
+        ]}
       />,
     );
 
     fireEvent.mouseEnter(screen.getByLabelText("Context 0% used"));
 
-    expect(await screen.findByText("Mode")).toBeInTheDocument();
-    expect(screen.getByText("agent")).toBeInTheDocument();
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+    expect(screen.getByText("claude-opus-terminal")).toBeInTheDocument();
+    expect(screen.getByText("claude-cmux")).toBeInTheDocument();
+    expect(screen.getByText("cmux")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy captain session ID" }),
+    ).toHaveAttribute("title", "captain-session");
+    expect(
+      screen.getByRole("button", { name: "Copy provider session ID" }),
+    ).toHaveAttribute("title", "provider-session");
+    expect(
+      screen.getByRole("button", { name: "Copy thread ID" }),
+    ).toHaveAttribute("title", "terminal-thread");
+    expect(
+      screen.getByRole("button", { name: "Copy turn ID" }),
+    ).toHaveAttribute("title", "terminal-turn");
+    expect(screen.queryByText("agent")).not.toBeInTheDocument();
+    expect(screen.queryByText("request-thread")).not.toBeInTheDocument();
   });
 });
 

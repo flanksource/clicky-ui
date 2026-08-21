@@ -84,8 +84,8 @@ export const WithRuntimeBar: Story = {
     const body = within(document.body);
     await waitFor(() => expect(body.getByRole("tooltip")).toBeInTheDocument());
     await expect(
-      within(body.getByRole("tooltip")).getByText("Claude Sonnet 4.5"),
-    ).toBeInTheDocument();
+      within(body.getByRole("tooltip")).queryByText("Claude Sonnet 4.5"),
+    ).not.toBeInTheDocument();
     await userEvent.click(runtime);
     await expect(body.getByRole("menu")).toHaveAttribute(
       "aria-label",

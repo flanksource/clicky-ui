@@ -395,15 +395,21 @@ export function Chat({
     if (status !== "ready") return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
-    if (!meta) return;
+    if (!meta) {
+      setUsage(null);
+      return;
+    }
+    const settledModel = meta.model
+      ? selectedChatModel(models, { id: meta.model, model: meta.model })
+      : undefined;
     const snapshot = usageSnapshotFromMetadata(meta, {
-      contextWindow: selectedModel?.contextWindow,
-      modelLabel: selectedModel?.label,
+      contextWindow: settledModel?.contextWindow,
+      modelLabel: settledModel?.label,
       messageCount: messages.length,
     });
     setUsage(snapshot);
     onUsageRef.current?.(snapshot);
-  }, [messages, status, selectedModel]);
+  }, [messages, models, status]);
 
   const handleRuntimeChange = (next: ChatModelRuntime) => {
     if (controlledRuntime === undefined) setInternalRuntime(next);

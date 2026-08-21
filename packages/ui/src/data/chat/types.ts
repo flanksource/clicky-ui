@@ -85,6 +85,15 @@ export interface ChatModel {
 /** Per-message metadata the backend rides on the SSE `finish` part
  *  (`messageMetadata`), applied by the AI SDK to the assistant `UIMessage`. */
 export interface ChatMessageMetadata {
+  backend?: string;
+  executionMode?: string;
+  model?: string;
+  captainSessionId?: string;
+  providerSessionId?: string;
+  threadId?: string;
+  turnId?: string;
+  success?: boolean;
+  interrupted?: boolean;
   usage?: ChatUsageBreakdown;
   costBreakdown?: ChatCostBreakdown;
   /** This turn's cost in USD. */
@@ -104,6 +113,16 @@ export interface ChatUsageSummary {
   usage?: ChatUsageBreakdown;
   costBreakdown?: ChatCostBreakdown;
   messageCount: number;
+  backend?: string;
+  executionMode?: string;
+  model?: string;
+  captainSessionId?: string;
+  providerSessionId?: string;
+  threadId?: string;
+  turnId?: string;
+  success?: boolean;
+  interrupted?: boolean;
+  /** @deprecated Use `model`; retained for compatibility with existing consumers. */
   modelLabel?: string;
 }
 
