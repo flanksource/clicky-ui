@@ -1,0 +1,26 @@
+import{j as l}from"./iframe-DVLyhhyR.js";import{T as r}from"./ToolCall-DgjgE_5q.js";import"./preload-helper-BF_8wlrL.js";import"./utils-DW-IJACk.js";import"./button-BpmYcoer.js";import"./index-CPURVhFy.js";import"./loading-D5f_KmBM.js";import"./Icon-Bcz4oWVg.js";import"./types-B1SOX9si.js";import"./CodeBlock-CB4TiB7t.js";import"./CodeDiff-dOnzDEr8.js";import"./SegmentedControl-qiWl8AQ0.js";import"./HighlightedTokens-DC7jht55.js";import"./JsonView-BNbm-R-L.js";import"./KeyValueList-CGu0Eyk0.js";import"./DataTable-BZ8dTbrw.js";import"./SortableHeader-3RP-paab.js";import"./Modal-BLSVbdLl.js";import"./index-C9M6r6Gv.js";import"./index-k6ap-kH7.js";import"./modalStack-tHezNq4t.js";import"./zIndex-BGbNBNA8.js";import"./FilterBar-CisZa1vs.js";import"./floating-ui.react-d2RX-2Uc.js";import"./FilterPill-DZc785eX.js";import"./Combobox-BiHWhjrB.js";import"./json-schema-form-size-E77C3uZS.js";import"./timestamp-format-CIXhO4AH.js";import"./DateTimePicker-D49XbMgL.js";import"./MultiSelect-Cy8_opG-.js";import"./RangeSlider-CPAnfaDB.js";import"./TimeRange-CnFFl-63.js";import"./select-Dhx-RWkR.js";import"./WorkloadPicker-PE1r84ZV.js";import"./NamespacePicker-D8gdpImp.js";import"./index-XBo6aJbL.js";import"./format-2niohfpq.js";import"./data-table-filter-values-BjWgdAnO.js";import"./Timestamp-OHWW41Q5.js";import"./TagList-FXdNxf-m.js";import"./Badge-BPMQmJTm.js";import"./HoverCard-gv6_MrnL.js";import"./Properties-B-cetqq_.js";import"./IconButton-BK8oEHbS.js";import"./DropdownMenu-BnjeottO.js";import"./DropdownMenuSubmenu-DYWaeLWS.js";import"./StatusDot-BGm_u8DQ.js";const{expect:e,within:x}=__STORYBOOK_MODULE_TEST__,u={type:"dynamic-tool",toolName:"Edit",toolCallId:"call-edit-collapsed",state:"output-available",input:{file_path:"src/config.ts",old_string:"export const enabled = false;",new_string:"export const enabled = true;"},output:"Updated src/config.ts"},y=[{type:"dynamic-tool",toolName:"Bash",toolCallId:"call-shell",state:"output-available",input:{command:"pnpm test",timeout:12e4},output:`3 tests passed
+exit 0`},{type:"dynamic-tool",toolName:"Read",toolCallId:"call-read",state:"output-available",input:{file_path:"src/config.ts"},output:"export const enabled = true;"},u,{type:"dynamic-tool",toolName:"update_plan",toolCallId:"call-plan",state:"output-available",input:{explanation:"Implementation plan",plan:[{step:"Trace the renderer",status:"completed"},{step:"Add known tools",status:"in_progress"}]},output:"Plan updated"},{type:"dynamic-tool",toolName:"AskUserQuestion",toolCallId:"call-question",state:"output-available",input:{questions:[{header:"Scope",question:"Which environment?",options:[{label:"Local",description:"Use local fixtures"},{label:"Staging"}]}]},output:"Local"}],it={title:"Chat/ToolCall/Known Tools",component:r,args:{part:u},parameters:{layout:"padded"}},o={render:t=>l.jsx("div",{className:"max-w-3xl",children:l.jsx(r,{...t})}),play:async({canvasElement:t})=>{const n=x(t).getByTestId("tool-call-args");await e(n).toHaveTextContent("file_path: src/config.ts"),await e(n).toHaveTextContent("old_string: export const enabled = false;")}},a={render:()=>l.jsx("div",{className:"max-w-4xl space-y-4",children:y.map(t=>l.jsx(r,{defaultOpen:!0,part:t},t.toolCallId))}),play:async({canvasElement:t})=>{await e(t.querySelector('[data-slot="tool-render-shell-input"]')).not.toBeNull(),await e(t.querySelector('[data-slot="tool-render-file-read"]')).not.toBeNull(),await e(t.querySelector('[data-slot="tool-render-file-edit"]')).not.toBeNull(),await e(t.querySelector('[data-slot="tool-render-plan"]')).not.toBeNull(),await e(t.querySelector('[data-slot="tool-render-question"]')).not.toBeNull()}};var s,p,i;o.parameters={...o.parameters,docs:{...(s=o.parameters)==null?void 0:s.docs,source:{originalSource:`{
+  render: args => <div className="max-w-3xl">
+      <ToolCall {...args} />
+    </div>,
+  play: async ({
+    canvasElement
+  }) => {
+    const args = within(canvasElement).getByTestId("tool-call-args");
+    await expect(args).toHaveTextContent("file_path: src/config.ts");
+    await expect(args).toHaveTextContent("old_string: export const enabled = false;");
+  }
+}`,...(i=(p=o.parameters)==null?void 0:p.docs)==null?void 0:i.source}}};var d,m,c;a.parameters={...a.parameters,docs:{...(d=a.parameters)==null?void 0:d.docs,source:{originalSource:`{
+  render: () => <div className="max-w-4xl space-y-4">
+      {KNOWN_TOOL_PARTS.map(part => <ToolCall key={part.toolCallId} defaultOpen part={part} />)}
+    </div>,
+  play: async ({
+    canvasElement
+  }) => {
+    await expect(canvasElement.querySelector('[data-slot="tool-render-shell-input"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-slot="tool-render-file-read"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-slot="tool-render-file-edit"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-slot="tool-render-plan"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-slot="tool-render-question"]')).not.toBeNull();
+  }
+}`,...(c=(m=a.parameters)==null?void 0:m.docs)==null?void 0:c.source}}};const dt=["CollapsedArguments","StandardRenderers"];export{o as CollapsedArguments,a as StandardRenderers,dt as __namedExportsOrder,it as default};
