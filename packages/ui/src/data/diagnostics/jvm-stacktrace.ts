@@ -1,3 +1,5 @@
+import { isRuntimeFrame, shortFrameName } from "./frame-heuristics";
+
 export interface ParsedThreadFrame {
   functionName: string;
   displayName: string;
@@ -280,9 +282,8 @@ function normalizeJvmState(value: string): string {
   return lower.split(/\s+/)[0] ?? "";
 }
 
-const runtimePrefixes = ["java.", "javax.", "sun.", "jdk.", "com.sun.", "or" + "acle.jrockit."];
 function isJvmRuntimeFrame(functionName: string): boolean {
-  return runtimePrefixes.some((p) => functionName.startsWith(p));
+  return isRuntimeFrame(functionName);
 }
 
 // splitClassMethod separates a JVM frame's `fully.qualified.Class.method` into
@@ -300,9 +301,7 @@ function splitClassMethod(functionName: string): { class?: string; method?: stri
 
 function sanitizeJvmFunctionName(functionName: string): string {
   // e.g. "com.example.App$Inner.method" → "App$Inner.method"
-  const parts = functionName.split(".");
-  if (parts.length < 2) return functionName;
-  const method = parts[parts.length - 1];
-  const cls = parts[parts.length - 2];
-  return `${cls}.${method}`;
+  const lastDot = functionName.lastIndexOf(".");
+  if (lastDot <= 0) return functionName;
+  return shortFrameName(functionName.slice(0, lastDot), functionName.slice(lastDot + 1));
 }

@@ -16,6 +16,9 @@ import { clickyFixture } from "./Clicky.fixtures";
 // the mock with a per-case implementation via `mocked(...).mockImplementation`.
 vi.mock("./code-highlight", () => ({
   highlightCode: vi.fn(async () => null),
+  // Null = "not highlighted": rows fall back to plain text, which is what the
+  // gutter assertions below read.
+  highlightToLines: vi.fn(async () => null),
 }));
 import { highlightCode } from "./code-highlight";
 const mockHighlightCode = vi.mocked(highlightCode);

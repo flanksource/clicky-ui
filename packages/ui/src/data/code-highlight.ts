@@ -12,7 +12,6 @@
 
 import type { HighlighterCore, ThemeRegistrationAny } from "shiki/core";
 
-type ShikiTransformersModule = typeof import("@shikijs/transformers");
 type ShikiTransformer = NonNullable<
   Parameters<HighlighterCore["codeToHtml"]>[1]["transformers"]
 >[number];
@@ -42,7 +41,6 @@ type SupportedTheme = (typeof SUPPORTED_THEMES)[number];
 const DEFAULT_THEME: SupportedTheme = "github-light";
 
 let highlighterLoad: Promise<HighlighterCore> | null = null;
-let transformersLoad: Promise<ShikiTransformersModule> | null = null;
 
 function loadHighlighter(): Promise<HighlighterCore> {
   highlighterLoad ??= (async () => {
@@ -75,11 +73,6 @@ function loadHighlighter(): Promise<HighlighterCore> {
     });
   })();
   return highlighterLoad;
-}
-
-export function loadShikiTransformers(): Promise<ShikiTransformersModule> {
-  transformersLoad ??= import("@shikijs/transformers");
-  return transformersLoad;
 }
 
 export type HighlightOptions = {
@@ -141,10 +134,12 @@ export async function highlightCode(
 export type HighlightedToken = { content: string; color?: string; fontStyle?: number };
 export type HighlightedLine = HighlightedToken[];
 
-// Tokenize `source` into per-line themed tokens for `CodeDiff`, which paints its
-// own diff gutters/rows rather than embedding Shiki's `<pre>` HTML. Returns null
-// on empty source, an unsupported language, or a highlighter failure — the caller
-// then renders plain text (same graceful degradation as `highlightCode`).
+// Tokenize `source` into per-line themed tokens for the renderers that paint
+// their own gutters/rows rather than embedding Shiki's `<pre>` HTML — `CodeDiff`
+// (add/remove markers) and `FrameSourceWindow` (absolute, possibly
+// non-contiguous, source line numbers). Returns null on empty source, an
+// unsupported language, or a highlighter failure — the caller then renders plain
+// text (same graceful degradation as `highlightCode`).
 export async function highlightToLines(
   source: string,
   opts: HighlightOptions,

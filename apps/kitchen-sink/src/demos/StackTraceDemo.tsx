@@ -44,7 +44,7 @@ const fixtureResolver: StackTraceSourceResolver = (frame: ParsedStackFrame) => {
   if (!frame.class) return undefined;
   const fx = sourceFixtures[frame.class];
   if (!fx) return undefined;
-  return { lines: fx.lines, startLine: fx.startLine, language: "java" };
+  return { sourceLines: fx.lines, sourceStartLine: fx.startLine, sourceLanguage: "java" };
 };
 
 export function StackTraceDemo() {

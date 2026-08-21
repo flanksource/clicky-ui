@@ -6,6 +6,7 @@ import type {
   OpenAPISpec,
   OperationLookupFilter,
   OperationLookupResponse,
+  OperationRequestValues,
 } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 
@@ -22,8 +23,8 @@ export type OperationApiClientContext = {
 export type OperationDefaultParams = (context: {
   path: string;
   method: string;
-  params: Record<string, string>;
-}) => MaybePromise<Record<string, string>>;
+  params: OperationRequestValues;
+}) => MaybePromise<OperationRequestValues>;
 
 export type OperationHeadersProvider = (
   headers: Headers,
@@ -78,7 +79,7 @@ export interface SharedOperationsApiClient extends OperationsApiClient {
     method: string,
     filterKey: string,
     query: string,
-    extraParams?: Record<string, string>,
+    extraParams?: OperationRequestValues,
   ): Promise<OperationLookupFilter>;
   executeCommandBody(
     path: string,
@@ -144,7 +145,7 @@ export function createOperationsApiClient(
     return parsed.data as OpenAPISpec;
   }
 
-  async function withDefaults(path: string, method: string, params: Record<string, string>) {
+  async function withDefaults(path: string, method: string, params: OperationRequestValues) {
     return (await options.defaultParams?.({ path, method, params })) ?? params;
   }
 
@@ -390,8 +391,8 @@ export function errorFromResponse(
 
 function resolvePathParams(
   path: string,
-  params: Record<string, string>,
-): { path: string; params: Record<string, string> } {
+  params: OperationRequestValues,
+): { path: string; params: OperationRequestValues } {
   const queryParams = { ...params };
   let resolvedPath = path;
   const placeholders = [...path.matchAll(/\{([^{}]+)\}/g)]
@@ -402,7 +403,11 @@ function resolvePathParams(
   const consumedDirectValues: string[] = [];
 
   for (const [index, name] of placeholders.entries()) {
-    const directValue = queryParams[name];
+    const rawDirectValue = queryParams[name];
+    if (Array.isArray(rawDirectValue)) {
+      throw new Error(`Path parameter ${name} must be a scalar value`);
+    }
+    const directValue = rawDirectValue;
     const fallbackValue = directValue || argValues[index];
     if (!fallbackValue) continue;
 
@@ -424,8 +429,9 @@ function resolvePathParams(
   return { path: resolvedPath, params: stripRunnerParams(queryParams) };
 }
 
-function parseArgsParam(value: string | undefined): string[] {
+function parseArgsParam(value: string | string[] | undefined): string[] {
   if (!value) return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
   const trimmed = value.trim();
   if (!trimmed || trimmed === "[]" || trimmed.toLowerCase() === "null") return [];
   try {
@@ -440,21 +446,30 @@ function parseArgsParam(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-function stripRunnerParams(params: Record<string, string>) {
+function stripRunnerParams(params: OperationRequestValues) {
   const next = { ...params };
   delete next.autoRun;
   delete next.__autoRun;
   return next;
 }
 
-function appendQuery(path: string, params: Record<string, string>) {
-  const query = new URLSearchParams(pruneParams(params)).toString();
+function appendQuery(path: string, params: OperationRequestValues) {
+  const query = new URLSearchParams(
+    Object.fromEntries(
+      Object.entries(pruneParams(params)).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? value.join(",") : value,
+      ]),
+    ),
+  ).toString();
   if (!query) return path;
   return `${path}${path.includes("?") ? "&" : "?"}${query}`;
 }
 
-function pruneParams(params: Record<string, string>) {
-  return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== ""));
+function pruneParams(params: OperationRequestValues): OperationRequestValues {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== "" && value.length > 0),
+  );
 }
 
 function joinUrl(baseUrl: string | undefined, path: string) {

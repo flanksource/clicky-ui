@@ -10,6 +10,29 @@ import {
 } from "./formMetadata";
 
 describe("packParameterValues", () => {
+  it("packs positional arguments in declaration order as an array", () => {
+    expect(
+      packParameterValues(
+        { output: "part,final.3mf", input: "source.3mf", format: "binary" },
+        [
+          {
+            name: "input",
+            in: "query",
+            description: "Positional argument from command",
+            required: true,
+          },
+          {
+            name: "output",
+            in: "query",
+            description: "Positional argument from command",
+            required: true,
+          },
+          { name: "format", in: "query" },
+        ],
+      ),
+    ).toEqual({ args: ["source.3mf", "part,final.3mf"], format: "binary" });
+  });
+
   it("keeps path params named even when they are described as positional", () => {
     expect(
       packParameterValues({ id: "stk-001", events: "3" }, [
@@ -68,7 +91,7 @@ describe("packLookupParameterValues", () => {
           },
         ],
       ),
-    ).toEqual({ status: "ready", query: "api", args: "payments" });
+    ).toEqual({ status: "ready", query: "api", args: ["payments"] });
   });
 });
 

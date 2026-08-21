@@ -56,7 +56,7 @@ const fixtureResolver: StackTraceSourceResolver = (frame: ParsedStackFrame) => {
   if (!frame.class) return undefined;
   const fx = fixtureSources[frame.class];
   if (!fx) return undefined;
-  return { lines: fx.lines, startLine: fx.startLine, language: "java" };
+  return { sourceLines: fx.lines, sourceStartLine: fx.startLine, sourceLanguage: "java" };
 };
 
 const greeterSource = fixtureSources["com.example.hello.Greeter"];
@@ -70,6 +70,33 @@ export const WithSourceResolver: Story = {
     input: sample,
     resolver: fixtureResolver,
     contextLines: 3,
+  },
+};
+
+// frameActions is a slot: the library places the node and reveals it on hover,
+// the consumer decides what a frame can do. Here, a stand-in for the host app's
+// "trace this method" / "decompile this class" affordances.
+export const WithFrameActions: Story = {
+  args: {
+    input: sample,
+    resolver: fixtureResolver,
+    frameActions: (frame) =>
+      frame.class?.startsWith("com.example.") ? (
+        <>
+          <button
+            type="button"
+            className="rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground hover:bg-accent"
+          >
+            Trace
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground hover:bg-accent"
+          >
+            Decompile
+          </button>
+        </>
+      ) : null,
   },
 };
 

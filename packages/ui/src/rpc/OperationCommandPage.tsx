@@ -25,6 +25,7 @@ import { hrefForOperation } from "./rowNavigation";
 import type {
   ExecutionResponse,
   OpenAPIParameter,
+  OperationRequestValues,
   ResolvedOperation,
 } from "./types";
 import { useOperationById, type OperationsApiClient } from "./useOperations";
@@ -211,7 +212,11 @@ export function OperationCommandPage({
   // "have I already fired this set of values" check.
   const lastSubmittedSignature = useRef("");
 
-  async function executeOperation(values: ParameterValues) {
+  async function executeOperation(options: {
+    values: ParameterValues;
+    request?: OperationRequestValues;
+    headers?: Record<string, string>;
+  }) {
     if (!operation) return;
 
     setIsExecuting(true);
@@ -221,11 +226,11 @@ export function OperationCommandPage({
       const response = await client.executeCommand(
         operation.path,
         operation.method,
-        packParameterValues(values, operation.operation.parameters ?? []),
-        { Accept: RESULT_ACCEPT },
+        options.request ?? packParameterValues(options.values, operation.operation.parameters ?? []),
+        options.headers ?? { Accept: RESULT_ACCEPT },
       );
       setResult(response);
-      onResult?.(response, operation, values);
+      onResult?.(response, operation, options.values);
     } catch (err) {
       setResult(null);
       setError(err);
@@ -259,7 +264,7 @@ export function OperationCommandPage({
     lastSubmittedSignature.current = JSON.stringify(
       pruneParameterValues(effectiveInitialValues),
     );
-    void executeOperation(effectiveInitialValues);
+    void executeOperation({ values: effectiveInitialValues });
   }, [
     effectiveAutoRun,
     effectiveInitialValues,
@@ -281,7 +286,7 @@ export function OperationCommandPage({
     const signature = JSON.stringify(pruneParameterValues(merged));
     if (lastSubmittedSignature.current === signature) return;
     lastSubmittedSignature.current = signature;
-    void executeOperation(merged);
+    void executeOperation({ values: merged });
   }, [
     isGet,
     hasAutoRun,
@@ -392,7 +397,7 @@ export function OperationCommandPage({
           <div className="rounded-lg border p-4">
             <CommandForm
               parameters={parameters}
-              onExecute={(params) => executeOperation(params)}
+              onExecute={(submission) => executeOperation(submission)}
               isPending={isExecuting}
               method={method}
               path={path}
