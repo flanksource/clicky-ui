@@ -395,7 +395,10 @@ export function Chat({
     if (status !== "ready") return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
-    if (!meta) return;
+    if (!meta) {
+      setUsage(null);
+      return;
+    }
     const settledModel = meta.model
       ? selectedChatModel(models, { id: meta.model, model: meta.model })
       : undefined;
