@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
+  dataTableGroupKey,
   groupRecords,
   isGroupCollapsedByDefault,
   type DataTableGroup,
 } from "./DataTable.grouping";
+
+describe("dataTableGroupKey", () => {
+  it.each([
+    ["api", "api"],
+    [0, "0"],
+    [false, "false"],
+    [12n, "12"],
+    [null, "(empty)"],
+    [undefined, "(empty)"],
+    ["", "(empty)"],
+  ])("normalizes the scalar value %s", (value, expected) => {
+    expect(dataTableGroupKey(value)).toBe(expected);
+  });
+
+  it("uses the configured empty label and rejects non-scalar column values", () => {
+    expect(dataTableGroupKey(null, "Unassigned")).toBe("Unassigned");
+    expect(() => dataTableGroupKey(["api"])).toThrow(/scalar values.*array/i);
+    expect(() => dataTableGroupKey({ service: "api" })).toThrow(
+      /scalar values.*object/i,
+    );
+  });
+});
 
 type Row = { id: string; team: string; cost: number };
 
@@ -52,9 +75,9 @@ describe("isGroupCollapsedByDefault", () => {
     expect(
       isGroupCollapsedByDefault(platform, (key) => key === "billing"),
     ).toBe(false);
-    expect(
-      isGroupCollapsedByDefault(billing, (key) => key === "billing"),
-    ).toBe(true);
+    expect(isGroupCollapsedByDefault(billing, (key) => key === "billing")).toBe(
+      true,
+    );
   });
 
   it("passes the group's own rows to the predicate", () => {

@@ -30,6 +30,58 @@ export type DataTableGrouping<T> = {
   compareGroups?: (a: DataTableGroup<T>, b: DataTableGroup<T>) => number;
 };
 
+type DataTableGroupingModeBase = {
+  /** Stable value used by the grouping picker and controlled state. */
+  value: string;
+  /** Text shown in the grouping picker. */
+  label: string;
+};
+
+export type DataTableGroupingCustomMode<T> = DataTableGroupingModeBase &
+  DataTableGrouping<T> & {
+    type: "custom";
+  };
+
+export type DataTableGroupingColumnMode<T> = DataTableGroupingModeBase &
+  Omit<DataTableGrouping<T>, "getGroupKey"> & {
+    type: "column";
+    /** Column key whose scalar value becomes the group key. */
+    columnKey: string;
+    /** Label used for null, undefined, or empty-string values. */
+    emptyGroupLabel?: string;
+  };
+
+export type DataTableGroupingNoneMode = DataTableGroupingModeBase & {
+  type: "none";
+};
+
+/** One selectable grouping strategy for DataTable's native picker. */
+export type DataTableGroupingMode<T> =
+  | DataTableGroupingCustomMode<T>
+  | DataTableGroupingColumnMode<T>
+  | DataTableGroupingNoneMode;
+
+/** Converts an automatic column-group value to the stable string key DataTable requires. */
+export function dataTableGroupKey(
+  value: unknown,
+  emptyGroupLabel = "(empty)",
+): string {
+  if (value === null || value === undefined || value === "") {
+    return emptyGroupLabel;
+  }
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+      return String(value);
+    default:
+      throw new Error(
+        `DataTable automatic grouping requires scalar values; received ${Array.isArray(value) ? "array" : typeof value}`,
+      );
+  }
+}
+
 /**
  * Buckets `records` by `getGroupKey`, preserving first-appearance order so
  * grouping never fights the active sort. Pure — no React, no DOM.
