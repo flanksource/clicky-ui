@@ -56,6 +56,28 @@ describe("SplitButton", () => {
     expect(screen.getByRole("button", { name: "Open menu" })).toBeDisabled();
   });
 
+  it("keeps the menu reachable when only the primary half is disabled", () => {
+    const { onCopy } = renderSplitButton({ primaryDisabled: true });
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    const chevron = screen.getByRole("button", { name: "Open menu" });
+    expect(chevron).toBeEnabled();
+
+    fireEvent.click(chevron);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy" }));
+    expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it("still disables the chevron when the whole control is disabled", () => {
+    renderSplitButton({ primaryDisabled: true, disabled: true });
+    expect(screen.getByRole("button", { name: "Open menu" })).toBeDisabled();
+  });
+
+  it("disables the sole button when a primary-disabled control has no menu items", () => {
+    renderSplitButton({ primaryDisabled: true, items: [] });
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
   it("fuses the two halves into a seamless control", () => {
     renderSplitButton();
     const primary = screen.getByRole("button", { name: "Save" });

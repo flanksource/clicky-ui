@@ -27,6 +27,10 @@ const meta = {
     },
     loading: { description: "Spinner on the primary half.", control: "boolean" },
     disabled: { description: "Disable both halves.", control: "boolean" },
+    primaryDisabled: {
+      description: "Disable only the primary action, leaving the menu reachable.",
+      control: "boolean",
+    },
   },
   args: {
     label: "Save",
@@ -47,6 +51,24 @@ export const Default: Story = {};
 export const Outline: Story = { args: { variant: "outline" } };
 
 export const Loading: Story = { args: { loading: true } };
+
+/** The default action does not apply right now, but the secondary ones still do. */
+export const PrimaryDisabled: Story = {
+  args: { primaryDisabled: true },
+  play: async ({ args, canvasElement, step }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+
+    await step("the primary half is unavailable", async () => {
+      await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    await step("the menu still opens and its items still fire", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Open menu" }));
+      await userEvent.click(canvas.getByRole("menuitem", { name: "Save as draft" }));
+      await expect(args.items[1].onSelect).toHaveBeenCalledTimes(1);
+    });
+  },
+};
 
 export const MenuInteraction: Story = {
   play: async ({ args, canvasElement, step }) => {

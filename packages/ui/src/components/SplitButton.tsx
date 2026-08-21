@@ -22,6 +22,11 @@ export type SplitButtonProps = {
   loading?: boolean;
   /** Disable both halves. */
   disabled?: boolean;
+  /**
+   * Disable only the primary action, leaving the menu reachable — for when the
+   * default action does not apply but the secondary ones still do.
+   */
+  primaryDisabled?: boolean;
   /** Horizontal alignment of the menu relative to the trigger. */
   align?: "left" | "right";
   /** Browser tooltip / accessible label for the chevron trigger. */
@@ -41,6 +46,7 @@ export function SplitButton({
   size = "default",
   loading = false,
   disabled = false,
+  primaryDisabled = false,
   align = "right",
   title,
   className,
@@ -54,7 +60,7 @@ export function SplitButton({
         variant={variant}
         size={size}
         loading={loading}
-        disabled={disabled}
+        disabled={disabled || primaryDisabled}
         onClick={onClick}
         className={className}
       >
@@ -70,7 +76,7 @@ export function SplitButton({
         variant={variant}
         size={size}
         loading={loading}
-        disabled={disabled}
+        disabled={disabled || primaryDisabled}
         onClick={onClick}
         className="rounded-r-none"
       >

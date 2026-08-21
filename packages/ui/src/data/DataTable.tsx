@@ -97,11 +97,14 @@ import { StatusDot } from "./cells/StatusDot";
 import { normalizeStatus } from "./cells/status-mapping";
 import type { BadgeStatus } from "./Badge";
 import {
+  dataTableGroupKey,
   groupRecords,
   isGroupCollapsedByDefault,
   type DataTableGrouping,
+  type DataTableGroupingMode,
   type DataTableGroupMetaAlign,
 } from "./DataTable.grouping";
+import { DataTableGroupingControls } from "./DataTableGroupingControls";
 
 export type { TimestampOptions, TagsOptions };
 
@@ -138,6 +141,11 @@ type ResolvedGroup<T> = {
   label: ReactNode;
   meta: ReactNode;
   collapsed: boolean;
+};
+
+type GroupCollapseState = {
+  all?: boolean;
+  groups: Record<string, boolean>;
 };
 
 type RowStreamItem<T> =
@@ -559,6 +567,14 @@ type DataTableInnerProps<
    * within a group and never pulls in rows from another page.
    */
   grouping?: DataTableGrouping<T>;
+  /** Selectable grouping strategies rendered in the native FilterBar picker. */
+  groupingModes?: Array<DataTableGroupingMode<T>>;
+  /** Controlled grouping-mode value. Requires `onGroupingModeChange`. */
+  groupingMode?: string;
+  /** Initial grouping mode when DataTable owns the picker state. */
+  defaultGroupingMode?: string;
+  /** Called when the native grouping picker changes. */
+  onGroupingModeChange?: (value: string) => void;
   /** Called when a clickable row is selected. */
   onRowClick?: (row: T) => void;
   /** Predicate controlling whether a row is clickable. */
@@ -650,6 +666,51 @@ export type DataTableProps<
   fullscreenButtonLabel?: string;
 };
 
+function assertDataTableGroupingProps<T>({
+  grouping,
+  groupingModes,
+  groupingMode,
+  defaultGroupingMode,
+  onGroupingModeChange,
+}: {
+  grouping: DataTableGrouping<T> | undefined;
+  groupingModes: Array<DataTableGroupingMode<T>> | undefined;
+  groupingMode: string | undefined;
+  defaultGroupingMode: string | undefined;
+  onGroupingModeChange: ((value: string) => void) | undefined;
+}) {
+  if (grouping && groupingModes) {
+    throw new Error("DataTable accepts grouping or groupingModes, not both");
+  }
+  if (!groupingModes) {
+    if (groupingMode !== undefined || defaultGroupingMode !== undefined) {
+      throw new Error("DataTable groupingMode values require groupingModes");
+    }
+    return;
+  }
+  if (groupingModes.length === 0) {
+    throw new Error("DataTable groupingModes must not be empty");
+  }
+  const values = new Set(groupingModes.map((mode) => mode.value));
+  if (values.size !== groupingModes.length) {
+    throw new Error("DataTable groupingModes values must be unique");
+  }
+  if (groupingMode !== undefined && !onGroupingModeChange) {
+    throw new Error(
+      "DataTable controlled groupingMode requires onGroupingModeChange",
+    );
+  }
+  if (groupingMode !== undefined && defaultGroupingMode !== undefined) {
+    throw new Error(
+      "DataTable cannot combine groupingMode with defaultGroupingMode",
+    );
+  }
+  const selected = groupingMode ?? defaultGroupingMode;
+  if (selected !== undefined && !values.has(selected)) {
+    throw new Error(`DataTable grouping mode "${selected}" does not exist`);
+  }
+}
+
 function DataTableInner<T extends Record<string, unknown>>({
   data,
   error,
@@ -686,6 +747,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   getRowClassName,
   footer,
   grouping,
+  groupingModes,
+  groupingMode,
+  defaultGroupingMode,
+  onGroupingModeChange,
   onRowClick,
   isRowClickable,
   getRowHref,
@@ -711,6 +776,13 @@ function DataTableInner<T extends Record<string, unknown>>({
   showHeaderFilters = true,
   menuActions,
 }: DataTableInnerProps<T>) {
+  assertDataTableGroupingProps({
+    grouping,
+    groupingModes,
+    groupingMode,
+    defaultGroupingMode,
+    onGroupingModeChange,
+  });
   const columns = useMemo<DataTableColumn<T>[]>(
     () =>
       columnsInput.map((column) =>
@@ -765,6 +837,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   >({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [detailRow, setDetailRow] = useState<InternalRow<T> | null>(null);
+  const [localGroupingMode, setLocalGroupingMode] = useState<
+    string | undefined
+  >(defaultGroupingMode);
   const [localGlobalFilter, setLocalGlobalFilter] = useState("");
   const [timeRangeFilter, setTimeRangeFilter] = useState<{
     from: string;
@@ -896,6 +971,36 @@ function DataTableInner<T extends Record<string, unknown>>({
       ),
     [columns, timestampFormats],
   );
+  const activeGroupingModeValue =
+    groupingMode ??
+    localGroupingMode ??
+    defaultGroupingMode ??
+    groupingModes?.[0]?.value;
+  const activeGroupingMode = groupingModes?.find(
+    (mode) => mode.value === activeGroupingModeValue,
+  );
+  const effectiveGrouping = useMemo<DataTableGrouping<T> | undefined>(() => {
+    if (!activeGroupingMode) return grouping;
+    if (activeGroupingMode.type === "none") return undefined;
+    if (activeGroupingMode.type === "custom") return activeGroupingMode;
+
+    const column = effectiveColumns.find(
+      (candidate) => candidate.key === activeGroupingMode.columnKey,
+    );
+    if (!column) {
+      throw new Error(
+        `DataTable grouping mode "${activeGroupingMode.value}" references missing column "${activeGroupingMode.columnKey}"`,
+      );
+    }
+    return {
+      ...activeGroupingMode,
+      getGroupKey: (row) =>
+        dataTableGroupKey(
+          resolveColumnValue(row, column),
+          activeGroupingMode.emptyGroupLabel,
+        ),
+    };
+  }, [activeGroupingMode, effectiveColumns, grouping]);
 
   const visibleColumns = useMemo(() => {
     if (!hideableColumns) return effectiveColumns;
@@ -1205,7 +1310,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   // The one range a column owns, and which column's header renders it. The
   // hoisted server bound wins over the local picker; a caller-supplied range
   // belongs to no column and so wins over both, in the bar only.
-  const columnTimeRange = useMemo<{ key: string; range: FilterBarRangeProps } | null>(() => {
+  const columnTimeRange = useMemo<{
+    key: string;
+    range: FilterBarRangeProps;
+  } | null>(() => {
     if (serverTimeRangeFilter && rangeCapableColumn) {
       return {
         key: rangeCapableColumn.key,
@@ -1242,21 +1350,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     !!externalSearch ||
     (externalFilters && externalFilters.length > 0) ||
     hasCustomFilterBarContent ||
+    !!groupingModes ||
     showTablePreferencesControl;
   const setDensityOverride = (next: Density | undefined) => {
     if (!densityControlled) setLocalDensityOverride(next);
     onDensityChange?.(next);
   };
-  const filterBarTrailing = showTablePreferencesControl ? (
-    <>
-      {filterBarProps?.trailing}
-      <ColumnVisibilityTrigger
-        onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))}
-      />
-    </>
-  ) : (
-    filterBarProps?.trailing
-  );
   const showHeaderFilterControls =
     showHeaderFilters && (headerFilterByColumn.size > 0 || !!columnTimeRange);
 
@@ -1522,34 +1621,78 @@ function DataTableInner<T extends Record<string, unknown>>({
       : pagination
         ? null
         : loading && sorted.length === 0
-          ? loadingMessage
-          : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`;
+            ? loadingMessage
+            : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`;
 
-  const [collapsedGroups, setCollapsedGroups] = useState<
-    Record<string, boolean>
+  const [collapseStateByMode, setCollapseStateByMode] = useState<
+    Record<string, GroupCollapseState>
   >({});
+  const collapseStateKey = activeGroupingMode
+    ? `mode:${activeGroupingMode.value}`
+    : "fixed";
+  const collapseState = collapseStateByMode[collapseStateKey];
   const groups = useMemo(() => {
-    if (!grouping) return null;
+    if (!effectiveGrouping) return null;
     const buckets = groupRecords(visibleSorted, (record) =>
-      grouping.getGroupKey(record.row),
+      effectiveGrouping.getGroupKey(record.row),
     );
     const resolved = buckets.map((bucket) => ({
       key: bucket.key,
       records: bucket.rows,
       rows: bucket.rows.map((record) => record.row),
     }));
-    if (grouping.compareGroups) {
-      resolved.sort((a, b) => grouping.compareGroups!(a, b));
+    if (effectiveGrouping.compareGroups) {
+      resolved.sort((a, b) => effectiveGrouping.compareGroups!(a, b));
     }
     return resolved.map((group) => ({
       ...group,
-      label: grouping.getGroupLabel?.(group.key, group.rows) ?? group.key,
-      meta: grouping.getGroupMeta?.(group.key, group.rows),
+      label:
+        effectiveGrouping.getGroupLabel?.(group.key, group.rows) ?? group.key,
+      meta: effectiveGrouping.getGroupMeta?.(group.key, group.rows),
       collapsed:
-        collapsedGroups[group.key] ??
-        isGroupCollapsedByDefault(group, grouping.defaultCollapsed),
+        collapseState?.groups[group.key] ??
+        collapseState?.all ??
+        isGroupCollapsedByDefault(group, effectiveGrouping.defaultCollapsed),
     }));
-  }, [collapsedGroups, grouping, visibleSorted]);
+  }, [collapseState, effectiveGrouping, visibleSorted]);
+
+  const hasGroups = !!groups?.length;
+  const allGroupsExpanded =
+    hasGroups && groups.every((group) => !group.collapsed);
+  const allGroupsCollapsed =
+    hasGroups && groups.every((group) => group.collapsed);
+  const setAllGroupsCollapsed = (collapsed: boolean) => {
+    setCollapseStateByMode((current) => ({
+      ...current,
+      [collapseStateKey]: { all: collapsed, groups: {} },
+    }));
+  };
+  const filterBarTrailing =
+    filterBarProps?.trailing || groupingModes || showTablePreferencesControl ? (
+      <>
+        {filterBarProps?.trailing}
+        {groupingModes ? (
+          <DataTableGroupingControls
+            modes={groupingModes}
+            value={activeGroupingModeValue!}
+            hasGroups={hasGroups}
+            allExpanded={allGroupsExpanded}
+            allCollapsed={allGroupsCollapsed}
+            onModeChange={(value) => {
+              if (groupingMode === undefined) setLocalGroupingMode(value);
+              onGroupingModeChange?.(value);
+            }}
+            onExpandAll={() => setAllGroupsCollapsed(false)}
+            onCollapseAll={() => setAllGroupsCollapsed(true)}
+          />
+        ) : null}
+        {showTablePreferencesControl ? (
+          <ColumnVisibilityTrigger
+            onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))}
+          />
+        ) : null}
+      </>
+    ) : undefined;
 
   // Group headers and data rows share one flat stream so the <tbody> keeps a
   // single row renderer whether or not grouping is on.
@@ -1754,20 +1897,26 @@ function DataTableInner<T extends Record<string, unknown>>({
             aria-busy={(loading && error == null) || undefined}
           >
             <table className="w-max min-w-full table-auto text-left text-sm">
-            <colgroup>
-              {rowSelection && error == null ? <col className="w-10" /> : null}
-              {visibleColumns.map((column) => (
-                <col
-                  key={column.key}
+              <colgroup>
+                {rowSelection && error == null ? (
+                  <col className="w-10" />
+                ) : null}
+                {visibleColumns.map((column) => (
+                  <col
+                    key={column.key}
                   // An error row spans every column and is the only body content
                   // there is, so the column widths have nothing left to size.
-                  // Keeping them stretches the table far past the viewport and
-                  // carries the error's own controls — copy, expand — out with
-                  // it, reachable only by scrolling sideways.
-                  style={error == null ? columnStyle(column, columnWidths) : undefined}
-                  className={
-                    column.shrink && !column.grow && error == null
-                      ? "w-px"
+                    // Keeping them stretches the table far past the viewport and
+                    // carries the error's own controls — copy, expand — out with
+                    // it, reachable only by scrolling sideways.
+                    style={
+                      error == null
+                        ? columnStyle(column, columnWidths)
+                        : undefined
+                    }
+                    className={
+                      column.shrink && !column.grow && error == null
+                        ? "w-px"
                       : undefined
                   }
                 />
@@ -1871,13 +2020,15 @@ function DataTableInner<T extends Record<string, unknown>>({
                         aria-orientation="vertical"
                         className="absolute right-0 top-0 hidden h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20 md:flex"
                         onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        onDoubleClick={(event) => autoFitColumn(event, column)}
-                        onMouseDown={(event) =>
-                          startColumnResize(event, column)
-                        }
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onDoubleClick={(event) =>
+                            autoFitColumn(event, column)
+                          }
+                          onMouseDown={(event) =>
+                            startColumnResize(event, column)
+                          }
                       >
                         <span
                           aria-hidden
@@ -1916,23 +2067,31 @@ function DataTableInner<T extends Record<string, unknown>>({
                   if (item.kind === "group") {
                     return (
                       <DataTableGroupHeaderRow
-                        key={`group:${item.group.key}`}
-                        label={item.group.label}
-                        meta={item.group.meta}
-                        metaAlign={grouping?.metaAlign ?? "end"}
-                        {...(grouping?.metaClassName
-                          ? { metaClassName: grouping.metaClassName }
-                          : {})}
-                        count={item.group.records.length}
-                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
-                        collapsed={item.group.collapsed}
-                        onToggleCollapsed={() =>
-                          setCollapsedGroups((current) => ({
-                            ...current,
-                            [item.group.key]: !item.group.collapsed,
-                          }))
-                        }
-                        {...(rowSelection
+                          key={`group:${item.group.key}`}
+                          label={item.group.label}
+                          meta={item.group.meta}
+                          metaAlign={effectiveGrouping?.metaAlign ?? "end"}
+                          {...(effectiveGrouping?.metaClassName
+                            ? { metaClassName: effectiveGrouping.metaClassName }
+                            : {})}
+                          count={item.group.records.length}
+                          colSpan={
+                            visibleColumns.length + (rowSelection ? 1 : 0)
+                          }
+                          collapsed={item.group.collapsed}
+                          onToggleCollapsed={() =>
+                            setCollapseStateByMode((current) => ({
+                              ...current,
+                              [collapseStateKey]: {
+                                ...current[collapseStateKey],
+                                groups: {
+                                  ...current[collapseStateKey]?.groups,
+                                  [item.group.key]: !item.group.collapsed,
+                                },
+                              },
+                            }))
+                          }
+                          {...(rowSelection
                           ? {
                               selection: {
                                 selectableCount: item.group.records.filter(
@@ -1983,13 +2142,14 @@ function DataTableInner<T extends Record<string, unknown>>({
                           "relative border-b border-border/60 align-top",
                           clickable && "cursor-pointer hover:bg-accent/40",
                           selectedRowIDs.has(record.id) && "bg-accent/50",
-                          getRowClassName?.(record.row),
-                        )}
-                        onClick={() => {
-                          if (selectionClickEnabled) toggleRowSelection(record);
-                          if (expandsInline) {
-                            setExpandedRows((current) => ({
-                              ...current,
+                            getRowClassName?.(record.row),
+                          )}
+                          onClick={() => {
+                            if (selectionClickEnabled)
+                              toggleRowSelection(record);
+                            if (expandsInline) {
+                              setExpandedRows((current) => ({
+                                ...current,
                               [record.id]: !current[record.id],
                             }));
                           }
@@ -2054,13 +2214,17 @@ function DataTableInner<T extends Record<string, unknown>>({
                             content = (
                               <CellFilterActions
                                 value={serverFilterValue}
-                                {...(serverFilterDisplayValue !== undefined
-                                  ? { displayValue: serverFilterDisplayValue }
-                                  : {})}
-                                mode={cellFilters?.[filterKey]?.[serverFilterValue]}
-                                onChange={(mode) =>
-                                  onCellFilterChange({
-                                    key: filterKey,
+                                  {...(serverFilterDisplayValue !== undefined
+                                    ? { displayValue: serverFilterDisplayValue }
+                                    : {})}
+                                  mode={
+                                    cellFilters?.[filterKey]?.[
+                                      serverFilterValue
+                                    ]
+                                  }
+                                  onChange={(mode) =>
+                                    onCellFilterChange({
+                                      key: filterKey,
                                     value: serverFilterValue,
                                     mode,
                                   })
@@ -2355,7 +2519,10 @@ function DataTablePaginationFooter({
     total === 0 || !hasVisibleRows ? 0 : infinite ? 1 : safePage * pageSize + 1;
   const rangeEnd =
     total != null && hasVisibleRows
-      ? Math.min(approximate ? Infinity : total, rangeStart + Math.max(visibleRowCount - 1, 0))
+      ? Math.min(
+          approximate ? Infinity : total,
+          rangeStart + Math.max(visibleRowCount - 1, 0),
+        )
       : visibleRowCount;
   const rangeLabel =
     total != null
@@ -2494,7 +2661,7 @@ function DataTableGroupHeaderRow({
             aria-expanded={!collapsed}
             onClick={onToggleCollapsed}
             className={cn(
-              "flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary",
+              "flex min-w-0 items-center gap-1.5 text-left text-sm font-semibold text-foreground hover:text-primary",
               // `flex-1` is what pushes the meta to the trailing edge. Dropping
               // it lets the meta sit right after the count instead.
               metaAlign === "end" && "flex-1",
@@ -2512,7 +2679,7 @@ function DataTableGroupHeaderRow({
           {meta ? (
             <div
               className={cn(
-                "shrink-0 text-xs text-muted-foreground",
+                "shrink-0 text-sm text-muted-foreground",
                 metaClassName,
               )}
             >
@@ -3189,10 +3356,7 @@ function CellContent<T extends Record<string, unknown>>({
 }) {
   return (
     <div
-      className={cn(
-        cellContentClassName(column),
-        alignmentClass(column.align),
-      )}
+      className={cn(cellContentClassName(column), alignmentClass(column.align))}
     >
       {children}
     </div>

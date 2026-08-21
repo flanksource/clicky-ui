@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { createRef } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
+import type { DataTableGroupingMode } from "./DataTable.grouping";
 import { RouterProvider } from "../rpc/RouterProvider";
 import type { RouterAdapter } from "../rpc/router";
 
@@ -94,7 +95,9 @@ describe("DataTable", () => {
   it("renders the table frame on the shared background surface", () => {
     render(<DataTable data={rows} columns={columns} />);
 
-    expect(screen.getByRole("table").parentElement).toHaveClass("bg-background");
+    expect(screen.getByRole("table").parentElement).toHaveClass(
+      "bg-background",
+    );
   });
 
   it("sorts columns by default and toggles the sort order", () => {
@@ -230,12 +233,11 @@ describe("DataTable", () => {
 
     const header = screen.getByRole("button", { name: /Status: healthy/ });
     const headerCell = header.closest("td");
-    expect(headerCell).toHaveAttribute(
-      "colSpan",
-      String(columns.length),
-    );
+    expect(headerCell).toHaveAttribute("colSpan", String(columns.length));
     expect(headerCell).toHaveTextContent("2 services");
     expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(header).toHaveClass("text-sm");
+    expect(header.nextElementSibling).toHaveClass("text-sm");
     expect(screen.getByText("api")).toBeInTheDocument();
     expect(screen.getByText("cron")).toBeInTheDocument();
 
@@ -308,7 +310,9 @@ describe("DataTable", () => {
       screen.getByRole("button", { name: /healthy/ }).closest("td"),
     ).toHaveAttribute("colSpan", String(columns.length + 1));
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select group healthy" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select group healthy" }),
+    );
 
     expect(onSelectionChange).toHaveBeenLastCalledWith(["api"], [rows[0]]);
   });
@@ -336,6 +340,132 @@ describe("DataTable", () => {
     ]);
     expect(screen.queryByText("worker")).not.toBeInTheDocument();
     expect(screen.getByText("api")).toBeInTheDocument();
+  });
+
+  it("owns the native grouping picker and supports custom, column, and ungrouped modes", () => {
+    const groupingModes: Array<DataTableGroupingMode<ServiceRow>> = [
+      {
+        type: "custom",
+        value: "status",
+        label: "By status",
+        getGroupKey: (row) => row.status,
+        getGroupLabel: (key) => `Status: ${key}`,
+      },
+      {
+        type: "column",
+        value: "service",
+        label: "By service",
+        columnKey: "service",
+      },
+      { type: "none", value: "none", label: "No grouping" },
+    ];
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        groupingModes={groupingModes}
+        defaultGroupingMode="status"
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", { name: "Group rows by" });
+    expect(picker.closest('[data-slot="filter-bar"]')).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: /^Status: healthy/ }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(picker, { target: { value: "service" } });
+    expect(screen.getByRole("button", { name: /^api 1$/ })).toBeInTheDocument();
+
+    fireEvent.change(picker, { target: { value: "none" } });
+    expect(
+      screen
+        .queryAllByRole("button")
+        .filter((button) => button.hasAttribute("aria-expanded")),
+    ).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Expand all groups" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Collapse all groups" }),
+    ).toBeDisabled();
+  });
+
+  it("reports controlled grouping changes without changing modes until the value changes", () => {
+    const onGroupingModeChange = vi.fn();
+    const groupingModes: Array<DataTableGroupingMode<ServiceRow>> = [
+      {
+        type: "custom",
+        value: "status",
+        label: "By status",
+        getGroupKey: (row) => row.status,
+      },
+      { type: "none", value: "none", label: "No grouping" },
+    ];
+    const { rerender } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        groupingModes={groupingModes}
+        groupingMode="none"
+        onGroupingModeChange={onGroupingModeChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Group rows by" }), {
+      target: { value: "status" },
+    });
+    expect(onGroupingModeChange).toHaveBeenCalledWith("status");
+    expect(screen.queryByRole("button", { name: /healthy/ })).toBeNull();
+
+    rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        groupingModes={groupingModes}
+        groupingMode="status"
+        onGroupingModeChange={onGroupingModeChange}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /healthy/ })).toBeInTheDocument();
+  });
+
+  it("keeps collapse-all active for groups revealed later and restores every row", () => {
+    const groupingModes: Array<DataTableGroupingMode<ServiceRow>> = [
+      {
+        type: "custom",
+        value: "status",
+        label: "By status",
+        getGroupKey: (row) => row.status,
+      },
+    ];
+    const { rerender } = render(
+      <DataTable
+        data={rows.slice(0, 1)}
+        columns={columns}
+        groupingModes={groupingModes}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Collapse all groups" }),
+    );
+    expect(screen.queryByText("api")).toBeNull();
+
+    rerender(
+      <DataTable data={rows} columns={columns} groupingModes={groupingModes} />,
+    );
+    expect(screen.queryByText("worker")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Collapse all groups" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.getByText("cron")).toBeInTheDocument();
   });
 
   it("reports controlled manual sort without reordering the current page", () => {
@@ -424,7 +554,13 @@ describe("DataTable", () => {
   });
 
   it("keeps the table shell visible with empty source data", () => {
-    render(<DataTable data={[]} columns={columns} emptyMessage="No matching records" />);
+    render(
+      <DataTable
+        data={[]}
+        columns={columns}
+        emptyMessage="No matching records"
+      />,
+    );
 
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(
@@ -551,8 +687,12 @@ describe("DataTable", () => {
       onPageChange: vi.fn(),
       onPageSizeChange: vi.fn(),
     };
-    const view = render(<DataTable data={rows} columns={columns} pagination={paged} />);
-    expect(screen.queryByRole("button", { name: /service/i })).not.toBeInTheDocument();
+    const view = render(
+      <DataTable data={rows} columns={columns} pagination={paged} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /service/i }),
+    ).not.toBeInTheDocument();
 
     // A caller that wired the sort to the server gets the header back, because
     // then it sorts the whole result rather than the page.
@@ -611,7 +751,9 @@ describe("DataTable", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Next page" })).not.toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Next page" }),
+    ).not.toBeDisabled();
   });
 
   describe("cursor pagination", () => {
@@ -640,7 +782,9 @@ describe("DataTable", () => {
     it("steps forward on the cursor the server minted", () => {
       const { onCursorChange } = cursorTable({ next: "page-2" });
 
-      expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "Previous page" }),
+      ).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: "Next page" }));
       expect(onCursorChange).toHaveBeenCalledWith("page-2");
     });
@@ -926,7 +1070,9 @@ describe("DataTable", () => {
       </RouterProvider>,
     );
 
-    fireEvent.mouseEnter(screen.getByText("payments").closest("span.relative")!);
+    fireEvent.mouseEnter(
+      screen.getByText("payments").closest("span.relative")!,
+    );
     act(() => vi.advanceTimersByTime(150));
 
     const link = screen.getByRole("link", { name: "payments" });
@@ -1144,9 +1290,9 @@ describe("DataTable", () => {
     expect(screen.getAllByText("healthy")[0].closest("td")).toHaveStyle({
       maxWidth: "256px",
     });
-    expect(screen.getByText("Production API service").closest("td")).toHaveStyle(
-      { maxWidth: "288px" },
-    );
+    expect(
+      screen.getByText("Production API service").closest("td"),
+    ).toHaveStyle({ maxWidth: "288px" });
     expect(screen.getByText("0").closest("td")).toHaveStyle({
       maxWidth: "400px",
     });
@@ -2055,13 +2201,14 @@ describe("DataTable", () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByText("payments").closest("span.relative")!);
+    fireEvent.mouseEnter(
+      screen.getByText("payments").closest("span.relative")!,
+    );
     act(() => vi.advanceTimersByTime(150));
 
-    expect(screen.getByRole("button", { name: "Exclude payments" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: "Exclude payments" }),
+    ).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Include payments" }));
     expect(onCellFilterChange).toHaveBeenCalledWith({
       key: "filter.service",
@@ -2552,8 +2699,12 @@ describe("DataTable caller-owned FilterBar inputs", () => {
         />,
       );
 
-      expect(screen.queryByRole("button", { name: "Previous page" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Previous page" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Next page" }),
+      ).not.toBeInTheDocument();
       expect(screen.queryByText(/^Page /)).not.toBeInTheDocument();
 
       // The accumulated run starts at the top, not at the offset the most
@@ -2570,7 +2721,9 @@ describe("DataTable caller-owned FilterBar inputs", () => {
   it("exposes the scrollable region through scrollContainerRef", () => {
     const ref = createRef<HTMLDivElement>();
 
-    render(<DataTable data={rows} columns={columns} scrollContainerRef={ref} />);
+    render(
+      <DataTable data={rows} columns={columns} scrollContainerRef={ref} />,
+    );
 
     expect(ref.current).not.toBeNull();
     expect(ref.current).toHaveClass("overflow-auto");

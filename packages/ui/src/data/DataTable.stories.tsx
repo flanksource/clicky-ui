@@ -20,6 +20,7 @@ import {
   type DataTableMenuAction,
   type DataTableProps,
 } from "./DataTable";
+import type { DataTableGroupingMode } from "./DataTable.grouping";
 
 type Row = {
   service: string;
@@ -651,9 +652,9 @@ function RowDetailDialogShowcase() {
 }
 
 function FilterDescriptionsShowcase() {
-  const [status, setStatus] = useState<Record<string, FilterBarMultiFilterMode>>(
-    {},
-  );
+  const [status, setStatus] = useState<
+    Record<string, FilterBarMultiFilterMode>
+  >({});
   const [owner, setOwner] = useState("");
   const [minRestarts, setMinRestarts] = useState("");
   const [service, setService] = useState("");
@@ -807,10 +808,12 @@ function DialogTableShowcase() {
   const [open, setOpen] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>({
-    key: "name",
-    dir: "asc",
-  });
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(
+    {
+      key: "name",
+      dir: "asc",
+    },
+  );
   // Keyed by row id so a selection made on page 1 survives paging to page 3.
   const [selected, setSelected] = useState<Record<string, PersonRow>>({});
 
@@ -934,6 +937,35 @@ function GroupedRowsShowcase() {
         />
       </section>
     </div>
+  );
+}
+
+const rowGroupingModes: Array<DataTableGroupingMode<Row>> = [
+  {
+    type: "column",
+    value: "owner",
+    label: "Owner",
+    columnKey: "owner",
+  },
+  {
+    type: "custom",
+    value: "status",
+    label: "Status",
+    getGroupKey: (row) => row.status,
+    getGroupLabel: (key) => `Status: ${key}`,
+  },
+  { type: "none", value: "none", label: "No grouping" },
+];
+
+function NativeGroupingShowcase() {
+  return (
+    <DataTable
+      data={rows}
+      columns={columns}
+      getRowId={(row) => row.service}
+      groupingModes={rowGroupingModes}
+      defaultGroupingMode="owner"
+    />
   );
 }
 
@@ -1148,11 +1180,11 @@ export const InDialogWithPagingAndSelection: Story = {
     docs: {
       description: {
         story: [
-          "A DataTable hosted inside a `Modal` with server-style pagination and controlled multi-row selection — the pattern behind the chat \"Add context\" picker.",
+          'A DataTable hosted inside a `Modal` with server-style pagination and controlled multi-row selection — the pattern behind the chat "Add context" picker.',
           "",
           "- **Only the rows scroll.** The dialog sets `scrollBody={false}`, so the modal body is a non-scrolling flex column and the table's own row region owns the scroll. The sticky header, filter/search bar, pagination footer, and the selection action bar all stay pinned.",
           "- **Selection persists across pages.** It is keyed by `getRowId`, so a row checked on page 1 stays checked after paging to page 3; the footer shows the running count and the primary action is disabled until at least one row is selected.",
-          "- **Pagination is server-shaped.** The DataTable never slices `data`, so the story sorts and slices the current page itself and reports the true `total` for \"Page X of Y\".",
+          '- **Pagination is server-shaped.** The DataTable never slices `data`, so the story sorts and slices the current page itself and reports the true `total` for "Page X of Y".',
         ].join("\n"),
       },
     },
@@ -1167,7 +1199,7 @@ export const SelectionActionsAndFooter: Story = {
         story: [
           "`selectionActions` renders a bulk action bar pinned to the bottom of the table shell whenever `rowSelection` holds a non-empty selection — it receives the selected rows and a `clearSelection` callback, so the caller owns the copy and the actions but not the plumbing.",
           "",
-          "`footer` replaces the default \"N of M rows\" strip, and `getRowClassName` tints the degraded row.",
+          '`footer` replaces the default "N of M rows" strip, and `getRowClassName` tints the degraded row.',
         ].join("\n"),
       },
     },
@@ -1213,7 +1245,7 @@ export const GroupedRows: Story = {
         story: [
           "`grouping` splits the rendered rows into collapsible groups. It presents what is already on screen — it runs after filtering, sorting and pagination, so it never reorders rows within a group and never pulls in rows from another page.",
           "",
-          "`getGroupMeta` is a per-group summary rendered inside the header row. `metaAlign` places it: `\"end\"` (the default) pins it to the trailing edge, while `\"start\"` keeps it immediately after the label and count — which is what you want when the summary is an aggregate of the group rather than a status for the row region.",
+          '`getGroupMeta` is a per-group summary rendered inside the header row. `metaAlign` places it: `"end"` (the default) pins it to the trailing edge, while `"start"` keeps it immediately after the label and count — which is what you want when the summary is an aggregate of the group rather than a status for the row region.',
         ].join("\n"),
       },
     },
@@ -1235,5 +1267,32 @@ export const GroupedRows: Story = {
 
     await userEvent.click(adjacent!);
     await expect(adjacent).toHaveAttribute("aria-expanded", "false");
+  },
+};
+
+export const NativeGrouping: Story = {
+  render: () => <NativeGroupingShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`groupingModes` adds DataTable-owned grouping controls to its FilterBar. Modes can group automatically by a scalar column, provide a custom key and label, or turn grouping off. Expand-all and collapse-all apply to current and subsequently revealed groups.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const picker = canvas.getByRole("combobox", { name: "Group rows by" });
+    await expect(picker).toHaveValue("owner");
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Collapse all groups" }),
+    );
+    await expect(canvas.queryByText("api")).toBeNull();
+
+    await userEvent.selectOptions(picker, "status");
+    await expect(
+      canvas.getByRole("button", { name: /^Status: healthy/ }),
+    ).toBeVisible();
   },
 };
