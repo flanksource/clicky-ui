@@ -21,6 +21,7 @@ export type AdvancedChatConfigProps = {
   onRuntimeChange?: ((runtime: ChatModelRuntime) => void) | undefined;
   runtimeFamilies?: SpecRuntimeFamily[] | undefined;
   reasoningEfforts: string[];
+  runtimeLocked?: boolean | undefined;
   permissionMode: ClaudePermissionMode;
   onPermissionModeChange?: ((mode: ClaudePermissionMode) => void) | undefined;
   temperature?: number | undefined;
@@ -39,6 +40,7 @@ export function AdvancedChatConfig({
   onRuntimeChange,
   runtimeFamilies,
   reasoningEfforts,
+  runtimeLocked = false,
   permissionMode,
   onPermissionModeChange,
   temperature,
@@ -65,6 +67,13 @@ export function AdvancedChatConfig({
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Runtime
           </div>
+          {runtimeLocked && (
+            <div className="rounded border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Model and backend are locked after the first message. Fork this
+              conversation to change them; effort and generation settings remain
+              adjustable.
+            </div>
+          )}
           {catalogLoading && (
             <div className="text-xs text-muted-foreground">
               Checking model and runtime availability…
@@ -95,6 +104,7 @@ export function AdvancedChatConfig({
             onChange={(next) => onRuntimeChange?.(next)}
             models={models}
             reasoningEfforts={reasoningEfforts}
+            locked={runtimeLocked}
             {...(runtimeFamilies ? { families: runtimeFamilies } : {})}
             className="max-w-full"
           />
@@ -105,7 +115,7 @@ export function AdvancedChatConfig({
               value={permissionMode}
               onChange={(event) =>
                 onPermissionModeChange?.(
-                  event.target.value as ClaudePermissionMode
+                  event.target.value as ClaudePermissionMode,
                 )
               }
               className="h-8 rounded border border-border bg-background px-2 text-xs"
@@ -218,7 +228,7 @@ function UsageCostPanel({
         <MetricRow
           label="Context"
           value={`${formatNumber(usage?.usedTokens)} / ${formatNumber(
-            usage?.maxTokens
+            usage?.maxTokens,
           )}`}
         />
         <MetricRow

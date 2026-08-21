@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
 } from "react";
@@ -9,8 +10,9 @@ import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Icon } from "../Icon";
-import { UiAdd, UiClose, UiFullscreen } from "../../icons";
+import { UiAdd, UiClose, UiFullscreen, UiGitBranch } from "../../icons";
 import { Chat } from "../chat/Chat";
+import { forkChatSession, type CaptainChatSession } from "../chat/approval";
 import type {
   ChatBudgetConfig,
   ChatUsageSummary,
@@ -128,12 +130,32 @@ export function ChatWindow({
     handleModelChange,
     handleReasoningEffortChange,
     handleTemperatureChange,
+    replaceRuntimeIdentity,
+    replaceRuntime,
   } = useChatWindowRuntime({
     chat,
     initialModel: panel.initialModel,
     models: resolvedModels,
     storedRuntime: storedPrefs.runtime,
   });
+  const [messageCount, setMessageCount] = useState(0);
+  const [runtimeBound, setRuntimeBound] = useState(false);
+  const [forking, setForking] = useState(false);
+  const runtimeLocked = runtimeBound || messageCount > 0;
+  const preferredRuntimeRef = useRef(runtime);
+  const threadIdRef = useRef(panel.threadId);
+  threadIdRef.current = panel.threadId;
+
+  useEffect(() => {
+    if (!runtimeLocked) preferredRuntimeRef.current = runtime;
+  }, [runtime, runtimeLocked]);
+
+  useEffect(() => {
+    setMessageCount(0);
+    setRuntimeBound(false);
+    setUsage(null);
+    replaceRuntime(preferredRuntimeRef.current);
+  }, [panel.threadId, replaceRuntime]);
 
   useEffect(() => {
     if (chat?.budget !== undefined) setBudget(chat.budget);
@@ -171,14 +193,14 @@ export function ChatWindow({
 
   useEffect(() => {
     saveChatPreferences({
-      runtime,
+      runtime: runtimeLocked ? preferredRuntimeRef.current : runtime,
       ...(budget.cost !== undefined || budget.maxTokens !== undefined
         ? { budget }
         : {}),
       permissionMode,
       toolPrefs: explicitToolPrefs,
     });
-  }, [budget, permissionMode, runtime, explicitToolPrefs]);
+  }, [budget, permissionMode, runtime, runtimeLocked, explicitToolPrefs]);
 
   const toolPrefs = useMemo(
     () =>
@@ -273,6 +295,41 @@ export function ChatWindow({
     },
     [chat],
   );
+  const handleSessionHydrated = useCallback(
+    (session: CaptainChatSession) => {
+      if (session.id !== panel.threadId) return;
+      setRuntimeBound(
+        Boolean(session.runtime?.model && session.runtime.backend),
+      );
+      if (session.runtime?.model && session.runtime.backend) {
+        replaceRuntimeIdentity(session.runtime);
+      }
+      chat?.onSessionHydrated?.(session);
+    },
+    [chat, panel.threadId, replaceRuntimeIdentity],
+  );
+  const handleMessageCountChange = useCallback(
+    (count: number) => {
+      setMessageCount(count);
+      chat?.onMessageCountChange?.(count);
+    },
+    [chat],
+  );
+  const handleFork = useCallback(async () => {
+    if (!sessionsApi || !panel.threadId || messageCount === 0 || forking)
+      return;
+    const sourceThreadId = panel.threadId;
+    setForking(true);
+    try {
+      const fork = await forkChatSession(sessionsApi, sourceThreadId);
+      if (threadIdRef.current !== sourceThreadId) return;
+      openPanel({ threadId: fork.id });
+    } catch (error) {
+      console.warn("clicky-ui: failed to fork chat session", error);
+    } finally {
+      setForking(false);
+    }
+  }, [forking, messageCount, openPanel, panel.threadId, sessionsApi]);
 
   const header = (
     <div className="chat-drag-handle flex cursor-move items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
@@ -309,6 +366,7 @@ export function ChatWindow({
         budget={budget}
         onBudgetChange={setBudget}
         usage={usage}
+        runtimeLocked={runtimeLocked}
         {...(sessionsApi ? { costsApi: sessionsApi } : {})}
         {...(panel.threadId ? { threadId: panel.threadId } : {})}
         toolsLoading={toolsLoading}
@@ -317,6 +375,21 @@ export function ChatWindow({
         catalogError={catalogError}
         onCatalogRetry={retryCatalogs}
       />
+      {sessionsApi && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title={
+            messageCount === 0
+              ? "Send a message before forking this conversation"
+              : "Fork conversation into a new window"
+          }
+          disabled={!panel.threadId || messageCount === 0 || forking}
+          onClick={() => void handleFork()}
+        >
+          <Icon icon={UiGitBranch} className="size-4" />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"
@@ -367,6 +440,7 @@ export function ChatWindow({
           <ChatThreadSetupStatus setup={threadSetup} />
         ) : (
           <Chat
+            key={panel.threadId ?? `new-${panel.id}`}
             {...chat}
             {...(resolvedModels.length
               ? { models: resolvedModels, modelsApi: null }
@@ -379,6 +453,9 @@ export function ChatWindow({
             onReasoningEffortChange={handleReasoningEffortChange}
             budget={budget}
             onUsage={handleUsage}
+            runtimeLocked={runtimeLocked}
+            onMessageCountChange={handleMessageCountChange}
+            onSessionHydrated={handleSessionHydrated}
             {...(panel.threadId ? { threadId: panel.threadId } : {})}
             sessionsApi={sessionsApi}
             tools={resolvedTools}

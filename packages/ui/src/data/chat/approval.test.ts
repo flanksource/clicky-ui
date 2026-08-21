@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getChatSession, postToolApproval } from "./approval";
+import { forkChatSession, getChatSession, postToolApproval } from "./approval";
 
 const session = {
   id: "session-1",
@@ -72,6 +72,24 @@ describe("Captain chat sessions", () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ approved: true }),
+      },
+    );
+  });
+
+  it("forks the encoded Captain session identity", async () => {
+    const fork = { id: "fork-1", forkedFrom: "session/1", messages: [] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json(fork, { status: 201 }));
+
+    await expect(
+      forkChatSession("/api/chat/sessions/", "session/1", fetchMock),
+    ).resolves.toEqual(fork);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/chat/sessions/session%2F1/fork",
+      {
+        method: "POST",
+        headers: { Accept: "application/json" },
       },
     );
   });

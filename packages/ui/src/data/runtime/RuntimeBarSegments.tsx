@@ -35,6 +35,7 @@ export type RuntimeBarSegmentsProps = {
   selectedMode: string;
   reasoningEfforts: string[];
   supportedEfforts: string[];
+  locked: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onBackendChange: (familyId: string, modeId: string) => void;
@@ -56,6 +57,7 @@ export function RuntimeBarSegments({
   selectedMode,
   reasoningEfforts,
   supportedEfforts,
+  locked,
   ariaLabel,
   className,
   onBackendChange,
@@ -81,6 +83,7 @@ export function RuntimeBarSegments({
       <RuntimeSegment
         menuLabel="Family"
         title={`Family — ${family.label}`}
+        disabled={locked}
         items={familyItems({
           families,
           models,
@@ -99,6 +102,7 @@ export function RuntimeBarSegments({
       <RuntimeSegment
         menuLabel="Runtime mode"
         title={mode.title ?? "Runtime mode"}
+        disabled={locked}
         items={modeItems({
           family,
           selectedId: selectedMode,
@@ -122,6 +126,7 @@ export function RuntimeBarSegments({
               ? `Model — ${value.model}`
               : "Model — prompt default"
         }
+        disabled={locked}
         className="min-w-0 max-w-56 flex-1 [&>span]:min-w-0 [&>span]:w-full [&>span>button]:w-full"
         header={
           <div className="grid gap-1">
@@ -133,6 +138,7 @@ export function RuntimeBarSegments({
                 ? { placeholder: "Unavailable selection" }
                 : {})}
               aria-label="Model id"
+              disabled={locked}
               inputClassName="font-mono text-xs"
               className="bg-background"
             />
@@ -187,6 +193,7 @@ function RuntimeSegment({
   menuLabel,
   title,
   header,
+  disabled = false,
   className,
   children,
 }: {
@@ -194,6 +201,7 @@ function RuntimeSegment({
   menuLabel: string;
   title: string;
   header?: ReactNode;
+  disabled?: boolean;
   className?: string | undefined;
   children: ReactNode;
 }) {
@@ -208,6 +216,7 @@ function RuntimeSegment({
       trigger={
         <button
           type="button"
+          disabled={disabled}
           title={title}
           className="inline-flex h-full min-w-0 items-center gap-1.5 px-density-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [[aria-expanded=true]_&]:bg-muted"
         >

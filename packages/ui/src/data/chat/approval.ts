@@ -1,9 +1,13 @@
 import type { UIMessage } from "ai";
+import type { ChatModelRuntime } from "./types";
 
 export type CaptainChatSession = {
   id: string;
   revision?: number;
   messages: UIMessage[];
+  providerSessionId?: string;
+  runtime?: ChatModelRuntime;
+  forkedFrom?: string;
 };
 
 export type ToolApprovalDecision = {
@@ -32,6 +36,27 @@ export async function getChatSession(
   });
   if (!response.ok) {
     throw await responseError("Chat session request", response);
+  }
+  return parseSession(await response.json());
+}
+
+export async function forkChatSession(
+  sessionsApi: string,
+  sessionId: string,
+  fetcher: SessionFetch = fetch,
+): Promise<CaptainChatSession> {
+  if (!sessionId.trim()) {
+    throw new Error("A session id is required to fork this chat.");
+  }
+  const response = await fetcher(
+    `${sessionEndpoint(sessionsApi, sessionId)}/fork`,
+    {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!response.ok) {
+    throw await responseError("Fork chat session", response);
   }
   return parseSession(await response.json());
 }

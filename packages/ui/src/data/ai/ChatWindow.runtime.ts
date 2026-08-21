@@ -22,8 +22,7 @@ export function useChatWindowRuntime({
   models,
   storedRuntime,
 }: ChatWindowRuntimeOptions) {
-  const reasoningEfforts =
-    chat?.reasoningEfforts ?? DEFAULT_REASONING_EFFORTS;
+  const reasoningEfforts = chat?.reasoningEfforts ?? DEFAULT_REASONING_EFFORTS;
   const [runtime, setRuntime] = useState<ChatModelRuntime>(() =>
     resolveChatRuntime({
       models,
@@ -125,9 +124,22 @@ export function useChatWindowRuntime({
     [chat],
   );
   const handleTemperatureChange = useCallback((next: number | undefined) => {
-    setRuntime((current) =>
-      withRuntimeField(current, "temperature", next),
-    );
+    setRuntime((current) => withRuntimeField(current, "temperature", next));
+  }, []);
+  const replaceRuntimeIdentity = useCallback((identity: ChatModelRuntime) => {
+    setRuntime((current) => {
+      const next: ChatModelRuntime = { ...current };
+      delete next.id;
+      delete next.mode;
+      delete next.model;
+      delete next.backend;
+      if (identity.model) next.model = identity.model;
+      if (identity.backend) next.backend = identity.backend;
+      return next;
+    });
+  }, []);
+  const replaceRuntime = useCallback((next: ChatModelRuntime) => {
+    setRuntime(next);
   }, []);
 
   return {
@@ -140,5 +152,7 @@ export function useChatWindowRuntime({
     handleModelChange,
     handleReasoningEffortChange,
     handleTemperatureChange,
+    replaceRuntimeIdentity,
+    replaceRuntime,
   };
 }

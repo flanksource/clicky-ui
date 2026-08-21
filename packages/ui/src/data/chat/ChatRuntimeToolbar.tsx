@@ -12,6 +12,7 @@ export type ChatRuntimeToolbarProps = {
   selectedModel?: ChatModel | undefined;
   usage?: ChatUsageSummary | null | undefined;
   threadId?: string | undefined;
+  locked?: boolean | undefined;
   onRuntimeChange: (runtime: ChatModelRuntime) => void;
 };
 
@@ -23,6 +24,7 @@ export function ChatRuntimeToolbar({
   selectedModel,
   usage,
   threadId,
+  locked = false,
   onRuntimeChange,
 }: ChatRuntimeToolbarProps) {
   const showRuntimeBar = Boolean(
@@ -48,6 +50,7 @@ export function ChatRuntimeToolbar({
           onChange={onRuntimeChange}
           models={models}
           reasoningEfforts={reasoningEfforts}
+          locked={locked}
           {...(runtimeFamilies ? { families: runtimeFamilies } : {})}
         />
       )}

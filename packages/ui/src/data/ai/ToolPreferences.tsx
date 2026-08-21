@@ -41,6 +41,7 @@ export type ToolPreferencesProps = {
   onModelChange?: ((model: string) => void) | undefined;
   runtimeFamilies?: SpecRuntimeFamily[] | undefined;
   reasoningEfforts?: string[] | undefined;
+  runtimeLocked?: boolean | undefined;
   reasoningEffort?: string | undefined;
   onReasoningEffortChange?: ((effort: string) => void) | undefined;
   permissionMode?: ClaudePermissionMode | undefined;
@@ -64,7 +65,12 @@ export type ToolPreferencesProps = {
 
 type AdvancedTab = "config" | "costs" | "permissions" | "browser";
 
-const ADVANCED_TABS: AdvancedTab[] = ["config", "costs", "permissions", "browser"];
+const ADVANCED_TABS: AdvancedTab[] = [
+  "config",
+  "costs",
+  "permissions",
+  "browser",
+];
 
 const ADVANCED_TAB_ICONS: Record<AdvancedTab, typeof UiSliders> = {
   config: UiSliders,
@@ -84,6 +90,7 @@ export function ToolPreferences({
   onModelChange,
   runtimeFamilies,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
+  runtimeLocked = false,
   reasoningEffort,
   onReasoningEffortChange,
   permissionMode = "default",
@@ -208,6 +215,7 @@ export function ToolPreferences({
               onRuntimeChange={handleRuntimeChange}
               runtimeFamilies={runtimeFamilies}
               reasoningEfforts={reasoningEfforts}
+              runtimeLocked={runtimeLocked}
               permissionMode={permissionMode}
               onPermissionModeChange={onPermissionModeChange}
               temperature={temperature}
