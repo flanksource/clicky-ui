@@ -4,6 +4,8 @@ import {
   DEFAULT_PAGE_SLUG,
   PAGES,
   buildRegistry,
+  fallbackPageSlug,
+  folderForPage,
   groupFromSlug,
   humanizeSlug,
   isPlaygroundPage,
@@ -14,6 +16,22 @@ describe("default page", () => {
   it("opens the Flanksource design-system hub independently of glob order", () => {
     expect(DEFAULT_PAGE_SLUG).toBe("flanksource");
     expect(PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)).toBe(true);
+  });
+});
+
+describe("fallbackPageSlug", () => {
+  const entries = registryOf("./pages/zebra.tsx", "./pages/alpha.tsx");
+
+  it("uses the first remaining page when the preferred page is unavailable", () => {
+    expect(fallbackPageSlug(entries)).toBe("alpha");
+  });
+
+  it("excludes a page that is about to be deleted", () => {
+    expect(fallbackPageSlug(entries, "alpha")).toBe("zebra");
+  });
+
+  it("returns undefined when no page remains", () => {
+    expect(fallbackPageSlug([], "alpha")).toBeUndefined();
   });
 });
 
@@ -112,5 +130,24 @@ describe("buildRegistry", () => {
     const [entry] = buildRegistry({ "./pages/welcome.tsx": () => Promise.resolve(module) });
 
     await expect(entry?.load()).resolves.toBe(module);
+  });
+});
+
+describe("folderForPage", () => {
+  const entries = registryOf(
+    "./pages/flanksource.tsx",
+    "./pages/flanksource/foundations/colors.tsx",
+    "./pages/flanksource/patterns/collections.tsx",
+    "./pages/makerprint/scad-studio.tsx",
+    "./pages/welcome.tsx",
+  );
+
+  it.each([
+    ["flanksource", "flanksource"],
+    ["flanksource/foundations/colors", "flanksource/foundations"],
+    ["makerprint/scad-studio", "makerprint"],
+    ["welcome", undefined],
+  ])("finds the nearest artifact folder for %s", (slug, expected) => {
+    expect(folderForPage(slug, entries)).toBe(expected);
   });
 });

@@ -94,7 +94,7 @@ export function readPage(dir: string, page: string): StoredComment[] {
   return readAll(dir)[page] ?? [];
 }
 
-function writeAll(dir: string, data: CommentsFile): void {
+export function writeAll(dir: string, data: CommentsFile): void {
   mkdirSync(dir, { recursive: true });
   const file = commentsPath(dir);
   const tmp = `${file}.tmp`;

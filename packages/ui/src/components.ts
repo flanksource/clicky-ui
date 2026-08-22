@@ -22,6 +22,10 @@ export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
 export {
+  DimensionField,
+  type DimensionFieldProps,
+} from "./components/DimensionField";
+export {
   JSONPathField,
   type JSONPathFieldProps,
   type JSONPathNode,
@@ -391,6 +395,7 @@ export {
   type CellActionsProps,
   type CellActionButtonProps,
 } from "./overlay/CellActions";
+export { ContextMenu, type ContextMenuProps } from "./overlay/ContextMenu";
 export {
   HoverCard,
   type HoverCardProps,

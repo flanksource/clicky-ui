@@ -31,6 +31,14 @@ describe("pageTemplate", () => {
     expect(pageTemplate("say-hi")).toContain('title: "Say hi"');
   });
 
+  it("uses an explicit display title without changing the component name", () => {
+    const source = pageTemplate("designs/review", "Quarterly design review");
+
+    expect(source).toContain('title: "Quarterly design review"');
+    expect(source).toContain("export default function Review()");
+    expect(source).toContain('>{"Quarterly design review"}</h1>');
+  });
+
   it("emits a template the registry would accept as a page", () => {
     const source = pageTemplate("dashboards/metrics");
 

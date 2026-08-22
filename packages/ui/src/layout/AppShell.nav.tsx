@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
+import { ContextMenu } from "../overlay/ContextMenu";
 import type { RenderLink } from "../rpc/EndpointList";
 import { useRouter } from "../rpc/router";
 import type {
@@ -51,40 +52,51 @@ export function NavSections({
                 {section.label}
               </div>
             ))}
-          {section.items?.map((item) => (
-            <NavItemRow
-              key={item.key}
-              item={item}
-              collapsed={collapsed}
-              renderLink={renderLink}
-              {...(onNavigate ? { onNavigate } : {})}
-            />
-          ))}
+          {section.variant !== "tree" &&
+            section.items?.map((item) => (
+              <NavItemRow
+                key={item.key}
+                item={item}
+                collapsed={collapsed}
+                renderLink={renderLink}
+                {...(onNavigate ? { onNavigate } : {})}
+              />
+            ))}
           {section.groups?.map((group) =>
             // A collapsed rail has no room for group headings, so the whole
             // subtree flattens into the icon strip rather than hiding behind
             // toggles the user cannot see.
-            collapsed
-              ? flattenGroup(group).map((item) => (
-                  <NavItemRow
-                    key={item.key}
-                    item={item}
-                    collapsed
-                    renderLink={renderLink}
-                    {...(onNavigate ? { onNavigate } : {})}
-                  />
-                ))
-              : (
-                  <NavGroupRows
-                    key={group.key}
-                    group={group}
-                    variant={section.variant ?? "list"}
-                    renderLink={renderLink}
-                    groupState={groupState}
-                    {...(onNavigate ? { onNavigate } : {})}
-                  />
-                ),
+            collapsed ? (
+              flattenGroup(group).map((item) => (
+                <NavItemRow
+                  key={item.key}
+                  item={item}
+                  collapsed
+                  renderLink={renderLink}
+                  {...(onNavigate ? { onNavigate } : {})}
+                />
+              ))
+            ) : (
+              <NavGroupRows
+                key={group.key}
+                group={group}
+                variant={section.variant ?? "list"}
+                renderLink={renderLink}
+                groupState={groupState}
+                {...(onNavigate ? { onNavigate } : {})}
+              />
+            ),
           )}
+          {section.variant === "tree" &&
+            section.items?.map((item) => (
+              <NavItemRow
+                key={item.key}
+                item={item}
+                collapsed={collapsed}
+                renderLink={renderLink}
+                {...(onNavigate ? { onNavigate } : {})}
+              />
+            ))}
         </div>
       ))}
     </nav>
@@ -114,6 +126,8 @@ function NavGroupRows({
   groupState: GroupState;
   onNavigate?: () => void;
 }) {
+  const [contextTarget, setContextTarget] = useState<HTMLElement | null>(null);
+  const hasChildren = group.items.length > 0 || (group.groups?.length ?? 0) > 0;
   const fallback = group.defaultCollapsed ?? false;
   const collapsed =
     !group.forceExpanded && groupState.isCollapsed(group.key, fallback);
@@ -132,13 +146,52 @@ function NavGroupRows({
       />
     </span>
   );
+  if (!hasChildren && !group.item) {
+    return (
+      <>
+        <div
+          ref={setContextTarget}
+          className="flex items-center gap-2.5 rounded-md px-density-2 py-1.5 text-[13px] text-sidebar-foreground"
+        >
+          {groupIcon}
+          <span className="flex-1 truncate text-left">{group.label}</span>
+          {group.badge}
+        </div>
+        {group.contextMenu && (
+          <ContextMenu
+            contextTarget={contextTarget}
+            menuLabel={group.contextMenuLabel ?? `${group.label} actions`}
+            menuItems={group.contextMenu}
+          />
+        )}
+      </>
+    );
+  }
+  if (!hasChildren && group.item) {
+    return (
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <NavItemRow
+            item={group.item}
+            collapsed={false}
+            renderLink={renderLink}
+            {...(onNavigate ? { onNavigate } : {})}
+          />
+        </div>
+        {group.badge}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col">
       {group.item ? (
         // Folder AND leaf: the link and the disclosure are siblings. Nesting a
         // button inside the anchor would be invalid DOM and would make the
         // click target ambiguous.
-        <div className="group/nav flex items-center gap-1">
+        <div
+          ref={setContextTarget}
+          className="group/nav flex items-center gap-1"
+        >
           <div className="min-w-0 flex-1">
             <NavItemRow
               item={group.item}
@@ -147,6 +200,7 @@ function NavGroupRows({
               {...(onNavigate ? { onNavigate } : {})}
             />
           </div>
+          {group.badge}
           <button
             type="button"
             onClick={toggle}
@@ -156,35 +210,56 @@ function NavGroupRows({
           >
             {chevron}
           </button>
+          {group.contextMenu && (
+            <ContextMenu
+              contextTarget={contextTarget}
+              menuLabel={
+                group.contextMenuLabel ?? `${group.label} folder actions`
+              }
+              menuItems={group.contextMenu}
+            />
+          )}
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={!collapsed}
-          className={cn(
-            "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            variant === "tree"
-              ? "text-[13px] text-sidebar-foreground"
-              : "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+        <>
+          <button
+            ref={setContextTarget}
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              variant === "tree"
+                ? "text-[13px] text-sidebar-foreground"
+                : "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+            )}
+          >
+            {groupIcon}
+            <span className="flex-1 truncate text-left">{group.label}</span>
+            {group.badge}
+            {chevron}
+          </button>
+          {group.contextMenu && (
+            <ContextMenu
+              contextTarget={contextTarget}
+              menuLabel={group.contextMenuLabel ?? `${group.label} actions`}
+              menuItems={group.contextMenu}
+            />
           )}
-        >
-          {groupIcon}
-          <span className="flex-1 truncate text-left">{group.label}</span>
-          {chevron}
-        </button>
+        </>
       )}
       {!collapsed && (
         <div className="ml-2 mt-0.5 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
-          {group.items.map((item) => (
-            <NavItemRow
-              key={item.key}
-              item={item}
-              collapsed={false}
-              renderLink={renderLink}
-              {...(onNavigate ? { onNavigate } : {})}
-            />
-          ))}
+          {variant !== "tree" &&
+            group.items.map((item) => (
+              <NavItemRow
+                key={item.key}
+                item={item}
+                collapsed={false}
+                renderLink={renderLink}
+                {...(onNavigate ? { onNavigate } : {})}
+              />
+            ))}
           {group.groups?.map((child) => (
             <NavGroupRows
               key={child.key}
@@ -195,6 +270,16 @@ function NavGroupRows({
               {...(onNavigate ? { onNavigate } : {})}
             />
           ))}
+          {variant === "tree" &&
+            group.items.map((item) => (
+              <NavItemRow
+                key={item.key}
+                item={item}
+                collapsed={false}
+                renderLink={renderLink}
+                {...(onNavigate ? { onNavigate } : {})}
+              />
+            ))}
         </div>
       )}
     </div>
@@ -212,6 +297,7 @@ function NavItemRow({
   renderLink: RenderLink;
   onNavigate?: () => void;
 }) {
+  const [contextTarget, setContextTarget] = useState<HTMLElement | null>(null);
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md px-density-2 py-1.5 text-left text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
     collapsed && "justify-center px-0",
@@ -236,7 +322,7 @@ function NavItemRow({
     collapsed && typeof item.label === "string" ? item.label : undefined;
 
   if (item.external) {
-    return (
+    const externalLink = (
       <a
         href={item.to}
         className={className}
@@ -248,6 +334,17 @@ function NavItemRow({
         {children}
       </a>
     );
+    if (!item.contextMenu) return externalLink;
+    return (
+      <div ref={setContextTarget} className="w-full">
+        {externalLink}
+        <ContextMenu
+          contextTarget={contextTarget}
+          menuLabel={item.contextMenuLabel ?? `${String(item.label)} actions`}
+          menuItems={item.contextMenu}
+        />
+      </div>
+    );
   }
   const link = renderLink({
     key: item.key,
@@ -257,6 +354,21 @@ function NavItemRow({
     ...(title ? { title } : {}),
   });
 
-  if (!onNavigate) return link;
-  return <div onClick={onNavigate}>{link}</div>;
+  if (!onNavigate && !item.contextMenu) return link;
+  return (
+    <div
+      ref={item.contextMenu ? setContextTarget : undefined}
+      className="w-full"
+      {...(onNavigate ? { onClick: onNavigate } : {})}
+    >
+      {link}
+      {item.contextMenu && (
+        <ContextMenu
+          contextTarget={contextTarget}
+          menuLabel={item.contextMenuLabel ?? `${String(item.label)} actions`}
+          menuItems={item.contextMenu}
+        />
+      )}
+    </div>
+  );
 }

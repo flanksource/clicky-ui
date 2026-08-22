@@ -51,6 +51,17 @@ export function groupFromSlug(slug: string): string {
   return parts.length > 1 ? humanizeSlug(parts.slice(0, -1).join("/")) : ROOT_GROUP;
 }
 
+export function folderForPage(
+  slug: string,
+  entries: readonly PageEntry[],
+): string | undefined {
+  const parts = slug.split("/");
+  const folder = parts.length > 1 ? parts.slice(0, -1).join("/") : slug;
+  return entries.some((entry) => entry.slug.startsWith(`${folder}/`))
+    ? folder
+    : undefined;
+}
+
 export function buildRegistry(modules: Record<string, PageLoader>): PageEntry[] {
   return Object.entries(modules)
     .filter(([key]) => isPlaygroundPage(key))
@@ -78,8 +89,13 @@ export const PAGES: PageEntry[] = buildRegistry(
 );
 
 export const DEFAULT_PAGE_SLUG = "flanksource";
-if (!PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)) {
-  throw new Error(`The default playground page "${DEFAULT_PAGE_SLUG}" is not registered.`);
+export function fallbackPageSlug(
+  entries: readonly PageEntry[],
+  excludedSlug?: string,
+): string | undefined {
+  const available = entries.filter((entry) => entry.slug !== excludedSlug);
+  return available.find((entry) => entry.slug === DEFAULT_PAGE_SLUG)?.slug ??
+    available[0]?.slug;
 }
 
 export function findPage(slug: string | null | undefined): PageEntry | undefined {

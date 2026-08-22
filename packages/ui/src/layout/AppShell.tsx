@@ -3,13 +3,11 @@ import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiClose, UiMenu, UiSidebar } from "../icons";
 import { useEscapeLayer } from "../overlay/modalStack";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { SplitPane } from "./SplitPane";
 import { AppShellSlotOutlines } from "./AppShell.debug";
 import { NavSections, type GroupState } from "./AppShell.nav";
-import {
-  contentWidthClassName,
-  type ContentWidth,
-} from "./content-width";
+import { contentWidthClassName, type ContentWidth } from "./content-width";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
 // owns the brand + collapse toggle and renders grouped nav sections; the top bar
@@ -34,6 +32,10 @@ export type AppShellNavItem = {
   external?: boolean;
   /** Trailing adornment (count, status dot). */
   badge?: ReactNode;
+  /** Actions opened by right-click, the Context Menu key, or Shift+F10. */
+  contextMenu?: DropdownMenuItem[];
+  /** Accessible label for the context menu. Defaults to `<label> actions`. */
+  contextMenuLabel?: string;
 };
 
 export type AppShellNavGroup = {
@@ -43,6 +45,12 @@ export type AppShellNavGroup = {
   label: string;
   /** Leading icon (icon name or component). */
   icon?: string | StaticIconComponent;
+  /** Trailing adornment (aggregate count, status dot). */
+  badge?: ReactNode;
+  /** Actions opened from the group heading's context menu. */
+  contextMenu?: DropdownMenuItem[];
+  /** Accessible label for the context menu. Defaults to `<label> actions`. */
+  contextMenuLabel?: string;
   /** Folded on first render until the user toggles it. */
   defaultCollapsed?: boolean;
   /**
@@ -270,7 +278,10 @@ export function AppShell(props: AppShellProps) {
   const hasBodyHeader = bodyHeader !== undefined || bodyActions !== undefined;
   const effectiveContentWidth =
     bodySidebar === undefined ? contentWidth : "full";
-  const renderSidebarContent = (collapsedValue: boolean, onNavigate?: () => void) =>
+  const renderSidebarContent = (
+    collapsedValue: boolean,
+    onNavigate?: () => void,
+  ) =>
     typeof sidebar === "function"
       ? sidebar(collapsedValue)
       : sidebar !== undefined
@@ -308,7 +319,10 @@ export function AppShell(props: AppShellProps) {
             )}
           >
             {!collapsed && brand && (
-              <div data-slot="app-shell-brand" className="flex min-w-0 items-center gap-2">
+              <div
+                data-slot="app-shell-brand"
+                className="flex min-w-0 items-center gap-2"
+              >
                 {brand}
               </div>
             )}
@@ -412,9 +426,12 @@ export function AppShell(props: AppShellProps) {
                 </div>
               )}
               {search === undefined && (
-                <div className={cn("flex-1", hasSidebar && "hidden md:block")} />
+                <div
+                  className={cn("flex-1", hasSidebar && "hidden md:block")}
+                />
               )}
-              {(actions !== undefined || (hasSidebar && mobileActions !== undefined)) && (
+              {(actions !== undefined ||
+                (hasSidebar && mobileActions !== undefined)) && (
                 <div
                   data-slot="app-shell-actions"
                   className={cn(
@@ -488,10 +505,7 @@ export function AppShell(props: AppShellProps) {
             minLeft={12}
             minRight={30}
             left={
-              <div
-                data-slot="app-shell-body-sidebar"
-                className="h-full"
-              >
+              <div data-slot="app-shell-body-sidebar" className="h-full">
                 {bodySidebar}
               </div>
             }
@@ -545,7 +559,9 @@ export function AppShell(props: AppShellProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-density-3">
-              {brand && <div className="flex min-w-0 items-center gap-2">{brand}</div>}
+              {brand && (
+                <div className="flex min-w-0 items-center gap-2">{brand}</div>
+              )}
               <button
                 type="button"
                 aria-label={`Close ${mobileSidebarLabel}`}

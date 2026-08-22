@@ -1,11 +1,22 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   assertSlug,
+  createFolder,
   createSource,
+  folderPath,
+  listFolders,
   pagePath,
   readSource,
   sourceExists,
@@ -55,6 +66,49 @@ describe("pagePath", () => {
 
   it("refuses a traversal attempt before touching the filesystem", () => {
     expect(() => pagePath("/repo/src/pages", "../../etc/passwd")).toThrow(/invalid page slug/);
+  });
+});
+
+describe("page folders on disk", () => {
+  let pagesDir: string;
+
+  beforeEach(() => {
+    mkdirSync(scratchRoot, { recursive: true });
+    pagesDir = mkdtempSync(join(scratchRoot, "folders-"));
+  });
+
+  afterEach(() => {
+    rmSync(pagesDir, { recursive: true, force: true });
+  });
+
+  it("creates nested folders and lists every visible level", () => {
+    expect(createFolder(pagesDir, "designs/reviewed")).toBe("designs/reviewed");
+
+    expect(listFolders(pagesDir)).toEqual(["designs", "designs/reviewed"]);
+    expect(folderPath(pagesDir, "designs/reviewed")).toBe(
+      join(pagesDir, "designs", "reviewed"),
+    );
+  });
+
+  it("refuses to create a folder that already exists", () => {
+    createFolder(pagesDir, "designs");
+
+    expect(() => createFolder(pagesDir, "designs")).toThrow(/already exists/);
+  });
+
+  it("hides underscore helper folders and rejects visible invalid names", () => {
+    mkdirSync(join(pagesDir, "_helpers"));
+    mkdirSync(join(pagesDir, "Invalid Folder"));
+
+    expect(() => listFolders(pagesDir)).toThrow(/Invalid Folder/);
+  });
+
+  it("refuses to traverse a visible symlink", () => {
+    const outside = mkdtempSync(join(scratchRoot, "outside-"));
+    symlinkSync(outside, join(pagesDir, "linked"));
+
+    expect(() => createFolder(pagesDir, "linked/nested")).toThrow(/symbolic link/);
+    rmSync(outside, { recursive: true, force: true });
   });
 });
 
