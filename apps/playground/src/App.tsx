@@ -11,13 +11,13 @@ import {
 
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
-import { DEFAULT_PAGE_SLUG, PAGES, findPage, preloadMeta } from "./registry";
+import { PAGES, fallbackPageSlug, findPage, preloadMeta } from "./registry";
 
 export function App() {
   const [route] = useHistoryRoute<{ page: string }>({
     parse: (_pathname, search) => {
       const candidate = new URLSearchParams(search).get("page");
-      return { page: findPage(candidate)?.slug ?? DEFAULT_PAGE_SLUG };
+      return { page: findPage(candidate)?.slug ?? fallbackPageSlug(PAGES) ?? "" };
     },
     build: (next) => `?page=${encodeURIComponent(next.page)}`,
   });
@@ -49,6 +49,7 @@ export function App() {
           >
             <PlaygroundShell
               active={active}
+              allComments={comments.allComments}
               query={query}
               onQueryChange={setQuery}
               commentsError={comments.error}

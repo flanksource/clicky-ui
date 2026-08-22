@@ -12,13 +12,13 @@ export function componentName(slug: string): string {
   return /^[A-Za-z]/.test(pascal) ? pascal : `Page${pascal}`;
 }
 
-export function pageTemplate(slug: string): string {
-  return `export const meta = { title: ${JSON.stringify(humanizeSlug(slug))} };
+export function pageTemplate(slug: string, title = humanizeSlug(slug)): string {
+  return `export const meta = { title: ${JSON.stringify(title)} };
 
 export default function ${componentName(slug)}() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">${humanizeSlug(slug)}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{${JSON.stringify(title)}}</h1>
       <p className="text-muted-foreground">Start building.</p>
     </div>
   );

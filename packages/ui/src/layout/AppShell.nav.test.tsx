@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell, type AppShellNavGroup } from "./AppShell";
 
 // Mirrors the profile hierarchy that motivated nested groups: `jms` is both a
@@ -101,7 +101,12 @@ describe("AppShell nested nav groups", () => {
     renderNav(jmsGroup(), true);
     // Every destination stays reachable; no disclosure survives, because a
     // collapsed rail has no room for a heading the user could aim at.
-    for (const name of ["/profile-jms", "/profile-jms-all", "/profile-jms-incoming", "/profile-jms-incoming-disbursements"]) {
+    for (const name of [
+      "/profile-jms",
+      "/profile-jms-all",
+      "/profile-jms-incoming",
+      "/profile-jms-incoming-disbursements",
+    ]) {
       expect(document.querySelector(`a[href="${name}"]`)).toBeTruthy();
     }
     expect(screen.queryByRole("button", { name: /Collapse jms/ })).toBeNull();
@@ -151,5 +156,90 @@ describe("AppShell nested nav groups", () => {
     expect(screen.getByRole("button", { name: /logs/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "logs" })).toBeNull();
     expect(screen.getByRole("link", { name: "api" })).toBeTruthy();
+  });
+
+  it("renders an empty tree group as a folder row without a false disclosure", () => {
+    renderNav({ key: "drafts", label: "Drafts", items: [] });
+
+    expect(screen.getByText("Drafts")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Drafts/ })).toBeNull();
+  });
+
+  it("renders a page bound to an empty folder without a false disclosure", () => {
+    renderNav({
+      key: "drafts",
+      label: "Drafts",
+      item: { key: "drafts-page", label: "Drafts", to: "/drafts" },
+      items: [],
+    });
+
+    expect(screen.getByRole("link", { name: "Drafts" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Drafts/ })).toBeNull();
+  });
+
+  it("renders folders before page leaves in a tree section", () => {
+    const { container } = render(
+      <AppShell
+        brand={<span>Brand</span>}
+        navSections={[
+          {
+            label: "Pages",
+            variant: "tree",
+            items: [{ key: "welcome", label: "Welcome", to: "/welcome" }],
+            groups: [
+              {
+                key: "designs",
+                label: "Designs",
+                items: [{ key: "review", label: "Review", to: "/review" }],
+              },
+            ],
+          },
+        ]}
+      >
+        <p>content</p>
+      </AppShell>,
+    );
+    const rail = container.querySelector<HTMLElement>(
+      '[data-slot="app-shell-sidebar"]',
+    );
+    if (!rail) throw new Error("expected the desktop rail");
+    const folder = within(rail).getByRole("button", { name: /Designs/ });
+    const page = within(rail).getByRole("link", { name: "Welcome" });
+
+    expect(
+      folder.compareDocumentPosition(page) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("opens declarative page and folder actions from their context menus", () => {
+    const rename = vi.fn();
+    const createPage = vi.fn();
+    renderNav({
+      key: "designs",
+      label: "Designs",
+      contextMenu: [{ label: "New page", onSelect: createPage }],
+      items: [
+        {
+          key: "designs-review",
+          label: "Review",
+          to: "/designs/review",
+          contextMenu: [{ label: "Rename", onSelect: rename }],
+        },
+      ],
+    });
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /Designs/ }), {
+      clientX: 80,
+      clientY: 40,
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "New page" }));
+    expect(createPage).toHaveBeenCalledOnce();
+
+    fireEvent.contextMenu(screen.getByRole("link", { name: "Review" }), {
+      clientX: 96,
+      clientY: 72,
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    expect(rename).toHaveBeenCalledOnce();
   });
 });

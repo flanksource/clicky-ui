@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   AppShell,
+  Badge,
   CommentSidePanel,
   DensitySwitcher,
   SplitButton,
@@ -19,24 +20,52 @@ import {
   type AppShellNavSection,
   type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
-import { UiCode2, UiComment } from "@flanksource/clicky-ui/icons";
+import {
+  UiCode2,
+  UiComment,
+  UiFilePlus,
+  UiFolder,
+  UiPencilSimpleLine,
+  UiTrash,
+} from "@flanksource/clicky-ui/icons";
 
 import { CommentOverlay } from "./comments/CommentOverlay";
-import { NewArtifactForm } from "./editor/NewArtifactForm";
+import {
+  NewPageMenu,
+  PageActions,
+  PageManagementDialogs,
+  type PageAction,
+} from "./editor/PageManagement";
+import { usePageFolders } from "./editor/usePageFolders";
 import { useSource } from "./editor/useSource";
 import { buildPlaygroundNavSections } from "./navigation";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
 const SourceEditor = lazy(() =>
-  import("./editor/SourceEditor").then((module) => ({ default: module.SourceEditor })),
+  import("./editor/SourceEditor").then((module) => ({
+    default: module.SourceEditor,
+  })),
 );
 import { resolveAnchor } from "./comments/dom-anchor";
-import { commentsToMarkdown, groupByPage, type CommentPageSection } from "./comments/markdown";
-import { fetchComments } from "./comments/useComments";
+import { writeClipboard } from "./comments/clipboard";
+import { countOpenCommentsByPage } from "./comments/counts";
+import {
+  commentsForFolder,
+  commentsToMarkdown,
+  groupByPage,
+  type CommentPageSection,
+} from "./comments/markdown";
+import {
+  fetchComments,
+  PLAYGROUND_COMMENT_CONFIG,
+  type PageComment,
+} from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
   PAGES,
+  fallbackPageSlug,
+  folderForPage,
   getMetaVersion,
   lazyPage,
   pageDescription,
@@ -49,9 +78,16 @@ import {
 
 export type PlaygroundShellProps = {
   active: PageEntry | undefined;
+  allComments: PageComment[];
   query: string;
   onQueryChange: (next: string) => void;
   commentsError: string | null;
+};
+
+type PageActionState = {
+  action: PageAction;
+  page?: PageEntry;
+  initialFolder?: string;
 };
 
 function shortAnchorLabel(anchor: string): string {
@@ -59,7 +95,13 @@ function shortAnchorLabel(anchor: string): string {
   return last === ":scope" ? "Whole page" : last;
 }
 
-function Banner({ tone, children }: { tone: "danger" | "warning"; children: React.ReactNode }) {
+function Banner({
+  tone,
+  children,
+}: {
+  tone: "danger" | "warning";
+  children: React.ReactNode;
+}) {
   return (
     <div
       role="status"
@@ -80,8 +122,9 @@ function EmptyPages() {
     <div className="mx-auto max-w-prose space-y-density-3 p-density-4 text-sm">
       <h1 className="text-lg font-semibold">No artifacts yet</h1>
       <p className="text-muted-foreground">
-        Create <code className="rounded bg-muted px-1">src/pages/my-idea.tsx</code> with a default
-        export and it appears here — no registration step.
+        Create{" "}
+        <code className="rounded bg-muted px-1">src/pages/my-idea.tsx</code>{" "}
+        with a default export and it appears here — no registration step.
       </p>
     </div>
   );
@@ -89,6 +132,7 @@ function EmptyPages() {
 
 export function PlaygroundShell({
   active,
+  allComments,
   query,
   onQueryChange,
   commentsError,
@@ -99,8 +143,15 @@ export function PlaygroundShell({
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const source = useSource(active?.slug, editing);
+  const pageFolders = usePageFolders();
+  const filesystemActionsDisabled = !import.meta.env.DEV || source.dirty;
+  const filesystemActionsDisabledReason = !import.meta.env.DEV
+    ? "Page filesystem actions are only available under vite dev"
+    : source.dirty
+      ? "Save or revert the source before changing pages"
+      : undefined;
 
   const { pins, orphans, labels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
@@ -109,15 +160,111 @@ export function PlaygroundShell({
   );
 
   // Rebuilds the nav when a page's `meta` resolves and its label/group changes.
-  const metaVersion = useSyncExternalStore(subscribeMeta, getMetaVersion, getMetaVersion);
+  const metaVersion = useSyncExternalStore(
+    subscribeMeta,
+    getMetaVersion,
+    getMetaVersion,
+  );
+
+  const openCommentCounts = useMemo(() => {
+    return countOpenCommentsByPage(allComments, PLAYGROUND_COMMENT_CONFIG);
+  }, [allComments]);
 
   const navSections = useMemo<AppShellNavSection[]>(() => {
-    return buildPlaygroundNavSections(PAGES, {
+    return buildPlaygroundNavSections(PAGES, pageFolders.folders, {
       activeSlug: active?.slug,
       query,
       metaFor: pageMeta,
+      badgeFor: (entry) => {
+        const count = openCommentCounts.get(entry.slug) ?? 0;
+        return count > 0 ? (
+          <Badge
+            clickToCopy={false}
+            count={count}
+            size="xxs"
+            tone="info"
+            variant="soft"
+          />
+        ) : null;
+      },
+      folderBadgeFor: (_folder, pages) => {
+        const count = pages.reduce(
+          (total, page) => total + (openCommentCounts.get(page.slug) ?? 0),
+          0,
+        );
+        return count > 0 ? (
+          <Badge
+            clickToCopy={false}
+            count={count}
+            size="xxs"
+            tone="info"
+            variant="soft"
+          />
+        ) : null;
+      },
+      contextMenuForPage: (entry) => [
+        {
+          label: "Rename",
+          group: "Page",
+          icon: UiPencilSimpleLine,
+          disabled: filesystemActionsDisabled,
+          ...(filesystemActionsDisabledReason
+            ? { title: filesystemActionsDisabledReason }
+            : {}),
+          onSelect: () => setPageAction({ action: "rename", page: entry }),
+        },
+        {
+          label: "Move",
+          icon: UiFolder,
+          disabled: filesystemActionsDisabled,
+          ...(filesystemActionsDisabledReason
+            ? { title: filesystemActionsDisabledReason }
+            : {}),
+          onSelect: () => setPageAction({ action: "move", page: entry }),
+        },
+        {
+          label: "Delete",
+          icon: UiTrash,
+          disabled: filesystemActionsDisabled,
+          ...(filesystemActionsDisabledReason
+            ? { title: filesystemActionsDisabledReason }
+            : {}),
+          onSelect: () => setPageAction({ action: "delete", page: entry }),
+        },
+      ],
+      contextMenuForFolder: (folder) => [
+        {
+          label: "New page",
+          group: "Folder",
+          icon: UiFilePlus,
+          disabled: filesystemActionsDisabled,
+          ...(filesystemActionsDisabledReason
+            ? { title: filesystemActionsDisabledReason }
+            : {}),
+          onSelect: () =>
+            setPageAction({ action: "new-page", initialFolder: folder }),
+        },
+        {
+          label: "New folder",
+          icon: UiFolder,
+          disabled: filesystemActionsDisabled,
+          ...(filesystemActionsDisabledReason
+            ? { title: filesystemActionsDisabledReason }
+            : {}),
+          onSelect: () =>
+            setPageAction({ action: "new-folder", initialFolder: folder }),
+        },
+      ],
     });
-  }, [active?.slug, metaVersion, query]);
+  }, [
+    active?.slug,
+    filesystemActionsDisabled,
+    filesystemActionsDisabledReason,
+    metaVersion,
+    openCommentCounts,
+    pageFolders.folders,
+    query,
+  ]);
 
   // `contentRef` comes from the provider as a read-only RefObject; a callback
   // ref is the only way to attach it without fighting the React 18/19 ref types.
@@ -148,11 +295,13 @@ export function PlaygroundShell({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey)
+        return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
       ) {
         return;
       }
@@ -173,7 +322,9 @@ export function PlaygroundShell({
    * their raw anchors.
    */
   const copyMarkdown = useCallback(
-    async (load: () => CommentPageSection[] | Promise<CommentPageSection[]>) => {
+    async (
+      load: () => CommentPageSection[] | Promise<CommentPageSection[]>,
+    ) => {
       try {
         // The dropdown actions fetch before they have anything to copy, and in
         // Safari and Firefox the click's transient user activation is already
@@ -182,7 +333,15 @@ export function PlaygroundShell({
         // claimed inside the activation and filled once the fetch lands.
         await writeClipboard(
           Promise.resolve(load()).then((sections) =>
-            commentsToMarkdown(sections, labels),
+            commentsToMarkdown(sections, {
+              labels,
+              pageUrl: (page) => {
+                const url = new URL(window.location.origin);
+                url.searchParams.set("page", page);
+                return url.href;
+              },
+              pagePath: (page) => `apps/playground/src/pages/${page}.tsx`,
+            }),
           ),
         );
         setCopyError(null);
@@ -200,6 +359,12 @@ export function PlaygroundShell({
     void copyMarkdown(() => [{ page: active.slug, comments: ctx.comments }]);
   }, [active, copyMarkdown, ctx.comments]);
 
+  const activeFolder = active ? folderForPage(active.slug, PAGES) : undefined;
+  const activeFolderLabel = activeFolder
+    ?.split("/")
+    .map((part) => part.replace(/[-_]+/g, " "))
+    .join(" / ");
+
   // The dropdown actions re-read from the backend rather than filtering the
   // provider's list: only the server knows the pages this session never opened.
   const copyActions = useMemo<DropdownMenuItem[]>(
@@ -211,28 +376,56 @@ export function PlaygroundShell({
         onSelect: () => {
           if (!active) return;
           void copyMarkdown(async () => [
-            { page: active.slug, comments: await fetchComments({ page: active.slug, unresolved: true }) },
+            {
+              page: active.slug,
+              comments: await fetchComments({
+                page: active.slug,
+                unresolved: true,
+              }),
+            },
           ]);
         },
       },
+      ...(activeFolder && activeFolderLabel
+        ? [
+            {
+              label: "Copy all comments (this folder)",
+              title: `Every note under ${activeFolderLabel}, resolved ones included`,
+              onSelect: () =>
+                void copyMarkdown(async () =>
+                  commentsForFolder(await fetchComments(), activeFolder),
+                ),
+            },
+          ]
+        : []),
       {
         label: "Copy all open comments",
         title: "Unresolved notes from every artifact page",
         onSelect: () =>
-          void copyMarkdown(async () => groupByPage(await fetchComments({ unresolved: true }))),
+          void copyMarkdown(async () =>
+            groupByPage(await fetchComments({ unresolved: true })),
+          ),
       },
       {
         label: "Copy all comments",
         title: "Every note from every artifact page, resolved ones included",
-        onSelect: () => void copyMarkdown(async () => groupByPage(await fetchComments())),
+        onSelect: () =>
+          void copyMarkdown(async () => groupByPage(await fetchComments())),
       },
     ],
-    [active, copyMarkdown],
+    [active, activeFolder, activeFolderLabel, copyMarkdown],
   );
 
   const PageComponent = active ? lazyPage(active) : null;
   const railVisible = ctx.railMode !== "closed" || ctx.comments.length > 0;
   const editorOpen = editing && active !== undefined;
+  const navigatePage = useCallback((slug?: string) => {
+    const url = new URL(window.location.href);
+    if (slug) url.searchParams.set("page", slug);
+    else url.searchParams.delete("page");
+    window.location.href = url.href;
+  }, []);
+  const actionPage = pageAction?.page ?? active;
 
   return (
     <AppShell
@@ -241,13 +434,17 @@ export function PlaygroundShell({
           <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             P
           </span>
-          <span className="font-semibold tracking-tight">Clicky UI · Playground</span>
+          <span className="font-semibold tracking-tight">
+            Clicky UI · Playground
+          </span>
         </>
       }
       search={
         <input
           value={query}
-          onChange={(event) => onQueryChange((event.target as HTMLInputElement).value)}
+          onChange={(event) =>
+            onQueryChange((event.target as HTMLInputElement).value)
+          }
           placeholder="Filter artifacts…"
           aria-label="Filter artifacts"
           className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
@@ -255,20 +452,11 @@ export function PlaygroundShell({
       }
       actions={
         <>
-          <button
-            type="button"
-            onClick={() => setCreating((on) => !on)}
-            aria-pressed={creating}
-            title="Create a new artifact"
-            className={cn(
-              "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
-              creating
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:text-foreground",
-            )}
-          >
-            New
-          </button>
+          <NewPageMenu
+            disabled={filesystemActionsDisabled}
+            disabledReason={filesystemActionsDisabledReason}
+            onSelect={(action) => setPageAction({ action })}
+          />
           <button
             type="button"
             onClick={() => setEditing((on) => !on)}
@@ -284,7 +472,9 @@ export function PlaygroundShell({
           >
             <UiCode2 className="size-3.5" />
             Edit
-            {source.dirty && <span className="size-1.5 rounded-full bg-amber-500" />}
+            {source.dirty && (
+              <span className="size-1.5 rounded-full bg-amber-500" />
+            )}
           </button>
           <button
             type="button"
@@ -330,7 +520,11 @@ export function PlaygroundShell({
               </p>
             }
           >
-            <SourceEditor slug={active.slug} source={source} onClose={() => setEditing(false)} />
+            <SourceEditor
+              slug={active.slug}
+              source={source}
+              onClose={() => setEditing(false)}
+            />
           </Suspense>
         ) : undefined
       }
@@ -350,6 +544,15 @@ export function PlaygroundShell({
           </div>
         ) : undefined
       }
+      bodyActions={
+        active ? (
+          <PageActions
+            disabled={filesystemActionsDisabled}
+            disabledReason={filesystemActionsDisabledReason}
+            onSelect={(action) => setPageAction({ action, page: active })}
+          />
+        ) : undefined
+      }
     >
       <div className="flex h-full min-h-0">
         <div
@@ -360,17 +563,29 @@ export function PlaygroundShell({
           )}
         >
           <div ref={contentRef} className="min-w-0 p-density-4">
-            {creating && <NewArtifactForm onCancel={() => setCreating(false)} />}
+            {pageFolders.error && (
+              <Banner tone="danger">{pageFolders.error}</Banner>
+            )}
             {commentsError && <Banner tone="danger">{commentsError}</Banner>}
-            {copyError && <Banner tone="danger">Nothing was copied — {copyError}</Banner>}
+            {copyError && (
+              <Banner tone="danger">Nothing was copied — {copyError}</Banner>
+            )}
             {orphans.length > 0 && (
               <Banner tone="warning">
-                {orphans.length} comment anchor{orphans.length === 1 ? " no longer matches" : "s no longer match"}{" "}
-                an element on this page. The notes are kept and listed as “Unavailable” in the rail.
+                {orphans.length} comment anchor
+                {orphans.length === 1
+                  ? " no longer matches"
+                  : "s no longer match"}{" "}
+                an element on this page. The notes are kept and listed as
+                “Unavailable” in the rail.
               </Banner>
             )}
             {PageComponent ? (
-              <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+              <Suspense
+                fallback={
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                }
+              >
                 <PageComponent />
               </Suspense>
             ) : (
@@ -383,7 +598,9 @@ export function PlaygroundShell({
             scrollRef={ctx.contentRef}
             contentRef={contentRef}
             pins={pins}
-            focusedAnchor={ctx.railMode === "focused" ? ctx.focusedAnchor : null}
+            focusedAnchor={
+              ctx.railMode === "focused" ? ctx.focusedAnchor : null
+            }
             onPick={handlePick}
             onFocus={ctx.focusAnchor}
           />
@@ -400,6 +617,28 @@ export function PlaygroundShell({
           </div>
         )}
       </div>
+      <PageManagementDialogs
+        action={pageAction?.action ?? null}
+        active={actionPage}
+        {...(pageAction?.initialFolder
+          ? { initialFolder: pageAction.initialFolder }
+          : {})}
+        folders={pageFolders.folders}
+        commentCount={
+          actionPage
+            ? allComments.filter((comment) => comment.page === actionPage.slug)
+                .length
+            : 0
+        }
+        onClose={() => setPageAction(null)}
+        onFolderCreated={pageFolders.add}
+        onNavigate={navigatePage}
+        fallbackAfterDelete={(deletedSlug) =>
+          deletedSlug === active?.slug
+            ? fallbackPageSlug(PAGES, deletedSlug)
+            : active?.slug
+        }
+      />
     </AppShell>
   );
 }

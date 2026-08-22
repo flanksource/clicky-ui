@@ -10,13 +10,17 @@ import { playgroundSources } from "./plugins/sources-server";
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
 const uiSrc = resolve(workspaceRoot, "packages/ui/src");
+const playgroundDataDir = resolve(root, ".playground");
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    playgroundComments({ dir: resolve(root, ".playground") }),
-    playgroundSources({ pagesDir: resolve(root, "src/pages") }),
+    playgroundComments({ dir: playgroundDataDir }),
+    playgroundSources({
+      pagesDir: resolve(root, "src/pages"),
+      commentsDir: playgroundDataDir,
+    }),
   ],
   resolve: {
     dedupe: ["react", "react-dom"],

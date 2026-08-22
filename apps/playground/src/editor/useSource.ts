@@ -1,32 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-export const SOURCES_ROUTE = "/__playground/sources";
+import { readPage, writePage } from "./page-api";
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
-}
-
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
-    throw new Error(
-      "Editing artifacts only works under `vite dev` — the playground-sources middleware is " +
-        "not part of the production build.",
-    );
-  }
-  const payload = (await response.json()) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error ?? `${init?.method ?? "GET"} ${url} failed (${response.status})`);
-  }
-  return payload;
-}
-
-export function createPage(slug: string, source: string): Promise<{ slug: string }> {
-  return request<{ slug: string }>(SOURCES_ROUTE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ slug, source }),
-  });
 }
 
 export type PageSource = {
@@ -67,7 +44,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
 
     let cancelled = false;
     setLoading(true);
-    void request<{ source: string }>(`${SOURCES_ROUTE}?slug=${encodeURIComponent(slug)}`)
+    void readPage(slug)
       .then(({ source }) => {
         if (cancelled) return;
         setSaved(source);
@@ -91,11 +68,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
     if (!slug) return;
     setSaving(true);
     try {
-      await request(`${SOURCES_ROUTE}?slug=${encodeURIComponent(slug)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, source: draft }),
-      });
+      await writePage(slug, draft);
       setSaved(draft);
       setError(null);
     } catch (cause) {
