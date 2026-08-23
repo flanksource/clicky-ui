@@ -41,9 +41,16 @@ export type MovePageRequest = {
   title?: string;
 };
 
+export type MovePageResult = {
+  slug: string;
+  movedComments: number;
+  updatedReferences: number;
+  updatedFiles: number;
+};
+
 export function movePage(
   body: MovePageRequest,
-): Promise<{ slug: string; movedComments: number }> {
+): Promise<MovePageResult> {
   return jsonRequest(SOURCES_ROUTE, "PATCH", body);
 }
 
