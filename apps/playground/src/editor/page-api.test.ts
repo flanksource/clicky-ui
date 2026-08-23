@@ -42,9 +42,17 @@ describe("playground page API", () => {
   });
 
   it("moves and optionally retitles a page", async () => {
-    mockJson({ slug: "designs/review", movedComments: 2 });
+    const result = {
+      slug: "designs/review",
+      movedComments: 2,
+      updatedReferences: 5,
+      updatedFiles: 3,
+    };
+    mockJson(result);
 
-    await movePage({ slug: "review", nextSlug: "designs/review", title: "Design review" });
+    await expect(
+      movePage({ slug: "review", nextSlug: "designs/review", title: "Design review" }),
+    ).resolves.toEqual(result);
     expect(fetch).toHaveBeenCalledWith(
       "/__playground/sources",
       expect.objectContaining({

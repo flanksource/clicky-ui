@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { dirname, isAbsolute, relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
 import { deletePage, movePage } from "./page-management-store";
@@ -42,6 +43,23 @@ export function matchSourceRoute(
   if (method === "PATCH") return "move";
   if (method === "DELETE" && hasSlug) return "delete";
   return undefined;
+}
+
+export function filterDeletedPageModules<T extends { file: string | null }>(
+  pagesDir: string,
+  file: string,
+  modules: readonly T[],
+): T[] | undefined {
+  const relativeFile = relative(pagesDir, file);
+  if (
+    relativeFile === "" ||
+    relativeFile === ".." ||
+    relativeFile.startsWith(`..${sep}`) ||
+    isAbsolute(relativeFile)
+  ) {
+    return undefined;
+  }
+  return modules.filter((module) => module.file !== file);
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -90,6 +108,21 @@ type SourceEvents = {
   deleted: (file: string) => void;
   folderCreated: (folder: string) => void;
 };
+
+export function announcePageMove(
+  pagesDir: string,
+  events: SourceEvents,
+  slug: string,
+  nextSlug: string,
+): void {
+  if (slug === nextSlug) {
+    events.changed(pagePath(pagesDir, nextSlug));
+    return;
+  }
+  // One glob invalidation discovers both the removed source and destination;
+  // separate unlink/add updates race React refresh boundaries.
+  events.created(pagePath(pagesDir, nextSlug));
+}
 
 function handle(
   pagesDir: string,
@@ -147,17 +180,14 @@ function handle(
         const nextSlug = assertSlug(body["nextSlug"]);
         const title = optionalTitle(body);
         const result = movePage({
+          sourceRoot: dirname(pagesDir),
           pagesDir,
           commentsDir,
           slug,
           nextSlug,
           ...(title !== undefined ? { title } : {}),
         });
-        if (slug === nextSlug) events.changed(pagePath(pagesDir, nextSlug));
-        else {
-          events.deleted(pagePath(pagesDir, slug));
-          events.created(pagePath(pagesDir, nextSlug));
-        }
+        announcePageMove(pagesDir, events, slug, nextSlug);
         sendJson(res, 200, result);
       });
 
@@ -180,11 +210,18 @@ export function playgroundSources(options: { pagesDir: string; commentsDir: stri
   return {
     name: "playground-sources",
     apply: "serve",
+    hotUpdate: {
+      order: "post",
+      handler({ type, file, modules }) {
+        if (type !== "delete") return;
+        return filterDeletedPageModules(options.pagesDir, file, modules);
+      },
+    },
     configureServer(server) {
       // A file written through this endpoint is new to the watcher, and the
-      // client reloads immediately afterwards. Announcing the add up front
-      // makes `import.meta.glob` in the registry re-evaluate deterministically
-      // instead of racing chokidar.
+      // client navigates to it immediately afterwards. Announcing the add up
+      // front makes `import.meta.glob` in the registry re-evaluate
+      // deterministically instead of racing chokidar.
       const events: SourceEvents = {
         created: (file) => server.watcher.emit("add", file),
         changed: (file) => server.watcher.emit("change", file),

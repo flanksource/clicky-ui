@@ -57,6 +57,8 @@ describe("page management", () => {
     vi.mocked(movePage).mockResolvedValue({
       slug: "designs/audit",
       movedComments: 2,
+      updatedReferences: 4,
+      updatedFiles: 3,
     });
     const { onNavigate } = renderDialog("rename");
 

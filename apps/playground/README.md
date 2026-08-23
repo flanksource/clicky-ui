@@ -39,7 +39,7 @@ Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens
 
 **Edit** opens the artifact's source in Monaco beside the live preview. `⌘S` (or the Save button) writes the file to disk; Vite's HMR then refreshes the preview — there is no separate "apply" step, and your own editor sees the same file.
 
-Choose **New → New folder** to create a visible folder. The active page header also exposes **Rename**, **Move**, and **Delete**. Right-click a page for those same page actions, or right-click a folder to create a page or nested folder there; the Context Menu key and Shift+F10 provide the same keyboard access. Rename updates the filename and a simple string-literal `export const meta = { title: "…" }`; derived metadata fails loudly instead of being rewritten. Move and rename carry the page's feedback to the new slug, while Delete confirms the exact `.tsx` path and removes its feedback. These filesystem actions are disabled while the Monaco buffer has unsaved changes and are available only under `vite dev`.
+Choose **New → New folder** to create a visible folder. The active page header also exposes **Rename**, **Move**, and **Delete**. Right-click a page for those same page actions, or right-click a folder to create a page or nested folder there; the Context Menu key and Shift+F10 provide the same keyboard access. Rename updates the filename and a simple string-literal `export const meta = { title: "…" }`; derived metadata fails loudly instead of being rewritten. Move and rename rebase the page's relative module and `import.meta.url` references, update incoming TypeScript imports and static `?page=` links under `src/`, and carry feedback to the new slug as one rollback-protected operation. They do not create an alias for the old URL or rewrite prose and comments. Delete confirms the exact `.tsx` path and removes its feedback. These filesystem actions are disabled while the Monaco buffer has unsaved changes and are available only under `vite dev`.
 
 Monaco is configured for TSX but **not** wired to the real type graph: pulling `@flanksource/clicky-ui` types into the browser would cost megabytes, so "cannot find module" diagnostics are suppressed. Syntax, JSX and local type errors still surface; authoritative type checking stays with `pnpm run typecheck` and the dev-server overlay.
 
@@ -51,7 +51,9 @@ Two complementary tools:
 
 **react-grab** — hover any element, press `⌘C`. Copies the element plus its React component stack and source location, formatted for a coding agent. Dev-only, loaded behind `import.meta.env.DEV` in `src/main.tsx`.
 
-**Comment pins** — press `c` (or the Comment button), click an element, write a note. The note is anchored to that element by a CSS path and persisted to `.playground/comments.json` (gitignored), so it survives reloads and can be read straight off disk by an agent.
+**Comment pins** — press `c` (or the Comment button), click an element, write a note. The note is anchored to that element by a CSS path and persisted to `.playground/comments.json` (gitignored), so it survives reloads and can be read straight off disk by an agent. The Comment split-button also starts a whole-page thread without picking an element.
+
+Comments can carry a positive or negative rating, with or without text. `BestPractice` and `ReviewVariant` in `src/review/ReviewComponents.tsx` build on that same store: each requires a stable fragment id, exposes a permalink, and renders aggregate rating controls. Variants additionally require an explicit discard handler.
 
 **Copy feedback** is a split button. The primary half copies the current page's notes as markdown; its dropdown widens the net:
 
@@ -79,16 +81,16 @@ The same comments are a REST API, so a coding agent can read feedback, act on it
 curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, description}'
 ```
 
-| Method   | Path                                  | Body                                     | Purpose                                                                   |
-| -------- | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
-| `GET`    | `/__playground/comments`              | —                                        | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true` |
-| `POST`   | `/__playground/comments`              | `{page, body, author, anchor?, status?}` | Start a thread                                                            |
-| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                         | Reply — page and anchor inherited from the root                           |
-| `POST`   | `/__playground/comments/{id}/resolve` | `{status?}`                              | Mark done (defaults to `resolved`)                                        |
-| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?}`                       | Edit text or move status                                                  |
-| `DELETE` | `/__playground/comments/{id}`         | —                                        | Remove, cascading to replies                                              |
+| Method   | Path                                  | Body                                               | Purpose                                                                   |
+| -------- | ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `GET`    | `/__playground/comments`              | —                                                  | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true` |
+| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, anchor?, status?}` | Start a thread; at least one of body or rating is required                |
+| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                   | Reply — page and anchor inherited from the root                           |
+| `POST`   | `/__playground/comments/{id}/resolve` | `{status?}`                                        | Mark done (defaults to `resolved`)                                        |
+| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                        | Edit text, rating, or status                                              |
+| `DELETE` | `/__playground/comments/{id}`         | —                                                  | Remove, cascading to replies                                              |
 
-Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two count as unresolved. Anything else is a 400 naming the valid values — the same for a missing `author`, which is never inferred so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
+Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two count as unresolved. Ratings are `positive` or `negative`. Anything else is a 400 naming the valid values — the same for a missing `author`, which is never inferred so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 
 ```bash
 # What still needs doing, and where
@@ -116,6 +118,7 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 | Comment persistence              | `plugins/comments-store.ts`, `plugins/comments-server.ts`            |
 | Comment API tool schema          | `plugins/comments-schema.ts`                                         |
 | Feedback → markdown for an agent | `src/comments/markdown.ts`                                           |
+| Routable review components       | `src/review/ReviewComponents.tsx`                                    |
 | Source editing                   | `src/editor/`, `plugins/pages-store.ts`, `plugins/sources-server.ts` |
 
 The comment _UI_ — threads, composer, statuses, the rail — is the library's own `CommentProvider` / `CommentSidePanel`. The playground only supplies the DOM-anchor adapter and the storage backend, which is dev-server middleware and therefore absent from `vite build` output by design.

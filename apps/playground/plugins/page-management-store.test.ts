@@ -1,11 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { addComment, readAll } from "./comments-store";
 import { deletePage, movePage } from "./page-management-store";
-import { createSource, readSource } from "./pages-store";
+import { createSource, readSource, sourceExists } from "./pages-store";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratchRoot = join(appRoot, ".tmp");
@@ -45,13 +53,19 @@ describe("page management", () => {
 
     expect(
       movePage({
+        sourceRoot: pagesDir,
         pagesDir,
         commentsDir,
         slug: "old-page",
         nextSlug: "designs/renamed-page",
         title: "Renamed page",
       }),
-    ).toEqual({ slug: "designs/renamed-page", movedComments: 1 });
+    ).toEqual({
+      slug: "designs/renamed-page",
+      movedComments: 1,
+      updatedReferences: 0,
+      updatedFiles: 1,
+    });
     expect(existsSync(join(pagesDir, "old-page.tsx"))).toBe(false);
     expect(readSource(pagesDir, "designs/renamed-page")).toContain(
       'title: "Renamed page"',
@@ -68,6 +82,7 @@ describe("page management", () => {
     createSource(pagesDir, "drafts/old-page", SOURCE);
 
     movePage({
+      sourceRoot: pagesDir,
       pagesDir,
       commentsDir,
       slug: "drafts/old-page",
@@ -89,6 +104,7 @@ describe("page management", () => {
 
     expect(() =>
       movePage({
+        sourceRoot: pagesDir,
         pagesDir,
         commentsDir,
         slug: "old-page",
@@ -107,6 +123,7 @@ describe("page management", () => {
 
     expect(() =>
       movePage({
+        sourceRoot: pagesDir,
         pagesDir,
         commentsDir,
         slug: "old-page",
@@ -115,6 +132,79 @@ describe("page management", () => {
     ).toThrow(/already exists/);
     expect(readSource(pagesDir, "old-page")).toBe(SOURCE);
     expect(readSource(pagesDir, "taken")).toBe("taken");
+  });
+
+  it("rebases the moved page and updates incoming imports and page links", () => {
+    const source = [
+      'import { DesignSystemPage } from "../design-system/DesignSystemPage";',
+      'import { fixture } from "./_access-review-decisions/fixture";',
+      "export default function AccessReview() { return null; }",
+    ].join("\n");
+    createSource(pagesDir, "access-review-decisions", source);
+    const consumer = join(pagesDir, "review.tsx");
+    writeFileSync(
+      consumer,
+      [
+        'import AccessReview from "./access-review-decisions";',
+        'export const href = "?page=access-review-decisions";',
+      ].join("\n"),
+    );
+
+    expect(
+      movePage({
+        sourceRoot: pagesDir,
+        pagesDir,
+        commentsDir,
+        slug: "access-review-decisions",
+        nextSlug: "trust/access-review-decisions",
+      }),
+    ).toEqual({
+      slug: "trust/access-review-decisions",
+      movedComments: 0,
+      updatedReferences: 4,
+      updatedFiles: 2,
+    });
+    expect(readSource(pagesDir, "trust/access-review-decisions")).toBe(
+      [
+        'import { DesignSystemPage } from "../../design-system/DesignSystemPage";',
+        'import { fixture } from "../_access-review-decisions/fixture";',
+        "export default function AccessReview() { return null; }",
+      ].join("\n"),
+    );
+    expect(readFileSync(consumer, "utf8")).toBe(
+      [
+        'import AccessReview from "./trust/access-review-decisions";',
+        'export const href = "?page=trust/access-review-decisions";',
+      ].join("\n"),
+    );
+  });
+
+  it("rolls back the page and rewritten references when a write fails", () => {
+    createSource(pagesDir, "review", SOURCE);
+    const consumer = join(pagesDir, "consumer.ts");
+    const consumerSource = [
+      'import Review from "./review";',
+      'export const href = "?page=review";',
+    ].join("\n");
+    writeFileSync(consumer, consumerSource);
+
+    expect(() =>
+      movePage({
+        sourceRoot: pagesDir,
+        pagesDir,
+        commentsDir,
+        slug: "review",
+        nextSlug: "approved/review",
+        writeReference: (file, source) => {
+          if (source.includes("approved/review")) throw new Error("simulated write failure");
+          writeFileSync(file, source);
+        },
+      }),
+    ).toThrow(/page move failed and was rolled back/);
+    expect(sourceExists(pagesDir, "review")).toBe(true);
+    expect(sourceExists(pagesDir, "approved/review")).toBe(false);
+    expect(readSource(pagesDir, "review")).toBe(SOURCE);
+    expect(readFileSync(consumer, "utf8")).toBe(consumerSource);
   });
 
   it("deletes the page and all feedback without leaving a backup", () => {
