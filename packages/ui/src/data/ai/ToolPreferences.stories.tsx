@@ -9,6 +9,12 @@ import {
   type ToolMeta,
   type ToolPolicy,
 } from "./ToolPreferences";
+import {
+  toolPolicyFromPreferences,
+  type PermissionPolicy,
+  type PermissionRule,
+} from "../chat/tool-policy";
+import { effectiveToolPolicies, withUserRule } from "./ToolPreferences.model";
 
 const SAMPLE_TOOLS: ToolMeta[] = [
   {
@@ -16,7 +22,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     label: "List Xero accounts",
     group: "Xero",
     preferenceKey: "Xero Read",
-    defaultPermission: "off",
+    defaultPermission: "deny",
     description: "List account balances from Xero.",
     hints: [
       "Read-only accounting lookup.",
@@ -69,7 +75,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     label: "List Xero contacts",
     group: "Xero",
     preferenceKey: "Xero Read",
-    defaultPermission: "off",
+    defaultPermission: "deny",
     description: "List customer and supplier contacts from Xero.",
     source: "clicky",
     method: "GET",
@@ -116,7 +122,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
     name: "search_docs",
     label: "Search docs",
     group: "Knowledge",
-    defaultPermission: "on",
+    defaultPermission: "allow",
     description: "Search the internal documentation index.",
     hints: ["Quote exact phrases for narrower results."],
     source: "mcp",
@@ -163,9 +169,9 @@ const SAMPLE_TOOLS: ToolMeta[] = [
 
 const INITIAL_PREFS: Record<string, ToolPolicy> = {
   filesystem_write: "ask",
-  xero_accounts_list: "off",
-  xero_contacts_list: "off",
-  search_docs: "on",
+  xero_accounts_list: "deny",
+  xero_contacts_list: "deny",
+  search_docs: "allow",
   sync_finance: "ask",
 };
 
@@ -206,7 +212,16 @@ type ToolPreferencesStoryProps = {
 function ToolPreferencesStory({
   initialValue = INITIAL_PREFS,
 }: ToolPreferencesStoryProps) {
-  const [prefs, setPrefs] = useState<Record<string, ToolPolicy>>(initialValue);
+  const [rules, setRules] = useState<PermissionPolicy>(() =>
+    toolPolicyFromPreferences(initialValue),
+  );
+  const prefs = effectiveToolPolicies({
+    tools: SAMPLE_TOOLS,
+    userRules: rules,
+    fallback: "ask",
+  });
+  const handleRule = (rule: PermissionRule) =>
+    setRules((current) => withUserRule(current, rule));
   const [model, setModel] = useState<string | undefined>(MOCK_MODELS[0]?.id);
   const [reasoningEffort, setReasoningEffort] = useState("medium");
   const [permissionMode, setPermissionMode] =
@@ -226,7 +241,7 @@ function ToolPreferencesStory({
         <ToolPreferences
           tools={SAMPLE_TOOLS}
           value={prefs}
-          onChange={setPrefs}
+          onRule={handleRule}
           models={MOCK_MODELS}
           model={model}
           onModelChange={setModel}
@@ -418,7 +433,7 @@ const NESTED_TOOLS: ToolMeta[] = [
     preferenceKey: "Accounting Read",
     parent: "Accounts",
     entity: "accounts",
-    defaultPermission: "on",
+    defaultPermission: "allow",
     method: "GET",
     path: "/api/v1/accounts/{id}",
   },
@@ -429,7 +444,7 @@ const NESTED_TOOLS: ToolMeta[] = [
     preferenceKey: "Accounting Read",
     parent: "Accounts",
     entity: "accounts",
-    defaultPermission: "on",
+    defaultPermission: "allow",
     method: "GET",
     path: "/api/v1/accounts",
   },
@@ -440,7 +455,7 @@ const NESTED_TOOLS: ToolMeta[] = [
     preferenceKey: "Accounting Read",
     parent: "Contacts",
     entity: "contacts",
-    defaultPermission: "on",
+    defaultPermission: "allow",
     method: "GET",
     path: "/api/v1/contacts/{id}",
   },
@@ -451,7 +466,7 @@ const NESTED_TOOLS: ToolMeta[] = [
     preferenceKey: "Accounting Read",
     parent: "Contacts",
     entity: "contacts",
-    defaultPermission: "on",
+    defaultPermission: "allow",
     method: "GET",
     path: "/api/v1/contacts",
   },
@@ -469,22 +484,31 @@ const NESTED_TOOLS: ToolMeta[] = [
 ];
 
 function NestedToolsStory() {
-  const [prefs, setPrefs] = useState<Record<string, ToolPolicy>>({});
+  const [rules, setRules] = useState<PermissionPolicy>([]);
+  const prefs = effectiveToolPolicies({
+    tools: NESTED_TOOLS,
+    userRules: rules,
+    fallback: "ask",
+  });
   return (
     <div className="min-h-[20rem] w-[42rem] max-w-[calc(100vw-2rem)] bg-background p-4 text-foreground">
       <div className="flex items-center justify-end border-b border-border pb-3">
-        <ToolPreferences tools={NESTED_TOOLS} value={prefs} onChange={setPrefs} />
+        <ToolPreferences
+          tools={NESTED_TOOLS}
+          value={prefs}
+          onRule={(rule) => setRules((current) => withUserRule(current, rule))}
+        />
       </div>
-      <pre data-testid="nested-prefs" className="pt-4 text-xs">
-        {JSON.stringify(prefs)}
+      <pre data-testid="nested-rules" className="pt-4 text-xs">
+        {JSON.stringify(rules)}
       </pre>
     </div>
   );
 }
 
-function readNestedPrefs(canvasElement: HTMLElement): Record<string, ToolPolicy> {
-  const raw = within(canvasElement).getByTestId("nested-prefs").textContent;
-  return raw ? (JSON.parse(raw) as Record<string, ToolPolicy>) : {};
+function readNestedRules(canvasElement: HTMLElement): PermissionPolicy {
+  const raw = within(canvasElement).getByTestId("nested-rules").textContent;
+  return raw ? (JSON.parse(raw) as PermissionPolicy) : [];
 }
 
 const dialog = () =>
@@ -495,48 +519,55 @@ const dialog = () =>
 export const NestedPermissions: Story = {
   render: () => <NestedToolsStory />,
   play: async ({ canvasElement, step }) => {
-    await step("starts collapsed; expanding reveals entity sub-headers", async () => {
-      const { dialogView } = await openAdvancedDialog(canvasElement);
-      await userEvent.click(
-        dialogView.getByRole("button", { name: /permissions/i }),
-      );
+    await step(
+      "starts collapsed; expanding reveals entity sub-headers",
+      async () => {
+        const { dialogView } = await openAdvancedDialog(canvasElement);
+        await userEvent.click(
+          dialogView.getByRole("button", { name: /permissions/i }),
+        );
 
-      // Group headers show, but entity sub-headers and rows stay hidden.
-      await expect(dialogView.getByText("Accounting Read")).toBeInTheDocument();
-      await expect(dialogView.queryByText("Accounts")).toBeNull();
+        // Group headers show, but entity sub-headers and rows stay hidden.
+        await expect(
+          dialogView.getByText("Accounting Read"),
+        ).toBeInTheDocument();
+        await expect(dialogView.queryByText("Accounts")).toBeNull();
 
-      await userEvent.click(
-        dialogView.getByRole("button", { name: "Expand Accounting Read" }),
-      );
-      // Entity sub-headers appear; their colliding verbs are still collapsed.
-      await expect(dialogView.getByText("Accounts")).toBeInTheDocument();
-      await expect(dialogView.getByText("Contacts")).toBeInTheDocument();
-      await expect(dialogView.queryByText("Get")).toBeNull();
-    });
+        await userEvent.click(
+          dialogView.getByRole("button", { name: "Expand Accounting Read" }),
+        );
+        // Entity sub-headers appear; their colliding verbs are still collapsed.
+        await expect(dialogView.getByText("Accounts")).toBeInTheDocument();
+        await expect(dialogView.getByText("Contacts")).toBeInTheDocument();
+        await expect(dialogView.queryByText("Get")).toBeNull();
+      },
+    );
 
-    await step("expanding an entity disambiguates its colliding verbs", async () => {
-      const dialogView = within(await dialog());
-      await userEvent.click(
-        dialogView.getByRole("button", { name: "Expand Accounts" }),
-      );
-      // Only Accounts' verbs so far — Contacts stays collapsed.
-      await expect(dialogView.getAllByText("Get")).toHaveLength(1);
-      await userEvent.click(
-        dialogView.getByRole("button", { name: "Expand Contacts" }),
-      );
-      // The two "Get"/"List" verbs now coexist, each under its own entity.
-      await expect(dialogView.getAllByText("Get")).toHaveLength(2);
-      await expect(dialogView.getAllByText("List")).toHaveLength(2);
-    });
+    await step(
+      "expanding an entity disambiguates its colliding verbs",
+      async () => {
+        const dialogView = within(await dialog());
+        await userEvent.click(
+          dialogView.getByRole("button", { name: "Expand Accounts" }),
+        );
+        // Only Accounts' verbs so far — Contacts stays collapsed.
+        await expect(dialogView.getAllByText("Get")).toHaveLength(1);
+        await userEvent.click(
+          dialogView.getByRole("button", { name: "Expand Contacts" }),
+        );
+        // The two "Get"/"List" verbs now coexist, each under its own entity.
+        await expect(dialogView.getAllByText("Get")).toHaveLength(2);
+        await expect(dialogView.getAllByText("List")).toHaveLength(2);
+      },
+    );
 
     await step("differing member modes surface as Mixed", async () => {
       const dialogView = within(await dialog());
       // Flip a single Accounts tool so Accounts (and thus the group) disagree.
       await userEvent.click(dialogView.getByTitle("accounts_get"));
-      const prefs = readNestedPrefs(canvasElement);
-      expect(prefs.accounts_get).toBe("auto");
-      expect(prefs.accounts_list).toBeUndefined();
-      expect(prefs.contacts_get).toBeUndefined();
+      expect(readNestedRules(canvasElement)).toEqual([
+        { name: "accounts_get", policy: "auto" },
+      ]);
       // Mixed shows on the Accounts sub-header AND the Accounting Read group.
       await expect(dialogView.getAllByText("Mixed")).toHaveLength(2);
     });
@@ -550,17 +581,18 @@ export const NestedPermissions: Story = {
       await expect(dialogView.getByTitle("contacts_get")).toBeInTheDocument();
     });
 
-    await step("group header cycles every tool in the tier", async () => {
+    await step("group rules preserve existing tool overrides", async () => {
       const dialogView = within(await dialog());
       await userEvent.click(
-        dialogView.getByRole("button", { name: "Toggle Accounting Read group" }),
+        dialogView.getByRole("button", {
+          name: "Toggle Accounting Read group",
+        }),
       );
-      const prefs = readNestedPrefs(canvasElement);
-      // Most-restrictive member ("auto") advances to "ask" for all four tools.
-      expect(prefs.accounts_get).toBe("ask");
-      expect(prefs.accounts_list).toBe("ask");
-      expect(prefs.contacts_get).toBe("ask");
-      expect(prefs.contacts_list).toBe("ask");
+      expect(readNestedRules(canvasElement)).toEqual([
+        { group: "Accounting Read", policy: "ask" },
+        { name: "accounts_get", policy: "auto" },
+      ]);
+      await expect(dialogView.getAllByText("Mixed")).toHaveLength(2);
     });
   },
 };
