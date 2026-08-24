@@ -88,7 +88,7 @@ import {
   type TagsValue,
 } from "./cells/tag-utils";
 import { parseClickyData, type ParsedClicky } from "./clicky-parse";
-import { useQueryInfo } from "./query-info/useQueryInfo";
+import { useDebugAction } from "./useDebugAction";
 import { useClickyExport } from "./clicky-export/useClickyExport";
 import {
   ClickyExportDialog,
@@ -485,9 +485,9 @@ export function Clicky(props: ClickyProps) {
         },
       }),
   );
-  // A remote payload knows the URL it came from, so the table can ask that URL
-  // what it ran — the one thing rows never show.
-  const queryInfo = useQueryInfo({ url: props.url });
+  // The rows never show the query behind them. "Debug" reveals the console,
+  // which holds the record for the run that produced these rows.
+  const debugAction = useDebugAction();
   const exporter = useClickyExport({
     formats: useMemo(
       () => exportFormatOptions({ url: props.url, download: props.download }),
@@ -510,15 +510,14 @@ export function Clicky(props: ClickyProps) {
   });
   const tableMenuActions = useMemo(
     () =>
-      [exporter.action, queryInfo.action].filter(
+      [exporter.action, debugAction].filter(
         (action): action is DataTableMenuAction => action !== undefined,
       ),
-    [exporter.action, queryInfo.action],
+    [exporter.action, debugAction],
   );
 
   const content = (
     <>
-      {queryInfo.dialog}
       {exporter.dialog}
       <ClickyRuntimeProvider
         {...(props.commandRuntime
