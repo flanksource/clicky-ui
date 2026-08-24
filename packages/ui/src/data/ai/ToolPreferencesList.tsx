@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { UiChevronDown, UiChevronRight } from "../../icons";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import type { ToolMeta, ToolMode } from "../chat/types";
+import type { ToolMeta, ToolPolicy } from "../chat/types";
+import type { PermissionRule } from "../chat/tool-policy";
 import {
   BADGE_DESCRIPTION,
   BADGE_LABEL,
@@ -10,9 +11,9 @@ import {
   commonMode,
   entryMode,
   groupedToolEntriesWithPreferences,
-  groupToolMode,
+  groupToolPolicy,
   nextMode,
-  type BadgeMode,
+  type BadgePolicy,
   type ToolGroup,
   type ToolPreferenceEntry,
   type ToolSubGroup,
@@ -20,23 +21,31 @@ import {
 
 export type CompactToolPreferencesListProps = {
   tools: ToolMeta[];
-  value: Record<string, ToolMode>;
-  onChange: (prefs: Record<string, ToolMode>) => void;
+  /** The effective mode of every tool, keyed by name — what the rows render. */
+  value: Record<string, ToolPolicy>;
+  /** Emits the rule a toggle means: a group header emits a group rule, a parent
+   *  header a group+parent rule, and a row a name rule. The caller appends it to
+   *  the user's list, where a name rule outranks the group rule above it.
+   *
+   *  This is deliberately not "here is the new map". A group toggle that wrote
+   *  every current member's name would stop applying the moment the catalog
+   *  gained a member, and the user would have no way to tell. */
+  onRule: (rule: PermissionRule) => void;
   title?: string | undefined;
   emptyLabel?: string | undefined;
   className?: string | undefined;
 };
 
-function ModeBadge({ mode }: { mode: BadgeMode }) {
+function ModeBadge({ mode }: { mode: BadgePolicy }) {
   return (
     <span
       className={cn(
         "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
-        mode === "on" &&
+        mode === "allow" &&
           "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
         mode === "auto" && "bg-sky-500/10 text-sky-600 dark:text-sky-400",
         mode === "ask" && "bg-amber-500/10 text-amber-600 dark:text-amber-500",
-        mode === "off" && "text-muted-foreground",
+        mode === "deny" && "text-muted-foreground",
         mode === "mixed" &&
           "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
       )}
@@ -58,7 +67,7 @@ function ToolGroupHeader({
   group: string;
   count: number;
   collapsed: boolean;
-  mode: BadgeMode;
+  mode: BadgePolicy;
   onCollapseToggle: () => void;
   onModeToggle: () => void;
 }) {
@@ -104,8 +113,8 @@ function ToolRow({
   indented = false,
 }: {
   entry: ToolPreferenceEntry;
-  mode: ToolMode;
-  onToggle: (entry: ToolPreferenceEntry, current: ToolMode) => void;
+  mode: ToolPolicy;
+  onToggle: (entry: ToolPreferenceEntry, current: ToolPolicy) => void;
   indented?: boolean;
 }) {
   return (
@@ -121,7 +130,7 @@ function ToolRow({
       <span
         className={cn(
           "min-w-0 truncate text-xs",
-          mode === "off" && "text-muted-foreground line-through",
+          mode === "deny" && "text-muted-foreground line-through",
         )}
       >
         {entry.label}
@@ -142,7 +151,7 @@ function ToolParentHeader({
   parent: string;
   count: number;
   collapsed: boolean;
-  mode: BadgeMode;
+  mode: BadgePolicy;
   onCollapseToggle: () => void;
   onModeToggle: () => void;
 }) {
@@ -187,14 +196,14 @@ function ToolSubGroupBlock({
   open,
   onToggle,
   onToggleEntry,
-  onCycleEntries,
+  onCycleSubGroup,
 }: {
   subGroup: ToolSubGroup;
-  value: Record<string, ToolMode>;
+  value: Record<string, ToolPolicy>;
   open: boolean;
   onToggle: () => void;
-  onToggleEntry: (entry: ToolPreferenceEntry, current: ToolMode) => void;
-  onCycleEntries: (entries: ToolPreferenceEntry[], current: ToolMode) => void;
+  onToggleEntry: (entry: ToolPreferenceEntry, current: ToolPolicy) => void;
+  onCycleSubGroup: (subGroup: ToolSubGroup, current: ToolPolicy) => void;
 }) {
   const hasParent = subGroup.parent !== NO_PARENT;
   const rows = subGroup.entries.map((entry) => (
@@ -216,10 +225,7 @@ function ToolSubGroupBlock({
         mode={commonMode(subGroup.entries, value)}
         onCollapseToggle={onToggle}
         onModeToggle={() =>
-          onCycleEntries(
-            subGroup.entries,
-            groupToolMode(subGroup.entries, value),
-          )
+          onCycleSubGroup(subGroup, groupToolPolicy(subGroup.entries, value))
         }
       />
       {open && rows}
@@ -230,12 +236,12 @@ function ToolSubGroupBlock({
 export function CompactToolList({
   groups,
   value,
-  onChange,
+  onRule,
   emptyLabel = "No tools available",
 }: {
   groups: ToolGroup[];
-  value: Record<string, ToolMode>;
-  onChange: (prefs: Record<string, ToolMode>) => void;
+  value: Record<string, ToolPolicy>;
+  onRule: (rule: PermissionRule) => void;
   emptyLabel?: string | undefined;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -254,14 +260,23 @@ export function CompactToolList({
       else next.add(key);
       return next;
     });
-  const handleToggle = (entry: ToolPreferenceEntry, current: ToolMode) =>
-    onChange({ ...value, [entry.key]: nextMode(current) });
-  const cycleEntries = (entries: ToolPreferenceEntry[], current: ToolMode) => {
-    const next = nextMode(current);
-    const updated = { ...value };
-    for (const entry of entries) updated[entry.key] = next;
-    onChange(updated);
-  };
+  const handleToggle = (entry: ToolPreferenceEntry, current: ToolPolicy) =>
+    onRule({ name: entry.key, policy: nextMode(current) });
+  const cycleGroup = (group: ToolGroup, current: ToolPolicy) =>
+    onRule({ group: group.group, policy: nextMode(current) });
+  // A parent is a subdivision of one group, not a group of its own, so the rule
+  // has to name both — a bare `parent` would reach the same display title under
+  // a different group.
+  const cycleSubGroup = (
+    group: ToolGroup,
+    subGroup: ToolSubGroup,
+    current: ToolPolicy,
+  ) =>
+    onRule({
+      group: group.group,
+      parent: subGroup.parent,
+      policy: nextMode(current),
+    });
   return (
     <div className="space-y-1">
       {groups.map((group) => {
@@ -275,7 +290,7 @@ export function CompactToolList({
               mode={commonMode(group.entries, value)}
               onCollapseToggle={() => toggle(group.group)}
               onModeToggle={() =>
-                cycleEntries(group.entries, groupToolMode(group.entries, value))
+                cycleGroup(group, groupToolPolicy(group.entries, value))
               }
             />
             {groupOpen && (
@@ -290,7 +305,9 @@ export function CompactToolList({
                       open={isOpen(parentKey)}
                       onToggle={() => toggle(parentKey)}
                       onToggleEntry={handleToggle}
-                      onCycleEntries={cycleEntries}
+                      onCycleSubGroup={(sub, current) =>
+                        cycleSubGroup(group, sub, current)
+                      }
                     />
                   );
                 })}
@@ -306,7 +323,7 @@ export function CompactToolList({
 export function CompactToolPreferencesList({
   tools,
   value,
-  onChange,
+  onRule,
   title = "Tools preferences",
   emptyLabel = "No tools available",
   className,
@@ -323,7 +340,7 @@ export function CompactToolPreferencesList({
       <CompactToolList
         groups={groups}
         value={value}
-        onChange={onChange}
+        onRule={onRule}
         emptyLabel={emptyLabel}
       />
     </div>

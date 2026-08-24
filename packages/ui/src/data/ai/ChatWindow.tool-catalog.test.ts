@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { effectiveToolPreferences } from "./ChatWindow.tool-catalog";
-import type { ToolMeta, ToolMode } from "./ToolPreferences";
+import type { ToolMeta, ToolPolicy } from "./ToolPreferences";
 
-const FALLBACK: ToolMode = "ask";
+const FALLBACK: ToolPolicy = "ask";
 
 function tool(partial: Partial<ToolMeta> & { name: string }): ToolMeta {
   return { label: partial.name, ...partial };

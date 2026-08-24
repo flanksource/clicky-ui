@@ -1,30 +1,38 @@
-import type { ToolMeta, ToolMode } from "../chat/types";
+import type { ToolMeta, ToolPolicy } from "../chat/types";
+import { normalizeToolPolicy } from "../chat/types";
+import {
+  resolveToolPolicy,
+  type PermissionPolicy,
+  type PermissionRule,
+} from "../chat/tool-policy";
 
-export const MODE_CYCLE: ToolMode[] = ["auto", "ask", "off", "on"];
+export const POLICY_CYCLE: ToolPolicy[] = ["auto", "ask", "deny", "allow"];
 
-export const MODE_LABEL: Record<ToolMode, string> = {
-  on: "On",
+/** On and Off stay as the control's labels — they read better on a toggle than
+ *  allow/deny do. The wire vocabulary is the policy; this is presentation. */
+export const POLICY_LABEL: Record<ToolPolicy, string> = {
+  allow: "On",
   auto: "Auto",
   ask: "Ask",
-  off: "Off",
+  deny: "Off",
 };
 
-export const MODE_DESCRIPTION: Record<ToolMode, string> = {
-  on: "Always allow this tool to run automatically.",
+export const POLICY_DESCRIPTION: Record<ToolPolicy, string> = {
+  allow: "Always allow this tool to run automatically.",
   auto: "Use the backend's default permission policy.",
   ask: "Ask before running this tool.",
-  off: "Hide this tool from the model.",
+  deny: "Hide this tool from the model.",
 };
 
-export type BadgeMode = ToolMode | "mixed";
+export type BadgePolicy = ToolPolicy | "mixed";
 
-export const BADGE_LABEL: Record<BadgeMode, string> = {
-  ...MODE_LABEL,
+export const BADGE_LABEL: Record<BadgePolicy, string> = {
+  ...POLICY_LABEL,
   mixed: "Mixed",
 };
 
-export const BADGE_DESCRIPTION: Record<BadgeMode, string> = {
-  ...MODE_DESCRIPTION,
+export const BADGE_DESCRIPTION: Record<BadgePolicy, string> = {
+  ...POLICY_DESCRIPTION,
   mixed: "Members have different permissions.",
 };
 
@@ -33,7 +41,7 @@ export type ToolPreferenceEntry = {
   label: string;
   group: string;
   tool: ToolMeta;
-  defaultPermission: ToolMode;
+  defaultPermission: ToolPolicy;
 };
 
 export const NO_PARENT = "\u0000no-parent";
@@ -42,6 +50,79 @@ export type ToolSubGroup = {
   parent: string;
   entries: ToolPreferenceEntry[];
 };
+
+/** A toggle in the popover emits one rule rather than writing a mode per tool.
+ *  Which control was used is the thing worth recording: a group toggle means
+ *  "this whole family", so it keeps applying to tools that arrive later, while
+ *  writing every current member's name would silently stop at today's catalog.
+ *
+ *  Rules are held in specificity order — group, then group+parent, then name —
+ *  so a per-tool toggle beats the group toggle above it however they were
+ *  clicked. Position, not a precedence number, is what encodes that. */
+const RULE_RANKS: ((rule: PermissionRule) => boolean)[] = [
+  (rule) => rule.name === undefined && rule.parent === undefined,
+  (rule) => rule.name === undefined,
+  () => true,
+];
+
+function ruleRank(rule: PermissionRule): number {
+  return RULE_RANKS.findIndex((matches) => matches(rule));
+}
+
+function ruleKey(patterns: PermissionRule["name"]): string {
+  if (patterns === undefined) return "";
+  return (typeof patterns === "string" ? [patterns] : patterns).join(",");
+}
+
+function sameSubject(a: PermissionRule, b: PermissionRule): boolean {
+  return (
+    ruleKey(a.name) === ruleKey(b.name) &&
+    ruleKey(a.group) === ruleKey(b.group) &&
+    ruleKey(a.parent) === ruleKey(b.parent)
+  );
+}
+
+/** Adds one toggle's rule to the user's list, replacing any earlier rule for the
+ *  same subject in place so re-toggling a control does not grow the list, and
+ *  keeping the list in specificity order. */
+export function withUserRule(
+  rules: PermissionPolicy,
+  rule: PermissionRule,
+): PermissionPolicy {
+  const replaced = rules.map((existing) =>
+    sameSubject(existing, rule) ? rule : existing,
+  );
+  const next = replaced.includes(rule) ? replaced : [...replaced, rule];
+  return [...next].sort((a, b) => ruleRank(a) - ruleRank(b));
+}
+
+/** The mode to show for each tool: the user's own rules over the surface's, then
+ *  what the catalog says about the tool, then the fallback.
+ *
+ *  `auto` from a rule is a refusal to decide rather than an answer, so it hands
+ *  the tool back to its catalog default — the same reading the server applies. */
+export function effectiveToolPolicies({
+  tools,
+  surfacePolicy,
+  userRules,
+  fallback,
+}: {
+  tools: ToolMeta[];
+  surfacePolicy?: PermissionPolicy | undefined;
+  userRules?: PermissionPolicy | undefined;
+  fallback: ToolPolicy;
+}): Record<string, ToolPolicy> {
+  const policy = [...(surfacePolicy ?? []), ...(userRules ?? [])];
+  const resolved: Record<string, ToolPolicy> = {};
+  for (const tool of tools) {
+    const matched = resolveToolPolicy(policy, tool);
+    resolved[tool.name] =
+      (matched === "auto" ? undefined : matched) ??
+      tool.defaultPermission ??
+      fallback;
+  }
+  return resolved;
+}
 
 export type ToolGroup = {
   group: string;
@@ -97,12 +178,12 @@ function compareSubGroups(a: ToolSubGroup, b: ToolSubGroup): number {
 
 export function groupedToolEntriesWithPreferences(
   tools: ToolMeta[],
-  value: Record<string, ToolMode>,
+  value: Record<string, ToolPolicy>,
 ): ToolGroup[] {
   const groups = groupedToolEntries(tools);
   const known = new Set(tools.map((tool) => tool.name));
   const customEntries = Object.entries(value).flatMap(([name, mode]) => {
-    const normalizedMode = normalizeToolMode(mode);
+    const normalizedMode = normalizeToolPolicy(mode);
     if (known.has(name) || !normalizedMode) return [];
     return [
       {
@@ -123,44 +204,27 @@ export function groupedToolEntriesWithPreferences(
   return [...groups, buildToolGroup("Custom", customEntries)];
 }
 
-function normalizeToolMode(value: string): ToolMode | undefined {
-  switch (value.trim().toLowerCase()) {
-    case "on":
-    case "enabled":
-      return "on";
-    case "auto":
-      return "auto";
-    case "ask":
-      return "ask";
-    case "off":
-    case "disabled":
-      return "off";
-    default:
-      return undefined;
-  }
-}
-
 export function entryMode(
   entry: ToolPreferenceEntry,
-  value: Record<string, ToolMode>,
-): ToolMode {
-  return normalizeToolMode(value[entry.key] ?? "") ?? entry.defaultPermission;
+  value: Record<string, ToolPolicy>,
+): ToolPolicy {
+  return normalizeToolPolicy(value[entry.key] ?? "") ?? entry.defaultPermission;
 }
 
-export function groupToolMode(
+export function groupToolPolicy(
   entries: ToolPreferenceEntry[],
-  value: Record<string, ToolMode>,
-): ToolMode {
-  return entries.reduce<ToolMode>(
+  value: Record<string, ToolPolicy>,
+): ToolPolicy {
+  return entries.reduce<ToolPolicy>(
     (mode, entry) => mostRestrictiveMode(mode, entryMode(entry, value)),
-    "on",
+    "allow",
   );
 }
 
 export function commonMode(
   entries: ToolPreferenceEntry[],
-  value: Record<string, ToolMode>,
-): BadgeMode {
+  value: Record<string, ToolPolicy>,
+): BadgePolicy {
   const first = entries[0];
   if (!first) return "mixed";
   const firstMode = entryMode(first, value);
@@ -169,24 +233,24 @@ export function commonMode(
     : "mixed";
 }
 
-export function nextMode(mode: ToolMode): ToolMode {
-  const current = MODE_CYCLE.indexOf(mode);
-  return MODE_CYCLE[((current >= 0 ? current : 0) + 1) % MODE_CYCLE.length]!;
+export function nextMode(mode: ToolPolicy): ToolPolicy {
+  const current = POLICY_CYCLE.indexOf(mode);
+  return POLICY_CYCLE[((current >= 0 ? current : 0) + 1) % POLICY_CYCLE.length]!;
 }
 
-function mostRestrictiveMode(a: ToolMode, b: ToolMode): ToolMode {
+function mostRestrictiveMode(a: ToolPolicy, b: ToolPolicy): ToolPolicy {
   return modeRank(a) >= modeRank(b) ? a : b;
 }
 
-function modeRank(mode: ToolMode): number {
+function modeRank(mode: ToolPolicy): number {
   switch (mode) {
-    case "on":
+    case "allow":
       return 0;
     case "auto":
       return 1;
     case "ask":
       return 2;
-    case "off":
+    case "deny":
       return 3;
   }
 }

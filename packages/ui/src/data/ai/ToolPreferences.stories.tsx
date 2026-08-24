@@ -7,7 +7,7 @@ import {
   ToolPreferences,
   type ClaudePermissionMode,
   type ToolMeta,
-  type ToolMode,
+  type ToolPolicy,
 } from "./ToolPreferences";
 
 const SAMPLE_TOOLS: ToolMeta[] = [
@@ -161,7 +161,7 @@ const SAMPLE_TOOLS: ToolMeta[] = [
   },
 ];
 
-const INITIAL_PREFS: Record<string, ToolMode> = {
+const INITIAL_PREFS: Record<string, ToolPolicy> = {
   filesystem_write: "ask",
   xero_accounts_list: "off",
   xero_contacts_list: "off",
@@ -200,13 +200,13 @@ const SAMPLE_USAGE: ChatUsageSummary = {
 };
 
 type ToolPreferencesStoryProps = {
-  initialValue?: Record<string, ToolMode>;
+  initialValue?: Record<string, ToolPolicy>;
 };
 
 function ToolPreferencesStory({
   initialValue = INITIAL_PREFS,
 }: ToolPreferencesStoryProps) {
-  const [prefs, setPrefs] = useState<Record<string, ToolMode>>(initialValue);
+  const [prefs, setPrefs] = useState<Record<string, ToolPolicy>>(initialValue);
   const [model, setModel] = useState<string | undefined>(MOCK_MODELS[0]?.id);
   const [reasoningEffort, setReasoningEffort] = useState("medium");
   const [permissionMode, setPermissionMode] =
@@ -469,7 +469,7 @@ const NESTED_TOOLS: ToolMeta[] = [
 ];
 
 function NestedToolsStory() {
-  const [prefs, setPrefs] = useState<Record<string, ToolMode>>({});
+  const [prefs, setPrefs] = useState<Record<string, ToolPolicy>>({});
   return (
     <div className="min-h-[20rem] w-[42rem] max-w-[calc(100vw-2rem)] bg-background p-4 text-foreground">
       <div className="flex items-center justify-end border-b border-border pb-3">
@@ -482,9 +482,9 @@ function NestedToolsStory() {
   );
 }
 
-function readNestedPrefs(canvasElement: HTMLElement): Record<string, ToolMode> {
+function readNestedPrefs(canvasElement: HTMLElement): Record<string, ToolPolicy> {
   const raw = within(canvasElement).getByTestId("nested-prefs").textContent;
-  return raw ? (JSON.parse(raw) as Record<string, ToolMode>) : {};
+  return raw ? (JSON.parse(raw) as Record<string, ToolPolicy>) : {};
 }
 
 const dialog = () =>

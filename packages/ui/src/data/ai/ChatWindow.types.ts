@@ -3,7 +3,7 @@ import type { ChatProps } from "../chat/Chat";
 import type { ChatWindowState } from "./chat-window-context";
 import type { ChatContextItem, ContextTypeConfig } from "./context";
 import type { ThreadSource } from "./ThreadPicker";
-import type { ToolMeta, ToolMode } from "./ToolPreferences";
+import type { ToolMeta, ToolPolicy } from "./ToolPreferences";
 import type {
   ToolRenderAdapter,
   ToolRenderRegistry,
@@ -31,7 +31,7 @@ export type ChatWindowProps = {
    * user can switch any tool to On/Auto/Off from the popover. */
   tools?: ToolMeta[];
   /** Initial mode assigned to tools when they first load. Defaults to "ask". */
-  defaultToolMode?: ToolMode;
+  defaultToolPolicy?: ToolPolicy;
   /** Backend tool catalog endpoint. Defaults to "/api/chat/tools"; null disables fetching. */
   toolsApi?: string | null;
   /** Backend runtime catalog endpoint. Null uses the built-in runtime families

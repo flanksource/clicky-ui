@@ -40,8 +40,16 @@ export {
   type ClaudePermissionMode,
   type ToolAnnotations,
   type ToolMeta,
-  type ToolMode,
+  type ToolPolicy,
 } from "./ToolPreferences";
+export {
+  effectiveToolPolicies,
+  withUserRule,
+  type ToolGroup,
+  type ToolPreferenceEntry,
+  type ToolSubGroup,
+} from "./ToolPreferences.model";
+export { normalizeToolPolicy } from "../chat/types";
 export {
   CLAUDE_PERMISSION_MODES,
   CLAUDE_PERMISSION_MODE_OPTIONS,

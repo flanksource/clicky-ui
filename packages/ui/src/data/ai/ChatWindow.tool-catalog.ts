@@ -1,4 +1,5 @@
-import type { ToolMeta, ToolMode } from "./ToolPreferences";
+import type { ToolMeta, ToolPolicy } from "./ToolPreferences";
+import { normalizeToolPolicy as normalizeToolPolicyValue } from "../chat/types";
 
 /** Resolves the effective mode of every tool, most-specific source first:
  *
@@ -17,11 +18,11 @@ export function effectiveToolPreferences({
   fallback,
 }: {
   tools: ToolMeta[];
-  explicit: Record<string, ToolMode>;
-  surfaceDefaults?: Record<string, ToolMode>;
-  fallback: ToolMode;
-}): Record<string, ToolMode> {
-  const resolved: Record<string, ToolMode> = {};
+  explicit: Record<string, ToolPolicy>;
+  surfaceDefaults?: Record<string, ToolPolicy>;
+  fallback: ToolPolicy;
+}): Record<string, ToolPolicy> {
+  const resolved: Record<string, ToolPolicy> = {};
   for (const tool of tools) {
     resolved[tool.name] =
       explicit[tool.name] ??
@@ -34,8 +35,8 @@ export function effectiveToolPreferences({
 
 function surfaceDefault(
   tool: ToolMeta,
-  surfaceDefaults: Record<string, ToolMode> | undefined
-): ToolMode | undefined {
+  surfaceDefaults: Record<string, ToolPolicy> | undefined
+): ToolPolicy | undefined {
   if (!surfaceDefaults) return undefined;
   for (const key of [tool.name, tool.preferenceKey, tool.group]) {
     if (key && surfaceDefaults[key]) return surfaceDefaults[key];
@@ -64,7 +65,7 @@ function normalizeToolMeta(tool: unknown): ToolMeta[] {
     stringValue(item.title) ??
     stringValue(item.operationName) ??
     name;
-  const defaultPermission = normalizeToolModeValue(
+  const defaultPermission = normalizeToolPolicyValue(
     item.defaultPermission ?? item.defaultMode
   );
   const group = stringValue(item.group);
@@ -79,9 +80,15 @@ function normalizeToolMeta(tool: unknown): ToolMeta[] {
   const method = stringValue(item.method);
   const path = stringValue(item.path);
   const operationName = stringValue(item.operationName);
+  // Facets a permission rule may match on. They are read even though nothing
+  // renders them, because a facet the client cannot see is one it resolves
+  // differently from the server that enforces the same rule.
+  const verb = stringValue(item.verb);
+  const action = stringValue(item.action);
+  const scope = stringValue(item.scope);
   const title = stringValue(item.title);
   const strict = booleanValue(item.strict);
-  const annotations = annotationsValue(item.annotations);
+  const annotations = toolAnnotations(item);
   const inputSchema = schemaValue(item.inputSchema);
   const outputSchema = schemaValue(item.outputSchema);
   return [
@@ -101,6 +108,9 @@ function normalizeToolMeta(tool: unknown): ToolMeta[] {
       ...(method ? { method } : {}),
       ...(path ? { path } : {}),
       ...(operationName ? { operationName } : {}),
+      ...(verb ? { verb } : {}),
+      ...(action ? { action } : {}),
+      ...(scope ? { scope } : {}),
       ...(title ? { title } : {}),
       ...(strict !== undefined ? { strict } : {}),
       ...(annotations ? { annotations } : {}),
@@ -138,20 +148,27 @@ function annotationsValue(value: unknown): ToolMeta["annotations"] | undefined {
   return value as ToolMeta["annotations"];
 }
 
-function normalizeToolModeValue(value: unknown): ToolMode | undefined {
-  if (typeof value !== "string") return undefined;
-  switch (value.trim().toLowerCase()) {
-    case "on":
-    case "enabled":
-      return "on";
-    case "ask":
-      return "ask";
-    case "off":
-    case "disabled":
-      return "off";
-    case "auto":
-      return "auto";
-    default:
-      return undefined;
-  }
+/** Safety hints arrive either nested under `annotations` (MCP `_meta`) or flat on
+ *  the catalog entry (a clicky operation). A rule matching on a hint has to see
+ *  both, so they are folded into one place here rather than at each rule check.
+ *
+ *  A hint the tool never declared stays absent. That is not the same as `false`:
+ *  a rule requiring `readOnly: false` must not select a tool that said nothing. */
+function toolAnnotations(
+  item: Record<string, unknown>
+): ToolMeta["annotations"] | undefined {
+  const nested = annotationsValue(item.annotations) ?? {};
+  const readOnlyHint = booleanValue(item.readOnlyHint) ?? nested.readOnlyHint;
+  const destructiveHint =
+    booleanValue(item.destructiveHint) ?? nested.destructiveHint;
+  const idempotentHint =
+    booleanValue(item.idempotentHint) ?? nested.idempotentHint;
+  const merged = {
+    ...nested,
+    ...(readOnlyHint !== undefined ? { readOnlyHint } : {}),
+    ...(destructiveHint !== undefined ? { destructiveHint } : {}),
+    ...(idempotentHint !== undefined ? { idempotentHint } : {}),
+  };
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
+

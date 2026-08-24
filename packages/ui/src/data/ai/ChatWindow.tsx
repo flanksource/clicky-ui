@@ -21,11 +21,7 @@ import type {
 import { useChatWindowManager } from "./chat-window-context";
 import { ThreadPicker } from "./ThreadPicker";
 import { ContextBadges } from "./ContextBadges";
-import {
-  ToolPreferences,
-  type ToolMeta,
-  type ToolMode,
-} from "./ToolPreferences";
+import { ToolPreferences, type ToolMeta } from "./ToolPreferences";
 import type { ChatContextItem } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 import {
@@ -35,10 +31,15 @@ import {
 } from "./ChatWindow.preferences";
 import { useChatWindowRuntime } from "./ChatWindow.runtime";
 import { useChatWindowCatalogs } from "./ChatWindow.catalogs";
+import { normalizeToolCatalog } from "./ChatWindow.tool-catalog";
 import {
-  effectiveToolPreferences,
-  normalizeToolCatalog,
-} from "./ChatWindow.tool-catalog";
+  effectiveToolPolicies,
+  withUserRule,
+} from "./ToolPreferences.model";
+import type {
+  PermissionPolicy,
+  PermissionRule,
+} from "../chat/tool-policy";
 import { useChatThreadSetup } from "./ChatWindow.thread";
 import { ChatThreadSetupStatus } from "./ChatWindow.thread-status";
 import type { ChatWindowProps } from "./ChatWindow.types";
@@ -70,7 +71,7 @@ export function ChatWindow({
   threadsSource,
   contextTypeConfig,
   tools,
-  defaultToolMode = "ask",
+  defaultToolPolicy = "ask",
   toolsApi = "/api/chat/tools",
   runtimesApi = null,
   toolRenderers,
@@ -97,12 +98,12 @@ export function ChatWindow({
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [titleRefresh, setTitleRefresh] = useState(0);
-  // Only the modes the user picked in the popover are stored. Everything else
-  // is derived, so a surface's declared defaults still reach tools the user has
-  // never touched (see effectiveToolPreferences).
-  const [explicitToolPrefs, setExplicitToolPrefs] = useState<
-    Record<string, ToolMode>
-  >(storedPrefs.toolPrefs ?? {});
+  // Only the rules the user actually toggled are stored. Everything else is
+  // derived, so a surface's rules still reach tools the user never touched, and
+  // a group toggle keeps applying as the catalog grows.
+  const [userToolRules, setUserToolRules] = useState<PermissionPolicy>(
+    storedPrefs.toolRules ?? [],
+  );
   const [fetchedTools, setFetchedTools] = useState<ToolMeta[] | undefined>(
     undefined,
   );
@@ -198,35 +199,26 @@ export function ChatWindow({
         ? { budget }
         : {}),
       permissionMode,
-      toolPrefs: explicitToolPrefs,
+      toolRules: userToolRules,
     });
   }, [budget, permissionMode, runtime, runtimeLocked, explicitToolPrefs]);
 
   const toolPrefs = useMemo(
     () =>
-      effectiveToolPreferences({
+      effectiveToolPolicies({
         tools: resolvedTools,
-        explicit: explicitToolPrefs,
-        surfaceDefaults: panel.toolDefaults,
-        fallback: defaultToolMode,
+        surfacePolicy: panel.toolPolicy,
+        userRules: userToolRules,
+        fallback: defaultToolPolicy,
       }),
-    [defaultToolMode, explicitToolPrefs, panel.toolDefaults, resolvedTools],
+    [defaultToolPolicy, panel.toolPolicy, resolvedTools, userToolRules],
   );
 
-  // The popover hands back the whole map, so the keys that differ from the
-  // currently effective modes are exactly what the user just changed.
-  const handleToolPrefsChange = useCallback(
-    (next: Record<string, ToolMode>) => {
-      setExplicitToolPrefs((prev) => {
-        const updated = { ...prev };
-        for (const [name, mode] of Object.entries(next)) {
-          if (toolPrefs[name] !== mode) updated[name] = mode;
-        }
-        return updated;
-      });
-    },
-    [toolPrefs],
-  );
+  // The popover hands back the one rule the toggle means, not a whole map, so
+  // which control was used survives into the request.
+  const handleToolRule = useCallback((rule: PermissionRule) => {
+    setUserToolRules((prev) => withUserRule(prev, rule));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -270,7 +262,8 @@ export function ChatWindow({
     base: chat?.body,
     contextItems: panel.contextItems,
     tools: resolvedTools,
-    toolPrefs,
+    surfacePolicy: panel.toolPolicy,
+    userPolicy: userToolRules,
   });
 
   const initialPrompt = panel.initialPrompt ?? chat?.initialPrompt ?? null;
@@ -353,7 +346,7 @@ export function ChatWindow({
       <ToolPreferences
         tools={resolvedTools}
         value={toolPrefs}
-        onChange={handleToolPrefsChange}
+        onRule={handleToolRule}
         models={resolvedModels}
         runtime={runtime}
         onRuntimeChange={handleRuntimeChange}

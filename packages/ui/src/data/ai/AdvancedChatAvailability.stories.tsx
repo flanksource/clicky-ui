@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ChatModel, ChatModelRuntime, ToolMode } from "../chat/types";
+import type { ChatModel, ChatModelRuntime, ToolPolicy } from "../chat/types";
 import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
 import { ToolPreferences } from "./ToolPreferences";
 
@@ -117,7 +117,7 @@ function AvailabilityStory() {
     backend: "claude-agent",
     model: "claude-sonnet",
   });
-  const [preferences, setPreferences] = useState<Record<string, ToolMode>>({});
+  const [preferences, setPreferences] = useState<Record<string, ToolPolicy>>({});
   return (
     <div className="flex min-h-96 items-start justify-end bg-background p-6">
       <ToolPreferences

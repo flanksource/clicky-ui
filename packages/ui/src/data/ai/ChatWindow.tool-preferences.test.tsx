@@ -64,7 +64,7 @@ describe("ChatWindow tool approval default", () => {
           <ChatWindowLayer
             sessionsApi={null}
             tools={CHAT_WINDOW_TEST_TOOLS}
-            defaultToolMode="auto"
+            defaultToolPolicy="auto"
             chat={{ modelsApi: null, transport: mockChatTransport() }}
           />
         </OpenChatWindowOnMount>
@@ -96,14 +96,14 @@ describe("ChatWindow tool approval default", () => {
         label: "List Xero accounts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultPermission: "off",
+        defaultPermission: "deny",
       },
       {
         name: "xero_contacts_list",
         label: "List Xero contacts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultPermission: "off",
+        defaultPermission: "deny",
       },
       {
         name: "sync",
@@ -158,7 +158,7 @@ describe("ChatWindow tool approval default", () => {
         label: "List Xero accounts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultPermission: "off",
+        defaultPermission: "deny",
         description: "List accounts from Xero",
       },
       {
@@ -166,7 +166,7 @@ describe("ChatWindow tool approval default", () => {
         label: "List Xero contacts",
         group: "Xero Read",
         preferenceKey: "Xero Read",
-        defaultPermission: "off",
+        defaultPermission: "deny",
         description: "List contacts from Xero",
       },
       {
@@ -178,13 +178,13 @@ describe("ChatWindow tool approval default", () => {
         description: "Synchronize Xero data",
       },
     ];
-    const onChange = vi.fn();
+    const onRule = vi.fn();
 
     render(
       <ToolPreferences
         tools={groupedTools}
-        value={{ xero_accounts_list: "off", xero_contacts_list: "off" }}
-        onChange={onChange}
+        value={{ xero_accounts_list: "deny", xero_contacts_list: "deny" }}
+        onRule={onRule}
       />
     );
 
@@ -213,20 +213,23 @@ describe("ChatWindow tool approval default", () => {
       })
     ).toBeNull();
 
+    // A row toggle names the tool; the group header names the group. Which
+    // control was used is what travels, so a group toggle keeps applying to
+    // members the catalog gains later instead of freezing today's list.
     fireEvent.click(
       within(dialog).getByRole("button", { name: /List Xero accounts/ })
     );
-    expect(onChange).toHaveBeenCalledWith({
-      xero_accounts_list: "on",
-      xero_contacts_list: "off",
+    expect(onRule).toHaveBeenCalledWith({
+      name: "xero_accounts_list",
+      policy: "allow",
     });
 
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Toggle Xero Read group" })
     );
-    expect(onChange).toHaveBeenLastCalledWith({
-      xero_accounts_list: "on",
-      xero_contacts_list: "on",
+    expect(onRule).toHaveBeenLastCalledWith({
+      group: "Xero Read",
+      policy: "allow",
     });
   });
 

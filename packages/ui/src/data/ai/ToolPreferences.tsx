@@ -14,7 +14,7 @@ import type {
   ClaudePermissionMode,
   ToolAnnotations,
   ToolMeta,
-  ToolMode,
+  ToolPolicy,
 } from "../chat/types";
 import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
 import { AdvancedChatConfig } from "./AdvancedChatConfig";
@@ -26,14 +26,15 @@ import {
   type CompactToolPreferencesListProps,
 } from "./ToolPreferencesList";
 import { groupedToolEntries, type ToolGroup } from "./ToolPreferences.model";
+import type { PermissionRule } from "../chat/tool-policy";
 
-export type { ClaudePermissionMode, ToolAnnotations, ToolMeta, ToolMode };
+export type { ClaudePermissionMode, ToolAnnotations, ToolMeta, ToolPolicy };
 export { CompactToolPreferencesList, type CompactToolPreferencesListProps };
 
 export type ToolPreferencesProps = {
   tools: ToolMeta[];
-  value: Record<string, ToolMode>;
-  onChange: (prefs: Record<string, ToolMode>) => void;
+  value: Record<string, ToolPolicy>;
+  onRule: (rule: PermissionRule) => void;
   models?: ChatModel[] | undefined;
   runtime?: ChatModelRuntime | undefined;
   onRuntimeChange?: ((runtime: ChatModelRuntime) => void) | undefined;
@@ -82,7 +83,7 @@ const ADVANCED_TAB_ICONS: Record<AdvancedTab, typeof UiSliders> = {
 export function ToolPreferences({
   tools,
   value,
-  onChange,
+  onRule,
   models = [],
   runtime,
   onRuntimeChange,
@@ -154,7 +155,7 @@ export function ToolPreferences({
             <CompactToolList
               groups={groups}
               value={value}
-              onChange={onChange}
+              onRule={onRule}
               emptyLabel="No tools available"
             />
             <div className="mt-2 border-t border-border pt-2">
@@ -233,7 +234,7 @@ export function ToolPreferences({
             <AdvancedPermissionsPanel
               groups={groups}
               value={value}
-              onChange={onChange}
+              onRule={onRule}
             />
           ) : (
             <ToolSchemaBrowser tools={tools} className="min-h-0 flex-1" />
@@ -247,18 +248,18 @@ export function ToolPreferences({
 function AdvancedPermissionsPanel({
   groups,
   value,
-  onChange,
+  onRule,
 }: {
   groups: ToolGroup[];
-  value: Record<string, ToolMode>;
-  onChange: (prefs: Record<string, ToolMode>) => void;
+  value: Record<string, ToolPolicy>;
+  onRule: (rule: PermissionRule) => void;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto rounded border border-border p-1">
       <CompactToolList
         groups={groups}
         value={value}
-        onChange={onChange}
+        onRule={onRule}
         emptyLabel="No tools"
       />
     </div>

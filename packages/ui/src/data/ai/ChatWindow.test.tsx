@@ -103,15 +103,22 @@ describe("ChatWindow", () => {
       base: { model: "test" },
       contextItems,
       tools: CHAT_WINDOW_TEST_TOOLS,
-      toolPrefs: { listPods: "on" },
+      surfacePolicy: [{ group: "provider.*", policy: "deny" }],
+      userPolicy: [{ name: "listPods", policy: "allow" }],
     });
 
     expect(body).toEqual({
       model: "test",
       context: "Context:\n[formula] Formula Playground (entity: Demo Co)\n\n",
       contextItems,
-      toolPreferences: { listPods: "on" },
+      // Order is the contract: the surface's rules first, the user's after, so
+      // the server's last-match-wins read lets a toggle beat the surface.
+      toolPolicy: [
+        { group: "provider.*", policy: "deny" },
+        { name: "listPods", policy: "allow" },
+      ],
     });
+    expect(body).not.toHaveProperty("toolPreferences");
     expect(body).not.toHaveProperty("toolApproval");
   });
 
