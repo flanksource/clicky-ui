@@ -33,6 +33,7 @@ export interface TaskProcessSample {
 export interface TaskProcessDetails {
   pid?: number;
   command: string;
+  args?: string[];
   status: string;
   started?: string;
   exitCode?: number;

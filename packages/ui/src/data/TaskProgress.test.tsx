@@ -4,6 +4,10 @@ import { TaskProgress } from "./TaskProgress";
 import { bucketTasks, taskSegments } from "./task-status";
 import type { TaskSnapshot } from "./TaskSnapshot";
 
+vi.mock("./TimeseriesGauge", () => ({
+  TimeseriesGauge: ({ title }: { title: string }) => <span>{title} gauge</span>,
+}));
+
 const RUN: TaskSnapshot[] = [
   {
     id: "fix-run",
@@ -236,6 +240,50 @@ describe("TaskProgress", () => {
     expect(screen.getByText("worker")).toBeInTheDocument();
     expect(screen.getByText("pid 101")).toBeInTheDocument();
     expect(screen.getByText("1 restart")).toBeInTheDocument();
+  });
+
+  it("expands supervised child tasks with argv, resource gauges, and captured streams", () => {
+    const snapshots: TaskSnapshot[] = [
+      {
+        id: "prepare",
+        name: "Prepare model",
+        type: "group",
+        status: "running",
+        groupId: "prepare-1",
+        total: 1,
+        running: 1,
+      },
+      {
+        id: "openscad",
+        name: "Run OpenSCAD",
+        type: "task",
+        status: "running",
+        groupId: "prepare-1",
+        stdout: "render complete\n",
+        stderr: "cache warning\n",
+        details: {
+          pid: 411,
+          command: "/usr/local/bin/openscad",
+          args: ["--backend", "manifold", "-o", "/models/box output.stl", "/models/box.scad"],
+          status: "running",
+          restarts: 0,
+          restartPolicy: "never",
+          latest: { cpuPercent: 12.5, rssBytes: 2048, vmsBytes: 8192, openFiles: 8, sampledAt: "2026-08-22T00:00:00Z" },
+          peak: { cpuPercent: 20, rssBytes: 4096, vmsBytes: 16384, openFiles: 10, sampledAt: "2026-08-22T00:00:00Z" },
+          metrics: { cpu: "task.openscad.cpu", rss: "task.openscad.rss" },
+        },
+      },
+    ];
+
+    render(<TaskProgress snapshots={snapshots} metricsBaseUrl="/api/v1/tasks/metrics/" />);
+    fireEvent.click(screen.getByText("Run OpenSCAD"));
+
+    expect(screen.getByText('["/usr/local/bin/openscad","--backend","manifold","-o","/models/box output.stl","/models/box.scad"]')).toBeInTheDocument();
+    expect(screen.getByText("12.5% CPU")).toBeInTheDocument();
+    expect(screen.getByText("CPU gauge")).toBeInTheDocument();
+    expect(screen.getByText("RSS gauge")).toBeInTheDocument();
+    expect(screen.getByText("render complete")).toBeInTheDocument();
+    expect(screen.getByText("cache warning")).toBeInTheDocument();
   });
 
   it("renders child exec argv, process runtime, and domain-specific details", () => {

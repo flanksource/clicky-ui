@@ -192,6 +192,7 @@ function TaskGroupCard({
           task={t}
           group={g}
           {...(onTaskControl ? { onTaskControl } : {})}
+          {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
         />
       ))}
     </div>
@@ -202,9 +203,11 @@ function TaskRow({
   task: t,
   group,
   onTaskControl,
+  metricsBaseUrl,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
+  metricsBaseUrl?: string;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -216,7 +219,8 @@ function TaskRow({
   const hasLogs = logs.length > 0;
   const hasOutput = !!t.stdout || !!t.stderr;
   const execDetails = isTaskExecDetails(t.details) ? t.details : undefined;
-  const expandable = hasLogs || hasOutput || execDetails !== undefined;
+  const processDetails = isTaskProcessDetails(t.details) ? t.details : undefined;
+  const expandable = hasLogs || hasOutput || execDetails !== undefined || processDetails !== undefined;
   // Promote the latest warning message inline so a `warning` row shows its
   // reason without expanding. Suppressed when an error is already shown.
   const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
@@ -252,7 +256,7 @@ function TaskRow({
             )}
             {expandable && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0) + (execDetails ? 1 : 0)}
+                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0) + (execDetails || processDetails ? 1 : 0)}
               </span>
             )}
           </span>
@@ -290,6 +294,12 @@ function TaskRow({
           </div>
         )}
         {expanded && execDetails && <TaskExecDetailsView details={execDetails} />}
+        {expanded && processDetails && (
+          <TaskProcessDetailsView
+            details={processDetails}
+            {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+          />
+        )}
         {expanded && hasLogs && (
           <div className="mt-1 ml-1 max-h-48 space-y-0.5 overflow-y-auto border-l-2 pl-2">
             {logs.map((l, i) => (
