@@ -16,6 +16,7 @@ const entry = {
   "mdx-editor": resolve(__dirname, "src/mdx-editor.ts"),
   components: resolve(__dirname, "src/components.ts"),
   data: resolve(__dirname, "src/data.ts"),
+  devtools: resolve(__dirname, "src/devtools.ts"),
   comments: resolve(__dirname, "src/comments.ts"),
   icons: resolve(__dirname, "src/icons.ts"),
   clicky: resolve(__dirname, "src/clicky.ts"),

@@ -323,7 +323,21 @@ export * from "./data/git";
 export * from "./data/test-runner";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
-export * from "./data/query-info";
+export {
+  debugCaptureHeaders,
+  debugConsoleAvailable,
+  debugConsoleOpen,
+  DEBUG_CAPTURE_HEADER,
+  registerDebugConsole,
+  revealDebugConsole,
+  DEBUG_REFRESH_INSPECTION_HEADER,
+  setDebugCaptureLevel,
+  setDebugConsoleOpen,
+  setDebugRefreshInspection,
+  subscribeToDebugConsole,
+  type DebugConsoleRequest,
+} from "./data/debugConsoleSignal";
+export { useDebugAction } from "./data/useDebugAction";
 export * from "./data/clicky-export";
 export {
   type LogEntry,
@@ -445,6 +459,9 @@ export type {
   HARRequest,
   HARResponse,
   HARContent,
+  HARCreator,
+  HARFile,
   HARHeader,
+  HARLog,
   HARPostData,
 } from "./data/har/types";

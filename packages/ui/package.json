@@ -67,6 +67,11 @@
       "import": "./dist/comments.js",
       "require": "./dist/comments.cjs"
     },
+    "./devtools": {
+      "types": "./dist/devtools.d.ts",
+      "import": "./dist/devtools.js",
+      "require": "./dist/devtools.cjs"
+    },
     "./icons": {
       "types": "./dist/icons.d.ts",
       "import": "./dist/icons.js",
