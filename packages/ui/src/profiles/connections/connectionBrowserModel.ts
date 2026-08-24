@@ -14,8 +14,7 @@ import type { QueryBrowserCompletion } from "../../data/query-browser/QueryBrows
 import type { QueryBrowserDiagnostics } from "../../data/query-browser/QueryBrowser.types";
 import { profileApiPath } from "../profileApi";
 import { QueryBrowserExecutionError } from "../../data/query-browser/QueryBrowser.types";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export type BrowserDescriptor = {
   kind: "query" | "cache";
@@ -37,10 +36,23 @@ export type BrowserDescriptor = {
    * all-row export stops. The query's own `limit` option is none of them.
    */
   rowLimits?: BrowserRowLimits;
+  /**
+   * The order the provider already returned these rows in.
+   *
+   * A browser query is a bounded top-N rather than a whole result, so the cut
+   * and the order are the same decision: re-sorting the rows the server chose
+   * shows them as though the cut had been made the other way round. Kubernetes
+   * is the case that proves it — its API only resumes forward, so a limit
+   * returns the oldest lines, and newest-first would read as "the latest logs".
+   */
+  resultSort?: BrowserResultSort;
 };
 
+/** A column a result is already ordered by, and which way. */
+export type BrowserResultSort = { key: string; dir: "asc" | "desc" };
+
 export type BrowserTarget =
-  | { kind: "index"; label: string }
+  | { kind: "index"; label: string; option: string }
   | {
       kind: "kubernetes-workload";
       label: string;
@@ -61,7 +73,12 @@ export type ProfileRowLimits = {
   maxExportRows?: number;
 };
 
-export type TargetKind = "index" | "alias" | "data_stream" | "pattern";
+export type TargetKind =
+  | "group"
+  | "index"
+  | "alias"
+  | "data_stream"
+  | "pattern";
 
 export type InspectionTarget = {
   name: string;
@@ -70,6 +87,22 @@ export type InspectionTarget = {
   pattern?: string;
   /** How many rotations a `pattern` target covers. */
   count?: number;
+  members?: string[];
+};
+
+export type InspectionCache = {
+  policy: string;
+  state: "fresh" | "stale";
+  cached: boolean;
+  refreshing?: boolean;
+  loadedAt: string;
+  freshUntil: string;
+  lastChangedAt: string;
+  lastRefreshAttempt?: string;
+  lastRefreshError?: string;
+  ageMs: number;
+  retryAfterMs?: number;
+  unchangedRefreshes?: number;
 };
 
 export type CatalogNode = {
@@ -112,6 +145,7 @@ export type BrowserInspection = {
   };
   truncated?: boolean;
   truncateReason?: string;
+  cache?: InspectionCache;
 };
 
 export type ConnectionProfileActionRenderer = (context: {
@@ -133,10 +167,15 @@ export function savedConnectionID(value: string | undefined): string | null {
 }
 
 export function browserBaseUrl(connectionID: string): string {
-  return profileApiPath(`connection/${encodeURIComponent(connectionID)}/browser`);
+  return profileApiPath(
+    `connection/${encodeURIComponent(connectionID)}/browser`,
+  );
 }
 
-export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
+export async function fetchJSON<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
     const body = await response.text();
@@ -168,6 +207,7 @@ export async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> 
  * indexes stay listed last so a single day is still reachable.
  */
 const targetGroups: { kind: TargetKind; label: string }[] = [
+  { kind: "group", label: "Index groups" },
   { kind: "pattern", label: "Index patterns" },
   { kind: "alias", label: "Aliases" },
   { kind: "data_stream", label: "Data streams" },
@@ -184,8 +224,10 @@ export function openSearchIndexOptions(
       .filter((target) => target.kind === kind)
       .map((target) => ({
         value: target.name,
-        label: target.count ? `${target.name} · ${target.count} indexes` : target.name,
-        selectedLabel: target.name,
+        label: target.count
+          ? `${target.pattern ?? target.name} · ${target.count} indexes`
+          : target.name,
+        selectedLabel: target.pattern ?? target.name,
         group: label,
         title: target.count
           ? `${target.name} · ${target.count} rotated indexes`
@@ -216,15 +258,16 @@ export function openSearchTargetKind(
  */
 export function withTarget(
   options: Record<string, unknown>,
-  target: { index: string; targetKind: string } | undefined,
+  target: { option: string; value: string; targetKind: string } | undefined,
 ): Record<string, unknown> {
   if (!target) return options;
   const next = { ...options };
-  if (target.index) {
-    next.index = target.index;
-    next.targetKind = target.targetKind;
+  if (target.value) {
+    next[target.option] = target.value;
+    if (target.targetKind) next.targetKind = target.targetKind;
+    else delete next.targetKind;
   } else {
-    delete next.index;
+    delete next[target.option];
     delete next.targetKind;
   }
   return next;
@@ -246,7 +289,9 @@ export function queryBrowserOptionsSchema(
     delete properties.search;
     delete properties.limit;
   }
-  if (descriptor.target?.kind === "index") delete properties.index;
+  if (descriptor.target?.kind === "index") {
+    delete properties[descriptor.target.option];
+  }
   if (descriptor.target?.kind === "kubernetes-workload") {
     delete properties.kind;
     delete properties.namespace;
@@ -308,99 +353,4 @@ export function mergeProviderOptions(input: {
   if (input.database) merged.database = input.database;
   if (!input.keepTargetKind) delete merged.targetKind;
   return merged;
-}
-
-export type InspectionScope = {
-  /** Query-cache namespace, so each host keeps its own inspection cache. */
-  cacheKey: string;
-  id: string;
-  baseUrl: string;
-  enabled: boolean;
-  /** The database the author picked; empty means the connection's default. */
-  database: string;
-  /** A database carried by the stored provider options, tried before the default. */
-  fallbackDatabase?: string;
-  /** The selected index, alias or data stream. */
-  target: string;
-  /** An explicit target kind; resolved from the catalog when absent. */
-  targetKind?: string;
-};
-
-export type Inspection = {
-  data?: BrowserInspection | undefined;
-  nodes: CatalogNode[];
-  databases: string[];
-  activeDatabase: string;
-  /** The database to send with a query — empty unless the source is SQL. */
-  sqlDatabase: string;
-  targetKind: string;
-  loading: boolean;
-  error: unknown;
-  completion?: QueryBrowserCompletion | undefined;
-};
-
-/**
- * useInspection resolves the catalog for a browser: the base inspection, the
- * per-database one a SQL author switched to, and the per-target field mappings
- * an OpenSearch author needs for completion.
- */
-export function useInspection(scope: InspectionScope): Inspection {
-  const { cacheKey, id, baseUrl } = scope;
-  const base = useQuery({
-    queryKey: [cacheKey, id],
-    queryFn: () => fetchJSON<BrowserInspection>(`${baseUrl}/inspect`),
-    enabled: scope.enabled,
-    retry: 0,
-    staleTime: 5 * 60_000,
-  });
-  const switchedDatabase =
-    scope.database !== "" && scope.database !== base.data?.database;
-  const database = useQuery({
-    queryKey: [cacheKey, id, scope.database],
-    queryFn: () => {
-      const params = new URLSearchParams({ database: scope.database });
-      return fetchJSON<BrowserInspection>(`${baseUrl}/inspect?${params}`);
-    },
-    enabled: base.data?.kind === "sql" && switchedDatabase,
-    retry: 0,
-    staleTime: 5 * 60_000,
-  });
-  const active = switchedDatabase ? database : base;
-  const data = active.data ?? base.data;
-
-  const targetKind =
-    scope.targetKind ??
-    data?.targets?.find((target) => target.name === scope.target)?.kind ??
-    "";
-  const target = useQuery({
-    queryKey: [cacheKey, id, targetKind, scope.target],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        target: scope.target,
-        targetKind,
-      });
-      return fetchJSON<BrowserInspection>(`${baseUrl}/inspect?${params}`);
-    },
-    enabled: data?.kind === "opensearch" && scope.target !== "" && targetKind !== "",
-    retry: 0,
-    staleTime: 5 * 60_000,
-  });
-
-  const activeDatabase =
-    scope.database || scope.fallbackDatabase || data?.database || "";
-  const completion = useMemo(
-    () => completionForInspection(data, target.data),
-    [data, target.data],
-  );
-  return {
-    data,
-    nodes: data?.nodes ?? [],
-    databases: base.data?.databases ?? [],
-    activeDatabase,
-    sqlDatabase: data?.kind === "sql" ? activeDatabase : "",
-    targetKind,
-    loading: active.isLoading,
-    error: active.error,
-    completion,
-  };
 }

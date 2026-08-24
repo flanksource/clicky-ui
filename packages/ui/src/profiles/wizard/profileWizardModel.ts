@@ -1,3 +1,5 @@
+import type { JsonSchemaObject } from "../../components/json-schema-form-types";
+import { profileSchema } from "../profileApi";
 import type { ProfileRowLimits } from "../connections/connectionBrowserModel";
 
 /** How a column is filtered at the backend; every field overrides an inference
@@ -5,6 +7,10 @@ import type { ProfileRowLimits } from "../connections/connectionBrowserModel";
 export type ProfileColumnFilter = {
   /** Backend field the selection applies to; blank infers it from the column. */
   field?: string;
+  /** Nested mapping containing the backend field. */
+  nested?: string;
+  /** Constants that pin the matching nested entry. */
+  where?: Record<string, string>;
   /** terms, range, time, boolean, text or none; blank infers it from the type. */
   kind?: string;
   /** Enumerated values, replacing the backend lookup. */
@@ -72,10 +78,23 @@ export type ProfileProvider = {
 };
 
 /** The parameter types the profile schema accepts. */
-export type ParamDraftType = "string" | "number" | "boolean" | "date" | "datetime" | "duration" | "enum" | "list";
+export type ParamDraftType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "date"
+  | "datetime"
+  | "duration"
+  | "enum"
+  | "list";
 
 /** filter, limit, offset, time-from or time-to; empty behaves as filter. */
-export type ParamDraftRole = "filter" | "limit" | "offset" | "time-from" | "time-to";
+export type ParamDraftRole =
+  | "filter"
+  | "limit"
+  | "offset"
+  | "time-from"
+  | "time-to";
 
 export type ParamDraft = {
   name?: string | undefined;
@@ -98,7 +117,9 @@ export type ParamDraft = {
 export const PARAM_TYPES_WITH_OPTIONS: ParamDraftType[] = ["enum", "list"];
 
 export function paramHasOptions(param: ParamDraft): boolean {
-  return param.type !== undefined && PARAM_TYPES_WITH_OPTIONS.includes(param.type);
+  return (
+    param.type !== undefined && PARAM_TYPES_WITH_OPTIONS.includes(param.type)
+  );
 }
 
 export type ProfileWizardDraft = Record<string, unknown> & {
@@ -265,14 +286,14 @@ export function applyVisibleFieldSelection(
  *  wording. Mirrors query.ColumnFilterKindValues() and the x-enum-labels the
  *  profile schema carries for them. */
 export const PROFILE_FILTER_KIND_OPTIONS = [
-  { value: "terms", label: "Value selection" },
+  { value: "terms", label: "Value list" },
   { value: "exact", label: "Exact match" },
-  { value: "text", label: "Substring" },
+  { value: "text", label: "Text search" },
   { value: "range", label: "Numeric range" },
   { value: "duration", label: "Duration range" },
   { value: "date", label: "Date range" },
   { value: "time", label: "Date & time range" },
-  { value: "boolean", label: "Yes/no" },
+  { value: "boolean", label: "Boolean" },
   { value: "none", label: "Not filterable" },
 ] as const;
 
@@ -297,7 +318,9 @@ export function patchColumnFilter(
   patch: Patch<ProfileColumnFilter>,
 ): ProfileColumnFilter | undefined {
   const merged = Object.fromEntries(
-    Object.entries({ ...filter, ...patch }).filter(([, value]) => value !== undefined),
+    Object.entries({ ...filter, ...patch }).filter(
+      ([, value]) => value !== undefined,
+    ),
   ) as ProfileColumnFilter;
   return Object.keys(merged).length ? merged : undefined;
 }
@@ -350,9 +373,67 @@ export function renameProfileField(
   });
 }
 
-export function providerTypeFromConnectionLabel(label: string): string | null {
+/**
+ * The connection type carried in a lookup option's label.
+ *
+ * The server renders each option as `"<name> (<type>)"`, so the parenthesised
+ * suffix is the **connection** type — not the query provider that reads it. The
+ * two coincide often enough (`opensearch`, `loki`, `postgres`) that using one as
+ * the other looks correct, and they diverge for exactly the cloud and cluster
+ * log backends: an `aws` connection is read by `cloudwatch`, `kubernetes` by
+ * `k8s`, `azure` by `azureloganalytics`. Resolving one to the other is
+ * providerTypesForConnectionType's job, and it uses the schema rather than a
+ * second copy of that mapping.
+ */
+export function connectionTypeFromLabel(label: string): string | null {
   const match = label.match(/\(([^()]+)\)\s*$/);
   return match?.[1]?.trim() || null;
+}
+
+/**
+ * The query providers the profile schema says can read this connection type,
+ * most specific first, or empty when nothing can read it.
+ *
+ * The authority is the schema the server already ships: the connection field's
+ * lookup scope carries provider → connection types, so inverting it here keeps
+ * one mapping rather than a client-side duplicate that can drift.
+ */
+export function providerTypesForConnectionType(
+  connectionType: string,
+): string[] {
+  const scope = providerConnectionScope();
+  const candidates = Object.keys(scope)
+    .filter((provider) => scope[provider]?.includes(connectionType))
+    .sort();
+  if (candidates.length <= 1) return candidates;
+  // A provider keyed exactly as the connection type is the one named for it.
+  const exact = candidates.find((provider) => provider === connectionType);
+  if (exact) return [exact];
+  // Otherwise drop the dialect-agnostic umbrella, so `sql_server` resolves to
+  // `sqlserver` instead of tying with the generic `sql`. A genuine tie —
+  // `google_cloud`, read by both `gcpcloudlogging` and `bigquery` — survives as
+  // a list for the caller to disambiguate.
+  const specific = candidates.filter((provider) => provider !== "sql");
+  return specific.length === 1 ? specific : candidates;
+}
+
+function providerConnectionScope(): Record<string, string[]> {
+  const provider = profileSchema().properties?.provider as
+    | JsonSchemaObject
+    | undefined;
+  const connection = provider?.properties?.connection as
+    | JsonSchemaObject
+    | undefined;
+  const lookup = connection?.["x-clicky-lookup"] as
+    | { scope?: { map?: unknown } }
+    | undefined;
+  const map = lookup?.scope?.map;
+  if (!map || typeof map !== "object") {
+    throw new Error(
+      "profile schema is missing provider.connection x-clicky-lookup.scope.map — the wizard cannot resolve a provider for a connection without it",
+    );
+  }
+  return map as Record<string, string[]>;
 }
 
 export function profileConnectionID(value: string): string | null {

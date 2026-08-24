@@ -1,17 +1,30 @@
-import type { QueryBrowserResult } from "../../data/query-browser/QueryBrowser.types";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { debugCaptureHeaders } from "../../data/debugConsoleSignal";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   browserBaseUrl,
   fetchJSON,
   mergeProviderOptions,
   queryBrowserOptionsSchema,
-  useInspection,
   type BrowserDescriptor,
 } from "../connections/connectionBrowserModel";
 import { ConnectionQueryWorkspace } from "../connections/connectionQueryWorkspace";
+import { useInspection } from "../connections/useInspection";
 import { profileApiPath } from "../profileApi";
 import { profileSamplePayload } from "../query/profileSamplePayload";
+import { lookupProfileSampleFilterValues } from "../query/profileSampleFilterLookup";
+import {
+  profileSampleFilterColumns,
+  profileSampleQueryResult,
+  type ProfileSampleResponse,
+} from "../query/profileSampleResult";
 import type { EsSearch } from "../elasticsearch/esQueryBuilderModel";
 import {
   profileWizardErrorMessage,
@@ -20,12 +33,10 @@ import {
   type ProfileWizardDraft,
 } from "./profileWizardModel";
 import { supportsQueryBuilder } from "../connections/connectionQueryWorkspaceModel";
-import { defaultParamValues, paramRoles } from "../elasticsearch/esQueryBuilderForm";
-
-type SampleResult = QueryBrowserResult & {
-  columns: ProfileColumn[];
-  renderedQuery: string;
-};
+import {
+  defaultParamValues,
+  paramRoles,
+} from "../elasticsearch/esQueryBuilderForm";
 
 /** What a sample yields: the discovered column shape plus the rows it came
  *  from, so the editor can preview the configured columns against real data. */
@@ -66,6 +77,7 @@ export function ProfileWizardQueryStep({
     {},
   );
   const [selectedDatabase, setSelectedDatabase] = useState("");
+  const filterColumns = useRef<ProfileColumn[]>([]);
 
   // The starter query is for a source whose artifact is the query. Where the
   // workspace builds filters instead, the specification is the artifact and a
@@ -79,7 +91,12 @@ export function ProfileWizardQueryStep({
     }
   }, [descriptor.data?.defaultQuery, draft, onDraftChange, query, rawArtifact]);
 
-  const explicitTargetKind = liveOptions.targetKind ?? providerOptions.targetKind;
+  const explicitTargetKind =
+    liveOptions.targetKind ?? providerOptions.targetKind;
+  const targetOption =
+    descriptor.data?.target?.kind === "index"
+      ? descriptor.data.target.option
+      : "";
   const inspection = useInspection({
     cacheKey: "profile-wizard-inspection",
     id: connectionID,
@@ -87,7 +104,9 @@ export function ProfileWizardQueryStep({
     enabled: descriptor.data?.catalog === true,
     database: selectedDatabase,
     fallbackDatabase: String(providerOptions.database ?? ""),
-    target: String(liveOptions.index ?? providerOptions.index ?? ""),
+    target: targetOption
+      ? String(liveOptions[targetOption] ?? providerOptions[targetOption] ?? "")
+      : "",
     ...(typeof explicitTargetKind === "string"
       ? { targetKind: explicitTargetKind }
       : {}),
@@ -144,7 +163,9 @@ export function ProfileWizardQueryStep({
     <div className="flex min-h-[32rem] flex-1 flex-col gap-3">
       <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 px-4 py-3">
         <div>
-          <p className="text-sm font-medium">Explore the source, then run a sample</p>
+          <p className="text-sm font-medium">
+            Explore the source, then run a sample
+          </p>
           <p className="text-xs text-muted-foreground">
             Sampling discovers fields without saving the profile.
           </p>
@@ -193,7 +214,9 @@ export function ProfileWizardQueryStep({
         paramValues={defaultParamValues(draft.params)}
         paramRoles={paramRoles(draft.params)}
         {...(draft.limits ? { limits: draft.limits } : {})}
-        onLimitsChange={(limits) => onDraftChange(withProfileLimits(draft, limits))}
+        onLimitsChange={(limits) =>
+          onDraftChange(withProfileLimits(draft, limits))
+        }
         compileBaseUrl={baseUrl}
         className="min-h-0 flex-1"
         onQueryChange={(nextQuery) => {
@@ -225,6 +248,21 @@ export function ProfileWizardQueryStep({
             },
           });
         }}
+        lookupFilterValues={(request) =>
+          lookupProfileSampleFilterValues({
+            draft: {
+              ...draft,
+              query: request.query,
+              provider: {
+                ...draft.provider,
+                options: effectiveOptions(request.options),
+              },
+            },
+            params: defaultParamValues(draft.params),
+            filterColumns: filterColumns.current,
+            request,
+          })
+        }
         execute={async (request) => {
           const nextDraft = {
             ...draft,
@@ -235,17 +273,31 @@ export function ProfileWizardQueryStep({
             },
           };
           onDraftChange(nextDraft);
-          const result = await fetchJSON<SampleResult>(profileApiPath("profile/sample"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(profileSamplePayload(nextDraft, request)),
-          });
+          const result = await fetchJSON<ProfileSampleResponse>(
+            profileApiPath("profile/sample"),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...debugCaptureHeaders(),
+              },
+              body: JSON.stringify(
+                profileSamplePayload({
+                  draft: nextDraft,
+                  request,
+                  params: defaultParamValues(nextDraft.params),
+                  filterColumns: filterColumns.current,
+                }),
+              ),
+            },
+          );
+          filterColumns.current = profileSampleFilterColumns(result);
           onSample({
             columns: result.columns ?? [],
             rows: result.rows ?? [],
             sourceDraft: nextDraft,
           });
-          return result;
+          return profileSampleQueryResult(result);
         }}
       />
     </div>

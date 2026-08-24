@@ -1,6 +1,12 @@
 import { QueryBrowserExecutionError } from "../../data/query-browser/QueryBrowser.types";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchJSON, mergeProviderOptions } from "./connectionBrowserModel";
+import {
+  fetchJSON,
+  mergeProviderOptions,
+  openSearchIndexOptions,
+  withTarget,
+} from "./connectionBrowserModel";
+import { effectiveInspectionDatabase, inspectionURL } from "./useInspection";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -32,9 +38,9 @@ it("preserves provider diagnostics from a failed JSON request", async () => {
   } catch (error) {
     expect(error).toBeInstanceOf(QueryBrowserExecutionError);
     expect((error as QueryBrowserExecutionError).message).toBe("query failed");
-    expect((error as QueryBrowserExecutionError).diagnostics?.request.query).toBe(
-      "SELECT broken",
-    );
+    expect(
+      (error as QueryBrowserExecutionError).diagnostics?.request.query,
+    ).toBe("SELECT broken");
     expect((error as QueryBrowserExecutionError).errorDetails).toEqual({
       message: "query failed",
       trace: "trace-query-1",
@@ -63,9 +69,10 @@ describe("provider option layering", () => {
   const live = { limit: "500", targetKind: "data_stream" };
 
   it("lets each later layer override the one before it", () => {
-    expect(
-      mergeProviderOptions({ layers: [stored, catalog, live] }),
-    ).toEqual({ index: "logs-2025", limit: "500" });
+    expect(mergeProviderOptions({ layers: [stored, catalog, live] })).toEqual({
+      index: "logs-2025",
+      limit: "500",
+    });
   });
 
   it("skips layers a host has not supplied", () => {
@@ -103,5 +110,69 @@ describe("provider option layering", () => {
   it("does not mutate the layers it merges", () => {
     mergeProviderOptions({ layers: [live], database: "analytics" });
     expect(live).toEqual({ limit: "500", targetKind: "data_stream" });
+  });
+});
+
+describe("inspection cache requests", () => {
+  it("uses a stored database before the first inspection fetch", () => {
+    expect(
+      effectiveInspectionDatabase({
+        database: "",
+        fallbackDatabase: "analytics",
+      }),
+    ).toBe("analytics");
+    expect(
+      effectiveInspectionDatabase({
+        database: "billing",
+        fallbackDatabase: "analytics",
+      }),
+    ).toBe("billing");
+  });
+
+  it("adds refresh without losing the active database or target", () => {
+    expect(
+      inspectionURL("/browser", {
+        database: "analytics",
+        target: "logs-a,logs-b",
+        targetKind: "group",
+        refresh: true,
+      }),
+    ).toBe(
+      "/browser/inspect?database=analytics&target=logs-a%2Clogs-b&targetKind=group&refresh=true",
+    );
+  });
+});
+
+describe("provider-owned targets", () => {
+  it("writes a selection to the option named by the descriptor", () => {
+    expect(
+      withTarget(
+        { limit: "200", workspaceID: "old" },
+        { option: "workspaceID", value: "workspace-new", targetKind: "" },
+      ),
+    ).toEqual({ limit: "200", workspaceID: "workspace-new" });
+  });
+
+  it("renders an exact rollover group under its readable pattern", () => {
+    expect(
+      openSearchIndexOptions({
+        kind: "opensearch",
+        targets: [
+          {
+            name: "logs-2026.08.21,logs-2026.08.22",
+            kind: "group",
+            pattern: "logs-*",
+            members: ["logs-2026.08.21", "logs-2026.08.22"],
+            count: 2,
+          },
+        ],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        value: "logs-2026.08.21,logs-2026.08.22",
+        label: "logs-* · 2 indexes",
+        group: "Index groups",
+      }),
+    ]);
   });
 });

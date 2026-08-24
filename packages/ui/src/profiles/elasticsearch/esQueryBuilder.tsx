@@ -10,8 +10,8 @@ import type { JsonSchemaProperty } from "../../components/json-schema-form-types
 import {
   browserBaseUrl,
   savedConnectionID,
-  useInspection
 } from "../connections/connectionBrowserModel";
+import { useInspection } from "../connections/useInspection";
 import {
   conditionAt,
   emptyGroup,
@@ -24,22 +24,17 @@ import {
 import {
   makeFieldValueLookup,
   valueLookupField,
-  type FieldValuesSource
+  type FieldValuesSource,
 } from "./esFieldValues";
 import { EsQueryClauseGroup } from "./esQueryClauseGroup";
-import type {
-  EsQueryContext,
-  EsQueryTreeActions
-} from "./esQueryConditionRow";
+import type { EsQueryContext, EsQueryTreeActions } from "./esQueryConditionRow";
 import {
   esBuilderVocabulary,
   type EsBuilderVocabulary,
-  type EsFieldMapping
+  type EsFieldMapping,
 } from "./esQueryOperators";
 import { EsQueryOutputEditor } from "./esQueryOutputEditor";
-import {
-  EsQueryPreview
-  } from "./esQueryPreview";
+import { EsQueryPreview } from "./esQueryPreview";
 import { EsQuerySortEditor } from "./esQuerySortEditor";
 import type { ProfileDraft } from "../editor/profileBuilderWorkspace";
 import type { ParamDraft } from "../wizard/profileWizardModel";
@@ -47,7 +42,7 @@ import {
   bindParamOperand,
   reconcileSearchParamMappings,
   removeParamMapping,
-  type ParamMappingEdit
+  type ParamMappingEdit,
 } from "./esParamMappingModel";
 import {
   defaultParamValues,
@@ -82,7 +77,7 @@ export function EsQueryBuilder({
   onMappingChange,
   values,
   compilation,
-  className
+  className,
 }: EsQueryBuilderProps) {
   const root = search.query ?? emptyGroup();
   const requiresTimeFieldFormat = timeFieldFormatRequired(
@@ -107,7 +102,7 @@ export function EsQueryBuilder({
     const edit = reconcileSearchParamMappings({
       previousSearch: search,
       nextSearch,
-      params
+      params,
     });
     if (mappingFieldsChanged(edit)) {
       commitMappingEdit(edit);
@@ -128,10 +123,13 @@ export function EsQueryBuilder({
           values: ({ path, field }) => {
             const target = valueLookupField(fields, field);
             if (!target) return undefined;
-            return values({ field: target, search: { ...search, query: removeAt(root, path) } });
-          }
+            return values({
+              field: target,
+              search: { ...search, query: removeAt(root, path) },
+            });
+          },
         }
-      : {})
+      : {}),
   };
   const actions: EsQueryTreeActions = {
     update: (path, update) =>
@@ -144,7 +142,7 @@ export function EsQueryBuilder({
           groupPath,
           conditionAt(root, groupPath)?.conditions?.length ?? 0,
           condition,
-        )
+        ),
       }),
     remove: (path) =>
       commitSearchEdit({ ...search, query: removeAt(root, path) }),
@@ -155,7 +153,7 @@ export function EsQueryBuilder({
     unmapParam: (path, name) => {
       const edit = removeParamMapping({ search, params, name, path });
       commitMappingEdit(edit);
-    }
+    },
   };
 
   return (
@@ -216,7 +214,9 @@ export function EsQueryBuilder({
         sort={search.sort ?? []}
         fields={fields}
         orders={vocabulary.sortOrders}
-        onChange={(sort) => onChange({ ...search, sort: sort.length ? sort : undefined })}
+        onChange={(sort) =>
+          onChange({ ...search, sort: sort.length ? sort : undefined })
+        }
       />
       <EsQueryOutputEditor
         search={search}
@@ -237,7 +237,7 @@ export function EsQueryBuilderField({
   onChange,
   schema,
   rootValue,
-  onRootChange
+  onRootChange,
 }: {
   search: EsSearch;
   onChange: (next: unknown) => void;
@@ -254,7 +254,7 @@ export function EsQueryBuilderField({
     baseUrl,
     enabled: baseUrl !== "",
     database: "",
-    target
+    target,
   });
   const roles = paramRoles(rootValue.params);
   const params = defaultParamValues(rootValue.params);
@@ -264,9 +264,14 @@ export function EsQueryBuilderField({
     search,
     params,
     roles,
-    enabled: baseUrl !== ""
+    enabled: baseUrl !== "",
   });
-  const values = makeFieldValueLookup({ baseUrl, index: target, params, roles });
+  const values = makeFieldValueLookup({
+    baseUrl,
+    index: target,
+    params,
+    roles,
+  });
 
   return (
     <EsQueryBuilder
@@ -288,9 +293,9 @@ export function EsQueryBuilderField({
             ...rootValue.provider,
             options: {
               ...rootValue.provider?.options,
-              search: edit.search
-            }
-          }
+              search: edit.search,
+            },
+          },
         });
       }}
       {...(values ? { values } : {})}

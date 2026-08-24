@@ -23,7 +23,10 @@ import {
   profileUnitOptions,
 } from "./profileFieldIcons";
 import type { Patch, ProfileColumn } from "../wizard/profileWizardModel";
-import { evaluateJsonPath, useJsonPathSampleRows } from "../query/jsonPathSample";
+import {
+  evaluateJsonPath,
+  useJsonPathSampleRows,
+} from "../query/jsonPathSample";
 
 type FieldActions = {
   selected: boolean;
@@ -45,7 +48,9 @@ export const profileFieldEditorEmptyMessage =
  * the Test dialog, which is where the examples that fit it are offered. So
  * these stay deliberately generic and lead there.
  */
-function celExamples(fieldName: string): Array<{ label: string; expression: string }> {
+function celExamples(
+  fieldName: string,
+): Array<{ label: string; expression: string }> {
   const field = celFieldAccess(fieldName);
   return [
     { label: "Use the entire row", expression: "row" },
@@ -54,8 +59,14 @@ function celExamples(fieldName: string): Array<{ label: string; expression: stri
       label: `Default ${fieldName} when missing`,
       expression: `${field.presence} ? ${field.reference} : ""`,
     },
-    { label: `Convert ${fieldName} to text`, expression: `string(${field.reference})` },
-    { label: `Scale ${fieldName} by 1,000`, expression: `${field.reference} / 1000.0` },
+    {
+      label: `Convert ${fieldName} to text`,
+      expression: `string(${field.reference})`,
+    },
+    {
+      label: `Scale ${fieldName} by 1,000`,
+      expression: `${field.reference} / 1000.0`,
+    },
   ];
 }
 
@@ -72,10 +83,22 @@ export function ProfileFieldEditorActions({
 }: FieldActions) {
   return (
     <>
-      <Button type="button" size="sm" variant="ghost" disabled={!canMoveUp} onClick={onMoveUp}>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={!canMoveUp}
+        onClick={onMoveUp}
+      >
         Move up
       </Button>
-      <Button type="button" size="sm" variant="ghost" disabled={!canMoveDown} onClick={onMoveDown}>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={!canMoveDown}
+        onClick={onMoveDown}
+      >
         Move down
       </Button>
       <Button type="button" size="sm" variant="ghost" onClick={onRemove}>
@@ -112,11 +135,37 @@ export function ProfileFieldEditorForm({
   const rows = useJsonPathSampleRows();
   return (
     <div className={`grid gap-4 ${columns === 2 ? "sm:grid-cols-2" : ""}`}>
-      <EditorField label="Output name" icon={profileTypeIcon(field.type)} help="Public field name used by tables, filters, APIs, and every export.">
-        <input aria-label="Output name" value={field.name} className={inputClassName} onChange={(event) => onChange({ name: event.target.value })} />
+      <ProfileFieldFilterEditor
+        field={field}
+        columns={columns}
+        onChange={onChange}
+      />
+      <EditorField
+        label="Output name"
+        icon={profileTypeIcon(field.type)}
+        help="Public field name used by tables, filters, APIs, and every export."
+      >
+        <input
+          aria-label="Output name"
+          value={field.name}
+          className={inputClassName}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
       </EditorField>
-      <EditorField label="Display label" icon={<UiTag />} help="Optional table header; blank uses the field name.">
-        <input aria-label="Display label" value={field.label ?? ""} className={inputClassName} placeholder={field.name} onChange={(event) => onChange({ label: event.target.value || undefined })} />
+      <EditorField
+        label="Display label"
+        icon={<UiTag />}
+        help="Optional table header; blank uses the field name."
+      >
+        <input
+          aria-label="Display label"
+          value={field.label ?? ""}
+          className={inputClassName}
+          placeholder={field.name}
+          onChange={(event) =>
+            onChange({ label: event.target.value || undefined })
+          }
+        />
       </EditorField>
       <EnumField
         label="Data type"
@@ -139,7 +188,11 @@ export function ProfileFieldEditorForm({
         // raw. The wizard already couples the two (mapTimestampColumn); doing
         // it here too is what keeps the per-field editor from undoing it.
         onChange={(next) =>
-          onChange(next === "timestamp" ? { kind: next, type: "datetime" } : { kind: next })
+          onChange(
+            next === "timestamp"
+              ? { kind: next, type: "datetime" }
+              : { kind: next },
+          )
         }
       />
       <EnumField
@@ -160,8 +213,26 @@ export function ProfileFieldEditorForm({
         placeholder="No unit"
         onChange={(next) => onChange({ unit: next })}
       />
-      <EditorField label="Max width (characters)" icon={<UiColumns />} help="Maximum rendered width; blank uses the table default.">
-        <input aria-label="Max width (characters)" type="number" min={1} value={field.width ?? ""} className={inputClassName} placeholder="Auto" onChange={(event) => onChange({ width: event.target.value ? Number(event.target.value) : undefined })} />
+      <EditorField
+        label="Max width (characters)"
+        icon={<UiColumns />}
+        help="Maximum rendered width; blank uses the table default."
+      >
+        <input
+          aria-label="Max width (characters)"
+          type="number"
+          min={1}
+          value={field.width ?? ""}
+          className={inputClassName}
+          placeholder="Auto"
+          onChange={(event) =>
+            onChange({
+              width: event.target.value
+                ? Number(event.target.value)
+                : undefined,
+            })
+          }
+        />
       </EditorField>
       <div className={wide}>
         <div className="grid gap-1.5 text-sm font-medium">
@@ -179,7 +250,9 @@ export function ProfileFieldEditorForm({
               >
                 <option value="">Examples</option>
                 {celExamples(field.source ?? field.name).map((example) => (
-                  <option key={example.label} value={example.expression}>{example.label}</option>
+                  <option key={example.label} value={example.expression}>
+                    {example.label}
+                  </option>
                 ))}
               </select>
               <CelTestButton
@@ -191,14 +264,28 @@ export function ProfileFieldEditorForm({
               />
             </span>
           </div>
-          <textarea aria-label="CEL expression" rows={4} value={field.cel ?? ""} className={`${inputClassName} resize-y font-mono text-xs`} placeholder="Optional value transformation" onChange={(event) => onChange({ cel: event.target.value || undefined })} />
+          <textarea
+            aria-label="CEL expression"
+            rows={4}
+            value={field.cel ?? ""}
+            className={`${inputClassName} resize-y font-mono text-xs`}
+            placeholder="Optional value transformation"
+            onChange={(event) =>
+              onChange({ cel: event.target.value || undefined })
+            }
+          />
           <span className="text-xs font-normal text-muted-foreground">
             Optional expression computing the value from row.
           </span>
         </div>
       </div>
       <div className={wide}>
-        <EditorField label="JSONPath" icon={<UiBraces />} fullWidth help="Optional path computing the value, rooted at the row or at Source; an alternative to CEL.">
+        <EditorField
+          label="JSONPath"
+          icon={<UiBraces />}
+          fullWidth
+          help="Optional path computing the value, rooted at the row or at Source; an alternative to CEL."
+        >
           <JSONPathField
             aria-label="JSONPath"
             value={field.jsonpath ?? ""}
@@ -219,13 +306,14 @@ export function ProfileFieldEditorForm({
         </EditorField>
       </div>
       <label className={`flex items-center gap-2 text-sm font-medium ${wide}`}>
-        <input type="checkbox" checked={field.hidden ?? false} onChange={(event) => onChange({ hidden: event.target.checked })} />
+        <input
+          type="checkbox"
+          checked={field.hidden ?? false}
+          onChange={(event) => onChange({ hidden: event.target.checked })}
+        />
         <UiEyeClosed className="text-[15px] text-muted-foreground" />
         Hide this field in the default table
       </label>
-      <div className={wide}>
-        <ProfileFieldFilterEditor field={field} columns={columns} onChange={onChange} />
-      </div>
     </div>
   );
 }

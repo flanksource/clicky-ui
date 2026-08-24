@@ -24,11 +24,14 @@ describe("profileSamplePayload", () => {
     };
 
     expect(
-      profileSamplePayload(draft, {
-        query,
-        options,
-        pagination: { limit: 25 },
-        debug: true,
+      profileSamplePayload({
+        draft,
+        request: {
+          query,
+          options,
+          pagination: { limit: 25 },
+          debug: true,
+        },
       }),
     ).toEqual({
       profile: {
@@ -43,16 +46,55 @@ describe("profileSamplePayload", () => {
       },
       params: {},
       pagination: { limit: 25 },
-      debug: true,
     });
   });
 
   it("rejects a draft without a provider", () => {
     expect(() =>
       profileSamplePayload(
-        { profile: "events", query },
-        { query, options: {} },
+        {
+          draft: { profile: "events", query },
+          request: { query, options: {} },
+        },
       ),
     ).toThrow("Cannot sample a profile without a provider");
+  });
+
+  it("sends runtime filters separately from declared parameter values", () => {
+    const columns = [{ name: "message", type: "string" as const }];
+
+    expect(
+      profileSamplePayload({
+        draft: {
+          profile: "events",
+          provider: {
+            type: "sql",
+            connection: `connection://${connectionID}`,
+            options,
+          },
+          query,
+        },
+        request: {
+          query,
+          options,
+          filters: { "filter.message": "started" },
+        },
+        params: { tenant: "acme" },
+        filterColumns: columns,
+      }),
+    ).toEqual({
+      profile: {
+        profile: "events",
+        provider: {
+          type: "sql",
+          connection: `connection://${connectionID}`,
+          options,
+        },
+        query,
+      },
+      params: { tenant: "acme" },
+      filters: { "filter.message": "started" },
+      filterColumns: columns,
+    });
   });
 });

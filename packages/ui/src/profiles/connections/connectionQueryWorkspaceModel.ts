@@ -5,11 +5,47 @@
  * components (react/only-export-components).
  */
 
-import type { BrowserDescriptor } from "./connectionBrowserModel";
+import type {
+  BrowserDescriptor,
+  BrowserResultSort,
+} from "./connectionBrowserModel";
 import type { EsSearch } from "../elasticsearch/esQueryBuilderModel";
 import { operatorCatalogFromSchema } from "../elasticsearch/esQueryOperators";
 
 export type NavigatorTab = { id: "catalog" | "form" | "json"; label: string };
+
+export function structuredSearchRequest<
+  T extends { query: string; options: Record<string, unknown> },
+>(request: T, search: EsSearch | undefined): T {
+  return {
+    ...request,
+    query: "",
+    options: { ...request.options, search },
+  };
+}
+
+/**
+ * How a logs result is handed to the table: as delivered, in the order the
+ * provider declared.
+ *
+ * A browser query is a bounded top-N, so the order the server applied and the
+ * cut it made are one decision. Sorting the returned rows again presents them
+ * as though the cut had been made the other way round — Kubernetes is the case
+ * that proves it, since its API only resumes forward, so a limit returns the
+ * *oldest* lines and newest-first would read as "the latest logs".
+ *
+ * `manualSort` is the load-bearing half: without it the table re-sorts and its
+ * header claims an order the rows were not selected under.
+ */
+export function logsResultSort(descriptor: BrowserDescriptor): {
+  manualSort: true;
+  defaultSort?: BrowserResultSort;
+} {
+  return {
+    manualSort: true,
+    ...(descriptor.resultSort ? { defaultSort: descriptor.resultSort } : {}),
+  };
+}
 
 /**
  * A source supports the builder when the server described a structured search on
