@@ -99,8 +99,9 @@ export function withUserRule(
 /** The mode to show for each tool: the user's own rules over the surface's, then
  *  what the catalog says about the tool, then the fallback.
  *
- *  `auto` from a rule is a refusal to decide rather than an answer, so it hands
- *  the tool back to its catalog default — the same reading the server applies. */
+ *  An explicit `auto` remains visible here so the control can advance from it
+ *  on the next toggle. The server applies its catalog fallback when enforcing
+ *  the emitted rule. */
 export function effectiveToolPolicies({
   tools,
   surfacePolicy,
@@ -116,10 +117,7 @@ export function effectiveToolPolicies({
   const resolved: Record<string, ToolPolicy> = {};
   for (const tool of tools) {
     const matched = resolveToolPolicy(policy, tool);
-    resolved[tool.name] =
-      (matched === "auto" ? undefined : matched) ??
-      tool.defaultPermission ??
-      fallback;
+    resolved[tool.name] = matched ?? tool.defaultPermission ?? fallback;
   }
   return resolved;
 }
@@ -235,7 +233,9 @@ export function commonMode(
 
 export function nextMode(mode: ToolPolicy): ToolPolicy {
   const current = POLICY_CYCLE.indexOf(mode);
-  return POLICY_CYCLE[((current >= 0 ? current : 0) + 1) % POLICY_CYCLE.length]!;
+  return POLICY_CYCLE[
+    ((current >= 0 ? current : 0) + 1) % POLICY_CYCLE.length
+  ]!;
 }
 
 function mostRestrictiveMode(a: ToolPolicy, b: ToolPolicy): ToolPolicy {

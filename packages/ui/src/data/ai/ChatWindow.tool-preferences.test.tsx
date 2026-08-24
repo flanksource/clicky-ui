@@ -240,7 +240,7 @@ describe("ChatWindow tool approval default", () => {
       <ToolPreferences
         tools={[]}
         value={{}}
-        onChange={vi.fn()}
+        onRule={vi.fn()}
         permissionMode="default"
         onPermissionModeChange={onPermissionModeChange}
       />
@@ -274,7 +274,7 @@ describe("ChatWindow tool approval default", () => {
       <ToolPreferences
         tools={[]}
         value={{}}
-        onChange={vi.fn()}
+        onRule={vi.fn()}
         models={[
           {
             id: "claude-opus",
@@ -365,7 +365,7 @@ describe("ChatWindow tool approval default", () => {
           },
         ]}
         value={{}}
-        onChange={vi.fn()}
+        onRule={vi.fn()}
       />
     );
 
