@@ -221,7 +221,7 @@ function FocusedComments({
       <LocationMeta
         label={
           anchor === DOCUMENT_ANCHOR
-            ? "Document-level comment"
+            ? "Whole-page comment"
             : `Attached to ${label}`
         }
       />
