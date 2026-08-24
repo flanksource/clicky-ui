@@ -101,6 +101,35 @@ describe("FilterForm time range", () => {
   });
 });
 
+describe("FilterForm filter-bar presentation", () => {
+  it("renders operation filters through the same FilterBar surface as a result table", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <FilterForm
+          client={makeClient()}
+          path="/policies"
+          method="GET"
+          parameters={parameters}
+          presentation="filter-bar"
+          autoSubmit
+          onSubmit={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      container.querySelector('[data-slot="filter-bar"]'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /date range filter/i }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("FilterForm placeholders", () => {
   it("renders no placeholder when the field has a label and none is explicit", async () => {
     renderFilterForm();

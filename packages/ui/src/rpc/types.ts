@@ -241,7 +241,9 @@ export interface ClickyToolHints {
   icon?: string;
   group?: string;
   parent?: string;
-  defaultPermission?: "on" | "ask" | "off" | "auto";
+  /** Captain's tool vocabulary. The legacy `on`/`off` spellings are still
+   *  accepted on decode and mean `allow`/`deny`. */
+  defaultPermission?: "allow" | "ask" | "deny" | "auto" | "on" | "off";
   strict?: boolean;
 }
 
