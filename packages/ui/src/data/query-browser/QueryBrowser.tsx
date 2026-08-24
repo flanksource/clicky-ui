@@ -27,8 +27,7 @@ import {
 } from "./QueryBrowser.editor";
 import { QueryBrowserDiagnosticsPanel } from "./QueryBrowserDiagnosticsPanel";
 import { QueryBrowserResults } from "./QueryBrowserResults";
-import { useQueryInfo } from "../query-info/useQueryInfo";
-import type { QueryExecutionInfo } from "../query-info/queryInfo";
+import { useDebugAction } from "../useDebugAction";
 import {
   QueryBrowserExecutionError,
   type QueryBrowserDiagnostics,
@@ -189,52 +188,11 @@ export function QueryBrowser({
     [runRequest],
   );
 
-  // "Debug" runs the displayed query again with diagnostics on rather than
-  // reading them off the result: a debug run costs a second execution, and one
-  // paid on every query so the answer is there if asked for is the wrong trade.
-  const loadQueryInfo = useCallback(async (): Promise<QueryExecutionInfo> => {
-    const previous = lastRun.current;
-    if (!previous) {
-      throw new Error("Run a query before asking what it sends");
-    }
-    const pagination = result?.pagination;
-    try {
-      const probe = await execute({
-        ...previous,
-        ...(pagination
-          ? {
-              pagination: {
-                limit: pagination.limit,
-                ...(pagination.offset !== undefined
-                  ? { offset: pagination.offset }
-                  : {}),
-                ...(pagination.cursor ? { cursor: pagination.cursor } : {}),
-              },
-            }
-          : {}),
-        debug: true,
-      });
-      return {
-        ...(probe.diagnostics?.provider
-          ? { provider: probe.diagnostics.provider }
-          : {}),
-        ...(probe.rows ? { rows: probe.rows.length } : {}),
-        ...(probe.durationMs !== undefined
-          ? { durationMs: probe.durationMs }
-          : {}),
-        ...(probe.diagnostics ? { diagnostics: probe.diagnostics } : {}),
-      };
-    } catch (err) {
-      if (err instanceof QueryBrowserExecutionError) {
-        return {
-          error: err.message,
-          ...(err.diagnostics ? { diagnostics: err.diagnostics } : {}),
-        };
-      }
-      throw err;
-    }
-  }, [execute, result?.pagination]);
-  const queryInfo = useQueryInfo({ load: loadQueryInfo, title: queryLabel });
+  // "Debug" reveals the console, which already holds the record for the run
+  // that produced the rows on screen. It used to re-execute the query with a
+  // `debug` flag — so the diagnostics described a *different* execution from
+  // the one being looked at, and cost the backend a second full run to say so.
+  const debugAction = useDebugAction();
 
   useEffect(() => {
     if (!lastRun.current) return;
@@ -389,7 +347,7 @@ export function QueryBrowser({
       filterConfig={filterConfig}
       serverFiltered={serverFiltered}
       {...(tablePagination ? { pagination: tablePagination } : {})}
-      {...(queryInfo.action ? { menuActions: [queryInfo.action] } : {})}
+      {...(debugAction ? { menuActions: [debugAction] } : {})}
     />
   );
 
@@ -484,7 +442,6 @@ export function QueryBrowser({
       ) : (
         workspace
       )}
-      {queryInfo.dialog}
     </div>
   );
 }
