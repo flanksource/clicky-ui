@@ -82,7 +82,6 @@ export type QueryBrowserRequest = {
   filters?: DataTableFilterSelection;
   columns?: DataTableServerColumn[];
   pagination?: { limit: number; offset?: number; cursor?: string };
-  debug?: boolean;
 };
 
 export type QueryBrowserFilterLookupRequest = DataTableFilterLookupRequest & {

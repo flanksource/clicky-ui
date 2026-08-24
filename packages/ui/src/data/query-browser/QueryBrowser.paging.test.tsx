@@ -6,35 +6,25 @@ import {
   within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { QueryBrowser } from "./QueryBrowser";
 import {
-  QueryBrowserExecutionError,
-  type QueryBrowserDiagnostics,
-} from "./QueryBrowser.types";
+  registerDebugConsole,
+  type DebugConsoleRequest,
+} from "../debugConsoleSignal";
+import { QueryBrowser } from "./QueryBrowser";
+import { QueryBrowserExecutionError } from "./QueryBrowser.types";
 
 describe("QueryBrowser paging and provider diagnostics", () => {
   beforeEach(() => window.localStorage.clear());
 
-  it("asks the backend what it ran when Debug is chosen, and renders the exchange", async () => {
-    const diagnostics: QueryBrowserDiagnostics = {
-      provider: "clickhouse",
-      request: {
-        query:
-          "WITH __cdb_base AS (SELECT 42) SELECT * FROM __cdb_base LIMIT 26",
-        arguments: ["tenant-x"],
-        details: { queryId: "query-1" },
-      },
-      response: {
-        returnedRows: 1,
-        durationMs: 7,
-        preview: '{"rows":[{"answer":42}]}',
-        contentType: "application/json",
-        details: { progress: { rows: 1 } },
-      },
-    };
-    const execute = vi
-      .fn()
-      .mockResolvedValue({ rows: [{ answer: 42 }], diagnostics });
+  // "Debug" used to re-execute the query with a flag so the backend would
+  // describe itself, which meant the diagnostics belonged to a *different* run
+  // from the rows on screen. It now reveals the console, which already holds
+  // the record for the run that produced them — so the query runs exactly once.
+  it("reveals the console instead of running the query a second time", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [{ answer: 42 }] });
+    const revealed: DebugConsoleRequest[] = [];
+    const unregister = registerDebugConsole((request) => revealed.push(request));
+
     render(
       <QueryBrowser
         id="db-debug"
@@ -45,9 +35,6 @@ describe("QueryBrowser paging and provider diagnostics", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
-
-    // The run itself asks for no diagnostics: they cost a second execution, so
-    // only a user who asked the question pays for the answer.
     await waitFor(() =>
       expect(execute).toHaveBeenCalledWith({ query: "SELECT 42", options: {} }),
     );
@@ -56,24 +43,30 @@ describe("QueryBrowser paging and provider diagnostics", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /^Debug$/ }));
 
-    await waitFor(() =>
-      expect(execute).toHaveBeenCalledWith({
-        query: "SELECT 42",
-        options: {},
-        debug: true,
-      }),
+    await waitFor(() => expect(revealed).toEqual([{ tab: "queries" }]));
+    expect(execute).toHaveBeenCalledTimes(1);
+    unregister();
+  });
+
+  // Absent, not inert: a menu item that silently does nothing reads as broken,
+  // while its absence reads as a feature this app does not have. Debug is the
+  // browser's only menu action, so with no console the whole menu goes with it.
+  it("offers no Debug affordance where no console is mounted", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [{ answer: 42 }] });
+    render(
+      <QueryBrowser
+        id="db-no-console"
+        initialQuery="SELECT 42"
+        language="sql"
+        execute={execute}
+      />,
     );
-    expect(await screen.findByText("Provider debug")).toBeInTheDocument();
-    expect(screen.getByLabelText("Provider query")).toHaveTextContent(
-      "__cdb_base",
-    );
-    expect(
-      screen.getByLabelText("Provider response preview"),
-    ).toHaveTextContent("answer");
-    expect(
-      within(screen.getByLabelText("Provider request")).getByText(/query-1/),
-    ).toBeVisible();
-    expect(screen.getByRole("table").closest(".min-h-72")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await screen.findByRole("table");
+
+    expect(screen.queryByRole("button", { name: "Open column menu" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /^Debug$/ })).toBeNull();
   });
 
   it("pages an offset result by re-running the last executed request", async () => {
