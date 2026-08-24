@@ -22,14 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: corepack enable
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - run: vp install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
