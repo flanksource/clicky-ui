@@ -86,13 +86,12 @@ describe("the column inspector", () => {
   const render = (field: ProfileColumn) =>
     renderToStaticMarkup(createElement(ProfileFieldEditorForm, { field, onChange: () => {} }));
 
-  it("offers the lookup limit for a value selection", () => {
+  it("uses the backend default as the lookup limit placeholder", () => {
     const markup = render({ name: "tenant", type: "string" });
 
     expect(markup).toContain("Values offered");
     // Blank means the server's default, so the placeholder has to name it.
     expect(markup).toContain(`placeholder="${PROFILE_FILTER_DEFAULT_LIMIT}"`);
-    expect(markup).toContain(`top ${PROFILE_FILTER_DEFAULT_LIMIT}`);
   });
 
   // A range is typed rather than picked, so a cap on a list it does not have
@@ -118,13 +117,18 @@ describe("the column inspector", () => {
     expect(render(field as ProfileColumn)).toContain(summary);
   });
 
-  it("shows a declared limit in the collapsed summary", () => {
-    expect(render({ name: "tenant", type: "string", filter: { limit: 7 } })).toContain("top 7");
+  it("shows a declared limit in the value lookup input", () => {
+    const markup = render({ name: "tenant", type: "string", filter: { limit: 7 } });
+    const label = markup.indexOf('aria-label="Values offered"');
+    const input = markup.slice(label - 200, label + 400);
+    expect(input).toContain('value="7"');
   });
 
-  it("reports a filter turned off without claiming a control", () => {
+  it("selects Off for a disabled filter", () => {
     const markup = render({ name: "tenant", type: "string", filter: { disabled: true } });
-    expect(markup).toContain(">off<");
+    const label = markup.indexOf('aria-label="Off"');
+    const input = markup.slice(label - 200, label + 100);
+    expect(input).toContain('checked=""');
   });
 
   // Enumerated values are the answer a lookup would fetch, so the two cannot
