@@ -24,6 +24,7 @@ type BuildNavOptions = {
   folderBadgeFor?: (folder: string, pages: readonly PageEntry[]) => ReactNode;
   contextMenuForPage?: (entry: PageEntry) => DropdownMenuItem[];
   contextMenuForFolder?: (folder: string) => DropdownMenuItem[];
+  pageHref?: (slug: string) => string;
 };
 
 function pageMatches(
@@ -137,7 +138,7 @@ function navItem(
     key: page.slug,
     label: meta?.title ?? page.title,
     active: page.slug === options.activeSlug,
-    to: `?page=${encodeURIComponent(page.slug)}`,
+    to: options.pageHref?.(page.slug) ?? `?page=${encodeURIComponent(page.slug)}`,
     icon: meta?.icon ?? UiFileCode,
     ...(options.badgeFor ? { badge: options.badgeFor(page) } : {}),
     ...(contextMenu

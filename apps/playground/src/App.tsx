@@ -12,14 +12,18 @@ import {
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { PAGES, fallbackPageSlug, findPage, preloadMeta } from "./registry";
+import { buildPlaygroundRoute, parsePlaygroundRoute, type PlaygroundRoute } from "./route";
 
 export function App() {
-  const [route] = useHistoryRoute<{ page: string }>({
+  const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
     parse: (_pathname, search) => {
-      const candidate = new URLSearchParams(search).get("page");
-      return { page: findPage(candidate)?.slug ?? fallbackPageSlug(PAGES) ?? "" };
+      const parsed = parsePlaygroundRoute(search, fallbackPageSlug(PAGES) ?? "");
+      return {
+        ...parsed,
+        page: findPage(parsed.page)?.slug ?? fallbackPageSlug(PAGES) ?? "",
+      };
     },
-    build: (next) => `?page=${encodeURIComponent(next.page)}`,
+    build: buildPlaygroundRoute,
   });
 
   // Browser adapter renders nav items as client-side <a> links; clicking pushes
@@ -45,6 +49,7 @@ export function App() {
             onCreate={comments.create}
             onReply={comments.reply}
             onUpdateStatus={comments.updateStatus}
+            onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
             <PlaygroundShell
@@ -53,6 +58,14 @@ export function App() {
               query={query}
               onQueryChange={setQuery}
               commentsError={comments.error}
+              view={route.view}
+              annotations={route.annotations}
+              pageHref={(slug) => buildPlaygroundRoute({ ...route, page: slug })}
+              onViewChange={(view) => navigateRoute({ ...route, view })}
+              onAnnotationsChange={(annotations) =>
+                navigateRoute({ ...route, annotations })
+              }
+              onNavigate={(slug) => navigateRoute({ ...route, page: slug ?? "" })}
             />
           </CommentProvider>
         </RouterProvider>

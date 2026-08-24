@@ -7,29 +7,12 @@ import {
 } from "@flanksource/clicky-ui";
 import type { SortState } from "@flanksource/clicky-ui/hooks";
 
-interface ServiceRow extends Record<string, unknown> {
-  service: string;
-  namespace: string;
-  status: string;
-  owner: string;
-  checked: string;
-}
-
-const SERVICES: ServiceRow[] = [
-  { service: "config-api", namespace: "platform", status: "Healthy", owner: "Platform", checked: "2m ago" },
-  { service: "canary-runner", namespace: "monitoring", status: "Healthy", owner: "Reliability", checked: "4m ago" },
-  { service: "notification-hub", namespace: "platform", status: "Warning", owner: "Platform", checked: "8m ago" },
-  { service: "evidence-store", namespace: "compliance", status: "Healthy", owner: "Trust", checked: "11m ago" },
-  { service: "asset-indexer", namespace: "inventory", status: "Failed", owner: "Inventory", checked: "14m ago" },
-  { service: "policy-engine", namespace: "compliance", status: "Healthy", owner: "Trust", checked: "16m ago" },
-  { service: "topology-sync", namespace: "inventory", status: "Warning", owner: "Inventory", checked: "18m ago" },
-  { service: "audit-export", namespace: "reporting", status: "Healthy", owner: "Reporting", checked: "21m ago" },
-];
+import { SERVICES, STATUS_TONE, type ServiceRow } from "./collection-data";
 
 const COLUMNS: DataTableColumn<ServiceRow>[] = [
   { key: "service", label: "Service", grow: true, sortable: true },
   { key: "namespace", label: "Namespace", sortable: true },
-  { key: "status", label: "Status", kind: "status", sortable: true },
+  { key: "status", label: "Status", kind: "status", status: { showLabel: true }, sortable: true },
   { key: "owner", label: "Owner", sortable: true },
   { key: "checked", label: "Last checked", align: "right" },
 ];
@@ -111,10 +94,7 @@ export function CollectionsPattern() {
             <p className="text-lg font-semibold text-foreground">{selected.service}</p>
             <p className="text-xs text-muted-foreground">{selected.namespace} namespace</p>
           </div>
-          <Badge
-            tone={selected.status === "Healthy" ? "success" : selected.status === "Warning" ? "warning" : "danger"}
-            clickToCopy={false}
-          >
+          <Badge tone={STATUS_TONE[selected.status]} clickToCopy={false}>
             {selected.status}
           </Badge>
           <dl className="grid grid-cols-[auto_1fr] gap-x-density-3 gap-y-density-2 text-sm">

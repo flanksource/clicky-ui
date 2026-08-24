@@ -4,13 +4,17 @@ import {
   type Comment,
   type CommentConfig,
   type CommentCreateInput,
+  type CommentRating,
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
 /** The playground is single-user and local; there is no identity to look up. */
-const AUTHOR = { name: "You", kind: "user" } as const;
+export const PLAYGROUND_COMMENT_AUTHOR = {
+  name: "You",
+  kind: "user",
+} as const;
 
 const DEFAULT_STATUS =
   DEFAULT_COMMENT_STATUSES.find((status) => status.unresolved)?.value ?? "open";
@@ -28,7 +32,9 @@ function describeError(cause: unknown): string {
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
-  if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
+  if (
+    !(response.headers.get("content-type") ?? "").includes("application/json")
+  ) {
     throw new Error(
       "Comment persistence only exists under `vite dev` — the playground-comments middleware " +
         "is not part of the production build.",
@@ -36,7 +42,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
-    throw new Error(payload.error ?? `${init?.method ?? "GET"} ${url} failed (${response.status})`);
+    throw new Error(
+      payload.error ??
+        `${init?.method ?? "GET"} ${url} failed (${response.status})`,
+    );
   }
   return payload;
 }
@@ -62,21 +71,29 @@ export async function fetchComments(
 
 export type PlaygroundComments = {
   comments: Comment[];
+  allComments: PageComment[];
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
   create: (input: CommentCreateInput) => Promise<void>;
   reply: (input: CommentReplyInput) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
+  updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
 };
 
 export function useComments(page: string): PlaygroundComments {
   const [comments, setComments] = useState<Comment[]>([]);
+  const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setComments(await fetchComments({ page }));
+      const [pageComments, everyComment] = await Promise.all([
+        fetchComments({ page }),
+        fetchComments(),
+      ]);
+      setComments(pageComments);
+      setAllComments(everyComment);
       setError(null);
     } catch (cause) {
       setError(describeError(cause));
@@ -117,9 +134,10 @@ export function useComments(page: string): PlaygroundComments {
         post(COMMENTS_ROUTE, {
           page,
           body: input.body,
-          author: AUTHOR,
+          author: PLAYGROUND_COMMENT_AUTHOR,
           status: DEFAULT_STATUS,
           anchor: input.anchor ?? null,
+          ...(input.rating ? { rating: input.rating } : {}),
         }),
       ),
     [mutate, page, post],
@@ -128,10 +146,13 @@ export function useComments(page: string): PlaygroundComments {
   const reply = useCallback(
     (input: CommentReplyInput) =>
       mutate(() =>
-        post(`${COMMENTS_ROUTE}/${encodeURIComponent(input.parentId)}/replies`, {
-          body: input.body,
-          author: AUTHOR,
-        }),
+        post(
+          `${COMMENTS_ROUTE}/${encodeURIComponent(input.parentId)}/replies`,
+          {
+            body: input.body,
+            author: PLAYGROUND_COMMENT_AUTHOR,
+          },
+        ),
       ),
     [mutate, post],
   );
@@ -148,11 +169,36 @@ export function useComments(page: string): PlaygroundComments {
     [mutate],
   );
 
-  const remove = useCallback(
-    (id: string) =>
-      mutate(() => request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, { method: "DELETE" })),
+  const updateRating = useCallback(
+    (id: string, rating: CommentRating) =>
+      mutate(() =>
+        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating }),
+        }),
+      ),
     [mutate],
   );
 
-  return { comments, error, create, reply, updateStatus, remove };
+  const remove = useCallback(
+    (id: string) =>
+      mutate(() =>
+        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        }),
+      ),
+    [mutate],
+  );
+
+  return {
+    comments,
+    allComments,
+    error,
+    create,
+    reply,
+    updateStatus,
+    updateRating,
+    remove,
+  };
 }

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_COMMENT_STATUSES } from "@flanksource/clicky-ui/comments";
 
 import {
+  COMMENT_RATINGS,
   COMMENT_STATUSES,
   RESOLVED_STATUS,
   UNRESOLVED_STATUSES,
@@ -26,7 +27,9 @@ import {
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratchRoot = join(appRoot, ".tmp");
 
-function comment(overrides: Partial<StoredComment> & { id: string }): StoredComment {
+function comment(
+  overrides: Partial<StoredComment> & { id: string },
+): StoredComment {
   return {
     body: `note ${overrides.id}`,
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -38,7 +41,9 @@ function comment(overrides: Partial<StoredComment> & { id: string }): StoredComm
 }
 
 /** A comment stored with no status at all — every reply, and older roots. */
-function statusless(overrides: Partial<StoredComment> & { id: string }): StoredComment {
+function statusless(
+  overrides: Partial<StoredComment> & { id: string },
+): StoredComment {
   const entry = comment(overrides);
   delete entry.status;
   return entry;
@@ -72,7 +77,9 @@ describe("comments-store", () => {
     addComment(dir, "agent-inbox", comment({ id: "c2" }));
 
     expect(readPage(dir, "welcome").map((entry) => entry.id)).toEqual(["c1"]);
-    expect(readPage(dir, "agent-inbox").map((entry) => entry.id)).toEqual(["c2"]);
+    expect(readPage(dir, "agent-inbox").map((entry) => entry.id)).toEqual([
+      "c2",
+    ]);
   });
 
   it("rejects a duplicate id on the same page", () => {
@@ -85,16 +92,45 @@ describe("comments-store", () => {
 
   it.each([
     ["id", { id: "" }],
-    ["body", { id: "c1", body: "" }],
     ["createdAt", { id: "c1", createdAt: "" }],
   ])("rejects a payload with an empty %s", (field, overrides) => {
     expect(() =>
-      addComment(dir, "welcome", comment(overrides as Partial<StoredComment> & { id: string })),
+      addComment(
+        dir,
+        "welcome",
+        comment(overrides as Partial<StoredComment> & { id: string }),
+      ),
     ).toThrow(new RegExp(`non-empty string "${field}"`));
   });
 
+  it("accepts a rating without comment text", () => {
+    const rated = comment({ id: "c1", body: "", rating: "positive" });
+
+    expect(addComment(dir, "welcome", rated)).toEqual(rated);
+  });
+
+  it("rejects a comment with neither text nor a rating", () => {
+    expect(() =>
+      addComment(dir, "welcome", comment({ id: "c1", body: "" })),
+    ).toThrow(/requires body or rating/);
+  });
+
+  it("rejects a rating the UI cannot render", () => {
+    expect(() =>
+      addComment(
+        dir,
+        "welcome",
+        comment({ id: "c1", rating: "mixed" as "positive" }),
+      ),
+    ).toThrow(
+      new RegExp(`rating "mixed" is not one of ${COMMENT_RATINGS.join(", ")}`),
+    );
+  });
+
   it("rejects an empty page slug", () => {
-    expect(() => addComment(dir, "", comment({ id: "c1" }))).toThrow(/non-empty page slug/);
+    expect(() => addComment(dir, "", comment({ id: "c1" }))).toThrow(
+      /non-empty page slug/,
+    );
   });
 
   it("throws rather than silently resetting when the file is malformed", () => {
@@ -120,7 +156,9 @@ describe("comments-store", () => {
 
   describe("status vocabulary", () => {
     it("matches the library's configured statuses", () => {
-      expect(COMMENT_STATUSES).toEqual(DEFAULT_COMMENT_STATUSES.map((status) => status.value));
+      expect(COMMENT_STATUSES).toEqual(
+        DEFAULT_COMMENT_STATUSES.map((status) => status.value),
+      );
     });
 
     it("treats exactly the library's unresolved statuses as unresolved", () => {
@@ -137,7 +175,9 @@ describe("comments-store", () => {
     });
 
     it("rejects a status the UI could not render", () => {
-      expect(() => addComment(dir, "welcome", comment({ id: "c1", status: "done" }))).toThrow(
+      expect(() =>
+        addComment(dir, "welcome", comment({ id: "c1", status: "done" })),
+      ).toThrow(
         /status "done" is not one of open, in_progress, resolved, closed/,
       );
     });
@@ -165,44 +205,62 @@ describe("comments-store", () => {
     });
 
     it("expands unresolved=true to the unresolved statuses", () => {
-      expect(parseCommentFilter(new URLSearchParams("unresolved=true"))).toEqual({
+      expect(
+        parseCommentFilter(new URLSearchParams("unresolved=true")),
+      ).toEqual({
         statuses: ["open", "in_progress"],
       });
     });
 
     it("leaves the filter open when unresolved=false", () => {
-      expect(parseCommentFilter(new URLSearchParams("unresolved=false"))).toEqual({});
+      expect(
+        parseCommentFilter(new URLSearchParams("unresolved=false")),
+      ).toEqual({});
     });
 
     it("de-duplicates statuses that arrive twice", () => {
-      expect(parseCommentFilter(new URLSearchParams("status=open&unresolved=true"))).toEqual({
+      expect(
+        parseCommentFilter(new URLSearchParams("status=open&unresolved=true")),
+      ).toEqual({
         statuses: ["open", "in_progress"],
       });
     });
 
     it("rejects an unknown status by naming the valid ones", () => {
-      expect(() => parseCommentFilter(new URLSearchParams("status=nope"))).toThrow(
+      expect(() =>
+        parseCommentFilter(new URLSearchParams("status=nope")),
+      ).toThrow(
         /status "nope" is not one of open, in_progress, resolved, closed/,
       );
     });
 
     it("rejects a non-boolean unresolved flag", () => {
-      expect(() => parseCommentFilter(new URLSearchParams("unresolved=yes"))).toThrow(
-        /"unresolved" must be "true" or "false"/,
-      );
+      expect(() =>
+        parseCommentFilter(new URLSearchParams("unresolved=yes")),
+      ).toThrow(/"unresolved" must be "true" or "false"/);
     });
   });
 
   describe("listComments", () => {
     beforeEach(() => {
       addComment(dir, "welcome", comment({ id: "w-open" }));
-      addComment(dir, "welcome", statusless({ id: "w-reply", parentId: "w-open" }));
+      addComment(
+        dir,
+        "welcome",
+        statusless({ id: "w-reply", parentId: "w-open" }),
+      );
       addComment(dir, "welcome", comment({ id: "w-done", status: "resolved" }));
-      addComment(dir, "agent-inbox", comment({ id: "a-progress", status: "in_progress" }));
+      addComment(
+        dir,
+        "agent-inbox",
+        comment({ id: "a-progress", status: "in_progress" }),
+      );
     });
 
     it("flattens every page and tags each comment with its page", () => {
-      expect(listComments(dir, {}).map((entry) => [entry.page, entry.id])).toEqual([
+      expect(
+        listComments(dir, {}).map((entry) => [entry.page, entry.id]),
+      ).toEqual([
         ["agent-inbox", "a-progress"],
         ["welcome", "w-open"],
         ["welcome", "w-reply"],
@@ -211,9 +269,9 @@ describe("comments-store", () => {
     });
 
     it("narrows to a single page", () => {
-      expect(listComments(dir, { page: "agent-inbox" }).map((entry) => entry.id)).toEqual([
-        "a-progress",
-      ]);
+      expect(
+        listComments(dir, { page: "agent-inbox" }).map((entry) => entry.id),
+      ).toEqual(["a-progress"]);
     });
 
     it("returns nothing for a page that has never been commented on", () => {
@@ -221,32 +279,32 @@ describe("comments-store", () => {
     });
 
     it("filters thread roots by status", () => {
-      expect(listComments(dir, { statuses: ["resolved"] }).map((entry) => entry.id)).toEqual([
-        "w-done",
-      ]);
+      expect(
+        listComments(dir, { statuses: ["resolved"] }).map((entry) => entry.id),
+      ).toEqual(["w-done"]);
     });
 
     it("keeps the replies of a root that matches the status filter", () => {
-      expect(listComments(dir, { statuses: ["open"] }).map((entry) => entry.id)).toEqual([
-        "w-open",
-        "w-reply",
-      ]);
+      expect(
+        listComments(dir, { statuses: ["open"] }).map((entry) => entry.id),
+      ).toEqual(["w-open", "w-reply"]);
     });
 
     it("combines a page and a status filter", () => {
       expect(
-        listComments(dir, { page: "welcome", statuses: UNRESOLVED_STATUSES }).map(
-          (entry) => entry.id,
-        ),
+        listComments(dir, {
+          page: "welcome",
+          statuses: UNRESOLVED_STATUSES,
+        }).map((entry) => entry.id),
       ).toEqual(["w-open", "w-reply"]);
     });
 
     it("treats a root with no stored status as open", () => {
       addComment(dir, "welcome", statusless({ id: "w-bare" }));
 
-      expect(listComments(dir, { statuses: ["open"] }).map((entry) => entry.id)).toContain(
-        "w-bare",
-      );
+      expect(
+        listComments(dir, { statuses: ["open"] }).map((entry) => entry.id),
+      ).toContain("w-bare");
     });
   });
 
@@ -281,6 +339,18 @@ describe("comments-store", () => {
       expect(readPage(dir, "welcome")).toEqual([patched]);
     });
 
+    it("changes a rating without replacing the comment body", () => {
+      addComment(
+        dir,
+        "welcome",
+        comment({ id: "rated", body: "Clear hierarchy", rating: "positive" }),
+      );
+
+      expect(patchComment(dir, "rated", { rating: "negative" })).toEqual(
+        comment({ id: "rated", body: "Clear hierarchy", rating: "negative" }),
+      );
+    });
+
     it("rejects a patch to a status the UI could not render", () => {
       expect(() => patchComment(dir, "root", { status: "done" })).toThrow(
         /status "done" is not one of/,
@@ -288,7 +358,9 @@ describe("comments-store", () => {
     });
 
     it("throws when patching a comment that does not exist", () => {
-      expect(() => patchComment(dir, "missing", { body: "x" })).toThrow(/comment "missing" not found/);
+      expect(() => patchComment(dir, "missing", { body: "x" })).toThrow(
+        /comment "missing" not found/,
+      );
     });
 
     it("cascades a root deletion to its replies at any depth", () => {
@@ -297,12 +369,18 @@ describe("comments-store", () => {
       addComment(dir, "welcome", comment({ id: "unrelated" }));
 
       expect(removeComment(dir, "root")).toBe(3);
-      expect(readPage(dir, "welcome").map((entry) => entry.id)).toEqual(["unrelated"]);
-      expect(readPage(dir, "agent-inbox").map((entry) => entry.id)).toEqual(["other"]);
+      expect(readPage(dir, "welcome").map((entry) => entry.id)).toEqual([
+        "unrelated",
+      ]);
+      expect(readPage(dir, "agent-inbox").map((entry) => entry.id)).toEqual([
+        "other",
+      ]);
     });
 
     it("throws when deleting a comment that does not exist", () => {
-      expect(() => removeComment(dir, "missing")).toThrow(/comment "missing" not found/);
+      expect(() => removeComment(dir, "missing")).toThrow(
+        /comment "missing" not found/,
+      );
     });
   });
 
@@ -317,17 +395,26 @@ describe("comments-store", () => {
       const reply = addReply(
         dir,
         "root",
-        statusless({ id: "r1", anchor: null, author: { name: "Agent", kind: "agent" } }),
+        statusless({
+          id: "r1",
+          anchor: null,
+          author: { name: "Agent", kind: "agent" },
+        }),
       );
 
       expect(reply).toMatchObject({ parentId: "root", anchor: ROOT_ANCHOR });
-      expect(readPage(dir, "welcome").map((entry) => entry.id)).toEqual(["root", "r1"]);
+      expect(readPage(dir, "welcome").map((entry) => entry.id)).toEqual([
+        "root",
+        "r1",
+      ]);
     });
 
     it("flattens a reply-to-a-reply onto the thread root", () => {
       addReply(dir, "root", statusless({ id: "r1" }));
 
-      expect(addReply(dir, "r1", statusless({ id: "r2" }))).toMatchObject({ parentId: "root" });
+      expect(addReply(dir, "r1", statusless({ id: "r2" }))).toMatchObject({
+        parentId: "root",
+      });
     });
 
     it("throws when the parent does not exist", () => {

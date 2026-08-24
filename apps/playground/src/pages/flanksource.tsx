@@ -1,10 +1,22 @@
 import { UiArrowRight } from "@flanksource/clicky-ui/icons";
 
-import { DesignSystemPage, SpecimenSection } from "../design-system/DesignSystemPage";
 import {
-  DESIGN_SYSTEM_PAGES,
+  DesignSystemPage,
+  SpecimenSection,
+  type SectionLink,
+} from "../design-system/DesignSystemPage";
+import {
   designSystemPage,
+  pagesInSection,
+  type DesignSystemPage as CatalogPage,
 } from "../design-system/catalog";
+import {
+  ColorsSection,
+  IconsSection,
+  SpacingSection,
+  TonesSection,
+  TypographySection,
+} from "../design-system/foundations/FoundationSections";
 
 export const meta = designSystemPage("flanksource");
 
@@ -23,6 +35,42 @@ const principles = [
   },
 ] as const;
 
+const SECTIONS: SectionLink[] = [
+  { id: "colors", label: "Colors" },
+  { id: "typography", label: "Typography" },
+  { id: "spacing", label: "Spacing & density" },
+  { id: "icons", label: "Icons" },
+  { id: "tones", label: "Tones" },
+  { id: "patterns", label: "Patterns" },
+  { id: "systems", label: "Product systems" },
+];
+
+function PageCards({ pages }: { pages: readonly CatalogPage[] }) {
+  return (
+    <div className="grid gap-density-3 md:grid-cols-2 xl:grid-cols-3">
+      {pages.map((page) => {
+        const Icon = page.icon;
+        return (
+          <a
+            key={page.slug}
+            href={`?page=${encodeURIComponent(page.slug)}`}
+            className="group flex min-h-36 flex-col rounded-xl border border-border bg-card p-density-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-density-3">
+              <span className="grid size-9 place-items-center rounded-lg bg-muted text-primary">
+                <Icon className="size-5" />
+              </span>
+              <UiArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+            </div>
+            <h3 className="mt-density-4 text-sm font-semibold text-foreground">{page.title}</h3>
+            <p className="mt-density-1 text-xs leading-5 text-muted-foreground">{page.description}</p>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function FlanksourceDesignSystem() {
   return (
     <DesignSystemPage
@@ -30,6 +78,7 @@ export default function FlanksourceDesignSystem() {
       title={meta.title}
       description={meta.description}
       icon={meta.icon}
+      sections={SECTIONS}
     >
       <div className="grid gap-density-4 lg:grid-cols-3">
         {principles.map((principle, index) => (
@@ -41,39 +90,27 @@ export default function FlanksourceDesignSystem() {
         ))}
       </div>
 
-      {(["foundations", "patterns"] as const).map((section) => (
-        <SpecimenSection
-          key={section}
-          title={section === "foundations" ? "Foundations" : "Common patterns"}
-          description={
-            section === "foundations"
-              ? "The shared visual language underneath every component and product surface."
-              : "Repeatable compositions for the tasks that appear across Flanksource products."
-          }
-        >
-          <div className="grid gap-density-3 md:grid-cols-2 xl:grid-cols-3">
-            {DESIGN_SYSTEM_PAGES.filter((page) => page.section === section).map((page) => {
-              const Icon = page.icon;
-              return (
-                <a
-                  key={page.slug}
-                  href={`?page=${encodeURIComponent(page.slug)}`}
-                  className="group flex min-h-36 flex-col rounded-xl border border-border bg-card p-density-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-density-3">
-                    <span className="grid size-9 place-items-center rounded-lg bg-muted text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <UiArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-                  </div>
-                  <h3 className="mt-density-4 text-sm font-semibold text-foreground">{page.title}</h3>
-                  <p className="mt-density-1 text-xs leading-5 text-muted-foreground">{page.description}</p>
-                </a>
-              );
-            })}
-          </div>
-        </SpecimenSection>
-      ))}
+      <ColorsSection />
+      <TypographySection />
+      <SpacingSection />
+      <IconsSection />
+      <TonesSection />
+
+      <SpecimenSection
+        id="patterns"
+        title="Common patterns"
+        description="Repeatable compositions for the tasks that appear across Flanksource products."
+      >
+        <PageCards pages={pagesInSection("patterns")} />
+      </SpecimenSection>
+
+      <SpecimenSection
+        id="systems"
+        title="Product systems"
+        description="Each product adds a vocabulary of its own on top of these foundations — the marks, hues, and rules that only make sense inside that domain."
+      >
+        <PageCards pages={pagesInSection("systems")} />
+      </SpecimenSection>
     </DesignSystemPage>
   );
 }

@@ -1,5 +1,6 @@
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import type { ComponentType } from "react";
 import type { StaticIconComponent } from "@flanksource/clicky-ui";
+import type { ExtractedGuidance } from "../plugins/markdown-model";
 
 /** Optional per-page presentation metadata layered over filename-derived defaults. */
 export type PageMeta = {
@@ -17,12 +18,14 @@ export type PageModule = {
 };
 
 export type PageLoader = () => Promise<PageModule>;
+export type GuidanceLoader = () => Promise<ExtractedGuidance>;
 
 export type PageEntry = {
   slug: string;
   title: string;
   group: string;
   load: PageLoader;
+  loadGuidance: GuidanceLoader;
 };
 
 const PAGES_PREFIX = "./pages/";
@@ -62,12 +65,21 @@ export function folderForPage(
     : undefined;
 }
 
-export function buildRegistry(modules: Record<string, PageLoader>): PageEntry[] {
+export function buildRegistry(
+  modules: Record<string, PageLoader>,
+  guidanceModules: Record<string, GuidanceLoader> = {},
+): PageEntry[] {
   return Object.entries(modules)
     .filter(([key]) => isPlaygroundPage(key))
     .map(([key, load]) => {
       const slug = slugFromGlobKey(key);
-      return { slug, title: humanizeSlug(slug), group: groupFromSlug(slug), load };
+      return {
+        slug,
+        title: humanizeSlug(slug),
+        group: groupFromSlug(slug),
+        load,
+        loadGuidance: guidanceModules[key] ?? (() => Promise.resolve({ blocks: [] })),
+      };
     })
     .sort((a, b) => {
       if (a.group !== b.group) {
@@ -85,7 +97,26 @@ export function buildRegistry(modules: Record<string, PageLoader>): PageEntry[] 
  * without restarting the dev server.
  */
 export const PAGES: PageEntry[] = buildRegistry(
-  import.meta.glob("./pages/**/*.tsx") as Record<string, PageLoader>,
+  import.meta.glob([
+    "./pages/**/*.tsx",
+    "!./pages/**/_*/**",
+    "!./pages/**/_*.tsx",
+    "!./pages/**/*.test.tsx",
+    "!./pages/**/*.stories.tsx",
+  ]) as Record<string, PageLoader>,
+  import.meta.glob(
+    [
+      "./pages/**/*.tsx",
+      "!./pages/**/_*/**",
+      "!./pages/**/_*.tsx",
+      "!./pages/**/*.test.tsx",
+      "!./pages/**/*.stories.tsx",
+    ],
+    {
+      query: "?playground-markdown",
+      import: "default",
+    },
+  ) as Record<string, GuidanceLoader>,
 );
 
 export const DEFAULT_PAGE_SLUG = "flanksource";
@@ -176,25 +207,17 @@ export function preloadMeta(entries: PageEntry[]): void {
   else window.setTimeout(run, 200);
 }
 
-const lazyCache = new Map<string, LazyExoticComponent<ComponentType>>();
-
-/** Lazily renders a page, failing loudly when the file forgot its default export. */
-export function lazyPage(entry: PageEntry): LazyExoticComponent<ComponentType> {
-  const existing = lazyCache.get(entry.slug);
-  if (existing) return existing;
-
-  const created = lazy(async () => {
-    const module = await entry.load();
-    cacheMeta(entry.slug, module.meta);
-    emit();
-    if (typeof module.default !== "function") {
-      throw new Error(
-        `src/pages/${entry.slug}.tsx has no default export — a playground page must ` +
-          "`export default` a React component.",
-      );
-    }
-    return { default: module.default };
-  });
-  lazyCache.set(entry.slug, created);
-  return created;
+export async function loadPage(
+  entry: PageEntry,
+): Promise<{ default: ComponentType }> {
+  const module = await entry.load();
+  cacheMeta(entry.slug, module.meta);
+  emit();
+  if (typeof module.default !== "function") {
+    throw new Error(
+      `src/pages/${entry.slug}.tsx has no default export — a playground page must ` +
+        "`export default` a React component.",
+    );
+  }
+  return { default: module.default };
 }

@@ -29,6 +29,7 @@ const active: PageEntry = {
   title: "Design review",
   group: "Designs",
   load: () => Promise.resolve({}),
+  loadGuidance: () => Promise.resolve({ blocks: [] }),
 };
 
 function renderDialog(action: "rename" | "delete") {
