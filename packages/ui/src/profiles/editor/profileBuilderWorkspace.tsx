@@ -1,7 +1,7 @@
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import { Button } from "../../components/button";
+import { debugCaptureHeaders } from "../../data/debugConsoleSignal";
 import { Icon } from "../../data/Icon";
-import type { QueryBrowserResult } from "../../data/query-browser/QueryBrowser.types";
 import { Modal } from "../../overlay/Modal";
 import { UiCheck, UiColumns, UiSqlColumn } from "../../icons";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -16,11 +17,12 @@ import {
   browserBaseUrl,
   fetchJSON,
   mergeProviderOptions,
-  useInspection,
   type BrowserDescriptor,
   type ProfileRowLimits,
 } from "../connections/connectionBrowserModel";
 import { ConnectionQueryWorkspace } from "../connections/connectionQueryWorkspace";
+import { useInspection } from "../connections/useInspection";
+import { profileApiPath } from "../profileApi";
 import type { EsSearch } from "../elasticsearch/esQueryBuilderModel";
 import {
   ColumnPicker,
@@ -37,6 +39,13 @@ import {
 } from "../elasticsearch/esQueryBuilderForm";
 import { mapTimestampColumn } from "../fields/profileColumnModel";
 import { sampleParamSchema } from "./profileBuilderModel";
+import { profileSamplePayload } from "../query/profileSamplePayload";
+import { lookupProfileSampleFilterValues } from "../query/profileSampleFilterLookup";
+import {
+  profileSampleFilterColumns,
+  profileSampleQueryResult,
+  type ProfileSampleResponse,
+} from "../query/profileSampleResult";
 
 // Same story as ProfileColumn: one ProfileProvider, defined with the draft
 // model. The copy here had drifted to carry `role`, which the canonical type's
@@ -51,11 +60,6 @@ export type ProfileDraft = Record<string, unknown> & {
   columns?: ProfileColumn[];
   /** The row caps this profile sets for itself; unset ones take their default. */
   limits?: ProfileRowLimits;
-};
-
-type SampleResult = QueryBrowserResult & {
-  columns: ProfileColumn[];
-  renderedQuery: string;
 };
 
 // Modal's body is a flex child. It must be allowed to shrink and must not own
@@ -119,6 +123,7 @@ export function ProfileBuilderWorkspace({
   const [limits, setLimits] = useState<ProfileRowLimits | undefined>(
     () => rootValue.limits,
   );
+  const filterColumns = useRef<ProfileColumn[]>([]);
 
   useEffect(() => {
     if (!query && descriptor.data?.defaultQuery) {
@@ -128,6 +133,10 @@ export function ProfileBuilderWorkspace({
 
   const explicitTargetKind =
     liveOptions.targetKind ?? initialProviderOptions.targetKind;
+  const targetOption =
+    descriptor.data?.target?.kind === "index"
+      ? descriptor.data.target.option
+      : "";
   const inspection = useInspection({
     cacheKey: "profile-builder-inspection",
     id: connectionID,
@@ -135,7 +144,13 @@ export function ProfileBuilderWorkspace({
     enabled: descriptor.data?.catalog === true,
     database: selectedDatabase,
     fallbackDatabase: String(initialProviderOptions.database ?? ""),
-    target: String(liveOptions.index ?? initialProviderOptions.index ?? ""),
+    target: targetOption
+      ? String(
+          liveOptions[targetOption] ??
+            initialProviderOptions[targetOption] ??
+            "",
+        )
+      : "",
     ...(typeof explicitTargetKind === "string"
       ? { targetKind: explicitTargetKind }
       : {}),
@@ -325,36 +340,58 @@ export function ProfileBuilderWorkspace({
               setCatalogOptions(nextOptions);
               setLiveOptions({ ...browserOptions, ...nextOptions });
             }}
+            lookupFilterValues={(request) =>
+              lookupProfileSampleFilterValues({
+                draft: {
+                  ...rootValue,
+                  params,
+                  profile: rootValue.profile || "sample",
+                  query: request.query,
+                  provider: {
+                    ...rootValue.provider,
+                    options: effectiveOptions(request.options),
+                  },
+                },
+                params: sampleParams,
+                filterColumns: filterColumns.current,
+                request,
+              })
+            }
             execute={async (request) => {
-              const result = await fetchJSON<SampleResult>(
-                "/api/v1/profile/sample",
+              const sampleDraft: ProfileDraft = {
+                ...rootValue,
+                params,
+                profile: rootValue.profile || "sample",
+                query: request.query,
+                provider: {
+                  ...rootValue.provider,
+                  options: effectiveOptions(request.options),
+                },
+              };
+              const result = await fetchJSON<ProfileSampleResponse>(
+                profileApiPath("profile/sample"),
                 {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    profile: {
-                      ...rootValue,
-                      params,
-                      profile: rootValue.profile || "sample",
-                      query: request.query,
-                      provider: {
-                        ...rootValue.provider,
-                        options: effectiveOptions(request.options),
-                      },
-                    },
-                    params: sampleParams,
-                    ...(request.pagination
-                      ? { pagination: request.pagination }
-                      : {}),
-                    ...(request.debug ? { debug: true } : {}),
-                  }),
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...debugCaptureHeaders(),
+                  },
+                  body: JSON.stringify(
+                    profileSamplePayload({
+                      draft: sampleDraft,
+                      request,
+                      params: sampleParams,
+                      filterColumns: filterColumns.current,
+                    }),
+                  ),
                 },
               );
+              filterColumns.current = profileSampleFilterColumns(result);
               setSampleColumns(result.columns ?? []);
               setSelectedColumns(
                 new Set((result.columns ?? []).map((column) => column.name)),
               );
-              return result;
+              return profileSampleQueryResult(result);
             }}
             renderResults={({ defaultView }) => (
               <div className="flex min-h-0 flex-1 flex-col gap-3">

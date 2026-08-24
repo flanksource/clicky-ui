@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { Inspection } from "../connections/connectionBrowserModel";
+import type { Inspection } from "../connections/useInspection";
 import { QueryTargetPicker } from "./queryTargetPicker";
 
 const inspection = (overrides: Partial<Inspection> = {}): Inspection => ({
@@ -51,5 +51,12 @@ describe("QueryTargetPicker", () => {
 
     expect(html).toContain("connection refused");
     expect(html).toContain("Unavailable");
+  });
+
+  it("prompts for a provider-owned target without OpenSearch wording", () => {
+    const html = render({ label: "Workspace", discoverable: false });
+
+    expect(html).toContain("Enter workspace");
+    expect(html).not.toContain("wildcard");
   });
 });

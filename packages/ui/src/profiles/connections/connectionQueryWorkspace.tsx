@@ -9,7 +9,12 @@
 import type { JsonSchemaObject } from "../../components/json-schema-form-types";
 import { LogsTable } from "../../data/LogsTable";
 import { QueryBrowser } from "../../data/query-browser/QueryBrowser";
-import type { QueryBrowserFilterLookup, QueryBrowserRequest, QueryBrowserResult, QueryBrowserResultContext } from "../../data/query-browser/QueryBrowser.types";
+import type {
+  QueryBrowserFilterLookup,
+  QueryBrowserRequest,
+  QueryBrowserResult,
+  QueryBrowserResultContext,
+} from "../../data/query-browser/QueryBrowser.types";
 import { Tabs } from "../../layout/Tabs";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CatalogTree } from "./catalogTree";
@@ -17,30 +22,34 @@ import {
   withTarget,
   type BrowserDescriptor,
   type CatalogNode,
-  type Inspection,
-  type ProfileRowLimits
+  type ProfileRowLimits,
 } from "./connectionBrowserModel";
+import type { Inspection } from "./useInspection";
 import { makeFieldValueLookup } from "../elasticsearch/esFieldValues";
 import { EsQueryBuilder } from "../elasticsearch/esQueryBuilder";
 import {
   toBuilderMode,
   toRawMode,
   type EsSearch,
-  type QueryModeTransition
+  type QueryModeTransition,
 } from "../elasticsearch/esQueryBuilderModel";
-import {
-  esBuilderVocabulary
-  } from "../elasticsearch/esQueryOperators";
+import { esBuilderVocabulary } from "../elasticsearch/esQueryOperators";
 import { PrometheusResults } from "../query/prometheusResults";
 import { QueryRowLimits } from "../query/queryRowLimits";
 import { QueryTargetPicker } from "../query/queryTargetPicker";
 import { KubernetesWorkloadTargetPicker } from "../query/kubernetesWorkloadTargetPicker";
 import type { ParamMappingEdit } from "../elasticsearch/esParamMappingModel";
 import type { ParamDraft } from "../wizard/profileWizardModel";
-import { initialNavigatorTab, navigatorTabs, supportsQueryBuilder } from "./connectionQueryWorkspaceModel";
+import {
+  initialNavigatorTab,
+  logsResultSort,
+  navigatorTabs,
+  structuredSearchRequest,
+  supportsQueryBuilder,
+} from "./connectionQueryWorkspaceModel";
 import { esQueryFields } from "../elasticsearch/esQueryBuilderForm";
 import { useCompiledSearch } from "../elasticsearch/esQueryCompile";
-
+import { InspectionStatus } from "./inspectionStatus";
 
 export type ConnectionQueryWorkspaceProps = {
   id: string;
@@ -121,7 +130,7 @@ export function ConnectionQueryWorkspace({
   execute,
   lookupFilterValues,
   renderResults,
-  className
+  className,
 }: ConnectionQueryWorkspaceProps) {
   const builder = Boolean(onSearchChange) && supportsQueryBuilder(descriptor);
   const tabs = navigatorTabs({ descriptor, builder });
@@ -130,7 +139,9 @@ export function ConnectionQueryWorkspace({
       tabs,
       search,
       query,
-      ...(descriptor.defaultQuery ? { defaultQuery: descriptor.defaultQuery } : {})
+      ...(descriptor.defaultQuery
+        ? { defaultQuery: descriptor.defaultQuery }
+        : {}),
     }),
   );
   // Picking a target has to reach the browser, which only resyncs its options
@@ -157,13 +168,13 @@ export function ConnectionQueryWorkspace({
     search: search ?? {},
     ...(paramValues ? { params: paramValues } : {}),
     ...(paramRoles ? { roles: paramRoles } : {}),
-    enabled: Boolean(search) && compileBaseUrl !== ""
+    enabled: Boolean(search) && compileBaseUrl !== "",
   });
   const values = makeFieldValueLookup({
     baseUrl: compileBaseUrl,
     index: String(browserOptions.index ?? ""),
     ...(paramValues ? { params: paramValues } : {}),
-    ...(paramRoles ? { roles: paramRoles } : {})
+    ...(paramRoles ? { roles: paramRoles } : {}),
   });
 
   // While a specification is active the editor mirrors what it compiles to. It
@@ -171,6 +182,8 @@ export function ConnectionQueryWorkspace({
   // there is no keystroke for a compile to overwrite.
   const specMode = search !== undefined;
   const active = tabs.some((entry) => entry.id === tab) ? tab : tabs[0]?.id;
+  const indexTarget =
+    descriptor.target?.kind === "index" ? descriptor.target : undefined;
 
   // The form tab is the specification, so being on it means holding one. A tab
   // that stores nothing would leave the builder rendering a query it cannot
@@ -211,13 +224,23 @@ export function ConnectionQueryWorkspace({
       navigator={
         tabs.length === 0 && !descriptor.target ? undefined : (
           <div className="flex min-h-0 flex-col gap-2">
-            {descriptor.target?.kind === "index" ? (
+            {descriptor.catalog ? (
+              <InspectionStatus inspection={inspection} />
+            ) : null}
+            {indexTarget ? (
               <QueryTargetPicker
-                label={descriptor.target.label}
+                label={indexTarget.label}
                 inspection={inspection}
-                value={String(browserOptions.index ?? "")}
+                discoverable={descriptor.catalog === true}
+                value={String(browserOptions[indexTarget.option] ?? "")}
                 onChange={(index, targetKind) =>
-                  applyOptions(withTarget(edited.current, { index, targetKind }))
+                  applyOptions(
+                    withTarget(edited.current, {
+                      option: indexTarget.option,
+                      value: index,
+                      targetKind,
+                    }),
+                  )
                 }
               />
             ) : null}
@@ -232,9 +255,7 @@ export function ConnectionQueryWorkspace({
             {builder ? (
               <QueryRowLimits
                 value={String(browserOptions.limit ?? "")}
-                onChange={(limit) =>
-                  applyOptions({ ...edited.current, limit })
-                }
+                onChange={(limit) => applyOptions({ ...edited.current, limit })}
                 {...(descriptor.rowLimits
                   ? { defaults: descriptor.rowLimits }
                   : {})}
@@ -279,13 +300,16 @@ export function ConnectionQueryWorkspace({
         )
       }
       execute={(request) =>
-        execute(
-          specMode
-            ? { ...request, query: "", options: { ...request.options, search } }
-            : request,
-        )
+        execute(specMode ? structuredSearchRequest(request, search) : request)
       }
-      {...(lookupFilterValues ? { lookupFilterValues } : {})}
+      {...(lookupFilterValues
+        ? {
+            lookupFilterValues: (request) =>
+              lookupFilterValues(
+                specMode ? structuredSearchRequest(request, search) : request,
+              ),
+          }
+        : {})}
       renderResults={renderResults ?? descriptorResultView(descriptor)}
     />
   );
@@ -302,7 +326,12 @@ function descriptorResultView(
   if (descriptor.resultView === "logs") {
     return ({ result, defaultView }) =>
       result.rows?.length ? (
-        <LogsTable logs={result.rows} autoFilter={false} fullscreenTitle="Logs" />
+        <LogsTable
+          logs={result.rows}
+          autoFilter={false}
+          fullscreenTitle="Logs"
+          {...logsResultSort(descriptor)}
+        />
       ) : (
         defaultView
       );

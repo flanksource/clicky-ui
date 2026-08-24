@@ -10,19 +10,21 @@ import { useMemo } from "react";
 import {
   openSearchIndexOptions,
   openSearchTargetKind,
-  type Inspection,
 } from "../connections/connectionBrowserModel";
+import type { Inspection } from "../connections/useInspection";
 
 export function QueryTargetPicker({
   label,
   inspection,
   value,
   onChange,
+  discoverable = true,
 }: {
   label: string;
   inspection: Inspection;
   value: string;
   onChange: (target: string, kind: string) => void;
+  discoverable?: boolean;
 }) {
   const options = useMemo(
     () => openSearchIndexOptions(inspection.data),
@@ -34,12 +36,16 @@ export function QueryTargetPicker({
         ariaLabel={label}
         label={label}
         value={value}
-        onChange={(next) => onChange(next, openSearchTargetKind(inspection.data, next))}
+        onChange={(next) =>
+          onChange(next, openSearchTargetKind(inspection.data, next))
+        }
         options={options}
         placeholder={
           inspection.error
             ? "Unavailable — check the connection"
-            : `Select ${label.toLowerCase()} or type a wildcard…`
+            : discoverable
+              ? `Select ${label.toLowerCase()} or type a wildcard…`
+              : `Enter ${label.toLowerCase()}…`
         }
         loading={inspection.loading}
         invalid={Boolean(inspection.error)}
@@ -56,7 +62,8 @@ export function QueryTargetPicker({
 }
 
 function targetErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  if (error instanceof Error && error.message.trim())
+    return error.message.trim();
   if (typeof error === "string" && error.trim()) return error.trim();
   return "The inspection request failed. Check the connection settings and try again.";
 }

@@ -3,7 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { ProfileFieldEditorForm } from "./profileFieldEditor";
 import { PROFILE_FIELD_TYPES } from "./profileFieldTypes";
-import { profileFilterKindOptions, profileTypeOptions } from "./profileFieldIcons";
+import {
+  profileFilterKindOptions,
+  profileTypeOptions,
+} from "./profileFieldIcons";
 
 describe("ProfileFieldEditorForm CEL examples", () => {
   it("offers field-aware expressions and applies the selected example", () => {
@@ -18,10 +21,16 @@ describe("ProfileFieldEditorForm CEL examples", () => {
 
     const examples = screen.getByRole("combobox", { name: "CEL examples" });
 
-    expect(screen.getByRole("option", { name: "Read duration_ms" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Default duration_ms when missing" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Read duration_ms" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Default duration_ms when missing" }),
+    ).toBeInTheDocument();
 
-    fireEvent.change(examples, { target: { value: "row.duration_ms / 1000.0" } });
+    fireEvent.change(examples, {
+      target: { value: "row.duration_ms / 1000.0" },
+    });
 
     expect(onChange).toHaveBeenCalledWith({ cel: "row.duration_ms / 1000.0" });
   });
@@ -40,12 +49,16 @@ describe("ProfileFieldEditorForm CEL examples", () => {
     // examples all quote a key the same way — and so escaping goes through
     // JSON.stringify rather than a hand-rolled replace that misses newlines.
     const examples = screen.getByRole("combobox", { name: "CEL examples" });
-    fireEvent.change(examples, { target: { value: 'row["http.status-code"]' } });
+    fireEvent.change(examples, {
+      target: { value: 'row["http.status-code"]' },
+    });
 
     expect(onChange).toHaveBeenCalledWith({ cel: 'row["http.status-code"]' });
 
     fireEvent.change(examples, {
-      target: { value: '"http.status-code" in row ? row["http.status-code"] : ""' },
+      target: {
+        value: '"http.status-code" in row ? row["http.status-code"] : ""',
+      },
     });
 
     expect(onChange).toHaveBeenLastCalledWith({
@@ -65,7 +78,7 @@ describe("ProfileFieldEditorForm enum controls", () => {
       />,
     );
 
-    for (const name of ["Data type", "Role", "Format", "Unit", "Filter type"]) {
+    for (const name of ["Data type", "Role", "Format", "Unit"]) {
       expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
     }
 
@@ -89,7 +102,10 @@ describe("ProfileFieldEditorForm enum controls", () => {
 
     fireEvent.focus(screen.getByRole("combobox", { name: "Role" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "Timestamp" }));
-    expect(onChange).toHaveBeenLastCalledWith({ kind: "timestamp", type: "datetime" });
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: "timestamp",
+      type: "datetime",
+    });
   });
 
   it("leaves the type alone for the roles that only say how a cell renders", () => {
@@ -130,7 +146,11 @@ describe("ProfileFieldEditorForm CEL editor", () => {
     render(
       // The dialog evaluates through react-query, as every sampling surface in
       // the editor does; the route mounts inside the host's provider.
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
         <ProfileFieldEditorForm
           field={{ name: "duration_ms", type: "number" }}
           columns={1}
@@ -149,42 +169,86 @@ describe("ProfileFieldEditorForm CEL editor", () => {
   });
 });
 
-describe("ProfileFieldEditorForm filter toggle", () => {
-  const renderFilterEditor = (field: Parameters<typeof ProfileFieldEditorForm>[0]["field"]) => {
+describe("ProfileFieldEditorForm filter segments", () => {
+  const renderSegments = (
+    field: Parameters<typeof ProfileFieldEditorForm>[0]["field"],
+  ) => {
     const onChange = vi.fn();
-    render(<ProfileFieldEditorForm field={field} columns={1} onChange={onChange} />);
-    return { onChange, toggle: screen.getByRole("checkbox", { name: /^Filter/ }) };
+    const rendered = render(
+      <ProfileFieldEditorForm field={field} columns={1} onChange={onChange} />,
+    );
+    return {
+      onChange,
+      rerender: (next: typeof field) =>
+        rendered.rerender(
+          <ProfileFieldEditorForm
+            field={next}
+            columns={1}
+            onChange={onChange}
+          />,
+        ),
+    };
   };
 
-  it("defaults on and shows the filter options", () => {
-    const { toggle } = renderFilterEditor({ name: "status", type: "string" });
+  it("puts the filter type control before the output name", () => {
+    renderSegments({ name: "message", type: "string" });
 
-    expect(toggle).toBeChecked();
-    expect(screen.getByRole("combobox", { name: "Filter type" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Backend field" })).toBeInTheDocument();
+    const filter = screen.getByRole("radiogroup", { name: "Filter type" });
+    const output = screen.getByRole("textbox", { name: "Output name" });
+    expect(
+      filter.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
   });
 
-  it("hides the filter options when switched off", () => {
-    const { onChange, toggle } = renderFilterEditor({ name: "status", type: "string" });
+  it("offers icon segments for auto, off and every concrete filter kind", () => {
+    renderSegments({ name: "message", type: "string" });
 
-    fireEvent.click(toggle);
-
-    expect(onChange).toHaveBeenCalledWith({ filter: { disabled: true } });
+    for (const name of [
+      "Auto",
+      "Off",
+      "Value list",
+      "Exact match",
+      "Text search",
+      "Numeric range",
+      "Duration range",
+      "Date range",
+      "Date & time range",
+      "Boolean",
+    ]) {
+      expect(screen.getByRole("radio", { name })).toBeInTheDocument();
+    }
   });
 
-  it("renders a disabled filter with only the toggle and turns it back on", () => {
-    const { onChange, toggle } = renderFilterEditor({
-      name: "status",
+  it("changes type directly and shows only applicable options", () => {
+    const { onChange, rerender } = renderSegments({
+      name: "message",
       type: "string",
-      filter: { disabled: true },
     });
 
-    expect(toggle).not.toBeChecked();
-    expect(screen.queryByRole("combobox", { name: "Filter type" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Backend field" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Text search" }));
+    expect(onChange).toHaveBeenLastCalledWith({ filter: { kind: "text" } });
+    rerender({ name: "message", type: "string", filter: { kind: "text" } });
+    expect(
+      screen.getByRole("textbox", { name: "Backend field" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Values" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("spinbutton", { name: "Values offered" }),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(toggle);
+  it("disables in one click while retaining the prior filter configuration", () => {
+    const { onChange } = renderSegments({
+      name: "tenant",
+      type: "string",
+      filter: { kind: "terms", limit: 12 },
+    });
 
-    expect(onChange).toHaveBeenCalledWith({ filter: undefined });
+    fireEvent.click(screen.getByRole("radio", { name: "Off" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      filter: { kind: "terms", limit: 12, disabled: true },
+    });
   });
 });

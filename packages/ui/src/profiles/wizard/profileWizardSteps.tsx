@@ -12,7 +12,15 @@ export type ConnectionChoice = {
   value: string;
   label: string;
   name: string;
-  providerType: string;
+  /** The saved connection's own type, e.g. `aws`. */
+  connectionType: string;
+  /**
+   * The query providers that can read it, most specific first — `aws` yields
+   * `["cloudwatch"]`. More than one is a genuine choice the reader has to make
+   * (`google_cloud` is read by both `gcpcloudlogging` and `bigquery`); none
+   * means no provider reads this connection type at all.
+   */
+  providerTypes: string[];
 };
 
 export function WizardProgress({
@@ -60,6 +68,7 @@ export function SourceStep({
   selectedType,
   onSearchChange,
   onSelect,
+  onProviderTypeChange,
 }: {
   choices: ConnectionChoice[];
   loading: boolean;
@@ -71,7 +80,9 @@ export function SourceStep({
   selectedType: string;
   onSearchChange: (search: string) => void;
   onSelect: (choice: ConnectionChoice) => void;
+  onProviderTypeChange: (type: string) => void;
 }) {
+  const selectedChoice = choices.find((choice) => choice.value === selected);
   return (
     <div className="mx-auto grid max-w-4xl gap-5 lg:grid-cols-[1fr_18rem]">
       <section className="overflow-hidden rounded-xl border bg-card">
@@ -102,8 +113,12 @@ export function SourceStep({
                   Saved connection
                 </span>
               </span>
-              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-                {choice.providerType}
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${choice.providerTypes.length === 0 ? "bg-destructive/10 text-destructive" : "bg-muted"}`}
+              >
+                {choice.providerTypes.length === 0
+                  ? `${choice.connectionType} · not queryable`
+                  : choice.providerTypes.join(" / ")}
               </span>
             </button>
           ))}
@@ -137,6 +152,31 @@ export function SourceStep({
           <>
             <h3 className="mt-3 font-semibold">{profileConnectionID(selected)}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{selectedType}</p>
+            {selectedChoice && selectedChoice.providerTypes.length === 0 ? (
+              <p role="alert" className="mt-4 text-sm leading-6 text-destructive">
+                No query provider reads {selectedChoice.connectionType}{" "}
+                connections, so this one cannot back a profile.
+              </p>
+            ) : null}
+            {selectedChoice && selectedChoice.providerTypes.length > 1 ? (
+              // A connection type several providers can read is a real choice —
+              // a Google Cloud connection is queried very differently by Cloud
+              // Logging than by BigQuery — so it is asked rather than guessed.
+              <label className="mt-4 grid gap-1.5 text-sm font-medium">
+                Read it with
+                <select
+                  value={selectedType}
+                  className="rounded-md border border-input bg-background px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                  onChange={(event) => onProviderTypeChange(event.target.value)}
+                >
+                  {selectedChoice.providerTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <p className="mt-5 text-sm leading-6 text-muted-foreground">
               The next step loads this connection&apos;s catalog, query language,
               and sampling controls.

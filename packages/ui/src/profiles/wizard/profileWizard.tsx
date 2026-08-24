@@ -11,7 +11,8 @@ import {
   profileWizardErrorMessage,
   profileWizardStepReady,
   profileWizardSteps,
-  providerTypeFromConnectionLabel,
+  connectionTypeFromLabel,
+  providerTypesForConnectionType,
   type ProfileColumn,
   type ProfileWizardDraft,
 } from "./profileWizardModel";
@@ -240,13 +241,24 @@ export function ProfileWizard({
                     ? { namespace: draft.namespace }
                     : {}),
                   provider: {
-                    type: choice.providerType,
+                    // The first candidate is the most specific one. Where the
+                    // connection type is read by several providers the step
+                    // offers the choice, and this is only what it opens on.
+                    ...(choice.providerTypes[0]
+                      ? { type: choice.providerTypes[0] }
+                      : {}),
                     connection: choice.value,
                   },
                 });
                 setDiscovered([]);
                 setActiveField("");
               }}
+              onProviderTypeChange={(type) =>
+                setDraft({
+                  ...draft,
+                  provider: { ...draft.provider, type },
+                })
+              }
             />
           ) : null}
           {step.id === "query" && connectionID ? (
@@ -291,13 +303,18 @@ function connectionChoice(
   node: ClickyNode,
 ): ConnectionChoice | null {
   const label = clickyNodeText(node) || value;
-  const providerType = providerTypeFromConnectionLabel(label);
-  if (!providerType) return null;
+  const connectionType = connectionTypeFromLabel(label);
+  if (!connectionType) return null;
+  // A connection no provider reads is still listed, with an empty candidate
+  // set: the Source step says so rather than the wizard emitting a draft whose
+  // provider.type is not in the schema's enum.
+  const providerTypes = providerTypesForConnectionType(connectionType);
   return {
     value,
     label,
     name: profileConnectionID(value) ?? label,
-    providerType,
+    connectionType,
+    providerTypes,
   };
 }
 

@@ -10,7 +10,8 @@ import type { ProfileWizardDraft } from "./profileWizardModel";
 // rendering never does — so the wiring is asserted on what the hook was handed.
 const compileInputs = vi.hoisted(() => [] as EsCompileRequest[]);
 vi.mock("../elasticsearch/esQueryCompile", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../elasticsearch/esQueryCompile")>();
+  const original =
+    await importOriginal<typeof import("../elasticsearch/esQueryCompile")>();
   return {
     ...original,
     useCompiledSearch: (input: EsCompileRequest) => {
@@ -27,7 +28,7 @@ const descriptor: BrowserDescriptor = {
   provider: "opensearch",
   language: "json",
   catalog: true,
-  target: { kind: "index", label: "Index" },
+  target: { kind: "index", label: "Index", option: "index" },
   optionsSchema: {
     type: "object",
     properties: {
@@ -35,7 +36,12 @@ const descriptor: BrowserDescriptor = {
         type: "object",
         "x-clicky-component": "es-query-builder",
         "x-es-operators": [
-          { op: "term", label: "term", arity: "single", fieldTypes: ["keyword"] },
+          {
+            op: "term",
+            label: "term",
+            arity: "single",
+            fieldTypes: ["keyword"],
+          },
         ],
       },
     },
@@ -50,7 +56,11 @@ const draft = (params: ProfileWizardDraft["params"]): ProfileWizardDraft => ({
     options: {
       index: "logs",
       search: {
-        query: { op: "term", field: "service.name", value: "{{.params.service}}" },
+        query: {
+          op: "term",
+          field: "service.name",
+          value: "{{.params.service}}",
+        },
       },
     },
   },

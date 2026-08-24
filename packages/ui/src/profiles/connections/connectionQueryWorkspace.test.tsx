@@ -1,16 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { BrowserDescriptor, Inspection } from "./connectionBrowserModel";
+import type { BrowserDescriptor } from "./connectionBrowserModel";
+import type { Inspection } from "./useInspection";
 import { ConnectionQueryWorkspace } from "./connectionQueryWorkspace";
-import { initialNavigatorTab, navigatorTabs, supportsQueryBuilder } from "./connectionQueryWorkspaceModel";
+import {
+  initialNavigatorTab,
+  navigatorTabs,
+  structuredSearchRequest,
+  supportsQueryBuilder,
+} from "./connectionQueryWorkspaceModel";
 import { EsCompileRequest } from "../elasticsearch/esQueryCompile";
 
 // The compile request only leaves the browser once effects run, which server
 // rendering never does — so the wiring is asserted on what the hook was handed.
 const compileInputs = vi.hoisted(() => [] as EsCompileRequest[]);
 vi.mock("../elasticsearch/esQueryCompile", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../elasticsearch/esQueryCompile")>();
+  const original =
+    await importOriginal<typeof import("../elasticsearch/esQueryCompile")>();
   return {
     ...original,
     useCompiledSearch: (input: EsCompileRequest) => {
@@ -38,7 +45,7 @@ const openSearch: BrowserDescriptor = {
   provider: "opensearch",
   language: "json",
   catalog: true,
-  target: { kind: "index", label: "Index" },
+  target: { kind: "index", label: "Index", option: "index" },
   optionsSchema: searchSchema,
 };
 
@@ -62,7 +69,10 @@ describe("supportsQueryBuilder", () => {
     expect(
       supportsQueryBuilder({
         ...openSearch,
-        optionsSchema: { type: "object", properties: { index: { type: "string" } } },
+        optionsSchema: {
+          type: "object",
+          properties: { index: { type: "string" } },
+        },
       }),
     ).toBe(false);
   });
@@ -96,7 +106,9 @@ describe("navigatorTabs", () => {
   });
 
   it("offers no tabs when the target picker is the whole navigator", () => {
-    expect(navigatorTabs({ descriptor: openSearch, builder: false })).toEqual([]);
+    expect(navigatorTabs({ descriptor: openSearch, builder: false })).toEqual(
+      [],
+    );
   });
 
   it("offers no navigator when there is neither a catalog nor a builder", () => {
@@ -159,6 +171,32 @@ describe("initialNavigatorTab", () => {
   });
 });
 
+describe("structuredSearchRequest", () => {
+  it("sends a structured search instead of a stale raw query", () => {
+    const search = { query: { op: "match_all" } };
+    expect(
+      structuredSearchRequest(
+        {
+          query: '{"query":{"term":{"level":"stale"}}}',
+          options: { index: "logs-*" },
+          filters: { "filter.level": "error" },
+          filterKey: "filter.service",
+          search: "pay",
+          limit: 20,
+        },
+        search,
+      ),
+    ).toEqual({
+      query: "",
+      options: { index: "logs-*", search },
+      filters: { "filter.level": "error" },
+      filterKey: "filter.service",
+      search: "pay",
+      limit: 20,
+    });
+  });
+});
+
 // The preview is compiled server-side, so an operand that interpolates
 // {{.params.…}} resolves only if the host's parameter values travel with the
 // specification. Without them the panel shows the compiler's refusal to guess.
@@ -171,6 +209,8 @@ describe("ConnectionQueryWorkspace compilation", () => {
     targetKind: "index",
     loading: false,
     error: undefined,
+    refreshing: false,
+    refresh: vi.fn(),
   };
 
   const renderWorkspace = (extra: Record<string, unknown>) => {
