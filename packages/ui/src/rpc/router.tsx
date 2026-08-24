@@ -52,11 +52,12 @@ function subscribeToHistory(onChange: () => void): () => void {
  *  navigate client-side via the History API (like react-router's <Link>). This
  *  is the router-agnostic default when no RouterProvider is mounted. */
 export function useBrowserRouter(): RouterAdapter {
-  const pathname = useSyncExternalStore(
+  const location = useSyncExternalStore(
     subscribeToHistory,
-    () => window.location.pathname,
+    () => `${window.location.pathname}${window.location.search}${window.location.hash}`,
     () => "/",
   );
+  const pathname = location.split(/[?#]/, 1)[0] || "/";
   const navigate = useCallback((to: string, opts?: { replace?: boolean }) => {
     if (typeof window === "undefined") return;
     if (opts?.replace)

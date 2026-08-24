@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useMemoryRouter, useRouter } from "./router";
+import { useBrowserRouter, useMemoryRouter, useRouter } from "./router";
 import { RouterProvider } from "./RouterProvider";
 
 function MemoryHarness() {
@@ -20,6 +20,18 @@ function RouterConsumer() {
     <div>
       <span data-testid="path">{pathname}</span>
       {renderLink({ to: "/x", children: "X", key: "x" })}
+    </div>
+  );
+}
+
+function BrowserSearchHarness() {
+  const router = useBrowserRouter();
+  return (
+    <div>
+      <span data-testid="search">{window.location.search}</span>
+      <button onClick={() => router.navigate(`${window.location.pathname}?file=model.scad`)}>
+        select file
+      </button>
     </div>
   );
 }
@@ -67,5 +79,14 @@ describe("useRouter", () => {
     }
     render(<Provided />);
     expect(screen.getByTestId("path").textContent).toBe("/provided");
+  });
+
+  it("re-renders browser consumers when only the query string changes", () => {
+    window.history.replaceState(window.history.state, "", "/customize");
+    render(<BrowserSearchHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "select file" }));
+
+    expect(screen.getByTestId("search")).toHaveTextContent("?file=model.scad");
   });
 });
