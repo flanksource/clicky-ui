@@ -201,7 +201,7 @@ export function ChatWindow({
       permissionMode,
       toolRules: userToolRules,
     });
-  }, [budget, permissionMode, runtime, runtimeLocked, explicitToolPrefs]);
+  }, [budget, permissionMode, runtime, runtimeLocked, userToolRules]);
 
   const toolPrefs = useMemo(
     () =>
