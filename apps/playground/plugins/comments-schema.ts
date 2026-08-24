@@ -1,4 +1,9 @@
-import { COMMENT_STATUSES, RESOLVED_STATUS, UNRESOLVED_STATUSES } from "./comments-store";
+import {
+  COMMENT_RATINGS,
+  COMMENT_STATUSES,
+  RESOLVED_STATUS,
+  UNRESOLVED_STATUSES,
+} from "./comments-store";
 
 /**
  * Machine-readable descriptions of the comment endpoints, served from
@@ -64,7 +69,8 @@ const AUTHOR: JsonProperty = {
 
 const BODY: JsonProperty = {
   type: "string",
-  description: "Comment text. Markdown is rendered.",
+  description:
+    "Comment text. Markdown is rendered. May be empty only when a rating is supplied.",
 };
 
 const ID: JsonProperty = {
@@ -76,6 +82,12 @@ const STATUS: JsonProperty = {
   type: "string",
   description: `Comment status. ${UNRESOLVED_STATUSES.join(" and ")} count as unresolved.`,
   enum: STATUS_VALUES,
+};
+
+const RATING: JsonProperty = {
+  type: "string",
+  description: "Optional positive or negative review signal.",
+  enum: [...COMMENT_RATINGS],
 };
 
 export const COMMENT_TOOLS: CommentTool[] = [
@@ -92,11 +104,13 @@ export const COMMENT_TOOLS: CommentTool[] = [
       properties: {
         page: {
           type: "string",
-          description: 'Restrict to one page slug, e.g. "welcome" or "flanksource/foundations/tones".',
+          description:
+            'Restrict to one page slug, e.g. "welcome" or "flanksource/foundations/tones".',
         },
         status: {
           type: "string",
-          description: "Restrict to these statuses (repeat or comma-separate). Matches thread roots; replies come along.",
+          description:
+            "Restrict to these statuses (repeat or comma-separate). Matches thread roots; replies come along.",
           enum: STATUS_VALUES,
         },
         unresolved: {
@@ -111,23 +125,31 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "create_comment",
     label: "Create comment",
     description:
-      "Start a new comment thread on a page. Omit anchor for a page-level note; supply the CSS path from an existing comment to pin it to the same element. The server assigns id and createdAt.",
+      "Start a new comment thread or rating on a page. Supply body, rating, or both. Omit anchor for a page-level note; supply the CSS path from an existing comment to pin it to the same element. The server assigns id and createdAt.",
     method: "POST",
     path: BASE,
     annotations: {},
     inputSchema: {
       type: "object",
       properties: {
-        page: { type: "string", description: "Page slug the comment belongs to." },
+        page: {
+          type: "string",
+          description: "Page slug the comment belongs to.",
+        },
         body: BODY,
+        rating: RATING,
         author: AUTHOR,
         anchor: {
           type: "string",
-          description: "CSS path to the element this note is about. Omit for a page-level note.",
+          description:
+            "CSS path to the element this note is about. Omit for a page-level note.",
         },
-        status: { ...STATUS, description: `${STATUS.description} Defaults to "open".` },
+        status: {
+          ...STATUS,
+          description: `${STATUS.description} Defaults to "open".`,
+        },
       },
-      required: ["page", "body", "author"],
+      required: ["page", "author"],
       additionalProperties: false,
     },
   },
@@ -158,7 +180,10 @@ export const COMMENT_TOOLS: CommentTool[] = [
       type: "object",
       properties: {
         id: ID,
-        status: { ...STATUS, description: `${STATUS.description} Defaults to "${RESOLVED_STATUS}".` },
+        status: {
+          ...STATUS,
+          description: `${STATUS.description} Defaults to "${RESOLVED_STATUS}".`,
+        },
       },
       required: ["id"],
       additionalProperties: false,
@@ -174,7 +199,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     annotations: { idempotentHint: true },
     inputSchema: {
       type: "object",
-      properties: { id: ID, body: BODY, status: STATUS },
+      properties: { id: ID, body: BODY, status: STATUS, rating: RATING },
       required: ["id"],
       additionalProperties: false,
     },

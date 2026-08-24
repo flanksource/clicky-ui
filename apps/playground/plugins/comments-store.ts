@@ -1,5 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+
+export const COMMENT_RATINGS = ["positive", "negative"] as const;
+export type CommentRating = (typeof COMMENT_RATINGS)[number];
 
 /**
  * On-disk shape for playground feedback. Deliberately structural rather than an
@@ -21,6 +30,7 @@ export type StoredComment = {
   status?: string;
   parentId?: string | null;
   anchor?: string | null;
+  rating?: CommentRating;
 };
 
 /** Page slug → the comments left on that page. */
@@ -32,6 +42,7 @@ export type ListedComment = StoredComment & { page: string };
 export type CommentPatch = {
   body?: string;
   status?: string;
+  rating?: CommentRating;
   updatedAt?: string;
 };
 
@@ -48,7 +59,12 @@ export type CommentFilter = {
  * bundler cannot follow the package alias. `comments-store.test.ts` asserts the
  * two stay identical, so drift fails the suite rather than reaching the UI.
  */
-export const COMMENT_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
+export const COMMENT_STATUSES = [
+  "open",
+  "in_progress",
+  "resolved",
+  "closed",
+] as const;
 
 /** The subset the library flags `unresolved: true`. */
 export const UNRESOLVED_STATUSES = ["open", "in_progress"] as const;
@@ -84,7 +100,9 @@ export function readAll(dir: string): CommentsFile {
   }
   for (const [page, list] of Object.entries(parsed)) {
     if (!Array.isArray(list)) {
-      throw new Error(`${file}: page "${page}" must map to an array of comments`);
+      throw new Error(
+        `${file}: page "${page}" must map to an array of comments`,
+      );
     }
   }
   return parsed as CommentsFile;
@@ -111,7 +129,10 @@ export function assertPage(page: unknown): string {
 
 /** Keeps an agent from writing a status the comment rail cannot render. */
 export function assertStatus(status: unknown): string {
-  if (typeof status !== "string" || !COMMENT_STATUSES.includes(status as never)) {
+  if (
+    typeof status !== "string" ||
+    !COMMENT_STATUSES.includes(status as never)
+  ) {
     throw new Error(
       `status ${JSON.stringify(status)} is not one of ${COMMENT_STATUSES.join(", ")}`,
     );
@@ -119,18 +140,40 @@ export function assertStatus(status: unknown): string {
   return status;
 }
 
+export function assertRating(rating: unknown): CommentRating {
+  if (
+    typeof rating !== "string" ||
+    !COMMENT_RATINGS.includes(rating as CommentRating)
+  ) {
+    throw new Error(
+      `rating ${JSON.stringify(rating)} is not one of ${COMMENT_RATINGS.join(", ")}`,
+    );
+  }
+  return rating as CommentRating;
+}
+
 export function assertComment(input: unknown): StoredComment {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("comment payload must be an object");
   }
   const candidate = input as Record<string, unknown>;
-  for (const key of ["id", "body", "createdAt"] as const) {
+  for (const key of ["id", "createdAt"] as const) {
     const value = candidate[key];
     if (typeof value !== "string" || value === "") {
       throw new Error(`comment payload requires a non-empty string "${key}"`);
     }
   }
-  if (!("author" in candidate) || (candidate["author"] !== null && typeof candidate["author"] !== "object")) {
+  if (typeof candidate["body"] !== "string") {
+    throw new Error('comment payload requires a string "body"');
+  }
+  if (candidate["rating"] !== undefined) assertRating(candidate["rating"]);
+  if (candidate["body"] === "" && candidate["rating"] === undefined) {
+    throw new Error("comment payload requires body or rating");
+  }
+  if (
+    !("author" in candidate) ||
+    (candidate["author"] !== null && typeof candidate["author"] !== "object")
+  ) {
     throw new Error('comment payload requires an "author" object or null');
   }
   if (candidate["status"] !== undefined) assertStatus(candidate["status"]);
@@ -158,7 +201,9 @@ export function parseCommentFilter(params: URLSearchParams): CommentFilter {
   const unresolved = params.get("unresolved");
   if (unresolved !== null) {
     if (unresolved !== "true" && unresolved !== "false") {
-      throw new Error(`"unresolved" must be "true" or "false", got ${JSON.stringify(unresolved)}`);
+      throw new Error(
+        `"unresolved" must be "true" or "false", got ${JSON.stringify(unresolved)}`,
+      );
     }
     if (unresolved === "true") statuses.push(...UNRESOLVED_STATUSES);
   }
@@ -168,10 +213,16 @@ export function parseCommentFilter(params: URLSearchParams): CommentFilter {
 }
 
 /** Roots matching `statuses`, each followed by every comment beneath it. */
-function selectThreads(list: StoredComment[], statuses: readonly string[]): StoredComment[] {
+function selectThreads(
+  list: StoredComment[],
+  statuses: readonly string[],
+): StoredComment[] {
   const kept = new Set(
     list
-      .filter((entry) => !entry.parentId && statuses.includes(entry.status ?? IMPLICIT_STATUS))
+      .filter(
+        (entry) =>
+          !entry.parentId && statuses.includes(entry.status ?? IMPLICIT_STATUS),
+      )
       .map((entry) => entry.id),
   );
 
@@ -193,13 +244,20 @@ function selectThreads(list: StoredComment[], statuses: readonly string[]): Stor
  * order; within a page the stored (creation) order is preserved so a thread
  * reads root-first.
  */
-export function listComments(dir: string, filter: CommentFilter = {}): ListedComment[] {
+export function listComments(
+  dir: string,
+  filter: CommentFilter = {},
+): ListedComment[] {
   const data = readAll(dir);
-  const pages = filter.page === undefined ? Object.keys(data).sort() : [filter.page];
+  const pages =
+    filter.page === undefined ? Object.keys(data).sort() : [filter.page];
 
   return pages.flatMap((page) => {
     const list = data[page] ?? [];
-    const selected = filter.statuses === undefined ? list : selectThreads(list, filter.statuses);
+    const selected =
+      filter.statuses === undefined
+        ? list
+        : selectThreads(list, filter.statuses);
     return selected.map((comment) => ({ ...comment, page }));
   });
 }
@@ -216,14 +274,20 @@ export function findComment(
   return undefined;
 }
 
-function requireComment(dir: string, id: string): { page: string; comment: StoredComment } {
+function requireComment(
+  dir: string,
+  id: string,
+): { page: string; comment: StoredComment } {
   const found = findComment(dir, id);
   if (!found) throw new Error(`comment "${id}" not found`);
   return found;
 }
 
 /** Walks up to the thread root so replies never nest more than one level. */
-function rootOf(dir: string, id: string): { page: string; comment: StoredComment } {
+function rootOf(
+  dir: string,
+  id: string,
+): { page: string; comment: StoredComment } {
   const found = requireComment(dir, id);
   const list = readPage(dir, found.page);
 
@@ -238,14 +302,20 @@ function rootOf(dir: string, id: string): { page: string; comment: StoredComment
   return { page: found.page, comment: current };
 }
 
-export function addComment(dir: string, page: string, comment: StoredComment): StoredComment {
+export function addComment(
+  dir: string,
+  page: string,
+  comment: StoredComment,
+): StoredComment {
   assertPage(page);
   assertComment(comment);
 
   const data = readAll(dir);
   const list = data[page] ?? [];
   if (list.some((entry) => entry.id === comment.id)) {
-    throw new Error(`comment id "${comment.id}" already exists on page "${page}"`);
+    throw new Error(
+      `comment id "${comment.id}" already exists on page "${page}"`,
+    );
   }
   data[page] = [...list, comment];
   writeAll(dir, data);
@@ -256,7 +326,11 @@ export function addComment(dir: string, page: string, comment: StoredComment): S
  * Attaches a reply to `parentId`'s thread root, inheriting the root's page and
  * anchor — a caller only has to know the id it is answering.
  */
-export function addReply(dir: string, parentId: string, reply: StoredComment): StoredComment {
+export function addReply(
+  dir: string,
+  parentId: string,
+  reply: StoredComment,
+): StoredComment {
   const root = rootOf(dir, parentId);
   return addComment(dir, root.page, {
     ...reply,
@@ -265,8 +339,13 @@ export function addReply(dir: string, parentId: string, reply: StoredComment): S
   });
 }
 
-export function patchComment(dir: string, id: string, patch: CommentPatch): StoredComment {
+export function patchComment(
+  dir: string,
+  id: string,
+  patch: CommentPatch,
+): StoredComment {
   if (patch.status !== undefined) assertStatus(patch.status);
+  if (patch.rating !== undefined) assertRating(patch.rating);
 
   const { page } = requireComment(dir, id);
   const data = readAll(dir);
@@ -278,7 +357,10 @@ export function patchComment(dir: string, id: string, patch: CommentPatch): Stor
           ...entry,
           ...(patch.body !== undefined ? { body: patch.body } : {}),
           ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
+          ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
+          ...(patch.updatedAt !== undefined
+            ? { updatedAt: patch.updatedAt }
+            : {}),
         }
       : entry,
   );
@@ -298,7 +380,11 @@ export function removeComment(dir: string, id: string): number {
   while (grew) {
     grew = false;
     for (const entry of list) {
-      if (entry.parentId && doomed.has(entry.parentId) && !doomed.has(entry.id)) {
+      if (
+        entry.parentId &&
+        doomed.has(entry.parentId) &&
+        !doomed.has(entry.id)
+      ) {
         doomed.add(entry.id);
         grew = true;
       }

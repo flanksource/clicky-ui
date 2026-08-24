@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { playgroundComments } from "./plugins/comments-server";
+import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundComments({ dir: playgroundDataDir }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
@@ -63,6 +65,11 @@ export default defineConfig({
     exclude: ["@flanksource/clicky-ui"],
   },
   server: {
+    // Bind every interface so the playground is reachable from other devices
+    // on the LAN; allowedHosts keeps hostname (.local, tunnel) access working,
+    // which Vite otherwise rejects with "Blocked request".
+    host: true,
+    allowedHosts: true,
     port: 5274,
     strictPort: true,
   },

@@ -3,42 +3,39 @@ import {
   lazy,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
+  type ComponentType,
+  type LazyExoticComponent,
 } from "react";
 import {
   AppShell,
-  Badge,
   CommentSidePanel,
   DensitySwitcher,
+  DOCUMENT_ANCHOR,
   SplitButton,
   ThemeSwitcher,
   cn,
   useCommentContext,
-  type AppShellNavSection,
-  type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
 import {
   UiCode2,
   UiComment,
-  UiFilePlus,
-  UiFolder,
-  UiPencilSimpleLine,
-  UiTrash,
+  UiFileText,
 } from "@flanksource/clicky-ui/icons";
 
 import { CommentOverlay } from "./comments/CommentOverlay";
+import { AnnotationVisibilityProvider } from "./annotations";
 import {
   NewPageMenu,
   PageActions,
   PageManagementDialogs,
-  type PageAction,
 } from "./editor/PageManagement";
 import { usePageFolders } from "./editor/usePageFolders";
 import { useSource } from "./editor/useSource";
-import { buildPlaygroundNavSections } from "./navigation";
+import { MarkdownPage } from "./markdown/MarkdownPage";
+import { usePageGuidance } from "./markdown/usePageGuidance";
+import { PlaygroundViewActions } from "./PlaygroundViewActions";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -48,33 +45,34 @@ const SourceEditor = lazy(() =>
   })),
 );
 import { resolveAnchor } from "./comments/dom-anchor";
-import { writeClipboard } from "./comments/clipboard";
-import { countOpenCommentsByPage } from "./comments/counts";
-import {
-  commentsForFolder,
-  commentsToMarkdown,
-  groupByPage,
-  type CommentPageSection,
-} from "./comments/markdown";
-import {
-  fetchComments,
-  PLAYGROUND_COMMENT_CONFIG,
-  type PageComment,
-} from "./comments/useComments";
+import { useFeedbackCopy } from "./comments/useFeedbackCopy";
+import { type PageComment } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
   PAGES,
   fallbackPageSlug,
-  folderForPage,
-  getMetaVersion,
-  lazyPage,
+  loadPage,
   pageDescription,
   pageGroup,
-  pageMeta,
   pageTitle,
-  subscribeMeta,
   type PageEntry,
 } from "./registry";
+import type { AnnotationVisibility, PlaygroundView } from "./route";
+import {
+  usePlaygroundNavigation,
+  type PageActionState,
+} from "./usePlaygroundNavigation";
+
+const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
+
+function lazyPage(entry: PageEntry): LazyExoticComponent<ComponentType> {
+  const existing = lazyPageCache.get(entry.slug);
+  if (existing) return existing;
+
+  const created = lazy(() => loadPage(entry));
+  lazyPageCache.set(entry.slug, created);
+  return created;
+}
 
 export type PlaygroundShellProps = {
   active: PageEntry | undefined;
@@ -82,12 +80,12 @@ export type PlaygroundShellProps = {
   query: string;
   onQueryChange: (next: string) => void;
   commentsError: string | null;
-};
-
-type PageActionState = {
-  action: PageAction;
-  page?: PageEntry;
-  initialFolder?: string;
+  view: PlaygroundView;
+  annotations: AnnotationVisibility;
+  pageHref: (slug: string) => string;
+  onViewChange: (view: PlaygroundView) => void;
+  onAnnotationsChange: (annotations: AnnotationVisibility) => void;
+  onNavigate: (slug?: string) => void;
 };
 
 function shortAnchorLabel(anchor: string): string {
@@ -136,12 +134,16 @@ export function PlaygroundShell({
   query,
   onQueryChange,
   commentsError,
+  view,
+  annotations,
+  pageHref,
+  onViewChange,
+  onAnnotationsChange,
+  onNavigate,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [commentMode, setCommentMode] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const source = useSource(active?.slug, editing);
@@ -155,116 +157,20 @@ export function PlaygroundShell({
 
   const { pins, orphans, labels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
-    ctx.comments,
+    view === "preview" ? ctx.comments : [],
     ctx.registerAnchor,
   );
 
-  // Rebuilds the nav when a page's `meta` resolves and its label/group changes.
-  const metaVersion = useSyncExternalStore(
-    subscribeMeta,
-    getMetaVersion,
-    getMetaVersion,
-  );
-
-  const openCommentCounts = useMemo(() => {
-    return countOpenCommentsByPage(allComments, PLAYGROUND_COMMENT_CONFIG);
-  }, [allComments]);
-
-  const navSections = useMemo<AppShellNavSection[]>(() => {
-    return buildPlaygroundNavSections(PAGES, pageFolders.folders, {
-      activeSlug: active?.slug,
-      query,
-      metaFor: pageMeta,
-      badgeFor: (entry) => {
-        const count = openCommentCounts.get(entry.slug) ?? 0;
-        return count > 0 ? (
-          <Badge
-            clickToCopy={false}
-            count={count}
-            size="xxs"
-            tone="info"
-            variant="soft"
-          />
-        ) : null;
-      },
-      folderBadgeFor: (_folder, pages) => {
-        const count = pages.reduce(
-          (total, page) => total + (openCommentCounts.get(page.slug) ?? 0),
-          0,
-        );
-        return count > 0 ? (
-          <Badge
-            clickToCopy={false}
-            count={count}
-            size="xxs"
-            tone="info"
-            variant="soft"
-          />
-        ) : null;
-      },
-      contextMenuForPage: (entry) => [
-        {
-          label: "Rename",
-          group: "Page",
-          icon: UiPencilSimpleLine,
-          disabled: filesystemActionsDisabled,
-          ...(filesystemActionsDisabledReason
-            ? { title: filesystemActionsDisabledReason }
-            : {}),
-          onSelect: () => setPageAction({ action: "rename", page: entry }),
-        },
-        {
-          label: "Move",
-          icon: UiFolder,
-          disabled: filesystemActionsDisabled,
-          ...(filesystemActionsDisabledReason
-            ? { title: filesystemActionsDisabledReason }
-            : {}),
-          onSelect: () => setPageAction({ action: "move", page: entry }),
-        },
-        {
-          label: "Delete",
-          icon: UiTrash,
-          disabled: filesystemActionsDisabled,
-          ...(filesystemActionsDisabledReason
-            ? { title: filesystemActionsDisabledReason }
-            : {}),
-          onSelect: () => setPageAction({ action: "delete", page: entry }),
-        },
-      ],
-      contextMenuForFolder: (folder) => [
-        {
-          label: "New page",
-          group: "Folder",
-          icon: UiFilePlus,
-          disabled: filesystemActionsDisabled,
-          ...(filesystemActionsDisabledReason
-            ? { title: filesystemActionsDisabledReason }
-            : {}),
-          onSelect: () =>
-            setPageAction({ action: "new-page", initialFolder: folder }),
-        },
-        {
-          label: "New folder",
-          icon: UiFolder,
-          disabled: filesystemActionsDisabled,
-          ...(filesystemActionsDisabledReason
-            ? { title: filesystemActionsDisabledReason }
-            : {}),
-          onSelect: () =>
-            setPageAction({ action: "new-folder", initialFolder: folder }),
-        },
-      ],
-    });
-  }, [
-    active?.slug,
-    filesystemActionsDisabled,
-    filesystemActionsDisabledReason,
-    metaVersion,
-    openCommentCounts,
-    pageFolders.folders,
+  const navSections = usePlaygroundNavigation({
+    active,
+    allComments,
     query,
-  ]);
+    folders: pageFolders.folders,
+    pageHref,
+    actionsDisabled: filesystemActionsDisabled,
+    disabledReason: filesystemActionsDisabledReason,
+    setPageAction,
+  });
 
   // `contentRef` comes from the provider as a read-only RefObject; a callback
   // ref is the only way to attach it without fighting the React 18/19 ref types.
@@ -313,118 +219,16 @@ export function PlaygroundShell({
   }, []);
 
   // Leaving a page must not leave the picker armed on the next one.
-  useEffect(() => setCommentMode(false), [active?.slug]);
+  useEffect(() => setCommentMode(false), [active?.slug, view]);
 
-  /**
-   * Every copy action funnels through here so a failed fetch or a refused
-   * clipboard surfaces as a banner instead of looking like "there was nothing
-   * to copy". `labels` only describe the live page; other pages fall back to
-   * their raw anchors.
-   */
-  const copyMarkdown = useCallback(
-    async (
-      load: () => CommentPageSection[] | Promise<CommentPageSection[]>,
-    ) => {
-      try {
-        // The dropdown actions fetch before they have anything to copy, and in
-        // Safari and Firefox the click's transient user activation is already
-        // spent by the time that await resolves — `writeText` would then be
-        // refused. `write` accepts a *pending* blob, so the clipboard is
-        // claimed inside the activation and filled once the fetch lands.
-        await writeClipboard(
-          Promise.resolve(load()).then((sections) =>
-            commentsToMarkdown(sections, {
-              labels,
-              pageUrl: (page) => {
-                const url = new URL(window.location.origin);
-                url.searchParams.set("page", page);
-                return url.href;
-              },
-              pagePath: (page) => `apps/playground/src/pages/${page}.tsx`,
-            }),
-          ),
-        );
-        setCopyError(null);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1500);
-      } catch (cause) {
-        setCopyError(cause instanceof Error ? cause.message : String(cause));
-      }
-    },
-    [labels],
-  );
-
-  const copyFeedback = useCallback(() => {
-    if (!active) return;
-    void copyMarkdown(() => [{ page: active.slug, comments: ctx.comments }]);
-  }, [active, copyMarkdown, ctx.comments]);
-
-  const activeFolder = active ? folderForPage(active.slug, PAGES) : undefined;
-  const activeFolderLabel = activeFolder
-    ?.split("/")
-    .map((part) => part.replace(/[-_]+/g, " "))
-    .join(" / ");
-
-  // The dropdown actions re-read from the backend rather than filtering the
-  // provider's list: only the server knows the pages this session never opened.
-  const copyActions = useMemo<DropdownMenuItem[]>(
-    () => [
-      {
-        label: "Copy open comments (this page)",
-        title: "Unresolved notes on the page you are looking at",
-        disabled: active === undefined,
-        onSelect: () => {
-          if (!active) return;
-          void copyMarkdown(async () => [
-            {
-              page: active.slug,
-              comments: await fetchComments({
-                page: active.slug,
-                unresolved: true,
-              }),
-            },
-          ]);
-        },
-      },
-      ...(activeFolder && activeFolderLabel
-        ? [
-            {
-              label: "Copy all comments (this folder)",
-              title: `Every note under ${activeFolderLabel}, resolved ones included`,
-              onSelect: () =>
-                void copyMarkdown(async () =>
-                  commentsForFolder(await fetchComments(), activeFolder),
-                ),
-            },
-          ]
-        : []),
-      {
-        label: "Copy all open comments",
-        title: "Unresolved notes from every artifact page",
-        onSelect: () =>
-          void copyMarkdown(async () =>
-            groupByPage(await fetchComments({ unresolved: true })),
-          ),
-      },
-      {
-        label: "Copy all comments",
-        title: "Every note from every artifact page, resolved ones included",
-        onSelect: () =>
-          void copyMarkdown(async () => groupByPage(await fetchComments())),
-      },
-    ],
-    [active, activeFolder, activeFolderLabel, copyMarkdown],
-  );
+  const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
 
   const PageComponent = active ? lazyPage(active) : null;
-  const railVisible = ctx.railMode !== "closed" || ctx.comments.length > 0;
+  const activeTitle = active ? pageTitle(active) : "";
+  const pageGuidance = usePageGuidance(active, activeTitle);
+  const railVisible =
+    view === "preview" && (ctx.railMode !== "closed" || ctx.comments.length > 0);
   const editorOpen = editing && active !== undefined;
-  const navigatePage = useCallback((slug?: string) => {
-    const url = new URL(window.location.href);
-    if (slug) url.searchParams.set("page", slug);
-    else url.searchParams.delete("page");
-    window.location.href = url.href;
-  }, []);
   const actionPage = pageAction?.page ?? active;
 
   return (
@@ -452,6 +256,15 @@ export function PlaygroundShell({
       }
       actions={
         <>
+          <PlaygroundViewActions
+            view={view}
+            annotations={annotations}
+            copyDisabled={pageGuidance.markdown === null}
+            copied={pageGuidance.copied}
+            onViewChange={onViewChange}
+            onAnnotationsChange={onAnnotationsChange}
+            onCopy={() => void pageGuidance.copyPage()}
+          />
           <NewPageMenu
             disabled={filesystemActionsDisabled}
             disabledReason={filesystemActionsDisabledReason}
@@ -476,25 +289,30 @@ export function PlaygroundShell({
               <span className="size-1.5 rounded-full bg-amber-500" />
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => setCommentMode((on) => !on)}
-            aria-pressed={commentMode}
-            title="Comment on an element (c)"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
-              commentMode
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <UiComment className="size-3.5" />
-            {commentMode ? "Pick an element…" : "Comment"}
-          </button>
+          {view === "preview" && (
+            <SplitButton
+              label={commentMode ? "Pick an element…" : "Comment"}
+              icon={UiComment}
+              onClick={() => setCommentMode((on) => !on)}
+              items={[
+                {
+                  label: "Comment on whole page",
+                  icon: UiFileText,
+                  onSelect: () => {
+                    setCommentMode(false);
+                    ctx.focusAnchor(DOCUMENT_ANCHOR);
+                  },
+                },
+              ]}
+              variant={commentMode ? "default" : "outline"}
+              size="sm"
+              title="Choose comment scope"
+            />
+          )}
           <SplitButton
-            label={copied ? "Copied" : "Copy feedback"}
-            onClick={copyFeedback}
-            items={copyActions}
+            label={feedback.copied ? "Copied" : "Copy feedback"}
+            onClick={feedback.copyFeedback}
+            items={feedback.copyActions}
             variant="outline"
             size="sm"
             // Only the primary half depends on this page having notes — the
@@ -567,10 +385,17 @@ export function PlaygroundShell({
               <Banner tone="danger">{pageFolders.error}</Banner>
             )}
             {commentsError && <Banner tone="danger">{commentsError}</Banner>}
-            {copyError && (
-              <Banner tone="danger">Nothing was copied — {copyError}</Banner>
+            {feedback.copyError && (
+              <Banner tone="danger">
+                Nothing was copied — {feedback.copyError}
+              </Banner>
             )}
-            {orphans.length > 0 && (
+            {pageGuidance.copyError && (
+              <Banner tone="danger">
+                Page Markdown was not copied — {pageGuidance.copyError}
+              </Banner>
+            )}
+            {view === "preview" && orphans.length > 0 && (
               <Banner tone="warning">
                 {orphans.length} comment anchor
                 {orphans.length === 1
@@ -580,30 +405,39 @@ export function PlaygroundShell({
                 “Unavailable” in the rail.
               </Banner>
             )}
-            {PageComponent ? (
+            {view === "markdown" ? (
+              <MarkdownPage
+                markdown={pageGuidance.markdown}
+                error={pageGuidance.loadError}
+              />
+            ) : PageComponent ? (
               <Suspense
                 fallback={
                   <p className="text-sm text-muted-foreground">Loading…</p>
                 }
               >
-                <PageComponent />
+                <AnnotationVisibilityProvider value={annotations}>
+                  <PageComponent />
+                </AnnotationVisibilityProvider>
               </Suspense>
             ) : (
               <EmptyPages />
             )}
           </div>
 
-          <CommentOverlay
-            active={commentMode}
-            scrollRef={ctx.contentRef}
-            contentRef={contentRef}
-            pins={pins}
-            focusedAnchor={
-              ctx.railMode === "focused" ? ctx.focusedAnchor : null
-            }
-            onPick={handlePick}
-            onFocus={ctx.focusAnchor}
-          />
+          {view === "preview" && (
+            <CommentOverlay
+              active={commentMode}
+              scrollRef={ctx.contentRef}
+              contentRef={contentRef}
+              pins={pins}
+              focusedAnchor={
+                ctx.railMode === "focused" ? ctx.focusedAnchor : null
+              }
+              onPick={handlePick}
+              onFocus={ctx.focusAnchor}
+            />
+          )}
         </div>
 
         {railVisible && (
@@ -632,7 +466,7 @@ export function PlaygroundShell({
         }
         onClose={() => setPageAction(null)}
         onFolderCreated={pageFolders.add}
-        onNavigate={navigatePage}
+        onNavigate={onNavigate}
         fallbackAfterDelete={(deletedSlug) =>
           deletedSlug === active?.slug
             ? fallbackPageSlug(PAGES, deletedSlug)

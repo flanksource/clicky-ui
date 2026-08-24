@@ -1,0 +1,73 @@
+/* ==========================================================================
+   Flanksource chart tokens
+
+   clicky-ui's chart components already reference --chart-1 … --chart-4 and
+   nothing defines them, so every TimeseriesPanel currently falls back to the
+   hardcoded hexes in its own `var(--chart-N, #......)` defaults. This file is
+   the missing definition.
+
+   It lives in the playground because that is where the pattern is being worked
+   out. **It belongs in packages/ui/src/styles/tokens.css** — defining it there
+   makes every existing clicky-ui chart correct by default with no component
+   change, which is the whole argument for adopting it.
+
+   Values and their validator provenance are documented in
+   `dataviz-palette.ts`. Keep the two in step; the pattern page prints these
+   hexes from the TS module beside the swatches these rules paint, so a
+   disagreement is visible rather than silent.
+
+   One set of hexes serves both themes: these steps sit inside the light
+   lightness band (OKLCH L 0.43–0.77) and the dark band (0.48–0.67) at once, and
+   clear 3:1 against both #ffffff and #030712. That is why there is no
+   [data-theme="dark"] block for the categorical slots.
+   ========================================================================== */
+
+:root,
+[data-theme] {
+  /* Categorical — assigned in this fixed order, never cycled. */
+  --chart-1: #0284c7; /* sky     */
+  --chart-2: #d97706; /* amber   */
+  --chart-3: #e11d48; /* rose    */
+  --chart-4: #7c3aed; /* violet  */
+  --chart-5: #059669; /* emerald */
+  --chart-6: #6366f1; /* indigo  */
+  --chart-7: #0d9488; /* teal    */
+
+  /* Sequential — one hue, light to dark. Magnitude only. */
+  --chart-seq-1: #e0f2fe;
+  --chart-seq-2: #bae6fd;
+  --chart-seq-3: #7dd3fc;
+  --chart-seq-4: #38bdf8;
+  --chart-seq-5: #0ea5e9;
+  --chart-seq-6: #0284c7;
+  --chart-seq-7: #0369a1;
+  --chart-seq-8: #075985;
+
+  /* Diverging — two poles around a NEUTRAL midpoint. Polarity only. */
+  --chart-div-neg-3: #be123c;
+  --chart-div-neg-2: #f43f5e;
+  --chart-div-neg-1: #fda4af;
+  --chart-div-mid: #e5e7eb;
+  --chart-div-pos-1: #7dd3fc;
+  --chart-div-pos-2: #0ea5e9;
+  --chart-div-pos-3: #0369a1;
+
+  /* Grid and axis ink. Recessive by construction — a grid that competes with
+     the data is a grid drawn too dark. */
+  --chart-grid: color-mix(in srgb, var(--border) 70%, transparent);
+  --chart-axis: var(--muted-foreground);
+}
+
+/* The diverging midpoint is the one value that must change with the theme: a
+   #e5e7eb midpoint on a near-black canvas reads as a bright band rather than as
+   "no signal". */
+[data-theme="dark"] {
+  --chart-div-mid: #374151;
+}
+
+/* The 2px surface gap between adjacent fills, and the 2px surface ring on
+   overlapping marks. Both are drawn in the surface colour rather than a border
+   colour, so segments look separated rather than outlined. */
+.viz-gap {
+  box-shadow: 0 0 0 2px var(--background);
+}

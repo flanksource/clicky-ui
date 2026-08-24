@@ -6,5 +6,20 @@
 !flanksource/
 !flanksource/**/*.tsx
 !supply-chain-posture.tsx
+!supply-chain-activity.tsx
+!review-components.tsx
 !_supply-chain-posture/
 !_supply-chain-posture/**
+# flanksource/reconctl.tsx is tracked, so everything it imports has to be too —
+# otherwise the published design-system page pulls in files nobody else has.
+# `_reconctl-picker/` is deliberately NOT here: the palette picker is scratch
+# that has served its purpose, and it pulls in the whole 1MB _recon fixture.
+!_reconctl/
+!_reconctl/**
+# The three modules _reconctl reads rather than restates. Listed file by file so
+# the ~1MB of fixture JSON alongside them stays out of the repo.
+!_recon/
+!_recon/severity.ts
+!_recon/marks.ts
+!_shared/
+!_shared/hues.ts

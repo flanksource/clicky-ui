@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { COMMENT_TOOLS, type CommentTool } from "./comments-schema";
 import { COMMENTS_ROUTE, matchRoute } from "./comments-server";
-import { COMMENT_STATUSES } from "./comments-store";
+import { COMMENT_RATINGS, COMMENT_STATUSES } from "./comments-store";
 
 /** The path a caller would actually request, with `{id}` filled in. */
 function examplePath(tool: CommentTool): string {
@@ -44,16 +44,19 @@ describe("comments-schema", () => {
     "%s only requires fields it declares",
     (_name, tool) => {
       const declared = Object.keys(tool.inputSchema.properties);
-      expect(declared).toEqual(expect.arrayContaining(tool.inputSchema.required ?? []));
+      expect(declared).toEqual(
+        expect.arrayContaining(tool.inputSchema.required ?? []),
+      );
     },
   );
 
-  it.each(COMMENT_TOOLS.filter((tool) => tool.path.includes("{id}")).map((tool) => [tool.name, tool] as const))(
-    "%s requires the id its path interpolates",
-    (_name, tool) => {
-      expect(tool.inputSchema.required ?? []).toContain("id");
-    },
-  );
+  it.each(
+    COMMENT_TOOLS.filter((tool) => tool.path.includes("{id}")).map(
+      (tool) => [tool.name, tool] as const,
+    ),
+  )("%s requires the id its path interpolates", (_name, tool) => {
+    expect(tool.inputSchema.required ?? []).toContain("id");
+  });
 
   it.each(COMMENT_TOOLS.map((tool) => [tool.name, tool] as const))(
     "%s documents what it does",
@@ -65,13 +68,17 @@ describe("comments-schema", () => {
 
   it("marks only the listing read-only", () => {
     expect(
-      COMMENT_TOOLS.filter((tool) => tool.annotations.readOnlyHint).map((tool) => tool.name),
+      COMMENT_TOOLS.filter((tool) => tool.annotations.readOnlyHint).map(
+        (tool) => tool.name,
+      ),
     ).toEqual(["list_comments"]);
   });
 
   it("marks deletion destructive so a model treats it with care", () => {
     expect(
-      COMMENT_TOOLS.filter((tool) => tool.annotations.destructiveHint).map((tool) => tool.name),
+      COMMENT_TOOLS.filter((tool) => tool.annotations.destructiveHint).map(
+        (tool) => tool.name,
+      ),
     ).toEqual(["delete_comment"]);
   });
 
@@ -81,7 +88,9 @@ describe("comments-schema", () => {
     ["resolve_comment", "status"],
   ])("%s enumerates the storable statuses for %s", (name, field) => {
     const tool = COMMENT_TOOLS.find((entry) => entry.name === name);
-    expect(tool?.inputSchema.properties[field]?.enum).toEqual([...COMMENT_STATUSES]);
+    expect(tool?.inputSchema.properties[field]?.enum).toEqual([
+      ...COMMENT_STATUSES,
+    ]);
   });
 
   it("tells a model that create and reply need an author", () => {
@@ -90,4 +99,14 @@ describe("comments-schema", () => {
       expect(tool?.inputSchema.required).toContain("author");
     }
   });
+
+  it.each(["create_comment", "update_comment"])(
+    "%s enumerates positive and negative ratings",
+    (name) => {
+      const tool = COMMENT_TOOLS.find((entry) => entry.name === name);
+      expect(tool?.inputSchema.properties["rating"]?.enum).toEqual([
+        ...COMMENT_RATINGS,
+      ]);
+    },
+  );
 });

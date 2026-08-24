@@ -16,3 +16,7 @@ body,
 #app {
   height: 100%;
 }
+
+[data-playground-annotations="hidden"] section:has(> [data-playground-annotation-only]) {
+  display: none;
+}

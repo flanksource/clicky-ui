@@ -8,6 +8,7 @@ import {
   addComment,
   addReply,
   assertPage,
+  assertRating,
   listComments,
   parseCommentFilter,
   patchComment,
@@ -37,7 +38,10 @@ export function matchRoute(
   method: string,
   pathname: string,
 ): { route: CommentRoute; id: string } | undefined {
-  const segments = pathname.split("/").filter((segment) => segment !== "").map(decodeURIComponent);
+  const segments = pathname
+    .split("/")
+    .filter((segment) => segment !== "")
+    .map(decodeURIComponent);
 
   if (segments.length === 0) {
     if (method === "GET") return { route: "list", id: "" };
@@ -48,7 +52,8 @@ export function matchRoute(
   const [first, second] = segments as [string, string | undefined];
 
   if (segments.length === 1) {
-    if (first === "schema") return method === "GET" ? { route: "schema", id: "" } : undefined;
+    if (first === "schema")
+      return method === "GET" ? { route: "schema", id: "" } : undefined;
     if (method === "PATCH") return { route: "update", id: first };
     if (method === "DELETE") return { route: "delete", id: first };
     return undefined;
@@ -61,7 +66,9 @@ export function matchRoute(
   return undefined;
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJsonBody(
+  req: IncomingMessage,
+): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   const raw = Buffer.concat(chunks).toString("utf8");
@@ -71,7 +78,9 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`request body is not valid JSON (${(error as Error).message})`);
+    throw new Error(
+      `request body is not valid JSON (${(error as Error).message})`,
+    );
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("request body must be a JSON object");
@@ -101,7 +110,9 @@ function requireText(body: Record<string, unknown>, key: string): string {
 function requireAuthor(body: Record<string, unknown>): StoredAuthor {
   const author = body["author"];
   if (author === null || typeof author !== "object" || Array.isArray(author)) {
-    throw new Error('"author" is required, e.g. {"name":"Claude","kind":"agent"}');
+    throw new Error(
+      '"author" is required, e.g. {"name":"Claude","kind":"agent"}',
+    );
   }
   const candidate = author as Record<string, unknown>;
   const name = candidate["name"];
@@ -115,7 +126,10 @@ function requireAuthor(body: Record<string, unknown>): StoredAuthor {
   return { name, ...(kind === undefined ? {} : { kind }) };
 }
 
-function optionalText(body: Record<string, unknown>, key: string): string | undefined {
+function optionalText(
+  body: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = body[key];
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") throw new Error(`"${key}" must be a string`);
@@ -123,16 +137,20 @@ function optionalText(body: Record<string, unknown>, key: string): string | unde
 }
 
 /** The server owns identity and creation time so two callers cannot collide. */
-function draft(body: Record<string, unknown>): StoredComment {
+function draft(body: Record<string, unknown>, text: string): StoredComment {
   return {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
-    body: requireText(body, "body"),
+    body: text,
     author: requireAuthor(body),
   };
 }
 
-function handle(dir: string, req: IncomingMessage, res: ServerResponse): Promise<void> | void {
+function handle(
+  dir: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> | void {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const matched = matchRoute(req.method ?? "", url.pathname);
   if (!matched) {
@@ -144,7 +162,9 @@ function handle(dir: string, req: IncomingMessage, res: ServerResponse): Promise
 
   switch (route) {
     case "list":
-      return sendJson(res, 200, { comments: listComments(dir, parseCommentFilter(url.searchParams)) });
+      return sendJson(res, 200, {
+        comments: listComments(dir, parseCommentFilter(url.searchParams)),
+      });
 
     case "schema":
       return sendJson(res, 200, { tools: COMMENT_TOOLS });
@@ -152,22 +172,28 @@ function handle(dir: string, req: IncomingMessage, res: ServerResponse): Promise
     case "create":
       return readJsonBody(req).then((body) => {
         const anchor = optionalText(body, "anchor");
+        const rating = optionalText(body, "rating");
         const status = optionalText(body, "status");
         sendJson(
           res,
           201,
           addComment(dir, assertPage(body["page"]), {
-            ...draft(body),
+            ...draft(body, optionalText(body, "body") ?? ""),
             status: status ?? "open",
             parentId: null,
             anchor: anchor ?? null,
+            ...(rating === undefined ? {} : { rating: assertRating(rating) }),
           }),
         );
       });
 
     case "reply":
       return readJsonBody(req).then((body) => {
-        sendJson(res, 201, addReply(dir, id, draft(body)));
+        sendJson(
+          res,
+          201,
+          addReply(dir, id, draft(body, requireText(body, "body"))),
+        );
       });
 
     case "resolve":
@@ -187,9 +213,13 @@ function handle(dir: string, req: IncomingMessage, res: ServerResponse): Promise
         // nothing but `updatedAt`.
         const nextBody = optionalText(body, "body");
         const nextStatus = optionalText(body, "status");
+        const nextRating = optionalText(body, "rating");
         const patch: CommentPatch = {
           ...(nextBody === undefined ? {} : { body: nextBody }),
           ...(nextStatus === undefined ? {} : { status: nextStatus }),
+          ...(nextRating === undefined
+            ? {}
+            : { rating: assertRating(nextRating) }),
           updatedAt: new Date().toISOString(),
         };
         sendJson(res, 200, patchComment(dir, id, patch));
@@ -217,8 +247,11 @@ export function playgroundComments(options: { dir: string }): Plugin {
           try {
             await handle(options.dir, req, res);
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            server.config.logger.error(`[playground-comments] ${req.method} failed: ${message}`);
+            const message =
+              error instanceof Error ? error.message : String(error);
+            server.config.logger.error(
+              `[playground-comments] ${req.method} failed: ${message}`,
+            );
             if (res.headersSent) {
               next(error);
               return;

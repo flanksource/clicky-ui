@@ -4,9 +4,10 @@ import { buildPlaygroundNavSections } from "./navigation";
 import type { PageEntry, PageMeta } from "./registry";
 
 const load = () => Promise.resolve({});
+const loadGuidance = () => Promise.resolve({ blocks: [] });
 
 function entry(slug: string): PageEntry {
-  return { slug, title: slug, group: "Pages", load };
+  return { slug, title: slug, group: "Pages", load, loadGuidance };
 }
 
 const orderedMeta = new Map<string, PageMeta>([

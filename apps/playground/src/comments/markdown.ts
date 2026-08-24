@@ -12,6 +12,12 @@ import { tallyAnchors } from "./useDomAnchors";
 /** One page's notes. A cross-page copy passes several; the toolbar passes one. */
 export type CommentPageSection = { page: string; comments: Comment[] };
 
+export type CommentMarkdownOptions = {
+  labels: Record<string, string>;
+  pageUrl: (page: string) => string;
+  pagePath: (page: string) => string;
+};
+
 /** Splits a cross-page listing into sections, in the order pages first appear. */
 export function groupByPage(comments: PageComment[]): CommentPageSection[] {
   const sections = new Map<string, Comment[]>();
@@ -21,11 +27,27 @@ export function groupByPage(comments: PageComment[]): CommentPageSection[] {
   return [...sections].map(([page, list]) => ({ page, comments: list }));
 }
 
+export function commentsForFolder(
+  comments: PageComment[],
+  folder: string,
+): CommentPageSection[] {
+  return groupByPage(
+    comments.filter(
+      ({ page }) => page === folder || page.startsWith(`${folder}/`),
+    ),
+  );
+}
+
 function renderSection(
   { page, comments }: CommentPageSection,
-  labels: Record<string, string>,
+  { labels, pageUrl, pagePath }: CommentMarkdownOptions,
 ): string[] {
-  const out = [`## Playground feedback — ${page}`, ""];
+  const out = [
+    `## Playground feedback — ${page}`,
+    `- URL: ${pageUrl(page)}`,
+    `- source: \`${pagePath(page)}\``,
+    "",
+  ];
 
   const roots = getRoots(comments);
   if (roots.length === 0) {
@@ -34,7 +56,9 @@ function renderSection(
   }
 
   const replies = buildReplyMap(comments);
-  const rank = new Map(tallyAnchors(comments).map((tally, index) => [tally.anchor, index]));
+  const rank = new Map(
+    tallyAnchors(comments).map((tally, index) => [tally.anchor, index]),
+  );
   const ordered = [...roots].sort((a, b) => {
     const ar = rank.get(a.anchor ?? DOCUMENT_ANCHOR) ?? Number.MAX_SAFE_INTEGER;
     const br = rank.get(b.anchor ?? DOCUMENT_ANCHOR) ?? Number.MAX_SAFE_INTEGER;
@@ -45,12 +69,21 @@ function renderSection(
     const anchor = root.anchor ?? DOCUMENT_ANCHOR;
     const isDocument = anchor === DOCUMENT_ANCHOR;
 
-    out.push(`### ${index + 1}. ${isDocument ? "Page-level" : (labels[anchor] ?? anchor)}`);
+    out.push(
+      `### ${index + 1}. ${isDocument ? "Page-level" : (labels[anchor] ?? anchor)}`,
+    );
     if (!isDocument) out.push(`- anchor: \`${anchor}\``);
     out.push(`- status: ${root.status ?? "open"}`);
-    out.push(`- ${root.author?.name ?? "Anonymous"}: ${root.body}`);
+    if (root.rating) out.push(`- rating: ${root.rating}`);
+    if (root.body.trim()) {
+      out.push(`- ${root.author?.name ?? "Anonymous"}: ${root.body}`);
+    } else {
+      out.push(`- author: ${root.author?.name ?? "Anonymous"}`);
+    }
     for (const reply of sortReplies(replies.get(root.id) ?? [])) {
-      out.push(`  - ${reply.author?.name ?? "Anonymous"} replied: ${reply.body}`);
+      out.push(
+        `  - ${reply.author?.name ?? "Anonymous"} replied: ${reply.body}`,
+      );
     }
     out.push("");
   });
@@ -68,8 +101,10 @@ function renderSection(
  */
 export function commentsToMarkdown(
   sections: CommentPageSection[],
-  labels: Record<string, string>,
+  options: CommentMarkdownOptions,
 ): string {
   if (sections.length === 0) return "_No comments._\n";
-  return sections.flatMap((section) => renderSection(section, labels)).join("\n");
+  return sections
+    .flatMap((section) => renderSection(section, options))
+    .join("\n");
 }
