@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { DropdownMenu } from "../overlay/DropdownMenu";
-import { UiArrowUp, UiClose } from "../icons";
+import { UiArrowUp, UiClose, UiThumbsDown, UiThumbsUp } from "../icons";
 import type { BadgeTone } from "../data/Badge";
 import { MentionTextarea } from "./MentionTextarea";
 import { toneToBadgeTone } from "./comment-utils";
@@ -12,6 +12,7 @@ import type {
   CommentCreateInput,
   CommentFacet,
   CommentMention,
+  CommentRating,
 } from "./comment-types";
 
 // Static literals so Tailwind's source scanner emits these utilities.
@@ -125,6 +126,7 @@ export function CommentComposer({
   const [open, setOpen] = useState(!collapsible || autoFocus);
   const [body, setBody] = useState("");
   const [facets, setFacets] = useState<Record<string, string>>({});
+  const [rating, setRating] = useState<CommentRating | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const mentionsRef = useRef<Map<string, CommentMention>>(new Map());
@@ -133,6 +135,7 @@ export function CommentComposer({
   function reset() {
     setBody("");
     setFacets({});
+    setRating(undefined);
     mentionsRef.current.clear();
   }
 
@@ -148,7 +151,7 @@ export function CommentComposer({
 
   async function submit() {
     const text = body.trim();
-    if (!text || submittingRef.current) return;
+    if ((!text && !rating) || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
     const mentions = [...mentionsRef.current.values()].filter((m) =>
@@ -158,6 +161,7 @@ export function CommentComposer({
       await onCreate?.({
         body: text,
         anchor: anchor ?? null,
+        ...(rating ? { rating } : {}),
         ...(Object.keys(facets).length > 0 ? { facets } : {}),
         ...(mentions.length > 0 ? { mentions } : {}),
       });
@@ -218,6 +222,31 @@ export function CommentComposer({
         </button>
       )}
       <div className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5">
+        {(
+          [
+            ["positive", "Positive rating", UiThumbsUp],
+            ["negative", "Negative rating", UiThumbsDown],
+          ] as const
+        ).map(([value, label, icon]) => (
+          <button
+            key={value}
+            type="button"
+            aria-label={label}
+            aria-pressed={rating === value}
+            onClick={() =>
+              setRating((current) => (current === value ? undefined : value))
+            }
+            className={cn(
+              "inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              rating === value &&
+                (value === "positive"
+                  ? "bg-green-100 text-green-700 [[data-theme=dark]_&]:bg-green-500/20 [[data-theme=dark]_&]:text-green-300"
+                  : "bg-red-100 text-red-700 [[data-theme=dark]_&]:bg-red-500/20 [[data-theme=dark]_&]:text-red-300"),
+            )}
+          >
+            <Icon icon={icon} className="text-sm" />
+          </button>
+        ))}
         {(config.facets ?? []).map((facet) => (
           <FacetPicker
             key={facet.key}
@@ -231,7 +260,7 @@ export function CommentComposer({
           data-testid="comment-compose-send"
           aria-label="Post comment"
           onClick={() => void submit()}
-          disabled={submitting || !body.trim()}
+          disabled={submitting || (!body.trim() && !rating)}
           className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
         >
           <Icon icon={UiArrowUp} className="text-xs" />

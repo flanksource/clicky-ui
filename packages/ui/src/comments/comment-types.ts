@@ -99,6 +99,9 @@ export type CommentAuthor = {
  */
 export type CommentAnchor = string;
 
+/** Binary review signal attached to a root comment. */
+export type CommentRating = "positive" | "negative";
+
 /** Anchor key reserved for document-level (un-anchored) comments. */
 export const DOCUMENT_ANCHOR = "__document__";
 
@@ -117,6 +120,8 @@ export type Comment = {
   parentId?: string | null;
   /** Where the comment is anchored; null/absent = document-level. */
   anchor?: CommentAnchor | null;
+  /** Optional positive/negative review signal; roots only. */
+  rating?: CommentRating;
   /** facet.key → selected option value. */
   facets?: Record<string, string>;
   refs?: CommentRefGroup[];
@@ -127,6 +132,7 @@ export type Comment = {
 export type CommentCreateInput = {
   body: string;
   anchor?: CommentAnchor | null;
+  rating?: CommentRating;
   facets?: Record<string, string>;
   mentions?: CommentMention[];
 };
@@ -147,6 +153,7 @@ export type CommentCallbacks = {
   onCreate?: (input: CommentCreateInput) => void | Promise<void>;
   onReply?: (input: CommentReplyInput) => void | Promise<void>;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
+  onUpdateRating?: (id: string, rating: CommentRating) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
   onChecklistToggle?: (
     id: string,

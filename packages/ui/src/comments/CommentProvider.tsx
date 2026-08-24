@@ -53,6 +53,7 @@ export function CommentProvider({
   onCreate,
   onReply,
   onUpdateStatus,
+  onUpdateRating,
   onDelete,
   onChecklistToggle,
   onMention,
@@ -116,21 +117,18 @@ export function CommentProvider({
     [],
   );
 
-  const getAnchorTop = useCallback(
-    (anchor: CommentAnchor): number | null => {
-      const resolved = resolveAnchorRef.current(
-        anchor,
-        Object.keys(anchorEls.current),
-      );
-      const el = resolved ? anchorEls.current[resolved] : null;
-      const container = contentRef.current;
-      if (!el || !container) return null;
-      return (
-        el.getBoundingClientRect().top - container.getBoundingClientRect().top
-      );
-    },
-    [],
-  );
+  const getAnchorTop = useCallback((anchor: CommentAnchor): number | null => {
+    const resolved = resolveAnchorRef.current(
+      anchor,
+      Object.keys(anchorEls.current),
+    );
+    const el = resolved ? anchorEls.current[resolved] : null;
+    const container = contentRef.current;
+    if (!el || !container) return null;
+    return (
+      el.getBoundingClientRect().top - container.getBoundingClientRect().top
+    );
+  }, []);
 
   const scrollToAnchor = useCallback(
     (anchor: CommentAnchor, options: CommentScrollOptions = {}): boolean => {
@@ -172,11 +170,20 @@ export function CommentProvider({
       ...(onCreate ? { onCreate } : {}),
       ...(onReply ? { onReply } : {}),
       ...(onUpdateStatus ? { onUpdateStatus } : {}),
+      ...(onUpdateRating ? { onUpdateRating } : {}),
       ...(onDelete ? { onDelete } : {}),
       ...(onChecklistToggle ? { onChecklistToggle } : {}),
       ...(onMention ? { onMention } : {}),
     }),
-    [onCreate, onReply, onUpdateStatus, onDelete, onChecklistToggle, onMention],
+    [
+      onCreate,
+      onReply,
+      onUpdateStatus,
+      onUpdateRating,
+      onDelete,
+      onChecklistToggle,
+      onMention,
+    ],
   );
 
   useLayoutEffect(() => {
@@ -230,7 +237,9 @@ export function CommentProvider({
   return (
     <CommentAnchorStoreContext.Provider value={anchorStore}>
       <CommentAnchorActionsContext.Provider value={anchorActions}>
-        <CommentContext.Provider value={value}>{children}</CommentContext.Provider>
+        <CommentContext.Provider value={value}>
+          {children}
+        </CommentContext.Provider>
       </CommentAnchorActionsContext.Provider>
     </CommentAnchorStoreContext.Provider>
   );

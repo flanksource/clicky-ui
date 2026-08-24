@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { fn } from "storybook/test";
 import { CommentCard } from "./CommentCard";
 import { sampleComments, sampleConfig } from "./comment-fixtures";
 
@@ -16,7 +17,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Collapsed: Story = {};
+export const Collapsed: Story = {
+  args: { onUpdateStatus: fn() },
+};
 
 export const Expanded: Story = {
   args: { defaultExpanded: true },

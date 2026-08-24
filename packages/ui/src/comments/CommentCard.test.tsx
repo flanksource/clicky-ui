@@ -18,6 +18,25 @@ const root: Comment = {
 };
 
 describe("CommentCard", () => {
+  it.each([
+    ["positive", "Positive rating"],
+    ["negative", "Negative rating"],
+  ] as const)(
+    "renders a %s rating on a rating-only comment",
+    (rating, label) => {
+      render(
+        <CommentCard
+          comment={{ ...root, body: "", rating }}
+          config={config}
+          defaultExpanded
+        />,
+      );
+
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.queryByTestId("comment-markdown")).not.toBeInTheDocument();
+    },
+  );
+
   it("expands from the collapsed preview on click", () => {
     render(<CommentCard comment={root} config={config} />);
     fireEvent.click(screen.getByTestId("comment-card"));
@@ -38,12 +57,86 @@ describe("CommentCard", () => {
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
   });
 
+  it("resolves an open root from the collapsed check action without expanding", () => {
+    const onUpdateStatus = vi.fn();
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
+        onUpdateStatus={onUpdateStatus}
+        onReply={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+
+    expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
+    expect(
+      screen.queryByRole("button", { name: "Reply" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes an open root when closed is the configured completion status", () => {
+    const onUpdateStatus = vi.fn();
+    render(
+      <CommentCard
+        comment={root}
+        config={{
+          statuses: [
+            { value: "open", label: "Open", unresolved: true },
+            { value: "closed", label: "Closed" },
+          ],
+        }}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close comment" }));
+
+    expect(onUpdateStatus).toHaveBeenCalledWith("closed");
+  });
+
+  it.each(["resolved", "closed"])(
+    "does not offer a resolve action for a %s root",
+    (status) => {
+      render(
+        <CommentCard
+          comment={{ ...root, status }}
+          config={config}
+          onUpdateStatus={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.queryByRole("button", { name: "Resolve comment" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it("shows a status update error when resolving fails", async () => {
     render(
       <CommentCard
         comment={root}
         config={config}
         defaultExpanded
+        onUpdateStatus={vi.fn().mockRejectedValue(new Error("resolve failed"))}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Couldn't update comment: resolve failed",
+      ),
+    );
+  });
+
+  it("shows a status update error when collapsed resolving fails", async () => {
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
         onUpdateStatus={vi.fn().mockRejectedValue(new Error("resolve failed"))}
       />,
     );

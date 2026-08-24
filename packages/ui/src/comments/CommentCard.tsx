@@ -13,18 +13,45 @@ import {
   UiClose,
   UiDotsVertical,
   UiFullscreen,
+  UiThumbsDown,
+  UiThumbsUp,
   UiTrash,
 } from "../icons";
 import { CommentAuthorAvatar } from "./CommentAuthor";
 import { CommentMarkdown } from "./CommentMarkdown";
 import {
   authorDisplayName,
+  isUnresolved,
   resolveFacetOption,
   resolveStatusConfig,
   toneToBadgeTone,
   truncatePlain,
 } from "./comment-utils";
-import type { Comment, CommentConfig } from "./comment-types";
+import type {
+  Comment,
+  CommentConfig,
+  CommentRating,
+  CommentStatusConfig,
+} from "./comment-types";
+
+function completionStatus(config: CommentConfig) {
+  for (const completionName of ["resolved", "closed"]) {
+    const status = config.statuses.find(
+      (candidate) =>
+        candidate.value.toLowerCase() === completionName ||
+        candidate.label.toLowerCase() === completionName,
+    );
+    if (status) return status;
+  }
+  return undefined;
+}
+
+function completionActionLabel(status: CommentStatusConfig) {
+  return status.value.toLowerCase() === "closed" ||
+    status.label.toLowerCase() === "closed"
+    ? "Close comment"
+    : "Resolve comment";
+}
 
 export type CommentCardProps = {
   comment: Comment;
@@ -44,6 +71,21 @@ export type CommentCardProps = {
   /** Advance the checklist item at `index` to its next status. */
   onChecklistToggle?: (index: number) => void;
 };
+
+function RatingChip({ rating }: { rating: CommentRating | undefined }) {
+  if (!rating) return null;
+  const positive = rating === "positive";
+  return (
+    <Badge
+      variant="soft"
+      tone={positive ? "success" : "danger"}
+      size="xs"
+      icon={positive ? UiThumbsUp : UiThumbsDown}
+    >
+      {positive ? "Positive rating" : "Negative rating"}
+    </Badge>
+  );
+}
 
 function StatusChip({
   status,
@@ -161,7 +203,7 @@ function statusMenuItems(
     onDelete?: () => void;
     onCollapse?: () => void;
     onMaximize?: () => void;
-    resolvedStatus?: string;
+    completionStatus?: string;
   },
 ): DropdownMenuItem[] {
   const items: DropdownMenuItem[] = [];
@@ -177,7 +219,7 @@ function statusMenuItems(
   }
   if (!isReply && opts.onUpdateStatus) {
     for (const status of config.statuses) {
-      if (status.value === opts.resolvedStatus) continue;
+      if (status.value === opts.completionStatus) continue;
       const current = status.value === comment.status;
       items.push({
         label: (
@@ -242,16 +284,12 @@ function CommentBody({
   const [statusError, setStatusError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
-  const resolvedStatus = config.statuses.find(
-    (status) =>
-      status.value.toLowerCase() === "resolved" ||
-      status.label.toLowerCase() === "resolved",
-  );
-  const canResolve =
+  const completion = completionStatus(config);
+  const canComplete =
     !isReply &&
     onUpdateStatus != null &&
-    resolvedStatus != null &&
-    comment.status !== resolvedStatus.value;
+    completion != null &&
+    isUnresolved(config, comment.status);
   const updateStatus = async (status: string) => {
     setStatusError("");
     try {
@@ -269,7 +307,7 @@ function CommentBody({
     ...(onDelete ? { onDelete } : {}),
     ...(onCollapse ? { onCollapse } : {}),
     ...(onMaximize ? { onMaximize } : {}),
-    ...(resolvedStatus ? { resolvedStatus: resolvedStatus.value } : {}),
+    ...(completion ? { completionStatus: completion.value } : {}),
   });
 
   return (
@@ -292,16 +330,17 @@ function CommentBody({
           </div>
           {!isReply && (
             <div className="mt-1 flex flex-wrap gap-1">
+              <RatingChip rating={comment.rating} />
               <FacetBadges comment={comment} config={config} />
             </div>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          {canResolve && (
+          {canComplete && (
             <IconAction
               icon={UiCheck}
-              label="Resolve comment"
-              onClick={() => void updateStatus(resolvedStatus.value)}
+              label={completionActionLabel(completion)}
+              onClick={() => void updateStatus(completion.value)}
               className="hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-500/20 dark:hover:text-green-300"
             />
           )}
@@ -324,13 +363,15 @@ function CommentBody({
           )}
         </div>
       </div>
-      <div className="text-[13px] leading-5 text-foreground">
-        {renderBody ? (
-          renderBody(comment.body)
-        ) : (
-          <CommentMarkdown text={comment.body} />
-        )}
-      </div>
+      {comment.body.trim() && (
+        <div className="text-[13px] leading-5 text-foreground">
+          {renderBody ? (
+            renderBody(comment.body)
+          ) : (
+            <CommentMarkdown text={comment.body} />
+          )}
+        </div>
+      )}
       {statusError && (
         <div
           role="alert"
@@ -368,7 +409,25 @@ export function CommentCard(props: CommentCardProps) {
   const { comment, config, compact, defaultExpanded } = props;
   const [expanded, setExpanded] = useState(defaultExpanded ?? false);
   const [maximized, setMaximized] = useState(false);
+  const [collapsedStatusError, setCollapsedStatusError] = useState("");
   const isReply = Boolean(comment.parentId);
+  const completion = completionStatus(config);
+  const canComplete =
+    !isReply &&
+    props.onUpdateStatus != null &&
+    completion != null &&
+    isUnresolved(config, comment.status);
+  const completeCollapsed = async () => {
+    if (!completion) return;
+    setCollapsedStatusError("");
+    try {
+      await props.onUpdateStatus?.(completion.value);
+    } catch (error) {
+      setCollapsedStatusError(
+        error instanceof Error ? error.message : "Unexpected error",
+      );
+    }
+  };
 
   const body = (
     <CommentBody
@@ -416,11 +475,34 @@ export function CommentCard(props: CommentCardProps) {
             {authorDisplayName(comment.author)}
           </span>
           {!isReply && (
-            <FacetBadges comment={comment} config={config} compact />
+            <>
+              <RatingChip rating={comment.rating} />
+              <FacetBadges comment={comment} config={config} compact />
+            </>
           )}
           <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/80">
-            {truncatePlain(comment.body)}
+            {comment.body.trim()
+              ? truncatePlain(comment.body)
+              : comment.rating === "positive"
+                ? "Positive rating"
+                : comment.rating === "negative"
+                  ? "Negative rating"
+                  : "Empty comment"}
           </span>
+          {canComplete && (
+            <span
+              role="presentation"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <IconAction
+                icon={UiCheck}
+                label={completionActionLabel(completion)}
+                onClick={() => void completeCollapsed()}
+                className="hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-500/20 dark:hover:text-green-300"
+              />
+            </span>
+          )}
           <span
             role="presentation"
             onClick={(e) => e.stopPropagation()}
@@ -449,6 +531,14 @@ export function CommentCard(props: CommentCardProps) {
             />
           </span>
         </div>
+        {collapsedStatusError && (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+          >
+            Couldn't update comment: {collapsedStatusError}
+          </div>
+        )}
         {modal}
       </>
     );
