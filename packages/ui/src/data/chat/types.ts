@@ -242,7 +242,38 @@ export const CLAUDE_PERMISSION_MODE_OPTIONS: ClaudePermissionModeOption[] = [
  *  derived from a clicky RPC operation (`description`/`inputSchema`). The Go
  *  backend owns execution; the client uses this only for display and to scope
  *  which tools a request may call (passed in the transport `body`). */
-export type ToolMode = "on" | "ask" | "off" | "auto";
+/** Authority for one tool, in Captain's tool vocabulary. The legacy `on`/`off`
+ *  spellings are still accepted on the way in (see `normalizeToolPolicyValue`)
+ *  and mean `allow`/`deny`; they are never produced here. The UI still *labels*
+ *  these On and Off — see `POLICY_LABEL`. */
+export type ToolPolicy = "allow" | "ask" | "deny" | "auto";
+
+/** Canonicalizes a tool policy from the wire, accepting the legacy `on`/`off`
+ *  spellings the backend still emits from older catalogs and MCP `_meta`.
+ *
+ *  `on` means allow rather than auto: the catalog encoding has no separate allow
+ *  list, so `on` was always its way of saying auto-run. Keeping private copies of
+ *  this rule per call site is how the UI and the server drifted apart, so this is
+ *  the only one. */
+export function normalizeToolPolicy(value: unknown): ToolPolicy | undefined {
+  if (typeof value !== "string") return undefined;
+  switch (value.trim().toLowerCase()) {
+    case "allow":
+    case "on":
+    case "enabled":
+      return "allow";
+    case "ask":
+      return "ask";
+    case "deny":
+    case "off":
+    case "disabled":
+      return "deny";
+    case "auto":
+      return "auto";
+    default:
+      return undefined;
+  }
+}
 
 export interface ToolAnnotations {
   title?: string;
@@ -271,7 +302,7 @@ export interface ToolMeta {
    *  clicky tools set this to the backend tool group. */
   preferenceKey?: string;
   /** Initial backend-owned permission when the chat window first sees this tool. */
-  defaultPermission?: ToolMode;
+  defaultPermission?: ToolPolicy;
   /** Opaque icon name emitted by the backend, resolved by the host UI. */
   icon?: string;
   /** Description shown in tool pickers / tool-call headers. */
@@ -283,6 +314,14 @@ export interface ToolMeta {
   method?: string;
   path?: string;
   operationName?: string;
+  /** The entity verb (list/get/create/update/delete, or a custom action), the
+   *  custom action's name, and whether the operation addresses a collection or a
+   *  single entity. Carried so a permission rule resolves the same way here as
+   *  it does on the server; empty for a tool that projects no clicky operation.
+   *  @see resolveToolPolicy */
+  verb?: string;
+  action?: string;
+  scope?: string;
   title?: string;
   /** Whether the runtime should treat the tool input schema as strict/closed. */
   strict?: boolean;
