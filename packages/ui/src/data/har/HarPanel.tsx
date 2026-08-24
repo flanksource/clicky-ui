@@ -76,7 +76,11 @@ export function HarPanel({
   }
 
   return (
-    <div className={`h-full ${className ?? ""}`}>
+    // A flex column, not a plain block: DataTable sizes itself as `flex-1
+    // min-h-0` so its own scroll region can be bounded, and in a block parent
+    // that resolves to content height — the table grows past the panel and
+    // nothing scrolls.
+    <div className={`flex h-full min-h-0 flex-col ${className ?? ""}`}>
       <DataTable
         data={filteredEntries}
         columns={COLS}

@@ -45,3 +45,24 @@ export interface HAREntry extends Record<string, unknown> {
   cache?: unknown;
   timings?: { send?: number; wait?: number; receive?: number };
 }
+
+export interface HARCreator {
+  name: string;
+  version: string;
+}
+
+export interface HARLog {
+  version: string;
+  creator: HARCreator;
+  pages?: unknown[];
+  entries: HAREntry[];
+}
+
+/**
+ * A whole HAR 1.2 document — the envelope `HAREntry[]` arrives in, and the shape
+ * a file has to be in for Chrome devtools to import it. Panels take entries;
+ * anything that saves or loads a capture takes this.
+ */
+export interface HARFile {
+  log: HARLog;
+}
