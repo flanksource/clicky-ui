@@ -2061,6 +2061,14 @@
       "note": ""
     },
     {
+      "consumerName": "open-scad",
+      "group": "files-code",
+      "status": "NEW",
+      "outline": "file-icons:openscad",
+      "filled": "skip",
+      "note": "OpenSCAD source files"
+    },
+    {
       "consumerName": "folder",
       "group": "files-code",
       "status": "EXISTS",

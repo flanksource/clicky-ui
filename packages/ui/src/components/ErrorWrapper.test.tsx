@@ -46,12 +46,14 @@ describe("ErrorWrapper", () => {
     );
     expect(report).toEqual(expect.stringContaining("Page: http://localhost"));
     expect(report).toEqual(expect.stringContaining("React component stack:"));
-    expect(
-      screen.getByRole("button", { name: "Copied" }),
-    ).toBeInTheDocument();
-    expect(liveRegion(fallback)).toHaveTextContent(
-      "Error details copied to clipboard.",
-    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Copied" }),
+      ).toBeInTheDocument();
+      expect(liveRegion(fallback)).toHaveTextContent(
+        "Error details copied to clipboard.",
+      );
+    });
   });
 
   it("announces a clipboard failure in the live region", async () => {
