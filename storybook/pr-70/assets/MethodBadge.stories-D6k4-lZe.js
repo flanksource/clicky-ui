@@ -1,0 +1,5 @@
+import{j as r}from"./iframe-BOpLb2SL.js";import{M as d}from"./MethodBadge-DHjwxVfb.js";import"./preload-helper-C9Uksf5K.js";import"./Badge-DNZTdoDu.js";import"./utils-DW-IJACk.js";import"./index-CPURVhFy.js";import"./Icon-JZhp7A68.js";const T={title:"Data/MethodBadge",component:d,args:{method:"GET"},parameters:{docs:{description:{component:"HTTP method badge with method-specific tones. It normalizes method casing and renders through the shared Badge primitive."}}}},e={render:()=>r.jsx("div",{className:"flex flex-wrap items-center gap-2",children:["GET","POST","PUT","PATCH","DELETE","OPTIONS"].map(t=>r.jsx(d,{method:t},t))})};var o,a,s;e.parameters={...e.parameters,docs:{...(o=e.parameters)==null?void 0:o.docs,source:{originalSource:`{
+  render: () => <div className="flex flex-wrap items-center gap-2">
+      {["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].map(method => <MethodBadge key={method} method={method} />)}
+    </div>
+}`,...(s=(a=e.parameters)==null?void 0:a.docs)==null?void 0:s.source}}};const g=["AllMethods"];export{e as AllMethods,g as __namedExportsOrder,T as default};
