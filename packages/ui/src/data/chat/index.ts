@@ -134,7 +134,11 @@ export {
   type ToolResultRenderer,
   type ToolAnnotations,
   type ToolMeta,
-  type ToolMode,
+  type ToolPolicy,
+  // The single tool-policy normalizer. Exported so consumers translate the
+  // legacy on/off spellings through this rather than growing another copy —
+  // private copies of this rule are how the UI and the server drifted apart.
+  normalizeToolPolicy,
   type DynamicToolUIPart,
   type FileUIPart,
   type JSONSchemaProperty,
@@ -143,3 +147,19 @@ export {
   type ToolUIPart,
   type UIMessage,
 } from "./types";
+
+// The ordered tool-permission policy. Exported because a host app builds the
+// surface half of the rule list — the page's own narrowing — and needs the same
+// matcher the chat window and the server resolve with.
+export {
+  appendToolPolicy,
+  matchItems,
+  matchesTool,
+  normalizeToolPolicyRules,
+  resolveToolPolicy,
+  toolPolicyFromPreferences,
+  type MatchPatterns,
+  type PermissionPolicy,
+  type PermissionRule,
+  type ToolMatch,
+} from "./tool-policy";

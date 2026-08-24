@@ -11,6 +11,7 @@ import type {
   ToolAnnotations,
   ToolMeta,
 } from "./types";
+import { normalizeToolPolicy } from "./types";
 
 /** Converts a clicky RPC operation catalog into AI-tool metadata for display
  *  and request scoping. Execution stays in the Go backend; this maps an
@@ -53,7 +54,9 @@ export function operationToTool(
   const surface = meta?.surface ? surfacesByKey?.get(meta.surface) : undefined;
   const parent = surface?.title || hints?.parent || surface?.entity;
   const icon = hints?.icon || surface?.icon;
-  const defaultPermission = hints?.defaultPermission;
+  // Operation hints still carry the legacy on/off spellings, so this is a real
+  // translation, not a pass-through.
+  const defaultPermission = normalizeToolPolicy(hints?.defaultPermission);
   const description = operation.description ?? operation.summary;
   return {
     name: operation.operationId,
