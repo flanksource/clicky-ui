@@ -38,12 +38,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - run: corepack enable
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
-      - run: vp install
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Check the vendored tree is generated, not hand-edited
         working-directory: packages/expressions
         run: pnpm vendor:check
@@ -71,12 +74,15 @@ jobs:
         with:
           go-version: stable
 
-      - run: corepack enable
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
-      - run: vp install
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Vendor
         working-directory: packages/expressions

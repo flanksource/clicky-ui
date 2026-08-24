@@ -20,14 +20,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - run: corepack enable
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - run: vp install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       # Library build + Playwright browser install run as `pre:` hooks in
       # .gavel.yaml so they're visible in gavel's report and stay colocated
       # with the gavel invocation rather than duplicated across CI jobs.
@@ -44,14 +47,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: corepack enable
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - run: vp install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
       - name: Build expressions
@@ -77,14 +83,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: corepack enable
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - run: vp install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
       - name: Run Playwright tests

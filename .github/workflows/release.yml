@@ -42,17 +42,18 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: actions/setup-node@v4
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
+          node-version: 22
+          cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: corepack enable
 
-      - name: Install Vite+
-        run: curl -fsSL https://vite.plus | bash
-      - name: Add Vite+ to PATH
-        run: echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
-
-      - run: vp install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Configure git
         env:
