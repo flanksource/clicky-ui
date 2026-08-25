@@ -1,4 +1,8 @@
 import type { ChatBudgetConfig } from "../chat/types";
+import {
+  normalizeToolPolicyRules,
+  type PermissionPolicy,
+} from "../chat/tool-policy";
 
 export const SPEC_PERMISSION_MODES = [
   "default",
@@ -36,6 +40,9 @@ export type SpecSandboxCapability = (typeof SPEC_SANDBOX_CAPABILITIES)[number];
 
 export const SPEC_WORKTREE_MODES = ["none", "new", "existing"] as const;
 export type SpecWorktreeMode = (typeof SPEC_WORKTREE_MODES)[number];
+
+export const SPEC_CLONE_MODES = ["clone", "skip"] as const;
+export type SpecCloneMode = (typeof SPEC_CLONE_MODES)[number];
 
 export const SPEC_STASH_MODES = [
   "none",
@@ -204,6 +211,8 @@ export type AISpecRuntimeSpec = {
   budget?: AISpecRuntimeBudget;
   memory?: AISpecRuntimeMemory;
   permissions?: AISpecRuntimePermissions;
+  /** Ordered, last-match-wins Captain tool authority rules. */
+  toolPolicy?: PermissionPolicy;
   setup?: AISpecRuntimeSetup;
   workflow?: AISpecRuntimeWorkflow;
   sessionId?: string;
@@ -216,6 +225,7 @@ export type AISpecRuntimeEnvVarSource = {
   configMapKeyRef?: { name?: string; key?: string };
   serviceAccount?: string;
   helmRef?: { name?: string; key?: string };
+  onePassword?: string;
 };
 
 export type AISpecRuntimeEnvVar = {
@@ -224,11 +234,48 @@ export type AISpecRuntimeEnvVar = {
   valueFrom?: string | AISpecRuntimeEnvVarSource;
 };
 
+export type AISpecRuntimeConnections = {
+  fromConfigItem?: string;
+  eksPodIdentity?: boolean;
+  serviceAccount?: boolean;
+  aws?: {
+    connection?: string;
+    accessKey?: AISpecRuntimeEnvVar;
+    secretKey?: AISpecRuntimeEnvVar;
+    sessionToken?: AISpecRuntimeEnvVar;
+    assumeRole?: string;
+    region?: string;
+    endpoint?: string;
+    skipTLSVerify?: boolean;
+  };
+  gcp?: {
+    connection?: string;
+    credentials?: AISpecRuntimeEnvVar;
+    endpoint?: string;
+    project?: string;
+    skipTLSVerify?: boolean;
+  };
+  azure?: {
+    connection?: string;
+    clientID?: AISpecRuntimeEnvVar;
+    clientSecret?: AISpecRuntimeEnvVar;
+    tenantID?: string;
+  };
+  kubernetes?: {
+    connection?: string;
+    kubeconfig?: AISpecRuntimeEnvVar;
+    eks?: Record<string, unknown>;
+    gke?: Record<string, unknown>;
+    cnrm?: Record<string, unknown>;
+  };
+};
+
 export type AISpecRuntimeSetup = {
   cwd?: string;
   baseDir?: string;
   dotenv?: string[];
   envVars?: AISpecRuntimeEnvVar[];
+  connections?: AISpecRuntimeConnections;
   checkout?: {
     mode?: SpecCheckoutMode | "";
     url?: string;
@@ -236,12 +283,15 @@ export type AISpecRuntimeSetup = {
     connection?: string;
     ref?: string;
     depth?: number;
+    since?: string;
     worktree?: {
       mode?: SpecWorktreeMode | "";
       prefix?: string;
       base?: string;
       path?: string;
       keep?: boolean;
+      uncommitted?: SpecCloneMode | "";
+      ignored?: SpecCloneMode | "";
     };
     dirty?: {
       stash?: SpecStashMode | "";
@@ -328,6 +378,8 @@ export function compactAISpecRuntime(
     value.memory?.skills,
   );
   if (permissions) spec.permissions = permissions;
+  const toolPolicy = normalizeToolPolicyRules(value.toolPolicy);
+  if (toolPolicy.length > 0) spec.toolPolicy = toolPolicy;
   const setup = compactSetup(value.setup);
   if (setup) spec.setup = setup;
   const workflow = compactWorkflow(value.workflow);
@@ -609,6 +661,9 @@ function compactSetup(
   if (dotenv) setup.dotenv = dotenv;
   const envVars = compactEnvVars(value.envVars);
   if (envVars) setup.envVars = envVars;
+  if (value.connections && hasKeys(value.connections)) {
+    setup.connections = structuredClone(value.connections);
+  }
   const checkout = compactSetupCheckout(value.checkout);
   if (checkout) setup.checkout = checkout;
   return hasKeys(setup) ? setup : undefined;
@@ -645,6 +700,7 @@ function compactEnvVarSource(
   if (kind === "configmap" && key) return { configMapKeyRef: { name, key } };
   if (kind === "serviceaccount") return { serviceAccount: name };
   if (kind === "helm" && key) return { helmRef: { name, key } };
+  if (kind === "op" && rest) return { onePassword: source };
   return undefined;
 }
 
@@ -667,6 +723,8 @@ function compactStructuredEnvVarSource(
   const helmName = cleanString(value.helmRef?.name);
   const helmKey = cleanString(value.helmRef?.key);
   if (helmName && helmKey) source.helmRef = { name: helmName, key: helmKey };
+  const onePassword = cleanString(value.onePassword);
+  if (onePassword) source.onePassword = onePassword;
   return hasKeys(source) ? source : undefined;
 }
 
@@ -688,6 +746,8 @@ function compactSetupCheckout(
   if (value.depth != null && Number.isFinite(value.depth) && value.depth > 0) {
     checkout.depth = Math.trunc(value.depth);
   }
+  const since = cleanString(value.since);
+  if (since) checkout.since = since;
 
   const worktree: NonNullable<
     NonNullable<AISpecRuntimeSetup["checkout"]>["worktree"]
@@ -703,6 +763,18 @@ function compactSetupCheckout(
   const worktreePath = cleanString(value.worktree?.path);
   if (worktreePath) worktree.path = worktreePath;
   if (worktree.mode === "new" && value.worktree?.keep) worktree.keep = true;
+  if (
+    value.worktree?.uncommitted === "clone" ||
+    value.worktree?.uncommitted === "skip"
+  ) {
+    worktree.uncommitted = value.worktree.uncommitted;
+  }
+  if (
+    value.worktree?.ignored === "clone" ||
+    value.worktree?.ignored === "skip"
+  ) {
+    worktree.ignored = value.worktree.ignored;
+  }
   if (hasKeys(worktree)) checkout.worktree = worktree;
 
   const dirty: NonNullable<
@@ -717,8 +789,8 @@ function compactSetupCheckout(
   ) {
     dirty.stash = stash;
   }
-  const since = cleanString(value.dirty?.since);
-  if (since) dirty.since = since;
+  const dirtySince = cleanString(value.dirty?.since);
+  if (dirtySince) dirty.since = dirtySince;
   if (hasKeys(dirty)) checkout.dirty = dirty;
 
   return hasKeys(checkout) ? checkout : undefined;

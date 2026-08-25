@@ -269,4 +269,21 @@ describe("AccordionList", () => {
     expect(screen.getByRole("button", { name: "Test /users" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove /users" })).toBeInTheDocument();
   });
+
+  it("renders persistent metadata outside the disclosure and action cluster", () => {
+    render(
+      <Harness
+        allowRemove
+        renderMeta={({ item }) => (
+          <button type="button" aria-label={`Count for ${item.path}`}>
+            3
+          </button>
+        )}
+      />,
+    );
+
+    const meta = screen.getByRole("button", { name: "Count for /users" });
+    expect(meta.closest("[data-accordion-row]")).not.toBeNull();
+    expect(within(headerFor("/users")).queryByRole("button")).toBeNull();
+  });
 });

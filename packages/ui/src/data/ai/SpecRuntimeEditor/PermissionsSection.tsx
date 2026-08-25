@@ -19,18 +19,13 @@ import {
   UiShield,
   UiTerminal,
 } from "../../../icons";
-import {
-  SPEC_PERMISSION_MODES,
-  type AISpecRuntimeValue,
-  type SpecPermissionMode,
-} from "../SpecRuntimeEditor.model";
-import { PERMISSION_MODE_ICONS } from "../agent-action-icons";
+import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
 import {
   PolicyTree,
   type PolicyOption,
   type PolicyTreeEntry,
 } from "../PolicyTree";
-import { CheckboxField, SpecField, SpecInput, SpecSelect } from "./fields";
+import { CheckboxField, SpecInput, SpecSelect } from "./fields";
 import {
   entryModeOptions,
   permissionAddPlaceholder,
@@ -49,7 +44,11 @@ import {
   type SavedPermissionPreset,
   type SpecRuntimePresetId,
 } from "./presets";
-import { withMemory, withPermissions } from "./update";
+import { withMemory } from "./update";
+import {
+  SUPPORT_ALL_RUNTIME_FIELDS,
+  type RuntimeFieldSupport,
+} from "../../runtime/runtime-field-support";
 
 const CUSTOM_PRESET_ID = "__custom";
 
@@ -100,6 +99,7 @@ export function PermissionsAdvanced({
   entries,
   onApplyEntries,
   onAddEntry,
+  supports = SUPPORT_ALL_RUNTIME_FIELDS,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
@@ -109,56 +109,64 @@ export function PermissionsAdvanced({
     mode: PermissionListMode,
   ) => void;
   onAddEntry: (domain: PermissionDomain, id: string) => void;
+  supports?: RuntimeFieldSupport | undefined;
 }) {
+  const memorySupport = {
+    skipProject: supports("memory.skipProject"),
+    skipUser: supports("memory.skipUser"),
+    skipHooks: supports("memory.skipHooks"),
+    skipMemory: supports("memory.skipMemory"),
+    bare: supports("memory.bare"),
+  };
   return (
     <div className="grid gap-density-3">
-      <SpecField label="Mode" composite>
-        <SpecSelect
-          ariaLabel="Permission mode"
-          icon={
-            PERMISSION_MODE_ICONS[value.permissions?.mode || "default"].icon
-          }
-          value={value.permissions?.mode || "default"}
-          onChange={(mode) =>
-            onChange(
-              withPermissions(value, { mode: mode as SpecPermissionMode }),
-            )
-          }
-          options={SPEC_PERMISSION_MODES.map((mode) => ({
-            value: mode,
-            label: mode,
-          }))}
-        />
-      </SpecField>
-      <div className="grid gap-density-2 sm:grid-cols-2 md:grid-cols-3">
-        <CheckboxField
-          label="Skip project"
-          checked={value.memory?.skipProject}
-          onChange={(skipProject) =>
-            onChange(withMemory(value, { skipProject }))
-          }
-        />
-        <CheckboxField
-          label="Skip user"
-          checked={value.memory?.skipUser}
-          onChange={(skipUser) => onChange(withMemory(value, { skipUser }))}
-        />
-        <CheckboxField
-          label="Skip hooks"
-          checked={value.memory?.skipHooks}
-          onChange={(skipHooks) => onChange(withMemory(value, { skipHooks }))}
-        />
-        <CheckboxField
-          label="Skip memory"
-          checked={value.memory?.skipMemory}
-          onChange={(skipMemory) => onChange(withMemory(value, { skipMemory }))}
-        />
-        <CheckboxField
-          label="Bare"
-          checked={value.memory?.bare}
-          onChange={(bare) => onChange(withMemory(value, { bare }))}
-        />
-      </div>
+      {Object.values(memorySupport).some(Boolean) && (
+        <div className="grid gap-density-2 sm:grid-cols-2 md:grid-cols-3">
+          {memorySupport.skipProject && (
+            <CheckboxField
+              label="Skip project"
+              checked={value.memory?.skipProject}
+              onChange={(skipProject) =>
+                onChange(withMemory(value, { skipProject }))
+              }
+            />
+          )}
+          {memorySupport.skipUser && (
+            <CheckboxField
+              label="Skip user"
+              checked={value.memory?.skipUser}
+              onChange={(skipUser) =>
+                onChange(withMemory(value, { skipUser }))
+              }
+            />
+          )}
+          {memorySupport.skipHooks && (
+            <CheckboxField
+              label="Skip hooks"
+              checked={value.memory?.skipHooks}
+              onChange={(skipHooks) =>
+                onChange(withMemory(value, { skipHooks }))
+              }
+            />
+          )}
+          {memorySupport.skipMemory && (
+            <CheckboxField
+              label="Skip memory"
+              checked={value.memory?.skipMemory}
+              onChange={(skipMemory) =>
+                onChange(withMemory(value, { skipMemory }))
+              }
+            />
+          )}
+          {memorySupport.bare && (
+            <CheckboxField
+              label="Bare"
+              checked={value.memory?.bare}
+              onChange={(bare) => onChange(withMemory(value, { bare }))}
+            />
+          )}
+        </div>
+      )}
       <PermissionPolicyList
         entries={entries}
         emptyLabel="No tools, MCP servers, plugins, or skills configured"

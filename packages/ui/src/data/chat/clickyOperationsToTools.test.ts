@@ -108,6 +108,34 @@ describe("clickyOperationsToTools", () => {
     const tool = operationToTool(listOrders);
     expect(tool?.label).toBe("List");
     expect(tool?.group).toBe("orders");
+    expect(tool).toMatchObject({
+      operationName: "orders_list",
+      source: "clicky",
+      verb: "list",
+      scope: "collection",
+    });
+  });
+
+  it("preserves custom action metadata for permission matching", () => {
+    const tool = operationToTool({
+      ...listOrders,
+      operationId: "projects_action",
+      "x-clicky": {
+        surface: "projects",
+        verb: "action",
+        actionName: "archive",
+        scope: "entity",
+      },
+    });
+
+    expect(tool).toMatchObject({
+      name: "projects_action",
+      operationName: "projects_action",
+      verb: "action",
+      action: "archive",
+      scope: "entity",
+    });
+    expect(tool?.entity).toBeUndefined();
   });
 
   it("uses an explicit x-clicky group as the preference key without host defaults", () => {
@@ -167,10 +195,7 @@ describe("clickyOperationsToTools", () => {
         toolHints: { parent: "xero" },
       },
     };
-    const [tool] = clickyOperationsToTools(
-      [resolve(operation)],
-      surfaces,
-    );
+    const [tool] = clickyOperationsToTools([resolve(operation)], surfaces);
     expect(tool.parent).toBe("Xero Accounts");
     expect(tool.entity).toBe("accounts");
     // The verb stays the leaf label; the parent disambiguates sibling verbs.

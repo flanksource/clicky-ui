@@ -21,6 +21,7 @@ import { SandboxCreateWizard } from "../SandboxCreateWizard";
 import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import { sandboxKindMeta } from "../sandbox-kind-meta";
 import {
+  CheckboxField,
   Disclosure,
   ListField,
   NumberField,
@@ -34,6 +35,7 @@ import type {
 } from "./types";
 import {
   sandboxRef,
+  withConnections,
   withSandbox,
   withSandboxBackend,
   withSandboxPolicy,
@@ -287,6 +289,25 @@ export function SandboxSection({
           Register exactly one isolator.
         </SandboxWarning>
       )}
+
+      <Disclosure label="Execution identity" hint="service accounts">
+        <div className="grid gap-density-2 sm:grid-cols-2">
+          <CheckboxField
+            label="Kubernetes service account"
+            checked={value.setup?.connections?.serviceAccount}
+            onChange={(serviceAccount) =>
+              onChange(withConnections(value, { serviceAccount }))
+            }
+          />
+          <CheckboxField
+            label="EKS pod identity"
+            checked={value.setup?.connections?.eksPodIdentity}
+            onChange={(eksPodIdentity) =>
+              onChange(withConnections(value, { eksPodIdentity }))
+            }
+          />
+        </div>
+      </Disclosure>
 
       {selected && (
         <Disclosure label="Policy" hint="paths, attempts">

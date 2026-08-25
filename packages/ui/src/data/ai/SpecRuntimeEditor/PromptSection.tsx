@@ -7,6 +7,10 @@ import {
 } from "../SpecRuntimeEditor.model";
 import { ExpandField, SpecField, TextareaField } from "./fields";
 import { withPrompt } from "./update";
+import {
+  SUPPORT_ALL_RUNTIME_FIELDS,
+  type RuntimeFieldSupport,
+} from "../../runtime/runtime-field-support";
 
 const SCHEMA_STRICTNESS_OPTIONS: Array<{
   id: SpecSchemaStrictness | "";
@@ -22,9 +26,11 @@ const SCHEMA_STRICTNESS_OPTIONS: Array<{
 export function PromptSection({
   value,
   onChange,
+  supports = SUPPORT_ALL_RUNTIME_FIELDS,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
+  supports?: RuntimeFieldSupport | undefined;
 }) {
   return (
     <div className="grid gap-density-2">
@@ -35,22 +41,26 @@ export function PromptSection({
         placeholder="Override the rendered user prompt"
         icon={UiUser}
       />
-      <ExpandField
-        label="System"
-        value={value.prompt?.system}
-        onChange={(system) => onChange(withPrompt(value, { system }))}
-        placeholder="Replace the system prompt"
-        icon={UiGearSix}
-      />
-      <ExpandField
-        label="Append system"
-        value={value.prompt?.appendSystem}
-        onChange={(appendSystem) =>
-          onChange(withPrompt(value, { appendSystem }))
-        }
-        placeholder="Appended to the default system prompt"
-        icon={UiAdd}
-      />
+      {supports("prompt.system") && (
+        <ExpandField
+          label="System"
+          value={value.prompt?.system}
+          onChange={(system) => onChange(withPrompt(value, { system }))}
+          placeholder="Replace the system prompt"
+          icon={UiGearSix}
+        />
+      )}
+      {supports("prompt.appendSystem") && (
+        <ExpandField
+          label="Append system"
+          value={value.prompt?.appendSystem}
+          onChange={(appendSystem) =>
+            onChange(withPrompt(value, { appendSystem }))
+          }
+          placeholder="Appended to the default system prompt"
+          icon={UiAdd}
+        />
+      )}
     </div>
   );
 }

@@ -237,7 +237,12 @@ export function ToolPreferences({
               onRule={onRule}
             />
           ) : (
-            <ToolSchemaBrowser tools={tools} className="min-h-0 flex-1" />
+            <ToolSchemaBrowser
+              tools={tools}
+              value={value}
+              onRule={onRule}
+              className="min-h-0 flex-1"
+            />
           )}
         </div>
       </Modal>

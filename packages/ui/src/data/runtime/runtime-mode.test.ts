@@ -110,7 +110,26 @@ const servedCatalog: RuntimeCatalogFamily[] = [
     catalogPrefix: "anthropic",
     modes: [
       { mode: "api", backend: "anthropic", kind: "api" },
-      { mode: "agent", backend: "claude-agent", kind: "cli" },
+      {
+        mode: "agent",
+        backend: "claude-agent",
+        kind: "cli",
+        permissions: {
+          modes: {
+            default: { kind: "native", effects: {} },
+            plan: {
+              kind: "approximated",
+              effects: { note: "Maps to read-only planning." },
+            },
+            bypassPermissions: {
+              kind: "unsupported",
+              effects: { note: "The backend cannot bypass approvals." },
+            },
+          },
+          toolPolicies: {},
+          resources: {},
+        },
+      },
       { mode: "cli", backend: "claude-cli", kind: "cli" },
       {
         mode: "cmux",
@@ -220,5 +239,17 @@ describe("familiesFromRuntimeCatalog", () => {
       family: "claude",
       mode: "cli",
     });
+  });
+
+  it("preserves Captain permission capabilities on each runtime mode", () => {
+    const agent = familiesFromRuntimeCatalog(servedCatalog)[0]!.modes[1]!;
+
+    expect(agent.permissions?.modes.plan).toEqual({
+      kind: "approximated",
+      effects: { note: "Maps to read-only planning." },
+    });
+    expect(agent.permissions?.modes.bypassPermissions?.kind).toBe(
+      "unsupported",
+    );
   });
 });

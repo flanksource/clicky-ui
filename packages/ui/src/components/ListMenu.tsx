@@ -70,6 +70,8 @@ export type ListMenuItemProps = HTMLAttributes<HTMLDivElement> & {
   itemKey?: string;
   /** Hide the leading checkbox for this row even when selection is enabled. */
   hideCheckbox?: boolean;
+  /** Accessible name for the leading checkbox. Defaults to "Select item". */
+  checkboxLabel?: string;
 };
 
 export function ListMenuItem({
@@ -79,6 +81,7 @@ export function ListMenuItem({
   interactive = true,
   itemKey,
   hideCheckbox = false,
+  checkboxLabel = "Select item",
   className,
   onClick,
   children,
@@ -105,7 +108,7 @@ export function ListMenuItem({
           type="checkbox"
           className="mt-0.5 size-4 shrink-0 rounded border-input"
           checked={rowSelected}
-          aria-label="Select item"
+          aria-label={checkboxLabel}
           onClick={(event) => {
             event.stopPropagation();
             if (event.shiftKey) {

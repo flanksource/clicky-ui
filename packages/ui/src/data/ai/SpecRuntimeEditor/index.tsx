@@ -32,7 +32,12 @@ import {
   type SpecRuntimeSecretSelectorConfig,
   type SpecSectionId,
 } from "./types";
-import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
+import {
+  SPEC_RUNTIME_FAMILIES,
+  firstMode,
+  type SpecRuntimeFamily,
+} from "../../runtime/runtime-mode";
+import { runtimeFieldSupport } from "../../runtime/runtime-field-support";
 import { useScrollSpy } from "./use-scrollspy";
 
 export type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
@@ -56,6 +61,8 @@ export type SpecRuntimeEditorProps = {
   models?: ChatModel[] | undefined;
   /** Provider families for the two-axis Family → Mode picker in the model section. */
   families?: SpecRuntimeFamily[] | undefined;
+  /** Resolved backend used to validate posture when this editable layer inherits backend. */
+  effectiveBackend?: string | undefined;
   tools?: ToolMeta[] | undefined;
   permissionCatalog?: AISpecRuntimePermissionCatalog | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
@@ -76,6 +83,8 @@ export type SpecRuntimeEditorProps = {
   beforeSections?: ReactNode | undefined;
   /** Sections that should start collapsed in embedded contexts. */
   defaultCollapsedSections?: readonly SpecSectionId[] | undefined;
+  /** Restrict task-owned fields when editing a reusable preset fragment. */
+  variant?: "run" | "preset" | undefined;
   /** Renders the sticky footer's save action when set. */
   onSave?: (() => void) | undefined;
   /** Renders the sticky footer's cancel action when set. */
@@ -99,6 +108,7 @@ export function SpecRuntimeEditor({
   onChange,
   models = [],
   families,
+  effectiveBackend,
   tools = [],
   permissionCatalog,
   secretSelector,
@@ -112,6 +122,7 @@ export function SpecRuntimeEditor({
   showHeader = true,
   beforeSections,
   defaultCollapsedSections,
+  variant = "run",
   onSave,
   onCancel,
   saveLabel = "Save & run",
@@ -122,6 +133,12 @@ export function SpecRuntimeEditor({
     () => buildPermissionCatalog(permissionCatalog, tools),
     [permissionCatalog, tools],
   );
+  const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
+  const backend =
+    value.backend?.trim() ||
+    effectiveBackend?.trim() ||
+    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
+  const supports = runtimeFieldSupport(runtimeFamilies, backend);
   const entries = useMemo(
     () => specPermissionEntries(value, catalog),
     [value, catalog],
@@ -135,7 +152,7 @@ export function SpecRuntimeEditor({
   // nothing to choose from, so the section is omitted rather than rendered empty.
   const sections = SPEC_RUNTIME_SECTIONS.filter(
     (section) =>
-      (section.id !== "cli" || cliOptions) &&
+      (section.id !== "cli" || (cliOptions && supports("cliArgs"))) &&
       (section.id !== "sandbox" || sandboxCatalog) &&
       (allowedSections == null || allowedSections.has(section.id)),
   );
@@ -168,17 +185,26 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={onChange}
             models={models}
-            {...(families ? { families } : {})}
+            effectiveBackend={effectiveBackend}
+            families={runtimeFamilies}
           />
         );
       case "prompt":
-        return <PromptSection value={value} onChange={onChange} />;
+        return (
+          <PromptSection
+            value={value}
+            onChange={onChange}
+            supports={supports}
+          />
+        );
       case "workspace":
         return (
           <WorkspaceSection
             value={value}
             onChange={onChange}
             secretSelector={secretSelector}
+            variant={variant}
+            supports={supports}
           />
         );
       case "sandbox":
@@ -187,7 +213,7 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={onChange}
             catalog={sandboxCatalog}
-            {...(families ? { families } : {})}
+            families={runtimeFamilies}
             {...(sandboxCreate ? { createConfig: sandboxCreate } : {})}
           />
         ) : null;
@@ -215,7 +241,7 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={onChange}
             models={models}
-            {...(families ? { families } : {})}
+            families={runtimeFamilies}
             {...(secretSelector ? { secretSelector } : {})}
           />
         );
@@ -240,11 +266,14 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={onChange}
             models={models}
-            {...(families ? { families } : {})}
+            supports={supports}
+            families={runtimeFamilies}
           />
         );
       case "prompt":
-        return <PromptAdvanced value={value} onChange={onChange} />;
+        return supports("prompt.schema") ? (
+          <PromptAdvanced value={value} onChange={onChange} />
+        ) : undefined;
       case "permissions":
         return (
           <PermissionsAdvanced
@@ -253,10 +282,13 @@ export function SpecRuntimeEditor({
             entries={entries}
             onApplyEntries={applyEntries}
             onAddEntry={addEntry}
+            supports={supports}
           />
         );
       case "environment":
-        return <EnvironmentAdvanced value={value} onChange={onChange} />;
+        return variant === "run" ? (
+          <EnvironmentAdvanced value={value} onChange={onChange} />
+        ) : undefined;
       default:
         return undefined;
     }

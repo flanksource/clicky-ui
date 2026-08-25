@@ -30,6 +30,8 @@ export type RuntimeBarComboProps = {
   selectedModelUnavailable: boolean;
   supportedEfforts: string[];
   locked: boolean;
+  showModel: boolean;
+  showEffort: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onFamilyChange: (familyId: string) => void;
@@ -50,6 +52,8 @@ export function RuntimeBarCombo({
   selectedModelUnavailable,
   supportedEfforts,
   locked,
+  showModel,
+  showEffort,
   ariaLabel,
   className,
   onFamilyChange,
@@ -59,12 +63,17 @@ export function RuntimeBarCombo({
   onEffortChange,
 }: RuntimeBarComboProps) {
   const brand = runtimeFamilyBrand(family);
-  const modelLabel = selectedModelUnavailable
-    ? "Unavailable selection"
-    : (selectedModel?.label ?? value.model ?? "Prompt default");
+  const modelLabel = showModel
+    ? selectedModelUnavailable
+      ? "Unavailable selection"
+      : (selectedModel?.label ?? value.model ?? "Prompt default")
+    : `${family.label} ${mode.label}`;
   const effortLabel = value.effort ? effortLevelLabel(value.effort) : "None";
   const effortIcon = value.effort ? effortLevelIcon(value.effort) : undefined;
-  const summary = `${ariaLabel}: ${family.label}, ${mode.label}, ${modelLabel}, effort ${effortLabel}${locked ? ". Model and backend are locked for this conversation; fork it to change them" : ""}`;
+  const summaryParts = [family.label, mode.label];
+  if (showModel) summaryParts.push(modelLabel);
+  if (showEffort) summaryParts.push(`effort ${effortLabel}`);
+  const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and backend are locked for this conversation; fork it to change them" : ""}`;
 
   return (
     <DropdownMenu
@@ -96,7 +105,7 @@ export function RuntimeBarCombo({
           <span className="min-w-0 truncate text-xs font-semibold text-foreground">
             {modelLabel}
           </span>
-          {effortIcon && (
+          {showEffort && effortIcon && (
             <Icon
               icon={effortIcon}
               className={cn(
@@ -133,20 +142,24 @@ export function RuntimeBarCombo({
               locked={locked}
               onChange={onModeChange}
             />
-            <EffortSlider
-              value={value.effort}
-              efforts={supportedEfforts}
-              onChange={onEffortChange}
-            />
+            {showEffort && (
+              <EffortSlider
+                value={value.effort}
+                efforts={supportedEfforts}
+                onChange={onEffortChange}
+              />
+            )}
           </div>
-          <ModelChoices
-            models={models}
-            familyBrand={brand}
-            selectedId={selectedModel?.id ?? value.model}
-            locked={locked}
-            onSelect={onModelSelect}
-            onClear={onModelClear}
-          />
+          {showModel && (
+            <ModelChoices
+              models={models}
+              familyBrand={brand}
+              selectedId={selectedModel?.id ?? value.model}
+              locked={locked}
+              onSelect={onModelSelect}
+              onClear={onModelClear}
+            />
+          )}
         </div>
       )}
     </DropdownMenu>

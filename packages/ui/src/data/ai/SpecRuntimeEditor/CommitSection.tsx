@@ -1,9 +1,9 @@
-import { UiGitCommit, UiPlay } from "../../../icons";
+import { UiGitCommit } from "../../../icons";
 import type {
   AISpecRuntimeValue,
   SpecCommitPhase,
 } from "../SpecRuntimeEditor.model";
-import { CheckboxField, SpecField, SpecInput, SpecSelect } from "./fields";
+import { SpecField, SpecInput, SpecSelect } from "./fields";
 import { commitPhase, withCommit, withCommitPhase } from "./update";
 
 // The phase select doubles as the on/off control, the way the checkout and
@@ -19,7 +19,7 @@ export function CommitSection({
   const phase = commitPhase(value);
   const commit = value.workflow?.commits?.[0];
   return (
-    <div className="grid gap-density-2 md:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(0,1fr)]">
+    <div className="grid gap-density-2 md:grid-cols-[minmax(8rem,10rem)_minmax(0,1fr)]">
       <SpecField label="Commit" composite>
         <SpecSelect
           ariaLabel="Commit"
@@ -38,12 +38,6 @@ export function CommitSection({
       </SpecField>
       {phase !== "none" && (
         <>
-          <CheckboxField
-            label="Dry run"
-            checked={commit?.dryRun}
-            onChange={(dryRun) => onChange(withCommit(value, { dryRun }))}
-            icon={UiPlay}
-          />
           <SpecField
             label="Commit message"
             hint={phase === "turn" ? "subject of the anchor commit" : undefined}

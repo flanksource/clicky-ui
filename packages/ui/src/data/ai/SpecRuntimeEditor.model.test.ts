@@ -54,6 +54,10 @@ describe("buildAISpecRuntimePayload", () => {
           plugins: { "/tmp/plugin": "disabled" },
           skills: { "/tmp/skills": "enabled" },
         },
+        toolPolicy: [
+          { group: "provider.read", policy: "allow" },
+          { name: ["invoice_delete", " invoice_update "], policy: "ask" },
+        ],
         memory: {
           bare: true,
         },
@@ -64,10 +68,15 @@ describe("buildAISpecRuntimePayload", () => {
           envVars: [
             { name: " API_TOKEN ", valueFrom: " secret://captain/token " },
             { name: " CONFIG_VALUE ", valueFrom: "configmap://app/config" },
+            { name: " OP_TOKEN ", valueFrom: "op://runtime/api/token" },
             { name: " STATIC_VALUE ", value: " inline " },
             { name: "EMPTY" },
             { name: " ", value: "ignored" },
           ],
+          connections: {
+            fromConfigItem: "shared-cloud",
+            serviceAccount: true,
+          },
           checkout: {
             mode: "remote",
             url: " https://github.com/flanksource/clicky-ui.git ",
@@ -75,12 +84,15 @@ describe("buildAISpecRuntimePayload", () => {
             connection: " github ",
             ref: " main ",
             depth: 1.9,
+            since: " origin/main ",
             worktree: {
               mode: "new",
               prefix: " ai ",
               base: " origin/main ",
               path: " .shell/worktrees/spec-runtime ",
               keep: true,
+              uncommitted: "clone",
+              ignored: "skip",
             },
             dirty: {
               stash: "all",
@@ -138,6 +150,10 @@ describe("buildAISpecRuntimePayload", () => {
           plugins: { "/tmp/plugin": "disabled" },
           skills: { "/tmp/skills": "enabled" },
         },
+        toolPolicy: [
+          { group: ["provider.read"], policy: "allow" },
+          { name: ["invoice_delete", "invoice_update"], policy: "ask" },
+        ],
         memory: {
           bare: true,
         },
@@ -154,8 +170,16 @@ describe("buildAISpecRuntimePayload", () => {
               name: "CONFIG_VALUE",
               valueFrom: { configMapKeyRef: { name: "app", key: "config" } },
             },
+            {
+              name: "OP_TOKEN",
+              valueFrom: { onePassword: "op://runtime/api/token" },
+            },
             { name: "STATIC_VALUE", value: "inline" },
           ],
+          connections: {
+            fromConfigItem: "shared-cloud",
+            serviceAccount: true,
+          },
           checkout: {
             mode: "remote",
             url: "https://github.com/flanksource/clicky-ui.git",
@@ -163,12 +187,15 @@ describe("buildAISpecRuntimePayload", () => {
             connection: "github",
             ref: "main",
             depth: 1,
+            since: "origin/main",
             worktree: {
               mode: "new",
               prefix: "ai",
               base: "origin/main",
               path: ".shell/worktrees/spec-runtime",
               keep: true,
+              uncommitted: "clone",
+              ignored: "skip",
             },
             dirty: {
               stash: "all",

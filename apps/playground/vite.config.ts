@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 import { playgroundComments } from "./plugins/comments-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
+import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
@@ -19,6 +20,10 @@ export default defineConfig({
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundComments({ dir: playgroundDataDir }),
+    playgroundRuntimeProfiles({
+      operationsURL: "http://localhost:9092/api/openapi.json",
+      runtimesURL: "http://localhost:9020/api/chat/runtimes",
+    }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
       commentsDir: playgroundDataDir,
@@ -56,6 +61,10 @@ export default defineConfig({
         replacement: resolve(uiSrc, "ai.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/utils$/,
+        replacement: resolve(uiSrc, "utils.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui$/,
         replacement: resolve(uiSrc, "index.ts"),
       },
@@ -63,6 +72,13 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["@flanksource/clicky-ui"],
+  },
+  test: {
+    server: {
+      deps: {
+        inline: ["@floating-ui/react"],
+      },
+    },
   },
   server: {
     // Bind every interface so the playground is reachable from other devices

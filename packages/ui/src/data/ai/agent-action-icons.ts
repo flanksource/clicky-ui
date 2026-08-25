@@ -62,16 +62,17 @@ const EFFORT_TONES: Record<EffortLevel, SessionTone> = {
   adaptive: "indigo",
 };
 
-export const EFFORT_ICONS: Record<EffortLevel, AgentActionMeta> = Object.fromEntries(
-  (Object.keys(EFFORT_LEVEL_ICONS) as EffortLevel[]).map((level) => [
-    level,
-    {
-      icon: EFFORT_LEVEL_ICONS[level],
-      tone: EFFORT_TONES[level],
-      label: effortLevelLabel(level),
-    },
-  ]),
-) as Record<EffortLevel, AgentActionMeta>;
+export const EFFORT_ICONS: Record<EffortLevel, AgentActionMeta> =
+  Object.fromEntries(
+    (Object.keys(EFFORT_LEVEL_ICONS) as EffortLevel[]).map((level) => [
+      level,
+      {
+        icon: EFFORT_LEVEL_ICONS[level],
+        tone: EFFORT_TONES[level],
+        label: effortLevelLabel(level),
+      },
+    ]),
+  ) as Record<EffortLevel, AgentActionMeta>;
 
 /** Resolve the effort glyph for a known value. */
 export function effortIcon(value: string): AgentActionMeta | undefined {
@@ -80,17 +81,25 @@ export function effortIcon(value: string): AgentActionMeta | undefined {
   return undefined;
 }
 
-// ── Permission modes: colors matched to Claude Code ──────────────────────────
+// ── Permission modes: Claude Code's native mode vocabulary ───────────────────
 export const PERMISSION_MODE_ICONS: Record<
   SpecPermissionMode,
   AgentActionMeta
 > = {
-  default: { icon: UiHandPalm, tone: "slate", label: "Ask" },
-  plan: { icon: UiPauseCircle, tone: "sky", label: "Plan" },
-  acceptEdits: { icon: UiFastForwardCircle, tone: "emerald", label: "Auto" },
-  auto: { icon: UiFastForwardCircle, tone: "emerald", label: "Auto" },
-  dontAsk: { icon: UiFastForwardCircle, tone: "emerald", label: "Don't ask" },
-  bypassPermissions: { icon: UiShieldSlash, tone: "rose", label: "Off" },
+  default: { icon: UiHandPalm, tone: "slate", label: "Manual" },
+  plan: { icon: UiPauseCircle, tone: "teal", label: "Plan" },
+  acceptEdits: {
+    icon: UiFastForwardCircle,
+    tone: "violet",
+    label: "Accept edits",
+  },
+  auto: { icon: UiFastForwardCircle, tone: "violet", label: "Auto" },
+  dontAsk: { icon: UiShieldSlash, tone: "rose", label: "Don't ask" },
+  bypassPermissions: {
+    icon: UiShieldSlash,
+    tone: "rose",
+    label: "Bypass permissions",
+  },
 };
 
 // ── Approval states: where a proposed action sits in the HITL flow ───────────

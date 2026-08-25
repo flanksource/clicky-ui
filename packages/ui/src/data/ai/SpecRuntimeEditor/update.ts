@@ -1,4 +1,5 @@
 import type {
+  AISpecRuntimeConnections,
   AISpecRuntimeMemory,
   AISpecRuntimePermissions,
   AISpecRuntimePrompt,
@@ -106,7 +107,8 @@ export function withSandbox(
   patch: Partial<AISpecRuntimeSandbox>,
 ): AISpecRuntimeValue {
   const next: AISpecRuntimeSandbox = { ...sandboxRef(value), ...patch };
-  if (!next.backend?.trim()) return withOptionalRoot(value, "sandbox", undefined);
+  if (!next.backend?.trim())
+    return withOptionalRoot(value, "sandbox", undefined);
   return withRoot(value, { sandbox: next });
 }
 
@@ -138,6 +140,15 @@ export function withSetup(
   patch: Partial<AISpecRuntimeSetup>,
 ): AISpecRuntimeValue {
   return withRoot(value, { setup: { ...value.setup, ...patch } });
+}
+
+export function withConnections(
+  value: AISpecRuntimeValue,
+  patch: Partial<AISpecRuntimeConnections>,
+): AISpecRuntimeValue {
+  return withSetup(value, {
+    connections: { ...value.setup?.connections, ...patch },
+  });
 }
 
 export function withCheckout(
@@ -232,7 +243,8 @@ export function withCheckoutMode(
       depth: 0,
     });
   }
-  if (mode === "local") return withCheckout(value, { mode, url: "", connection: "" });
+  if (mode === "local")
+    return withCheckout(value, { mode, url: "", connection: "" });
   return withCheckout(value, { mode, path: "" });
 }
 

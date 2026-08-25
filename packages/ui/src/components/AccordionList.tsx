@@ -52,6 +52,8 @@ export interface AccordionListProps<T> {
   renderBody: (ctx: AccordionListItemContext<T>) => ReactNode;
   /** Extra per-row actions, rendered before the built-in ones. */
   renderActions?: (ctx: AccordionListItemContext<T>) => ReactNode;
+  /** Persistent row metadata rendered between the disclosure and actions. */
+  renderMeta?: (ctx: AccordionListItemContext<T>) => ReactNode;
   /** Content above the list — typically the item count. */
   summary?: ReactNode;
   /** Names an item in its actions' accessible labels. Defaults to `Item <n>`. */
@@ -127,6 +129,7 @@ export function AccordionList<T>({
   renderHeader,
   renderBody,
   renderActions,
+  renderMeta,
   summary,
   itemLabel,
   allowReorder = false,
@@ -297,6 +300,7 @@ export function AccordionList<T>({
           };
           const label = itemLabel?.({ item, index: i }) ?? `Item ${i + 1}`;
           const actions = renderActions?.(slotCtx);
+          const meta = renderMeta?.(slotCtx);
           const dragEnabled = allowDrag && !readOnly && (canDrag?.({ item, index: i }) ?? true);
           const droppable = dragEnabled && dragFrom !== null && dragFrom !== i;
           const edge = droppable ? dropEdge(i) : null;
@@ -375,6 +379,7 @@ export function AccordionList<T>({
                   />
                   {renderHeader(slotCtx)}
                 </button>
+                {meta}
                 {!readOnly && (allowReorder || allowDuplicate || allowRemove || actions) && (
                   <ItemActions
                     label={label}

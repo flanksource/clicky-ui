@@ -51,6 +51,17 @@ export {
 } from "./ToolPreferences.model";
 export { normalizeToolPolicy } from "../chat/types";
 export {
+  appendToolPolicy,
+  matchesTool,
+  normalizeToolPolicyRules,
+  resolveToolPolicy,
+  toolPolicyFromPreferences,
+  type MatchPatterns,
+  type PermissionPolicy,
+  type PermissionRule,
+  type ToolMatch,
+} from "../chat/tool-policy";
+export {
   CLAUDE_PERMISSION_MODES,
   CLAUDE_PERMISSION_MODE_OPTIONS,
   type ClaudePermissionModeOption,
@@ -94,6 +105,7 @@ export {
   buildAISpecRuntimePayload,
   compactAISpecRuntime,
   SPEC_CHECKOUT_MODES,
+  SPEC_CLONE_MODES,
   SPEC_COMMIT_CONDITIONS,
   SPEC_COMMIT_GATES,
   SPEC_COMMIT_MODES,
@@ -105,6 +117,7 @@ export {
   SPEC_VERIFY_SCOPES,
   SPEC_WORKTREE_MODES,
   type AISpecRuntimeBudget,
+  type AISpecRuntimeConnections,
   type AISpecRuntimeEnvVar,
   type AISpecRuntimeEnvVarSource,
   type AISpecRuntimeModelFallback,
@@ -121,6 +134,7 @@ export {
   type AISpecRuntimeResourcePolicies,
   type AISpecRuntimeSandbox,
   type AISpecRuntimeSandboxPolicy,
+  type SpecCloneMode,
   type SpecSandboxCapability,
   type AISpecRuntimeSetup,
   type AISpecRuntimeSpec,
@@ -197,6 +211,11 @@ export {
   selectionForBackend,
   type RuntimeCatalogFamily,
   type RuntimeCatalogMode,
+  type RuntimeArgumentImplementation,
+  type RuntimeArgumentMapping,
+  type RuntimePermissionCapabilities,
+  type RuntimePermissionSupport,
+  type RuntimePermissionSupportKind,
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "../runtime/runtime-mode";

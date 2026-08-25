@@ -162,16 +162,14 @@ function DropdownMenuRoot({
     loop: true,
   });
 
-  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([
-    click,
-    dismiss,
-    role,
-    listNav,
-  ]);
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions(
+    [click, dismiss, role, listNav],
+  );
 
   const closeMenu = () => {
     setOpen(false);
-    if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
+    if (refs.domReference.current instanceof HTMLElement)
+      refs.domReference.current.focus();
   };
   useEscapeLayer(open, closeMenu);
 
@@ -209,24 +207,34 @@ function DropdownMenuRoot({
             aria-expanded={open}
             {...getReferenceProps()}
           >
-            {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
+            {icon && (
+              <Icon
+                {...(typeof icon === "string" ? { name: icon } : { icon })}
+              />
+            )}
             {label}
             {!hideChevron && <Icon icon={UiChevronDown} />}
           </Button>
         )}
         {open && (
           <FloatingPortal>
-            <FloatingFocusManager context={context} modal={false} closeOnFocusOut={false}>
+            <FloatingFocusManager
+              context={context}
+              modal={false}
+              closeOnFocusOut={false}
+            >
               <div
                 ref={refs.setFloating}
+                {...getFloatingProps()}
                 role="menu"
                 aria-label={menuLabel}
                 style={{ ...floatingStyles, zIndex: floatingZ }}
                 className={cn(MENU_POPOVER_CLASS, menuClassName)}
-                {...getFloatingProps()}
               >
                 {header != null && (
-                  <div className="border-b border-border px-3 py-1.5">{header}</div>
+                  <div className="border-b border-border px-3 py-1.5">
+                    {header}
+                  </div>
                 )}
                 {children ? (
                   children(closeMenu)
@@ -246,7 +254,9 @@ function DropdownMenuRoot({
                   </MenuContext.Provider>
                 )}
                 {footer != null && (
-                  <div className="border-t border-border px-3 py-1.5">{footer}</div>
+                  <div className="border-t border-border px-3 py-1.5">
+                    {footer}
+                  </div>
                 )}
               </div>
             </FloatingFocusManager>

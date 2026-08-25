@@ -1,15 +1,14 @@
 import { SecretKeySelector } from "../../../components/SecretKeySelector";
-import { Icon } from "../../Icon";
-import { UiAdd, UiBraces, UiFileText, UiKey, UiTrash } from "../../../icons";
+import { AccordionList } from "../../../components/AccordionList";
+import { UiBraces, UiFileText, UiKey } from "../../../icons";
 import type {
   AISpecRuntimeEnvVar,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
 import { envVarFromSecretValue, secretValueFromEnvVar } from "./env-model";
-import { ListField, SpecButton, SpecInput } from "./fields";
-import { withSetup } from "./update";
+import { ListField, SpecField, SpecInput } from "./fields";
+import { withConnections, withSetup } from "./update";
 import type { SpecRuntimeSecretSelectorConfig } from "./types";
-import { IconButton } from "../../../components";
 
 export function EnvironmentSection({
   value,
@@ -21,11 +20,24 @@ export function EnvironmentSection({
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
 }) {
   return (
-    <EnvVarRows
-      value={value.setup?.envVars}
-      onChange={(envVars) => onChange(withSetup(value, { envVars }))}
-      secretSelector={secretSelector}
-    />
+    <div className="grid gap-density-3">
+      <SpecField label="Connection config item">
+        <SpecInput
+          ariaLabel="Connection config item"
+          value={value.setup?.connections?.fromConfigItem}
+          onChange={(fromConfigItem) =>
+            onChange(withConnections(value, { fromConfigItem }))
+          }
+          icon={UiKey}
+          mono
+        />
+      </SpecField>
+      <EnvVarRows
+        value={value.setup?.envVars}
+        onChange={(envVars) => onChange(withSetup(value, { envVars }))}
+        secretSelector={secretSelector}
+      />
+    </div>
   );
 }
 
@@ -56,99 +68,90 @@ function EnvVarRows({
   onChange: (value: AISpecRuntimeEnvVar[]) => void;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
 }) {
-  const rows = value && value.length > 0 ? value : [{ name: "", value: "" }];
-  const updateRow = (index: number, patch: AISpecRuntimeEnvVar) => {
-    onChange(
-      rows.map((row, rowIndex) =>
-        rowIndex === index ? { ...row, ...patch } : row,
-      ),
-    );
-  };
+  const rows = value ?? [];
   return (
     <div className="space-y-density-2">
-      <div className="flex items-center justify-between gap-density-2">
-        <div className="text-xs font-medium text-muted-foreground">
-          Environment variables
-        </div>
-        <SpecButton
-          onClick={() => onChange([...rows, { name: "", value: "" }])}
-        >
-          <Icon icon={UiAdd} className="size-3.5" />
-          Add
-        </SpecButton>
+      <div className="text-xs font-medium text-muted-foreground">
+        Environment variables
       </div>
-      <div className="overflow-hidden rounded-md border border-border">
-        <div className="grid grid-cols-[minmax(6rem,1fr)_minmax(0,1fr)_auto] gap-density-2 border-b border-border bg-muted/40 px-density-2 py-density-1 text-[10px] font-semibold uppercase text-muted-foreground md:grid-cols-[minmax(8rem,12rem)_minmax(0,1fr)_auto]">
-          <span>Name</span>
-          <span>Value</span>
-          <span className="sr-only">Actions</span>
-        </div>
-        <div className="divide-y divide-border">
-          {rows.map((row, index) => (
-            <div
-              key={index}
-              className="grid gap-density-2 px-density-1 py-density-1 md:grid-cols-[minmax(8rem,12rem)_minmax(0,1fr)_auto]"
-            >
-              <SpecInput
-                value={row.name}
-                onChange={(name) => updateRow(index, { name })}
-                ariaLabel="Environment variable name"
-                icon={UiBraces}
-                mono
-              />
-              <div className="min-w-0">
-                {secretSelector ? (
-                  <SecretKeySelector
-                    value={secretValueFromEnvVar(row)}
-                    onChange={(next) =>
-                      onChange(
-                        rows.map((current, rowIndex) =>
-                          rowIndex === index
-                            ? envVarFromSecretValue(current.name ?? "", next)
-                            : current,
-                        ),
-                      )
-                    }
-                    loadResources={secretSelector.loadResources}
-                    loadKeyPreview={secretSelector.loadKeyPreview}
-                    {...(secretSelector.allowLiteral !== undefined
-                      ? { allowLiteral: secretSelector.allowLiteral }
-                      : {})}
-                    {...(secretSelector.strict !== undefined
-                      ? { strict: secretSelector.strict }
-                      : {})}
-                    className="min-w-0 flex-wrap text-xs"
-                  />
-                ) : (
-                  <SpecInput
-                    value={
-                      typeof row.valueFrom === "string"
-                        ? row.valueFrom
-                        : row.value
-                    }
-                    onChange={(next) =>
-                      updateRow(index, { value: next, valueFrom: "" })
-                    }
-                    placeholder="secret://name/key"
-                    ariaLabel="Environment variable value"
-                    icon={UiKey}
-                    mono
-                  />
-                )}
-              </div>
-              <div className="flex items-center">
-                <IconButton
-                  icon={UiTrash}
-                  label="Remove"
-                  onClick={() =>
-                    onChange(rows.filter((_, rowIndex) => rowIndex !== index))
+      <AccordionList
+        items={rows}
+        onChange={onChange}
+        allowRemove
+        onCreate={() => ({ name: "", value: "" })}
+        addLabel="Add environment variable"
+        idPrefix="environment-variable"
+        itemLabel={({ item, index }) =>
+          item.name?.trim() || `Environment variable ${index + 1}`
+        }
+        renderHeader={({ item }) => (
+          <div className="flex min-w-0 flex-1 items-center gap-density-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium">
+              {item.name?.trim() || "New variable"}
+            </span>
+            <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
+              {environmentValueSummary(item)}
+            </span>
+          </div>
+        )}
+        renderBody={({ item: row, onChange: updateRow }) => (
+          <div className="grid gap-density-2 md:grid-cols-[minmax(8rem,12rem)_minmax(0,1fr)]">
+            <SpecInput
+              value={row.name}
+              onChange={(name) => updateRow({ ...row, name })}
+              ariaLabel="Environment variable name"
+              icon={UiBraces}
+              mono
+            />
+            <div className="min-w-0">
+              {secretSelector ? (
+                <SecretKeySelector
+                  value={secretValueFromEnvVar(row)}
+                  onChange={(next) =>
+                    updateRow(envVarFromSecretValue(row.name ?? "", next))
                   }
+                  loadResources={secretSelector.loadResources}
+                  loadKeyPreview={secretSelector.loadKeyPreview}
+                  {...(secretSelector.allowLiteral !== undefined
+                    ? { allowLiteral: secretSelector.allowLiteral }
+                    : {})}
+                  {...(secretSelector.strict !== undefined
+                    ? { strict: secretSelector.strict }
+                    : {})}
+                  className="min-w-0 flex-wrap text-xs"
                 />
-              </div>
+              ) : (
+                <SpecInput
+                  value={
+                    typeof row.valueFrom === "string"
+                      ? row.valueFrom
+                      : row.value
+                  }
+                  onChange={(next) =>
+                    updateRow({ ...row, value: next, valueFrom: "" })
+                  }
+                  placeholder="secret://name/key"
+                  ariaLabel="Environment variable value"
+                  icon={UiKey}
+                  mono
+                />
+              )}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        )}
+      />
     </div>
   );
+}
+
+function environmentValueSummary(value: AISpecRuntimeEnvVar): string {
+  if (value.value !== undefined) return value.value || "Empty value";
+  if (typeof value.valueFrom === "string") {
+    return value.valueFrom.trim() || "No value";
+  }
+  const reference =
+    value.valueFrom?.secretKeyRef ?? value.valueFrom?.configMapKeyRef;
+  if (reference)
+    return [reference.name, reference.key].filter(Boolean).join("/");
+  return "No value";
 }
