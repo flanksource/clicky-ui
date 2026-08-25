@@ -4,10 +4,20 @@
 !sandbox-runtime.tsx
 !flanksource.tsx
 !flanksource/
+!flanksource/**/*.ts
 !flanksource/**/*.tsx
+!flanksource/**/*.css
+!flanksource/merivio/
 !supply-chain-posture.tsx
 !supply-chain-activity.tsx
 !review-components.tsx
+!inspection-results.tsx
+!_inspection-results/
+!_inspection-results/**
+!runtime-profiles.tsx
+!runtime-profiles.test.tsx
+!_runtime-profiles/
+!_runtime-profiles/**
 !_supply-chain-posture/
 !_supply-chain-posture/**
 # flanksource/reconctl.tsx is tracked, so everything it imports has to be too —

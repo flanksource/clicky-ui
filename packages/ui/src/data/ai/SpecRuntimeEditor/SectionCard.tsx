@@ -48,26 +48,30 @@ export function SectionCard({
             aria-expanded={!collapsed}
             aria-controls={bodyId}
             onClick={() => setCollapsed((current) => !current)}
-            className="group flex w-full items-center gap-density-2 text-left"
+            className="group block w-full text-left"
           >
-            <Icon
-              icon={meta.icon}
-              className={cn(
-                "size-5",
-                meta.iconClassName ?? "text-muted-foreground",
-              )}
-            />
-            <span>{meta.label}</span>
-            <span className="text-[10px] font-bold tabular-nums text-muted-foreground/70">
-              {number}
+            <span className="flex w-full items-center gap-density-2">
+              <Icon
+                icon={meta.icon}
+                className={cn(
+                  "size-5",
+                  meta.iconClassName ?? "text-muted-foreground",
+                )}
+              />
+              <span>{meta.label}</span>
+              <span className="text-[10px] font-bold tabular-nums text-muted-foreground/70">
+                {number}
+              </span>
+              <Icon
+                icon={collapsed ? UiChevronRight : UiChevronDown}
+                className="ml-auto size-4 shrink-0 text-muted-foreground/70 group-hover:text-foreground"
+              />
             </span>
-            <Icon
-              icon={collapsed ? UiChevronRight : UiChevronDown}
-              className="ml-auto size-4 shrink-0 text-muted-foreground/70 group-hover:text-foreground"
-            />
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">
+              {meta.hint}
+            </span>
           </button>
         </h3>
-        <p className="mt-1 text-xs text-muted-foreground">{meta.hint}</p>
       </header>
       {!collapsed && (
         <div id={bodyId} className="mt-density-3">

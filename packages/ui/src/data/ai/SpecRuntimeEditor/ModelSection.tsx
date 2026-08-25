@@ -26,12 +26,18 @@ import type {
 import { ProviderStatusPanel } from "../../runtime/ProviderStatusPanel";
 import { RuntimeBar } from "../../runtime/RuntimeBar";
 import {
+  SUPPORT_ALL_RUNTIME_FIELDS,
+  runtimeFieldSupport,
+  type RuntimeFieldSupport,
+} from "../../runtime/runtime-field-support";
+import {
   SPEC_RUNTIME_FAMILIES,
   firstMode,
   modeForBackend,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
+import { PermissionModeField } from "./PermissionModeField";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 
 type FallbackDraftPatch = {
@@ -49,12 +55,20 @@ export function ModelSection({
   onChange,
   models,
   families,
+  effectiveBackend,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models: ChatModel[];
   families?: SpecRuntimeFamily[] | undefined;
+  effectiveBackend?: string | undefined;
 }) {
+  const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
+  const backend =
+    value.backend?.trim() ||
+    effectiveBackend?.trim() ||
+    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
+  const supports = runtimeFieldSupport(runtimeFamilies, backend);
   // The bar owns family, mode, model and effort — including the free-text model
   // entry for families the catalog does not describe.
   return (
@@ -63,17 +77,32 @@ export function ModelSection({
         value={value}
         onChange={onChange}
         models={models}
-        {...(families ? { families } : {})}
+        effectiveBackend={effectiveBackend}
+        showModel={supports("model")}
+        showEffort={supports("effort")}
+        families={runtimeFamilies}
       />
-      <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
-        <NumberField
-          label="Max cost (USD)"
-          value={value.budget?.cost}
-          onChange={(cost) => onChange(withBudgetValue(value, "cost", cost))}
-          icon={UiCurrencyDollar}
-          min={0}
-          step={0.01}
+      {supports("permissions.mode") && (
+        <PermissionModeField
+          value={value}
+          onChange={onChange}
+          families={runtimeFamilies}
+          effectiveBackend={effectiveBackend}
         />
+      )}
+      <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
+        {supports("budget.cost") && (
+          <NumberField
+            label="Max cost (USD)"
+            value={value.budget?.cost}
+            onChange={(cost) =>
+              onChange(withBudgetValue(value, "cost", cost))
+            }
+            icon={UiCurrencyDollar}
+            min={0}
+            step={0.01}
+          />
+        )}
         <NumberField
           label="Max tokens"
           value={value.budget?.maxTokens}
@@ -85,18 +114,20 @@ export function ModelSection({
           step={1}
           integer
         />
-        <NumberField
-          label="Max turns"
-          value={value.budget?.maxTurns}
-          onChange={(maxTurns) =>
-            onChange(withBudgetValue(value, "maxTurns", maxTurns))
-          }
-          icon={UiRepeat}
-          min={0}
-          max={100}
-          step={1}
-          integer
-        />
+        {supports("budget.maxTurns") && (
+          <NumberField
+            label="Max turns"
+            value={value.budget?.maxTurns}
+            onChange={(maxTurns) =>
+              onChange(withBudgetValue(value, "maxTurns", maxTurns))
+            }
+            icon={UiRepeat}
+            min={0}
+            max={100}
+            step={1}
+            integer
+          />
+        )}
         <SpecField label="Timeout">
           <SpecInput
             value={value.budget?.timeout}
@@ -111,7 +142,7 @@ export function ModelSection({
       </div>
       <ProviderStatusPanel
         models={models}
-        families={families ?? SPEC_RUNTIME_FAMILIES}
+        families={runtimeFamilies}
         defaultCollapsed
       />
     </div>
@@ -123,11 +154,13 @@ export function ModelAdvanced({
   onChange,
   models = [],
   families,
+  supports = SUPPORT_ALL_RUNTIME_FIELDS,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
+  supports?: RuntimeFieldSupport | undefined;
 }) {
   return (
     <div className="grid gap-density-2">
@@ -137,22 +170,26 @@ export function ModelAdvanced({
         models={models}
         {...(families ? { families } : {})}
       />
-      <SpecField label="Session ID">
-        <SpecInput
-          value={value.sessionId}
-          onChange={(sessionId) =>
-            onChange(withOptionalRoot(value, "sessionId", sessionId))
-          }
-          placeholder="session UUID"
-          icon={UiFingerprint}
-          mono
+      {supports("sessionId") && (
+        <SpecField label="Session ID">
+          <SpecInput
+            value={value.sessionId}
+            onChange={(sessionId) =>
+              onChange(withOptionalRoot(value, "sessionId", sessionId))
+            }
+            placeholder="session UUID"
+            icon={UiFingerprint}
+            mono
+          />
+        </SpecField>
+      )}
+      {supports("noCache") && (
+        <CheckboxField
+          label="Disable prompt caching"
+          checked={value.noCache}
+          onChange={(noCache) => onChange(withRoot(value, { noCache }))}
         />
-      </SpecField>
-      <CheckboxField
-        label="Disable prompt caching"
-        checked={value.noCache}
-        onChange={(noCache) => onChange(withRoot(value, { noCache }))}
-      />
+      )}
     </div>
   );
 }
@@ -193,8 +230,8 @@ function FallbackModelsEditor({
   const updateFallback = (index: number, nextFallback: FallbackDraftPatch) => {
     setFallbacks(
       fallbacks.map((fallback, rowIndex) =>
-        rowIndex === index ? compactEditableFallback(nextFallback) : fallback
-      )
+        rowIndex === index ? compactEditableFallback(nextFallback) : fallback,
+      ),
     );
   };
 
@@ -284,7 +321,7 @@ function FallbackModelRow({
             <Glyph
               className={cn(
                 "size-4 shrink-0",
-                meta.provider ? providerIconColor(meta.provider) : undefined
+                meta.provider ? providerIconColor(meta.provider) : undefined,
               )}
             />
           ) : (
@@ -379,7 +416,7 @@ function FallbackModelPicker({
 
 function newFallbackDraft(
   value: AISpecRuntimeValue,
-  families: SpecRuntimeFamily[]
+  families: SpecRuntimeFamily[],
 ): AISpecRuntimeModelFallback {
   const fallback: AISpecRuntimeModelFallback = {};
   const backend = value.backend || defaultFallbackBackend(families);
@@ -401,7 +438,7 @@ function defaultFallbackBackend(families: SpecRuntimeFamily[]): string {
 }
 
 function compactEditableFallback(
-  value: FallbackDraftPatch
+  value: FallbackDraftPatch,
 ): AISpecRuntimeModelFallback {
   const next: AISpecRuntimeModelFallback = {};
   const model = cleanString(value.model);
@@ -423,11 +460,11 @@ function compactEditableFallback(
 
 function fallbackModelMeta(
   fallback: AISpecRuntimeModelFallback,
-  models: ChatModel[]
+  models: ChatModel[],
 ): { label: string; provider?: string | undefined } {
   const modelId = fallback.model ?? "";
   const match = models.find(
-    (model) => model.id === modelId || model.label === modelId
+    (model) => model.id === modelId || model.label === modelId,
   );
   if (match) return { label: match.label, provider: match.provider };
   return {
@@ -437,7 +474,7 @@ function fallbackModelMeta(
 }
 
 function inferProvider(
-  fallback: AISpecRuntimeModelFallback
+  fallback: AISpecRuntimeModelFallback,
 ): string | undefined {
   const text = `${fallback.backend ?? ""} ${
     fallback.model ?? ""

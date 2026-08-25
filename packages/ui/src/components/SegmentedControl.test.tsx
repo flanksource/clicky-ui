@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { UiLock } from "../icons";
 import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 
 const OPTIONS: SegmentedOption[] = [
@@ -24,7 +25,9 @@ function Controlled({ initial = "all" }: { initial?: string }) {
 describe("SegmentedControl", () => {
   it("uses the density control height for the default md track", () => {
     render(<Controlled initial="all" />);
-    expect(screen.getByRole("radiogroup", { name: "Scope" })).toHaveClass("h-control-h");
+    expect(screen.getByRole("radiogroup", { name: "Scope" })).toHaveClass(
+      "h-control-h",
+    );
   });
 
   it("keeps sm as an explicit compact segmented control", () => {
@@ -37,7 +40,9 @@ describe("SegmentedControl", () => {
         size="sm"
       />,
     );
-    expect(screen.getByRole("radiogroup", { name: "Scope" })).not.toHaveClass("h-control-h");
+    expect(screen.getByRole("radiogroup", { name: "Scope" })).not.toHaveClass(
+      "h-control-h",
+    );
   });
 
   it("marks the selected option via aria-checked", () => {
@@ -127,10 +132,46 @@ describe("SegmentedControl", () => {
       "true",
     );
     expect(screen.getByText("Edits auto, shell asks.")).toBeInTheDocument();
-    expect(screen.getByText("Edits auto, shell asks.")).not.toHaveClass("truncate");
-    expect(screen.getByText("Edits auto, shell asks.")).toHaveClass("whitespace-normal");
+    expect(screen.getByText("Edits auto, shell asks.")).not.toHaveClass(
+      "truncate",
+    );
+    expect(screen.getByText("Edits auto, shell asks.")).toHaveClass(
+      "whitespace-normal",
+    );
     expect(
       screen.getByRole("radiogroup", { name: "Permission preset" }),
     ).toHaveClass("flex-wrap");
+  });
+
+  it("applies option icon and active styling without coloring inactive segments", () => {
+    render(
+      <SegmentedControl
+        aria-label="Access"
+        value="read"
+        onChange={() => {}}
+        options={[
+          {
+            id: "read",
+            label: "Read only",
+            icon: UiLock,
+            iconClassName: "text-sky-700",
+            activeClassName: "border-sky-500 bg-sky-100",
+          },
+          {
+            id: "full",
+            label: "Full access",
+            activeClassName: "border-rose-500 bg-rose-100",
+          },
+        ]}
+      />,
+    );
+
+    const selected = screen.getByRole("radio", { name: "Read only" });
+    expect(selected).toHaveClass("border-sky-500", "bg-sky-100");
+    expect(selected.querySelector("svg")).toHaveClass("text-sky-700");
+    expect(screen.getByRole("radio", { name: "Full access" })).not.toHaveClass(
+      "border-rose-500",
+      "bg-rose-100",
+    );
   });
 });

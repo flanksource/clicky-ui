@@ -11,6 +11,10 @@ export type SegmentedOption<T extends string = string> = {
   label: ReactNode;
   /** Optional leading icon (imported `Ui*` component or runtime name). */
   icon?: string | StaticIconComponent;
+  /** Classes applied to the leading icon. */
+  iconClassName?: string;
+  /** Classes applied to this segment only while selected. */
+  activeClassName?: string;
   /** Optional secondary line, used by larger card-like segmented controls. */
   description?: ReactNode;
   /** Native title attribute. */
@@ -124,6 +128,7 @@ export function SegmentedControl<T extends string = string>({
                 : size === "lg"
                   ? "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:bg-card hover:text-foreground hover:shadow-sm"
                   : "text-muted-foreground hover:border-border hover:bg-background/60 hover:text-foreground",
+              active && option.activeClassName,
             )}
           >
             {option.icon && (
@@ -135,6 +140,7 @@ export function SegmentedControl<T extends string = string>({
                   size === "lg" ? "size-4 shrink-0" : "size-3.5 shrink-0",
                   size === "lg" &&
                     (active ? "text-primary" : "text-muted-foreground"),
+                  option.iconClassName,
                 )}
               />
             )}

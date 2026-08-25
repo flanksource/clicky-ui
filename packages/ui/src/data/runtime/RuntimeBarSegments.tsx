@@ -36,6 +36,8 @@ export type RuntimeBarSegmentsProps = {
   reasoningEfforts: string[];
   supportedEfforts: string[];
   locked: boolean;
+  showModel: boolean;
+  showEffort: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onBackendChange: (familyId: string, modeId: string) => void;
@@ -58,6 +60,8 @@ export function RuntimeBarSegments({
   reasoningEfforts,
   supportedEfforts,
   locked,
+  showModel,
+  showEffort,
   ariaLabel,
   className,
   onBackendChange,
@@ -117,48 +121,50 @@ export function RuntimeBarSegments({
         )}
         <span className={CAPTION_CLASS}>{mode.label}</span>
       </RuntimeSegment>
-      <RuntimeSegment
-        menuLabel="Model"
-        title={
-          selectedModelUnavailable
-            ? "Model — unavailable selection"
-            : value.model
-              ? `Model — ${value.model}`
-              : "Model — prompt default"
-        }
-        disabled={locked}
-        className="min-w-0 max-w-56 flex-1 [&>span]:min-w-0 [&>span]:w-full [&>span>button]:w-full"
-        header={
-          <div className="grid gap-1">
-            <span className={KEY_CLASS}>Model id</span>
-            <InputField
-              value={selectedModelUnavailable ? "" : (value.model ?? "")}
-              onChange={onCustomModel}
-              {...(selectedModelUnavailable
-                ? { placeholder: "Unavailable selection" }
-                : {})}
-              aria-label="Model id"
-              disabled={locked}
-              inputClassName="font-mono text-xs"
-              className="bg-background"
-            />
-          </div>
-        }
-        items={modelItems({
-          models: modelOptions,
-          group: `${family.label} models`,
-          selectedId: selectedModelUnavailable
-            ? undefined
-            : (resolvedModel?.id ?? value.model),
-          onSelect: onModelSelect,
-          onClear: onModelClear,
-        })}
-      >
-        <span className="min-w-0 truncate font-mono text-xs text-foreground">
-          {modelLabel}
-        </span>
-      </RuntimeSegment>
-      {supportedEfforts.length > 0 && (
+      {showModel && (
+        <RuntimeSegment
+          menuLabel="Model"
+          title={
+            selectedModelUnavailable
+              ? "Model — unavailable selection"
+              : value.model
+                ? `Model — ${value.model}`
+                : "Model — prompt default"
+          }
+          disabled={locked}
+          className="min-w-0 max-w-56 flex-1 [&>span]:min-w-0 [&>span]:w-full [&>span>button]:w-full"
+          header={
+            <div className="grid gap-1">
+              <span className={KEY_CLASS}>Model id</span>
+              <InputField
+                value={selectedModelUnavailable ? "" : (value.model ?? "")}
+                onChange={onCustomModel}
+                {...(selectedModelUnavailable
+                  ? { placeholder: "Unavailable selection" }
+                  : {})}
+                aria-label="Model id"
+                disabled={locked}
+                inputClassName="font-mono text-xs"
+                className="bg-background"
+              />
+            </div>
+          }
+          items={modelItems({
+            models: modelOptions,
+            group: `${family.label} models`,
+            selectedId: selectedModelUnavailable
+              ? undefined
+              : (resolvedModel?.id ?? value.model),
+            onSelect: onModelSelect,
+            onClear: onModelClear,
+          })}
+        >
+          <span className="min-w-0 truncate font-mono text-xs text-foreground">
+            {modelLabel}
+          </span>
+        </RuntimeSegment>
+      )}
+      {showEffort && supportedEfforts.length > 0 && (
         <RuntimeSegment
           menuLabel="Reasoning effort"
           title="Reasoning effort"

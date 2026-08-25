@@ -61,6 +61,8 @@ export function operationToTool(
   return {
     name: operation.operationId,
     label: toolLabel(operation),
+    operationName: operation.operationId,
+    source: "clicky",
     ...(group
       ? { group, preferenceKey: group }
       : meta?.surface
@@ -69,6 +71,9 @@ export function operationToTool(
     ...(defaultPermission ? { defaultPermission } : {}),
     ...(parent ? { parent } : {}),
     ...(surface?.entity ? { entity: surface.entity } : {}),
+    ...(meta?.verb ? { verb: meta.verb } : {}),
+    ...(meta?.actionName ? { action: meta.actionName } : {}),
+    ...(meta?.scope ? { scope: meta.scope } : {}),
     ...(icon ? { icon } : {}),
     ...(description ? { description } : {}),
     ...(resolved?.method ? { method: resolved.method.toUpperCase() } : {}),
@@ -132,15 +137,14 @@ function isDestructiveTool(
   if (method === "DELETE") return true;
   if (method === "GET" || method === "HEAD" || method === "OPTIONS")
     return false;
-  const text = `${resolved?.path ?? ""} ${operation.operationId ?? ""}`.toLowerCase();
+  const text =
+    `${resolved?.path ?? ""} ${operation.operationId ?? ""}`.toLowerCase();
   return /\b(write|delete|remove|destroy|void|sync|create|update|patch|post)\b/.test(
     text,
   );
 }
 
-function operationToolGroup(
-  operation: OpenAPIOperation,
-): string | undefined {
+function operationToolGroup(operation: OpenAPIOperation): string | undefined {
   const meta = operation["x-clicky"];
   if (meta?.toolHints?.group) return meta.toolHints.group;
   if (meta?.group) return meta.group;
@@ -182,7 +186,6 @@ function pathContainsCobraBuiltin(path: string | undefined): boolean {
   const first = commandParts[0];
   return first === "completion" || first === "help";
 }
-
 
 /** A concise popover label: the clicky action/verb (capitalized) when present,
  *  else the operation summary, else a humanized operationId. Mirrors the intent

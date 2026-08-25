@@ -1,7 +1,6 @@
 import { SecretKeySelector } from "../../../components/SecretKeySelector";
 import { SegmentedControl } from "../../../components/SegmentedControl";
 import {
-  UiClock,
   UiFolder,
   UiFolderGit,
   UiGitBranch,
@@ -11,11 +10,11 @@ import {
   UiTag,
 } from "../../../icons";
 import {
-  SPEC_STASH_MODES,
+  SPEC_CLONE_MODES,
   SPEC_WORKTREE_MODES,
   type AISpecRuntimeValue,
   type SpecCheckoutMode,
-  type SpecStashMode,
+  type SpecCloneMode,
   type SpecWorktreeMode,
 } from "../SpecRuntimeEditor.model";
 import { secretValueFromString, stringFromSecretValue } from "./env-model";
@@ -25,20 +24,22 @@ import {
   NumberField,
   SpecField,
   SpecInput,
+  SpecSelect,
 } from "./fields";
 import type { SpecRuntimeSecretSelectorConfig } from "./types";
 import {
   checkoutMode,
-  stashMode,
   withCheckout,
   withCheckoutMode,
-  withDirty,
   withSetup,
-  withStashMode,
   withWorktree,
   withWorktreeMode,
   worktreeMode,
 } from "./update";
+import {
+  SUPPORT_ALL_RUNTIME_FIELDS,
+  type RuntimeFieldSupport,
+} from "../../runtime/runtime-field-support";
 
 const CHECKOUT_OPTIONS: Array<{ id: SpecCheckoutMode; label: string }> = [
   { id: "none", label: "None" },
@@ -50,35 +51,119 @@ const WORKTREE_OPTIONS: Array<{ id: SpecWorktreeMode; label: string }> =
     id: mode,
     label: mode === "none" ? "None" : mode === "new" ? "New" : "Existing",
   }));
-const STASH_OPTIONS: Array<{ id: SpecStashMode; label: string }> =
-  SPEC_STASH_MODES.map((mode) => ({
-    id: mode,
-    label:
-      mode === "none" ? "None" : mode.charAt(0).toUpperCase() + mode.slice(1),
-  }));
-
 export function WorkspaceSection({
   value,
   onChange,
   secretSelector,
+  variant = "run",
+  supports = SUPPORT_ALL_RUNTIME_FIELDS,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
+  variant?: "run" | "preset" | undefined;
+  supports?: RuntimeFieldSupport | undefined;
 }) {
   const checkout = checkoutMode(value);
   const worktree = worktreeMode(value);
+  if (variant === "preset") {
+    const cloneOptions = [
+      { value: "", label: "Inherit" },
+      ...SPEC_CLONE_MODES.map((mode) => ({
+        value: mode,
+        label: mode === "clone" ? "Clone" : "Skip",
+      })),
+    ];
+    return (
+      <div className="grid gap-density-3">
+        <div className="space-y-density-2">
+          <SpecField label="Git checkout behavior">
+            <SegmentedControl
+              aria-label="Checkout source"
+              size="sm"
+              value={checkout}
+              onChange={(mode) => onChange(withCheckoutMode(value, mode))}
+              options={CHECKOUT_OPTIONS}
+            />
+          </SpecField>
+          <div className="grid gap-density-2 md:grid-cols-2">
+            <NumberField
+              label="Clone depth"
+              value={value.setup?.checkout?.depth}
+              onChange={(depth) =>
+                onChange(withCheckout(value, { depth: depth ?? 0 }))
+              }
+              icon={UiStack}
+              min={0}
+              step={1}
+              integer
+            />
+          </div>
+        </div>
+        <div className="space-y-density-2">
+          <SpecField label="Worktree behavior">
+            <SegmentedControl
+              aria-label="Worktree mode"
+              size="sm"
+              value={worktree}
+              onChange={(mode) => onChange(withWorktreeMode(value, mode))}
+              options={WORKTREE_OPTIONS}
+            />
+          </SpecField>
+          <div className="grid gap-density-2 md:grid-cols-2">
+            <SpecField label="Uncommitted files" composite>
+              <SpecSelect
+                ariaLabel="Uncommitted files"
+                value={value.setup?.checkout?.worktree?.uncommitted ?? ""}
+                onChange={(uncommitted) =>
+                  onChange(
+                    withWorktree(value, {
+                      uncommitted: uncommitted as SpecCloneMode | "",
+                    }),
+                  )
+                }
+                options={cloneOptions}
+              />
+            </SpecField>
+            <SpecField label="Ignored files" composite>
+              <SpecSelect
+                ariaLabel="Ignored files"
+                value={value.setup?.checkout?.worktree?.ignored ?? ""}
+                onChange={(ignored) =>
+                  onChange(
+                    withWorktree(value, {
+                      ignored: ignored as SpecCloneMode | "",
+                    }),
+                  )
+                }
+                options={cloneOptions}
+              />
+            </SpecField>
+          </div>
+          <div className="max-w-64">
+            <CheckboxField
+              label="Keep worktree after run"
+              checked={value.setup?.checkout?.worktree?.keep}
+              onChange={(keep) => onChange(withWorktree(value, { keep }))}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid gap-density-3">
       <div className="grid gap-density-2 md:grid-cols-2">
-        <SpecField label="Directory">
-          <SpecInput
-            value={value.setup?.cwd}
-            onChange={(cwd) => onChange(withSetup(value, { cwd }))}
-            icon={UiFolder}
-            mono
-          />
-        </SpecField>
+        {supports("setup.cwd") && (
+          <SpecField label="Directory">
+            <SpecInput
+              value={value.setup?.cwd}
+              onChange={(cwd) => onChange(withSetup(value, { cwd }))}
+              icon={UiFolder}
+              mono
+            />
+          </SpecField>
+        )}
         <SpecField label="Base dir">
           <SpecInput
             value={value.setup?.baseDir}
@@ -247,27 +332,19 @@ export function WorkspaceSection({
         )}
       </div>
 
-      <div className="space-y-density-2">
-        <SpecField label="Stash">
-          <SegmentedControl
-            aria-label="Stash mode"
-            size="sm"
-            value={stashMode(value)}
-            onChange={(stash) => onChange(withStashMode(value, stash))}
-            options={STASH_OPTIONS}
-          />
-        </SpecField>
-        <div className="grid gap-density-2 md:grid-cols-2">
-          <SpecField label="Since">
-            <SpecInput
-              value={value.setup?.checkout?.dirty?.since}
-              onChange={(since) => onChange(withDirty(value, { since }))}
-              icon={UiClock}
-              mono
-            />
-          </SpecField>
-        </div>
-      </div>
+      <SpecField
+        label="Report changes since"
+        hint="merge-base used only to report changed files"
+      >
+        <SpecInput
+          ariaLabel="Report changes since"
+          value={value.setup?.checkout?.since}
+          onChange={(since) => onChange(withCheckout(value, { since }))}
+          placeholder="origin/main"
+          icon={UiGitBranch}
+          mono
+        />
+      </SpecField>
     </div>
   );
 }

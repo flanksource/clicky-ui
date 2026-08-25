@@ -113,6 +113,30 @@ describe("RuntimeBar", () => {
     ).toHaveAttribute("aria-valuetext", "High");
   });
 
+  it("renders an inherited backend without persisting it on unrelated edits", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{ effort: "high" }}
+        effectiveBackend="codex-cli"
+        onChange={onChange}
+        models={MODELS}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Runtime: Codex, CLI, Prompt default, effort High",
+      }),
+    );
+    expect(screen.getByRole("radio", { name: "Codex" })).toBeChecked();
+    fireEvent.change(screen.getByRole("slider", { name: "Reasoning effort" }), {
+      target: { value: "1" },
+    });
+    expect(onChange).toHaveBeenCalledWith({ effort: "low" });
+  });
+
   it("updates combo fields without closing the runtime menu", () => {
     const onChange = vi.fn();
     render(

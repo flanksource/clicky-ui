@@ -30,10 +30,16 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
    *  catalog does not describe is served by the segment's free-text entry. */
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
+  /** Resolved backend shown when the editable value inherits it from another layer. */
+  effectiveBackend?: string | undefined;
   /** Effort tiers offered when the catalog does not describe the model. */
   reasoningEfforts?: string[] | undefined;
   /** Locks model identity (family, backend, and model) while leaving effort editable. */
   locked?: boolean | undefined;
+  /** Whether the selected runtime exposes a model argument. */
+  showModel?: boolean | undefined;
+  /** Whether the selected runtime exposes reasoning effort. */
+  showEffort?: boolean | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
 };
@@ -45,12 +51,16 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   variant = "segmented",
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
+  effectiveBackend,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   locked = false,
+  showModel = true,
+  showEffort = true,
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
-  const selection = selectionForBackend(families, value.backend);
+  const backend = value.backend?.trim() || effectiveBackend?.trim();
+  const selection = selectionForBackend(families, backend);
   const family = familyById(families, selection.family);
   const mode =
     family.modes.find((entry) => entry.id === selection.mode) ??
@@ -122,6 +132,8 @@ export function RuntimeBar<T extends RuntimeBarValue>({
         selectedModelUnavailable={selectedModelUnavailable}
         supportedEfforts={supportedEfforts}
         locked={locked}
+        showModel={showModel}
+        showEffort={showEffort}
         ariaLabel={ariaLabel}
         className={className}
         onFamilyChange={(familyId) => applyBackend(familyId, selection.mode)}
@@ -147,6 +159,8 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       reasoningEfforts={reasoningEfforts}
       supportedEfforts={supportedEfforts}
       locked={locked}
+      showModel={showModel}
+      showEffort={showEffort}
       ariaLabel={ariaLabel}
       className={className}
       onBackendChange={applyBackend}
