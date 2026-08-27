@@ -55,11 +55,20 @@ export {
   type DataTablePagination,
   type DataTableProps,
   type DataTableRowSelection,
+  type DataTableSelectAllPages,
+  type DataTableSelectAllScope,
+  type DataTableSelectionAction,
+  type DataTableSelectionConfirm,
   type DataTableSelectionContext,
   type StatusOptions,
   type TagsOptions,
   type TimestampOptions,
 } from "./data/DataTable";
+export {
+  SelectionActionBar,
+  splitSelectionActions,
+  type SelectionActionBarProps,
+} from "./data/SelectionActionBar";
 export {
   groupRecords,
   isGroupCollapsedByDefault,

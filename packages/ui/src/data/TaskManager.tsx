@@ -13,8 +13,8 @@ import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./t
 
 // TaskManager is the generic clicky-ui task-manager view: it lists every run
 // (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
-// each row into a live <TaskProgress> for that run id. Fully generic — no
-// application concepts.
+// each row into a live <TaskProgress> for that run id. Runs are grouped by kind,
+// which applications use as their stable task identity.
 //
 // Requires a react-query QueryClientProvider in the host app (like
 // TimeseriesPanel and CacheBrowser): control actions run through useMutation,
@@ -87,6 +87,7 @@ export function TaskManager({
     for (const r of runs) if (r.kind) set.add(r.kind);
     return [...set].sort();
   }, [runs]);
+  const applications = useMemo(() => groupRunsByApplication(runs), [runs]);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -125,22 +126,51 @@ export function TaskManager({
           No background tasks.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border bg-card">
-          {runs.map((run) => (
-            <RunRow
-              key={run.id}
-              run={run}
-              basePath={basePath}
-              pollMs={pollMs}
-              selectedId={selectedId}
-              onSelectRun={onSelectRun}
-              runsQueryKey={runsQueryKey}
-            />
+        <div className="space-y-3">
+          {applications.map((application) => (
+            <section key={application.kind}>
+              <h3 className="mb-1 px-1 text-xs font-semibold text-muted-foreground">
+                {applicationLabel(application.kind)}
+              </h3>
+              <div className="overflow-hidden rounded-lg border bg-card">
+                {application.runs.map((run) => (
+                  <RunRow
+                    key={run.id}
+                    run={run}
+                    basePath={basePath}
+                    pollMs={pollMs}
+                    selectedId={selectedId}
+                    onSelectRun={onSelectRun}
+                    runsQueryKey={runsQueryKey}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+function groupRunsByApplication(runs: TaskRunMeta[]) {
+  const grouped = new Map<string, TaskRunMeta[]>();
+  for (const run of runs) {
+    const application = run.kind || "other";
+    grouped.set(application, [...(grouped.get(application) ?? []), run]);
+  }
+  return [...grouped].map(([kind, applicationRuns]) => ({ kind, runs: applicationRuns }));
+}
+
+function applicationLabel(kind: string): string {
+  const names: Record<string, string> = {
+    makerprint: "MakerPrint",
+    openscad: "OpenSCAD",
+    orca: "Orca",
+    snapmaker: "Snapmaker",
+    other: "Other",
+  };
+  return names[kind] ?? kind;
 }
 
 function RunRow({

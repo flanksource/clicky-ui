@@ -40,51 +40,59 @@ export interface UseTaskRunResult {
 }
 
 export interface UseTaskRunOptions extends TaskTransportOptions {
-  /** Stable run id to follow (drill-down). Mutually exclusive with kind. */
+  /** Stable run id to follow (drill-down). Mutually exclusive with ids/kind. */
   id?: string | undefined;
+  /** Stable run ids to follow together. Mutually exclusive with id/kind. */
+  ids?: string[] | undefined;
   /** Follow every run of a kind. */
   kind?: string | undefined;
 }
 
-// useTaskRun follows one run (by id) or a kind, SSE-first. It accumulates the
+// useTaskRun follows one or more runs (by id) or a kind, SSE-first. It accumulates the
 // latest snapshot per task/group id and reports completion once every group is
 // terminal.
 export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   const {
     id,
+    ids,
     kind,
     basePath = DEFAULT_BASE,
     enabled = true,
     pollMs = DEFAULT_POLL_MS,
     forcePoll = false,
   } = options;
+  const runIdsKey = (ids?.filter(Boolean) ?? (id ? [id] : [])).join(",");
 
   const [byId, setById] = useState<Record<string, TaskSnapshot>>({});
   const [status, setStatus] = useState("idle");
   const [isComplete, setIsComplete] = useState(false);
   // Reset accumulator whenever the subscription target changes.
-  const targetKey = `${id ?? ""}|${kind ?? ""}|${enabled}`;
+  const targetKey = `${runIdsKey}|${kind ?? ""}|${enabled}`;
   const prevKey = useRef(targetKey);
   if (prevKey.current !== targetKey) {
     prevKey.current = targetKey;
   }
 
   useEffect(() => {
-    if (!enabled || (!id && !kind)) {
+    const runIds = runIdsKey ? runIdsKey.split(",") : [];
+    if (!enabled || (runIds.length === 0 && !kind)) {
+      setById({});
+      setStatus("idle");
+      setIsComplete(false);
       return;
     }
     setById({});
     setIsComplete(false);
 
     const params = new URLSearchParams();
-    if (id) params.set("tasks", id);
+    if (runIds.length > 0) params.set("tasks", runIdsKey);
     if (kind) params.set("kind", kind);
     const query = params.toString();
 
     const merge = (incoming: TaskSnapshot[]) => {
       setById((prev) => {
         const next = { ...prev };
-        for (const snap of incoming) next[snap.id] = { ...next[snap.id], ...snap };
+        for (const snap of incoming) next[snap.id] = snap;
         return next;
       });
     };
@@ -118,11 +126,14 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = async () => {
         try {
-          const res = await fetch(`${basePath}/tasks/${encodeURIComponent(id ?? "")}`, {
-            headers: { Accept: "application/json" },
-          });
-          if (res.ok) {
-            const snaps = (await res.json()) as TaskSnapshot[];
+          const responses = await Promise.all(runIds.map((runId) => fetch(
+            `${basePath}/tasks/${encodeURIComponent(runId)}`,
+            { headers: { Accept: "application/json" } },
+          )));
+          if (responses.every((response) => response.ok)) {
+            const snaps = (await Promise.all(responses.map(
+              async (response) => (await response.json()) as TaskSnapshot[],
+            ))).flat();
             merge(snaps);
             setStatus("polling");
             if (allGroupsTerminal(snaps)) {
@@ -166,7 +177,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [id, kind, basePath, enabled, pollMs, forcePoll]);
+  }, [runIdsKey, kind, basePath, enabled, pollMs, forcePoll]);
 
   return { snapshots: Object.values(byId), status, isComplete };
 }

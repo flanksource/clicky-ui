@@ -3186,7 +3186,7 @@ export function ClickyTable({
       ...base,
       ...(column.kind ? { kind: column.kind } : {}),
       render: (value) => <ClickyNodeRenderer node={value as ClickyNode} />,
-      sortValue: (value) => clickyNodeText(value as ClickyNode),
+      sortValue: (value) => clickyNodeSortValue(value as ClickyNode),
       filterValue: (value) => clickyNodeText(value as ClickyNode),
     };
   });
@@ -4037,6 +4037,24 @@ function isExecutionResponse(value: unknown): value is ExecutionResponse {
     typeof value === "object" &&
     ("stdout" in value || "output" in value || "message" in value)
   );
+}
+
+/**
+ * clickyNodeSortValue is the value a cell is ordered by client-side.
+ *
+ * It prefers the raw scalar the server sent over the text it rendered, because
+ * the comparator only orders numerically when both sides are numbers — and a
+ * cell's text is a formatting of its value, not the value. Sorting on the text
+ * puts 10 before 9, and puts "1.5s" before "2ms" on any duration column that
+ * formats its own units.
+ *
+ * The fallback is the rendered text, which is the right answer for the columns
+ * that carry no scalar because they never had one.
+ */
+function clickyNodeSortValue(
+  node: ClickyNode | null | undefined,
+): string | number | boolean {
+  return node?.filterValue ?? clickyNodeText(node);
 }
 
 function clickyNodeText(node: ClickyNode | null | undefined): string {
