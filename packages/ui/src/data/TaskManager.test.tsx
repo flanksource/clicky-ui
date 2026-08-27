@@ -88,6 +88,23 @@ describe("TaskManager selection", () => {
     expect(onSelectRun).toHaveBeenCalledWith(null);
   });
 
+  it("groups an unfiltered task list by application", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        { ...RUN, id: "openscad-1", name: "Preview model", kind: "openscad" },
+        { ...RUN, id: "orca-1", name: "Slice model", kind: "orca" },
+      ],
+    }) as Response));
+
+    renderManager(createClient(), <TaskManager basePath="/api/v1" />);
+
+    expect(await screen.findByRole("heading", { name: "OpenSCAD" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Orca" })).toBeInTheDocument();
+    expect(screen.getByText("Preview model")).toBeInTheDocument();
+    expect(screen.getByText("Slice model")).toBeInTheDocument();
+  });
+
   it("scopes the run listing with label equality filters", async () => {
     const fetchMock = mockFetch();
     vi.stubGlobal("fetch", fetchMock);

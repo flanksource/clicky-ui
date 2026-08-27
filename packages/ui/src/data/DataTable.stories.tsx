@@ -3,6 +3,7 @@ import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { Button } from "../components/button";
 import {
+  UiArrowRight,
   UiFileCode,
   UiFileSpreadsheet,
   UiFileText,
@@ -969,6 +970,60 @@ function NativeGroupingShowcase() {
   );
 }
 
+const MATCHING_SERVICES = 3706;
+
+function SelectAllPagesShowcase() {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [resolving, setResolving] = useState(false);
+  // A real caller fetches the pages it has not loaded and hands their ids back;
+  // the story stands in for that round trip.
+  const selectEveryMatch = () => {
+    setResolving(true);
+    window.setTimeout(() => {
+      setSelected(
+        Array.from({ length: MATCHING_SERVICES }, (_, index) => `service-${index}`),
+      );
+      setResolving(false);
+    }, 300);
+  };
+  return (
+    <DataTable
+      data={rows}
+      columns={columns}
+      getRowId={(row) => row.service}
+      rowSelection={{
+        selectedRowIds: selected,
+        onSelectionChange: (ids) => setSelected(ids),
+        selectAllPages: {
+          noun: "services",
+          loading: resolving,
+          scopes: [{ total: MATCHING_SERVICES, onSelectAll: selectEveryMatch }],
+        },
+      }}
+      pagination={{
+        page: 0,
+        pageSize: 3,
+        total: MATCHING_SERVICES,
+        onPageChange: () => {},
+        onPageSizeChange: () => {},
+      }}
+      selectionActions={({ selectedRowIds, clearSelection }) => (
+        <>
+          <span className="text-xs">
+            <b>{selectedRowIds.length.toLocaleString()} selected</b>
+          </span>
+          <span className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+            <Button size="sm">Restart {selectedRowIds.length.toLocaleString()}</Button>
+          </span>
+        </>
+      )}
+    />
+  );
+}
+
 function SelectionActionsShowcase() {
   const [selected, setSelected] = useState<string[]>([]);
   return (
@@ -1007,6 +1062,66 @@ function SelectionActionsShowcase() {
         </>
       )}
     />
+  );
+}
+
+function SelectionActionDescriptorsShowcase() {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [log, setLog] = useState<string[]>([]);
+  const record = (line: string) => setLog((entries) => [...entries, line]);
+
+  return (
+    <div className="flex flex-col gap-density-2">
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: selected,
+          onSelectionChange: (ids) => setSelected(ids),
+        }}
+        selectionActions={[
+          {
+            id: "restart",
+            label: "Restart",
+            primary: true,
+            variant: "default",
+            icon: UiArrowRight,
+            pendingLabel: "Restarting…",
+            onSelect: async (context) => {
+              await new Promise((resolve) => setTimeout(resolve, 600));
+              record(`restarted ${context.selectedRowIds.join(", ")}`);
+            },
+          },
+          { id: "drain", label: "Drain", primary: true, onSelect: () => record("drained") },
+          {
+            id: "delete",
+            label: "Delete",
+            primary: true,
+            variant: "destructive",
+            confirm: {
+              message: (context) =>
+                `Delete ${context.selectedRows.length} services? This cannot be undone.`,
+            },
+            onSelect: (context) => record(`deleted ${context.selectedRowIds.length}`),
+          },
+          {
+            id: "export",
+            label: "Export",
+            section: "Download",
+            onSelect: () => undefined,
+            children: [
+              { id: "export-csv", label: "CSV", onSelect: () => record("exported csv") },
+              { id: "export-json", label: "JSON", onSelect: () => record("exported json") },
+            ],
+          },
+          { id: "tag", label: "Add tag", onSelect: () => record("tagged") },
+        ]}
+      />
+      <p className="px-1 text-xs text-muted-foreground">
+        {log.length ? log.join(" · ") : "No actions run yet."}
+      </p>
+    </div>
   );
 }
 
@@ -1197,7 +1312,7 @@ export const SelectionActionsAndFooter: Story = {
     docs: {
       description: {
         story: [
-          "`selectionActions` renders a bulk action bar pinned to the bottom of the table shell whenever `rowSelection` holds a non-empty selection — it receives the selected rows and a `clearSelection` callback, so the caller owns the copy and the actions but not the plumbing.",
+          "`selectionActions` renders bulk actions in the toolbar beside the table menu whenever `rowSelection` holds a non-empty selection — it receives the selected rows and a `clearSelection` callback, so the caller owns the copy and the actions but not the plumbing.",
           "",
           '`footer` replaces the default "N of M rows" strip, and `getRowClassName` tints the degraded row.',
         ].join("\n"),
@@ -1222,6 +1337,92 @@ export const SelectionActionsAndFooter: Story = {
     await expect(
       canvas.queryByTestId("data-table-selection-actions"),
     ).toBeNull();
+  },
+};
+
+export const SelectionActionDescriptors: Story = {
+  render: () => <SelectionActionDescriptorsShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "`selectionActions` also takes a list of descriptors, and then the table renders them: the count, the Clear, the buttons, the overflow menu, the pending state while an async action is in flight, and the prompt in front of a destructive one.",
+          "",
+          "`primary` pins an action to the toolbar; the rest collapse into a menu whose sections and submenus come from the same `section`/`children` fields the table preferences menu uses. The render-prop form is still there for a cluster that is genuinely bespoke.",
+        ].join("\n"),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "Select row worker" }),
+    );
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "Select row cron" }),
+    );
+
+    const bar = within(canvas.getByTestId("data-table-selection-actions"));
+    await expect(bar.getByText("2 selected")).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Restart" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    // A destructive action names the count before it runs, and backing out runs
+    // nothing.
+    await userEvent.click(bar.getByRole("button", { name: "Delete" }));
+    await expect(
+      await within(document.body).findByText(
+        "Delete 2 services? This cannot be undone.",
+      ),
+    ).toBeVisible();
+    await userEvent.click(
+      within(document.body).getByRole("button", { name: "Cancel" }),
+    );
+    await expect(canvas.getByText("No actions run yet.")).toBeVisible();
+
+    // The unpinned actions live in the overflow, grouped by section.
+    await userEvent.click(bar.getByRole("button", { name: /More/ }));
+    const menu = within(await within(document.body).findByRole("menu"));
+    await expect(menu.getByRole("menuitem", { name: "Add tag" })).toBeVisible();
+  },
+};
+
+export const SelectAllPages: Story = {
+  render: () => <SelectAllPagesShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "The header checkbox reaches only the rows the table is holding. `rowSelection.selectAllPages` adds the step past the page: the count shows for any selection, and once every loaded row is selected the table offers the rest, calling `onSelectAll` so the caller can fetch the pages it has not loaded.",
+          "",
+          "`scopes` is a ladder, narrowest first. A table showing one group of a larger result passes the group and then the whole match, so `select all` means the rows in front of the reader before it means every row the filters allow. A scope's `total` defaults to `pagination.total`.",
+        ].join("\n"),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByTestId("data-table-selection-scope")).toBeNull();
+
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "Select all visible rows" }),
+    );
+    const scope = within(canvas.getByTestId("data-table-selection-scope"));
+    await expect(scope.getByText("3 of 3,706 services selected.")).toBeVisible();
+
+    await userEvent.click(
+      scope.getByRole("button", { name: "Select all 3,706 services" }),
+    );
+    await expect(
+      await canvas.findByText("All 3,706 services selected."),
+    ).toBeVisible();
+    const bar = within(canvas.getByTestId("data-table-selection-actions"));
+    await expect(bar.getByText("3,706 selected")).toBeVisible();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Clear selection" }),
+    );
+    await expect(canvas.queryByTestId("data-table-selection-scope")).toBeNull();
   },
 };
 

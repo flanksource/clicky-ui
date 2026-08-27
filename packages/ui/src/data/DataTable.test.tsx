@@ -149,6 +149,206 @@ describe("DataTable", () => {
     );
   });
 
+  it("puts the selection cluster in the toolbar beside the table menu, above the rows", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange: vi.fn(),
+          selectAllPages: { scopes: [{ total: 3706, onSelectAll: vi.fn() }], noun: "requests" },
+        }}
+        selectionActions={() => <button type="button">Restart selected</button>}
+      />,
+    );
+
+    const cluster = screen.getByTestId("data-table-selection-actions");
+    const menu = screen.getByRole("button", { name: "Open column menu" });
+    expect(cluster.parentElement).toBe(menu.parentElement);
+    expect(
+      cluster.compareDocumentPosition(screen.getByRole("table")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(cluster).getByRole("button", { name: "Restart selected" }),
+    ).toBeInTheDocument();
+    expect(
+      within(cluster).getByRole("button", { name: "Select all 3,706 requests" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the rows past the page only once the whole page is selected", () => {
+    const onSelectAll = vi.fn();
+    const onSelectionChange = vi.fn();
+    const selectAllPages = { scopes: [{ total: 3706, onSelectAll }], noun: "requests" };
+    const { rerender } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange, selectAllPages }}
+      />,
+    );
+
+    // A partial page still gets the count — it is the offer that waits.
+    const partial = within(screen.getByTestId("data-table-selection-scope"));
+    expect(partial.getByText("1 of 3,706 requests selected.")).toBeInTheDocument();
+    expect(partial.queryByRole("button", { name: /Select all/ })).toBeNull();
+
+    rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange,
+          selectAllPages,
+        }}
+      />,
+    );
+
+    const notice = within(screen.getByTestId("data-table-selection-scope"));
+    expect(notice.getByText("3 of 3,706 requests selected.")).toBeInTheDocument();
+    fireEvent.click(notice.getByRole("button", { name: "Select all 3,706 requests" }));
+    expect(onSelectAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the group it is showing before the whole match, and the match once the group is covered", () => {
+    const selectGroup = vi.fn();
+    const selectEverything = vi.fn();
+    const scopes = [
+      { total: 12, onSelectAll: selectGroup, label: "Select all 12 in this group" },
+      { total: 3706, onSelectAll: selectEverything },
+    ];
+    const { rerender } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange: vi.fn(),
+          selectAllPages: { scopes, noun: "requests" },
+        }}
+      />,
+    );
+
+    const narrow = within(screen.getByTestId("data-table-selection-scope"));
+    expect(narrow.getByText("3 of 3,706 requests selected.")).toBeInTheDocument();
+    fireEvent.click(narrow.getByRole("button", { name: "Select all 12 in this group" }));
+    expect(selectGroup).toHaveBeenCalledTimes(1);
+    expect(selectEverything).not.toHaveBeenCalled();
+
+    // The group is covered now, so the ladder moves on to the whole match.
+    rerender(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: Array.from({ length: 12 }, (_, index) => `row-${index}`).concat([
+            "api",
+            "worker",
+            "cron",
+          ]),
+          onSelectionChange: vi.fn(),
+          selectAllPages: { scopes, noun: "requests" },
+        }}
+      />,
+    );
+
+    const wide = within(screen.getByTestId("data-table-selection-scope"));
+    expect(wide.queryByRole("button", { name: /in this group/ })).toBeNull();
+    fireEvent.click(wide.getByRole("button", { name: "Select all 3,706 requests" }));
+    expect(selectEverything).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a selection that already spans every match and offers only to clear it", () => {
+    const onSelectAll = vi.fn();
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange,
+          selectAllPages: { scopes: [{ total: 3, onSelectAll }], noun: "requests" },
+        }}
+      />,
+    );
+
+    const notice = within(screen.getByTestId("data-table-selection-scope"));
+    expect(notice.getByText("All 3 requests selected.")).toBeInTheDocument();
+    expect(notice.queryByRole("button", { name: /Select all/ })).toBeNull();
+    fireEvent.click(notice.getByRole("button", { name: "Clear selection" }));
+    expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
+  });
+
+  it("holds the cross-page offer while the caller is still resolving it", () => {
+    const onSelectAll = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange: vi.fn(),
+          selectAllPages: { scopes: [{ total: 3706, onSelectAll }], loading: true },
+        }}
+      />,
+    );
+
+    const pending = within(screen.getByTestId("data-table-selection-scope")).getByRole(
+      "button",
+      { name: "Selecting…" },
+    );
+    expect(pending).toBeDisabled();
+    fireEvent.click(pending);
+    expect(onSelectAll).not.toHaveBeenCalled();
+  });
+
+  it("takes the cross-page total from the pager when the caller does not name one", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange: vi.fn(),
+          selectAllPages: { scopes: [{ onSelectAll: vi.fn() }] },
+        }}
+        pagination={{ page: 0, pageSize: 3, total: 42, onPageChange: vi.fn(), onPageSizeChange: vi.fn() }}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("data-table-selection-scope")).getByRole("button", {
+        name: "Select all 42 rows",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves tables that never opted into cross-page selection unchanged", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api", "worker", "cron"], onSelectionChange: vi.fn() }}
+        pagination={{ page: 0, pageSize: 3, total: 42, onPageChange: vi.fn(), onPageSizeChange: vi.fn() }}
+      />,
+    );
+
+    expect(screen.queryByTestId("data-table-selection-scope")).toBeNull();
+  });
+
   it("renders selectionActions only while rows are selected", () => {
     const onSelectionChange = vi.fn();
     const { rerender } = render(
@@ -184,6 +384,281 @@ describe("DataTable", () => {
     const bar = within(screen.getByTestId("data-table-selection-actions"));
     fireEvent.click(bar.getByRole("button", { name: "Clear api, cron" }));
     expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
+
+    // The render-prop form is the caller's markup start to finish; the table
+    // must not also volunteer a count it never asked for.
+    expect(screen.queryByTestId("data-table-selection-count")).toBeNull();
+  });
+
+  it("renders a selectionActions list as toolbar buttons and hands each one the selection", () => {
+    const onArchive = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          { id: "archive", label: "Archive", onSelect: onArchive },
+          { id: "restart", label: "Restart", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    fireEvent.click(bar.getByRole("button", { name: "Archive" }));
+
+    expect(onArchive).toHaveBeenCalledTimes(1);
+    const context = onArchive.mock.calls[0]![0];
+    expect(context.selectedRowIds).toEqual(["api", "cron"]);
+    expect(context.selectedRows.map((row: ServiceRow) => row.service)).toEqual([
+      "api",
+      "cron",
+    ]);
+  });
+
+  it("states the count itself so the caller stops writing it", () => {
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange }}
+        selectionActions={[{ id: "archive", label: "Archive", onSelect: vi.fn() }]}
+      />,
+    );
+
+    const count = within(screen.getByTestId("data-table-selection-count"));
+    expect(count.getByText("2 selected")).toBeTruthy();
+    fireEvent.click(count.getByRole("button", { name: "Clear selection" }));
+    expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
+  });
+
+  it("leaves the count to the scope notice when a cross-page scope is present", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "cron"],
+          onSelectionChange: vi.fn(),
+          selectAllPages: {
+            noun: "services",
+            scopes: [{ total: 42, onSelectAll: vi.fn() }],
+          },
+        }}
+        pagination={{
+          page: 0,
+          pageSize: 3,
+          total: 42,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+        selectionActions={[{ id: "archive", label: "Archive", onSelect: vi.fn() }]}
+      />,
+    );
+
+    // Two counts and two Clears in one row reads as two selections.
+    expect(screen.queryByTestId("data-table-selection-count")).toBeNull();
+    expect(screen.getByTestId("data-table-selection-scope")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Clear selection" })).toHaveLength(1);
+  });
+
+  it("keeps three actions on the toolbar and collapses the rest into the overflow menu", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={["one", "two", "three", "four", "five"].map((id) => ({
+          id,
+          label: id,
+          onSelect: vi.fn(),
+        }))}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    expect(bar.getByRole("button", { name: "one" })).toBeTruthy();
+    expect(bar.getByRole("button", { name: "three" })).toBeTruthy();
+    expect(bar.queryByRole("button", { name: "four" })).toBeNull();
+
+    fireEvent.click(bar.getByRole("button", { name: /More/ }));
+    // Queried by role alone: floating-ui's useRole points the menu's
+    // aria-labelledby at its trigger, so its computed name is the trigger's
+    // rather than the menuLabel passed in.
+    const menu = within(screen.getByRole("menu"));
+    expect(menu.getByRole("menuitem", { name: "four" })).toBeTruthy();
+    expect(menu.getByRole("menuitem", { name: "five" })).toBeTruthy();
+  });
+
+  // The menu groups by section, and grouping must not reorder the caller's
+  // list. A caller that deliberately puts its destructive action last would
+  // otherwise find a section named "Danger" sorted alphabetically to the top of
+  // the menu — directly under the cursor that just opened it.
+  it("keeps sections in the order the caller listed them", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          // Three pinned so the grouped ones below all reach the overflow.
+          { id: "pin1", label: "pin1", primary: true, onSelect: vi.fn() },
+          { id: "pin2", label: "pin2", primary: true, onSelect: vi.fn() },
+          { id: "pin3", label: "pin3", primary: true, onSelect: vi.fn() },
+          { id: "status", label: "status", section: "Status", onSelect: vi.fn() },
+          { id: "labels", label: "labels", section: "Labels", onSelect: vi.fn() },
+          { id: "comment", label: "comment", section: "Status", onSelect: vi.fn() },
+          { id: "delete", label: "delete", section: "Danger", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    fireEvent.click(bar.getByRole("button", { name: /More/ }));
+    const items = within(screen.getByRole("menu"))
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+
+    // Sections in first-appearance order, and same-section items contiguous so
+    // DropdownMenu's headings land on the right rows.
+    expect(items).toEqual(["status", "comment", "labels", "delete"]);
+  });
+
+  it("pins the actions that ask for it and collapses the ones that do not", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          { id: "one", label: "one", onSelect: vi.fn() },
+          { id: "two", label: "two", onSelect: vi.fn() },
+          { id: "three", label: "three", primary: true, onSelect: vi.fn() },
+          { id: "four", label: "four", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    expect(bar.getByRole("button", { name: "three" })).toBeTruthy();
+    // Naming a primary action is the caller saying what the toolbar is for, so
+    // position stops deciding for the rest.
+    expect(bar.queryByRole("button", { name: "one" })).toBeNull();
+    expect(bar.queryByRole("button", { name: "two" })).toBeNull();
+  });
+
+  it("shows the running action pending and refuses a second click until it settles", async () => {
+    let release!: () => void;
+    const onSelect = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          { id: "slow", label: "Archive", onSelect },
+          { id: "other", label: "Restart", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    const archive = bar.getByRole("button", { name: "Archive" });
+    fireEvent.click(archive);
+
+    expect(archive.getAttribute("aria-busy")).toBe("true");
+    // The rows underneath are already being rewritten; a second bulk call
+    // against a half-changed selection is the one nobody can put back.
+    expect(bar.getByRole("button", { name: "Restart" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(archive);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release();
+    });
+    await waitFor(() =>
+      expect(
+        bar.getByRole("button", { name: "Restart" }).hasAttribute("disabled"),
+      ).toBe(false),
+    );
+  });
+
+  it("asks before running an action that carries a confirm, and only then runs it", async () => {
+    const onSelect = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          {
+            id: "delete",
+            label: "Delete",
+            variant: "destructive",
+            confirm: {
+              message: (context) => `Delete ${context.selectedRowIds.length} services?`,
+            },
+            onSelect,
+          },
+        ]}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    fireEvent.click(bar.getByRole("button", { name: "Delete" }));
+
+    // The count is the number that makes a bulk confirmation worth stopping for.
+    expect(await screen.findByText("Delete 2 services?")).toBeTruthy();
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByText("Delete 2 services?")).toBeNull());
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(bar.getByRole("button", { name: "Delete" }));
+    const dialog = within(await screen.findByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports every selected id when the selection reaches past the loaded page", () => {
+    const onSelect = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "beyond-the-page"],
+          onSelectionChange: vi.fn(),
+        }}
+        selectionActions={[{ id: "archive", label: "Archive", onSelect }]}
+      />,
+    );
+
+    // Filtering the ids down to loaded rows would make the cluster vanish at
+    // exactly the moment a cross-page selection got big enough to matter.
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    fireEvent.click(bar.getByRole("button", { name: "Archive" }));
+
+    const context = onSelect.mock.calls[0]![0];
+    expect(context.selectedRowIds).toEqual(["api", "beyond-the-page"]);
+    expect(context.selectedRows.map((row: ServiceRow) => row.service)).toEqual(["api"]);
   });
 
   it("applies getRowClassName to the matching row", () => {

@@ -32,15 +32,14 @@ export function TaskManagerButton({
   onSelectRun,
 }: TaskManagerButtonProps) {
   const { runs } = useTaskRuns({ basePath, kind, labels });
-  const active = runs.filter((run) => run.status === "running" || run.status === "pending").length;
-  const activeRun = runs.find((run) => run.status === "running") ?? runs.find((run) => run.status === "pending");
+  const activeRuns = runs.filter((run) => run.status === "running" || run.status === "pending");
   const { snapshots } = useTaskRun({
     ...(basePath ? { basePath } : {}),
-    ...(activeRun ? { id: activeRun.id } : {}),
-    enabled: Boolean(activeRun),
+    ids: activeRuns.map((run) => run.id),
+    enabled: activeRuns.length > 0,
   });
   const resources = resourceSummary(snapshots);
-  const trigger = <TaskTrigger active={active} {...(resources ? { resources } : {})} />;
+  const trigger = <TaskTrigger active={activeRuns.length} {...(resources ? { resources } : {})} />;
 
   return panel ? (
     <TaskPanelDropdown
@@ -166,8 +165,15 @@ function ResourceGauge({ icon, label, percent, value }: { icon: React.ReactNode;
 }
 
 function resourceSummary(snapshots: TaskSnapshot[]): ResourceSummary | undefined {
-  const tasks = snapshots.filter((snapshot) => snapshot.type === "task" && isTaskProcessDetails(snapshot.details));
-  const processes = tasks.length ? tasks : snapshots.filter((snapshot) => isTaskProcessDetails(snapshot.details));
+  const activeSnapshots = snapshots.filter(
+    (snapshot) => snapshot.status === "running" || snapshot.status === "pending",
+  );
+  const tasks = activeSnapshots.filter(
+    (snapshot) => snapshot.type === "task" && isTaskProcessDetails(snapshot.details),
+  );
+  const processes = tasks.length
+    ? tasks
+    : activeSnapshots.filter((snapshot) => isTaskProcessDetails(snapshot.details));
   if (!processes.length) return undefined;
   return processes.reduce<ResourceSummary>((total, snapshot) => {
     if (!isTaskProcessDetails(snapshot.details)) return total;

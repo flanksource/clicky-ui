@@ -62,7 +62,7 @@ describe("useTaskRun (SSE)", () => {
     expect(es.url).toContain("tasks=g1");
 
     act(() => {
-      es.emit("task", groupSnap("running"));
+      es.emit("task", { ...groupSnap("running"), controls: ["stop"] });
       es.emit("task", taskSnap("running"));
     });
     await waitFor(() => expect(result.current.snapshots).toHaveLength(2));
@@ -79,6 +79,7 @@ describe("useTaskRun (SSE)", () => {
     // Latest snapshot per id wins.
     const group = result.current.snapshots.find((s) => s.type === "group");
     expect(group?.status).toBe("success");
+    expect(group?.controls).toBeUndefined();
   });
 
   it("applies stdout and stderr SSE deltas without replacing task metadata", async () => {
@@ -105,6 +106,26 @@ describe("useTaskRun (SSE)", () => {
       const task = result.current.snapshots.find((snapshot) => snapshot.id === "t1");
       expect(task).toMatchObject({ stdout: "tail", stdoutTruncated: true });
     });
+  });
+
+  it("clears snapshots when the subscription is disabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useTaskRun({ id: "g1", enabled }),
+      { initialProps: { enabled: true } },
+    );
+    const es = MockEventSource.last!;
+
+    act(() => es.emit("task", taskSnap("running")));
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+
+    rerender({ enabled: false });
+
+    await waitFor(() => expect(result.current).toMatchObject({
+      snapshots: [],
+      status: "idle",
+      isComplete: false,
+    }));
+    expect(es.closed).toBe(true);
   });
 });
 

@@ -106,6 +106,7 @@ import {
   type DataTableGroupMetaAlign,
 } from "./DataTable.grouping";
 import { DataTableGroupingControls } from "./DataTableGroupingControls";
+import { SelectionActionBar } from "./SelectionActionBar";
 
 export type { TimestampOptions, TagsOptions };
 
@@ -347,6 +348,39 @@ export type DataTableCursorPagination = {
 };
 
 /**
+ * isSinglePage reports whether the rows on screen are the whole result.
+ *
+ * It is the question a client-side sort turns on. Sorting one page of many
+ * reorders that page and nothing else, which reads as a sort of the table and is
+ * not one — but when there is no page after this one, sorting these rows *is*
+ * sorting the table, and withholding the header helps nobody.
+ *
+ * `hasMore` is preferred over inferring the end of the data from a short page:
+ * the two are different facts and only the server knows which one happened. A
+ * lower-bound total says nothing about the end, so it is not read as one; the
+ * short-page inference is the last resort, and matches what the footer already
+ * falls back to.
+ */
+function isSinglePage(
+  pagination: DataTablePagination | undefined,
+  visibleRowCount: number,
+): boolean {
+  if (!pagination) return true;
+  if (pagination.cursor) {
+    return (
+      pagination.cursor.current === undefined &&
+      pagination.cursor.next === undefined
+    );
+  }
+  if (pagination.page !== 0) return false;
+  if (pagination.hasMore != null) return !pagination.hasMore;
+  if (pagination.total != null && pagination.totalRelation !== "gte") {
+    return pagination.total <= pagination.pageSize;
+  }
+  return visibleRowCount < pagination.pageSize;
+}
+
+/**
  * DataTableInfinite turns a server-paged table into one continuous list: the
  * caller accumulates the pages it has fetched and hands the whole run in as
  * `data`, and the table asks for the next one as the reader reaches the end.
@@ -403,6 +437,44 @@ export type DataTableRowSelection<
   isRowSelectable?: (row: T) => boolean;
   /** Toggle selection when the user clicks anywhere on a selectable row. */
   toggleOnRowClick?: boolean;
+  /**
+   * Extends the selection past the loaded page. Without it the header checkbox
+   * is the whole story and it only reaches rows the table is holding, which
+   * reads as "select all" but stops at the page boundary.
+   */
+  selectAllPages?: DataTableSelectAllPages;
+};
+
+/**
+ * The caller's half of a cross-page selection. The table knows how many rows it
+ * has and how many are selected; it cannot know the rows it never fetched, so
+ * resolving them stays with whoever owns the query.
+ */
+export type DataTableSelectAllPages = {
+  /**
+   * What the selection can widen to, narrowest first. A table showing one
+   * group of a larger result offers that group before the whole match, so
+   * "select all" means the rows in front of the reader before it means every
+   * row the filters allow. One scope is the ordinary case.
+   */
+  scopes: readonly DataTableSelectAllScope[];
+  /** True while a scope is still resolving. */
+  loading?: boolean;
+  /** Plural noun for the rows, used in the notice. Defaults to "rows". */
+  noun?: string;
+};
+
+export type DataTableSelectAllScope = {
+  /** Rows this scope covers. Defaults to `pagination.total`. */
+  total?: number;
+  /**
+   * Selects every row in the scope, adding to whatever is already selected.
+   * Usually async, since the caller has to fetch the pages it has not loaded
+   * before it can hand their ids back through `onSelectionChange`.
+   */
+  onSelectAll: () => void;
+  /** Button label. Defaults to `Select all ${total} ${noun}`. */
+  label?: string;
 };
 
 /** Passed to `selectionActions` while rows are selected. */
@@ -414,6 +486,71 @@ export type DataTableSelectionContext<
   selectedRows: T[];
   /** Empties the selection through the same `onSelectionChange` callback. */
   clearSelection: () => void;
+};
+
+/**
+ * Copy for the prompt a bulk action puts in front of itself. The count is the
+ * one number that makes a bulk confirmation worth stopping for, and the table
+ * is the only side that knows it — so `message` can be a function of the
+ * selection rather than a fixed string the caller has to keep in sync.
+ */
+export type DataTableSelectionConfirm<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  /** Heading of the prompt. Defaults to the action's own label. */
+  title?: ReactNode;
+  message?: ReactNode | ((context: DataTableSelectionContext<T>) => ReactNode);
+  /** Label of the button that proceeds. Defaults to the action's label. */
+  confirmLabel?: string;
+  /** Label of the button that backs out. Defaults to "Cancel". */
+  cancelLabel?: string;
+};
+
+/**
+ * A bulk action the table renders for itself, rather than markup the caller
+ * assembles. It is a `DataTableMenuAction` with the selection wired in: the
+ * same id / label / icon / section / children shape, so the overflow menu keeps
+ * one renderer and one set of submenu rules, and an `onSelect` that is handed
+ * the rows it acts on.
+ *
+ * Everything it adds is something a bulk action has and a preferences entry
+ * does not. A bulk action is a request against real rows, so it can be slow
+ * (`onSelect` may return a promise), it can be the reason the reader ticked the
+ * boxes at all (`primary`), it can be the one nobody meant to click
+ * (`variant: "destructive"`), and it can be the one that deserves to be asked
+ * about twice (`confirm`).
+ */
+export type DataTableSelectionAction<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = Omit<DataTableMenuAction, "onSelect" | "children"> & {
+  /**
+   * Runs the action against the current selection. Returning a promise puts
+   * this button in a pending state and locks the rest of the cluster until it
+   * settles: the slow half of a bulk call is also the half that can be fired
+   * twice, and the rows it is rewriting are already under the reader's cursor.
+   */
+  onSelect: (context: DataTableSelectionContext<T>) => void | Promise<void>;
+  /**
+   * Nested actions. As in the preferences menu, a parent that has them is a
+   * submenu trigger and its own `onSelect` never runs. An action with children
+   * always lives in the overflow menu — a flyout hung off a toolbar button
+   * needs an anchor the toolbar does not have, and the menu already is one.
+   */
+  children?: DataTableSelectionAction<T>[];
+  /**
+   * Keeps the action on the toolbar as its own button. Once any action claims
+   * `primary` the ones that do not fall into the overflow menu, because a
+   * caller that has named its important action has already said what the
+   * toolbar is for. With none claimed, position decides.
+   */
+  primary?: boolean;
+  /** Button styling. "destructive" is the only one that changes what the
+   * action means rather than how loudly it says it. */
+  variant?: "default" | "outline" | "ghost" | "destructive";
+  /** Ask before running. `true` uses the default copy. */
+  confirm?: boolean | DataTableSelectionConfirm<T>;
+  /** Label shown while `onSelect` is in flight. Defaults to the normal label. */
+  pendingLabel?: ReactNode;
 };
 
 /** Passed to a `footer` render function. */
@@ -547,10 +684,20 @@ type DataTableInnerProps<
   /** Controlled checkbox selection for entity/bulk-action tables. */
   rowSelection?: DataTableRowSelection<T>;
   /**
-   * Bulk action bar, pinned to the bottom of the table shell while
-   * `rowSelection` holds a non-empty selection. Ignored without `rowSelection`.
+   * Bulk actions, rendered in the toolbar beside the table menu while
+   * `rowSelection` holds a non-empty selection — next to what the selection
+   * covers, and above the rows it acts on. Ignored without `rowSelection`.
+   *
+   * A list is the form to reach for: the table renders the buttons, the count,
+   * the Clear, the overflow menu, the pending state while an async action is in
+   * flight, and the prompt in front of a destructive one — the same way it
+   * renders `menuActions`. The render-prop form stays for the cluster that is
+   * genuinely bespoke (a running total, a bar with its own layout) and hands
+   * back the plumbing only.
    */
-  selectionActions?: (context: DataTableSelectionContext<T>) => ReactNode;
+  selectionActions?:
+    | DataTableSelectionAction<T>[]
+    | ((context: DataTableSelectionContext<T>) => ReactNode);
   /**
    * Extra classes for a row's `<tr>`, applied last so tailwind-merge lets the
    * caller override the built-in hover / selected backgrounds.
@@ -1498,7 +1645,15 @@ function DataTableInner<T extends Record<string, unknown>>({
   // else, which reads as a sort of the whole table and is not one. Under server
   // paging the header therefore goes inert unless the caller wired the sort
   // through to the server, where the whole result set actually lives.
-  const pageLocalSort = !!pagination && !onSortChange;
+  //
+  // Unless there is no other page. A single page holds the entire result, so
+  // sorting it is sorting the table and the objection does not apply. Infinite
+  // scroll is the same question asked of the run so far: rows still to be
+  // fetched are rows this sort would not have seen.
+  const pageLocalSort =
+    !!pagination &&
+    !onSortChange &&
+    !(isSinglePage(pagination, data.length) && !infinite?.hasMore);
 
   // Client-side incremental reveal: when `clientReveal` is set (and the caller
   // is not doing server pagination), only the first `visibleCount` sorted rows
@@ -1553,6 +1708,26 @@ function DataTableInner<T extends Record<string, unknown>>({
     selectedVisibleCount === selectableVisibleRows.length;
   const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const selectAllPages = rowSelection?.selectAllPages;
+  // Scopes resolved against the pager, then read as a ladder: the sentence
+  // measures the selection against the widest scope, and the button offers the
+  // narrowest one the selection has not covered yet.
+  const selectAllScopes = useMemo(
+    () =>
+      (selectAllPages?.scopes ?? []).flatMap((scope) => {
+        const total = scope.total ?? pagination?.total;
+        return total != null ? [{ ...scope, total }] : [];
+      }),
+    [pagination?.total, selectAllPages?.scopes],
+  );
+  const widestScope = selectAllScopes[selectAllScopes.length - 1];
+  // The offer waits until the whole page is selected: "select all 3,706" beside
+  // three ticked rows invites a click nobody meant to make. The count itself
+  // shows for any selection, so the actions never have to restate it.
+  const nextScope = allVisibleSelected
+    ? selectAllScopes.find((scope) => scope.total > selectedRowIDs.size)
+    : undefined;
+  const showSelectionScope = !!widestScope && selectedRowIDs.size > 0;
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -1602,16 +1777,46 @@ function DataTableInner<T extends Record<string, unknown>>({
     selectedRowIDs,
   ]);
 
-  const selectionBar = useMemo(() => {
-    if (!rowSelection || !selectionActions) return null;
-    const selected = rows.filter((record) => selectedRowIDs.has(record.id));
-    if (selected.length === 0) return null;
-    return selectionActions({
-      selectedRowIds: selected.map((record) => record.id),
-      selectedRows: selected.map((record) => record.row),
+  const selectionContext = useMemo<DataTableSelectionContext<T> | null>(() => {
+    if (!rowSelection || selectedRowIDs.size === 0) return null;
+    return {
+      // The ids are the caller's, not the page's. A cross-page selection covers
+      // rows this table never fetched, and an action about to say what it will
+      // touch needs all of them; `selectedRows` is only the ones on hand.
+      // Filtering the ids down to loaded rows instead would make the whole
+      // cluster vanish at the moment the selection got big enough to matter.
+      selectedRowIds: Array.from(selectedRowIDs),
+      selectedRows: rows
+        .filter((record) => selectedRowIDs.has(record.id))
+        .map((record) => record.row),
       clearSelection: () => notifySelection(new Set()),
-    });
-  }, [notifySelection, rowSelection, rows, selectedRowIDs, selectionActions]);
+    };
+  }, [notifySelection, rowSelection, rows, selectedRowIDs]);
+
+  // The render-prop form keeps its own path: it is the caller's markup, and the
+  // table has nothing to add to it.
+  const selectionBar = useMemo(() => {
+    if (!selectionContext || typeof selectionActions !== "function") return null;
+    return selectionActions(selectionContext);
+  }, [selectionActions, selectionContext]);
+
+  const descriptorSelectionActions = Array.isArray(selectionActions)
+    ? selectionActions
+    : null;
+
+  const selectionCluster =
+    selectionContext && descriptorSelectionActions ? (
+      <SelectionActionBar
+        actions={descriptorSelectionActions}
+        context={selectionContext}
+        // The scope notice already carries the count and the Clear; two of each
+        // in one row reads as two selections.
+        showCount={!showSelectionScope}
+        className="flex flex-wrap items-center gap-density-2"
+      />
+    ) : (
+      selectionBar
+    );
 
   const renderedFooter =
     error != null
@@ -1673,10 +1878,37 @@ function DataTableInner<T extends Record<string, unknown>>({
       [collapseStateKey]: { all: collapsed, groups: {} },
     }));
   };
+  // The selection cluster rides in the toolbar beside the table menu: it is
+  // about the rows in this table, and a reader who has just ticked a box is
+  // already looking at the top of it. Scope first, then the caller's actions,
+  // then the table's own controls.
+  const selectionToolbar =
+    error == null && (showSelectionScope || selectionCluster) ? (
+      <div
+        data-testid="data-table-selection-actions"
+        className="flex flex-wrap items-center gap-density-2"
+      >
+        {showSelectionScope && widestScope ? (
+          <SelectionScopeNotice
+            noun={selectAllPages?.noun ?? "rows"}
+            {...(selectAllPages?.loading ? { loading: true } : {})}
+            total={widestScope.total}
+            selectedCount={selectedRowIDs.size}
+            {...(nextScope ? { nextScope } : {})}
+            onClear={() => notifySelection(new Set())}
+          />
+        ) : null}
+        {selectionCluster}
+      </div>
+    ) : null;
   const filterBarTrailing =
-    filterBarProps?.trailing || groupingModes || showTablePreferencesControl ? (
+    filterBarProps?.trailing ||
+    selectionToolbar ||
+    groupingModes ||
+    showTablePreferencesControl ? (
       <>
         {filterBarProps?.trailing}
+        {selectionToolbar}
         {groupingModes ? (
           <DataTableGroupingControls
             modes={groupingModes}
@@ -1865,7 +2097,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-1", className)}
         data-density={densityOverride}
       >
-        {showFilterBar && (
+        {(showFilterBar || selectionToolbar) && (
           <FilterBar
             {...filterBarProps}
             {...(externalSearch
@@ -2330,15 +2562,6 @@ function DataTableInner<T extends Record<string, unknown>>({
           </div>
         </div>
 
-        {error == null && selectionBar ? (
-          <div
-            data-testid="data-table-selection-actions"
-            className="sticky bottom-2 z-10 flex shrink-0 items-center justify-between gap-density-3 rounded-md border border-border bg-card p-density-2 shadow-md"
-          >
-            {selectionBar}
-          </div>
-        ) : null}
-
         {renderedFooter !== null && (
           <div className="shrink-0 px-1 text-xs text-muted-foreground">
             {renderedFooter}
@@ -2473,6 +2696,64 @@ function useCursorTrail(cursor: DataTableCursorPagination | undefined) {
     push: (next: string) => setTrail((previous) => [...previous.slice(0, index), next]),
     previous: () => (index <= 1 ? undefined : trail[index - 2]),
   };
+}
+
+/**
+ * Says what a selection actually covers once it can outgrow the page, and
+ * offers the one step the header checkbox cannot take. Once the selection
+ * spans the matched set it stops offering and starts reporting, because the
+ * only thing left to do with it is let it go.
+ */
+function SelectionScopeNotice({
+  noun,
+  loading,
+  total,
+  selectedCount,
+  nextScope,
+  onClear,
+}: {
+  noun: string;
+  loading?: boolean;
+  /** The widest scope, which is what the count is measured against. */
+  total: number;
+  selectedCount: number;
+  /** The narrowest scope the selection has not covered, if any is left. */
+  nextScope?: DataTableSelectAllScope & { total: number };
+  onClear: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      data-testid="data-table-selection-scope"
+      className="flex flex-wrap items-center gap-density-2 text-xs text-muted-foreground"
+    >
+      <span>
+        {selectedCount >= total
+          ? `All ${total.toLocaleString()} ${noun} selected.`
+          : `${selectedCount.toLocaleString()} of ${total.toLocaleString()} ${noun} selected.`}
+      </span>
+      {nextScope ? (
+        <button
+          type="button"
+          className="rounded-md border border-border bg-background px-2 py-0.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={loading}
+          onClick={nextScope.onSelectAll}
+        >
+          {loading
+            ? "Selecting…"
+            : (nextScope.label ??
+              `Select all ${nextScope.total.toLocaleString()} ${noun}`)}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="rounded-md border border-border bg-background px-2 py-0.5 font-medium text-foreground hover:bg-accent"
+        onClick={onClear}
+      >
+        Clear selection
+      </button>
+    </div>
+  );
 }
 
 // DataTablePaginationFooter renders a small page-size selector and prev/next
