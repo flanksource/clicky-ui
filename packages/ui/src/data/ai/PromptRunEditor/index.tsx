@@ -17,6 +17,7 @@ import {
 import type { ChatModel, ToolMeta } from "../../chat/types";
 import type { FileUIPart } from "../../chat/types";
 import { RuntimeBar } from "../../runtime/RuntimeBar";
+import { runtimeModelForValue } from "../../runtime/RuntimeBar.model";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
@@ -110,9 +111,7 @@ export function PromptRunEditor({
   const [specOpen, setSpecOpen] = useState(false);
   const spec = value.spec ?? {};
   const rows = runtimeRows(value);
-  const selectedModel = models.find(
-    (model) => model.id === spec.id || model.id === spec.model,
-  );
+  const selectedModel = runtimeModelForValue(models, spec);
   const resolvedAttachmentUpload = useMemo(
     () => attachmentUpload ?? createAttachmentUploadAdapter(),
     [attachmentUpload],

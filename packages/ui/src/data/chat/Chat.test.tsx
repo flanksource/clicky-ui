@@ -56,6 +56,84 @@ const RUNTIME_MODEL: ChatModel = {
 };
 
 describe("Chat runtime controls", () => {
+  it("does not report a model change when a shared row keeps its identity", () => {
+    const apiModel: ChatModel = {
+      id: "openai/gpt-5.6-luna",
+      provider: "openai",
+      label: "GPT-5.6 Luna",
+      reasoning: false,
+      configured: true,
+      capabilitiesKnown: true,
+      runtime: {
+        id: "openai/gpt-5.6-luna",
+        model: "gpt-5.6-luna",
+        backend: "openai",
+        mode: "api",
+      },
+    };
+    const agentModel: ChatModel = {
+      id: "gpt-5.6-luna",
+      provider: "codex-agent",
+      label: "GPT-5.6 Luna",
+      reasoning: false,
+      configured: true,
+      capabilitiesKnown: true,
+      runtime: {
+        model: "gpt-5.6-luna",
+        backend: "codex-agent",
+        mode: "agent",
+      },
+    };
+    const onRuntimeChange = vi.fn();
+    const onModelChange = vi.fn();
+
+    render(
+      <Chat
+        models={[apiModel, agentModel]}
+        modelsApi={null}
+        defaultModel={agentModel.id}
+        runtimeFamilies={[
+          {
+            id: "codex",
+            label: "Codex",
+            provider: "codex-agent",
+            modes: [
+              {
+                id: "agent",
+                label: "Agent",
+                backend: "codex-agent",
+                provider: "codex-agent",
+              },
+              {
+                id: "cli",
+                label: "CLI",
+                backend: "codex-cli",
+                provider: "codex-agent",
+              },
+            ],
+          },
+        ]}
+        transport={recordingTransport()}
+        onRuntimeChange={onRuntimeChange}
+        onModelChange={onModelChange}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Runtime: Codex, Agent, GPT-5.6 Luna, effort None",
+      }),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "CLI" }));
+
+    expect(onRuntimeChange).toHaveBeenCalledWith({
+      model: "gpt-5.6-luna",
+      backend: "codex-cli",
+      mode: "cli",
+    });
+    expect(onModelChange).not.toHaveBeenCalled();
+  });
+
   it("renders the RuntimeBar combo instead of separate model and effort selectors", () => {
     render(
       <Chat
@@ -100,6 +178,7 @@ describe("Chat runtime controls", () => {
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
       backend: "openai",
+      mode: "api",
       effort: "medium",
     });
     expect(

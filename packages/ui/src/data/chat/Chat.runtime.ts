@@ -2,7 +2,11 @@ import {
   reconcileModelCapabilities,
   type ModelRuntimeSelection,
 } from "../runtime/model-capabilities";
-import { runtimeModelMatches } from "../runtime/RuntimeBar.model";
+import {
+  runtimeModelForValue,
+  runtimeModelMatches,
+} from "../runtime/RuntimeBar.model";
+import { modelMatchesBackend } from "../runtime/runtime-mode";
 import type { ChatModel, ChatModelRuntime } from "./types";
 
 export type ResolveChatRuntimeOptions = {
@@ -22,12 +26,34 @@ export function resolveChatRuntime({
   temperature,
   reasoningEfforts,
 }: ResolveChatRuntimeOptions): ChatModelRuntime {
+  const currentModel = selectedChatModel(models, current);
   const selected = preferredModel
-    ? models.find((model) => model.id === preferredModel)
-    : selectedChatModel(models, current);
+    ? currentModel?.id === preferredModel
+      ? currentModel
+      : models.find((model) => model.id === preferredModel)
+    : currentModel;
   let next: ChatModelRuntime;
   if (selected) {
+    const preservesExecutionSelection = Boolean(
+      selected === currentModel &&
+        current.backend !== undefined &&
+        current.mode !== undefined &&
+        selected.runtime?.backend !== undefined &&
+        selected.runtime.backend !== current.backend &&
+        selected.runtime.mode !== undefined &&
+        selected.runtime.mode !== current.mode &&
+        !runtimeModelMatches(selected, current) &&
+        modelMatchesBackend(selected, current.backend),
+    );
     next = reconcileModelCapabilities(current, selected, reasoningEfforts);
+    if (
+      preservesExecutionSelection &&
+      current.backend !== undefined &&
+      current.mode !== undefined
+    ) {
+      next.backend = current.backend;
+      next.mode = current.mode;
+    }
     if (!next.id && !next.model) next.id = selected.id;
   } else if (preferredModel) {
     next = { ...current, model: preferredModel };
@@ -41,7 +67,7 @@ export function selectedChatModel(
   models: ChatModel[],
   runtime: ModelRuntimeSelection,
 ): ChatModel | undefined {
-  return models.find((model) => runtimeModelMatches(model, runtime));
+  return runtimeModelForValue(models, runtime);
 }
 
 export function withRuntimeOverrides<T extends ChatModelRuntime>(

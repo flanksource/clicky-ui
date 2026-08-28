@@ -139,6 +139,7 @@ describe("RuntimeBar", () => {
     fireEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     expect(onChange).toHaveBeenCalledWith({
       backend: "claude-cli",
+      mode: "cli",
       effort: "high",
     });
     expect(menu).toBeInTheDocument();
@@ -146,6 +147,7 @@ describe("RuntimeBar", () => {
     fireEvent.click(within(menu).getByRole("radio", { name: "cmux" }));
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cmux",
+      mode: "cmux",
       model: "codex-cli/gpt-5",
       effort: "high",
     });
@@ -176,7 +178,10 @@ describe("RuntimeBar", () => {
     openSegment("Family — Claude");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "codex-cli" });
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cli",
+      mode: "cli",
+    });
   });
 
   it("drops a model the new family cannot run", () => {
@@ -192,7 +197,10 @@ describe("RuntimeBar", () => {
     openSegment("Family — Claude");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "codex-agent" });
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-agent",
+      mode: "agent",
+    });
   });
 
   it("drops the catalog id alongside the model the new family cannot run", () => {
@@ -212,7 +220,10 @@ describe("RuntimeBar", () => {
     openSegment("Family — Claude");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "codex-agent" });
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-agent",
+      mode: "agent",
+    });
   });
 
   it("drops the catalog id when a model is typed in directly", () => {
@@ -236,6 +247,7 @@ describe("RuntimeBar", () => {
 
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cli",
+      mode: "cli",
       model: "gpt-5.1",
     });
   });
@@ -255,7 +267,9 @@ describe("RuntimeBar", () => {
 
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cmux",
+      mode: "cmux",
       model: "codex-cli/gpt-5",
+      effort: "medium",
     });
   });
 
@@ -296,6 +310,7 @@ describe("RuntimeBar", () => {
     });
     expect(onChange).toHaveBeenCalledWith({
       backend: "gemini",
+      mode: "api",
       model: "gemini-3-pro",
     });
   });
@@ -322,6 +337,7 @@ describe("RuntimeBar", () => {
     // A reasoning model with unknown capabilities defaults to medium effort.
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-cli",
+      mode: "cli",
       model: "codex-cli/gpt-5",
       effort: "medium",
     });
@@ -438,6 +454,7 @@ describe("RuntimeBar", () => {
       model: "claude-sonnet-4-6",
       id: "anthropic/claude-sonnet-4-6",
       backend: "anthropic",
+      mode: "api",
       effort: "medium",
     });
   });
@@ -512,7 +529,10 @@ describe("RuntimeBar", () => {
     openSegment("Model — codex-cli/gpt-5");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Prompt default/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "codex-cli" });
+    expect(onChange).toHaveBeenCalledWith({
+      backend: "codex-cli",
+      mode: "cli",
+    });
   });
 
   it("clears the effort through the None entry", () => {

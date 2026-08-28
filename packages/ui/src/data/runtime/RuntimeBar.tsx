@@ -1,6 +1,6 @@
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
-import { runtimeModelMatches } from "./RuntimeBar.model";
+import { runtimeModelForValue } from "./RuntimeBar.model";
 import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import { RuntimeBarSegments } from "./RuntimeBarSegments";
 import { isSelectableModel } from "./availability";
@@ -13,7 +13,7 @@ import {
   backendForFamilyMode,
   familyById,
   firstMode,
-  modelBelongsToFamily,
+  modelForFamily,
   modelsForFamily,
   selectionForBackend,
   type SpecRuntimeFamily,
@@ -58,22 +58,10 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     family.modes.find((entry) => entry.id === selection.mode) ??
     firstMode(family);
   const modelOptions = modelsForFamily(models, family, value.backend);
-  const selectedModel = models.find(
-    (entry) =>
-      isSelectableModel(entry) &&
-      entry.runtime?.backend === value.backend &&
-      runtimeModelMatches(entry, value),
-  );
-  const resolvedModel =
-    selectedModel ??
-    models.find(
-      (entry) => isSelectableModel(entry) && runtimeModelMatches(entry, value),
-    );
+  const resolvedModel = runtimeModelForValue(models, value, isSelectableModel);
   const selectedModelUnavailable = Boolean(
-    value.model &&
-    models.some(
-      (entry) => !isSelectableModel(entry) && runtimeModelMatches(entry, value),
-    ),
+    (value.id || value.model) &&
+      runtimeModelForValue(models, value, (entry) => !isSelectableModel(entry)),
   );
   const supportedEfforts = effortOptionsForModel(
     resolvedModel,
@@ -82,28 +70,35 @@ export function RuntimeBar<T extends RuntimeBarValue>({
 
   const applyBackend = (familyId: string, modeId: string) => {
     const backend = backendForFamilyMode(families, familyId, modeId);
-    if (backend === (value.backend ?? "")) return;
-    let next = withOptionalRuntimeValue(
-      withRuntimeValue(value, { backend }),
-      "cliArgs",
-      undefined,
+    const nextMode = selectionForBackend(families, backend).mode;
+    if (backend === (value.backend ?? "") && nextMode === value.mode) return;
+    const nextFamily = familyById(families, familyId);
+    const modelId =
+      resolvedModel?.runtime?.model ??
+      value.model ??
+      resolvedModel?.id ??
+      value.id;
+    const nextModel = modelForFamily(
+      modelId,
+      models,
+      nextFamily,
+      backend,
     );
-    if (
-      !modelBelongsToFamily(
-        value.model,
-        models,
-        familyById(families, familyId),
-        backend,
-      )
-    ) {
-      next = withoutCatalogModel(next);
+    let next = withoutCatalogModel(value);
+    if (nextModel) {
+      next = reconcileModelCapabilities(next, nextModel, reasoningEfforts);
     }
+    next = withRuntimeValue(next, { backend, mode: nextMode });
+    next = withOptionalRuntimeValue(next, "cliArgs", undefined);
     onChange(next);
   };
 
   const applyCustomModel = (model: string) =>
     onChange(
-      withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
+      withRuntimeValue(
+        withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
+        { backend: mode.backend, mode: mode.id },
+      ),
     );
   // A menu row carries the backend of the catalog it was listed under, and one
   // catalog serves several backends — claude-cli and claude-cmux models are
@@ -111,20 +106,22 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   // picking a model silently move the user off the mode they chose, so a row
   // drawn from the selected mode's own catalog keeps that mode.
   const applyModel = (model: ChatModel) => {
-    const next = reconcileModelCapabilities(value, model, reasoningEfforts);
-    if (!mode.provider || model.provider !== mode.provider) {
-      onChange(next);
-      return;
-    }
+    const next = reconcileModelCapabilities(
+      withoutCatalogModel(value),
+      model,
+      reasoningEfforts,
+    );
     onChange(
-      withOptionalRuntimeValue(
-        withOptionalRuntimeValue(next, "backend", mode.backend),
-        "mode",
-        mode.id,
-      ),
+      withRuntimeValue(next, { backend: mode.backend, mode: mode.id }),
     );
   };
-  const clearModel = () => onChange(withoutCatalogModel(value));
+  const clearModel = () =>
+    onChange(
+      withRuntimeValue(withoutCatalogModel(value), {
+        backend: mode.backend,
+        mode: mode.id,
+      }),
+    );
   const applyEffort = (effort: string) =>
     onChange(withOptionalRuntimeValue(value, "effort", effort));
 
