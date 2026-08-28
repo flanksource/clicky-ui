@@ -1,53 +1,163 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
+import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
 import type { SpecRuntimeSandboxCatalog } from "./SpecRuntimeEditor/types";
 
+const approvalModes = {
+  default: { kind: "native" as const },
+  plan: { kind: "native" as const },
+  acceptEdits: {
+    kind: "approximated" as const,
+    effects: { sandbox: "workspace-write", approval: "on-request" },
+  },
+  auto: {
+    kind: "approximated" as const,
+    effects: { sandbox: "workspace-write", approval: "on-request" },
+  },
+  bypassPermissions: { kind: "native" as const },
+  dontAsk: { kind: "unsupported" as const },
+};
+
+const sandboxSchema = (claude: boolean) => ({
+  type: "object" as const,
+  properties: {
+    sandbox: {
+      type: "object" as const,
+      properties: {
+        mode: {
+          type: "string" as const,
+          title: "Sandbox mode",
+          enum: ["off", "native", "docker", "git-agent"],
+          "x-enum-display": "segmented" as const,
+        },
+        approval: {
+          type: "string" as const,
+          title: "Permission posture",
+          enum: ["default", "acceptEdits", "auto", "bypassPermissions", "plan"],
+        },
+        policy: {
+          type: "object" as const,
+          title: "Native sandbox settings",
+          properties: {
+            ...(claude
+              ? {
+                  required: {
+                    type: "boolean" as const,
+                    title: "Require native sandbox",
+                    "x-icon": "shield",
+                  },
+                }
+              : {}),
+            filesystem: {
+              type: "object" as const,
+              title: "Filesystem",
+              properties: {
+                access: {
+                  type: "string" as const,
+                  title: "Filesystem access",
+                  enum: ["read-only", "workspace-write"],
+                  "x-enum-display": "segmented" as const,
+                  "x-icon": "folder-lock",
+                },
+                writableRoots: {
+                  type: "array" as const,
+                  title: "Writable roots",
+                  items: { type: "string" as const },
+                },
+              },
+            },
+            network: {
+              type: "object" as const,
+              title: "Network",
+              properties: {
+                access: {
+                  type: "string" as const,
+                  title: "Network access",
+                  enum: claude
+                    ? ["disabled", "restricted", "unrestricted"]
+                    : ["disabled", "unrestricted"],
+                  "x-enum-display": "segmented" as const,
+                  "x-icon": "globe-lock",
+                },
+              },
+            },
+          },
+        },
+        backend: { type: "string" as const },
+        agent: { type: "string" as const },
+        dispatch: {
+          type: "object" as const,
+          properties: {
+            paths: {
+              type: "array" as const,
+              items: { type: "string" as const },
+            },
+            maxAttempts: { type: "integer" as const },
+          },
+        },
+      },
+    },
+  },
+});
+
+const FAMILIES: SpecRuntimeFamily[] = [
+  {
+    id: "claude",
+    label: "Claude",
+    provider: "claude-agent",
+    modes: [
+      {
+        id: "cli",
+        label: "CLI",
+        backend: "claude-cli",
+        schema: sandboxSchema(true),
+        permissions: {
+          modes: approvalModes,
+          toolPolicies: {},
+          resources: {},
+        },
+      },
+    ],
+  },
+  {
+    id: "codex",
+    label: "Codex",
+    provider: "codex-agent",
+    modes: [
+      {
+        id: "cli",
+        label: "CLI",
+        backend: "codex-cli",
+        schema: sandboxSchema(false),
+        permissions: {
+          modes: approvalModes,
+          toolPolicies: {},
+          resources: {},
+        },
+      },
+    ],
+  },
+];
+
 const CATALOG: SpecRuntimeSandboxCatalog = {
-  default: "none",
   kinds: [
     {
-      kind: "none",
-      description: "Run the agent directly on the host, unconfined",
-      capabilities: [],
-      modes: ["api", "cli", "agent", "cmux"],
-    },
-    {
-      kind: "srt",
-      description: "Confine the agent with sandbox-runtime",
-      capabilities: ["wrap-command"],
-      modes: ["cli"],
+      kind: "docker",
+      backends: [{ name: "docker-safe", kind: "docker" }],
     },
     {
       kind: "git-agent",
-      description: "Relocate the run onto an enrolled remote agent over git",
-      capabilities: ["remote-exec", "isolate-workspace", "egress-proxy"],
-      modes: ["cli", "agent", "cmux"],
       backends: [
         {
           name: "prod-pool",
+          kind: "git-agent",
           agents: [
             { name: "worker-01", status: "enrolled", dispatchable: true },
-            {
-              name: "worker-02",
-              status: "enrolled",
-              dispatchable: false,
-              dispatchIssue: "missing host key",
-            },
-            {
-              name: "worker-03",
-              status: "pending until 2026-08-02T00:00:00Z",
-              dispatchable: false,
-            },
+            { name: "worker-02", status: "enrolled", dispatchable: false },
           ],
         },
       ],
@@ -55,223 +165,153 @@ const CATALOG: SpecRuntimeSandboxCatalog = {
   ],
 };
 
-// captain's own config names a backend after the kind it selects
-// (`sandbox.backends.git-agent: {kind: git-agent}`), and SandboxDefaults.Resolve
-// looks in backends before adapter kinds — so that selector means the backend,
-// and the bare kind is unreachable.
-const SHADOWED_CATALOG: SpecRuntimeSandboxCatalog = {
-  kinds: [
-    {
-      kind: "git-agent",
-      description: "Relocate the run onto an enrolled remote agent over git",
-      capabilities: ["remote-exec", "isolate-workspace"],
-      modes: ["cli", "agent", "cmux"],
-      backends: [
-        {
-          name: "git-agent",
-          agents: [{ name: "w03", status: "enrolled", dispatchable: true }],
-        },
-      ],
-    },
-  ],
-};
-
-// `withCatalog` rather than an optional `catalog`: a default parameter is
-// applied for an explicitly-passed undefined, which would silently re-supply
-// the catalog in the "no catalog" case and make that test vacuous.
 function Harness({
-  initial = {},
-  catalog = CATALOG,
-  withCatalog = true,
-  withCreator = false,
+  initial = { backend: "claude-cli" },
+  catalog,
 }: {
   initial?: AISpecRuntimeValue;
-  catalog?: SpecRuntimeSandboxCatalog;
-  withCatalog?: boolean;
-  withCreator?: boolean;
+  catalog?: SpecRuntimeSandboxCatalog | undefined;
 }) {
-  const [value, setValue] = useState<AISpecRuntimeValue>(initial);
+  const [value, setValue] = useState(initial);
   return (
     <>
       <SpecRuntimeEditor
         value={value}
         onChange={setValue}
-        sections={["sandbox", "workspace"]}
-        {...(withCatalog ? { sandboxCatalog: catalog } : {})}
-        {...(withCreator
-          ? {
-              sandboxCreate: {
-                onCreate: async (input) => ({
-                  name: input.name,
-                  kind: input.kind,
-                }),
-              },
-            }
-          : {})}
+        sections={["sandbox"]}
+        families={FAMILIES}
+        {...(catalog ? { sandboxCatalog: catalog } : {})}
       />
       <output aria-label="Runtime value">{JSON.stringify(value)}</output>
     </>
   );
 }
 
-// Queried by role: SectionCard labels the whole <section> "Sandbox" too, so a
-// bare label lookup is ambiguous.
-const sandboxSelect = () => screen.getByRole("combobox", { name: "Sandbox" });
-const agentSelect = () =>
-  screen.queryByRole("combobox", { name: "Pinned agent" });
+const sandboxModes = () =>
+  screen.getByRole("radiogroup", { name: "Sandbox mode" });
 
-function chooseCombobox(combobox: HTMLElement, optionName: string | RegExp) {
-  fireEvent.focus(combobox);
-  fireEvent.mouseDown(screen.getByRole("option", { name: optionName }));
+function chooseMode(name: string) {
+  fireEvent.click(
+    within(sandboxModes()).getByRole("radio", {
+      name: new RegExp(`^${name}(?:\\s|$)`),
+    }),
+  );
 }
 
-// Warning copy interleaves <code> elements, so getByText cannot see it whole.
-const warningText = (warnings: HTMLElement[]) =>
-  warnings.map((warning) => warning.textContent ?? "").join("\n");
+function chooseCombobox(name: string, option: string) {
+  const combobox = screen.getByRole("combobox", { name });
+  fireEvent.focus(combobox);
+  fireEvent.mouseDown(screen.getByRole("option", { name: option }));
+}
 
 describe("SpecRuntimeEditor sandbox section", () => {
-  it("uses the searchable combobox control for sandbox selection", () => {
+  it("renders only public modes published by the selected backend schema", () => {
     render(<Harness />);
-
-    expect(sandboxSelect()).toHaveAttribute("type", "text");
-    expect(sandboxSelect().tagName).toBe("INPUT");
-  });
-
-  it("is omitted when the host supplies no catalog", () => {
-    render(<Harness withCatalog={false} />);
-    expect(screen.queryByRole("combobox", { name: "Sandbox" })).toBeNull();
-  });
-
-  it("offers every adapter kind and each configured backend", () => {
-    render(<Harness />);
-    fireEvent.focus(sandboxSelect());
-    const listbox = screen.getByRole("listbox");
-    expect(within(listbox).getAllByRole("option")).toHaveLength(5);
-    for (const name of [
-      /^Inherit \(none\)/,
-      /^none/,
-      /^Sandbox Runtime/,
-      /^Git agent/,
-      /^prod-pool \(Git agent\)/,
-    ]) {
-      expect(within(listbox).getByRole("option", { name })).toBeInTheDocument();
+    expect(within(sandboxModes()).getAllByRole("radio")).toHaveLength(4);
+    for (const label of ["Off", "Native", "Docker", "Git Agent"]) {
+      expect(
+        within(sandboxModes()).getByRole("radio", {
+          name: new RegExp(`^${label}(?:\\s|$)`),
+        }),
+      ).toBeInTheDocument();
     }
+    expect(screen.queryByText("Sandbox Runtime")).toBeNull();
+    expect(screen.queryByText("Local")).toBeNull();
   });
 
-  it("lets a backend shadow the bare kind it is named after", () => {
-    render(<Harness catalog={SHADOWED_CATALOG} />);
-    fireEvent.focus(sandboxSelect());
-    const listbox = screen.getByRole("listbox");
+  it("does not require an adapter catalog to render schema-owned modes", () => {
+    render(<Harness />);
+    expect(sandboxModes()).toBeInTheDocument();
+  });
 
-    // Inherit plus one row: both entries write the selector "git-agent", so
-    // offering the kind as well would repeat the same choice.
-    expect(within(listbox).getAllByRole("option")).toHaveLength(2);
+  it("renders native settings from the selected backend schema", () => {
+    render(<Harness />);
+    chooseMode("Native");
     expect(
-      within(listbox).queryByRole("option", { name: /^Git agent/ }),
+      screen.getByRole("radiogroup", { name: "Permission posture" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Require native sandbox" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Filesystem access" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Network access" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Execution identity")).toBeNull();
+  });
+
+  it("hides native fields not present in the active provider schema", () => {
+    render(<Harness initial={{ backend: "codex-cli" }} />);
+    chooseMode("Native");
+    expect(
+      screen.queryByRole("checkbox", { name: "Require native sandbox" }),
     ).toBeNull();
-
-    // And the surviving row is the backend, so its roster reaches the picker —
-    // the bare kind carries none, and a lookup that found it first would report
-    // an enrolled agent as "none dispatchable".
-    chooseCombobox(sandboxSelect(), /^git-agent \(Git agent\)/);
-    fireEvent.focus(agentSelect()!);
-    expect(screen.getByRole("option", { name: "w03" })).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Network access" }),
+      ).queryByRole("radio", { name: "restricted" }),
+    ).toBeNull();
   });
 
-  it("only offers the agent picker for an adapter that relocates the run", () => {
-    render(<Harness />);
-    // srt wraps a local command; there is no roster to pin against.
-    chooseCombobox(sandboxSelect(), /^Sandbox Runtime/);
-    expect(agentSelect()).toBeNull();
-
-    chooseCombobox(sandboxSelect(), /^prod-pool \(Git agent\)/);
-    fireEvent.focus(agentSelect()!);
-    const agents = within(screen.getByRole("listbox")).getAllByRole("option");
-    // Only agents that the backend can actually dispatch to reach this picker.
-    expect(agents).toHaveLength(2);
-    for (const name of ["Any dispatchable agent", "worker-01"]) {
-      expect(screen.getByRole("option", { name })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("option", { name: "worker-02" })).toBeNull();
-    expect(screen.queryByRole("option", { name: "worker-03" })).toBeNull();
-  });
-
-  it("writes a pinned dispatchable agent into the runtime sandbox payload", () => {
-    render(<Harness catalog={SHADOWED_CATALOG} />);
-    chooseCombobox(sandboxSelect(), /^git-agent \(Git agent\)/);
-    chooseCombobox(agentSelect()!, "w03");
-
+  it("moves posture into sandbox and collapses equivalent provider aliases", () => {
+    render(<Harness initial={{ backend: "codex-cli" }} />);
+    chooseMode("Native");
+    expect(
+      screen.getAllByRole("radio", { name: "Ask for approval" }),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
     expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
-      JSON.stringify({ sandbox: { backend: "git-agent", agent: "w03" } }),
-    );
-  });
-
-  it("shows the adapter's declared capabilities", () => {
-    render(<Harness />);
-    chooseCombobox(sandboxSelect(), /^Git agent/);
-    const chips = screen.getByLabelText("Sandbox capabilities");
-    expect(chips.textContent).toContain("remote-exec");
-    expect(chips.textContent).toContain("isolate-workspace");
-  });
-
-  it("warns when an isolating sandbox is combined with a worktree", () => {
-    render(
-      <Harness
-        initial={{ setup: { checkout: { worktree: { mode: "new" } } } }}
-      />,
-    );
-    const isolatorWarning = () => warningText(screen.queryAllByRole("status"));
-
-    expect(isolatorWarning()).not.toMatch(/Register exactly one isolator/);
-
-    chooseCombobox(sandboxSelect(), /^Git agent/);
-    expect(isolatorWarning()).toMatch(/Register exactly one isolator/);
-
-    // srt wraps the command in place, so it composes with a worktree fine.
-    chooseCombobox(sandboxSelect(), /^Sandbox Runtime/);
-    expect(isolatorWarning()).not.toMatch(/Register exactly one isolator/);
-  });
-
-  it("warns when the adapter cannot serve the selected runtime mode", () => {
-    // git-agent's contract is that work returns as commits, so it deliberately
-    // excludes api mode — the mode the anthropic backend runs in.
-    const api = render(<Harness initial={{ backend: "anthropic" }} />);
-    chooseCombobox(
-      api.getByRole("combobox", { name: "Sandbox" }),
-      /^Git agent/,
-    );
-    expect(warningText(api.getAllByRole("status"))).toMatch(
-      /does not support runtime mode/,
-    );
-    api.unmount();
-
-    // A cli-mode backend pairs fine, so no warning appears for it.
-    const cli = render(<Harness initial={{ backend: "claude-code" }} />);
-    chooseCombobox(
-      cli.getByRole("combobox", { name: "Sandbox" }),
-      /^Git agent/,
-    );
-    expect(warningText(cli.queryAllByRole("status"))).not.toMatch(
-      /does not support runtime mode/,
-    );
-  });
-
-  it("selects a backend created from the sandbox section", async () => {
-    render(<Harness withCreator />);
-    fireEvent.click(screen.getByRole("button", { name: "Create sandbox" }));
-    fireEvent.change(screen.getByLabelText("Sandbox name"), {
-      target: { value: "local-safe" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Create sandbox",
+      JSON.stringify({
+        backend: "codex-cli",
+        sandbox: { mode: "native", approval: "plan" },
       }),
     );
+  });
 
-    await waitFor(() =>
-      expect(sandboxSelect()).toHaveValue("local-safe (Sandbox Runtime)"),
+  it("clears native policy when switching to docker but preserves posture", () => {
+    render(
+      <Harness
+        initial={{
+          backend: "claude-cli",
+          sandbox: {
+            mode: "native",
+            approval: "plan",
+            policy: { filesystem: { access: "read-only" } },
+          },
+        }}
+        catalog={CATALOG}
+      />,
+    );
+    chooseMode("Docker");
+    expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
+      JSON.stringify({
+        backend: "claude-cli",
+        sandbox: { mode: "docker", approval: "plan" },
+      }),
+    );
+  });
+
+  it("filters configured backends by mode and pins dispatchable Git agents", () => {
+    render(<Harness catalog={CATALOG} />);
+    chooseMode("Docker");
+    chooseCombobox("Sandbox backend", "docker-safe");
+    expect(screen.queryByText("prod-pool")).toBeNull();
+
+    chooseMode("Git Agent");
+    chooseCombobox("Sandbox backend", "prod-pool");
+    chooseCombobox("Pinned agent", "worker-01");
+    expect(screen.queryByRole("option", { name: "worker-02" })).toBeNull();
+    expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
+      JSON.stringify({
+        backend: "claude-cli",
+        sandbox: {
+          mode: "git-agent",
+          backend: "prod-pool",
+          agent: "worker-01",
+        },
+      }),
     );
   });
 });
