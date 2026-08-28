@@ -54,6 +54,8 @@ export function secretValueFromString(
   return parseSecretRef(value?.trim() ?? "");
 }
 
-export function stringFromSecretValue(next: SecretKeyValue | undefined): string {
+export function stringFromSecretValue(
+  next: SecretKeyValue | undefined,
+): string {
   return serializeSecretRef(next);
 }

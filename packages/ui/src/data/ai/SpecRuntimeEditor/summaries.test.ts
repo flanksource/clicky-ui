@@ -28,7 +28,6 @@ const VALUE: AISpecRuntimeValue = {
     appendSystem: "Prefer primitives.",
   },
   permissions: {
-    mode: "acceptEdits",
     tools: { Read: "allow", Bash: "deny", Write: "deny" },
     mcp: { gavel: "disabled", ado: "disabled", servers: ["filesystem"] },
   },
@@ -101,10 +100,8 @@ describe("summaries", () => {
         [],
       ),
     );
-    expect(summarizePermissions(VALUE, entries)).toBe(
-      "acceptEdits · 2 denied · 2 off",
-    );
-    expect(summarizePermissions({}, [])).toBe("default");
+    expect(summarizePermissions(VALUE, entries)).toBe("2 denied · 2 off");
+    expect(summarizePermissions({}, [])).toBe("No overrides");
   });
 
   it("summarizes environment variables and secrets", () => {

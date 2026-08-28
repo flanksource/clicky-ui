@@ -15,21 +15,23 @@ import {
   collapsePermissionModeAliases,
   permissionModeVisual,
 } from "./permission-mode-visuals";
-import { withPermissions } from "./update";
+import { sandboxRef, withSandboxApproval } from "./update";
 
 export function PermissionModeField({
   value,
   onChange,
   families,
+  availableModes,
   effectiveBackend,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   families: SpecRuntimeFamily[];
+  availableModes: SpecPermissionMode[];
   effectiveBackend?: string | undefined;
 }) {
   const backend = value.backend?.trim() || effectiveBackend?.trim();
-  const current = value.permissions?.mode || undefined;
+  const current = sandboxRef(value).approval;
   if (!backend) {
     return current ? (
       <PermissionPostureError>
@@ -40,28 +42,25 @@ export function PermissionModeField({
   const runtime = modeForBackend(families, backend);
   const family = familyForBackend(families, backend);
   const capabilities = runtime?.permissions;
-  if (!capabilities) {
-    return current ? (
-      <PermissionPostureError>
-        Permission posture {JSON.stringify(current)} cannot be validated because
-        backend {JSON.stringify(backend)} did not publish capabilities.
-      </PermissionPostureError>
-    ) : null;
-  }
-  const availableModes = SPEC_PERMISSION_MODES.filter((mode) => {
-    const kind = capabilities.modes[mode]?.kind;
-    return kind === "native" || kind === "approximated";
-  });
+  const publishedModes = SPEC_PERMISSION_MODES.filter((mode) =>
+    availableModes.includes(mode),
+  );
+  const support = Object.fromEntries(
+    publishedModes.map((mode) => [
+      mode,
+      capabilities?.modes[mode] ?? { kind: "native" as const },
+    ]),
+  );
   const visibleModes = collapsePermissionModeAliases(
     family?.id,
-    availableModes,
+    publishedModes,
     current,
-    capabilities.modes,
+    support,
   );
-  const invalid = current && !availableModes.includes(current);
+  const invalid = current && !publishedModes.includes(current);
   if (visibleModes.length === 0 && !invalid) return null;
   const selected = current || "default";
-  const support = capabilities.modes[selected];
+  const selectedSupport = support[selected];
   const runtimeLabel = runtime
     ? `${family?.label ?? backend} ${runtime.label}`
     : backend;
@@ -76,20 +75,20 @@ export function PermissionModeField({
       {visibleModes.length > 0 && (
         <SpecField
           label="Permission posture"
-          hint={support?.effects?.note || support?.kind}
+          hint={selectedSupport?.effects?.note || selectedSupport?.kind}
           composite
         >
           <SegmentedControl
             aria-label="Permission posture"
             value={selected}
             onChange={(mode: SpecPermissionMode) =>
-              onChange(withPermissions(value, { mode }))
+              onChange(withSandboxApproval(value, mode))
             }
             size="sm"
             wrap
             className="w-full"
             options={visibleModes.map((mode) => {
-              const cell = capabilities.modes[mode];
+              const cell = support[mode];
               if (!cell) {
                 throw new Error(
                   `permission posture ${JSON.stringify(mode)} disappeared from backend capabilities`,

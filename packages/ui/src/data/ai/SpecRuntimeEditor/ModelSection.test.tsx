@@ -13,40 +13,32 @@ const families: SpecRuntimeFamily[] = [
         id: "agent",
         label: "Agent",
         backend: "claude-agent",
-        arguments: [
-          {
-            name: "model",
-            source: "model",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            budget: {
+              type: "object",
+              properties: { maxTurns: { type: "integer" } },
+            },
           },
-          {
-            name: "maxTurns",
-            source: "budget.maxTurns",
-            implementation: "mapped",
-          },
-        ],
+        },
       },
       {
         id: "cli",
         label: "CLI",
         backend: "claude-cli",
-        arguments: [
-          {
-            name: "model",
-            source: "model",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            effort: { type: "string" },
+            budget: {
+              type: "object",
+              properties: { cost: { type: "number" } },
+            },
           },
-          {
-            name: "effort",
-            source: "effort",
-            implementation: "mapped",
-          },
-          {
-            name: "maxBudgetUsd",
-            source: "budget.cost",
-            implementation: "mapped",
-          },
-        ],
+        },
       },
     ],
   },

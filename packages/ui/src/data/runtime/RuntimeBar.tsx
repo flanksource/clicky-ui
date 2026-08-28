@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 import { applyRuntimeBackend, runtimeModelForValue } from "./RuntimeBar.model";
@@ -13,7 +14,8 @@ import {
   familyById,
   firstMode,
   modelsForFamily,
-  selectionForBackend,
+  selectionForRuntime,
+  runtimeBackendFromModel,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -32,6 +34,8 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   families?: SpecRuntimeFamily[] | undefined;
   /** Resolved backend shown when the editable value inherits it from another layer. */
   effectiveBackend?: string | undefined;
+  /** Resolved model used to identify the inherited provider family without persisting it. */
+  effectiveModel?: string | undefined;
   /** Effort tiers offered when the catalog does not describe the model. */
   reasoningEfforts?: string[] | undefined;
   /** Locks model identity (family, backend, and model) while leaving effort editable. */
@@ -52,6 +56,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
   effectiveBackend,
+  effectiveModel,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   locked = false,
   showModel = true,
@@ -59,8 +64,18 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
-  const backend = value.backend?.trim() || effectiveBackend?.trim();
-  const selection = selectionForBackend(families, backend);
+  const [preferredFamily, setPreferredFamily] = useState<string>();
+  const backend =
+    runtimeBackendFromModel(value.model) ||
+    value.backend?.trim() ||
+    effectiveBackend?.trim();
+  const selection = selectionForRuntime(
+    families,
+    backend,
+    value.model || effectiveModel,
+    models,
+    preferredFamily,
+  );
   const family = familyById(families, selection.family);
   const mode =
     family.modes.find((entry) => entry.id === selection.mode) ??

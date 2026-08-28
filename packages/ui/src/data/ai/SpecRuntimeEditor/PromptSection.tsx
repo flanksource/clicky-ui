@@ -27,20 +27,33 @@ export function PromptSection({
   value,
   onChange,
   supports = SUPPORT_ALL_RUNTIME_FIELDS,
+  variant = "runtime",
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   supports?: RuntimeFieldSupport | undefined;
+  variant?: "runtime" | "document" | undefined;
 }) {
   return (
     <div className="grid gap-density-2">
-      <ExpandField
-        label="User override"
-        value={value.prompt?.user}
-        onChange={(user) => onChange(withPrompt(value, { user }))}
-        placeholder="Override the rendered user prompt"
-        icon={UiUser}
-      />
+      {variant === "document" ? (
+        <TextareaField
+          label="Prompt document body"
+          value={value.prompt?.user}
+          onChange={(user) => onChange(withPrompt(value, { user }))}
+          placeholder="Write the .prompt template body"
+          minHeight={220}
+          icon={UiUser}
+        />
+      ) : (
+        <ExpandField
+          label="User override"
+          value={value.prompt?.user}
+          onChange={(user) => onChange(withPrompt(value, { user }))}
+          placeholder="Override the rendered user prompt"
+          icon={UiUser}
+        />
+      )}
       {supports("prompt.system") && (
         <ExpandField
           label="System"

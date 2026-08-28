@@ -31,6 +31,9 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
     delete next.backend;
     delete next.mode;
     Object.assign(next, model.runtime);
+    // Provider-specific model catalogs may describe execution metadata, but a
+    // prompt spec has one canonical runtime field: backend.
+    delete next.mode;
   } else if (model) {
     next.model = model.id;
   }
@@ -55,7 +58,7 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
         ? preferred
         : efforts.includes("medium")
           ? "medium"
-        : efforts[0]!;
+          : efforts[0]!;
   }
 
   if (model?.temperature === false) delete next.temperature;

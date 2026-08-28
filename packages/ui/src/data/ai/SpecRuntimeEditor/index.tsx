@@ -10,6 +10,7 @@ import { CLIArgsSection, type SpecRuntimeCLIOptions } from "./CLIArgsSection";
 import { CommitSection } from "./CommitSection";
 import { EnvironmentAdvanced, EnvironmentSection } from "./EnvironmentSection";
 import { Footer } from "./Footer";
+import { ModelContextAdvanced } from "./ModelContextAdvanced";
 import { ModelAdvanced, ModelSection } from "./ModelSection";
 import { PermissionsAdvanced, PermissionsSection } from "./PermissionsSection";
 import { PromptAdvanced, PromptSection } from "./PromptSection";
@@ -27,17 +28,26 @@ import {
 import { summarizeTarget } from "./summaries";
 import {
   SPEC_RUNTIME_SECTIONS,
-  sectionNumber,
   type SpecRuntimeSandboxCatalog,
   type SpecRuntimeSecretSelectorConfig,
   type SpecSectionId,
 } from "./types";
 import {
   SPEC_RUNTIME_FAMILIES,
+  familyForModel,
   firstMode,
+  runtimeBackendError,
+  runtimeBackendFromModel,
+  runtimeModelError,
+  modeForBackend,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
-import { runtimeFieldSupport } from "../../runtime/runtime-field-support";
+import {
+  runtimeFieldSection,
+  runtimeFieldSupport,
+  runtimeSchemaPropertyAtPath,
+  SUPPORT_ALL_RUNTIME_FIELDS,
+} from "../../runtime/runtime-field-support";
 import { useScrollSpy } from "./use-scrollspy";
 
 export type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
@@ -63,6 +73,8 @@ export type SpecRuntimeEditorProps = {
   families?: SpecRuntimeFamily[] | undefined;
   /** Resolved backend used to validate posture when this editable layer inherits backend. */
   effectiveBackend?: string | undefined;
+  /** Resolved model used to identify the inherited provider family. */
+  effectiveModel?: string | undefined;
   tools?: ToolMeta[] | undefined;
   permissionCatalog?: AISpecRuntimePermissionCatalog | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
@@ -72,8 +84,12 @@ export type SpecRuntimeEditorProps = {
   sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
   /** Host-owned sandbox creation and credential-reference adapter. */
   sandboxCreate?: SpecRuntimeSandboxCreateConfig | undefined;
-  /** Optional section allow-list for embedded editors that only need part of the runtime spec. */
+  /** Optional ordered section selection for embedded editors that only need part of the runtime spec. */
   sections?: readonly SpecSectionId[] | undefined;
+  /** Presents prompt.user as a complete .prompt document body. */
+  promptVariant?: "runtime" | "document" | undefined;
+  /** Disables value controls while preserving section navigation and disclosures. */
+  readOnly?: boolean | undefined;
   className?: string | undefined;
   title?: ReactNode | undefined;
   eyebrow?: ReactNode | undefined;
@@ -94,9 +110,9 @@ export type SpecRuntimeEditorProps = {
 };
 
 const ADVANCED_HINTS: Partial<Record<SpecSectionId, string>> = {
-  model: "fallbacks, session, caching",
+  model: "fallbacks, session, caching, memory, skills",
   prompt: "schema",
-  permissions: "full permission tree",
+  permissions: "tools, MCP, plugins",
   environment: "dotenv files",
 };
 
@@ -109,6 +125,7 @@ export function SpecRuntimeEditor({
   models = [],
   families,
   effectiveBackend,
+  effectiveModel,
   tools = [],
   permissionCatalog,
   secretSelector,
@@ -116,6 +133,8 @@ export function SpecRuntimeEditor({
   sandboxCatalog,
   sandboxCreate,
   sections: sectionFilter,
+  promptVariant = "runtime",
+  readOnly = false,
   className,
   title = "Runtime Spec",
   eyebrow = "Agent configuration",
@@ -129,32 +148,89 @@ export function SpecRuntimeEditor({
   footerStatus = "Ready to run",
 }: SpecRuntimeEditorProps) {
   const idPrefix = useId();
+  const commitChange: (next: AISpecRuntimeValue) => void = readOnly
+    ? () => undefined
+    : onChange;
   const catalog = useMemo(
     () => buildPermissionCatalog(permissionCatalog, tools),
     [permissionCatalog, tools],
   );
   const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
+  const selectedFamily = familyForModel(
+    runtimeFamilies,
+    models,
+    value.model || effectiveModel,
+  );
   const backend =
+    runtimeBackendFromModel(value.model) ||
     value.backend?.trim() ||
     effectiveBackend?.trim() ||
     firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
-  const supports = runtimeFieldSupport(runtimeFamilies, backend);
+  const runtimeError =
+    runtimeModelError(value.model || effectiveModel) ??
+    runtimeBackendError(runtimeFamilies, backend, selectedFamily?.id);
+  const selectedRuntime = runtimeError
+    ? undefined
+    : modeForBackend(runtimeFamilies, backend, selectedFamily?.id);
+  const supports = selectedRuntime
+    ? runtimeFieldSupport(runtimeFamilies, backend, selectedFamily?.id)
+    : SUPPORT_ALL_RUNTIME_FIELDS;
+  const runtimeSchema = selectedRuntime?.schema;
+  const hasSandboxSection =
+    runtimeSchema != null &&
+    runtimeSchemaPropertyAtPath(runtimeSchema, "sandbox.mode") != null;
   const entries = useMemo(
     () => specPermissionEntries(value, catalog),
     [value, catalog],
   );
+  const skillsSection = selectedRuntime
+    ? (runtimeFieldSection(
+        runtimeFamilies,
+        backend,
+        "permissions.skills",
+        selectedFamily?.id,
+      ) ?? "model")
+    : "model";
+  const modelSkillEntries = entries.filter(
+    (entry) =>
+      entry.domain === "skills" &&
+      skillsSection === "model" &&
+      supports("permissions.skills"),
+  );
+  const permissionEntries = entries.filter(
+    (entry) =>
+      (entry.domain !== "skills" || skillsSection === "permissions") &&
+      supports(`permissions.${entry.domain}`),
+  );
+  const hasPermissionSection =
+    (skillsSection === "permissions" && supports("permissions.skills")) ||
+    (["tools", "mcp", "plugins"] as const).some((domain) =>
+      supports(`permissions.${domain}`),
+    );
 
-  const allowedSections = useMemo(
-    () => (sectionFilter ? new Set(sectionFilter) : undefined),
+  const requestedSections = useMemo(
+    () =>
+      sectionFilter
+        ? sectionFilter.map((id) => {
+            const section = SPEC_RUNTIME_SECTIONS.find(
+              (candidate) => candidate.id === id,
+            );
+            if (!section)
+              throw new Error(
+                `unknown runtime editor section ${JSON.stringify(id)}`,
+              );
+            return section;
+          })
+        : SPEC_RUNTIME_SECTIONS,
     [sectionFilter],
   );
-  // "cli" and "sandbox" describe host-supplied catalogs; without one there is
-  // nothing to choose from, so the section is omitted rather than rendered empty.
-  const sections = SPEC_RUNTIME_SECTIONS.filter(
+  // Sandbox modes come from the selected runtime schema. The adapter catalog is
+  // optional metadata for configured Docker and Git Agent backends.
+  const sections = requestedSections.filter(
     (section) =>
       (section.id !== "cli" || (cliOptions && supports("cliArgs"))) &&
-      (section.id !== "sandbox" || sandboxCatalog) &&
-      (allowedSections == null || allowedSections.has(section.id)),
+      (section.id !== "sandbox" || hasSandboxSection) &&
+      (section.id !== "permissions" || hasPermissionSection),
   );
   const collapsedSections = useMemo(
     () => new Set(defaultCollapsedSections ?? []),
@@ -168,13 +244,13 @@ export function SpecRuntimeEditor({
   const applyEntries = (
     applied: Parameters<typeof withPermissionEntries>[1],
     mode: Parameters<typeof withPermissionEntries>[2],
-  ) => onChange(withPermissionEntries(value, applied, mode));
+  ) => commitChange(withPermissionEntries(value, applied, mode));
   const addEntry = (
     domain: Parameters<typeof withAddedPermission>[1],
     id: string,
   ) => {
     const next = withAddedPermission(value, domain, id);
-    if (next) onChange(next);
+    if (next) commitChange(next);
   };
 
   const sectionBody = (id: SpecSectionId): ReactNode => {
@@ -183,9 +259,10 @@ export function SpecRuntimeEditor({
         return (
           <ModelSection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             models={models}
             effectiveBackend={effectiveBackend}
+            effectiveModel={effectiveModel}
             families={runtimeFamilies}
           />
         );
@@ -193,45 +270,45 @@ export function SpecRuntimeEditor({
         return (
           <PromptSection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             supports={supports}
+            variant={promptVariant}
           />
         );
       case "workspace":
         return (
           <WorkspaceSection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             secretSelector={secretSelector}
             variant={variant}
             supports={supports}
           />
         );
       case "sandbox":
-        return sandboxCatalog ? (
+        return runtimeSchema ? (
           <SandboxSection
             value={value}
-            onChange={onChange}
-            catalog={sandboxCatalog}
+            onChange={commitChange}
+            schema={runtimeSchema}
+            {...(sandboxCatalog ? { catalog: sandboxCatalog } : {})}
             families={runtimeFamilies}
             {...(sandboxCreate ? { createConfig: sandboxCreate } : {})}
           />
         ) : null;
       case "permissions":
-        return (
+        return supports("permissions") ? (
           <PermissionsSection
             value={value}
-            onChange={onChange}
-            entries={entries}
-            onApplyEntries={applyEntries}
-            onAddEntry={addEntry}
+            onChange={commitChange}
+            entries={permissionEntries}
           />
-        );
+        ) : null;
       case "environment":
         return (
           <EnvironmentSection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             secretSelector={secretSelector}
           />
         );
@@ -239,19 +316,19 @@ export function SpecRuntimeEditor({
         return (
           <VerifySection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             models={models}
             families={runtimeFamilies}
             {...(secretSelector ? { secretSelector } : {})}
           />
         );
       case "commit":
-        return <CommitSection value={value} onChange={onChange} />;
+        return <CommitSection value={value} onChange={commitChange} />;
       case "cli":
         return cliOptions ? (
           <CLIArgsSection
             value={value}
-            onChange={onChange}
+            onChange={commitChange}
             cliOptions={cliOptions}
           />
         ) : null;
@@ -262,37 +339,56 @@ export function SpecRuntimeEditor({
     switch (id) {
       case "model":
         return (
-          <ModelAdvanced
-            value={value}
-            onChange={onChange}
-            models={models}
-            supports={supports}
-            families={runtimeFamilies}
-          />
+          <div className="grid gap-density-3">
+            <ModelAdvanced
+              value={value}
+              onChange={commitChange}
+              models={models}
+              supports={supports}
+              families={runtimeFamilies}
+            />
+            <ModelContextAdvanced
+              value={value}
+              onChange={commitChange}
+              entries={modelSkillEntries}
+              onApplyEntries={applyEntries}
+              onAddEntry={addEntry}
+              showSkills={skillsSection === "model"}
+              supports={supports}
+            />
+          </div>
         );
       case "prompt":
         return supports("prompt.schema") ? (
-          <PromptAdvanced value={value} onChange={onChange} />
+          <PromptAdvanced value={value} onChange={commitChange} />
         ) : undefined;
       case "permissions":
         return (
           <PermissionsAdvanced
-            value={value}
-            onChange={onChange}
-            entries={entries}
+            entries={permissionEntries}
             onApplyEntries={applyEntries}
             onAddEntry={addEntry}
+            includeSkills={skillsSection === "permissions"}
             supports={supports}
           />
         );
       case "environment":
         return variant === "run" ? (
-          <EnvironmentAdvanced value={value} onChange={onChange} />
+          <EnvironmentAdvanced value={value} onChange={commitChange} />
         ) : undefined;
       default:
         return undefined;
     }
   };
+
+  const valueControls = (content: ReactNode) =>
+    readOnly && content ? (
+      <fieldset disabled className="m-0 min-w-0 border-0 p-0">
+        {content}
+      </fieldset>
+    ) : (
+      content
+    );
 
   return (
     <div className={cn("@container", className)}>
@@ -304,19 +400,35 @@ export function SpecRuntimeEditor({
             target={summarizeTarget(value)}
           />
         )}
+        {runtimeError ? (
+          <div
+            role="alert"
+            className="mb-density-3 rounded-md border border-destructive/40 bg-destructive/10 px-density-3 py-density-2 text-sm text-destructive"
+          >
+            {runtimeError} Select a valid backend below or switch to Raw to
+            repair the prompt source.
+          </div>
+        ) : null}
         {beforeSections}
-        {sections.map((section) => (
+        {sections.map((section, index) => (
           <SectionCard
             key={section.id}
-            meta={section}
-            number={sectionNumber(section.id)}
+            meta={
+              section.id === "prompt" && promptVariant === "document"
+                ? {
+                    ...section,
+                    hint: "The .prompt document body and its explicit system fields.",
+                  }
+                : section
+            }
+            number={String(index + 1).padStart(2, "0")}
             domId={domId(section.id)}
             sectionRef={sectionRef(domId(section.id))}
-            advanced={sectionAdvanced(section.id)}
+            advanced={valueControls(sectionAdvanced(section.id))}
             advancedHint={ADVANCED_HINTS[section.id]}
             defaultCollapsed={collapsedSections.has(section.id)}
           >
-            {sectionBody(section.id)}
+            {valueControls(sectionBody(section.id))}
           </SectionCard>
         ))}
       </div>

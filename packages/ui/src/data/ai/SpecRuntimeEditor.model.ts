@@ -3,17 +3,27 @@ import {
   normalizeToolPolicyRules,
   type PermissionPolicy,
 } from "../chat/tool-policy";
+import {
+  compactRuntimeSandbox,
+  type AISpecRuntimeSandbox,
+  type SpecPermissionMode,
+} from "./SpecRuntimeEditor.sandbox-model";
 
-export const SPEC_PERMISSION_MODES = [
-  "default",
-  "acceptEdits",
-  "auto",
-  "bypassPermissions",
-  "dontAsk",
-  "plan",
-] as const;
-
-export type SpecPermissionMode = (typeof SPEC_PERMISSION_MODES)[number];
+export {
+  SPEC_PERMISSION_MODES,
+  SPEC_SANDBOX_MODES,
+} from "./SpecRuntimeEditor.sandbox-model";
+export type {
+  AISpecRuntimeSandbox,
+  AISpecRuntimeSandboxDispatch,
+  AISpecRuntimeSandboxFilesystemPolicy,
+  AISpecRuntimeSandboxNetworkPolicy,
+  AISpecRuntimeSandboxPolicy,
+  SpecPermissionMode,
+  SpecSandboxFilesystemAccess,
+  SpecSandboxMode,
+  SpecSandboxNetworkAccess,
+} from "./SpecRuntimeEditor.sandbox-model";
 
 export const SPEC_TOOL_POLICIES = ["auto", "ask", "allow", "deny"] as const;
 export type SpecToolPolicy = (typeof SPEC_TOOL_POLICIES)[number];
@@ -137,7 +147,10 @@ export type AISpecRuntimeMCPPermissions = {
 };
 
 export type AISpecRuntimePermissions = {
-  mode?: SpecPermissionMode | "";
+  // The base posture, independent of the sandbox: isolation bounds what the
+  // process can reach, while the mode decides whether the agent asks before
+  // acting. A run can ask for `plan` with no sandbox at all.
+  mode?: SpecPermissionMode;
   presets?: string[];
   tools?: AISpecRuntimeToolPolicies | AISpecRuntimeLegacyToolPermissions;
   mcp?: AISpecRuntimeMCPPermissions;
@@ -169,38 +182,13 @@ export type AISpecRuntimeBudget = ChatBudgetConfig & {
   timeout?: string;
 };
 
-/**
- * Bounds what a dispatched run may touch. Mirrors captain's api.SandboxPolicy;
- * zero values inherit the backend's configured policy.
- */
-export type AISpecRuntimeSandboxPolicy = {
-  /** Path allow/deny list, gitignore syntax with `!` negating. */
-  paths?: string[];
-  /** Bound on submit cycles per task. */
-  maxAttempts?: number;
-};
-
-/**
- * The object form of captain's api.SandboxRef. `backend` names a configured
- * sandbox backend or a bare adapter kind; `agent` pins one enrolled agent of a
- * git-agent backend.
- */
-export type AISpecRuntimeSandbox = {
-  backend?: string;
-  agent?: string;
-  policy?: AISpecRuntimeSandboxPolicy;
-};
-
 export type AISpecRuntimeSpec = {
   model?: string;
   id?: string;
   backend?: string;
   mode?: string;
   /**
-   * Sandbox the run executes under. Accepts a bare selector or the object form,
-   * exactly as api.SandboxRef marshals: a ref carrying only a backend
-   * round-trips as a scalar so `sandbox: git-agent` in a .prompt is not
-   * rewritten into a mapping on save.
+   * Unified sandbox settings. A mode-only ref round-trips as a scalar.
    */
   sandbox?: string | AISpecRuntimeSandbox;
   temperature?: number;
@@ -386,58 +374,10 @@ export function compactAISpecRuntime(
   if (workflow) spec.workflow = workflow;
   const sessionId = cleanString(value.sessionId);
   if (sessionId) spec.sessionId = sessionId;
-  const sandbox = compactSandbox(value.sandbox);
+  const sandbox = compactRuntimeSandbox(value.sandbox);
   if (sandbox !== undefined) spec.sandbox = sandbox;
   if (value.cliArgs && hasKeys(value.cliArgs)) spec.cliArgs = value.cliArgs;
   return spec;
-}
-
-/**
- * Narrows a sandbox ref to what the Go side will accept, and collapses it back
- * to the scalar form when only a backend is set — the same rule as
- * api.SandboxRef.isScalar. Emitting `{backend: "git-agent"}` for a prompt
- * written as `sandbox: git-agent` would rewrite the user's frontmatter on every
- * save, so the shorthand has to survive the round-trip.
- *
- * An overrides-only ref (agent/policy with no backend) resolves to nothing and
- * is dropped: api.SandboxRef.Validate rejects it outright.
- */
-function compactSandbox(
-  value: string | AISpecRuntimeSandbox | undefined,
-): string | AISpecRuntimeSandbox | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string") {
-    return cleanString(value) || undefined;
-  }
-  const backend = cleanString(value.backend);
-  if (!backend) return undefined;
-  const agent = cleanString(value.agent);
-  const policy = compactSandboxPolicy(value.policy);
-  if (!agent && !policy) return backend;
-  const sandbox: AISpecRuntimeSandbox = { backend };
-  if (agent) sandbox.agent = agent;
-  if (policy) sandbox.policy = policy;
-  return sandbox;
-}
-
-function compactSandboxPolicy(
-  value: AISpecRuntimeSandboxPolicy | undefined,
-): AISpecRuntimeSandboxPolicy | undefined {
-  if (!value) return undefined;
-  const policy: AISpecRuntimeSandboxPolicy = {};
-  const paths = value.paths
-    ?.map((path) => cleanString(path))
-    .filter((path) => path !== "");
-  if (paths?.length) policy.paths = paths;
-  // Validate rejects a negative bound, and 0 means "inherit the backend's".
-  if (
-    value.maxAttempts != null &&
-    Number.isFinite(value.maxAttempts) &&
-    value.maxAttempts > 0
-  ) {
-    policy.maxAttempts = Math.floor(value.maxAttempts);
-  }
-  return hasKeys(policy) ? policy : undefined;
 }
 
 function compactWorkflow(
@@ -631,7 +571,8 @@ function compactPermissions(
 ): AISpecRuntimePermissions | undefined {
   if (!value && !legacySkills?.length) return undefined;
   const permissions: AISpecRuntimePermissions = {};
-  if (value?.mode && value.mode !== "default") permissions.mode = value.mode;
+  const mode = cleanString(value?.mode) as SpecPermissionMode | undefined;
+  if (mode) permissions.mode = mode;
   const presets = compactList(value?.presets);
   if (presets) permissions.presets = presets;
 

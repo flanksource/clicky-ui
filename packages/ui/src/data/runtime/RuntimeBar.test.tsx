@@ -5,25 +5,31 @@ import { RuntimeBar } from "./RuntimeBar";
 
 const MODELS: ChatModel[] = [
   {
-    id: "claude-agent/sonnet",
-    provider: "claude-agent",
+    id: "anthropic/sonnet",
+    provider: "anthropic",
     label: "Sonnet",
     reasoning: true,
     configured: true,
+    backends: ["api", "agent", "cli", "cmux"],
+    runtime: { model: "sonnet" },
   },
   {
-    id: "codex-cli/gpt-5",
-    provider: "codex-cli",
+    id: "openai/gpt-5",
+    provider: "openai",
     label: "GPT-5",
     reasoning: true,
     configured: true,
+    backends: ["api", "agent", "cli", "cmux"],
+    runtime: { model: "gpt-5" },
   },
   {
-    id: "codex-cli/gpt-5-mini",
-    provider: "codex-cli",
+    id: "openai/gpt-5-mini",
+    provider: "openai",
     label: "GPT-5 mini",
     reasoning: false,
     configured: false,
+    backends: ["api", "agent", "cli", "cmux"],
+    runtime: { model: "gpt-5-mini" },
     availability: {
       state: "missing_executable",
       reason: "`codex` was not found on PATH.",
@@ -43,8 +49,8 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "codex-cli",
-          model: "codex-cli/gpt-5",
+          backend: "cli",
+          model: "gpt-5",
           effort: "high",
         }}
         onChange={onChange}
@@ -67,8 +73,8 @@ describe("RuntimeBar", () => {
     expect(effort).not.toBeDisabled();
     fireEvent.change(effort, { target: { value: "1" } });
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
-      model: "codex-cli/gpt-5",
+      backend: "cli",
+      model: "gpt-5",
       effort: "low",
     });
   });
@@ -78,8 +84,8 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "codex-cli",
-          model: "codex-cli/gpt-5",
+          backend: "cli",
+          model: "gpt-5",
           effort: "high",
         }}
         onChange={vi.fn()}
@@ -106,8 +112,8 @@ describe("RuntimeBar", () => {
       name: "GPT-5",
     });
     expect(modelChoice).toBeInTheDocument();
-    expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5");
-    expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5");
+    expect(modelChoice).toHaveAttribute("title", "openai/gpt-5");
+    expect(modelChoice).not.toHaveTextContent("openai/gpt-5");
     expect(
       within(menu).getByRole("slider", { name: "Reasoning effort" }),
     ).toHaveAttribute("aria-valuetext", "High");
@@ -119,7 +125,8 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{ effort: "high" }}
-        effectiveBackend="codex-cli"
+        effectiveBackend="cli"
+        effectiveModel="gpt-5"
         onChange={onChange}
         models={MODELS}
       />,
@@ -143,8 +150,8 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "codex-cli",
-          model: "codex-cli/gpt-5",
+          backend: "cli",
+          model: "gpt-5",
           effort: "high",
         }}
         onChange={onChange}
@@ -182,8 +189,8 @@ describe("RuntimeBar", () => {
       { target: { value: "1" } },
     );
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
-      model: "codex-cli/gpt-5",
+      backend: "cli",
+      model: "gpt-5",
       effort: "low",
     });
     expect(menu).toBeInTheDocument();
@@ -193,7 +200,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "claude-cli" }}
+        value={{ backend: "cli", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -208,11 +215,11 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("drops a model the new family cannot run", () => {
+  it("selects a model from the new family when providers share a backend", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "claude-agent", model: "claude-agent/sonnet" }}
+        value={{ backend: "agent", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -227,14 +234,14 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("drops the catalog id alongside the model the new family cannot run", () => {
+  it("replaces the catalog id alongside the model when changing family", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
         value={{
-          backend: "claude-agent",
-          model: "claude-agent/sonnet",
-          id: "claude-agent/sonnet",
+          backend: "agent",
+          model: "sonnet",
+          id: "anthropic/sonnet",
         }}
         onChange={onChange}
         models={MODELS}
@@ -255,16 +262,16 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         value={{
-          backend: "codex-cli",
-          model: "codex-cli/gpt-5",
-          id: "codex-cli/gpt-5",
+          backend: "cli",
+          model: "gpt-5",
+          id: "openai/gpt-5",
         }}
         onChange={onChange}
         models={MODELS}
       />,
     );
 
-    openSegment("Model — codex-cli/gpt-5");
+    openSegment("Model — gpt-5");
     fireEvent.change(screen.getByLabelText("Model id"), {
       target: { value: "gpt-5.1" },
     });
@@ -280,7 +287,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "codex-cli", model: "codex-cli/gpt-5" }}
+        value={{ backend: "cli", model: "gpt-5" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -301,36 +308,55 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "claude-agent" }}
+        value={{ backend: "agent", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
+        families={[
+          {
+            id: "claude",
+            label: "Claude",
+            provider: "anthropic",
+            modes: [
+              { id: "agent", label: "Agent", backend: "agent" },
+              { id: "cli", label: "CLI", backend: "cli" },
+            ],
+          },
+        ]}
       />,
     );
 
-    openSegment("Claude Agent SDK");
+    openSegment("Runtime mode");
     expect(
       screen.queryByRole("menuitem", { name: /^API/ }),
     ).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("keeps the model segment when the catalog has none for the family", () => {
+  it("keeps the model segment when the selected family has no catalog rows", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "gemini" }}
+        value={{ backend: "api", model: "gemini-3-pro" }}
         onChange={onChange}
         models={MODELS}
+        families={[
+          {
+            id: "gemini",
+            label: "Gemini",
+            provider: "googleai",
+            modes: [{ id: "api", label: "API", backend: "api" }],
+          },
+        ]}
       />,
     );
 
-    openSegment("Model — prompt default");
+    openSegment("Model — gemini-3-pro");
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
     ).toEqual(["Prompt defaultno override"]);
 
     fireEvent.change(screen.getByLabelText("Model id"), {
-      target: { value: "gemini-3-pro" },
+      target: { value: "gemini-3-pro-preview" },
     });
     expect(onChange).toHaveBeenCalledWith({
       backend: "gemini",
@@ -343,7 +369,8 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "codex-cli" }}
+        value={{ backend: "cli" }}
+        effectiveModel="gpt-5"
         onChange={onChange}
         models={MODELS}
       />,
@@ -353,7 +380,7 @@ describe("RuntimeBar", () => {
     const items = screen.getAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "Prompt defaultno override",
-      "GPT-5codex-cli/gpt-5",
+      "GPT-5openai/gpt-5",
     ]);
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
 
@@ -371,7 +398,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "claude-agent" }}
+        value={{ backend: "agent", model: "sonnet" }}
         onChange={onChange}
         families={[
           {
@@ -379,11 +406,11 @@ describe("RuntimeBar", () => {
             label: "Claude",
             provider: "anthropic",
             modes: [
-              { id: "agent", label: "Agent", backend: "claude-agent" },
+              { id: "agent", label: "Agent", backend: "agent" },
               {
                 id: "cmux",
                 label: "cmux",
-                backend: "claude-cmux",
+                backend: "cmux",
                 availability: {
                   state: "disabled",
                   reason: "Disabled by mode cmux in Captain configuration.",
@@ -409,8 +436,8 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         value={{
-          backend: "codex-cli",
-          model: "codex-cli/gpt-5-mini",
+          backend: "cli",
+          model: "gpt-5-mini",
         }}
         onChange={vi.fn()}
         models={MODELS}
@@ -430,7 +457,8 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         variant="combo"
-        value={{ backend: "codex-cli" }}
+        value={{ backend: "cli" }}
+        effectiveModel="gpt-5"
         onChange={vi.fn()}
         models={MODELS}
       />,
@@ -452,7 +480,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "anthropic" }}
+        value={{ backend: "api" }}
         onChange={onChange}
         models={[
           {
@@ -464,7 +492,7 @@ describe("RuntimeBar", () => {
             runtime: {
               model: "claude-sonnet-4-6",
               id: "anthropic/claude-sonnet-4-6",
-              backend: "anthropic",
+              backend: "api",
             },
           },
         ]}
@@ -483,13 +511,11 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("keeps the selected mode when one menu row serves several backends", () => {
-    // The served catalog lists claude-cli and claude-cmux models as claude-agent
-    // rows, so the row's own backend must not replace the mode the user picked.
+  it("keeps the selected mode when one provider model serves several backends", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "claude-cli" }}
+        value={{ backend: "cli" }}
         onChange={onChange}
         families={[
           {
@@ -500,14 +526,14 @@ describe("RuntimeBar", () => {
               {
                 id: "agent",
                 label: "Agent",
-                backend: "claude-agent",
-                provider: "claude-agent",
+                backend: "agent",
+                provider: "anthropic",
               },
               {
                 id: "cli",
                 label: "CLI",
-                backend: "claude-cli",
-                provider: "claude-agent",
+                backend: "cli",
+                provider: "anthropic",
               },
             ],
           },
@@ -515,14 +541,13 @@ describe("RuntimeBar", () => {
         models={[
           {
             id: "claude-opus-5",
-            provider: "claude-agent",
+            provider: "anthropic",
             label: "Opus 5",
             reasoning: true,
             configured: true,
+            backends: ["agent", "cli"],
             runtime: {
               model: "claude-opus-5",
-              backend: "claude-agent",
-              mode: "agent",
             },
           },
         ]}
@@ -534,8 +559,7 @@ describe("RuntimeBar", () => {
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-opus-5",
-      backend: "claude-cli",
-      mode: "cli",
+      backend: "cli",
       effort: "medium",
     });
   });
@@ -544,13 +568,13 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "codex-cli", model: "codex-cli/gpt-5" }}
+        value={{ backend: "cli", model: "gpt-5" }}
         onChange={onChange}
         models={MODELS}
       />,
     );
 
-    openSegment("Model — codex-cli/gpt-5");
+    openSegment("Model — gpt-5");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Prompt default/ }));
 
     expect(onChange).toHaveBeenCalledWith({
@@ -563,7 +587,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "codex-cli", effort: "high" }}
+        value={{ backend: "cli", model: "gpt-5", effort: "high" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -572,13 +596,13 @@ describe("RuntimeBar", () => {
     openSegment("Reasoning effort");
     fireEvent.click(screen.getByRole("menuitem", { name: /^None/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "codex-cli" });
+    expect(onChange).toHaveBeenCalledWith({ backend: "cli", model: "gpt-5" });
   });
 
   it("offers a tier the catalog omits when the spec already selects it", () => {
     render(
       <RuntimeBar
-        value={{ backend: "codex-cli", effort: "minimal" }}
+        value={{ backend: "cli", model: "gpt-5", effort: "minimal" }}
         onChange={vi.fn()}
         models={MODELS}
         reasoningEfforts={["low", "high"]}

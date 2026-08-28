@@ -1,5 +1,6 @@
 import type { StaticIconComponent } from "../Icon";
 import { UiCloud, UiColumns, UiRobotAi, UiTerminal } from "../../icons";
+import type { JsonSchemaProperty } from "../../components/json-schema-form-types";
 import type { ChatModel, RuntimeAvailability } from "../chat/types";
 import {
   availabilityText,
@@ -8,33 +9,101 @@ import {
   unsupportedAvailability,
 } from "./availability";
 
-// A backend runtime is factored into two UI axes — a provider
-// **family** (Claude, OpenAI, …) and a **mode** within it (Agent, CLI, cmux,
-// API) — that together resolve to a single `spec.backend` string. This is the
-// only place that mapping lives; both the inline PromptRunEditor and the modal
-// SpecRuntimeEditor drive their Mode pickers from it.
+// A runtime has two independent axes: the model selects a provider family and
+// `spec.backend` selects api | agent | cli | cmux. The backend never contains a
+// provider name or a composite adapter id.
+
+export const SPEC_RUNTIME_BACKENDS = ["api", "agent", "cli", "cmux"] as const;
+export type SpecRuntimeBackend = (typeof SPEC_RUNTIME_BACKENDS)[number];
+
+export function isSpecRuntimeBackend(
+  value: string | undefined,
+): value is SpecRuntimeBackend {
+  return SPEC_RUNTIME_BACKENDS.some((backend) => backend === value);
+}
+
+export function runtimeBackendFromModel(
+  model: string | undefined,
+): SpecRuntimeBackend | undefined {
+  const [prefix] = (model ?? "").trim().toLowerCase().split(":");
+  return isSpecRuntimeBackend(prefix) ? prefix : undefined;
+}
+
+export function runtimeModelError(
+  model: string | undefined,
+): string | undefined {
+  for (const raw of (model ?? "").split(",")) {
+    const compact = raw.trim();
+    if (!compact || !compact.includes(":")) continue;
+    const parts = compact.split(":").map((part) => part.trim());
+    const [backend, name, effort] = parts;
+    if (!isSpecRuntimeBackend(backend)) {
+      return `Invalid model configuration: backend ${JSON.stringify(backend)} in model ${JSON.stringify(compact)}. Expected api, agent, cli, or cmux.`;
+    }
+    if (!name || parts.length > 3) {
+      return `Invalid model configuration: model ${JSON.stringify(compact)}. Expected backend:model[:effort].`;
+    }
+    if (
+      effort !== undefined &&
+      !["low", "medium", "high", "xhigh", "max", "ultra"].includes(effort)
+    ) {
+      return `Invalid model configuration: effort ${JSON.stringify(effort)} in model ${JSON.stringify(compact)}.`;
+    }
+  }
+  return undefined;
+}
+
+export function runtimeBackendError(
+  families: SpecRuntimeFamily[],
+  backend: string | undefined,
+  familyId?: string | undefined,
+): string | undefined {
+  if (!backend) return undefined;
+  if (!isSpecRuntimeBackend(backend)) {
+    return `Invalid model configuration: backend ${JSON.stringify(backend)}. Expected api, agent, cli, or cmux.`;
+  }
+  const family = familyId
+    ? families.find((entry) => entry.id === familyId)
+    : undefined;
+  if (family && !family.modes.some((mode) => mode.backend === backend)) {
+    return `Invalid model configuration: backend ${JSON.stringify(backend)} is not available for ${family.label}.`;
+  }
+  if (
+    !families.some((entry) =>
+      entry.modes.some((mode) => mode.backend === backend),
+    )
+  ) {
+    return `Invalid model configuration: backend ${JSON.stringify(backend)} is missing from the runtime catalog.`;
+  }
+  return undefined;
+}
 
 export type SpecRuntimeModeOption = {
   /** UI mode id within a family (e.g. "agent", "cli", "cmux", "api"). */
   id: string;
   label: string;
-  /** The concrete `spec.backend` this (family, mode) resolves to. */
+  /** The canonical `spec.backend`: api | agent | cli | cmux. */
   backend: string;
   icon?: StaticIconComponent | undefined;
   title?: string | undefined;
   provider?: string | undefined;
+  defaultModel?: string | undefined;
   availability?: RuntimeAvailability | undefined;
   permissions?: RuntimePermissionCapabilities | undefined;
-  arguments?: RuntimeArgumentMapping[] | undefined;
+  schema?: RuntimeSpecSchema | undefined;
 };
 
 export type RuntimeArgumentImplementation = "mapped" | "managed";
 
 export type RuntimeArgumentMapping = {
   name: string;
-  source?: string | undefined;
   implementation: RuntimeArgumentImplementation;
   description?: string | undefined;
+};
+
+export type RuntimeSpecSchema = JsonSchemaProperty & {
+  "x-clicky-arguments"?: RuntimeArgumentMapping[] | undefined;
+  "x-clicky-managed-arguments"?: RuntimeArgumentMapping[] | undefined;
 };
 
 export type RuntimePermissionSupportKind =
@@ -70,90 +139,84 @@ export type SpecRuntimeFamily = {
   modes: SpecRuntimeModeOption[];
 };
 
-// Default catalog covering the captain/gavel backend set. Hosts may pass their
-// own via the `families` prop when their catalog differs.
+// Offline catalog for stories and tests. Live hosts should pass Captain's
+// registry projection; both use the same provider + backend structure.
 export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "claude",
     label: "Claude",
-    provider: "claude-agent",
+    provider: "anthropic",
     modes: [
+      {
+        id: "api",
+        label: "API",
+        backend: "api",
+        icon: UiCloud,
+        title: "Anthropic API",
+        provider: "anthropic",
+      },
       {
         id: "agent",
         label: "Agent",
-        backend: "claude-agent",
+        backend: "agent",
         icon: UiRobotAi,
         title: "Claude Agent SDK",
+        provider: "anthropic",
       },
       {
         id: "cli",
         label: "CLI",
-        backend: "claude-cli",
+        backend: "cli",
         icon: UiTerminal,
         title: "Claude Code CLI",
+        provider: "anthropic",
       },
       {
         id: "cmux",
         label: "cmux",
-        backend: "claude-cmux",
+        backend: "cmux",
         icon: UiColumns,
         title: "Claude multiplexer",
+        provider: "anthropic",
       },
     ],
   },
   {
     id: "codex",
     label: "Codex",
-    provider: "codex-cli",
-    modes: [
-      {
-        id: "agent",
-        label: "Agent",
-        backend: "codex-agent",
-        icon: UiRobotAi,
-        title: "Codex agent",
-      },
-      {
-        id: "cli",
-        label: "CLI",
-        backend: "codex-cli",
-        icon: UiTerminal,
-        title: "Codex CLI",
-      },
-      {
-        id: "cmux",
-        label: "cmux",
-        backend: "codex-cmux",
-        icon: UiColumns,
-        title: "Codex multiplexer",
-      },
-    ],
-  },
-  {
-    id: "openai",
-    label: "OpenAI",
     provider: "openai",
     modes: [
       {
         id: "api",
         label: "API",
-        backend: "openai",
+        backend: "api",
         icon: UiCloud,
         title: "OpenAI API",
+        provider: "openai",
       },
-    ],
-  },
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    provider: "anthropic",
-    modes: [
       {
-        id: "api",
-        label: "API",
-        backend: "anthropic",
-        icon: UiCloud,
-        title: "Anthropic API",
+        id: "agent",
+        label: "Agent",
+        backend: "agent",
+        icon: UiRobotAi,
+        title: "Codex agent",
+        provider: "openai",
+      },
+      {
+        id: "cli",
+        label: "CLI",
+        backend: "cli",
+        icon: UiTerminal,
+        title: "Codex CLI",
+        provider: "openai",
+      },
+      {
+        id: "cmux",
+        label: "cmux",
+        backend: "cmux",
+        icon: UiColumns,
+        title: "Codex multiplexer",
+        provider: "openai",
       },
     ],
   },
@@ -165,14 +228,14 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "api",
         label: "API",
-        backend: "gemini",
+        backend: "api",
         icon: UiCloud,
         title: "Gemini API",
       },
       {
         id: "cli",
         label: "CLI",
-        backend: "gemini-cli",
+        backend: "cli",
         icon: UiTerminal,
         title: "Gemini CLI",
       },
@@ -186,7 +249,7 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "api",
         label: "API",
-        backend: "deepseek",
+        backend: "api",
         icon: UiCloud,
         title: "DeepSeek API",
       },
@@ -199,10 +262,8 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
 // ids, not display text: `claude`/`api` are enough to render both, and a served
 // label would be a second place for presentation to drift.
 export type RuntimeCatalogMode = {
-  /** api | agent | cli | cmux */
-  mode: string;
-  /** The concrete `spec.backend`, e.g. "claude-cmux". */
-  backend: string;
+  /** The canonical `spec.backend`: api | agent | cli | cmux. */
+  backend: SpecRuntimeBackend;
   /** "api" (remote, in-process) or "cli" (supervised local binary). */
   kind?: string | undefined;
   /** Rides the local CLI's own login; never consults an API key. */
@@ -216,8 +277,8 @@ export type RuntimeCatalogMode = {
   catalogProvider?: string | undefined;
   availability?: RuntimeAvailability | undefined;
   permissions?: RuntimePermissionCapabilities | undefined;
-  /** Native CLI or agent-protocol options emitted by Captain for this mode. */
-  arguments?: RuntimeArgumentMapping[] | undefined;
+  /** Supported Spec fields, annotated with native CLI and protocol bindings. */
+  schema: RuntimeSpecSchema;
 };
 
 export type RuntimeCatalogFamily = {
@@ -274,14 +335,15 @@ export function familiesFromRuntimeCatalog(
   for (const entry of catalog) {
     const label = FAMILY_LABELS[entry.family] ?? titleCase(entry.family);
     const modes = entry.modes.map((mode) => ({
-      id: mode.mode,
-      label: MODE_LABELS[mode.mode] ?? titleCase(mode.mode),
+      id: mode.backend,
+      label: MODE_LABELS[mode.backend] ?? titleCase(mode.backend),
       backend: mode.backend,
-      icon: MODE_ICONS[mode.mode],
-      title: `${label} ${MODE_TITLES[mode.mode] ?? titleCase(mode.mode)}`,
+      icon: MODE_ICONS[mode.backend],
+      title: `${label} ${MODE_TITLES[mode.backend] ?? titleCase(mode.backend)}`,
       provider: mode.catalogProvider ?? entry.catalogPrefix,
+      ...(mode.defaultModel ? { defaultModel: mode.defaultModel } : {}),
       ...(mode.permissions ? { permissions: mode.permissions } : {}),
-      ...(mode.arguments?.length ? { arguments: mode.arguments } : {}),
+      ...(mode.schema ? { schema: mode.schema } : {}),
       ...(mode.availability
         ? { availability: mode.availability }
         : mode.disabled
@@ -395,8 +457,16 @@ export function backendForFamilyMode(
 export function selectionForBackend(
   families: SpecRuntimeFamily[],
   backend: string | undefined,
+  preferredFamily?: string | undefined,
 ): { family: string; mode: string } {
   const target = (backend ?? "").toLowerCase();
+  const preferred = families.find((family) => family.id === preferredFamily);
+  const preferredMode = preferred?.modes.find(
+    (mode) => mode.backend.toLowerCase() === target,
+  );
+  if (preferred && preferredMode) {
+    return { family: preferred.id, mode: preferredMode.id };
+  }
   for (const family of families) {
     for (const mode of family.modes) {
       if (mode.backend.toLowerCase() === target) {
@@ -408,10 +478,49 @@ export function selectionForBackend(
   return { family: first.id, mode: firstMode(first).id };
 }
 
+export function familyForModel(
+  families: SpecRuntimeFamily[],
+  models: ChatModel[],
+  modelId: string | undefined,
+): SpecRuntimeFamily | undefined {
+  if (!modelId) return undefined;
+  const selected = models.find(
+    (model) =>
+      model.id === modelId ||
+      model.runtime?.model === modelId ||
+      model.runtime?.id === modelId,
+  );
+  if (!selected) return undefined;
+  return families.find(
+    (family) =>
+      family.provider === selected.provider ||
+      family.modes.some((mode) => mode.provider === selected.provider),
+  );
+}
+
+export function selectionForRuntime(
+  families: SpecRuntimeFamily[],
+  backend: string | undefined,
+  modelId: string | undefined,
+  models: ChatModel[],
+  preferredFamily?: string | undefined,
+): { family: string; mode: string } {
+  return selectionForBackend(
+    families,
+    backend,
+    familyForModel(families, models, modelId)?.id ?? preferredFamily,
+  );
+}
+
 export function familyForBackend(
   families: SpecRuntimeFamily[],
   backend: string | undefined,
+  preferredFamily?: string | undefined,
 ): SpecRuntimeFamily | undefined {
+  if (preferredFamily) {
+    const family = families.find((entry) => entry.id === preferredFamily);
+    if (family?.modes.some((mode) => mode.backend === backend)) return family;
+  }
   const target = (backend ?? "").toLowerCase();
   return families.find((family) =>
     family.modes.some((mode) => mode.backend.toLowerCase() === target),
@@ -424,10 +533,17 @@ export function familyForBackend(
 export function modeForBackend(
   families: SpecRuntimeFamily[],
   backend: string | undefined,
+  preferredFamily?: string | undefined,
 ): SpecRuntimeModeOption | undefined {
   const target = (backend ?? "").toLowerCase();
   if (!target) return undefined;
-  for (const family of families) {
+  const ordered = preferredFamily
+    ? [
+        ...families.filter((family) => family.id === preferredFamily),
+        ...families.filter((family) => family.id !== preferredFamily),
+      ]
+    : families;
+  for (const family of ordered) {
     const mode = family.modes.find(
       (entry) => entry.backend.toLowerCase() === target,
     );
@@ -436,7 +552,7 @@ export function modeForBackend(
   return undefined;
 }
 
-// "claude-agent" -> "Claude Agent"; unknown/empty -> "Prompt default".
+// `backend` is provider-independent, so a family is needed for a full label.
 export function labelForBackend(
   backend: string | undefined,
   families: SpecRuntimeFamily[] = SPEC_RUNTIME_FAMILIES,

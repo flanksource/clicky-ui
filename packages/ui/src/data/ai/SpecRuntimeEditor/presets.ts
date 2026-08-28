@@ -5,7 +5,6 @@ import type {
   AISpecRuntimeResourcePolicies,
   AISpecRuntimeToolPolicies,
   AISpecRuntimeValue,
-  SpecPermissionMode,
   SpecResourceMode,
   SpecToolPolicy,
 } from "../SpecRuntimeEditor.model";
@@ -32,7 +31,6 @@ export type SpecRuntimePreset = {
   id: SpecRuntimePresetId;
   label: string;
   description: string;
-  mode: SpecPermissionMode;
   /** Per-tool policies applied by id. */
   policies: Record<string, SpecToolPolicy>;
   /** Fallback policy for catalog tools by group, when not named in policies. */
@@ -51,7 +49,6 @@ export const SPEC_RUNTIME_PRESETS: SpecRuntimePreset[] = [
     id: "edit",
     label: "Edit",
     description: "Edits auto, shell and web ask.",
-    mode: "acceptEdits",
     policies: {
       Read: "allow",
       Edit: "auto",
@@ -68,7 +65,6 @@ export const SPEC_RUNTIME_PRESETS: SpecRuntimePreset[] = [
     id: "plan",
     label: "Plan",
     description: "Read and web ask, writes off.",
-    mode: "plan",
     policies: {
       Read: "allow",
       Edit: "deny",
@@ -85,7 +81,6 @@ export const SPEC_RUNTIME_PRESETS: SpecRuntimePreset[] = [
     id: "readonly",
     label: "Read-only",
     description: "No writes, shell, network, or resources.",
-    mode: "default",
     policies: {
       Read: "ask",
       Edit: "deny",
@@ -134,9 +129,7 @@ export function buildPermissionPresetSnapshot(
   value: AISpecRuntimeValue,
   entries: PermissionListEntry[],
 ): SpecRuntimePermissionSnapshot {
-  const permissions: AISpecRuntimePermissions = {
-    mode: value.permissions?.mode || "default",
-  };
+  const permissions: AISpecRuntimePermissions = {};
   const tools: AISpecRuntimeToolPolicies = {};
   const mcp: AISpecRuntimeMCPPermissions = {};
   const plugins: AISpecRuntimeResourcePolicies = {};
@@ -200,7 +193,7 @@ function buildBuiltinPermissionSnapshot(
   preset: SpecRuntimePreset,
   entries: PermissionListEntry[],
 ): SpecRuntimePermissionSnapshot {
-  const permissions: AISpecRuntimePermissions = { mode: preset.mode };
+  const permissions: AISpecRuntimePermissions = {};
   const tools: AISpecRuntimeToolPolicies = {};
   const mcp: AISpecRuntimeMCPPermissions = {};
   const plugins: AISpecRuntimeResourcePolicies = {};
@@ -259,7 +252,6 @@ function clonePermissions(
   value: AISpecRuntimePermissions,
 ): AISpecRuntimePermissions {
   const permissions: AISpecRuntimePermissions = {};
-  if (value.mode) permissions.mode = value.mode;
   if (value.tools)
     permissions.tools = { ...(value.tools as AISpecRuntimeToolPolicies) };
   if (value.mcp) {

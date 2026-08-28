@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
+import { SPEC_PERMISSION_MODES } from "../SpecRuntimeEditor.model";
 import { PermissionModeField } from "./PermissionModeField";
+
+const ALL_MODES = [...SPEC_PERMISSION_MODES];
+const CODEX_MODES = ALL_MODES.filter((mode) => mode !== "dontAsk");
 
 const FAMILIES: SpecRuntimeFamily[] = [
   {
@@ -60,9 +64,13 @@ describe("PermissionModeField", () => {
     const onChange = vi.fn();
     render(
       <PermissionModeField
-        value={{ backend: "codex-agent", permissions: { mode: "default" } }}
+        value={{
+          backend: "codex-agent",
+          sandbox: { mode: "native", approval: "default" },
+        }}
         onChange={onChange}
         families={FAMILIES}
+        availableModes={CODEX_MODES}
       />,
     );
 
@@ -89,7 +97,7 @@ describe("PermissionModeField", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-agent",
-      permissions: { mode: "plan" },
+      sandbox: { mode: "native", approval: "plan" },
     });
   });
 
@@ -97,8 +105,12 @@ describe("PermissionModeField", () => {
     const onChange = vi.fn();
     render(
       <PermissionModeField
-        value={{ backend: "codex-agent", permissions: { mode: "default" } }}
+        value={{
+          backend: "codex-agent",
+          sandbox: { mode: "native", approval: "default" },
+        }}
         onChange={onChange}
+        availableModes={["default", "acceptEdits", "auto"]}
         families={[
           {
             id: "codex",
@@ -145,16 +157,20 @@ describe("PermissionModeField", () => {
     fireEvent.click(automatic);
     expect(onChange).toHaveBeenCalledWith({
       backend: "codex-agent",
-      permissions: { mode: "acceptEdits" },
+      sandbox: { mode: "native", approval: "acceptEdits" },
     });
   });
 
   it("preserves a selected codex alias while presenting one native posture", () => {
     render(
       <PermissionModeField
-        value={{ backend: "codex-agent", permissions: { mode: "auto" } }}
+        value={{
+          backend: "codex-agent",
+          sandbox: { mode: "native", approval: "auto" },
+        }}
         onChange={vi.fn()}
         families={FAMILIES}
+        availableModes={CODEX_MODES}
       />,
     );
 
@@ -166,8 +182,12 @@ describe("PermissionModeField", () => {
   it("keeps claude native postures distinct and uses its mode tones", () => {
     render(
       <PermissionModeField
-        value={{ backend: "claude-cli", permissions: { mode: "plan" } }}
+        value={{
+          backend: "claude-cli",
+          sandbox: { mode: "native", approval: "plan" },
+        }}
         onChange={vi.fn()}
+        availableModes={ALL_MODES}
         families={[
           {
             id: "claude",
@@ -255,8 +275,12 @@ describe("PermissionModeField", () => {
     };
     render(
       <PermissionModeField
-        value={{ backend: "gemini-cli", permissions: { mode: "default" } }}
+        value={{
+          backend: "gemini-cli",
+          sandbox: { mode: "docker", approval: "default" },
+        }}
         onChange={onChange}
+        availableModes={ALL_MODES}
         families={[
           {
             id: "gemini",
@@ -286,15 +310,19 @@ describe("PermissionModeField", () => {
     fireEvent.click(screen.getByRole("radio", { name: "YOLO" }));
     expect(onChange).toHaveBeenCalledWith({
       backend: "gemini-cli",
-      permissions: { mode: "bypassPermissions" },
+      sandbox: { mode: "docker", approval: "bypassPermissions" },
     });
   });
 
   it("preserves a selected Gemini approximation inside a collapsed native posture", () => {
     render(
       <PermissionModeField
-        value={{ backend: "gemini-cli", permissions: { mode: "dontAsk" } }}
+        value={{
+          backend: "gemini-cli",
+          sandbox: { mode: "docker", approval: "dontAsk" },
+        }}
         onChange={vi.fn()}
+        availableModes={["bypassPermissions", "dontAsk"]}
         families={[
           {
             id: "gemini",
@@ -335,10 +363,11 @@ describe("PermissionModeField", () => {
   it("uses the resolved backend when the editable spec inherits it", () => {
     render(
       <PermissionModeField
-        value={{ permissions: { mode: "plan" } }}
+        value={{ sandbox: { mode: "native", approval: "plan" } }}
         effectiveBackend="codex-agent"
         onChange={vi.fn()}
         families={FAMILIES}
+        availableModes={CODEX_MODES}
       />,
     );
 
@@ -352,6 +381,7 @@ describe("PermissionModeField", () => {
       <PermissionModeField
         value={{ backend: "openai" }}
         onChange={vi.fn()}
+        availableModes={[]}
         families={[
           {
             id: "openai",
@@ -385,10 +415,11 @@ describe("PermissionModeField", () => {
       <PermissionModeField
         value={{
           backend: "codex-agent",
-          permissions: { mode: "dontAsk" },
+          sandbox: { mode: "native", approval: "dontAsk" },
         }}
         onChange={onChange}
         families={FAMILIES}
+        availableModes={CODEX_MODES}
       />,
     );
 
@@ -402,9 +433,10 @@ describe("PermissionModeField", () => {
   it("requires backend context for a persisted posture", () => {
     render(
       <PermissionModeField
-        value={{ permissions: { mode: "plan" } }}
+        value={{ sandbox: { mode: "native", approval: "plan" } }}
         onChange={vi.fn()}
         families={FAMILIES}
+        availableModes={CODEX_MODES}
       />,
     );
 

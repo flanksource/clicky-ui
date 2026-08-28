@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SpecRuntimeFamily } from "./runtime-mode";
-import { runtimeFieldSupport } from "./runtime-field-support";
+import {
+  runtimeFieldSection,
+  runtimeFieldSupport,
+} from "./runtime-field-support";
 
 const families: SpecRuntimeFamily[] = [
   {
@@ -12,40 +15,53 @@ const families: SpecRuntimeFamily[] = [
         id: "agent",
         label: "Agent",
         backend: "claude-agent",
-        arguments: [
-          { name: "model", source: "model", implementation: "mapped" },
-          {
-            name: "ephemeral",
-            source: "memory.skipMemory|memory.bare",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            budget: {
+              type: "object",
+              properties: { timeout: { type: "string" } },
+            },
+            memory: {
+              type: "object",
+              properties: {
+                skipMemory: {
+                  type: "boolean",
+                  "x-clicky-section": "model",
+                },
+                bare: { type: "boolean" },
+              },
+            },
           },
-        ],
+        },
       },
       {
         id: "cli",
         label: "CLI",
         backend: "claude-cli",
-        arguments: [
-          { name: "model", source: "model", implementation: "mapped" },
-          { name: "effort", source: "effort", implementation: "mapped" },
-          {
-            name: "system",
-            source: "prompt.system",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            effort: { type: "string" },
+            prompt: {
+              type: "object",
+              properties: { system: { type: "string" } },
+            },
+            cliArgs: {
+              type: "object",
+              properties: { tools: { type: "string" } },
+            },
           },
-          {
-            name: "tool",
-            source: "cliArgs.tools",
-            implementation: "mapped",
-          },
-        ],
+        },
       },
     ],
   },
 ];
 
 describe("runtimeFieldSupport", () => {
-  it("shows selected-mode sources and hides provider-specific sources from other modes", () => {
+  it("shows only fields declared by the selected runtime schema", () => {
     const supports = runtimeFieldSupport(families, "claude-agent");
 
     expect(supports("model")).toBe(true);
@@ -56,14 +72,50 @@ describe("runtimeFieldSupport", () => {
     expect(supports("cliArgs")).toBe(false);
   });
 
-  it("keeps Captain-global fields that no runtime maps directly", () => {
+  it("keeps server-managed fields Captain includes in the selected schema", () => {
     expect(runtimeFieldSupport(families, "claude-agent")("budget.timeout")).toBe(
       true,
     );
   });
 
-  it("does not restrict editors when no argument catalog was published", () => {
-    const withoutArguments: SpecRuntimeFamily[] = [
+  it("reads editor placement from the selected runtime schema", () => {
+    expect(
+      runtimeFieldSection(families, "claude-agent", "memory.skipMemory"),
+    ).toBe("model");
+  });
+
+  it("rejects an invalid editor section published by the server", () => {
+    const invalid: SpecRuntimeFamily[] = [
+      {
+        id: "claude",
+        label: "Claude",
+        provider: "claude-agent",
+        modes: [
+          {
+            id: "agent",
+            label: "Agent",
+            backend: "claude-agent",
+            schema: {
+              type: "object",
+              properties: {
+                model: {
+                  type: "string",
+                  "x-clicky-section": "unexpected",
+                },
+              },
+            },
+          },
+        ],
+      },
+    ];
+
+    expect(() => runtimeFieldSection(invalid, "claude-agent", "model")).toThrow(
+      'runtime field "model" has invalid x-clicky-section "unexpected"',
+    );
+  });
+
+  it("does not restrict editors when no runtime schema was published", () => {
+    const withoutSchema: SpecRuntimeFamily[] = [
       {
         id: "api",
         label: "API",
@@ -72,6 +124,6 @@ describe("runtimeFieldSupport", () => {
       },
     ];
 
-    expect(runtimeFieldSupport(withoutArguments, "api")("effort")).toBe(true);
+    expect(runtimeFieldSupport(withoutSchema, "api")("effort")).toBe(true);
   });
 });

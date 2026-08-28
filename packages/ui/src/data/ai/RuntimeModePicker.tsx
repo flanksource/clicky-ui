@@ -30,7 +30,12 @@ export function RuntimeModePicker({
   families = SPEC_RUNTIME_FAMILIES,
   models = [],
 }: RuntimeModePickerProps) {
-  const selection = selectionForBackend(families, value.backend);
+  const selection = selectionForRuntime(
+    families,
+    value.backend,
+    value.model,
+    models,
+  );
   const family = familyById(families, selection.family);
 
   const applyBackend = (familyId: string, modeId: string) => {
@@ -55,9 +60,15 @@ export function RuntimeModePicker({
           value={family.id}
           options={families.map((entry) => {
             const icon = providerIcon(entry.id);
-            return { id: entry.id, label: entry.label, ...(icon ? { icon } : {}) };
+            return {
+              id: entry.id,
+              label: entry.label,
+              ...(icon ? { icon } : {}),
+            };
           })}
-          onChange={(familyId) => applyBackend(familyId, firstMode(familyById(families, familyId)).id)}
+          onChange={(familyId) =>
+            applyBackend(familyId, firstMode(familyById(families, familyId)).id)
+          }
         />
       </SpecField>
       <SpecField label="Mode" hint="runtime">

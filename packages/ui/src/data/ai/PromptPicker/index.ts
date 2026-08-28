@@ -18,6 +18,7 @@ export {
   type InvalidPromptSpecDetail,
   type PromptPickerValue,
   type PromptSpecDetail,
+  type PromptSpecEffective,
   type PromptSpecSavePayload,
   type ValidPromptSpecDetail,
 } from "./types";
