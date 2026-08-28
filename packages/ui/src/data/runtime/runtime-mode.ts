@@ -411,7 +411,7 @@ export function labelForBackend(
   return "Prompt default";
 }
 
-/** Lists the exact model rows available to a family and runtime mode. */
+/** Lists selectable models by provider and declared backend support. */
 export function modelsForFamily(
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
@@ -421,36 +421,38 @@ export function modelsForFamily(
   const provider =
     family.modes.find((mode) => mode.backend === backend)?.provider ??
     family.provider;
-  const providerModels = models.filter((model) => model.provider === provider);
-  return providerModels.filter((model) => {
-    if (!isSelectableModel(model)) return false;
-    const backends = model.backends?.filter(Boolean);
-    if (backend && backends?.length) return backends.includes(backend);
-    if (!backend || !model.runtime?.backend || model.runtime.backend === backend) {
-      return true;
-    }
-    const identity = model.runtime.model ?? model.runtime.id ?? model.id;
-    return (
-      providerModels.filter(
-        (candidate) =>
-          (candidate.runtime?.model ?? candidate.runtime?.id ?? candidate.id) ===
-          identity
-      ).length === 1
-    );
-  });
+  return models.filter(
+    (model) =>
+      isSelectableModel(model) &&
+      model.provider === provider &&
+      modelMatchesBackend(model, backend)
+  );
 }
 
-/** Reports whether a model identity resolves within a family and runtime mode. */
+/** Reports whether the first matching catalog identity belongs to the target family. */
 export function modelBelongsToFamily(
   modelId: string | undefined,
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
   backend?: string | undefined
 ): boolean {
-  return !modelId || Boolean(modelForFamily(modelId, models, family, backend));
+  if (!modelId) return true;
+  const selected = models.find(
+    (model) =>
+      isSelectableModel(model) &&
+      (model.id === modelId ||
+        model.runtime?.model === modelId ||
+        model.runtime?.id === modelId)
+  );
+  if (!selected) return false;
+  const provider =
+    family?.modes.find((mode) => mode.backend === backend)?.provider ??
+    family?.provider;
+  const providerMatches = !provider || selected.provider === provider;
+  return providerMatches && modelMatchesBackend(selected, backend);
 }
 
-/** Resolves a model identity to the exact row offered by a family and backend. */
+/** Resolves a target backend row, using a sole shared row as fallback. */
 export function modelForFamily(
   modelId: string | undefined,
   models: ChatModel[],
@@ -458,11 +460,19 @@ export function modelForFamily(
   backend?: string | undefined
 ): ChatModel | undefined {
   if (!modelId) return undefined;
-  return modelsForFamily(models, family, backend).find(
+  const matches = modelsForFamily(models, family, backend).filter(
     (model) =>
       model.id === modelId ||
       model.runtime?.model === modelId ||
       model.runtime?.id === modelId
+  );
+  return (
+    matches.find(
+      (model) =>
+        !backend ||
+        !model.runtime?.backend ||
+        model.runtime.backend === backend
+    ) ?? (matches.length === 1 ? matches[0] : undefined)
   );
 }
 

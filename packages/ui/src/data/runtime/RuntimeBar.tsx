@@ -1,6 +1,6 @@
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
-import { runtimeModelForValue } from "./RuntimeBar.model";
+import { applyRuntimeBackend, runtimeModelForValue } from "./RuntimeBar.model";
 import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import { RuntimeBarSegments } from "./RuntimeBarSegments";
 import { isSelectableModel } from "./availability";
@@ -10,10 +10,8 @@ import {
 } from "./model-capabilities";
 import {
   SPEC_RUNTIME_FAMILIES,
-  backendForFamilyMode,
   familyById,
   firstMode,
-  modelForFamily,
   modelsForFamily,
   selectionForBackend,
   type SpecRuntimeFamily,
@@ -69,28 +67,15 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   );
 
   const applyBackend = (familyId: string, modeId: string) => {
-    const backend = backendForFamilyMode(families, familyId, modeId);
-    const nextMode = selectionForBackend(families, backend).mode;
-    if (backend === (value.backend ?? "") && nextMode === value.mode) return;
-    const nextFamily = familyById(families, familyId);
-    const modelId =
-      resolvedModel?.runtime?.model ??
-      value.model ??
-      resolvedModel?.id ??
-      value.id;
-    const nextModel = modelForFamily(
-      modelId,
+    const next = applyRuntimeBackend(
+      value,
       models,
-      nextFamily,
-      backend,
+      families,
+      familyId,
+      modeId,
+      reasoningEfforts,
     );
-    let next = withoutCatalogModel(value);
-    if (nextModel) {
-      next = reconcileModelCapabilities(next, nextModel, reasoningEfforts);
-    }
-    next = withRuntimeValue(next, { backend, mode: nextMode });
-    next = withOptionalRuntimeValue(next, "cliArgs", undefined);
-    onChange(next);
+    if (next !== value) onChange(next);
   };
 
   const applyCustomModel = (model: string) =>
@@ -110,10 +95,9 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       withoutCatalogModel(value),
       model,
       reasoningEfforts,
+      { backend: mode.backend, mode: mode.id },
     );
-    onChange(
-      withRuntimeValue(next, { backend: mode.backend, mode: mode.id }),
-    );
+    onChange(next);
   };
   const clearModel = () =>
     onChange(

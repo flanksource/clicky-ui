@@ -2,17 +2,14 @@ import { SegmentedControl } from "../../components/SegmentedControl";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
-import { reconcileModelCapabilities } from "../runtime/model-capabilities";
+import { applyRuntimeBackend } from "../runtime/RuntimeBar.model";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { SpecField } from "./SpecRuntimeEditor/fields";
-import { withOptionalRoot, withRoot } from "./SpecRuntimeEditor/update";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
-  backendForFamilyMode,
   familyById,
   firstMode,
-  modelForFamily,
   selectionForBackend,
 } from "../runtime/runtime-mode";
 
@@ -37,38 +34,15 @@ export function RuntimeModePicker({
   const family = familyById(families, selection.family);
 
   const applyBackend = (familyId: string, modeId: string) => {
-    const backend = backendForFamilyMode(families, familyId, modeId);
-    const nextMode = selectionForBackend(families, backend).mode;
-    if (backend === (value.backend ?? "") && nextMode === value.mode) return;
-    const nextFamily = familyById(families, familyId);
-    const currentModel = modelForFamily(
-      value.model ?? value.id,
+    const next = applyRuntimeBackend(
+      value,
       models,
-      family,
-      value.backend,
+      families,
+      familyId,
+      modeId,
+      DEFAULT_REASONING_EFFORTS,
     );
-    const modelId =
-      currentModel?.runtime?.model ??
-      value.model ??
-      currentModel?.id ??
-      value.id;
-    const nextModel = modelForFamily(modelId, models, nextFamily, backend);
-    // A backend switch invalidates the previous backend's cmux CLI-arg values.
-    let next = withOptionalRoot(
-      withOptionalRoot(value, "model", undefined),
-      "id",
-      undefined,
-    );
-    if (nextModel) {
-      next = reconcileModelCapabilities(
-        next,
-        nextModel,
-        DEFAULT_REASONING_EFFORTS,
-      );
-    }
-    next = withRoot(next, { backend, mode: nextMode });
-    next = withOptionalRoot(next, "cliArgs", undefined);
-    onChange(next);
+    if (next !== value) onChange(next);
   };
 
   return (

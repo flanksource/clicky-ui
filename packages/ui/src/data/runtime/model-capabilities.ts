@@ -1,11 +1,10 @@
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 
-// A runtime control edits exactly the wire value a catalog row
-// carries (`reconcileModelCapabilities` copies one onto the other), so it stays
-// one declaration — a field added to the catalog shape cannot drift out of the
-// editable shape.
+// Runtime controls and catalog rows share one wire shape. Reconciliation copies
+// catalog identity while retaining user-owned runtime options that remain valid.
 export type ModelRuntimeSelection = ChatModelRuntime;
 
+/** Lists the effort values accepted by the selected catalog model. */
 export function effortOptionsForModel(
   model: ChatModel | undefined,
   fallbackEfforts: readonly string[],
@@ -15,23 +14,32 @@ export function effortOptionsForModel(
   return [...(model.supportedEfforts ?? [])];
 }
 
+/** Applies catalog identity and capabilities under the caller's execution policy. */
 export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
   value: T,
   model: ChatModel | undefined,
   fallbackEfforts: readonly string[],
+  execution?: {
+    backend: string | undefined;
+    mode: string | undefined;
+  },
 ): T {
   const next = { ...value } as ModelRuntimeSelection;
   if (model?.runtime) {
     delete next.model;
     delete next.id;
     delete next.backend;
-    delete next.temperature;
-    delete next.effort;
-    delete next.noCache;
-    delete next.fallbacks;
+    delete next.mode;
     Object.assign(next, model.runtime);
   } else if (model) {
     next.model = model.id;
+  }
+
+  if (execution) {
+    if (execution.backend) next.backend = execution.backend;
+    else delete next.backend;
+    if (execution.mode) next.mode = execution.mode;
+    else delete next.mode;
   }
 
   const efforts = effortOptionsForModel(model, fallbackEfforts);

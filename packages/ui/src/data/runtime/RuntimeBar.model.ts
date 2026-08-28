@@ -1,10 +1,19 @@
 import type { StaticIconComponent } from "../Icon";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
+import { reconcileModelCapabilities } from "./model-capabilities";
 import {
+  backendForFamilyMode,
+  familyById,
+  modelForFamily,
   modelMatchesBackend,
+  selectionForBackend,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
+
+type RuntimeBackendValue = ChatModelRuntime & {
+  cliArgs?: Record<string, unknown> | undefined;
+};
 
 export function runtimeFamilyBrand(family: SpecRuntimeFamily): {
   icon: StaticIconComponent | undefined;
@@ -59,11 +68,57 @@ function runtimeModelIdentityMatches(
   model: ChatModel,
   value: ChatModelRuntime,
 ): boolean {
-  if (value.id !== undefined) {
-    return model.id === value.id || model.runtime?.id === value.id;
-  }
-  return Boolean(
-    value.model !== undefined &&
-      (model.id === value.model || model.runtime?.model === value.model),
+  return (
+    (value.id !== undefined &&
+      (model.id === value.id || model.runtime?.id === value.id)) ||
+    (value.model !== undefined &&
+      (model.id === value.model || model.runtime?.model === value.model))
   );
+}
+
+/** Applies a family/mode transition without replacing user-owned runtime options. */
+export function applyRuntimeBackend<T extends RuntimeBackendValue>(
+  value: T,
+  models: ChatModel[],
+  families: SpecRuntimeFamily[],
+  familyId: string,
+  modeId: string,
+  reasoningEfforts: readonly string[],
+): T {
+  const backend = backendForFamilyMode(families, familyId, modeId);
+  const mode = selectionForBackend(families, backend).mode;
+  if (
+    backend === (value.backend ?? "") &&
+    (value.mode === undefined || mode === value.mode)
+  ) {
+    return value;
+  }
+
+  const currentModel = runtimeModelForValue(models, value);
+  const modelId =
+    currentModel?.runtime?.model ?? value.model ?? currentModel?.id ?? value.id;
+  const nextModel = modelForFamily(
+    modelId,
+    models,
+    familyById(families, familyId),
+    backend,
+  );
+  let next = withoutCatalogModel(value);
+  if (nextModel) {
+    next = reconcileModelCapabilities(next, nextModel, reasoningEfforts, {
+      backend,
+      mode,
+    });
+  } else {
+    next = { ...next, backend, mode };
+  }
+  delete next.cliArgs;
+  return next;
+}
+
+function withoutCatalogModel<T extends RuntimeBackendValue>(value: T): T {
+  const next = { ...value };
+  delete next.model;
+  delete next.id;
+  return next;
 }

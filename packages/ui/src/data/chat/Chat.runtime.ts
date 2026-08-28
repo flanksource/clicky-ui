@@ -2,10 +2,7 @@ import {
   reconcileModelCapabilities,
   type ModelRuntimeSelection,
 } from "../runtime/model-capabilities";
-import {
-  runtimeModelForValue,
-  runtimeModelMatches,
-} from "../runtime/RuntimeBar.model";
+import { runtimeModelForValue } from "../runtime/RuntimeBar.model";
 import { modelMatchesBackend } from "../runtime/runtime-mode";
 import type { ChatModel, ChatModelRuntime } from "./types";
 
@@ -36,24 +33,19 @@ export function resolveChatRuntime({
   if (selected) {
     const preservesExecutionSelection = Boolean(
       selected === currentModel &&
-        current.backend !== undefined &&
-        current.mode !== undefined &&
-        selected.runtime?.backend !== undefined &&
-        selected.runtime.backend !== current.backend &&
-        selected.runtime.mode !== undefined &&
-        selected.runtime.mode !== current.mode &&
-        !runtimeModelMatches(selected, current) &&
-        modelMatchesBackend(selected, current.backend),
-    );
-    next = reconcileModelCapabilities(current, selected, reasoningEfforts);
-    if (
-      preservesExecutionSelection &&
       current.backend !== undefined &&
-      current.mode !== undefined
-    ) {
-      next.backend = current.backend;
-      next.mode = current.mode;
-    }
+      selected.runtime?.backend !== undefined &&
+      selected.runtime.backend !== current.backend &&
+      modelMatchesBackend(selected, current.backend),
+    );
+    next = reconcileModelCapabilities(
+      current,
+      selected,
+      reasoningEfforts,
+      preservesExecutionSelection
+        ? { backend: current.backend, mode: current.mode }
+        : undefined,
+    );
     if (!next.id && !next.model) next.id = selected.id;
   } else if (preferredModel) {
     next = { ...current, model: preferredModel };

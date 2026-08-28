@@ -42,6 +42,7 @@ const AI_RUNTIME_KEYS = new Set([
   "effort",
   "id",
   "model",
+  "mode",
   "noCache",
   "prompt",
   "temperature",
@@ -53,6 +54,7 @@ const AI_MODEL_KEYS = new Set([
   "effort",
   "id",
   "model",
+  "mode",
   "noCache",
   "temperature",
 ]);
@@ -163,6 +165,8 @@ function aiToRuntime(ai: Record<string, unknown>): AISpecRuntimeValue {
   if (model) runtime.model = model;
   const backend = stringValue(ai.backend);
   if (backend) runtime.backend = backend;
+  const mode = stringValue(ai.mode);
+  if (mode) runtime.mode = mode;
   const id = stringValue(ai.id);
   if (id) runtime.id = id;
   const effort = stringValue(ai.effort);
