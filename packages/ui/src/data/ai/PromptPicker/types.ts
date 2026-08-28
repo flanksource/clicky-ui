@@ -2,15 +2,29 @@ import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
 
 export type PromptPickerValue = string | { inline?: string; file?: string };
 
+// PromptSpecEffective is what actually runs once every config layer is merged —
+// distinct from the layer being edited, which can be untouched ("default")
+// while a lower layer supplies the override.
+export type PromptSpecEffective = {
+  source: "default" | "inline" | "file";
+  origin?: string | undefined;
+  path?: string | undefined;
+  raw: string;
+  version: string;
+};
+
 // PromptSpecDetailBase carries the identity + source of a resolved prompt for a
 // config layer, independent of whether its .prompt frontmatter parsed cleanly.
-// `raw` is always present so a malformed override can still be repaired.
+// `raw` is always present so a malformed override can still be repaired;
+// `version` hashes it so a save can be refused when the layer moved on.
 type PromptSpecDetailBase = {
   id?: string | undefined;
   scope?: string | undefined;
   source: "default" | "inline" | "file";
   path?: string | undefined;
   raw: string;
+  version?: string | undefined;
+  effective?: PromptSpecEffective | undefined;
 };
 
 // ValidPromptSpecDetail is a prompt whose frontmatter parsed: it carries the

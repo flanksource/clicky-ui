@@ -32,12 +32,15 @@ import {
 } from "../../runtime/runtime-field-support";
 import {
   SPEC_RUNTIME_FAMILIES,
+  familyForModel,
   firstMode,
   modeForBackend,
+  runtimeBackendError,
+  runtimeBackendFromModel,
+  runtimeModelError,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
-import { PermissionModeField } from "./PermissionModeField";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 
 type FallbackDraftPatch = {
@@ -56,19 +59,31 @@ export function ModelSection({
   models,
   families,
   effectiveBackend,
+  effectiveModel,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models: ChatModel[];
   families?: SpecRuntimeFamily[] | undefined;
   effectiveBackend?: string | undefined;
+  effectiveModel?: string | undefined;
 }) {
   const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
+  const selectedFamily = familyForModel(
+    runtimeFamilies,
+    models,
+    value.model || effectiveModel,
+  );
   const backend =
+    runtimeBackendFromModel(value.model) ||
     value.backend?.trim() ||
     effectiveBackend?.trim() ||
     firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
-  const supports = runtimeFieldSupport(runtimeFamilies, backend);
+  const supports =
+    (runtimeModelError(value.model || effectiveModel) ??
+    runtimeBackendError(runtimeFamilies, backend, selectedFamily?.id))
+      ? SUPPORT_ALL_RUNTIME_FIELDS
+      : runtimeFieldSupport(runtimeFamilies, backend, selectedFamily?.id);
   // The bar owns family, mode, model and effort — including the free-text model
   // entry for families the catalog does not describe.
   return (
@@ -78,26 +93,17 @@ export function ModelSection({
         onChange={onChange}
         models={models}
         effectiveBackend={effectiveBackend}
+        effectiveModel={effectiveModel}
         showModel={supports("model")}
         showEffort={supports("effort")}
         families={runtimeFamilies}
       />
-      {supports("permissions.mode") && (
-        <PermissionModeField
-          value={value}
-          onChange={onChange}
-          families={runtimeFamilies}
-          effectiveBackend={effectiveBackend}
-        />
-      )}
       <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
         {supports("budget.cost") && (
           <NumberField
             label="Max cost (USD)"
             value={value.budget?.cost}
-            onChange={(cost) =>
-              onChange(withBudgetValue(value, "cost", cost))
-            }
+            onChange={(cost) => onChange(withBudgetValue(value, "cost", cost))}
             icon={UiCurrencyDollar}
             min={0}
             step={0.01}

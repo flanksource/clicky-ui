@@ -104,7 +104,7 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
   {
     id: "model",
     label: "Model",
-    hint: "Which model runs, how hard it reasons, and its budget ceiling.",
+    hint: "Which model runs, how it reasons, what it loads, and its budget ceiling.",
     icon: UiRobotAi,
     iconClassName: "text-indigo-500",
   },
@@ -135,7 +135,7 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
   {
     id: "permissions",
     label: "Permissions",
-    hint: "What the agent may do without asking. Overrides the preset above.",
+    hint: "Tool, MCP, and plugin access layered over the selected posture.",
     icon: UiShield,
     iconClassName: "text-emerald-600 dark:text-emerald-400",
   },
@@ -167,8 +167,3 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
     icon: UiTerminal,
   },
 ];
-
-export function sectionNumber(id: SpecSectionId): string {
-  const index = SPEC_RUNTIME_SECTIONS.findIndex((section) => section.id === id);
-  return String(index + 1).padStart(2, "0");
-}

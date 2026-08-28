@@ -4,11 +4,14 @@ import type {
   AISpecRuntimePermissions,
   AISpecRuntimePrompt,
   AISpecRuntimeSandbox,
+  AISpecRuntimeSandboxDispatch,
   AISpecRuntimeSandboxPolicy,
   AISpecRuntimeSetup,
   AISpecRuntimeValue,
   SpecCheckoutMode,
   SpecCommitPhase,
+  SpecPermissionMode,
+  SpecSandboxMode,
   SpecStashMode,
   SpecWorktreeMode,
 } from "../SpecRuntimeEditor.model";
@@ -90,48 +93,91 @@ export function withPermissions(
  * in, so the section's controls do not each have to re-narrow the union.
  */
 export function sandboxRef(value: AISpecRuntimeValue): AISpecRuntimeSandbox {
-  if (typeof value.sandbox === "string") return { backend: value.sandbox };
+  if (typeof value.sandbox === "string") {
+    return { mode: value.sandbox.trim() as SpecSandboxMode };
+  }
   return value.sandbox ?? {};
 }
 
 /**
- * Patches the sandbox ref. Clearing the backend drops the whole ref: `sandbox:
- * ""` is present-but-selecting-nothing, which api.SandboxRef.Validate rejects,
- * and agent/policy overrides have nothing to apply to without one.
- *
- * The stored shape stays the object form while editing; compactAISpecRuntime
- * collapses it back to a scalar on save when only a backend is set.
+ * Patches the unified ref while keeping its object form during editing.
  */
 export function withSandbox(
   value: AISpecRuntimeValue,
   patch: Partial<AISpecRuntimeSandbox>,
 ): AISpecRuntimeValue {
   const next: AISpecRuntimeSandbox = { ...sandboxRef(value), ...patch };
-  if (!next.backend?.trim())
-    return withOptionalRoot(value, "sandbox", undefined);
+  if (!next.mode) {
+    throw new Error("sandbox.mode is required before configuring sandbox settings");
+  }
   return withRoot(value, { sandbox: next });
 }
 
-/**
- * Selects the adapter, discarding any previous overrides. Switching backends
- * must not carry an agent pin or a path policy across: an agent enrolled on one
- * git-agent backend does not exist on another, and a stale pin would fail at
- * dispatch rather than at the click that caused it.
- */
+export function withSandboxMode(
+  value: AISpecRuntimeValue,
+  mode: SpecSandboxMode,
+): AISpecRuntimeValue {
+  const current = sandboxRef(value);
+  if (current.mode === mode) return value;
+  if (mode === "off") return withRoot(value, { sandbox: { mode } });
+  return withRoot(value, {
+    sandbox: { mode, ...(current.approval ? { approval: current.approval } : {}) },
+  });
+}
+
 export function withSandboxBackend(
   value: AISpecRuntimeValue,
   backend: string,
 ): AISpecRuntimeValue {
-  if (!backend.trim()) return withOptionalRoot(value, "sandbox", undefined);
-  return withRoot(value, { sandbox: { backend } });
+  const next = { ...sandboxRef(value) };
+  const selected = backend.trim();
+  if (selected) next.backend = selected;
+  else delete next.backend;
+  return withRoot(value, { sandbox: next });
+}
+
+export function withSandboxAgent(
+  value: AISpecRuntimeValue,
+  agent: string,
+): AISpecRuntimeValue {
+  const next = { ...sandboxRef(value) };
+  const selected = agent.trim();
+  if (selected) next.agent = selected;
+  else delete next.agent;
+  return withRoot(value, { sandbox: next });
+}
+
+export function withSandboxApproval(
+  value: AISpecRuntimeValue,
+  approval: SpecPermissionMode,
+): AISpecRuntimeValue {
+  if (sandboxRef(value).mode === "off") {
+    throw new Error("sandbox mode off does not accept approval");
+  }
+  return withSandbox(value, { approval });
 }
 
 export function withSandboxPolicy(
   value: AISpecRuntimeValue,
   patch: Partial<AISpecRuntimeSandboxPolicy>,
 ): AISpecRuntimeValue {
+  if (sandboxRef(value).mode !== "native") {
+    throw new Error("native sandbox policy requires sandbox.mode native");
+  }
   return withSandbox(value, {
     policy: { ...sandboxRef(value).policy, ...patch },
+  });
+}
+
+export function withSandboxDispatch(
+  value: AISpecRuntimeValue,
+  patch: Partial<AISpecRuntimeSandboxDispatch>,
+): AISpecRuntimeValue {
+  if (sandboxRef(value).mode !== "git-agent") {
+    throw new Error("sandbox dispatch policy requires sandbox.mode git-agent");
+  }
+  return withSandbox(value, {
+    dispatch: { ...sandboxRef(value).dispatch, ...patch },
   });
 }
 

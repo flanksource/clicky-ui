@@ -35,9 +35,8 @@ function entries(value: AISpecRuntimeValue) {
 }
 
 describe("presets", () => {
-  it("applies the edit preset mode and tool policies with group fallback", () => {
+  it("applies the edit preset tool policies with group fallback", () => {
     const next = applySpecPreset({}, "edit", entries({}));
-    expect(next.permissions?.mode).toBe("acceptEdits");
     expect(next.permissions?.tools).toMatchObject({
       Read: "allow",
       Edit: "auto",
@@ -56,7 +55,6 @@ describe("presets", () => {
 
   it("applies plan and readonly presets", () => {
     const plan = applySpecPreset({}, "plan", entries({}));
-    expect(plan.permissions?.mode).toBe("plan");
     expect(plan.permissions?.tools).toMatchObject({
       Read: "allow",
       Edit: "deny",
@@ -70,7 +68,6 @@ describe("presets", () => {
     });
 
     const readonly = applySpecPreset({}, "readonly", entries({}));
-    expect(readonly.permissions?.mode).toBe("default");
     expect(readonly.permissions?.tools).toMatchObject({
       Read: "ask",
       Write: "deny",
@@ -112,7 +109,6 @@ describe("presets", () => {
   it("captures, reapplies, and matches saved permission snapshots", () => {
     const value: AISpecRuntimeValue = {
       permissions: {
-        mode: "dontAsk",
         tools: { Read: "allow", Bash: "deny" },
         mcp: { filesystem: "disabled" },
         skills: { "$CWD/.skills": "disabled" },
@@ -122,7 +118,6 @@ describe("presets", () => {
     const snapshot = buildPermissionPresetSnapshot(value, entries(value));
     const applied = applyPermissionPresetSnapshot({}, snapshot);
 
-    expect(applied.permissions?.mode).toBe("dontAsk");
     expect(applied.permissions?.tools).toMatchObject({
       Read: "allow",
       Bash: "deny",

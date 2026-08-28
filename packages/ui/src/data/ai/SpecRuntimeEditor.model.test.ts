@@ -38,7 +38,6 @@ describe("buildAISpecRuntimePayload", () => {
           schemaStrictness: "retry",
         },
         permissions: {
-          mode: "acceptEdits",
           presets: ["edit"],
           tools: {
             Read: "allow",
@@ -61,6 +60,7 @@ describe("buildAISpecRuntimePayload", () => {
         memory: {
           bare: true,
         },
+        sandbox: { mode: "native", approval: "acceptEdits" },
         setup: {
           cwd: ".",
           baseDir: " .captain/workspaces ",
@@ -134,7 +134,6 @@ describe("buildAISpecRuntimePayload", () => {
           schemaStrictness: "retry",
         },
         permissions: {
-          mode: "acceptEdits",
           presets: ["edit"],
           tools: {
             Read: "allow",
@@ -157,6 +156,7 @@ describe("buildAISpecRuntimePayload", () => {
         memory: {
           bare: true,
         },
+        sandbox: { mode: "native", approval: "acceptEdits" },
         setup: {
           cwd: ".",
           baseDir: ".captain/workspaces",
@@ -293,11 +293,13 @@ describe("buildAISpecRuntimePayload", () => {
     expect(buildAISpecRuntimePayload({ cliArgs: {} })).toEqual({});
   });
 
-  it("emits the dontAsk permission mode", () => {
+  it("emits the dontAsk approval posture under sandbox", () => {
     expect(SPEC_PERMISSION_MODES).toContain("dontAsk");
     expect(
-      buildAISpecRuntimePayload({ permissions: { mode: "dontAsk" } }),
-    ).toEqual({ spec: { permissions: { mode: "dontAsk" } } });
+      buildAISpecRuntimePayload({
+        sandbox: { mode: "native", approval: "dontAsk" },
+      }),
+    ).toEqual({ spec: { sandbox: { mode: "native", approval: "dontAsk" } } });
   });
 
   it("omits empty setup and local workflow sections", () => {

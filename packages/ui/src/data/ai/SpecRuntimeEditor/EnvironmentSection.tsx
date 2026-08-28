@@ -6,8 +6,8 @@ import type {
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
 import { envVarFromSecretValue, secretValueFromEnvVar } from "./env-model";
-import { ListField, SpecField, SpecInput } from "./fields";
-import { withConnections, withSetup } from "./update";
+import { ListField, SpecInput } from "./fields";
+import { withSetup } from "./update";
 import type { SpecRuntimeSecretSelectorConfig } from "./types";
 
 export function EnvironmentSection({
@@ -21,17 +21,6 @@ export function EnvironmentSection({
 }) {
   return (
     <div className="grid gap-density-3">
-      <SpecField label="Connection config item">
-        <SpecInput
-          ariaLabel="Connection config item"
-          value={value.setup?.connections?.fromConfigItem}
-          onChange={(fromConfigItem) =>
-            onChange(withConnections(value, { fromConfigItem }))
-          }
-          icon={UiKey}
-          mono
-        />
-      </SpecField>
       <EnvVarRows
         value={value.setup?.envVars}
         onChange={(envVars) => onChange(withSetup(value, { envVars }))}

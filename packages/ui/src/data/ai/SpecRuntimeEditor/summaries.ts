@@ -38,10 +38,10 @@ export function summarizeWorkspace(value: AISpecRuntimeValue): string {
 }
 
 export function summarizePermissions(
-  value: AISpecRuntimeValue,
+  _value: AISpecRuntimeValue,
   entries: PermissionListEntry[],
 ): string {
-  const parts: string[] = [value.permissions?.mode || "default"];
+  const parts: string[] = [];
   const denied = entries.filter(
     (entry) => entry.domain === "tools" && entry.mode === "deny",
   ).length;
@@ -50,7 +50,7 @@ export function summarizePermissions(
   ).length;
   if (denied > 0) parts.push(`${denied} denied`);
   if (off > 0) parts.push(`${off} off`);
-  return parts.join(" · ");
+  return parts.length > 0 ? parts.join(" · ") : "No overrides";
 }
 
 export function summarizeEnvironment(value: AISpecRuntimeValue): string {

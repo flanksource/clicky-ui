@@ -1,142 +1,46 @@
 import { useState, type ReactNode } from "react";
 
-import {
-  UiAdd,
-  UiBox,
-  UiRepeat,
-  UiRobotAi,
-  UiWarningTriangle,
-} from "../../../icons";
+import { JsonSchemaForm, SegmentedControl } from "../../../components";
+import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
+import { UiAdd, UiRepeat, UiRobotAi, UiWarningTriangle } from "../../../icons";
 import { Icon } from "../../Icon";
 import {
   SPEC_RUNTIME_FAMILIES,
-  modeForBackend,
+  type RuntimeSpecSchema,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
-import type {
-  AISpecRuntimeValue,
-  SpecSandboxCapability,
+import { runtimeSchemaPropertyAtPath } from "../../runtime/runtime-field-support";
+import {
+  SPEC_PERMISSION_MODES,
+  SPEC_SANDBOX_MODES,
+  type AISpecRuntimeSandboxPolicy,
+  type AISpecRuntimeValue,
+  type SpecPermissionMode,
+  type SpecSandboxMode,
 } from "../SpecRuntimeEditor.model";
 import { SandboxCreateWizard } from "../SandboxCreateWizard";
 import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import { sandboxKindMeta } from "../sandbox-kind-meta";
 import {
-  CheckboxField,
-  Disclosure,
   ListField,
   NumberField,
   SpecButton,
   SpecField,
   SpecSelect,
 } from "./fields";
+import { PermissionModeField } from "./PermissionModeField";
 import type {
   SpecRuntimeSandboxBackend,
   SpecRuntimeSandboxCatalog,
 } from "./types";
 import {
   sandboxRef,
-  withConnections,
   withSandbox,
+  withSandboxAgent,
   withSandboxBackend,
-  withSandboxPolicy,
+  withSandboxDispatch,
+  withSandboxMode,
 } from "./update";
-
-/** One selectable entry, flattened from the catalog's kinds + their backends. */
-type SandboxOption = {
-  selector: string;
-  kind: string;
-  label: string;
-  description: string;
-  capabilities: SpecSandboxCapability[];
-  modes: string[];
-  agents: string[];
-};
-
-function flattenCatalog(
-  catalog: SpecRuntimeSandboxCatalog,
-  additions: SpecRuntimeSandboxBackend[],
-): SandboxOption[] {
-  // A configured backend shadows a bare kind of the same name, because captain's
-  // SandboxDefaults.Resolve looks in Backends before adapter kinds. Both entries
-  // would write the identical selector, so emitting the kind too offers one
-  // choice twice — and the roster-less kind entry wins the `selected` lookup
-  // below, hiding the backend's enrolled agents.
-  const shadowed = new Set<string>();
-  for (const kind of catalog.kinds ?? []) {
-    for (const backend of kind.backends ?? []) shadowed.add(backend.name);
-  }
-  for (const backend of additions) shadowed.add(backend.name);
-
-  const options: SandboxOption[] = [];
-  for (const kind of catalog.kinds ?? []) {
-    const meta = sandboxKindMeta(kind.kind);
-    if (!shadowed.has(kind.kind)) {
-      options.push({
-        selector: kind.kind,
-        kind: kind.kind,
-        label: meta.label,
-        description: kind.description ?? "",
-        capabilities: kind.capabilities ?? [],
-        modes: kind.modes ?? [],
-        agents: [],
-      });
-    }
-    for (const backend of kind.backends ?? []) {
-      options.push({
-        selector: backend.name,
-        kind: kind.kind,
-        // A configured backend is only meaningful next to the adapter it selects.
-        label: `${backend.name} (${meta.label})`,
-        description: kind.description ?? "",
-        capabilities: kind.capabilities ?? [],
-        modes: kind.modes ?? [],
-        agents: (backend.agents ?? [])
-          .filter((agent) => agent.status === "enrolled" && agent.dispatchable)
-          .map((agent) => agent.name),
-      });
-    }
-  }
-  const selectors = new Set(options.map((option) => option.selector));
-  for (const backend of additions) {
-    if (selectors.has(backend.name)) continue;
-    const kind = catalog.kinds?.find((item) => item.kind === backend.kind);
-    if (!kind) continue;
-    options.push({
-      selector: backend.name,
-      kind: kind.kind,
-      label: `${backend.name} (${sandboxKindMeta(kind.kind).label})`,
-      description: kind.description ?? "",
-      capabilities: kind.capabilities ?? [],
-      modes: kind.modes ?? [],
-      agents: (backend.agents ?? [])
-        .filter((agent) => agent.status === "enrolled" && agent.dispatchable)
-        .map((agent) => agent.name),
-    });
-  }
-  return options;
-}
-
-function has(
-  option: SandboxOption | undefined,
-  capability: SpecSandboxCapability,
-) {
-  return option?.capabilities.includes(capability) ?? false;
-}
-
-/**
- * True when the Workspace section already establishes a working tree. A sandbox
- * declaring `isolate-workspace` materializes its own, and captain refuses to
- * register two isolators for one run.
- */
-function workspaceIsolates(value: AISpecRuntimeValue) {
-  const checkout = value.setup?.checkout;
-  if (!checkout) return false;
-  const worktree = checkout.worktree?.mode;
-  return (
-    (checkout.mode != null && checkout.mode !== "none") ||
-    (worktree != null && worktree !== "none")
-  );
-}
 
 function SandboxWarning({ children }: { children: ReactNode }) {
   return (
@@ -153,15 +57,15 @@ function SandboxWarning({ children }: { children: ReactNode }) {
 export function SandboxSection({
   value,
   onChange,
+  schema,
   catalog,
   createConfig,
-  // Same fallback as ModelSection: without it a host that does not pass a
-  // catalog cannot resolve the runtime mode, and the pairing check goes silent.
   families = SPEC_RUNTIME_FAMILIES,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
-  catalog: SpecRuntimeSandboxCatalog;
+  schema: RuntimeSpecSchema;
+  catalog?: SpecRuntimeSandboxCatalog | undefined;
   createConfig?: SpecRuntimeSandboxCreateConfig | undefined;
   families?: SpecRuntimeFamily[] | undefined;
 }) {
@@ -169,85 +73,212 @@ export function SandboxSection({
   const [createdBackends, setCreatedBackends] = useState<
     SpecRuntimeSandboxBackend[]
   >([]);
-  const options = flattenCatalog(catalog, createdBackends);
   const ref = sandboxRef(value);
-  const selected = options.find((option) => option.selector === ref.backend);
-  // The spec carries no runtime mode of its own — the Model section's two-axis
-  // picker writes a concrete `backend`, and the mode is the axis it came from.
-  const mode = modeForBackend(families, value.backend)?.id ?? "";
+  const modes = sandboxModes(schema);
+  const mode = ref.mode ?? modes[0];
+  if (!mode) throw new Error("the selected backend published no sandbox modes");
+  const approvalModes = sandboxApprovalModes(schema);
+  const backends = sandboxBackends(catalog, createdBackends, mode);
+  const selectedBackend = backends.find(
+    (backend) => backend.name === ref.backend,
+  );
+  const dispatchableAgents = (selectedBackend?.agents ?? []).filter(
+    (agent) => agent.status === "enrolled" && agent.dispatchable,
+  );
 
-  // The descriptor table declares which runtime modes an adapter can serve, and
-  // captain rejects a pairing outside it before the run starts. Surfacing it
-  // here turns a dispatch-time failure into a visible one.
-  const modeUnsupported =
-    selected != null &&
-    mode !== "" &&
-    selected.modes.length > 0 &&
-    !selected.modes.includes(mode);
+  return (
+    <div className="grid gap-density-3">
+      <SpecField label="Sandbox mode" composite>
+        <SegmentedControl
+          aria-label="Sandbox mode"
+          value={mode}
+          onChange={(next: SpecSandboxMode) =>
+            onChange(withSandboxMode(value, next))
+          }
+          options={modes.map((item) => {
+            const meta = sandboxKindMeta(item);
+            return {
+              id: item,
+              label: meta.label,
+              icon: meta.icon,
+              ...(meta.description ? { description: meta.description } : {}),
+              ...(meta.iconClassName
+                ? { iconClassName: meta.iconClassName }
+                : {}),
+              ...(meta.activeClassName
+                ? { activeClassName: meta.activeClassName }
+                : {}),
+            };
+          })}
+          size="lg"
+          wrap
+          className="w-full"
+        />
+      </SpecField>
 
-  const remote = has(selected, "remote-exec");
-  const isolates = has(selected, "isolate-workspace");
+      {mode !== "off" && approvalModes.length > 0 && (
+        <PermissionModeField
+          value={value}
+          onChange={onChange}
+          families={families}
+          availableModes={approvalModes}
+        />
+      )}
 
+      {mode === "native" && (
+        <NativeSandboxSettings
+          value={value}
+          onChange={onChange}
+          schema={schema}
+        />
+      )}
+
+      {(mode === "docker" || mode === "git-agent") && (
+        <ConfiguredBackendFields
+          value={value}
+          onChange={onChange}
+          mode={mode}
+          backends={backends}
+          dispatchableAgents={dispatchableAgents.map((agent) => agent.name)}
+          createConfig={createConfig}
+          onCreate={() => setCreating(true)}
+        />
+      )}
+
+      {mode === "git-agent" && workspaceIsolates(value) && (
+        <SandboxWarning>
+          Git Agent materializes its own working tree, so it cannot be combined
+          with the checkout or worktree set in Workspace. Register exactly one
+          isolator.
+        </SandboxWarning>
+      )}
+
+      {createConfig && catalog && (
+        <SandboxCreateWizard
+          open={creating}
+          catalog={catalog}
+          config={createConfig}
+          onClose={() => setCreating(false)}
+          onCreated={(backend, input) => {
+            const created = { ...backend, kind: backend.kind ?? input.kind };
+            if (created.kind !== "docker" && created.kind !== "git-agent") {
+              throw new Error(
+                `created sandbox kind ${JSON.stringify(created.kind)} is not public`,
+              );
+            }
+            setCreatedBackends((current) => [
+              ...current.filter((item) => item.name !== created.name),
+              created,
+            ]);
+            onChange(
+              withSandboxBackend(
+                withSandboxMode(value, created.kind),
+                created.name,
+              ),
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NativeSandboxSettings({
+  value,
+  onChange,
+  schema,
+}: {
+  value: AISpecRuntimeValue;
+  onChange: (value: AISpecRuntimeValue) => void;
+  schema: RuntimeSpecSchema;
+}) {
+  const policySchema = runtimeSchemaPropertyAtPath(schema, "sandbox.policy");
+  if (!policySchema) {
+    throw new Error(
+      "sandbox.mode native requires a published sandbox.policy schema",
+    );
+  }
+  return (
+    <JsonSchemaForm
+      idPrefix="runtime-native-sandbox"
+      schema={policySchema as JsonSchemaObject}
+      value={(sandboxRef(value).policy ?? {}) as Record<string, unknown>}
+      onChange={(policy) =>
+        onChange(
+          withSandbox(value, { policy: policy as AISpecRuntimeSandboxPolicy }),
+        )
+      }
+      size="sm"
+      showPreferencesMenu={false}
+      persistPreferences={false}
+    />
+  );
+}
+
+function ConfiguredBackendFields({
+  value,
+  onChange,
+  mode,
+  backends,
+  dispatchableAgents,
+  createConfig,
+  onCreate,
+}: {
+  value: AISpecRuntimeValue;
+  onChange: (value: AISpecRuntimeValue) => void;
+  mode: "docker" | "git-agent";
+  backends: SpecRuntimeSandboxBackend[];
+  dispatchableAgents: string[];
+  createConfig?: SpecRuntimeSandboxCreateConfig | undefined;
+  onCreate: () => void;
+}) {
+  const ref = sandboxRef(value);
   return (
     <div className="grid gap-density-3">
       <div className="flex flex-wrap items-end gap-density-3">
         <div className="min-w-56 flex-1">
-          <SpecField
-            label="Sandbox"
-            hint={catalog.default ? `default: ${catalog.default}` : undefined}
-            composite
-          >
+          <SpecField label="Backend" composite>
             <SpecSelect
-              ariaLabel="Sandbox"
+              ariaLabel="Sandbox backend"
               value={ref.backend ?? ""}
               onChange={(backend) =>
                 onChange(withSandboxBackend(value, backend))
               }
               options={[
-                {
-                  value: "",
-                  label: `Inherit (${catalog.default || "none"})`,
-                  icon: <UiBox />,
-                },
-                ...options.map((option) => {
-                  const KindIcon = sandboxKindMeta(option.kind).icon;
-                  return {
-                    value: option.selector,
-                    label: option.label,
-                    ...(option.description
-                      ? { description: option.description }
-                      : {}),
-                    icon: <KindIcon />,
-                  };
-                }),
+                { value: "", label: "Configured default" },
+                ...backends.map((backend) => ({
+                  value: backend.name,
+                  label: backend.name,
+                })),
               ]}
             />
           </SpecField>
         </div>
         {createConfig && (
-          <SpecButton
-            ariaLabel="Create sandbox"
-            onClick={() => setCreating(true)}
-          >
+          <SpecButton ariaLabel="Create sandbox" onClick={onCreate}>
             <Icon icon={UiAdd} className="size-3.5" />
             Create sandbox
           </SpecButton>
         )}
-        {remote && (
+        {mode === "git-agent" && (
           <div className="min-w-48 flex-1">
             <SpecField
               label="Agent"
-              hint={selected?.agents.length ? undefined : "none dispatchable"}
+              hint={
+                ref.backend && dispatchableAgents.length === 0
+                  ? "none dispatchable"
+                  : undefined
+              }
               composite
             >
               <SpecSelect
                 ariaLabel="Pinned agent"
                 icon={UiRobotAi}
                 value={ref.agent ?? ""}
-                onChange={(agent) => onChange(withSandbox(value, { agent }))}
+                onChange={(agent) => onChange(withSandboxAgent(value, agent))}
                 options={[
                   { value: "", label: "Any dispatchable agent" },
-                  ...(selected?.agents ?? []).map((agent) => ({
+                  ...dispatchableAgents.map((agent) => ({
                     value: agent,
                     label: agent,
                   })),
@@ -257,103 +288,87 @@ export function SandboxSection({
           </div>
         )}
       </div>
-
-      {selected?.description && (
-        <p className="text-xs text-muted-foreground">{selected.description}</p>
-      )}
-
-      {selected && selected.capabilities.length > 0 && (
-        <ul className="flex flex-wrap gap-1" aria-label="Sandbox capabilities">
-          {selected.capabilities.map((capability) => (
-            <li
-              key={capability}
-              className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-            >
-              {capability}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {modeUnsupported && (
-        <SandboxWarning>
-          Sandbox <code>{ref.backend}</code> does not support runtime mode{" "}
-          <code>{mode}</code>; it supports {selected?.modes.join(", ")}.
-        </SandboxWarning>
-      )}
-
-      {isolates && workspaceIsolates(value) && (
-        <SandboxWarning>
-          <code>{ref.backend}</code> materializes its own working tree, so it
-          cannot be combined with the checkout or worktree set in Workspace.
-          Register exactly one isolator.
-        </SandboxWarning>
-      )}
-
-      <Disclosure label="Execution identity" hint="service accounts">
-        <div className="grid gap-density-2 sm:grid-cols-2">
-          <CheckboxField
-            label="Kubernetes service account"
-            checked={value.setup?.connections?.serviceAccount}
-            onChange={(serviceAccount) =>
-              onChange(withConnections(value, { serviceAccount }))
+      {mode === "git-agent" && (
+        <div className="grid gap-density-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <ListField
+            label="Included paths"
+            value={ref.dispatch?.paths}
+            onChange={(paths) =>
+              onChange(withSandboxDispatch(value, { paths }))
             }
+            placeholder={"pkg/**\n!**/*.pem"}
           />
-          <CheckboxField
-            label="EKS pod identity"
-            checked={value.setup?.connections?.eksPodIdentity}
-            onChange={(eksPodIdentity) =>
-              onChange(withConnections(value, { eksPodIdentity }))
+          <NumberField
+            label="Max attempts"
+            value={ref.dispatch?.maxAttempts}
+            onChange={(maxAttempts) =>
+              onChange(
+                withSandboxDispatch(value, { maxAttempts: maxAttempts ?? 0 }),
+              )
             }
+            icon={UiRepeat}
+            min={0}
+            step={1}
+            integer
           />
         </div>
-      </Disclosure>
-
-      {selected && (
-        <Disclosure label="Policy" hint="paths, attempts">
-          <div className="grid gap-density-3">
-            <ListField
-              label="Paths"
-              value={ref.policy?.paths}
-              onChange={(paths) =>
-                onChange(withSandboxPolicy(value, { paths }))
-              }
-              placeholder={"pkg/**\n!**/*.pem"}
-            />
-            <div className="w-40">
-              <NumberField
-                label="Max attempts"
-                value={ref.policy?.maxAttempts}
-                onChange={(maxAttempts) =>
-                  onChange(
-                    withSandboxPolicy(value, { maxAttempts: maxAttempts ?? 0 }),
-                  )
-                }
-                icon={UiRepeat}
-                min={0}
-                step={1}
-                integer
-              />
-            </div>
-          </div>
-        </Disclosure>
-      )}
-      {createConfig && (
-        <SandboxCreateWizard
-          open={creating}
-          catalog={catalog}
-          config={createConfig}
-          onClose={() => setCreating(false)}
-          onCreated={(backend, input) => {
-            const created = { ...backend, kind: backend.kind ?? input.kind };
-            setCreatedBackends((current) => [
-              ...current.filter((item) => item.name !== created.name),
-              created,
-            ]);
-            onChange(withSandboxBackend(value, created.name));
-          }}
-        />
       )}
     </div>
+  );
+}
+
+function sandboxModes(schema: RuntimeSpecSchema): SpecSandboxMode[] {
+  const values = runtimeSchemaPropertyAtPath(schema, "sandbox.mode")?.enum;
+  if (!Array.isArray(values))
+    throw new Error("sandbox.mode must publish an enum");
+  return values.map((value) => {
+    if (
+      typeof value !== "string" ||
+      !SPEC_SANDBOX_MODES.includes(value as SpecSandboxMode)
+    ) {
+      throw new Error(
+        `sandbox.mode published unsupported value ${JSON.stringify(value)}`,
+      );
+    }
+    return value as SpecSandboxMode;
+  });
+}
+
+function sandboxApprovalModes(schema: RuntimeSpecSchema): SpecPermissionMode[] {
+  const values = runtimeSchemaPropertyAtPath(schema, "sandbox.approval")?.enum;
+  if (values == null) return [];
+  if (!Array.isArray(values))
+    throw new Error("sandbox.approval must publish an enum");
+  return values.map((value) => {
+    if (
+      typeof value !== "string" ||
+      !SPEC_PERMISSION_MODES.includes(value as SpecPermissionMode)
+    ) {
+      throw new Error(
+        `sandbox.approval published unsupported value ${JSON.stringify(value)}`,
+      );
+    }
+    return value as SpecPermissionMode;
+  });
+}
+
+function sandboxBackends(
+  catalog: SpecRuntimeSandboxCatalog | undefined,
+  additions: SpecRuntimeSandboxBackend[],
+  mode: SpecSandboxMode,
+) {
+  const configured =
+    catalog?.kinds?.find((kind) => kind.kind === mode)?.backends ?? [];
+  return [...configured, ...additions].filter(
+    (backend) => backend.kind === mode,
+  );
+}
+
+function workspaceIsolates(value: AISpecRuntimeValue) {
+  const checkout = value.setup?.checkout;
+  if (!checkout) return false;
+  return (
+    (checkout.mode != null && checkout.mode !== "none") ||
+    (checkout.worktree?.mode != null && checkout.worktree.mode !== "none")
   );
 }
