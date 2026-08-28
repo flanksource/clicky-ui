@@ -47,7 +47,7 @@ export function runtimeModelMatches(
   return true;
 }
 
-/** Finds one exact runtime row, falling back only when its identity is unique. */
+/** Finds one exact runtime row, scoping shared aliases by their canonical provider. */
 export function runtimeModelForValue(
   models: ChatModel[],
   value: ChatModelRuntime,
@@ -57,11 +57,21 @@ export function runtimeModelForValue(
     (model) => isEligible(model) && runtimeModelMatches(model, value),
   );
   if (exact) return exact;
-  const identityMatches = models.filter((model) =>
-    runtimeModelIdentityMatches(model, value),
+  const identityMatches = models.filter(
+    (model) =>
+      isEligible(model) &&
+      runtimeModelIdentityMatches(model, value) &&
+      modelMatchesBackend(model, value.backend),
   );
-  const only = identityMatches.length === 1 ? identityMatches[0] : undefined;
-  return only && isEligible(only) ? only : undefined;
+  const canonicalMatches = identityMatches.filter(
+    (model) => model.id === value.id || model.id === value.model,
+  );
+  const provider =
+    canonicalMatches.length === 1 ? canonicalMatches[0]?.provider : undefined;
+  const scopedMatches = provider
+    ? identityMatches.filter((model) => model.provider === provider)
+    : identityMatches;
+  return scopedMatches.length === 1 ? scopedMatches[0] : undefined;
 }
 
 function runtimeModelIdentityMatches(

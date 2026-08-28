@@ -78,13 +78,17 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     if (next !== value) onChange(next);
   };
 
-  const applyCustomModel = (model: string) =>
+  const preserveSelectedMode = (next: T) =>
+    value.backend === mode.backend
+      ? withRuntimeValue(next, { mode: mode.id })
+      : next;
+  const applyCustomModel = (model: string) => {
     onChange(
-      withRuntimeValue(
+      preserveSelectedMode(
         withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
-        { backend: mode.backend, mode: mode.id },
       ),
     );
+  };
   // A menu row carries the backend of the catalog it was listed under, and one
   // catalog serves several backends — claude-cli and claude-cmux models are
   // listed as claude-agent rows. Copying the row's runtime verbatim would let
@@ -99,13 +103,9 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     );
     onChange(next);
   };
-  const clearModel = () =>
-    onChange(
-      withRuntimeValue(withoutCatalogModel(value), {
-        backend: mode.backend,
-        mode: mode.id,
-      }),
-    );
+  const clearModel = () => {
+    onChange(preserveSelectedMode(withoutCatalogModel(value)));
+  };
   const applyEffort = (effort: string) =>
     onChange(withOptionalRuntimeValue(value, "effort", effort));
 
