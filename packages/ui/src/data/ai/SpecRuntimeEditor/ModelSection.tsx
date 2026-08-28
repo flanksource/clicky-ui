@@ -38,6 +38,7 @@ type FallbackDraftPatch = {
   model?: string | undefined;
   id?: string | undefined;
   backend?: string | undefined;
+  mode?: string | undefined;
   temperature?: number | undefined;
   effort?: string | undefined;
   noCache?: boolean | undefined;
@@ -383,6 +384,10 @@ function newFallbackDraft(
   const fallback: AISpecRuntimeModelFallback = {};
   const backend = value.backend || defaultFallbackBackend(families);
   if (backend) fallback.backend = backend;
+  const mode =
+    (backend === value.backend ? value.mode : undefined) ??
+    modeForBackend(families, backend)?.id;
+  if (mode) fallback.mode = mode;
   if (value.effort) fallback.effort = value.effort;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
     fallback.temperature = value.temperature;
@@ -405,6 +410,8 @@ function compactEditableFallback(
   if (id) next.id = id;
   const backend = cleanString(value.backend);
   if (backend) next.backend = backend;
+  const mode = cleanString(value.mode);
+  if (mode) next.mode = mode;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
     next.temperature = value.temperature;
   }

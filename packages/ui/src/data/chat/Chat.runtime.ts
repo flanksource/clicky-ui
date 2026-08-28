@@ -2,7 +2,8 @@ import {
   reconcileModelCapabilities,
   type ModelRuntimeSelection,
 } from "../runtime/model-capabilities";
-import { runtimeModelMatches } from "../runtime/RuntimeBar.model";
+import { runtimeModelForValue } from "../runtime/RuntimeBar.model";
+import { modelMatchesBackend } from "../runtime/runtime-mode";
 import type { ChatModel, ChatModelRuntime } from "./types";
 
 export type ResolveChatRuntimeOptions = {
@@ -22,12 +23,29 @@ export function resolveChatRuntime({
   temperature,
   reasoningEfforts,
 }: ResolveChatRuntimeOptions): ChatModelRuntime {
+  const currentModel = selectedChatModel(models, current);
   const selected = preferredModel
-    ? models.find((model) => model.id === preferredModel)
-    : selectedChatModel(models, current);
+    ? currentModel?.id === preferredModel
+      ? currentModel
+      : models.find((model) => model.id === preferredModel)
+    : currentModel;
   let next: ChatModelRuntime;
   if (selected) {
-    next = reconcileModelCapabilities(current, selected, reasoningEfforts);
+    const preservesExecutionSelection = Boolean(
+      selected === currentModel &&
+      current.backend !== undefined &&
+      selected.runtime?.backend !== undefined &&
+      selected.runtime.backend !== current.backend &&
+      modelMatchesBackend(selected, current.backend),
+    );
+    next = reconcileModelCapabilities(
+      current,
+      selected,
+      reasoningEfforts,
+      preservesExecutionSelection
+        ? { backend: current.backend, mode: current.mode }
+        : undefined,
+    );
     if (!next.id && !next.model) next.id = selected.id;
   } else if (preferredModel) {
     next = { ...current, model: preferredModel };
@@ -41,7 +59,7 @@ export function selectedChatModel(
   models: ChatModel[],
   runtime: ModelRuntimeSelection,
 ): ChatModel | undefined {
-  return models.find((model) => runtimeModelMatches(model, runtime));
+  return runtimeModelForValue(models, runtime);
 }
 
 export function withRuntimeOverrides<T extends ChatModelRuntime>(

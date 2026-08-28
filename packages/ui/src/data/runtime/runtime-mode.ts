@@ -411,6 +411,7 @@ export function labelForBackend(
   return "Prompt default";
 }
 
+/** Lists selectable models by provider and declared backend support. */
 export function modelsForFamily(
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
@@ -428,6 +429,7 @@ export function modelsForFamily(
   );
 }
 
+/** Reports whether the first matching catalog identity belongs to the target family. */
 export function modelBelongsToFamily(
   modelId: string | undefined,
   models: ChatModel[],
@@ -450,7 +452,32 @@ export function modelBelongsToFamily(
   return providerMatches && modelMatchesBackend(selected, backend);
 }
 
-function modelMatchesBackend(
+/** Resolves a target backend row, using a sole shared row as fallback. */
+export function modelForFamily(
+  modelId: string | undefined,
+  models: ChatModel[],
+  family: SpecRuntimeFamily | undefined,
+  backend?: string | undefined
+): ChatModel | undefined {
+  if (!modelId) return undefined;
+  const matches = modelsForFamily(models, family, backend).filter(
+    (model) =>
+      model.id === modelId ||
+      model.runtime?.model === modelId ||
+      model.runtime?.id === modelId
+  );
+  return (
+    matches.find(
+      (model) =>
+        !backend ||
+        !model.runtime?.backend ||
+        model.runtime.backend === backend
+    ) ?? (matches.length === 1 ? matches[0] : undefined)
+  );
+}
+
+/** Checks a model row's declared runtime backends when the catalog scopes it. */
+export function modelMatchesBackend(
   model: ChatModel,
   backend: string | undefined
 ): boolean {

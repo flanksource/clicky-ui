@@ -11,6 +11,7 @@ export type AISpecRuntimeModel = Pick<
   | "model"
   | "id"
   | "backend"
+  | "mode"
   | "temperature"
   | "effort"
   | "noCache"
@@ -28,6 +29,7 @@ const MODEL_KEYS = [
   "model",
   "id",
   "backend",
+  "mode",
   "temperature",
   "effort",
   "noCache",

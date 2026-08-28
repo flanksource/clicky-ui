@@ -415,8 +415,10 @@ export function Chat({
     if (controlledRuntime === undefined) setInternalRuntime(next);
     onRuntimeChange?.(next);
     const nextModel = selectedChatModel(models, next);
-    if (nextModel?.id !== selectedModel?.id) {
-      onModelChange?.(nextModel?.id ?? next.id ?? next.model ?? "");
+    const currentModelId = selectedModel?.id ?? runtime.id ?? runtime.model ?? "";
+    const nextModelId = nextModel?.id ?? next.id ?? next.model ?? "";
+    if (nextModelId !== currentModelId) {
+      onModelChange?.(nextModelId);
     }
     if ((next.effort ?? "") !== (runtime.effort ?? "")) {
       onReasoningEffortChange?.(next.effort ?? "");

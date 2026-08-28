@@ -97,6 +97,7 @@ export type AISpecRuntimeModelFallback = {
   model?: string;
   id?: string;
   backend?: string;
+  mode?: string;
   temperature?: number;
   effort?: string;
   noCache?: boolean;
@@ -187,6 +188,7 @@ export type AISpecRuntimeSpec = {
   model?: string;
   id?: string;
   backend?: string;
+  mode?: string;
   /**
    * Sandbox the run executes under. Accepts a bare selector or the object form,
    * exactly as api.SandboxRef marshals: a ref carrying only a backend
@@ -304,6 +306,8 @@ export function compactAISpecRuntime(
   if (id) spec.id = id;
   const backend = cleanString(value.backend);
   if (backend) spec.backend = backend;
+  const mode = cleanString(value.mode);
+  if (mode) spec.mode = mode;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
     spec.temperature = value.temperature;
   }
@@ -516,6 +520,8 @@ function compactFallbacks(
     if (id) fallback.id = id;
     const backend = cleanString(item.backend);
     if (backend) fallback.backend = backend;
+    const mode = cleanString(item.mode);
+    if (mode) fallback.mode = mode;
     if (item.temperature != null && Number.isFinite(item.temperature)) {
       fallback.temperature = item.temperature;
     }
