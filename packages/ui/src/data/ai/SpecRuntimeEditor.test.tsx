@@ -56,12 +56,12 @@ const PERMISSION_FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "claude",
     label: "Claude",
-    provider: "claude-agent",
+    provider: "anthropic",
     modes: [
       {
         id: "agent",
         label: "Agent",
-        backend: "claude-agent",
+        backend: "agent",
         permissions: {
           modes: Object.fromEntries(
             [
@@ -115,6 +115,53 @@ function openModelAdvanced() {
 }
 
 describe("SpecRuntimeEditor", () => {
+  it("keeps legacy runtime values editable and marks them as invalid model configuration", () => {
+    const canonicalFamilies: SpecRuntimeFamily[] = [
+      {
+        id: "claude",
+        label: "Claude",
+        provider: "anthropic",
+        modes: [
+          { id: "api", label: "API", backend: "api" },
+          { id: "agent", label: "Agent", backend: "agent" },
+        ],
+      },
+    ];
+
+    render(
+      <SpecRuntimeEditor
+        value={{ model: "haiku", backend: "anthropic" }}
+        onChange={vi.fn()}
+        families={canonicalFamilies}
+        sections={["model", "prompt"]}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      'Invalid model configuration: backend "anthropic"',
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "api, agent, cli, or cmux",
+    );
+    expect(screen.getByRole("region", { name: "Model" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Prompt" })).toBeInTheDocument();
+  });
+
+  it("rejects legacy provider prefixes in compact model values", () => {
+    render(
+      <SpecRuntimeEditor
+        value={{ model: "anthropic:haiku", backend: "agent" }}
+        onChange={vi.fn()}
+        sections={["model", "prompt"]}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      'Invalid model configuration: backend "anthropic" in model "anthropic:haiku"',
+    );
+    expect(screen.getByRole("region", { name: "Model" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Prompt" })).toBeInTheDocument();
+  });
 
   it("renders every section at once and edits a literal env var through SecretKeySelector", () => {
     const value: AISpecRuntimeValue = {
@@ -158,9 +205,7 @@ describe("SpecRuntimeEditor", () => {
     expect(commitPhaseSelect()).toHaveValue("Never");
     expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /CAPTAIN_MODE.*demo/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /CAPTAIN_MODE.*demo/ }));
     fireEvent.change(screen.getByPlaceholderText("Static value…"), {
       target: { value: "changed" },
     });
@@ -307,7 +352,7 @@ describe("SpecRuntimeEditor", () => {
   it("renders fallback models as rows with expandable inline editors", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "openai",
+        backend: "api",
         fallbacks: [{ model: "openai/gpt-4o", effort: "low" }],
       });
       return (
@@ -395,7 +440,7 @@ describe("SpecRuntimeEditor", () => {
       within(modelSection).queryByRole("button", { name: "Add fallback" }),
     ).not.toBeInTheDocument();
     const bar = within(picker).getByRole("group", { name: "Fallback runtime" });
-    expect(within(bar).getByTitle("OpenAI API")).toHaveTextContent("API");
+    expect(within(bar).getByTitle("Anthropic API")).toHaveTextContent("API");
     expect(
       within(bar).getByTitle("Model — prompt default"),
     ).toBeInTheDocument();
@@ -409,9 +454,11 @@ describe("SpecRuntimeEditor", () => {
         within(modelSection).getByRole("button", {
           name: "Edit fallback Select model",
         }),
-      ).getByRole("img", { name: "OpenAI API" }),
+      ).getByRole("img", { name: "Anthropic API" }),
     ).toBeInTheDocument();
 
+    fireEvent.click(within(bar).getByTitle("Family — Claude"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Codex/ }));
     fireEvent.click(within(bar).getByTitle("Model — prompt default"));
     fireEvent.click(await screen.findByRole("menuitem", { name: /o4-mini/ }));
     expect(
@@ -528,7 +575,7 @@ describe("SpecRuntimeEditor", () => {
   it("applies permission presets and marks custom trees after manual tweaks", () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "claude-agent",
+        backend: "agent",
       });
       return (
         <SpecRuntimeEditor
@@ -548,14 +595,6 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.click(planPreset);
 
     expect(planPreset).toHaveAttribute("aria-checked", "true");
-    expect(
-      within(
-        within(screen.getByRole("region", { name: "Model" })).getByRole(
-          "radiogroup",
-          { name: "Permission posture" },
-        ),
-      ).getByRole("radio", { name: "Plan" }),
-    ).toBeChecked();
     openPermissionsAdvanced();
     expect(
       within(screen.getByLabelText("Permissions")).queryByRole("combobox", {
@@ -592,7 +631,7 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.change(screen.getByLabelText("Permission preset name"), {
       target: { value: "Locked down" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
     expect(
       window.localStorage.getItem(SPEC_PERMISSION_PRESET_STORAGE_KEY),
     ).toContain("Locked down");
@@ -625,15 +664,81 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByText("clicky-ui · main")).toBeInTheDocument();
   });
 
-  it("places execution identity under Sandbox and hides deprecated run controls", () => {
+  it("renders an ordered read-only prompt document presentation", () => {
+    const onChange = vi.fn();
     render(
       <SpecRuntimeEditor
-        value={{}}
+        value={{
+          prompt: {
+            user: '{{role "system"}}\nBe concise.\n{{role "user"}}\n{{body}}',
+          },
+        }}
+        onChange={onChange}
+        sections={["prompt", "model"]}
+        promptVariant="document"
+        readOnly
+      />,
+    );
+
+    const body = screen.getByLabelText("Prompt document body");
+    expect(body).toBeDisabled();
+    expect(body).toHaveValue(
+      '{{role "system"}}\nBe concise.\n{{role "user"}}\n{{body}}',
+    );
+    expect(screen.queryByLabelText("User override")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Prompt 01/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Model 02/ }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(body, { target: { value: "changed" } });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps captain execution identity out of runtime profiles", () => {
+    render(
+      <SpecRuntimeEditor
+        value={{ backend: "agent" }}
         onChange={() => {}}
+        families={[
+          {
+            id: "claude",
+            label: "Claude",
+            provider: "anthropic",
+            modes: [
+              {
+                id: "agent",
+                label: "Agent",
+                backend: "agent",
+                schema: {
+                  type: "object",
+                  properties: {
+                    sandbox: {
+                      type: "object",
+                      properties: {
+                        mode: {
+                          type: "string",
+                          enum: ["off", "native", "docker", "git-agent"],
+                        },
+                        approval: {
+                          type: "string",
+                          enum: ["default", "plan"],
+                        },
+                        policy: { type: "object", properties: {} },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        ]}
         sandboxCatalog={{
           kinds: [
             {
-              kind: "none",
+              kind: "docker",
               capabilities: [],
               modes: ["api", "cli", "agent", "cmux"],
             },
@@ -650,8 +755,8 @@ describe("SpecRuntimeEditor", () => {
       within(environment).queryByText("Execution identity"),
     ).not.toBeInTheDocument();
     expect(
-      within(sandbox).getByText("Execution identity"),
-    ).toBeInTheDocument();
+      within(sandbox).queryByText("Execution identity"),
+    ).not.toBeInTheDocument();
     expect(
       within(workspace).getByLabelText("Report changes since"),
     ).toBeInTheDocument();
@@ -717,7 +822,7 @@ describe("SpecRuntimeEditor", () => {
   it("selects the agent runtime through the runtime bar's mode segment", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "claude-cli",
+        backend: "cli",
       });
       return <SpecRuntimeEditor value={value} onChange={setValue} />;
     }
@@ -755,12 +860,12 @@ describe("SpecRuntimeEditor", () => {
   it("shows provider status below the model budget and collapses it by default", () => {
     render(
       <SpecRuntimeEditor
-        value={{ backend: "claude-agent" }}
+        value={{ backend: "agent" }}
         onChange={() => {}}
         models={[
           {
-            id: "claude-agent/opus",
-            provider: "claude-agent",
+            id: "anthropic/opus",
+            provider: "anthropic",
             label: "Claude Opus",
             reasoning: true,
             configured: false,
@@ -775,12 +880,12 @@ describe("SpecRuntimeEditor", () => {
           {
             id: "claude",
             label: "Claude",
-            provider: "claude-agent",
+            provider: "anthropic",
             modes: [
               {
                 id: "agent",
                 label: "Agent",
-                backend: "claude-agent",
+                backend: "agent",
               },
             ],
           },

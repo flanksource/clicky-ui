@@ -188,7 +188,6 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
   },
   permissions: {
     ...GENERATED_INITIAL_VALUE.permissions,
-    mode: "acceptEdits",
     presets: ["edit"],
     tools: {
       ...recordValue(GENERATED_INITIAL_VALUE.permissions?.tools),
@@ -217,6 +216,7 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
     ...GENERATED_INITIAL_VALUE.memory,
     skipHooks: true,
   },
+  sandbox: { mode: "native", approval: "acceptEdits" },
   setup: {
     ...GENERATED_INITIAL_VALUE.setup,
     cwd: ".",

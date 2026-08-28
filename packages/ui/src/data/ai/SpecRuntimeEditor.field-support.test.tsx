@@ -13,45 +13,70 @@ const FAMILIES: SpecRuntimeFamily[] = [
         id: "agent",
         label: "Agent",
         backend: "claude-agent",
-        arguments: [
-          { name: "model", source: "model", implementation: "mapped" },
-          {
-            name: "system",
-            source: "prompt.system",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            noCache: { type: "boolean" },
+            prompt: {
+              type: "object",
+              properties: { system: { type: "string" } },
+            },
+            setup: {
+              type: "object",
+              properties: { cwd: { type: "string" } },
+            },
+            memory: {
+              type: "object",
+              properties: {
+                skipMemory: {
+                  type: "boolean",
+                  "x-clicky-section": "model",
+                },
+                skipSkills: {
+                  type: "boolean",
+                  "x-clicky-section": "model",
+                },
+              },
+            },
+            permissions: {
+              type: "object",
+              properties: {
+                skills: {
+                  type: "object",
+                  additionalProperties: { type: "string" },
+                  "x-clicky-section": "model",
+                },
+              },
+            },
           },
-          { name: "cwd", source: "setup.cwd", implementation: "mapped" },
-          {
-            name: "skipMemory",
-            source: "memory.skipMemory",
-            implementation: "mapped",
-          },
-        ],
+        },
       },
       {
         id: "cli",
         label: "CLI",
         backend: "claude-cli",
-        arguments: [
-          { name: "model", source: "model", implementation: "mapped" },
-          { name: "effort", source: "effort", implementation: "mapped" },
-          {
-            name: "appendSystem",
-            source: "prompt.appendSystem",
-            implementation: "mapped",
+        schema: {
+          type: "object",
+          properties: {
+            model: { type: "string" },
+            noCache: { type: "boolean" },
+            effort: { type: "string" },
+            prompt: {
+              type: "object",
+              properties: { appendSystem: { type: "string" } },
+            },
+            sessionId: { type: "string" },
+            memory: {
+              type: "object",
+              properties: { bare: { type: "boolean" } },
+            },
+            cliArgs: {
+              type: "object",
+              properties: { profile: { type: "string" } },
+            },
           },
-          {
-            name: "resume",
-            source: "sessionId",
-            implementation: "mapped",
-          },
-          { name: "bare", source: "memory.bare", implementation: "mapped" },
-          {
-            name: "profile",
-            source: "cliArgs.profile",
-            implementation: "mapped",
-          },
-        ],
+        },
       },
     ],
   },
@@ -71,12 +96,16 @@ describe("SpecRuntimeEditor field support", () => {
     expect(screen.getByRole("group", { name: "Runtime" })).toBeInTheDocument();
   });
 
-  it("projects provider argument support onto the existing field editors", () => {
+  it("projects the runtime schema onto the existing field editors", () => {
     render(
       <SpecRuntimeEditor
         value={{ backend: "claude-agent" }}
         onChange={() => {}}
         families={FAMILIES}
+        permissionCatalog={{
+          tools: [{ id: "Read", label: "Read", group: "Agent tools" }],
+          skills: [{ id: "review", label: "Review", group: "Model skills" }],
+        }}
         sections={["model", "prompt", "workspace", "permissions"]}
       />,
     );
@@ -91,16 +120,28 @@ describe("SpecRuntimeEditor field support", () => {
         { name: /Advanced/ },
       ),
     );
-    expect(screen.queryByPlaceholderText("session UUID")).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("session UUID"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Disable prompt caching")).toBeInTheDocument();
-
-    fireEvent.click(
-      within(screen.getByLabelText("Permissions")).getByRole("button", {
-        name: /Advanced/,
-      }),
-    );
-    expect(screen.getByText("Skip memory")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Model" })).getByText(
+        "Skip memory",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Model" })).getByText(
+        "Skip skills",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Model" })).getByText("Review"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Bare")).not.toBeInTheDocument();
+    expect(screen.queryByText("Read")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Permissions" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides CLI fields when the selected mode does not publish them", () => {
@@ -124,5 +165,73 @@ describe("SpecRuntimeEditor field support", () => {
     expect(
       screen.queryByRole("region", { name: "CLI flags" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("places skills in the section selected by the runtime schema", () => {
+    const families: SpecRuntimeFamily[] = [
+      {
+        id: "claude",
+        label: "Claude",
+        provider: "claude-agent",
+        modes: [
+          {
+            id: "agent",
+            label: "Agent",
+            backend: "claude-agent",
+            schema: {
+              type: "object",
+              properties: {
+                model: { type: "string" },
+                permissions: {
+                  type: "object",
+                  properties: {
+                    skills: {
+                      type: "object",
+                      "x-clicky-section": "permissions",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <SpecRuntimeEditor
+        value={{ backend: "claude-agent" }}
+        onChange={() => {}}
+        families={families}
+        permissionCatalog={{
+          skills: [{ id: "review", label: "Review", group: "Model skills" }],
+        }}
+        sections={["model", "permissions"]}
+      />,
+    );
+
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Model" })).getByRole(
+        "button",
+        { name: /Advanced/ },
+      ),
+    );
+    expect(
+      within(screen.getByRole("region", { name: "Model" })).queryByText(
+        "Review",
+      ),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Permissions" })).getByRole(
+        "button",
+        { name: /Advanced/ },
+      ),
+    );
+    expect(
+      within(screen.getByRole("region", { name: "Permissions" })).getByText(
+        "Review",
+      ),
+    ).toBeInTheDocument();
   });
 });
