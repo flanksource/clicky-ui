@@ -26,7 +26,7 @@ export type {
 export interface ChatModelRuntime {
   model?: string;
   id?: string;
-  backend?: string;
+  /** The canonical `spec.mode`: api | agent | cli | cmux. */
   mode?: string;
   temperature?: number;
   effort?: string;
@@ -74,8 +74,6 @@ export interface ChatModel {
    * configured row.
    */
   default?: boolean;
-  /** Concrete runtime backends that advertised this model. Empty/omitted means provider-wide. */
-  backends?: string[];
   /** Max context tokens — the denominator for a usage gauge. */
   contextWindow?: number;
   /** MIME patterns accepted as model inputs, e.g. image/* or application/pdf. */
@@ -85,7 +83,10 @@ export interface ChatModel {
 /** Per-message metadata the backend rides on the SSE `finish` part
  *  (`messageMetadata`), applied by the AI SDK to the assistant `UIMessage`. */
 export interface ChatMessageMetadata {
-  backend?: string;
+  /** The provider family that served the turn: anthropic | openai | google | deepseek. */
+  provider?: string;
+  /** The mechanism it ran on: api | agent | cli | cmux. */
+  mode?: string;
   executionMode?: string;
   model?: string;
   captainSessionId?: string;
@@ -113,7 +114,8 @@ export interface ChatUsageSummary {
   usage?: ChatUsageBreakdown;
   costBreakdown?: ChatCostBreakdown;
   messageCount: number;
-  backend?: string;
+  provider?: string;
+  mode?: string;
   executionMode?: string;
   model?: string;
   captainSessionId?: string;

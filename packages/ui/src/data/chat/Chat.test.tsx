@@ -50,7 +50,7 @@ const RUNTIME_MODEL: ChatModel = {
   runtime: {
     model: "claude-sonnet-4-5",
     id: RESOLVED_MODEL.id,
-    backend: "anthropic",
+    mode: "api",
     effort: "medium",
   },
 };
@@ -67,7 +67,6 @@ describe("Chat runtime controls", () => {
       runtime: {
         id: "openai/gpt-5.6-luna",
         model: "gpt-5.6-luna",
-        backend: "openai",
         mode: "api",
       },
     };
@@ -80,7 +79,6 @@ describe("Chat runtime controls", () => {
       capabilitiesKnown: true,
       runtime: {
         model: "gpt-5.6-luna",
-        backend: "codex-agent",
         mode: "agent",
       },
     };
@@ -101,13 +99,11 @@ describe("Chat runtime controls", () => {
               {
                 id: "agent",
                 label: "Agent",
-                backend: "codex-agent",
                 provider: "codex-agent",
               },
               {
                 id: "cli",
                 label: "CLI",
-                backend: "codex-cli",
                 provider: "codex-agent",
               },
             ],
@@ -128,7 +124,6 @@ describe("Chat runtime controls", () => {
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
       model: "gpt-5.6-luna",
-      backend: "codex-cli",
       mode: "cli",
     });
     expect(onModelChange).not.toHaveBeenCalled();
@@ -146,7 +141,7 @@ describe("Chat runtime controls", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+        name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
       }),
     ).toBeInTheDocument();
     expect(
@@ -171,19 +166,18 @@ describe("Chat runtime controls", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+        name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
       }),
     );
-    fireEvent.click(screen.getByRole("radio", { name: "OpenAI" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Codex" }));
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
-      backend: "openai",
       mode: "api",
       effort: "medium",
     });
     expect(
       screen.getByRole("button", {
-        name: "Runtime: OpenAI, API, Prompt default, effort Medium",
+        name: "Runtime: Codex, API, Prompt default, effort Medium",
       }),
     ).toBeInTheDocument();
   });
@@ -312,7 +306,7 @@ describe("Chat initialPrompt", () => {
       id: "claude-sonnet-5",
       runtime: {
         model: "claude-sonnet-5",
-        backend: "claude-agent",
+        mode: "agent",
       },
     };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -376,7 +370,6 @@ describe("Chat context meter", () => {
     const runtimeModel: ChatModel = {
       ...RESOLVED_MODEL,
       runtime: {
-        backend: "claude-agent",
         mode: "agent",
       },
     };
@@ -393,7 +386,8 @@ describe("Chat context meter", () => {
             role: "assistant",
             parts: [],
             metadata: {
-              backend: "claude-cmux",
+              provider: "anthropic",
+              mode: "cmux",
               executionMode: "cmux",
               model: "claude-opus-terminal",
               captainSessionId: "captain-session",
@@ -410,7 +404,7 @@ describe("Chat context meter", () => {
 
     expect(await screen.findByRole("tooltip")).toBeInTheDocument();
     expect(screen.getByText("claude-opus-terminal")).toBeInTheDocument();
-    expect(screen.getByText("claude-cmux")).toBeInTheDocument();
+    expect(screen.getByText("anthropic")).toBeInTheDocument();
     expect(screen.getByText("cmux")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Copy captain session ID" }),
@@ -451,6 +445,17 @@ describe("Chat Captain session projection", () => {
         JSON.stringify({
           id: "session-1",
           revision: 2,
+          context: {
+            usedTokens: 128_138,
+            windowTokens: 1_000_000,
+            freePercent: 87,
+          },
+          usage: { inputTokens: 120_000, outputTokens: 8_138 },
+          cost: { providerCostUSD: 7.35 },
+          modelMode: "agent",
+          executionMode: "agent",
+          model: "claude-opus-5",
+          providerSessionId: "provider-session-1",
           messages: [
             {
               id: "user-1",
@@ -475,6 +480,7 @@ describe("Chat Captain session projection", () => {
     );
 
     expect(await screen.findByText("Edit the account")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context 13% used")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/chat/sessions/session-1", {
       headers: { Accept: "application/json" },
@@ -488,7 +494,7 @@ describe("Chat Captain session projection", () => {
     const session = {
       id: "session-1",
       revision: 2,
-      runtime: { model: "gpt-5", backend: "openai" },
+      runtime: { model: "gpt-5", mode: "api" },
       messages: [
         {
           id: "fork-seed",
@@ -601,7 +607,7 @@ describe("Chat Captain session projection", () => {
     fetchMock.mockRestore();
   });
 
-  it("keeps a rejected decision pending and shows the backend reason", async () => {
+  it("keeps a rejected decision pending and shows the server reason", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(

@@ -108,12 +108,11 @@ const FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "claude",
     label: "Claude",
-    provider: "claude-agent",
+    provider: "anthropic",
     modes: [
       {
         id: "cli",
         label: "CLI",
-        backend: "claude-cli",
         schema: sandboxSchema(true),
         permissions: {
           modes: approvalModes,
@@ -126,12 +125,11 @@ const FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "codex",
     label: "Codex",
-    provider: "codex-agent",
+    provider: "openai",
     modes: [
       {
-        id: "cli",
-        label: "CLI",
-        backend: "codex-cli",
+        id: "agent",
+        label: "Agent",
         schema: sandboxSchema(false),
         permissions: {
           modes: approvalModes,
@@ -166,7 +164,7 @@ const CATALOG: SpecRuntimeSandboxCatalog = {
 };
 
 function Harness({
-  initial = { backend: "claude-cli" },
+  initial = { mode: "cli" },
   catalog,
 }: {
   initial?: AISpecRuntimeValue;
@@ -205,7 +203,7 @@ function chooseCombobox(name: string, option: string) {
 }
 
 describe("SpecRuntimeEditor sandbox section", () => {
-  it("renders only public modes published by the selected backend schema", () => {
+  it("renders only public modes published by the selected runtime schema", () => {
     render(<Harness />);
     expect(within(sandboxModes()).getAllByRole("radio")).toHaveLength(4);
     for (const label of ["Off", "Native", "Docker", "Git Agent"]) {
@@ -224,7 +222,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     expect(sandboxModes()).toBeInTheDocument();
   });
 
-  it("renders native settings from the selected backend schema", () => {
+  it("renders native settings from the selected runtime schema", () => {
     render(<Harness />);
     chooseMode("Native");
     expect(
@@ -243,7 +241,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
   });
 
   it("hides native fields not present in the active provider schema", () => {
-    render(<Harness initial={{ backend: "codex-cli" }} />);
+    render(<Harness initial={{ mode: "agent" }} />);
     chooseMode("Native");
     expect(
       screen.queryByRole("checkbox", { name: "Require native sandbox" }),
@@ -256,7 +254,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
   });
 
   it("moves posture into sandbox and collapses equivalent provider aliases", () => {
-    render(<Harness initial={{ backend: "codex-cli" }} />);
+    render(<Harness initial={{ mode: "agent" }} />);
     chooseMode("Native");
     expect(
       screen.getAllByRole("radio", { name: "Ask for approval" }),
@@ -264,7 +262,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
     expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
       JSON.stringify({
-        backend: "codex-cli",
+        mode: "agent",
         sandbox: { mode: "native", approval: "plan" },
       }),
     );
@@ -274,7 +272,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     render(
       <Harness
         initial={{
-          backend: "claude-cli",
+          mode: "cli",
           sandbox: {
             mode: "native",
             approval: "plan",
@@ -287,7 +285,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     chooseMode("Docker");
     expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
       JSON.stringify({
-        backend: "claude-cli",
+        mode: "cli",
         sandbox: { mode: "docker", approval: "plan" },
       }),
     );
@@ -305,7 +303,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     expect(screen.queryByRole("option", { name: "worker-02" })).toBeNull();
     expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
       JSON.stringify({
-        backend: "claude-cli",
+        mode: "cli",
         sandbox: {
           mode: "git-agent",
           backend: "prod-pool",

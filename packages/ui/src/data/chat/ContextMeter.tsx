@@ -54,8 +54,8 @@ export type ContextMeterProps = {
   providerSessionId?: string | undefined;
   threadId?: string | undefined;
   turnId?: string | undefined;
-  /** Resolved backend that produced the terminal chat turn. */
-  backend?: string | undefined;
+  /** Provider family that produced the terminal chat turn: anthropic, openai, … */
+  provider?: string | undefined;
   /** Runtime mechanism used to execute the session, such as api or cmux. */
   executionMode?: string | undefined;
   /** Model id/label and its brand glyph. */
@@ -226,7 +226,7 @@ export function ContextMeter({
   providerSessionId,
   threadId,
   turnId,
-  backend,
+  provider,
   executionMode,
   model,
   modelIcon: Glyph,
@@ -430,7 +430,7 @@ export function ContextMeter({
           </div>
         )}
 
-        {(identities.length > 0 || backend || executionMode) && (
+        {(identities.length > 0 || provider || executionMode) && (
           <div className="space-y-1.5 border-b border-border pb-2">
             {identities.map((identity) => {
               const copyStatus =
@@ -473,7 +473,7 @@ export function ContextMeter({
                 </div>
               );
             })}
-            {backend ? <Row label="Backend" value={backend} /> : null}
+            {provider ? <Row label="Provider" value={provider} /> : null}
             {executionMode ? <Row label="Mode" value={executionMode} /> : null}
           </div>
         )}

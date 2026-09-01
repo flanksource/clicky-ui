@@ -1,4 +1,4 @@
-import { modeForBackend, type SpecRuntimeFamily } from "./runtime-mode";
+import { modeOptionFor, type SpecRuntimeFamily } from "./runtime-mode";
 
 export type RuntimeFieldSupport = (path: string) => boolean;
 
@@ -18,13 +18,13 @@ export const SUPPORT_ALL_RUNTIME_FIELDS: RuntimeFieldSupport = () => true;
 
 export function runtimeFieldSupport(
   families: SpecRuntimeFamily[],
-  backend: string,
+  mode: string,
   preferredFamily?: string | undefined,
 ): RuntimeFieldSupport {
-  const selected = modeForBackend(families, backend, preferredFamily);
+  const selected = modeOptionFor(families, mode, preferredFamily);
   if (!selected) {
     throw new Error(
-      `runtime backend ${JSON.stringify(backend)} is missing from the catalog`,
+      `runtime mode ${JSON.stringify(mode)} is missing from the catalog`,
     );
   }
   const schema = selected.schema;
@@ -34,14 +34,14 @@ export function runtimeFieldSupport(
 
 export function runtimeFieldSection(
   families: SpecRuntimeFamily[],
-  backend: string,
+  mode: string,
   path: string,
   preferredFamily?: string | undefined,
 ): RuntimeSchemaSection | undefined {
-  const selected = modeForBackend(families, backend, preferredFamily);
+  const selected = modeOptionFor(families, mode, preferredFamily);
   if (!selected) {
     throw new Error(
-      `runtime backend ${JSON.stringify(backend)} is missing from the catalog`,
+      `runtime mode ${JSON.stringify(mode)} is missing from the catalog`,
     );
   }
   if (!selected.schema) return undefined;

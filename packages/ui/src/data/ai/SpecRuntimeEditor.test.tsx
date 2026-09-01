@@ -61,7 +61,7 @@ const PERMISSION_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "agent",
         label: "Agent",
-        backend: "agent",
+        mode: "agent",
         permissions: {
           modes: Object.fromEntries(
             [
@@ -122,15 +122,15 @@ describe("SpecRuntimeEditor", () => {
         label: "Claude",
         provider: "anthropic",
         modes: [
-          { id: "api", label: "API", backend: "api" },
-          { id: "agent", label: "Agent", backend: "agent" },
+          { id: "api", label: "API" },
+          { id: "agent", label: "Agent" },
         ],
       },
     ];
 
     render(
       <SpecRuntimeEditor
-        value={{ model: "haiku", backend: "anthropic" }}
+        value={{ model: "haiku", mode: "anthropic" }}
         onChange={vi.fn()}
         families={canonicalFamilies}
         sections={["model", "prompt"]}
@@ -138,7 +138,7 @@ describe("SpecRuntimeEditor", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      'Invalid model configuration: backend "anthropic"',
+      'Invalid model configuration: mode "anthropic"',
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
       "api, agent, cli, or cmux",
@@ -150,14 +150,14 @@ describe("SpecRuntimeEditor", () => {
   it("rejects legacy provider prefixes in compact model values", () => {
     render(
       <SpecRuntimeEditor
-        value={{ model: "anthropic:haiku", backend: "agent" }}
+        value={{ model: "anthropic:haiku", mode: "agent" }}
         onChange={vi.fn()}
         sections={["model", "prompt"]}
       />,
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      'Invalid model configuration: backend "anthropic" in model "anthropic:haiku"',
+      'Invalid model configuration: mode "anthropic" in model "anthropic:haiku"',
     );
     expect(screen.getByRole("region", { name: "Model" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Prompt" })).toBeInTheDocument();
@@ -352,7 +352,7 @@ describe("SpecRuntimeEditor", () => {
   it("renders fallback models as rows with expandable inline editors", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "api",
+        mode: "api",
         fallbacks: [{ model: "openai/gpt-4o", effort: "low" }],
       });
       return (
@@ -399,7 +399,7 @@ describe("SpecRuntimeEditor", () => {
     // the brand color, the effort battery on the low (sky) rung.
     expect(gpt4oRow.querySelector("svg.text-black")).not.toBeNull();
     expect(gpt4oRow.querySelector("svg.text-sky-700")).not.toBeNull();
-    // This fallback names no backend, so the row claims no runtime mode.
+    // This fallback names no mode, so the row claims none.
     expect(within(gpt4oRow).queryByRole("img")).not.toBeInTheDocument();
 
     fireEvent.click(
@@ -448,7 +448,7 @@ describe("SpecRuntimeEditor", () => {
     expect(
       within(picker).queryByLabelText("Temperature"),
     ).not.toBeInTheDocument();
-    // The draft inherits the spec's backend, so its collapsed row shows the mode.
+    // The draft inherits the spec's mode, so its collapsed row shows it.
     expect(
       within(
         within(modelSection).getByRole("button", {
@@ -575,7 +575,7 @@ describe("SpecRuntimeEditor", () => {
   it("applies permission presets and marks custom trees after manual tweaks", () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "agent",
+        mode: "agent",
       });
       return (
         <SpecRuntimeEditor
@@ -700,7 +700,7 @@ describe("SpecRuntimeEditor", () => {
   it("keeps captain execution identity out of runtime profiles", () => {
     render(
       <SpecRuntimeEditor
-        value={{ backend: "agent" }}
+        value={{ mode: "agent" }}
         onChange={() => {}}
         families={[
           {
@@ -711,7 +711,7 @@ describe("SpecRuntimeEditor", () => {
               {
                 id: "agent",
                 label: "Agent",
-                backend: "agent",
+                mode: "agent",
                 schema: {
                   type: "object",
                   properties: {
@@ -822,7 +822,7 @@ describe("SpecRuntimeEditor", () => {
   it("selects the agent runtime through the runtime bar's mode segment", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
-        backend: "cli",
+        mode: "cli",
       });
       return <SpecRuntimeEditor value={value} onChange={setValue} />;
     }
@@ -860,7 +860,7 @@ describe("SpecRuntimeEditor", () => {
   it("shows provider status below the model budget and collapses it by default", () => {
     render(
       <SpecRuntimeEditor
-        value={{ backend: "agent" }}
+        value={{ mode: "agent" }}
         onChange={() => {}}
         models={[
           {
@@ -885,7 +885,7 @@ describe("SpecRuntimeEditor", () => {
               {
                 id: "agent",
                 label: "Agent",
-                backend: "agent",
+                mode: "agent",
               },
             ],
           },

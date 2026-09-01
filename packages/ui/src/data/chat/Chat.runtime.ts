@@ -3,7 +3,6 @@ import {
   type ModelRuntimeSelection,
 } from "../runtime/model-capabilities";
 import { runtimeModelForValue } from "../runtime/RuntimeBar.model";
-import { modelMatchesBackend } from "../runtime/runtime-mode";
 import type { ChatModel, ChatModelRuntime } from "./types";
 
 export type ResolveChatRuntimeOptions = {
@@ -33,18 +32,15 @@ export function resolveChatRuntime({
   if (selected) {
     const preservesExecutionSelection = Boolean(
       selected === currentModel &&
-      current.backend !== undefined &&
-      selected.runtime?.backend !== undefined &&
-      selected.runtime.backend !== current.backend &&
-      modelMatchesBackend(selected, current.backend),
+      current.mode !== undefined &&
+      selected.runtime?.mode !== undefined &&
+      selected.runtime.mode !== current.mode,
     );
     next = reconcileModelCapabilities(
       current,
       selected,
       reasoningEfforts,
-      preservesExecutionSelection
-        ? { backend: current.backend, mode: current.mode }
-        : undefined,
+      preservesExecutionSelection ? { mode: current.mode } : undefined,
     );
     if (!next.id && !next.model) next.id = selected.id;
   } else if (preferredModel) {
@@ -69,11 +65,7 @@ export function withRuntimeOverrides<T extends ChatModelRuntime>(
 ): T {
   const next = { ...runtime };
   if (effort !== undefined) {
-    setOptionalRuntimeField(
-      next as Record<string, unknown>,
-      "effort",
-      effort,
-    );
+    setOptionalRuntimeField(next as Record<string, unknown>, "effort", effort);
   }
   if (temperature !== undefined) next.temperature = temperature;
   return next;
@@ -95,11 +87,10 @@ export function hasStructuredRuntime(
 ): boolean {
   return Boolean(
     selected?.runtime ||
-      runtime.backend ||
-      runtime.id ||
-      runtime.mode ||
-      runtime.noCache ||
-      runtime.fallbacks?.length,
+    runtime.id ||
+    runtime.mode ||
+    runtime.noCache ||
+    runtime.fallbacks?.length,
   );
 }
 

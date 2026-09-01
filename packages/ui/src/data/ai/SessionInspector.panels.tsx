@@ -173,7 +173,7 @@ function MetadataPanel({
     kv("History", session.historyFile),
     kv("Model", session.model),
     kv("Provider", session.provider),
-    kv("Backend", session.backend),
+    kv("Mode", session.modelMode),
     kv("Effort", session.reasoningEffort),
     kv("Version", session.version),
     kv("Git", gitLabel(session.git)),

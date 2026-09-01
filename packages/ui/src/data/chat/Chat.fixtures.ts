@@ -16,7 +16,7 @@ export const MOCK_MODELS: ChatModel[] = [
     runtime: {
       id: "anthropic/claude-sonnet-4-5",
       model: "claude-sonnet-4-5",
-      backend: "anthropic",
+      mode: "api",
       effort: "medium",
     },
   },
@@ -31,7 +31,7 @@ export const MOCK_MODELS: ChatModel[] = [
     runtime: {
       id: "openai/gpt-4o",
       model: "gpt-4o",
-      backend: "openai",
+      mode: "api",
     },
   },
   {
@@ -47,7 +47,7 @@ export const MOCK_MODELS: ChatModel[] = [
     runtime: {
       id: "googleai/gemini-2.5-pro",
       model: "gemini-2.5-pro",
-      backend: "gemini",
+      mode: "api",
       effort: "high",
     },
   },

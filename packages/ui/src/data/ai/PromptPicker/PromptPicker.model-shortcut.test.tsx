@@ -15,7 +15,6 @@ const models = [
     provider: "openai",
     label: "GPT-5.6 Luna",
     reasoning: true,
-    backends: ["codex-agent", "codex-cmux"],
   },
 ];
 const families = [
@@ -24,7 +23,7 @@ const families = [
     label: "OpenAI",
     provider: "openai",
     modes: [
-      { id: "codex-agent", label: "Codex Agent", backend: "codex-agent" },
+      { id: "agent", label: "Codex Agent" },
     ],
   },
 ];
@@ -41,7 +40,7 @@ it("resolves agent:luna while loading and saves the canonical model fields", asy
   };
   const saved = {
     ...loaded,
-    spec: { model: "gpt-5.6-luna", backend: "codex-agent" },
+    spec: { model: "gpt-5.6-luna", mode: "agent" },
   };
   const onChange = vi.fn();
   const saveDetail = vi.fn(async (_payload: PromptSpecSavePayload) => saved);
@@ -66,7 +65,7 @@ it("resolves agent:luna while loading and saves the canonical model fields", asy
 
   fireEvent.click(row);
   expect(await screen.findByTestId("runtime-value")).toHaveTextContent(
-    '"model":"gpt-5.6-luna","backend":"codex-agent"'
+    '"model":"gpt-5.6-luna","mode":"agent"'
   );
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -74,7 +73,7 @@ it("resolves agent:luna while loading and saves the canonical model fields", asy
     expect(saveDetail).toHaveBeenCalledWith({
       source: "inline",
       path: undefined,
-      spec: { model: "gpt-5.6-luna", backend: "codex-agent" },
+      spec: { model: "gpt-5.6-luna", mode: "agent" },
       body: "Review the change.",
       baseRaw: raw,
     })

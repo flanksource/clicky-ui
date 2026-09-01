@@ -8,7 +8,7 @@ const VALUE: AIPromptRunValue = {
   spec: {
     model: "claude-sonnet-4-6",
     id: "anthropic/claude-sonnet-4-6",
-    backend: "anthropic",
+    mode: "api",
     prompt: { user: "Review {{company}}", system: "Be precise" },
     messages: [{ role: "user", parts: [{ type: "text", text: "preserve me" }] }],
   },
@@ -50,9 +50,9 @@ describe("PromptRunEditor", () => {
         {
           model: "claude-sonnet-4-6",
           id: "anthropic/claude-sonnet-4-6",
-          backend: "anthropic",
+          mode: "api",
         },
-        { backend: "anthropic" },
+        { mode: "api" },
       ],
     });
   });

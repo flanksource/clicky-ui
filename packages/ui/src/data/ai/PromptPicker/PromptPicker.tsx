@@ -79,11 +79,14 @@ const DefaultModelIcon: ProviderGlyph = ({ className }) => (
   <UiRobotAi className={className} />
 );
 
+// A mode id is the shortcut. The suffix match this replaces (`-${shortcut}`)
+// only ever fired on the composite adapter ids — "claude-agent" ending in
+// "-agent" — which no longer exist.
 function runtimeModeMatchesShortcut(
-  mode: { id: string; backend: string },
+  mode: { id: string },
   shortcut: string
 ): boolean {
-  return mode.id === shortcut || mode.backend.endsWith(`-${shortcut}`);
+  return mode.id === shortcut;
 }
 
 function resolveModelShortcut(
@@ -113,7 +116,7 @@ function resolveModelShortcut(
   }
 
   const model = modelForShortcut(value, alias, models);
-  const backend = backendForShortcut(value, mode, model, runtimeFamilies);
+  const specMode = modeForShortcut(value, mode, model, runtimeFamilies);
   if (
     effort &&
     model.supportedEfforts?.length &&
@@ -127,7 +130,7 @@ function resolveModelShortcut(
     spec: {
       ...detail.spec,
       model: model.id,
-      backend,
+      mode: specMode,
       ...(effort ? { effort } : {}),
     },
   };
@@ -162,29 +165,26 @@ function modelForShortcut(
   );
 }
 
-function backendForShortcut(
+function modeForShortcut(
   value: string,
   mode: string,
   model: ChatModel,
   families: SpecRuntimeFamily[]
 ): string {
-  const backends = new Set(
+  const modes = new Set(
     families.flatMap((family) =>
       family.modes
         .filter(
           (item) =>
             runtimeModeMatchesShortcut(item, mode) &&
-            (model.backends?.includes(item.backend) ||
-              (!model.backends?.length && family.provider === model.provider))
+            family.provider === model.provider
         )
-        .map((item) => item.backend)
+        .map((item) => item.id)
     )
   );
-  if (backends.size === 1) return [...backends][0]!;
+  if (modes.size === 1) return [...modes][0]!;
   throw new Error(
-    `model shortcut ${JSON.stringify(value)} matched ${
-      backends.size
-    } runtime backends`
+    `model shortcut ${JSON.stringify(value)} matched ${modes.size} runtime modes`
   );
 }
 

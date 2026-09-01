@@ -9,12 +9,11 @@ const families: SpecRuntimeFamily[] = [
   {
     id: "claude",
     label: "Claude",
-    provider: "claude-agent",
+    provider: "anthropic",
     modes: [
       {
         id: "agent",
         label: "Agent",
-        backend: "claude-agent",
         schema: {
           type: "object",
           properties: {
@@ -39,7 +38,6 @@ const families: SpecRuntimeFamily[] = [
       {
         id: "cli",
         label: "CLI",
-        backend: "claude-cli",
         schema: {
           type: "object",
           properties: {
@@ -62,7 +60,7 @@ const families: SpecRuntimeFamily[] = [
 
 describe("runtimeFieldSupport", () => {
   it("shows only fields declared by the selected runtime schema", () => {
-    const supports = runtimeFieldSupport(families, "claude-agent");
+    const supports = runtimeFieldSupport(families, "agent");
 
     expect(supports("model")).toBe(true);
     expect(supports("memory.skipMemory")).toBe(true);
@@ -73,14 +71,14 @@ describe("runtimeFieldSupport", () => {
   });
 
   it("keeps server-managed fields Captain includes in the selected schema", () => {
-    expect(runtimeFieldSupport(families, "claude-agent")("budget.timeout")).toBe(
+    expect(runtimeFieldSupport(families, "agent")("budget.timeout")).toBe(
       true,
     );
   });
 
   it("reads editor placement from the selected runtime schema", () => {
     expect(
-      runtimeFieldSection(families, "claude-agent", "memory.skipMemory"),
+      runtimeFieldSection(families, "agent", "memory.skipMemory"),
     ).toBe("model");
   });
 
@@ -89,12 +87,11 @@ describe("runtimeFieldSupport", () => {
       {
         id: "claude",
         label: "Claude",
-        provider: "claude-agent",
+        provider: "anthropic",
         modes: [
           {
             id: "agent",
             label: "Agent",
-            backend: "claude-agent",
             schema: {
               type: "object",
               properties: {
@@ -109,7 +106,7 @@ describe("runtimeFieldSupport", () => {
       },
     ];
 
-    expect(() => runtimeFieldSection(invalid, "claude-agent", "model")).toThrow(
+    expect(() => runtimeFieldSection(invalid, "agent", "model")).toThrow(
       'runtime field "model" has invalid x-clicky-section "unexpected"',
     );
   });
@@ -120,7 +117,7 @@ describe("runtimeFieldSupport", () => {
         id: "api",
         label: "API",
         provider: "api",
-        modes: [{ id: "api", label: "API", backend: "api" }],
+        modes: [{ id: "api", label: "API", mode: "api" }],
       },
     ];
 

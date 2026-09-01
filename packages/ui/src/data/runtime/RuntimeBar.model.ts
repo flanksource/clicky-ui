@@ -3,15 +3,13 @@ import { providerIcon, providerIconColor } from "../chat/provider-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 import { reconcileModelCapabilities } from "./model-capabilities";
 import {
-  backendForFamilyMode,
   familyById,
+  modeForFamily,
   modelForFamily,
-  modelMatchesBackend,
-  selectionForBackend,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
-type RuntimeBackendValue = ChatModelRuntime & {
+type RuntimeModeValue = ChatModelRuntime & {
   cliArgs?: Record<string, unknown> | undefined;
 };
 
@@ -29,14 +27,6 @@ export function runtimeModelMatches(
   value: ChatModelRuntime,
 ): boolean {
   if (!runtimeModelIdentityMatches(model, value)) return false;
-  if (!modelMatchesBackend(model, value.backend)) return false;
-  if (
-    value.backend !== undefined &&
-    model.runtime?.backend !== undefined &&
-    model.runtime.backend !== value.backend
-  ) {
-    return false;
-  }
   if (
     value.mode !== undefined &&
     model.runtime?.mode !== undefined &&
@@ -58,10 +48,7 @@ export function runtimeModelForValue(
   );
   if (exact) return exact;
   const identityMatches = models.filter(
-    (model) =>
-      isEligible(model) &&
-      runtimeModelIdentityMatches(model, value) &&
-      modelMatchesBackend(model, value.backend),
+    (model) => isEligible(model) && runtimeModelIdentityMatches(model, value),
   );
   const canonicalMatches = identityMatches.filter(
     (model) => model.id === value.id || model.id === value.model,
@@ -87,7 +74,7 @@ function runtimeModelIdentityMatches(
 }
 
 /** Applies a family/mode transition without replacing user-owned runtime options. */
-export function applyRuntimeBackend<T extends RuntimeBackendValue>(
+export function applyRuntimeMode<T extends RuntimeModeValue>(
   value: T,
   models: ChatModel[],
   families: SpecRuntimeFamily[],
@@ -95,11 +82,11 @@ export function applyRuntimeBackend<T extends RuntimeBackendValue>(
   modeId: string,
   reasoningEfforts: readonly string[],
 ): T {
-  const backend = backendForFamilyMode(families, familyId, modeId);
-  const mode = selectionForBackend(families, backend).mode;
+  const mode = modeForFamily(families, familyId, modeId);
+  const family = familyById(families, familyId);
   if (
-    backend === (value.backend ?? "") &&
-    (value.mode === undefined || mode === value.mode)
+    mode === (value.mode ?? "") &&
+    modelForFamily(value.model ?? value.id, models, family, mode)
   ) {
     return value;
   }
@@ -107,26 +94,20 @@ export function applyRuntimeBackend<T extends RuntimeBackendValue>(
   const currentModel = runtimeModelForValue(models, value);
   const modelId =
     currentModel?.runtime?.model ?? value.model ?? currentModel?.id ?? value.id;
-  const nextModel = modelForFamily(
-    modelId,
-    models,
-    familyById(families, familyId),
-    backend,
-  );
+  const nextModel = modelForFamily(modelId, models, family, mode);
   let next = withoutCatalogModel(value);
   if (nextModel) {
     next = reconcileModelCapabilities(next, nextModel, reasoningEfforts, {
-      backend,
       mode,
     });
   } else {
-    next = { ...next, backend, mode };
+    next = { ...next, mode };
   }
   delete next.cliArgs;
   return next;
 }
 
-function withoutCatalogModel<T extends RuntimeBackendValue>(value: T): T {
+function withoutCatalogModel<T extends RuntimeModeValue>(value: T): T {
   const next = { ...value };
   delete next.model;
   delete next.id;

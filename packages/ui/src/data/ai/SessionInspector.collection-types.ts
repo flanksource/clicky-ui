@@ -9,7 +9,7 @@ import type {
 
 export interface SessionCollectionSummary {
   provider?: string;
-  backend?: string;
+  modelMode?: string;
   model?: string;
   effort?: string;
   mode?: string;

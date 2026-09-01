@@ -10,23 +10,25 @@ import {
 } from "./availability";
 
 // A runtime has two independent axes: the model selects a provider family and
-// `spec.backend` selects api | agent | cli | cmux. The backend never contains a
-// provider name or a composite adapter id.
+// `spec.mode` selects api | agent | cli | cmux. The mode never contains a
+// provider name. This file used to call that axis `backend`, which is also what
+// captain called the composite adapter id it once served — so a value read from
+// one and posted back as the other type-checked and ran the wrong runtime.
 
-export const SPEC_RUNTIME_BACKENDS = ["api", "agent", "cli", "cmux"] as const;
-export type SpecRuntimeBackend = (typeof SPEC_RUNTIME_BACKENDS)[number];
+export const SPEC_RUNTIME_MODES = ["api", "agent", "cli", "cmux"] as const;
+export type SpecRuntimeMode = (typeof SPEC_RUNTIME_MODES)[number];
 
-export function isSpecRuntimeBackend(
+export function isSpecRuntimeMode(
   value: string | undefined,
-): value is SpecRuntimeBackend {
-  return SPEC_RUNTIME_BACKENDS.some((backend) => backend === value);
+): value is SpecRuntimeMode {
+  return SPEC_RUNTIME_MODES.some((mode) => mode === value);
 }
 
-export function runtimeBackendFromModel(
+export function runtimeModeFromModel(
   model: string | undefined,
-): SpecRuntimeBackend | undefined {
+): SpecRuntimeMode | undefined {
   const [prefix] = (model ?? "").trim().toLowerCase().split(":");
-  return isSpecRuntimeBackend(prefix) ? prefix : undefined;
+  return isSpecRuntimeMode(prefix) ? prefix : undefined;
 }
 
 export function runtimeModelError(
@@ -36,12 +38,12 @@ export function runtimeModelError(
     const compact = raw.trim();
     if (!compact || !compact.includes(":")) continue;
     const parts = compact.split(":").map((part) => part.trim());
-    const [backend, name, effort] = parts;
-    if (!isSpecRuntimeBackend(backend)) {
-      return `Invalid model configuration: backend ${JSON.stringify(backend)} in model ${JSON.stringify(compact)}. Expected api, agent, cli, or cmux.`;
+    const [mode, name, effort] = parts;
+    if (!isSpecRuntimeMode(mode)) {
+      return `Invalid model configuration: mode ${JSON.stringify(mode)} in model ${JSON.stringify(compact)}. Expected api, agent, cli, or cmux.`;
     }
     if (!name || parts.length > 3) {
-      return `Invalid model configuration: model ${JSON.stringify(compact)}. Expected backend:model[:effort].`;
+      return `Invalid model configuration: model ${JSON.stringify(compact)}. Expected mode:model[:effort].`;
     }
     if (
       effort !== undefined &&
@@ -53,37 +55,31 @@ export function runtimeModelError(
   return undefined;
 }
 
-export function runtimeBackendError(
+export function runtimeModeError(
   families: SpecRuntimeFamily[],
-  backend: string | undefined,
+  mode: string | undefined,
   familyId?: string | undefined,
 ): string | undefined {
-  if (!backend) return undefined;
-  if (!isSpecRuntimeBackend(backend)) {
-    return `Invalid model configuration: backend ${JSON.stringify(backend)}. Expected api, agent, cli, or cmux.`;
+  if (!mode) return undefined;
+  if (!isSpecRuntimeMode(mode)) {
+    return `Invalid model configuration: mode ${JSON.stringify(mode)}. Expected api, agent, cli, or cmux.`;
   }
   const family = familyId
     ? families.find((entry) => entry.id === familyId)
     : undefined;
-  if (family && !family.modes.some((mode) => mode.backend === backend)) {
-    return `Invalid model configuration: backend ${JSON.stringify(backend)} is not available for ${family.label}.`;
+  if (family && !family.modes.some((entry) => entry.id === mode)) {
+    return `Invalid model configuration: mode ${JSON.stringify(mode)} is not available for ${family.label}.`;
   }
-  if (
-    !families.some((entry) =>
-      entry.modes.some((mode) => mode.backend === backend),
-    )
-  ) {
-    return `Invalid model configuration: backend ${JSON.stringify(backend)} is missing from the runtime catalog.`;
+  if (!families.some((entry) => entry.modes.some((m) => m.id === mode))) {
+    return `Invalid model configuration: mode ${JSON.stringify(mode)} is missing from the runtime catalog.`;
   }
   return undefined;
 }
 
 export type SpecRuntimeModeOption = {
-  /** UI mode id within a family (e.g. "agent", "cli", "cmux", "api"). */
+  /** The canonical `spec.mode`: api | agent | cli | cmux. */
   id: string;
   label: string;
-  /** The canonical `spec.backend`: api | agent | cli | cmux. */
-  backend: string;
   icon?: StaticIconComponent | undefined;
   title?: string | undefined;
   provider?: string | undefined;
@@ -140,7 +136,7 @@ export type SpecRuntimeFamily = {
 };
 
 // Offline catalog for stories and tests. Live hosts should pass Captain's
-// registry projection; both use the same provider + backend structure.
+// registry projection; both use the same provider + mode structure.
 export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "claude",
@@ -150,7 +146,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "api",
         label: "API",
-        backend: "api",
         icon: UiCloud,
         title: "Anthropic API",
         provider: "anthropic",
@@ -158,7 +153,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "agent",
         label: "Agent",
-        backend: "agent",
         icon: UiRobotAi,
         title: "Claude Agent SDK",
         provider: "anthropic",
@@ -166,7 +160,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "cli",
         label: "CLI",
-        backend: "cli",
         icon: UiTerminal,
         title: "Claude Code CLI",
         provider: "anthropic",
@@ -174,7 +167,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "cmux",
         label: "cmux",
-        backend: "cmux",
         icon: UiColumns,
         title: "Claude multiplexer",
         provider: "anthropic",
@@ -189,7 +181,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "api",
         label: "API",
-        backend: "api",
         icon: UiCloud,
         title: "OpenAI API",
         provider: "openai",
@@ -197,7 +188,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "agent",
         label: "Agent",
-        backend: "agent",
         icon: UiRobotAi,
         title: "Codex agent",
         provider: "openai",
@@ -205,7 +195,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "cli",
         label: "CLI",
-        backend: "cli",
         icon: UiTerminal,
         title: "Codex CLI",
         provider: "openai",
@@ -213,7 +202,6 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
       {
         id: "cmux",
         label: "cmux",
-        backend: "cmux",
         icon: UiColumns,
         title: "Codex multiplexer",
         provider: "openai",
@@ -225,35 +213,15 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
     label: "Gemini",
     provider: "googleai",
     modes: [
-      {
-        id: "api",
-        label: "API",
-        backend: "api",
-        icon: UiCloud,
-        title: "Gemini API",
-      },
-      {
-        id: "cli",
-        label: "CLI",
-        backend: "cli",
-        icon: UiTerminal,
-        title: "Gemini CLI",
-      },
+      { id: "api", label: "API", icon: UiCloud, title: "Gemini API" },
+      { id: "cli", label: "CLI", icon: UiTerminal, title: "Gemini CLI" },
     ],
   },
   {
     id: "deepseek",
     label: "DeepSeek",
     provider: "deepseek",
-    modes: [
-      {
-        id: "api",
-        label: "API",
-        backend: "api",
-        icon: UiCloud,
-        title: "DeepSeek API",
-      },
-    ],
+    modes: [{ id: "api", label: "API", icon: UiCloud, title: "DeepSeek API" }],
   },
 ];
 
@@ -262,8 +230,8 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
 // ids, not display text: `claude`/`api` are enough to render both, and a served
 // label would be a second place for presentation to drift.
 export type RuntimeCatalogMode = {
-  /** The canonical `spec.backend`: api | agent | cli | cmux. */
-  backend: SpecRuntimeBackend;
+  /** The canonical `spec.mode`: api | agent | cli | cmux. */
+  mode: SpecRuntimeMode;
   /** "api" (remote, in-process) or "cli" (supervised local binary). */
   kind?: string | undefined;
   /** Rides the local CLI's own login; never consults an API key. */
@@ -335,11 +303,10 @@ export function familiesFromRuntimeCatalog(
   for (const entry of catalog) {
     const label = FAMILY_LABELS[entry.family] ?? titleCase(entry.family);
     const modes = entry.modes.map((mode) => ({
-      id: mode.backend,
-      label: MODE_LABELS[mode.backend] ?? titleCase(mode.backend),
-      backend: mode.backend,
-      icon: MODE_ICONS[mode.backend],
-      title: `${label} ${MODE_TITLES[mode.backend] ?? titleCase(mode.backend)}`,
+      id: mode.mode,
+      label: MODE_LABELS[mode.mode] ?? titleCase(mode.mode),
+      icon: MODE_ICONS[mode.mode],
+      title: `${label} ${MODE_TITLES[mode.mode] ?? titleCase(mode.mode)}`,
       provider: mode.catalogProvider ?? entry.catalogPrefix,
       ...(mode.defaultModel ? { defaultModel: mode.defaultModel } : {}),
       ...(mode.permissions ? { permissions: mode.permissions } : {}),
@@ -351,10 +318,10 @@ export function familiesFromRuntimeCatalog(
               availability: {
                 state: "disabled" as const,
                 reason: `Disabled by ${
-                  mode.disabledReason ?? mode.backend
+                  mode.disabledReason ?? mode.mode
                 } in Captain configuration.`,
                 remediation: `Enable ${
-                  mode.disabledReason ?? mode.backend
+                  mode.disabledReason ?? mode.mode
                 } on the Whoami page, then refresh.`,
               },
             }
@@ -393,9 +360,9 @@ export function firstMode(family: SpecRuntimeFamily): SpecRuntimeModeOption {
   return mode;
 }
 
-// Every mode id in the catalog, first-seen order. The returned `backend` belongs
-// to the family that declared the mode first — resolve the real one with
-// `backendForFamilyMode`.
+// Every mode id in the catalog, first-seen order. The entry returned for an id
+// belongs to the family that declared it first, so its presentation fields may
+// differ from another family's — the id itself is family-independent.
 export function runtimeModeOptions(
   families: SpecRuntimeFamily[],
 ): SpecRuntimeModeOption[] {
@@ -435,7 +402,9 @@ export function unsupportedModeAvailability(
   );
 }
 
-export function backendForFamilyMode(
+// The mode a family will actually run for a requested id, falling back to its
+// first available one. The answer is a `spec.mode` value.
+export function modeForFamily(
   families: SpecRuntimeFamily[],
   familyId: string,
   modeId: string,
@@ -451,26 +420,26 @@ export function backendForFamilyMode(
       `SpecRuntimeFamily "${family.id}" has no available runtime modes`,
     );
   }
-  return mode.backend;
+  return mode.id;
 }
 
-export function selectionForBackend(
+export function selectionForMode(
   families: SpecRuntimeFamily[],
-  backend: string | undefined,
+  mode: string | undefined,
   preferredFamily?: string | undefined,
 ): { family: string; mode: string } {
-  const target = (backend ?? "").toLowerCase();
+  const target = (mode ?? "").toLowerCase();
   const preferred = families.find((family) => family.id === preferredFamily);
   const preferredMode = preferred?.modes.find(
-    (mode) => mode.backend.toLowerCase() === target,
+    (entry) => entry.id.toLowerCase() === target,
   );
   if (preferred && preferredMode) {
     return { family: preferred.id, mode: preferredMode.id };
   }
   for (const family of families) {
-    for (const mode of family.modes) {
-      if (mode.backend.toLowerCase() === target) {
-        return { family: family.id, mode: mode.id };
+    for (const entry of family.modes) {
+      if (entry.id.toLowerCase() === target) {
+        return { family: family.id, mode: entry.id };
       }
     }
   }
@@ -500,42 +469,42 @@ export function familyForModel(
 
 export function selectionForRuntime(
   families: SpecRuntimeFamily[],
-  backend: string | undefined,
+  mode: string | undefined,
   modelId: string | undefined,
   models: ChatModel[],
   preferredFamily?: string | undefined,
 ): { family: string; mode: string } {
-  return selectionForBackend(
+  return selectionForMode(
     families,
-    backend,
+    mode,
     familyForModel(families, models, modelId)?.id ?? preferredFamily,
   );
 }
 
-export function familyForBackend(
+export function familyForMode(
   families: SpecRuntimeFamily[],
-  backend: string | undefined,
+  mode: string | undefined,
   preferredFamily?: string | undefined,
 ): SpecRuntimeFamily | undefined {
   if (preferredFamily) {
     const family = families.find((entry) => entry.id === preferredFamily);
-    if (family?.modes.some((mode) => mode.backend === backend)) return family;
+    if (family?.modes.some((entry) => entry.id === mode)) return family;
   }
-  const target = (backend ?? "").toLowerCase();
+  const target = (mode ?? "").toLowerCase();
   return families.find((family) =>
-    family.modes.some((mode) => mode.backend.toLowerCase() === target),
+    family.modes.some((entry) => entry.id.toLowerCase() === target),
   );
 }
 
-// The mode a backend id names, or undefined when the catalog does not declare
-// it. Unlike `selectionForBackend` this does not fall back to the first family,
-// so a summary can stay silent about a runtime it cannot identify.
-export function modeForBackend(
+// The mode option a `spec.mode` names, or undefined when the catalog does not
+// declare it. Unlike `selectionForMode` this does not fall back to the first
+// family, so a summary can stay silent about a runtime it cannot identify.
+export function modeOptionFor(
   families: SpecRuntimeFamily[],
-  backend: string | undefined,
+  mode: string | undefined,
   preferredFamily?: string | undefined,
 ): SpecRuntimeModeOption | undefined {
-  const target = (backend ?? "").toLowerCase();
+  const target = (mode ?? "").toLowerCase();
   if (!target) return undefined;
   const ordered = preferredFamily
     ? [
@@ -544,45 +513,42 @@ export function modeForBackend(
       ]
     : families;
   for (const family of ordered) {
-    const mode = family.modes.find(
-      (entry) => entry.backend.toLowerCase() === target,
+    const entry = family.modes.find(
+      (candidate) => candidate.id.toLowerCase() === target,
     );
-    if (mode) return mode;
+    if (entry) return entry;
   }
   return undefined;
 }
 
-// `backend` is provider-independent, so a family is needed for a full label.
-export function labelForBackend(
-  backend: string | undefined,
+// `mode` is provider-independent, so a family is needed for a full label.
+export function labelForMode(
+  mode: string | undefined,
   families: SpecRuntimeFamily[] = SPEC_RUNTIME_FAMILIES,
 ): string {
-  const target = (backend ?? "").toLowerCase();
+  const target = (mode ?? "").toLowerCase();
   for (const family of families) {
-    for (const mode of family.modes) {
-      if (mode.backend.toLowerCase() === target) {
-        return `${family.label} ${mode.label}`;
+    for (const entry of family.modes) {
+      if (entry.id.toLowerCase() === target) {
+        return `${family.label} ${entry.label}`;
       }
     }
   }
   return "Prompt default";
 }
 
-/** Lists selectable models by provider and declared backend support. */
+/** Lists selectable models for one provider family. */
 export function modelsForFamily(
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
-  backend?: string | undefined,
+  mode?: string | undefined,
 ): ChatModel[] {
   if (!family) return models.filter(isSelectableModel);
   const provider =
-    family.modes.find((mode) => mode.backend === backend)?.provider ??
+    family.modes.find((entry) => entry.id === mode)?.provider ??
     family.provider;
   return models.filter(
-    (model) =>
-      isSelectableModel(model) &&
-      model.provider === provider &&
-      modelMatchesBackend(model, backend),
+    (model) => isSelectableModel(model) && model.provider === provider,
   );
 }
 
@@ -591,7 +557,7 @@ export function modelBelongsToFamily(
   modelId: string | undefined,
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
-  backend?: string | undefined,
+  mode?: string | undefined,
 ): boolean {
   if (!modelId) return true;
   const selected = models.find(
@@ -603,43 +569,31 @@ export function modelBelongsToFamily(
   );
   if (!selected) return false;
   const provider =
-    family?.modes.find((mode) => mode.backend === backend)?.provider ??
+    family?.modes.find((entry) => entry.id === mode)?.provider ??
     family?.provider;
-  const providerMatches = !provider || selected.provider === provider;
-  return providerMatches && modelMatchesBackend(selected, backend);
+  return (
+    (!provider || selected.provider === provider) &&
+    (!selected.runtime?.mode || selected.runtime.mode === mode)
+  );
 }
 
-/** Resolves a target backend row, using a sole shared row as fallback. */
+/** Resolves a target mode row, using a sole shared row as fallback. */
 export function modelForFamily(
   modelId: string | undefined,
   models: ChatModel[],
   family: SpecRuntimeFamily | undefined,
-  backend?: string | undefined
+  mode?: string | undefined,
 ): ChatModel | undefined {
   if (!modelId) return undefined;
-  const matches = modelsForFamily(models, family, backend).filter(
+  const matches = modelsForFamily(models, family, mode).filter(
     (model) =>
       model.id === modelId ||
       model.runtime?.model === modelId ||
-      model.runtime?.id === modelId
+      model.runtime?.id === modelId,
   );
   return (
     matches.find(
-      (model) =>
-        !backend ||
-        !model.runtime?.backend ||
-        model.runtime.backend === backend
+      (model) => !mode || !model.runtime?.mode || model.runtime.mode === mode,
     ) ?? (matches.length === 1 ? matches[0] : undefined)
   );
-}
-
-/** Checks a model row's declared runtime backends when the catalog scopes it. */
-export function modelMatchesBackend(
-  model: ChatModel,
-  backend: string | undefined,
-): boolean {
-  if (!backend) return true;
-  const backends = model.backends?.filter(Boolean);
-  if (!backends || backends.length === 0) return true;
-  return backends.includes(backend);
 }

@@ -42,7 +42,10 @@ import type {
   ToolMeta,
   ToolResultRenderer,
 } from "./types";
-import { usageSnapshotFromMetadata } from "./usage-snapshot";
+import {
+  usageSnapshotFromMetadata,
+  usageSnapshotFromSession,
+} from "./usage-snapshot";
 
 /** Assistant messages carry token usage + cost the backend rode on the finish
  *  part's `messageMetadata`. */
@@ -331,12 +334,15 @@ export function Chat({
   });
   const setMessagesRef = useRef(setMessages);
   setMessagesRef.current = setMessages;
+  const hydratedUsageRef = useRef<ChatUsageSummary | null>(null);
 
   useEffect(() => {
     if (!sessionsApi || !threadId) return;
     let cancelled = false;
     setHydratedSessionId(null);
     setApprovalError(undefined);
+    hydratedUsageRef.current = null;
+    setUsage(null);
     setMessagesRef.current([]);
     void getChatSession(sessionsApi, threadId)
       .then((session) => {
@@ -346,6 +352,9 @@ export function Chat({
             `Captain chat session response ID "${session.id}" does not match requested session "${threadId}".`,
           );
         }
+        const snapshot = usageSnapshotFromSession(session);
+        hydratedUsageRef.current = snapshot;
+        setUsage(snapshot);
         setMessagesRef.current(session.messages as ChatUIMessage[]);
         setHydratedSessionId(session.id);
         onSessionHydratedRef.current?.(session);
@@ -396,7 +405,10 @@ export function Chat({
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     const meta = last?.metadata;
     if (!meta) {
-      setUsage(null);
+      setUsage(hydratedUsageRef.current);
+      if (hydratedUsageRef.current) {
+        onUsageRef.current?.(hydratedUsageRef.current);
+      }
       return;
     }
     const settledModel = meta.model
@@ -407,6 +419,7 @@ export function Chat({
       modelLabel: settledModel?.label,
       messageCount: messages.length,
     });
+    hydratedUsageRef.current = snapshot;
     setUsage(snapshot);
     onUsageRef.current?.(snapshot);
   }, [messages, models, status]);

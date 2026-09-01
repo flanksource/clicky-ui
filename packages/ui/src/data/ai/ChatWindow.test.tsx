@@ -218,7 +218,7 @@ describe("ChatWindow", () => {
     localStorage.setItem(
       "clicky-ui.chat-window.preferences",
       JSON.stringify({
-        runtime: { model: "gpt-5", backend: "codex-agent" },
+        runtime: { model: "gpt-5", mode: "agent" },
         permissionMode: "default",
       }),
     );
@@ -236,7 +236,7 @@ describe("ChatWindow", () => {
         if (url === "/api/chat/sessions/source-1" && !init?.method) {
           return Response.json({
             id: "source-1",
-            runtime: { model: "claude-sonnet-4-6", backend: "anthropic" },
+            runtime: { model: "claude-sonnet-4-6", mode: "api" },
             messages: [sourceMessage],
           });
         }
@@ -305,7 +305,7 @@ describe("ChatWindow", () => {
     );
     expect(
       screen.getByRole("button", {
-        name: /Model and backend are locked for this conversation/,
+        name: /Model and mode are locked for this conversation/,
       }),
     ).toBeInTheDocument();
     fireEvent.click(
@@ -332,7 +332,7 @@ describe("ChatWindow", () => {
       );
       expect(saved.runtime).toMatchObject({
         model: "gpt-5",
-        backend: "codex-agent",
+        mode: "agent",
       });
     });
   });

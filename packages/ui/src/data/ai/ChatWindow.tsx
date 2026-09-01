@@ -291,10 +291,12 @@ export function ChatWindow({
   const handleSessionHydrated = useCallback(
     (session: CaptainChatSession) => {
       if (session.id !== panel.threadId) return;
-      setRuntimeBound(
-        Boolean(session.runtime?.model && session.runtime.backend),
-      );
-      if (session.runtime?.model && session.runtime.backend) {
+      // A hydrated session names its runtime as (model, mode). Requiring a
+      // `backend` key here left every loaded session unbound — the picker kept
+      // its defaults and the next send posted a runtime the thread had not
+      // agreed to.
+      setRuntimeBound(Boolean(session.runtime?.model && session.runtime.mode));
+      if (session.runtime?.model && session.runtime.mode) {
         replaceRuntimeIdentity(session.runtime);
       }
       chat?.onSessionHydrated?.(session);

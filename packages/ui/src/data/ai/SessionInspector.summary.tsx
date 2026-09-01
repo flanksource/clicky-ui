@@ -31,7 +31,7 @@ export function SessionInspectorHeader({
 }: {
   session: UnifiedSessionInput;
 }) {
-  const provider = runtimeDescriptor(session.backend);
+  const provider = runtimeDescriptor(session.modelMode);
   const providerId = session.provider || provider?.family;
   const ProviderIcon = providerIcon(providerId) ?? UiRobotAi;
   const providerColor = providerIconColor(providerId);
@@ -94,7 +94,7 @@ export function SessionInspectorSidebar({
 }: {
   session: UnifiedSessionInput;
 }) {
-  const runtime = runtimeDescriptor(session.backend);
+  const runtime = runtimeDescriptor(session.modelMode);
   const RuntimeIcon = runtime?.icon ?? UiRobotAi;
   const usage = session.usage ?? session.cost;
   const tokens = tokenTotal(usage);
@@ -121,7 +121,7 @@ export function SessionInspectorSidebar({
             <DetailRow
               icon={RuntimeIcon}
               label="Mode"
-              value={runtime?.mode || session.backend}
+              value={runtime?.mode || session.modelMode}
               {...(runtime?.title ? { title: runtime.title } : {})}
             />
           </div>

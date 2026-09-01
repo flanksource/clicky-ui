@@ -227,7 +227,7 @@ function modeIcon(mode: string) {
   }
   for (const family of SPEC_RUNTIME_FAMILIES) {
     const match = family.modes.find(
-      (candidate) => candidate.id === key || candidate.backend === key,
+      (candidate) => candidate.id === key,
     );
     if (match) return { icon: match.icon, label: match.label };
   }

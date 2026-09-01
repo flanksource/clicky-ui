@@ -132,9 +132,8 @@ export function useChatWindowRuntime({
       delete next.id;
       delete next.mode;
       delete next.model;
-      delete next.backend;
       if (identity.model) next.model = identity.model;
-      if (identity.backend) next.backend = identity.backend;
+      if (identity.mode) next.mode = identity.mode;
       return next;
     });
   }, []);

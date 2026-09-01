@@ -50,7 +50,7 @@ export function providerStatusGroups(
       family.label,
       family.id,
       family.modes.map((mode) => ({
-        id: mode.backend,
+        id: mode.id,
         label: mode.label,
         availability: mode.availability ?? AVAILABLE,
       })),
