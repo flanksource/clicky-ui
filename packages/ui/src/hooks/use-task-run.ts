@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   allGroupsTerminal,
   type TaskRunMeta,
@@ -66,12 +66,6 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   const [byId, setById] = useState<Record<string, TaskSnapshot>>({});
   const [status, setStatus] = useState("idle");
   const [isComplete, setIsComplete] = useState(false);
-  // Reset accumulator whenever the subscription target changes.
-  const targetKey = `${runIdsKey}|${kind ?? ""}|${enabled}`;
-  const prevKey = useRef(targetKey);
-  if (prevKey.current !== targetKey) {
-    prevKey.current = targetKey;
-  }
 
   useEffect(() => {
     const runIds = runIdsKey ? runIdsKey.split(",") : [];
@@ -134,6 +128,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
             const snaps = (await Promise.all(responses.map(
               async (response) => (await response.json()) as TaskSnapshot[],
             ))).flat();
+            if (stopped) return;
             merge(snaps);
             setStatus("polling");
             if (allGroupsTerminal(snaps)) {
@@ -142,7 +137,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
             }
           }
         } catch {
-          setStatus("connection lost — retrying");
+          if (!stopped) setStatus("connection lost — retrying");
         }
         if (!stopped) timer = setTimeout(tick, pollMs);
       };
@@ -251,11 +246,13 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
             headers: { Accept: "application/json" },
           });
           if (res.ok) {
-            receive((await res.json()) as TaskRunMeta[]);
+            const next = (await res.json()) as TaskRunMeta[];
+            if (stopped) return;
+            receive(next);
             setStatus("polling");
           }
         } catch {
-          setStatus("connection lost — retrying");
+          if (!stopped) setStatus("connection lost — retrying");
         }
         if (!stopped) timer = setTimeout(tick, pollMs);
       };

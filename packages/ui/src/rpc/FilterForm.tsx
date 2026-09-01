@@ -30,6 +30,9 @@ export type FilterFormProps = {
   emptyMessage?: string | undefined;
   isSubmitting?: boolean | undefined;
   className?: string | undefined;
+  formId?: string | undefined;
+  showSubmit?: boolean | undefined;
+  excludedParameterNames?: string[] | undefined;
   /** Renders operation controls as form rows or the shared table FilterBar. */
   presentation?: "form" | "filter-bar" | undefined;
   onSubmit: (values: ParameterValues) => void | Promise<void>;
@@ -50,28 +53,35 @@ export function FilterForm({
   emptyMessage = "This operation does not require input.",
   isSubmitting = false,
   className,
+  formId,
+  showSubmit = true,
+  excludedParameterNames = [],
   presentation = "form",
   onSubmit,
 }: FilterFormProps) {
   const resetKey = useMemo(
     () =>
-      `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(lockedValues)}`,
-    [initialValues, lockedValues, method, path],
+      `${method}:${path}:${JSON.stringify(initialValues)}:${JSON.stringify(
+        lockedValues
+      )}`,
+    [initialValues, lockedValues, method, path]
+  );
+  const visibleParameters = useMemo(
+    () =>
+      parameters.filter(
+        (parameter) => !excludedParameterNames.includes(parameter.name)
+      ),
+    [excludedParameterNames, parameters]
   );
   const [values, setValues] = useState<ParameterValues>(() =>
-    buildInitialParameterValues(
-      parameters,
-      method,
-      lockedValues,
-      initialValues,
-    ),
+    buildInitialParameterValues(parameters, method, lockedValues, initialValues)
   );
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
   const lastAutoSubmitted = useRef<string | null>(null);
   const lookupParameters = useMemo(
     () => packLookupParameterValues(debouncedValues, parameters),
-    [debouncedValues, parameters],
+    [debouncedValues, parameters]
   );
 
   const lookupQuery = useQuery({
@@ -96,7 +106,7 @@ export function FilterForm({
 
   const formConfig = useMemo(
     () =>
-      parametersToFormConfig(parameters, values, setValues, {
+      parametersToFormConfig(visibleParameters, values, setValues, {
         lookup: lookupQuery.data,
         components: filterShapes,
         lockedValues,
@@ -107,9 +117,9 @@ export function FilterForm({
       hideLocked,
       lockedValues,
       lookupQuery.data,
-      parameters,
+      visibleParameters,
       values,
-    ],
+    ]
   );
 
   const hasFields =
@@ -128,7 +138,9 @@ export function FilterForm({
 
     if (missingRequired.length > 0) {
       setError(
-        `Missing required fields: ${missingRequired.map((param) => titleCase(param.name)).join(", ")}`,
+        `Missing required fields: ${missingRequired
+          .map((param) => titleCase(param.name))
+          .join(", ")}`
       );
       return;
     }
@@ -143,8 +155,8 @@ export function FilterForm({
         parameters,
         method,
         lockedValues,
-        initialValues,
-      ),
+        initialValues
+      )
     );
     setError("");
     lastAutoSubmitted.current = null;
@@ -177,7 +189,7 @@ export function FilterForm({
   }, [autoSubmit, debouncedValues, lockedValues, onSubmit, parameters]);
 
   return (
-    <form className="space-y-3" onSubmit={handleSubmit}>
+    <form id={formId} className="space-y-3" onSubmit={handleSubmit}>
       {hasFields ? (
         presentation === "filter-bar" ? (
           <FilterBar
@@ -204,6 +216,7 @@ export function FilterForm({
             isSubmitting={isSubmitting}
             submitLabel={submitLabel}
             submittingLabel={submittingLabel}
+            showSubmit={showSubmit}
             {...(formConfig.timeRange
               ? { timeRange: formConfig.timeRange }
               : {})}
@@ -213,9 +226,15 @@ export function FilterForm({
       ) : (
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-          <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? submittingLabel : submitLabel}
-          </Button>
+          {showSubmit ? (
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? submittingLabel : submitLabel}
+            </Button>
+          ) : null}
         </div>
       )}
 

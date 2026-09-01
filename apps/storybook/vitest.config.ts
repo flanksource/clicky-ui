@@ -21,10 +21,6 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
-          // Applies preview.tsx's decorators/parameters/globals to every story
-          // (via setProjectAnnotations) — otherwise stories render outside the
-          // ThemeProvider/DensityProvider decorator and theme hooks throw.
-          setupFiles: [path.join(dirname, '.storybook/vitest.setup.ts')],
           browser: {
             enabled: true,
             headless: true,

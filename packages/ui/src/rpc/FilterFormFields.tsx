@@ -16,6 +16,7 @@ export type ParameterGridProps = {
   submitLabel: string;
   submittingLabel: string;
   className?: string | undefined;
+  showSubmit?: boolean | undefined;
 };
 
 export function ParameterGrid({
@@ -26,6 +27,7 @@ export function ParameterGrid({
   submitLabel,
   submittingLabel,
   className,
+  showSubmit = true,
 }: ParameterGridProps) {
   return (
     <div className={cn("space-y-3", className)}>
@@ -36,7 +38,7 @@ export function ParameterGrid({
         {timeRange && <TimeRangeRow timeRange={timeRange} />}
       </div>
 
-      {!autoSubmit && (
+      {!autoSubmit && showSubmit && (
         <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? submittingLabel : submitLabel}
@@ -55,7 +57,7 @@ function ParameterRow({ filter }: { filter: FilterBarFilter }) {
       title={filter.description}
       className={cn(
         "grid grid-cols-1 gap-2 py-2 sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] sm:items-center",
-        filter.disabled && "opacity-60",
+        filter.disabled && "opacity-60"
       )}
     >
       <label htmlFor={id} className="text-sm font-medium text-muted-foreground">
@@ -251,7 +253,7 @@ function MultiParameterInput({
         label:
           typeof option.label === "string"
             ? option.label
-            : (option.title ?? option.value),
+            : option.title ?? option.value,
         ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
         ...(option.title !== undefined ? { title: option.title } : {}),
       }))}

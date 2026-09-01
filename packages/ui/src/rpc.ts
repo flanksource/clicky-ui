@@ -40,6 +40,10 @@ export {
   type OperationActionDialogProps,
 } from "./rpc/OperationActionDialog";
 export {
+  OperationActionBar,
+  type OperationActionBarProps,
+} from "./rpc/OperationActionBar";
+export {
   OperationEntityPage,
   type OperationEntityPageProps,
   type EntityDetailBodyRenderContext,

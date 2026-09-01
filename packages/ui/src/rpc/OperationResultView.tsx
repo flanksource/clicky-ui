@@ -13,6 +13,7 @@ import {
 import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
+  ClickyTableRowSelection,
 } from "../data/Clicky";
 import type {
   CellFilterChange,
@@ -102,6 +103,8 @@ export type OperationResultViewProps = {
   pages?: ExecutionResponse[];
   /** Load-more handle for that walk, forwarded to the table's sentinel. */
   infinite?: DataTableInfinite;
+  rowSelection?: ClickyTableRowSelection;
+  getRowDetailHref?: (id: string) => string | undefined;
 };
 
 type ErrorResultRow = {
@@ -140,8 +143,10 @@ export function OperationResultView({
   download,
   pages,
   infinite,
+  rowSelection,
+  getRowDetailHref,
 }: OperationResultViewProps) {
-  const rowNav = useRowDetailNavigation(detailOperation);
+  const rowNav = useRowDetailNavigation(detailOperation, getRowDetailHref);
   const filters = filterConfig?.filters;
   // A walk of one page is the page, so the common case costs nothing and the
   // document identity is preserved. `response` gating it keeps a failed newest
@@ -151,7 +156,7 @@ export function OperationResultView({
       pages && pages.length > 1 && response != null
         ? mergeExecutionPages(pages)
         : response,
-    [pages, response],
+    [pages, response]
   );
 
   if (error != null) {
@@ -196,7 +201,7 @@ export function OperationResultView({
       {...(ariaLabel ? { ariaLabel } : {})}
       {...(className ? { className } : {})}
       {...(commandRuntime ? { commandRuntime } : {})}
-      {...(detailOperation
+      {...(detailOperation || getRowDetailHref
         ? {
             getTableRowHref: rowNav.getRowHref,
             onTableRowClick: rowNav.onRowClick,
@@ -218,6 +223,7 @@ export function OperationResultView({
       {...(sort ? { sort: sort.value, onSortChange: sort.onChange } : {})}
       {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
+      {...(rowSelection ? { rowSelection } : {})}
     />
   );
 }

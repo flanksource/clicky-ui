@@ -117,24 +117,20 @@ async function execute(request: QueryBrowserRequest): Promise<QueryBrowserResult
       totalRelation: "eq",
       consistency: "snapshot",
     },
-    ...(request.debug
-      ? {
-          diagnostics: {
-            provider: "postgresql",
-            request: {
-              query: request.query,
-              options: request.options,
-              details: { transaction: "read-only", plan: "Index Scan" },
-            },
-            response: {
-              durationMs: 18,
-              returnedRows: page.length,
-              contentType: "application/json",
-              preview: JSON.stringify(page),
-            },
-          },
-        }
-      : {}),
+    diagnostics: {
+      provider: "postgresql",
+      request: {
+        query: request.query,
+        options: request.options,
+        details: { transaction: "read-only", plan: "Index Scan" },
+      },
+      response: {
+        durationMs: 18,
+        returnedRows: page.length,
+        contentType: "application/json",
+        preview: JSON.stringify(page),
+      },
+    },
   };
 }
 

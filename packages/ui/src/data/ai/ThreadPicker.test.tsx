@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -132,5 +133,65 @@ describe("ThreadPicker renaming", () => {
 
     expect(await screen.findByText("Named from the first message")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ThreadPicker loading", () => {
+  it("keeps the newest thread list when an older request resolves last", async () => {
+    let resolveFirst!: (threads: ThreadSummary[]) => void;
+    let resolveSecond!: (threads: ThreadSummary[]) => void;
+    const load = vi
+      .fn<() => Promise<ThreadSummary[]>>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFirst = resolve)),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve)),
+      );
+    const { rerender } = render(
+      <ThreadPicker
+        threadId="t-001"
+        onSelect={vi.fn()}
+        onNew={vi.fn()}
+        source={{ load }}
+        refreshToken={0}
+      />,
+    );
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <ThreadPicker
+        threadId="t-001"
+        onSelect={vi.fn()}
+        onNew={vi.fn()}
+        source={{ load }}
+        refreshToken={1}
+      />,
+    );
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      resolveSecond([{ id: "t-001", title: "Newest conversations" }]);
+    });
+    expect(await screen.findByText("Newest conversations")).toBeTruthy();
+
+    await act(async () => {
+      resolveFirst([{ id: "t-001", title: "Stale conversations" }]);
+    });
+    expect(screen.getByText("Newest conversations")).toBeTruthy();
+    expect(screen.queryByText("Stale conversations")).toBeNull();
+  });
+
+  it("keeps row actions outside the conversation selection control", async () => {
+    mockFetch();
+    render(
+      <ThreadPicker threadId="t-001" onSelect={vi.fn()} onNew={vi.fn()} api={API} />,
+    );
+    await openMenu();
+
+    const rename = screen.getAllByLabelText("Rename conversation")[0]!;
+    const remove = screen.getAllByLabelText("Delete conversation")[0]!;
+    expect(rename.closest('[role="button"]')).toBeNull();
+    expect(remove.closest('[role="button"]')).toBeNull();
   });
 });
