@@ -58,6 +58,8 @@ export function ListMenuHeader({ className, ...props }: ListMenuHeaderProps) {
 }
 
 export type ListMenuItemProps = HTMLAttributes<HTMLDivElement> & {
+  /** Row density. Compact is intended for single-line values and controls. */
+  variant?: "default" | "compact";
   /** Applies the primary selected-row treatment used for the open/detail row. */
   active?: boolean;
   /** Applies the softer selected treatment used for checkbox or multi-select rows. */
@@ -75,6 +77,7 @@ export type ListMenuItemProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export function ListMenuItem({
+  variant = "default",
   active = false,
   selected = false,
   accentClassName = "border-transparent",
@@ -134,6 +137,7 @@ export function ListMenuItem({
           : rowSelected
             ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
             : cn(accentClassName, interactive && "hover:bg-muted"),
+        variant === "compact" && "px-density-2 py-1 text-xs",
         className,
       )}
       onClick={handleClick}

@@ -520,6 +520,31 @@ export type DataTableSelectionConfirm<
  * (`variant: "destructive"`), and it can be the one that deserves to be asked
  * about twice (`confirm`).
  */
+/** Where a bulk action renders on the selection bar. */
+export type SelectionActionDisplay = "button" | "menu" | "overflow";
+
+/** Handed to an action's custom `menu` body. */
+export type DataTableSelectionMenuContext<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  /** The selection the action will act on. */
+  context: DataTableSelectionContext<T>;
+  /** Dismisses the dropdown. */
+  close: () => void;
+  /** True while any action on this bar is in flight; disable your controls. */
+  busy: boolean;
+  /**
+   * Runs work through the bar's own plumbing — this action's pending spinner,
+   * the sibling lock, the confirm prompt. Call it instead of the mutation
+   * directly, or the bar has no idea anything is running.
+   */
+  run: (task: {
+    pendingLabel?: ReactNode;
+    confirm?: boolean | DataTableSelectionConfirm<T>;
+    onSelect: (context: DataTableSelectionContext<T>) => void | Promise<void>;
+  }) => void;
+};
+
 export type DataTableSelectionAction<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = Omit<DataTableMenuAction, "onSelect" | "children"> & {
@@ -532,11 +557,35 @@ export type DataTableSelectionAction<
   onSelect: (context: DataTableSelectionContext<T>) => void | Promise<void>;
   /**
    * Nested actions. As in the preferences menu, a parent that has them is a
-   * submenu trigger and its own `onSelect` never runs. An action with children
-   * always lives in the overflow menu — a flyout hung off a toolbar button
-   * needs an anchor the toolbar does not have, and the menu already is one.
+   * submenu trigger and its own `onSelect` never runs. Inline, the parent is a
+   * named dropdown of its children — "Status ▾" over the statuses it can set;
+   * in the overflow menu it is a submenu.
    */
   children?: DataTableSelectionAction<T>[];
+  /**
+   * How the bar renders this action, overriding what it would otherwise infer:
+   *
+   *   "button"   — its own toolbar button.
+   *   "menu"     — a named inline dropdown ("Status ▾"), bodied by `menu` if
+   *                given and by `children` otherwise. Never collapses: naming a
+   *                dropdown is the caller saying the row has space for it.
+   *   "overflow" — an item in the trailing ⋯ menu.
+   *
+   * Left unset, an action with `menu` is a dropdown, one with `children` or a
+   * `section` is overflow (a flyout needs an anchor, a heading needs a menu),
+   * and anything else is a button subject to `primary` and the cap.
+   */
+  display?: SelectionActionDisplay;
+  /**
+   * A menu body that is not a list of commands — a filterable, tri-state set of
+   * labels, say, applied as one edit when the menu closes. Handed straight to
+   * DropdownMenu's own render prop, so this adds a body, not a second menu.
+   *
+   * Implies `display: "menu"`, and like `children` it makes the action a
+   * trigger: its `onSelect` never runs. The body routes work back through
+   * `run` so the bar still owns the pending spinner and the sibling lock.
+   */
+  menu?: (menu: DataTableSelectionMenuContext<T>) => ReactNode;
   /**
    * Keeps the action on the toolbar as its own button. Once any action claims
    * `primary` the ones that do not fall into the overflow menu, because a
@@ -698,6 +747,18 @@ type DataTableInnerProps<
   selectionActions?:
     | DataTableSelectionAction<T>[]
     | ((context: DataTableSelectionContext<T>) => ReactNode);
+  /**
+   * Where the bulk cluster goes while rows are selected.
+   *
+   *   "takeover" — it replaces the filter row in place: the filters stay
+   *      mounted behind it and come back when the selection clears, so nothing
+   *      below the bar moves. Only honoured for the descriptor (array) form of
+   *      `selectionActions`; a render-prop cluster is the caller's own markup
+   *      and the table cannot claim the row on its behalf.
+   *   "toolbar" (the default) — the cluster rides in the filter bar's trailing
+   *      slot beside the table menu, sharing the row with the filters.
+   */
+  selectionBar?: "takeover" | "toolbar";
   /**
    * Extra classes for a row's `<tr>`, applied last so tailwind-merge lets the
    * caller override the built-in hover / selected backgrounds.
@@ -892,6 +953,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   getRowId,
   rowSelection,
   selectionActions,
+  selectionBar: selectionBarPlacement = "toolbar",
   getRowClassName,
   footer,
   grouping,
@@ -1203,7 +1265,12 @@ function DataTableInner<T extends Record<string, unknown>>({
   // source already answered with — and the timestamp cell it reads is often a
   // rendered node rather than a value, so it would silently empty the table.
   const timeRangeColumn = useMemo(() => {
-    if (!autoFilter || manualFilter || externalTimeRange || filterBarProps?.timeRange) {
+    if (
+      !autoFilter ||
+      manualFilter ||
+      externalTimeRange ||
+      filterBarProps?.timeRange
+    ) {
       return null;
     }
     return rangeCapableColumn;
@@ -1393,7 +1460,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     [generatedFilters, multiFilters, numberFilters, textFilters],
   );
   const serverFilterByKey = useMemo(
-    () => new Map((externalFilters ?? []).map((filter) => [filter.key, filter])),
+    () =>
+      new Map((externalFilters ?? []).map((filter) => [filter.key, filter])),
     [externalFilters],
   );
   // The timestamp column's own bound, when the caller supplies one, IS the
@@ -1423,13 +1491,21 @@ function DataTableInner<T extends Record<string, unknown>>({
         bound.set(column.key, native);
         continue;
       }
-      const server = column.filterKey ? serverFilterByKey.get(column.filterKey) : undefined;
+      const server = column.filterKey
+        ? serverFilterByKey.get(column.filterKey)
+        : undefined;
       // The hoisted range is rendered as a range in this column's header, not
       // as a chip, so it must not be bound here as well.
-      if (server && server !== serverTimeRangeFilter) bound.set(column.key, server);
+      if (server && server !== serverTimeRangeFilter)
+        bound.set(column.key, server);
     }
     return bound;
-  }, [effectiveColumns, nativeFilters, serverFilterByKey, serverTimeRangeFilter]);
+  }, [
+    effectiveColumns,
+    nativeFilters,
+    serverFilterByKey,
+    serverTimeRangeFilter,
+  ]);
   const hasCustomFilterBarContent = Boolean(
     filterBarProps?.leading ||
     filterBarProps?.children ||
@@ -1477,13 +1553,20 @@ function DataTableInner<T extends Record<string, unknown>>({
       return { key: timeRangeColumn.key, range: autoTimeRange };
     }
     return null;
-  }, [autoTimeRange, rangeCapableColumn, serverTimeRangeFilter, timeRangeColumn]);
+  }, [
+    autoTimeRange,
+    rangeCapableColumn,
+    serverTimeRangeFilter,
+    timeRangeColumn,
+  ]);
   const barTimeRange = externalTimeRange ?? columnTimeRange?.range ?? null;
   const barFilters = useMemo(() => {
     const external = (externalFilters ?? []).filter(
       (filter) => filter !== serverTimeRangeFilter,
     );
-    return external.length > 0 ? [...external, ...nativeFilters] : nativeFilters;
+    return external.length > 0
+      ? [...external, ...nativeFilters]
+      : nativeFilters;
   }, [externalFilters, nativeFilters, serverTimeRangeFilter]);
   // The built-in search narrows rows here, so it mounts by default only where
   // DataTable already owns filtering. An explicit value still wins, which is
@@ -1493,7 +1576,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     autoFilter,
     manualFilter,
     showGlobalFilter: resolvedShowGlobalFilter,
-    globalFilterControlled: globalFilter !== undefined || onGlobalFilterChange !== undefined,
+    globalFilterControlled:
+      globalFilter !== undefined || onGlobalFilterChange !== undefined,
     hasExternalSearch: externalSearch !== undefined,
   });
   const showFilterBar =
@@ -1796,13 +1880,23 @@ function DataTableInner<T extends Record<string, unknown>>({
   // The render-prop form keeps its own path: it is the caller's markup, and the
   // table has nothing to add to it.
   const selectionBar = useMemo(() => {
-    if (!selectionContext || typeof selectionActions !== "function") return null;
+    if (!selectionContext || typeof selectionActions !== "function")
+      return null;
     return selectionActions(selectionContext);
   }, [selectionActions, selectionContext]);
 
   const descriptorSelectionActions = Array.isArray(selectionActions)
     ? selectionActions
     : null;
+
+  // Requiring the descriptor form is what makes the takeover safe to default
+  // on for anyone who asks for it: a table with only `selectAllPages`, and
+  // every render-prop caller, keeps the toolbar placement untouched.
+  const selectionTakeover =
+    error == null &&
+    selectionBarPlacement === "takeover" &&
+    !!selectionContext &&
+    !!descriptorSelectionActions;
 
   const selectionCluster =
     selectionContext && descriptorSelectionActions ? (
@@ -1822,16 +1916,16 @@ function DataTableInner<T extends Record<string, unknown>>({
     error != null
       ? null
       : footer !== undefined
-      ? typeof footer === "function"
-        ? footer({
-            visibleRowCount: sorted.length,
-            totalRowCount: data.length,
-            loading,
-          })
-        : footer
-      : pagination
-        ? null
-        : loading && sorted.length === 0
+        ? typeof footer === "function"
+          ? footer({
+              visibleRowCount: sorted.length,
+              totalRowCount: data.length,
+              loading,
+            })
+          : footer
+        : pagination
+          ? null
+          : loading && sorted.length === 0
             ? loadingMessage
             : `${sorted.length} of ${data.length} row${data.length === 1 ? "" : "s"}`;
 
@@ -1883,7 +1977,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   // already looking at the top of it. Scope first, then the caller's actions,
   // then the table's own controls.
   const selectionToolbar =
-    error == null && (showSelectionScope || selectionCluster) ? (
+    !selectionTakeover &&
+    error == null &&
+    (showSelectionScope || selectionCluster) ? (
       <div
         data-testid="data-table-selection-actions"
         className="flex flex-wrap items-center gap-density-2"
@@ -1901,14 +1997,17 @@ function DataTableInner<T extends Record<string, unknown>>({
         {selectionCluster}
       </div>
     ) : null;
-  const filterBarTrailing =
-    filterBarProps?.trailing ||
-    selectionToolbar ||
-    groupingModes ||
-    showTablePreferencesControl ? (
+  // The table's own view controls — grouping, columns, and whatever the caller
+  // put in `trailing` (the fullscreen button among them). They follow the bar
+  // into a takeover rather than being hidden with the filters: regrouping does
+  // not invalidate an id-keyed selection, and losing fullscreen the moment a
+  // box is ticked is a regression, not a simplification. It is the *filters*
+  // that go quiet, because those are what would change what "select all
+  // matching" means underneath the reader.
+  const tableControls =
+    filterBarProps?.trailing || groupingModes || showTablePreferencesControl ? (
       <>
         {filterBarProps?.trailing}
-        {selectionToolbar}
         {groupingModes ? (
           <DataTableGroupingControls
             modes={groupingModes}
@@ -1931,6 +2030,46 @@ function DataTableInner<T extends Record<string, unknown>>({
         ) : null}
       </>
     ) : undefined;
+
+  const filterBarTrailing =
+    selectionToolbar || tableControls ? (
+      <>
+        {selectionToolbar}
+        {tableControls}
+      </>
+    ) : undefined;
+
+  // The bar that stands in for the filter row while a selection exists. It
+  // carries the table's view controls at its far end, so the takeover costs
+  // the reader nothing but the filters.
+  const selectionBarNode = selectionTakeover ? (
+    <div
+      data-testid="data-table-selection-actions"
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-density-2"
+    >
+      {showSelectionScope && widestScope ? (
+        <SelectionScopeNotice
+          noun={selectAllPages?.noun ?? "rows"}
+          {...(selectAllPages?.loading ? { loading: true } : {})}
+          total={widestScope.total}
+          selectedCount={selectedRowIDs.size}
+          {...(nextScope ? { nextScope } : {})}
+          onClear={() => notifySelection(new Set())}
+        />
+      ) : null}
+      <SelectionActionBar
+        actions={descriptorSelectionActions!}
+        context={selectionContext!}
+        showCount={!showSelectionScope}
+        className="flex flex-wrap items-center gap-density-2"
+      />
+      {tableControls ? (
+        <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+          {tableControls}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   // Group headers and data rows share one flat stream so the <tbody> keeps a
   // single row renderer whether or not grouping is on.
@@ -2097,9 +2236,10 @@ function DataTableInner<T extends Record<string, unknown>>({
         className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-1", className)}
         data-density={densityOverride}
       >
-        {(showFilterBar || selectionToolbar) && (
+        {(showFilterBar || selectionToolbar || selectionBarNode) && (
           <FilterBar
             {...filterBarProps}
+            {...(selectionBarNode ? { overlay: selectionBarNode } : {})}
             {...(externalSearch
               ? { search: externalSearch }
               : resolvedShowGlobalFilter
@@ -2119,7 +2259,10 @@ function DataTableInner<T extends Record<string, unknown>>({
 
         <div className="relative flex min-h-0 max-w-full flex-1 flex-col">
           {loading && error == null ? (
-            <LoadingBar data-testid="data-table-loading-bar" className="rounded-t-md" />
+            <LoadingBar
+              data-testid="data-table-loading-bar"
+              className="rounded-t-md"
+            />
           ) : null}
           <div
             // The prop is spelled the React 19 way — RefObject<T | null>, which
@@ -2142,8 +2285,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                 {visibleColumns.map((column) => (
                   <col
                     key={column.key}
-                  // An error row spans every column and is the only body content
-                  // there is, so the column widths have nothing left to size.
+                    // An error row spans every column and is the only body content
+                    // there is, so the column widths have nothing left to size.
                     // Keeping them stretches the table far past the viewport and
                     // carries the error's own controls — copy, expand — out with
                     // it, reachable only by scrolling sideways.
@@ -2155,109 +2298,109 @@ function DataTableInner<T extends Record<string, unknown>>({
                     className={
                       column.shrink && !column.grow && error == null
                         ? "w-px"
-                      : undefined
-                  }
-                />
-              ))}
-            </colgroup>
-            <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                {rowSelection && error == null ? (
-                  <th
-                    className={cn(
-                      "w-10 text-center",
-                      DATA_TABLE_HEADER_DENSITY_CLASS,
-                    )}
-                  >
-                    <input
-                      ref={selectAllRef}
-                      type="checkbox"
-                      aria-label="Select all visible rows"
-                      checked={allVisibleSelected}
-                      disabled={selectableVisibleRows.length === 0}
-                      onChange={toggleVisibleSelection}
-                      className="size-3.5 rounded border-border accent-primary"
-                    />
-                  </th>
-                ) : null}
-                {visibleColumns.map((column) => (
-                  <th
-                    key={column.key}
-                    className={cn(
-                      "group/header relative whitespace-nowrap font-medium",
-                      DATA_TABLE_HEADER_DENSITY_CLASS,
-                      alignmentClass(column.align),
-                      resizableColumns &&
-                        column.resizable !== false &&
-                        "select-none",
-                      column.headerClassName,
-                    )}
-                    onContextMenu={(event) =>
-                      openHeaderColumnMenu(event, column)
+                        : undefined
                     }
-                  >
-                    <div
+                  />
+                ))}
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  {rowSelection && error == null ? (
+                    <th
                       className={cn(
-                        "flex min-w-0 items-center gap-1",
-                        headerAlignmentClass(column.align),
-                        resizableColumns &&
-                          column.resizable !== false &&
-                          "pr-2",
+                        "w-10 text-center",
+                        DATA_TABLE_HEADER_DENSITY_CLASS,
                       )}
                     >
-                      <span className="min-w-0">
-                        {column.sortable === false || pageLocalSort ? (
-                          <span
-                            {...(pageLocalSort && column.sortable !== false
-                              ? {
-                                  title:
-                                    "Sorting is served by the query while this table is paged by the server",
-                                }
-                              : {})}
-                          >
-                            {column.label}
-                          </span>
-                        ) : (
-                          <SortableHeader
-                            active={sort?.key === column.key}
-                            {...(sort?.key === column.key
-                              ? { dir: sort.dir }
-                              : {})}
-                            {...(column.align ? { align: column.align } : {})}
-                            onClick={() => toggle(column.key)}
-                          >
-                            {column.label}
-                          </SortableHeader>
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        aria-label="Select all visible rows"
+                        checked={allVisibleSelected}
+                        disabled={selectableVisibleRows.length === 0}
+                        onChange={toggleVisibleSelection}
+                        className="size-3.5 rounded border-border accent-primary"
+                      />
+                    </th>
+                  ) : null}
+                  {visibleColumns.map((column) => (
+                    <th
+                      key={column.key}
+                      className={cn(
+                        "group/header relative whitespace-nowrap font-medium",
+                        DATA_TABLE_HEADER_DENSITY_CLASS,
+                        alignmentClass(column.align),
+                        resizableColumns &&
+                          column.resizable !== false &&
+                          "select-none",
+                        column.headerClassName,
+                      )}
+                      onContextMenu={(event) =>
+                        openHeaderColumnMenu(event, column)
+                      }
+                    >
+                      <div
+                        className={cn(
+                          "flex min-w-0 items-center gap-1",
+                          headerAlignmentClass(column.align),
+                          resizableColumns &&
+                            column.resizable !== false &&
+                            "pr-2",
                         )}
-                      </span>
-                      {showHeaderFilterControls &&
-                        (headerFilterByColumn.has(column.key) ||
-                          columnTimeRange?.key === column.key) && (
-                          <HeaderFilterButton
-                            column={column}
-                            active={
-                              headerFilterByColumn.has(column.key)
-                                ? isFilterBarFilterActive(
-                                    headerFilterByColumn.get(column.key)!,
-                                  )
-                                : Boolean(
-                                    columnTimeRange?.range.from ||
+                      >
+                        <span className="min-w-0">
+                          {column.sortable === false || pageLocalSort ? (
+                            <span
+                              {...(pageLocalSort && column.sortable !== false
+                                ? {
+                                    title:
+                                      "Sorting is served by the query while this table is paged by the server",
+                                  }
+                                : {})}
+                            >
+                              {column.label}
+                            </span>
+                          ) : (
+                            <SortableHeader
+                              active={sort?.key === column.key}
+                              {...(sort?.key === column.key
+                                ? { dir: sort.dir }
+                                : {})}
+                              {...(column.align ? { align: column.align } : {})}
+                              onClick={() => toggle(column.key)}
+                            >
+                              {column.label}
+                            </SortableHeader>
+                          )}
+                        </span>
+                        {showHeaderFilterControls &&
+                          (headerFilterByColumn.has(column.key) ||
+                            columnTimeRange?.key === column.key) && (
+                            <HeaderFilterButton
+                              column={column}
+                              active={
+                                headerFilterByColumn.has(column.key)
+                                  ? isFilterBarFilterActive(
+                                      headerFilterByColumn.get(column.key)!,
+                                    )
+                                  : Boolean(
+                                      columnTimeRange?.range.from ||
                                       columnTimeRange?.range.to,
-                                  )
-                            }
-                            onOpen={(event) =>
-                              openHeaderFilterMenu(event, column.key)
-                            }
-                          />
-                        )}
-                    </div>
-                    {resizableColumns && column.resizable !== false && (
-                      <span
-                        role="separator"
-                        aria-label={`Resize ${labelText(column)} column`}
-                        aria-orientation="vertical"
-                        className="absolute right-0 top-0 hidden h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20 md:flex"
-                        onClick={(event) => {
+                                    )
+                              }
+                              onOpen={(event) =>
+                                openHeaderFilterMenu(event, column.key)
+                              }
+                            />
+                          )}
+                      </div>
+                      {resizableColumns && column.resizable !== false && (
+                        <span
+                          role="separator"
+                          aria-label={`Resize ${labelText(column)} column`}
+                          aria-orientation="vertical"
+                          className="absolute right-0 top-0 hidden h-full w-3 cursor-col-resize touch-none items-center justify-center border-r border-border/70 bg-gradient-to-l from-border/30 to-transparent transition-colors hover:border-primary hover:from-primary/20 md:flex"
+                          onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
                           }}
@@ -2267,44 +2410,44 @@ function DataTableInner<T extends Record<string, unknown>>({
                           onMouseDown={(event) =>
                             startColumnResize(event, column)
                           }
-                      >
-                        <span
-                          aria-hidden
-                          className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
-                        />
-                      </span>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {error != null ? (
-                <DataTableErrorRow
-                  colSpan={visibleColumns.length}
-                  error={error}
-                />
-              ) : loading && visibleSorted.length === 0 ? (
-                <DataTableLoadingRows
-                  columns={visibleColumns}
-                  rowCount={loadingRowCount}
-                  message={loadingMessage}
-                  selection={!!rowSelection}
-                />
-              ) : filteredRows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
-                    className="px-4 py-10 text-center text-sm text-muted-foreground"
-                  >
-                    {emptyMessage}
-                  </td>
+                        >
+                          <span
+                            aria-hidden
+                            className="h-4 w-0.5 rounded-full bg-border transition-colors group-hover/header:bg-primary/70"
+                          />
+                        </span>
+                      )}
+                    </th>
+                  ))}
                 </tr>
-              ) : (
-                rowStream.map((item) => {
-                  if (item.kind === "group") {
-                    return (
-                      <DataTableGroupHeaderRow
+              </thead>
+              <tbody>
+                {error != null ? (
+                  <DataTableErrorRow
+                    colSpan={visibleColumns.length}
+                    error={error}
+                  />
+                ) : loading && visibleSorted.length === 0 ? (
+                  <DataTableLoadingRows
+                    columns={visibleColumns}
+                    rowCount={loadingRowCount}
+                    message={loadingMessage}
+                    selection={!!rowSelection}
+                  />
+                ) : filteredRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      className="px-4 py-10 text-center text-sm text-muted-foreground"
+                    >
+                      {emptyMessage}
+                    </td>
+                  </tr>
+                ) : (
+                  rowStream.map((item) => {
+                    if (item.kind === "group") {
+                      return (
+                        <DataTableGroupHeaderRow
                           key={`group:${item.group.key}`}
                           label={item.group.label}
                           meta={item.group.meta}
@@ -2330,128 +2473,136 @@ function DataTableInner<T extends Record<string, unknown>>({
                             }))
                           }
                           {...(rowSelection
-                          ? {
-                              selection: {
-                                selectableCount: item.group.records.filter(
-                                  (record) =>
-                                    rowSelection.isRowSelectable?.(
-                                      record.row,
-                                    ) ?? true,
-                                ).length,
-                                selectedCount: item.group.records.filter(
-                                  (record) => selectedRowIDs.has(record.id),
-                                ).length,
-                                onToggle: () =>
-                                  toggleGroupSelection(item.group.records),
-                              },
-                            }
-                          : {})}
-                      />
-                    );
-                  }
-                  const record = item.record;
-                  const href = getRowHref?.(record.row);
-                  const expanded = expandedRows[record.id] ?? false;
-                  const expandedContent =
-                    renderExpandedRow?.(record.row, {
-                      columns: effectiveColumns,
-                      visibleColumns,
-                      filterActionsByColumn,
-                    }) ?? null;
-                  const expandable = expandedContent !== null;
-                  const expandsInline = expandable && detailStyle === "row";
-                  const opensDialog = expandable && detailStyle === "dialog";
-                  const rowClickEnabled =
-                    isRowClickable?.(record.row) ?? !!onRowClick;
-                  const rowSelectable =
-                    rowSelection?.isRowSelectable?.(record.row) ?? true;
-                  const selectionClickEnabled =
-                    !!rowSelection?.toggleOnRowClick && rowSelectable;
-                  const clickable =
-                    !!href ||
-                    rowClickEnabled ||
-                    expandable ||
-                    selectionClickEnabled;
+                            ? {
+                                selection: {
+                                  selectableCount: item.group.records.filter(
+                                    (record) =>
+                                      rowSelection.isRowSelectable?.(
+                                        record.row,
+                                      ) ?? true,
+                                  ).length,
+                                  selectedCount: item.group.records.filter(
+                                    (record) => selectedRowIDs.has(record.id),
+                                  ).length,
+                                  onToggle: () =>
+                                    toggleGroupSelection(item.group.records),
+                                },
+                              }
+                            : {})}
+                        />
+                      );
+                    }
+                    const record = item.record;
+                    const href = getRowHref?.(record.row);
+                    const expanded = expandedRows[record.id] ?? false;
+                    const expandedContent =
+                      renderExpandedRow?.(record.row, {
+                        columns: effectiveColumns,
+                        visibleColumns,
+                        filterActionsByColumn,
+                      }) ?? null;
+                    const expandable = expandedContent !== null;
+                    const expandsInline = expandable && detailStyle === "row";
+                    const opensDialog = expandable && detailStyle === "dialog";
+                    const rowClickEnabled =
+                      isRowClickable?.(record.row) ?? !!onRowClick;
+                    const rowSelectable =
+                      rowSelection?.isRowSelectable?.(record.row) ?? true;
+                    const selectionClickEnabled =
+                      !!rowSelection?.toggleOnRowClick && rowSelectable;
+                    const clickable =
+                      !!href ||
+                      rowClickEnabled ||
+                      expandable ||
+                      selectionClickEnabled;
+                    const activateRow = () => {
+                      if (selectionClickEnabled) toggleRowSelection(record);
+                      if (expandsInline) {
+                        setExpandedRows((current) => ({
+                          ...current,
+                          [record.id]: !current[record.id],
+                        }));
+                      }
+                      if (opensDialog) setDetailRow(record);
+                      if (rowClickEnabled) onRowClick?.(record.row);
+                    };
 
-                  return (
-                    <Fragment key={record.id}>
-                      <tr
-                        className={cn(
-                          "relative border-b border-border/60 align-top",
-                          clickable && "cursor-pointer hover:bg-accent/40",
-                          selectedRowIDs.has(record.id) && "bg-accent/50",
+                    return (
+                      <Fragment key={record.id}>
+                        <tr
+                          className={cn(
+                            "relative border-b border-border/60 align-top",
+                            clickable && "cursor-pointer hover:bg-accent/40",
+                            clickable &&
+                              !href &&
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                            selectedRowIDs.has(record.id) && "bg-accent/50",
                             getRowClassName?.(record.row),
                           )}
-                          onClick={() => {
-                            if (selectionClickEnabled)
-                              toggleRowSelection(record);
-                            if (expandsInline) {
-                              setExpandedRows((current) => ({
-                                ...current,
-                              [record.id]: !current[record.id],
-                            }));
-                          }
-                          if (opensDialog) {
-                            setDetailRow(record);
-                          }
-                          if (rowClickEnabled) {
-                            onRowClick?.(record.row);
-                          }
-                        }}
-                      >
-                        {rowSelection ? (
-                          <td
-                            className={cn(
-                              // relative z-10 keeps the checkbox above the row's
-                              // stretched-link overlay so it stays clickable.
-                              "relative z-10 w-10 text-center",
-                              DATA_TABLE_CELL_DENSITY_CLASS,
-                            )}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              aria-label={`Select row ${record.id}`}
-                              checked={selectedRowIDs.has(record.id)}
-                              disabled={!rowSelectable}
-                              onChange={() => toggleRowSelection(record)}
-                              className="size-3.5 rounded border-border accent-primary"
-                            />
-                          </td>
-                        ) : null}
-                        {visibleColumns.map((column, index) => {
-                          const rawValue = resolveColumnValue(
-                            record.row,
-                            column,
-                          );
-                          let content: ReactNode = column.render
-                            ? column.render(rawValue, record.row)
-                            : formatCell(rawValue);
+                          tabIndex={clickable && !href ? 0 : undefined}
+                          onClick={activateRow}
+                          onKeyDown={(event) => {
+                            if (href || event.target !== event.currentTarget)
+                              return;
+                            if (event.key !== "Enter" && event.key !== " ")
+                              return;
+                            event.preventDefault();
+                            activateRow();
+                          }}
+                        >
+                          {rowSelection ? (
+                            <td
+                              className={cn(
+                                // relative z-10 keeps the checkbox above the row's
+                                // stretched-link overlay so it stays clickable.
+                                "relative z-10 w-10 text-center",
+                                DATA_TABLE_CELL_DENSITY_CLASS,
+                              )}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                aria-label={`Select row ${record.id}`}
+                                checked={selectedRowIDs.has(record.id)}
+                                disabled={!rowSelectable}
+                                onChange={() => toggleRowSelection(record)}
+                                className="size-3.5 rounded border-border accent-primary"
+                              />
+                            </td>
+                          ) : null}
+                          {visibleColumns.map((column, index) => {
+                            const rawValue = resolveColumnValue(
+                              record.row,
+                              column,
+                            );
+                            let content: ReactNode = column.render
+                              ? column.render(rawValue, record.row)
+                              : formatCell(rawValue);
 
-                          const serverFilterValue = resolveServerFilterValue(
-                            rawValue,
-                            record.row,
-                            column,
-                          );
-                          const serverFilterDisplayValue =
-                            resolveCellFilterDisplayValue(
+                            const serverFilterValue = resolveServerFilterValue(
                               rawValue,
                               record.row,
                               column,
                             );
-                          const hasCellFilterActions =
-                            !!column.filterKey &&
-                            !!onCellFilterChange &&
-                            serverFilterValue !== undefined;
-                          if (
-                            column.filterKey &&
-                            onCellFilterChange &&
-                            serverFilterValue !== undefined
-                          ) {
-                            const filterKey = column.filterKey;
-                            content = (
-                              <CellFilterActions
-                                value={serverFilterValue}
+                            const serverFilterDisplayValue =
+                              resolveCellFilterDisplayValue(
+                                rawValue,
+                                record.row,
+                                column,
+                              );
+                            const hasCellFilterActions =
+                              !!column.filterKey &&
+                              !!onCellFilterChange &&
+                              serverFilterValue !== undefined;
+                            if (
+                              column.filterKey &&
+                              onCellFilterChange &&
+                              serverFilterValue !== undefined
+                            ) {
+                              const filterKey = column.filterKey;
+                              content = (
+                                <CellFilterActions
+                                  value={serverFilterValue}
                                   {...(serverFilterDisplayValue !== undefined
                                     ? { displayValue: serverFilterDisplayValue }
                                     : {})}
@@ -2463,101 +2614,101 @@ function DataTableInner<T extends Record<string, unknown>>({
                                   onChange={(mode) =>
                                     onCellFilterChange({
                                       key: filterKey,
-                                    value: serverFilterValue,
-                                    mode,
-                                  })
-                                }
-                              >
-                                {content}
-                              </CellFilterActions>
-                            );
-                          }
-
-                          // Tag cells get the + / − filter affordance via
-                          // context; copy-to-clipboard works without it too.
-                          if (
-                            column.kind === "tags" &&
-                            filterActionsByColumn[column.key]
-                          ) {
-                            content = (
-                              <TagActionsProvider
-                                value={filterActionsByColumn[column.key]!}
-                              >
-                                {content}
-                              </TagActionsProvider>
-                            );
-                          }
-
-                          return (
-                            <td
-                              key={column.key}
-                              className={cn(
-                                DATA_TABLE_CELL_DENSITY_CLASS,
-                                alignmentClass(column.align),
-                                column.cellClassName,
-                              )}
-                              style={cellSizingStyle(
-                                column,
-                                columnWidths[column.key],
-                              )}
-                            >
-                              <CellContent column={column}>
-                                {href && index === 0
-                                  ? // One real <a href> per row whose ::after
-                                    // overlay stretches across the whole (relative)
-                                    // row: right/middle-click give native "open in
-                                    // new tab", plain left-click routes client-side.
-                                    // The overlay paints over the cell, so a cell
-                                    // with filter actions lifts them above it —
-                                    // otherwise the link swallows the hover that
-                                    // reveals the include/exclude buttons.
-                                    renderLink({
-                                      to: href,
-                                      className:
-                                        "hover:underline after:absolute after:inset-0 after:content-['']",
-                                      children: hasCellFilterActions ? (
-                                        <span className="relative z-10 inline-flex min-w-0 items-center">
-                                          {content}
-                                        </span>
-                                      ) : (
-                                        content
-                                      ),
+                                      value: serverFilterValue,
+                                      mode,
                                     })
-                                  : content}
-                              </CellContent>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {expandsInline && expanded && expandedContent && (
-                        <tr>
-                          <td
-                            colSpan={
-                              visibleColumns.length + (rowSelection ? 1 : 0)
+                                  }
+                                >
+                                  {content}
+                                </CellFilterActions>
+                              );
                             }
-                            className="bg-muted/40 p-density-3"
-                          >
-                            <div className="rounded-md border border-border bg-background p-density-3">
-                              {expandedContent}
-                            </div>
-                          </td>
+
+                            // Tag cells get the + / − filter affordance via
+                            // context; copy-to-clipboard works without it too.
+                            if (
+                              column.kind === "tags" &&
+                              filterActionsByColumn[column.key]
+                            ) {
+                              content = (
+                                <TagActionsProvider
+                                  value={filterActionsByColumn[column.key]!}
+                                >
+                                  {content}
+                                </TagActionsProvider>
+                              );
+                            }
+
+                            return (
+                              <td
+                                key={column.key}
+                                className={cn(
+                                  DATA_TABLE_CELL_DENSITY_CLASS,
+                                  alignmentClass(column.align),
+                                  column.cellClassName,
+                                )}
+                                style={cellSizingStyle(
+                                  column,
+                                  columnWidths[column.key],
+                                )}
+                              >
+                                <CellContent column={column}>
+                                  {href && index === 0
+                                    ? // One real <a href> per row whose ::after
+                                      // overlay stretches across the whole (relative)
+                                      // row: right/middle-click give native "open in
+                                      // new tab", plain left-click routes client-side.
+                                      // The overlay paints over the cell, so a cell
+                                      // with filter actions lifts them above it —
+                                      // otherwise the link swallows the hover that
+                                      // reveals the include/exclude buttons.
+                                      renderLink({
+                                        to: href,
+                                        className:
+                                          "hover:underline after:absolute after:inset-0 after:content-['']",
+                                        children: hasCellFilterActions ? (
+                                          <span className="relative z-10 inline-flex min-w-0 items-center">
+                                            {content}
+                                          </span>
+                                        ) : (
+                                          content
+                                        ),
+                                      })
+                                    : content}
+                                </CellContent>
+                              </td>
+                            );
+                          })}
                         </tr>
-                      )}
-                    </Fragment>
-                  );
-                })
-              )}
-              {error == null && sentinelActive && (
-                <tr ref={revealSentinelRef} aria-hidden>
-                  <td
-                    colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
-                    className="p-density-2 text-center text-xs text-muted-foreground"
-                  >
-                    {sentinelLabel}
-                  </td>
-                </tr>
-              )}
-            </tbody>
+                        {expandsInline && expanded && expandedContent && (
+                          <tr>
+                            <td
+                              colSpan={
+                                visibleColumns.length + (rowSelection ? 1 : 0)
+                              }
+                              className="bg-muted/40 p-density-3"
+                            >
+                              <div className="rounded-md border border-border bg-background p-density-3">
+                                {expandedContent}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })
+                )}
+                {error == null && sentinelActive && (
+                  <tr ref={revealSentinelRef} aria-hidden>
+                    <td
+                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      className="p-density-2 text-center text-xs text-muted-foreground"
+                    >
+                      {sentinelLabel}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
             </table>
           </div>
         </div>
@@ -2620,7 +2771,8 @@ function DataTableInner<T extends Record<string, unknown>>({
         {headerFilterMenu && (
           <HeaderFilterMenu
             filter={headerFilterByColumn.get(headerFilterMenu.columnKey ?? "")}
-            {...(columnTimeRange && columnTimeRange.key === headerFilterMenu.columnKey
+            {...(columnTimeRange &&
+            columnTimeRange.key === headerFilterMenu.columnKey
               ? { timeRange: columnTimeRange.range }
               : {})}
             anchor={headerFilterMenu}
@@ -2693,7 +2845,8 @@ function useCursorTrail(cursor: DataTableCursorPagination | undefined) {
 
   return {
     page: index,
-    push: (next: string) => setTrail((previous) => [...previous.slice(0, index), next]),
+    push: (next: string) =>
+      setTrail((previous) => [...previous.slice(0, index), next]),
     previous: () => (index <= 1 ? undefined : trail[index - 2]),
   };
 }
@@ -2771,8 +2924,15 @@ function DataTablePaginationFooter({
   /** Infinite scroll owns the paging; see `steppable` and `rangeStart` below. */
   infinite?: boolean;
 }) {
-  const { page, pageSize, total, totalRelation, cursor, onPageChange, onPageSizeChange } =
-    pagination;
+  const {
+    page,
+    pageSize,
+    total,
+    totalRelation,
+    cursor,
+    onPageChange,
+    onPageSizeChange,
+  } = pagination;
   const options = Array.from(
     new Set([
       ...(pagination.pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS),
@@ -3494,7 +3654,9 @@ function MenuActionItem({
       {isSubmenu && submenu && (
         <div
           role="menu"
-          aria-label={typeof action.label === "string" ? action.label : "Submenu"}
+          aria-label={
+            typeof action.label === "string" ? action.label : "Submenu"
+          }
           className="fixed z-50 max-h-[calc(100vh-1rem)] min-w-[14rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
           style={{ left: submenu.x, top: submenu.y }}
         >

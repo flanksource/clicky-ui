@@ -381,6 +381,10 @@ export type FilterBarDateRangeFilter = FilterBarRangeProps & {
   description?: string;
 };
 
+/** The bar's own row. Shared with the overlay so the two cannot drift apart. */
+const FILTER_BAR_ROW_CLASS =
+  "flex items-center gap-2 overflow-visible bg-background py-1.5";
+
 export type FilterBarProps = {
   /** Optional global search control shown first. */
   search?: FilterBarSearchProps;
@@ -411,6 +415,15 @@ export type FilterBarProps = {
   isPending?: boolean;
   /** `responsive` moves hidden filters into an overflow popover; `wrap` lets them wrap. */
   overflowMode?: "responsive" | "wrap";
+  /**
+   * Content that takes the bar's place while it is present — a bulk-action bar
+   * that owns the row while rows are selected, say.
+   *
+   * The bar's own controls stay mounted, hidden rather than unmounted, so a
+   * half-typed search survives the takeover and the row keeps whichever of the
+   * two is taller. Nothing below it moves.
+   */
+  overlay?: ReactNode;
 };
 
 export function FilterBar({
@@ -427,6 +440,7 @@ export function FilterBar({
   applyLabel = "Apply",
   isPending = false,
   overflowMode = "responsive",
+  overlay,
 }: FilterBarProps) {
   const hasRangeControls = Boolean(timeRange || dateRange);
   const showApply = !autoSubmit && !!onApply;
@@ -554,16 +568,25 @@ export function FilterBar({
     filterNodeRefs.current.set(key, node);
   }, []);
 
-  return (
+  const row = (
     <FilterBarContext.Provider value={contextValue}>
       <div
         data-slot="filter-bar"
         className={cn(
-          "flex flex-nowrap items-center gap-2 overflow-visible bg-background py-1.5",
-          "flex-wrap md:flex-nowrap",
-          overflowMode === "wrap" && "flex-wrap",
+          FILTER_BAR_ROW_CLASS,
+          // `wrap` has to drop the md:flex-nowrap entirely rather than add a
+          // plain flex-wrap beside it: the two live in different variant groups,
+          // so twMerge keeps both and the breakpoint variant still wins above
+          // md — which made the documented escape hatch do nothing on exactly
+          // the desktop widths where a crowded bar overflows the viewport.
+          overflowMode === "wrap" ? "flex-wrap" : "flex-wrap md:flex-nowrap",
           className,
+          // Hidden rather than unmounted, so a half-typed search survives the
+          // takeover. `visibility: hidden` is not focusable per spec, so this
+          // leaves the tab order without needing `inert`.
+          overlay && "invisible pointer-events-none",
         )}
+        {...(overlay ? { "aria-hidden": true } : {})}
       >
         {leading && <div className="flex shrink-0 items-center gap-2">{leading}</div>}
 
@@ -628,6 +651,24 @@ export function FilterBar({
         )}
       </div>
     </FilterBarContext.Provider>
+  );
+
+  if (!overlay) return row;
+
+  // Both rows share one grid cell, so the cell is as tall as the taller of the
+  // two and neither can move the table underneath it. A min-height guess would
+  // not do: the bar's height depends on which controls a caller supplied, so
+  // there is no constant to guess.
+  return (
+    <div className="grid">
+      <div className="col-start-1 row-start-1 min-w-0">{row}</div>
+      <div
+        data-slot="filter-bar-overlay"
+        className={cn(FILTER_BAR_ROW_CLASS, "col-start-1 row-start-1 min-w-0 flex-wrap")}
+      >
+        {overlay}
+      </div>
+    </div>
   );
 }
 

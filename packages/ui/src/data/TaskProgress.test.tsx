@@ -204,6 +204,64 @@ describe("TaskProgress", () => {
     expect(screen.queryByText("staging one.go")).not.toBeInTheDocument();
   });
 
+  describe("copy affordances", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    beforeEach(() => {
+      writeText.mockClear();
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    });
+
+    it("copies the whole run, including a failing task's error, from the header", async () => {
+      render(<TaskProgress snapshots={RUN} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+      const copied = writeText.mock.calls[0]?.[0] as string;
+      expect(copied).toContain("# fix-run");
+      expect(copied).toContain("## update stats");
+      // The failing task's error and its log line are the reason to copy at all.
+      expect(copied).toContain("error: timeout");
+      expect(copied).toContain("error boom");
+    });
+
+    it("copies a single task from its row without toggling the row open", async () => {
+      const snapshots: TaskSnapshot[] = [
+        { id: "g", name: "run", type: "group", status: "running", groupId: "g1", total: 1 },
+        {
+          id: "t",
+          name: "Commit one.go",
+          type: "task",
+          status: "running",
+          groupId: "g1",
+          stdout: "staging one.go\n",
+        },
+      ];
+      render(<TaskProgress snapshots={snapshots} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy Commit one.go" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+      expect(writeText.mock.calls[0]?.[0]).toContain("## Commit one.go");
+      // The row's own onClick must not have fired.
+      expect(screen.queryByText("staging one.go")).not.toBeInTheDocument();
+    });
+
+    it("disables the errors-only item for a run with nothing wrong", () => {
+      const snapshots: TaskSnapshot[] = [
+        { id: "g", name: "clean", type: "group", status: "success", groupId: "g1", total: 1 },
+        { id: "t", name: "step", type: "task", status: "success", groupId: "g1" },
+      ];
+      render(<TaskProgress snapshots={snapshots} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "More copy options" }));
+
+      expect(screen.getByRole("menuitem", { name: /Copy errors only/ })).toBeDisabled();
+      expect(screen.getByRole("menuitem", { name: /Copy as JSON/ })).toBeEnabled();
+    });
+  });
+
   it("renders the nested supervised process tree and current resource summary", () => {
     const snapshots: TaskSnapshot[] = [
       {

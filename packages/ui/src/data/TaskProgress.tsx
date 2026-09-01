@@ -1,13 +1,25 @@
 import { useState } from "react";
 import { Button } from "../components/button";
-import { UiPlay, UiRestart, UiStop } from "../icons";
+import { CopyButton } from "../components/CopyButton";
+import { SplitButton } from "../components/SplitButton";
+import { useCopyFlash } from "../components/clipboard";
+import { UiCheck, UiCopy, UiJson, UiPlay, UiRestart, UiStop, UiWarningTriangle } from "../icons";
 import { cn } from "../lib/utils";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { AnsiHtml } from "./AnsiHtml";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
+import {
+  isFailedOrWarn,
+  taskGroupErrorCount,
+  taskGroupErrors,
+  taskGroupJson,
+  taskGroupMarkdown,
+  taskMarkdown,
+} from "./task-copy";
 import { isTaskExecDetails } from "./task-exec-details";
 import { isTaskProcessDetails } from "./task-process-details";
 import {
@@ -80,10 +92,6 @@ export function TaskProgress({
   );
 }
 
-function isFailedOrWarn(t: TaskSnapshot): boolean {
-  return t.status === "failed" || t.status === "FAIL" || t.status === "ERR" || t.status === "warning";
-}
-
 function TaskGroupCard({
   group: g,
   tasks,
@@ -104,6 +112,7 @@ function TaskGroupCard({
   metricsBaseUrl?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const { state: copyState, copy } = useCopyFlash();
   const total = g.total ?? tasks.length;
   const counts = bucketTasks(tasks);
   const done = counts.ok + counts.warn + counts.fail;
@@ -125,18 +134,38 @@ function TaskGroupCard({
 
   const isTerminal = g.status !== "running" && g.status !== "pending";
 
+  const copyItems: DropdownMenuItem[] = [
+    {
+      label: "Copy as JSON",
+      icon: UiJson,
+      onSelect: () => copy(taskGroupJson(g, tasks)),
+    },
+    {
+      label: "Copy errors only",
+      icon: UiWarningTriangle,
+      disabled: taskGroupErrorCount(tasks) === 0,
+      onSelect: () => copy(taskGroupErrors(g, tasks)),
+    },
+  ];
+
   return (
     <div className={cn("rounded-lg border bg-card", compact ? "p-3" : "p-4")}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
           <Icon
             icon={taskStatusIcon(g.status)}
-            className={cn(taskStatusColor(g.status), g.status === "running" && "animate-spin")}
+            className={cn(
+              "shrink-0",
+              taskStatusColor(g.status),
+              g.status === "running" && "animate-spin",
+            )}
           />
-          <span>{g.name}</span>
-          {progress && <span className="text-xs text-muted-foreground">{progress}</span>}
+          <span className="truncate">{g.name}</span>
+          {progress && (
+            <span className="shrink-0 text-xs text-muted-foreground">{progress}</span>
+          )}
           {g.kind && (
-            <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">
+            <span className="shrink-0 rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">
               {g.kind}
             </span>
           )}
@@ -153,6 +182,15 @@ function TaskGroupCard({
               {g.status}
             </span>
           )}
+          <SplitButton
+            label={copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy"}
+            icon={copyState === "copied" ? UiCheck : UiCopy}
+            variant="ghost"
+            size="sm"
+            title="More copy options"
+            onClick={() => copy(taskGroupMarkdown(g, tasks))}
+            items={copyItems}
+          />
           {onControl && <TaskControls target={g} onControl={onControl} />}
         </div>
       </div>
@@ -235,7 +273,7 @@ function TaskRow({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 border-b py-2 last:border-0",
+        "group flex items-start gap-3 border-b py-2 last:border-0",
         expandable && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
       )}
       onClick={expandable ? () => setExpanded((v) => !v) : undefined}
@@ -262,6 +300,12 @@ function TaskRow({
           </span>
           <div className="flex shrink-0 items-center gap-1">
             {t.duration && <span className="text-xs text-muted-foreground">{t.duration}</span>}
+            <CopyButton
+              value={() => taskMarkdown(t)}
+              label={`Copy ${t.name}`}
+              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              iconClassName="text-xs"
+            />
             {onTaskControl && (
               <TaskControls
                 target={t}

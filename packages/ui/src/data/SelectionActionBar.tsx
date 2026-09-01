@@ -9,41 +9,10 @@ import type {
   DataTableSelectionConfirm,
   DataTableSelectionContext,
 } from "./DataTable";
-
-/**
- * How many bulk actions stay on the toolbar before the rest collapse into the
- * overflow menu. The cluster shares one row with the filter bar, the grouping
- * picker and the preferences button, so past three the toolbar starts wrapping
- * on a laptop — and a wrapped toolbar pushes the rows the actions apply to off
- * the top of the screen, which is the one thing this placement was for.
- */
-const MAX_INLINE_SELECTION_ACTIONS = 3;
-
-/**
- * Splits bulk actions into the ones the toolbar shows and the ones the menu
- * keeps. `primary` is the explicit answer and position is the fallback. An
- * action with `children` is always menu material: its flyout needs a menu to
- * hang off, and the overflow already is one.
- */
-export function splitSelectionActions<T extends Record<string, unknown>>(
-  actions: DataTableSelectionAction<T>[],
-): {
-  inline: DataTableSelectionAction<T>[];
-  overflow: DataTableSelectionAction<T>[];
-} {
-  const pinnable = actions.filter(
-    (action) => !action.children?.length && action.primary !== false,
-  );
-  const pinned = pinnable.filter((action) => action.primary);
-  const inline = pinned.length
-    ? pinned
-    : pinnable.slice(0, MAX_INLINE_SELECTION_ACTIONS);
-  const inlineIDs = new Set(inline.map((action) => action.id));
-  return {
-    inline,
-    overflow: actions.filter((action) => !inlineIDs.has(action.id)),
-  };
-}
+// The placement rules live beside this file rather than in it: they are pure
+// functions over descriptors, and a module that exports both components and
+// helpers loses fast refresh for the component.
+import { splitSelectionActions } from "./selectionActionSplit";
 
 /**
  * The count and the way out of it. `SelectionScopeNotice` says the same thing
@@ -145,6 +114,11 @@ export type SelectionActionBarProps<T extends Record<string, unknown>> = {
    * already stating them — DataTable's cross-page scope notice, say.
    */
   showCount?: boolean;
+  /**
+   * How many plain buttons stay on the row before the rest collapse. Named
+   * dropdowns are never capped — they are what the bar is for.
+   */
+  maxButtons?: number;
   className?: string;
 };
 
@@ -162,6 +136,7 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
   actions,
   context,
   showCount = true,
+  maxButtons,
   className,
 }: SelectionActionBarProps<T>) {
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
@@ -207,7 +182,10 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
     [run],
   );
 
-  const { inline, overflow } = splitSelectionActions(actions);
+  const { menus, buttons, overflow } = splitSelectionActions(actions, {
+    maxButtons,
+  });
+  const inline = [...menus, ...buttons];
   const busy = pendingActionId !== null;
   const pendingOverflow = overflow.find(
     (action) => action.id === pendingActionId,
@@ -256,15 +234,17 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
       <span className={className}>
         {inline.map((action) => {
           const pending = pendingActionId === action.id;
-          return (
+          const isMenu = menus.includes(action);
+          const trigger = (
             <Button
-              key={action.id}
               type="button"
               size="sm"
               variant={action.variant ?? "outline"}
               disabled={action.disabled || (busy && !pending)}
               loading={pending}
-              onClick={() => begin(action)}
+              {...(isMenu
+                ? { "aria-haspopup": "menu" as const }
+                : { onClick: () => begin(action) })}
             >
               {/* The spinner takes the icon's place rather than sitting beside it. */}
               {action.icon && !pending ? (
@@ -278,7 +258,55 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
               {pending && action.pendingLabel !== undefined
                 ? action.pendingLabel
                 : action.label}
+              {isMenu ? <Icon icon={UiChevronDown} /> : null}
             </Button>
+          );
+
+          if (!isMenu) {
+            return <span key={action.id}>{trigger}</span>;
+          }
+
+          // The trigger only opens the menu; the write is whichever value the
+          // reader picks inside it. `menu` and `children` are the two bodies a
+          // caller can supply, and DropdownMenu already renders both — one as
+          // items, one as its own render prop — so nothing here re-implements a
+          // menu.
+          const body = action.menu
+            ? {
+                children: (closeMenu: () => void) =>
+                  action.menu!({
+                    context,
+                    close: closeMenu,
+                    busy,
+                    // Work started inside a custom body is still this action's
+                    // work: routing it through `run` is what puts the spinner
+                    // on this trigger and locks the siblings, instead of the
+                    // bar sitting idle while a bulk call is in flight.
+                    run: (task) =>
+                      begin({
+                        ...action,
+                        ...(task.pendingLabel !== undefined
+                          ? { pendingLabel: task.pendingLabel }
+                          : {}),
+                        ...(task.confirm !== undefined
+                          ? { confirm: task.confirm }
+                          : {}),
+                        onSelect: task.onSelect,
+                      }),
+                  }),
+              }
+            : { items: (action.children ?? []).map(toMenuItem) };
+
+          return (
+            <DropdownMenu
+              key={action.id}
+              align="left"
+              menuLabel={
+                typeof action.label === "string" ? action.label : action.id
+              }
+              trigger={trigger}
+              {...body}
+            />
           );
         })}
         {overflow.length > 0 ? (
