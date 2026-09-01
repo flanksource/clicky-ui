@@ -40,7 +40,7 @@ export type RuntimeBarSegmentsProps = {
   showEffort: boolean;
   ariaLabel: string;
   className?: string | undefined;
-  onBackendChange: (familyId: string, modeId: string) => void;
+  onModeChange: (familyId: string, modeId: string) => void;
   onCustomModel: (model: string) => void;
   onModelSelect: (model: ChatModel) => void;
   onModelClear: () => void;
@@ -64,7 +64,7 @@ export function RuntimeBarSegments({
   showEffort,
   ariaLabel,
   className,
-  onBackendChange,
+  onModeChange,
   onCustomModel,
   onModelSelect,
   onModelClear,
@@ -92,7 +92,7 @@ export function RuntimeBarSegments({
           families,
           models,
           selectedId: family.id,
-          onSelect: (familyId) => onBackendChange(familyId, selectedMode),
+          onSelect: (familyId) => onModeChange(familyId, selectedMode),
         })}
       >
         {brand.icon && (
@@ -110,7 +110,7 @@ export function RuntimeBarSegments({
         items={modeItems({
           family,
           selectedId: selectedMode,
-          onSelect: (modeId) => onBackendChange(family.id, modeId),
+          onSelect: (modeId) => onModeChange(family.id, modeId),
         })}
       >
         {mode.icon && (

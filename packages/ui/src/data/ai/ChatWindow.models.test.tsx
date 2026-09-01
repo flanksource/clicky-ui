@@ -34,7 +34,7 @@ describe("ChatWindow model fetching", () => {
         runtime: {
           id: "claude-sonnet-5",
           model: "claude-sonnet-5",
-          backend: "anthropic",
+          mode: "api",
         },
       }),
     );
@@ -56,7 +56,7 @@ describe("ChatWindow model fetching", () => {
         runtime: {
           id: "current-chat",
           model: "current-chat",
-          backend: "anthropic",
+          mode: "api",
         },
       }),
     );
@@ -85,7 +85,6 @@ describe("ChatWindow model fetching", () => {
               modes: [
                 {
                   mode: "api",
-                  backend: "anthropic",
                   kind: "api",
                   catalogProvider: "anthropic",
                   availability: { state: "available" },
@@ -140,11 +139,14 @@ describe("ChatWindow model fetching", () => {
 
 // The runtime control mounts with the stored model and settles after the
 // catalog fetch, so re-query and assert after that update.
+// No runtimesApi is passed here, so the bar falls back to the offline catalog,
+// where provider "anthropic" is the Claude family. The name it used to expect,
+// "Anthropic", was a family that catalog has not carried for some time.
 async function expectRuntimeModel(label: string): Promise<void> {
   await waitFor(() =>
     expect(
       screen.getByRole("button", {
-        name: new RegExp(`^Runtime: Anthropic, API, ${label}, effort None$`),
+        name: new RegExp(`^Runtime: Claude, API, ${label}, effort None$`),
       }),
     ).toBeInTheDocument(),
   );
@@ -157,7 +159,7 @@ async function expectStoredRuntime(modelId: string): Promise<void> {
     ).toMatchObject({
       id: modelId,
       model: modelId,
-      backend: "anthropic",
+      mode: "api",
     }),
   );
 }
@@ -198,6 +200,6 @@ function model(id: string, label: string, configured: boolean): ChatModel {
     provider: "anthropic",
     reasoning: false,
     capabilitiesKnown: true,
-    runtime: { id, model: id, backend: "anthropic" },
+    runtime: { id, model: id, mode: "api" },
   };
 }

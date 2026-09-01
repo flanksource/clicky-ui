@@ -113,7 +113,7 @@ export type AISpecRuntimeAttachment = {
 export type AISpecRuntimeModelFallback = {
   model?: string;
   id?: string;
-  backend?: string;
+  /** The canonical runtime mode: api | agent | cli | cmux. */
   mode?: string;
   temperature?: number;
   effort?: string;
@@ -185,7 +185,7 @@ export type AISpecRuntimeBudget = ChatBudgetConfig & {
 export type AISpecRuntimeSpec = {
   model?: string;
   id?: string;
-  backend?: string;
+  /** The canonical runtime mode: api | agent | cli | cmux. */
   mode?: string;
   /**
    * Unified sandbox settings. A mode-only ref round-trips as a scalar.
@@ -342,10 +342,8 @@ export function compactAISpecRuntime(
   if (model) spec.model = model;
   const id = cleanString(value.id);
   if (id) spec.id = id;
-  const backend = cleanString(value.backend);
-  if (backend) spec.backend = backend;
-  const mode = cleanString(value.mode);
-  if (mode) spec.mode = mode;
+  const specMode = cleanString(value.mode);
+  if (specMode) spec.mode = specMode;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
     spec.temperature = value.temperature;
   }
@@ -510,10 +508,8 @@ function compactFallbacks(
     const fallback: AISpecRuntimeModelFallback = { model };
     const id = cleanString(item.id);
     if (id) fallback.id = id;
-    const backend = cleanString(item.backend);
-    if (backend) fallback.backend = backend;
-    const mode = cleanString(item.mode);
-    if (mode) fallback.mode = mode;
+    const itemMode = cleanString(item.mode);
+    if (itemMode) fallback.mode = itemMode;
     if (item.temperature != null && Number.isFinite(item.temperature)) {
       fallback.temperature = item.temperature;
     }

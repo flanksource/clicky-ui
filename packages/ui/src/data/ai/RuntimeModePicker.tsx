@@ -2,7 +2,7 @@ import { SegmentedControl } from "../../components/SegmentedControl";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
-import { applyRuntimeBackend } from "../runtime/RuntimeBar.model";
+import { applyRuntimeMode } from "../runtime/RuntimeBar.model";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 import { SpecField } from "./SpecRuntimeEditor/fields";
 import {
@@ -10,7 +10,7 @@ import {
   type SpecRuntimeFamily,
   familyById,
   firstMode,
-  selectionForBackend,
+  selectionForRuntime,
 } from "../runtime/runtime-mode";
 
 export type RuntimeModePickerProps = {
@@ -32,14 +32,14 @@ export function RuntimeModePicker({
 }: RuntimeModePickerProps) {
   const selection = selectionForRuntime(
     families,
-    value.backend,
+    value.mode,
     value.model,
     models,
   );
   const family = familyById(families, selection.family);
 
-  const applyBackend = (familyId: string, modeId: string) => {
-    const next = applyRuntimeBackend(
+  const applyMode = (familyId: string, modeId: string) => {
+    const next = applyRuntimeMode(
       value,
       models,
       families,
@@ -67,7 +67,7 @@ export function RuntimeModePicker({
             };
           })}
           onChange={(familyId) =>
-            applyBackend(familyId, firstMode(familyById(families, familyId)).id)
+            applyMode(familyId, firstMode(familyById(families, familyId)).id)
           }
         />
       </SpecField>
@@ -83,7 +83,7 @@ export function RuntimeModePicker({
             ...(mode.icon ? { icon: mode.icon } : {}),
             ...(mode.title ? { title: mode.title } : {}),
           }))}
-          onChange={(modeId) => applyBackend(family.id, modeId)}
+          onChange={(modeId) => applyMode(family.id, modeId)}
         />
       </SpecField>
     </div>

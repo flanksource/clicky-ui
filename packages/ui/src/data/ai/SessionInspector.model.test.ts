@@ -6,16 +6,20 @@ import {
 } from "./SessionInspector.model";
 
 describe("runtimeDescriptor", () => {
+  // A session records its runtime mode, not a composite adapter id. The
+  // composite ids this table used to carry ("claude-agent", "codex-cli") do not
+  // exist any more, and the family half they smuggled in is a separate field.
   it.each([
-    ["claude-agent", "Agent"],
-    ["claude", "CLI"],
-    ["claude-sdk", "SDK"],
-    ["codex", "CLI"],
-    ["codex-cli", "CLI"],
-    ["openai", "API"],
-    ["claude-cmux", "cmux"],
-  ])("maps %s to its session runtime mode", (backend, mode) => {
-    expect(runtimeDescriptor(backend)).toMatchObject({ mode });
+    ["api", "API"],
+    ["agent", "Agent"],
+    ["cli", "CLI"],
+    ["cmux", "cmux"],
+  ])("maps %s to its session runtime mode", (specMode, label) => {
+    expect(runtimeDescriptor(specMode)).toMatchObject({ mode: label });
+  });
+
+  it("stays silent about a mode the catalog does not declare", () => {
+    expect(runtimeDescriptor("claude-agent")).toBeUndefined();
   });
 });
 

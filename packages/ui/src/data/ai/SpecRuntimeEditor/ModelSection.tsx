@@ -34,9 +34,9 @@ import {
   SPEC_RUNTIME_FAMILIES,
   familyForModel,
   firstMode,
-  modeForBackend,
-  runtimeBackendError,
-  runtimeBackendFromModel,
+  modeOptionFor,
+  runtimeModeError,
+  runtimeModeFromModel,
   runtimeModelError,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
@@ -46,7 +46,6 @@ import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 type FallbackDraftPatch = {
   model?: string | undefined;
   id?: string | undefined;
-  backend?: string | undefined;
   mode?: string | undefined;
   temperature?: number | undefined;
   effort?: string | undefined;
@@ -58,14 +57,14 @@ export function ModelSection({
   onChange,
   models,
   families,
-  effectiveBackend,
+  effectiveMode,
   effectiveModel,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models: ChatModel[];
   families?: SpecRuntimeFamily[] | undefined;
-  effectiveBackend?: string | undefined;
+  effectiveMode?: string | undefined;
   effectiveModel?: string | undefined;
 }) {
   const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
@@ -74,16 +73,16 @@ export function ModelSection({
     models,
     value.model || effectiveModel,
   );
-  const backend =
-    runtimeBackendFromModel(value.model) ||
-    value.backend?.trim() ||
-    effectiveBackend?.trim() ||
-    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
+  const specMode =
+    runtimeModeFromModel(value.model) ||
+    value.mode?.trim() ||
+    effectiveMode?.trim() ||
+    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).id;
   const supports =
     (runtimeModelError(value.model || effectiveModel) ??
-    runtimeBackendError(runtimeFamilies, backend, selectedFamily?.id))
+    runtimeModeError(runtimeFamilies, specMode, selectedFamily?.id))
       ? SUPPORT_ALL_RUNTIME_FIELDS
-      : runtimeFieldSupport(runtimeFamilies, backend, selectedFamily?.id);
+      : runtimeFieldSupport(runtimeFamilies, specMode, selectedFamily?.id);
   // The bar owns family, mode, model and effort — including the free-text model
   // entry for families the catalog does not describe.
   return (
@@ -92,7 +91,7 @@ export function ModelSection({
         value={value}
         onChange={onChange}
         models={models}
-        effectiveBackend={effectiveBackend}
+        effectiveMode={effectiveMode}
         effectiveModel={effectiveModel}
         showModel={supports("model")}
         showEffort={supports("effort")}
@@ -308,7 +307,7 @@ function FallbackModelRow({
   const label = meta.label || "Select model";
   // The collapsed row is the bar in miniature: brand mark, runtime mode, model,
   // effort — each carrying the same tone it has inside the expanded editor.
-  const mode = modeForBackend(families, fallback.backend);
+  const mode = modeOptionFor(families, fallback.mode);
   const effortGlyph = fallback.effort
     ? effortLevelIcon(fallback.effort)
     : undefined;
@@ -425,11 +424,7 @@ function newFallbackDraft(
   families: SpecRuntimeFamily[],
 ): AISpecRuntimeModelFallback {
   const fallback: AISpecRuntimeModelFallback = {};
-  const backend = value.backend || defaultFallbackBackend(families);
-  if (backend) fallback.backend = backend;
-  const mode =
-    (backend === value.backend ? value.mode : undefined) ??
-    modeForBackend(families, backend)?.id;
+  const mode = value.mode || defaultFallbackMode(families);
   if (mode) fallback.mode = mode;
   if (value.effort) fallback.effort = value.effort;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
@@ -438,9 +433,9 @@ function newFallbackDraft(
   return fallback;
 }
 
-function defaultFallbackBackend(families: SpecRuntimeFamily[]): string {
+function defaultFallbackMode(families: SpecRuntimeFamily[]): string {
   const family = families[0] ?? SPEC_RUNTIME_FAMILIES[0];
-  return family ? firstMode(family).backend : "";
+  return family ? firstMode(family).id : "";
 }
 
 function compactEditableFallback(
@@ -451,8 +446,6 @@ function compactEditableFallback(
   if (model) next.model = model;
   const id = cleanString(value.id);
   if (id) next.id = id;
-  const backend = cleanString(value.backend);
-  if (backend) next.backend = backend;
   const mode = cleanString(value.mode);
   if (mode) next.mode = mode;
   if (value.temperature != null && Number.isFinite(value.temperature)) {
@@ -482,9 +475,7 @@ function fallbackModelMeta(
 function inferProvider(
   fallback: AISpecRuntimeModelFallback,
 ): string | undefined {
-  const text = `${fallback.backend ?? ""} ${
-    fallback.model ?? ""
-  }`.toLowerCase();
+  const text = `${fallback.mode ?? ""} ${fallback.model ?? ""}`.toLowerCase();
   if (text.includes("anthropic") || text.includes("claude")) return "anthropic";
   if (text.includes("google") || text.includes("gemini")) return "googleai";
   if (

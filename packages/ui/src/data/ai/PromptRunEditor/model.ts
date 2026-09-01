@@ -8,14 +8,7 @@ export type AIPromptRunSpec = AISpecRuntimeValue & {
 
 export type AISpecRuntimeModel = Pick<
   AISpecRuntimeValue,
-  | "model"
-  | "id"
-  | "backend"
-  | "mode"
-  | "temperature"
-  | "effort"
-  | "noCache"
-  | "fallbacks"
+  "model" | "id" | "mode" | "temperature" | "effort" | "noCache" | "fallbacks"
 >;
 
 export type AIPromptRunValue = {
@@ -28,7 +21,6 @@ export type AIPromptRunValue = {
 const MODEL_KEYS = [
   "model",
   "id",
-  "backend",
   "mode",
   "temperature",
   "effort",

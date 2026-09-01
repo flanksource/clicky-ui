@@ -42,7 +42,6 @@ const AI_RUNTIME_KEYS = new Set([
   "effort",
   "id",
   "model",
-  "mode",
   "noCache",
   "prompt",
   "temperature",
@@ -54,7 +53,6 @@ const AI_MODEL_KEYS = new Set([
   "effort",
   "id",
   "model",
-  "mode",
   "noCache",
   "temperature",
 ]);
@@ -163,10 +161,8 @@ function aiToRuntime(ai: Record<string, unknown>): AISpecRuntimeValue {
   const runtime: AISpecRuntimeValue = {};
   const model = stringValue(ai.model);
   if (model) runtime.model = model;
-  const backend = stringValue(ai.backend);
-  if (backend) runtime.backend = backend;
-  const mode = stringValue(ai.mode);
-  if (mode) runtime.mode = mode;
+  const specMode = stringValue(ai.mode);
+  if (specMode) runtime.mode = specMode;
   const id = stringValue(ai.id);
   if (id) runtime.id = id;
   const effort = stringValue(ai.effort);
@@ -253,7 +249,9 @@ function compactAIExtras(extras: FixtureAIExtras): Record<string, unknown> {
     ...(numberValue(extras.maxConcurrent) != null
       ? { maxConcurrent: numberValue(extras.maxConcurrent) }
       : {}),
-    ...(stringValue(extras.cacheTTL) ? { cacheTTL: stringValue(extras.cacheTTL) } : {}),
+    ...(stringValue(extras.cacheTTL)
+      ? { cacheTTL: stringValue(extras.cacheTTL) }
+      : {}),
   };
 }
 
@@ -297,11 +295,14 @@ function serializeFixtureFrontmatter(
   return `---\n${normalizedYaml}---\n${body}`;
 }
 
-function splitMarkdownFrontmatter(markdown: string):
+function splitMarkdownFrontmatter(
+  markdown: string,
+):
   | { hasFrontmatter: false }
   | { hasFrontmatter: true; closed: boolean; raw: string; body: string } {
   const lines = splitLinesWithEndings(markdown);
-  if (stripLineEnding(lines[0] ?? "") !== "---") return { hasFrontmatter: false };
+  if (stripLineEnding(lines[0] ?? "") !== "---")
+    return { hasFrontmatter: false };
 
   for (let index = 1; index < lines.length; index += 1) {
     const line = stripLineEnding(lines[index] ?? "");
@@ -343,11 +344,14 @@ function parseYamlRecord(
   if (firstError) return { ok: false, error: firstError.message };
   const value = doc.toJSON();
   if (value == null) return { ok: true, value: {} };
-  if (!isRecord(value)) return { ok: false, error: "Frontmatter root must be an object" };
+  if (!isRecord(value))
+    return { ok: false, error: "Frontmatter root must be an object" };
   return { ok: true, value };
 }
 
-function omitControlledAIKeys(ai: Record<string, unknown>): Record<string, unknown> {
+function omitControlledAIKeys(
+  ai: Record<string, unknown>,
+): Record<string, unknown> {
   const omitted = new Set([...AI_RUNTIME_KEYS, ...AI_EXTRA_KEYS, "maxTokens"]);
   return omitKeys(ai, [...omitted]);
 }
@@ -382,7 +386,9 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function numberValue(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function hasKeys(value: Record<string, unknown>): boolean {

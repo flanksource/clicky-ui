@@ -11,7 +11,7 @@ describe("example sessions", () => {
     for (const session of EXAMPLE_SESSIONS) {
       expect(session).toMatchObject({
         provider: expect.any(String),
-        backend: expect.any(String),
+        modelMode: expect.any(String),
         model: expect.any(String),
         reasoningEffort: expect.any(String),
         usage: { totalTokens: expect.any(Number) },

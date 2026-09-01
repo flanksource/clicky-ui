@@ -73,7 +73,7 @@ export function RuntimeBarCombo({
   const summaryParts = [family.label, mode.label];
   if (showModel) summaryParts.push(modelLabel);
   if (showEffort) summaryParts.push(`effort ${effortLabel}`);
-  const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and backend are locked for this conversation; fork it to change them" : ""}`;
+  const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and mode are locked for this conversation; fork it to change them" : ""}`;
 
   return (
     <DropdownMenu
@@ -126,7 +126,7 @@ export function RuntimeBarCombo({
           <div className="space-y-2 border-b border-border px-2 pb-3 pt-2">
             {locked && (
               <div className="rounded bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
-                Model and backend are locked. Fork this conversation to change
+                Model and mode are locked. Fork this conversation to change
                 them.
               </div>
             )}

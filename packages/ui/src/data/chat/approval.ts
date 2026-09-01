@@ -1,5 +1,21 @@
 import type { UIMessage } from "ai";
-import type { ChatModelRuntime } from "./types";
+import type { ChatModelRuntime, ChatUsageBreakdown } from "./types";
+
+export type CaptainChatContext = {
+  usedTokens?: number;
+  windowTokens?: number;
+  freePercent: number;
+};
+
+export type CaptainChatCost = {
+  model?: string;
+  inputCost?: number;
+  outputCost?: number;
+  reasoningCost?: number;
+  cacheReadCost?: number;
+  cacheWriteCost?: number;
+  providerCostUSD?: number;
+};
 
 export type CaptainChatSession = {
   id: string;
@@ -8,6 +24,12 @@ export type CaptainChatSession = {
   providerSessionId?: string;
   runtime?: ChatModelRuntime;
   forkedFrom?: string;
+  context?: CaptainChatContext;
+  usage?: ChatUsageBreakdown;
+  cost?: CaptainChatCost;
+  backend?: string;
+  executionMode?: string;
+  model?: string;
 };
 
 export type ToolApprovalDecision = {

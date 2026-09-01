@@ -77,13 +77,13 @@ const RUNTIME_ALIASES: Record<string, RuntimeDescriptor> = {
 };
 
 export function runtimeDescriptor(
-  backend?: string,
+  runtimeMode?: string,
 ): RuntimeDescriptor | undefined {
-  const target = backend?.toLowerCase();
+  const target = runtimeMode?.toLowerCase();
   if (!target) return undefined;
   for (const family of SPEC_RUNTIME_FAMILIES) {
     const mode = family.modes.find(
-      (candidate) => candidate.backend.toLowerCase() === target,
+      (candidate) => candidate.id.toLowerCase() === target,
     );
     if (mode) {
       return {

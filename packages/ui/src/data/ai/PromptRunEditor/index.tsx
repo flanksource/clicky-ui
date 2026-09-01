@@ -21,7 +21,7 @@ import { runtimeModelForValue } from "../../runtime/RuntimeBar.model";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
-  labelForBackend,
+  labelForMode,
 } from "../../runtime/runtime-mode";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
 import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
@@ -190,7 +190,7 @@ export function PromptRunEditor({
                 onChange(
                   withRuntimeRows(value, [
                     ...rows,
-                    rows[0]?.backend ? { backend: rows[0].backend } : {},
+                    rows[0]?.mode ? { mode: rows[0].mode } : {},
                   ]),
                 )
               }
@@ -311,7 +311,7 @@ export function PromptRunEditor({
           onSave={() => setSpecOpen(false)}
           onCancel={() => setSpecOpen(false)}
           saveLabel="Done"
-          footerStatus={labelForBackend(spec.backend, families)}
+          footerStatus={labelForMode(spec.mode, families)}
         />
       </Modal>
     </div>

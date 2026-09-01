@@ -118,7 +118,8 @@ export interface SessionTurn {
   endedAt?: string;
   stopReason?: string;
   model?: string;
-  backend?: string;
+  modelProvider?: string;
+  mode?: string;
   reasoningEffort?: string;
   status?: string;
   error?: string;
@@ -201,7 +202,7 @@ export interface UnifiedSessionInput {
   initialPrompt?: string;
   version?: string;
   provider?: string;
-  backend?: string;
+  modelMode?: string;
   model?: string;
   reasoningEffort?: string;
   historyFile?: string;

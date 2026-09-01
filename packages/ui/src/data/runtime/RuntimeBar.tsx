@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
-import { applyRuntimeBackend, runtimeModelForValue } from "./RuntimeBar.model";
+import { applyRuntimeMode, runtimeModelForValue } from "./RuntimeBar.model";
 import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import { RuntimeBarSegments } from "./RuntimeBarSegments";
 import { isSelectableModel } from "./availability";
@@ -15,7 +15,7 @@ import {
   firstMode,
   modelsForFamily,
   selectionForRuntime,
-  runtimeBackendFromModel,
+  runtimeModeFromModel,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -32,13 +32,13 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
    *  catalog does not describe is served by the segment's free-text entry. */
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
-  /** Resolved backend shown when the editable value inherits it from another layer. */
-  effectiveBackend?: string | undefined;
+  /** Resolved mode shown when the editable value inherits it from another layer. */
+  effectiveMode?: string | undefined;
   /** Resolved model used to identify the inherited provider family without persisting it. */
   effectiveModel?: string | undefined;
   /** Effort tiers offered when the catalog does not describe the model. */
   reasoningEfforts?: string[] | undefined;
-  /** Locks model identity (family, backend, and model) while leaving effort editable. */
+  /** Locks model identity (family, mode, and model) while leaving effort editable. */
   locked?: boolean | undefined;
   /** Whether the selected runtime exposes a model argument. */
   showModel?: boolean | undefined;
@@ -55,7 +55,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   variant = "segmented",
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
-  effectiveBackend,
+  effectiveMode,
   effectiveModel,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
   locked = false,
@@ -65,13 +65,13 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   className,
 }: RuntimeBarProps<T>) {
   const [preferredFamily, setPreferredFamily] = useState<string>();
-  const backend =
-    runtimeBackendFromModel(value.model) ||
-    value.backend?.trim() ||
-    effectiveBackend?.trim();
+  const specMode =
+    runtimeModeFromModel(value.model) ||
+    value.mode?.trim() ||
+    effectiveMode?.trim();
   const selection = selectionForRuntime(
     families,
-    backend,
+    specMode,
     value.model || effectiveModel,
     models,
     preferredFamily,
@@ -80,19 +80,20 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   const mode =
     family.modes.find((entry) => entry.id === selection.mode) ??
     firstMode(family);
-  const modelOptions = modelsForFamily(models, family, value.backend);
+  const modelOptions = modelsForFamily(models, family, specMode);
   const resolvedModel = runtimeModelForValue(models, value, isSelectableModel);
   const selectedModelUnavailable = Boolean(
     (value.id || value.model) &&
-      runtimeModelForValue(models, value, (entry) => !isSelectableModel(entry)),
+    runtimeModelForValue(models, value, (entry) => !isSelectableModel(entry)),
   );
   const supportedEfforts = effortOptionsForModel(
     resolvedModel,
     reasoningEfforts,
   );
 
-  const applyBackend = (familyId: string, modeId: string) => {
-    const next = applyRuntimeBackend(
+  const applyMode = (familyId: string, modeId: string) => {
+    setPreferredFamily(familyId);
+    const next = applyRuntimeMode(
       value,
       models,
       families,
@@ -103,33 +104,24 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     if (next !== value) onChange(next);
   };
 
-  const preserveSelectedMode = (next: T) =>
-    value.backend === mode.backend
-      ? withRuntimeValue(next, { mode: mode.id })
-      : next;
   const applyCustomModel = (model: string) => {
     onChange(
-      preserveSelectedMode(
-        withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
-      ),
+      withOptionalRuntimeValue(withoutCatalogModel(value), "model", model),
     );
   };
-  // A menu row carries the backend of the catalog it was listed under, and one
-  // catalog serves several backends — claude-cli and claude-cmux models are
-  // listed as claude-agent rows. Copying the row's runtime verbatim would let
-  // picking a model silently move the user off the mode they chose, so a row
-  // drawn from the selected mode's own catalog keeps that mode.
+  // A family's model catalog can serve several modes. Selecting a row must not
+  // silently move the user away from the mode they chose.
   const applyModel = (model: ChatModel) => {
     const next = reconcileModelCapabilities(
       withoutCatalogModel(value),
       model,
       reasoningEfforts,
-      { backend: mode.backend, mode: mode.id },
+      { mode: mode.id },
     );
     onChange(next);
   };
   const clearModel = () => {
-    onChange(preserveSelectedMode(withoutCatalogModel(value)));
+    onChange(withoutCatalogModel(value));
   };
   const applyEffort = (effort: string) =>
     onChange(withOptionalRuntimeValue(value, "effort", effort));
@@ -151,8 +143,8 @@ export function RuntimeBar<T extends RuntimeBarValue>({
         showEffort={showEffort}
         ariaLabel={ariaLabel}
         className={className}
-        onFamilyChange={(familyId) => applyBackend(familyId, selection.mode)}
-        onModeChange={(modeId) => applyBackend(family.id, modeId)}
+        onFamilyChange={(familyId) => applyMode(familyId, selection.mode)}
+        onModeChange={(modeId) => applyMode(family.id, modeId)}
         onModelSelect={applyModel}
         onModelClear={clearModel}
         onEffortChange={applyEffort}
@@ -178,7 +170,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       showEffort={showEffort}
       ariaLabel={ariaLabel}
       className={className}
-      onBackendChange={applyBackend}
+      onModeChange={applyMode}
       onCustomModel={applyCustomModel}
       onModelSelect={applyModel}
       onModelClear={clearModel}
@@ -193,13 +185,6 @@ function withoutCatalogModel<T extends RuntimeBarValue>(value: T): T {
     "id",
     undefined,
   );
-}
-
-function withRuntimeValue<T extends RuntimeBarValue>(
-  value: T,
-  patch: Partial<RuntimeBarValue>,
-): T {
-  return { ...value, ...patch };
 }
 
 function withOptionalRuntimeValue<T extends RuntimeBarValue>(

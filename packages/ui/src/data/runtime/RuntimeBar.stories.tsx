@@ -88,7 +88,7 @@ const meta = {
     },
   },
   render: ({ variant }) => (
-    <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
+    <RuntimeBarStory initial={{ mode: "agent" }} variant={variant} />
   ),
 } satisfies Meta<typeof RuntimeBar>;
 
@@ -102,7 +102,7 @@ export const WithModelAndEffort: Story = {
     <RuntimeBarStory
       variant={variant}
       initial={{
-        backend: "codex-cli",
+        mode: "cli",
         model: "codex-cli/gpt-5-codex",
         effort: "high",
       }}
@@ -118,7 +118,7 @@ export const Combo: Story = {
     <RuntimeBarStory
       variant={variant}
       initial={{
-        backend: "codex-cli",
+        mode: "cli",
         model: "codex-cli/gpt-5-codex",
         effort: "high",
       }}
@@ -177,7 +177,7 @@ export const NoModelsForFamily: Story = {
   // segmented variant; the combo variant renders no SpecInput.
   args: { variant: "segmented" },
   render: ({ variant }) => (
-    <RuntimeBarStory initial={{ backend: "gemini" }} variant={variant} />
+    <RuntimeBarStory initial={{ mode: "api" }} variant={variant} />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -199,7 +199,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
   render: ({ variant }) => (
     <RuntimeBarStory
       variant={variant}
-      initial={{ backend: "claude-cli", model: "claude-agent/claude-opus-4-1" }}
+      initial={{ mode: "cli", model: "claude-opus-4-1" }}
     />
   ),
   play: async ({ canvasElement }) => {
@@ -222,7 +222,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
 export const UnavailableModesAreOmitted: Story = {
   args: { variant: "segmented" },
   render: ({ variant }) => (
-    <RuntimeBarStory initial={{ backend: "claude-agent" }} variant={variant} />
+    <RuntimeBarStory initial={{ mode: "agent" }} variant={variant} />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

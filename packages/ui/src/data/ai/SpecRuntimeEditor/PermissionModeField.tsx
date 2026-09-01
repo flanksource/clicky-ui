@@ -5,7 +5,7 @@ import {
   type SpecPermissionMode,
 } from "../SpecRuntimeEditor.model";
 import {
-  modeForBackend,
+  modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
 import { SegmentedControl } from "../../../components/SegmentedControl";
@@ -22,25 +22,25 @@ export function PermissionModeField({
   onChange,
   families,
   availableModes,
-  effectiveBackend,
+  effectiveMode,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   families: SpecRuntimeFamily[];
   availableModes: SpecPermissionMode[];
-  effectiveBackend?: string | undefined;
+  effectiveMode?: string | undefined;
 }) {
-  const backend = value.backend?.trim() || effectiveBackend?.trim();
+  const specMode = value.mode?.trim() || effectiveMode?.trim();
   const current = sandboxRef(value).approval;
-  if (!backend) {
+  if (!specMode) {
     return current ? (
       <PermissionPostureError>
-        Permission posture requires a backend context.
+        Permission posture requires a runtime mode.
       </PermissionPostureError>
     ) : null;
   }
-  const runtime = modeForBackend(families, backend);
-  const family = familyForBackend(families, backend);
+  const runtime = modeOptionFor(families, specMode);
+  const family = familyForMode(families, specMode);
   const capabilities = runtime?.permissions;
   const publishedModes = SPEC_PERMISSION_MODES.filter((mode) =>
     availableModes.includes(mode),
@@ -62,8 +62,8 @@ export function PermissionModeField({
   const selected = current || "default";
   const selectedSupport = support[selected];
   const runtimeLabel = runtime
-    ? `${family?.label ?? backend} ${runtime.label}`
-    : backend;
+    ? `${family?.label ?? specMode} ${runtime.label}`
+    : specMode;
   return (
     <div className="grid gap-density-2">
       {invalid && (
@@ -91,7 +91,7 @@ export function PermissionModeField({
               const cell = support[mode];
               if (!cell) {
                 throw new Error(
-                  `permission posture ${JSON.stringify(mode)} disappeared from backend capabilities`,
+                  `permission posture ${JSON.stringify(mode)} disappeared from runtime capabilities`,
                 );
               }
               const visual = permissionModeVisual(family?.id, mode);
@@ -112,9 +112,9 @@ export function PermissionModeField({
   );
 }
 
-function familyForBackend(families: SpecRuntimeFamily[], backend: string) {
+function familyForMode(families: SpecRuntimeFamily[], specMode: string) {
   return families.find((family) =>
-    family.modes.some((mode) => mode.backend === backend),
+    family.modes.some((mode) => mode.id === specMode),
   );
 }
 

@@ -1,4 +1,5 @@
 import type { ChatMessageMetadata, ChatUsageSummary } from "./types";
+import type { CaptainChatSession } from "./approval";
 
 /**
  * Builds the usage snapshot a chat surfaces (gauge, hover card, config panel)
@@ -30,8 +31,11 @@ export function usageSnapshotFromMetadata(
     messageCount: options.messageCount,
     ...(cost != null ? { cost } : {}),
     ...(metadata.usage ? { usage: metadata.usage } : {}),
-    ...(metadata.costBreakdown ? { costBreakdown: metadata.costBreakdown } : {}),
-    ...(metadata.backend !== undefined ? { backend: metadata.backend } : {}),
+    ...(metadata.costBreakdown
+      ? { costBreakdown: metadata.costBreakdown }
+      : {}),
+    ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
+    ...(metadata.mode !== undefined ? { mode: metadata.mode } : {}),
     ...(metadata.executionMode !== undefined
       ? { executionMode: metadata.executionMode }
       : {}),
@@ -51,5 +55,37 @@ export function usageSnapshotFromMetadata(
     ...(metadata.interrupted !== undefined
       ? { interrupted: metadata.interrupted }
       : {}),
+  };
+}
+
+export function usageSnapshotFromSession(
+  session: CaptainChatSession,
+): ChatUsageSummary {
+  const bucketCost = session.cost
+    ? (session.cost.inputCost ?? 0) +
+      (session.cost.outputCost ?? 0) +
+      (session.cost.reasoningCost ?? 0) +
+      (session.cost.cacheReadCost ?? 0) +
+      (session.cost.cacheWriteCost ?? 0)
+    : undefined;
+  const cost = session.cost
+    ? session.cost.providerCostUSD && session.cost.providerCostUSD > 0
+      ? session.cost.providerCostUSD
+      : bucketCost
+    : undefined;
+  return {
+    usedTokens: session.context?.usedTokens ?? 0,
+    maxTokens: session.context?.windowTokens ?? 0,
+    messageCount: session.messages.length,
+    ...(cost !== undefined ? { cost } : {}),
+    ...(session.usage ? { usage: session.usage } : {}),
+    ...(session.backend ? { backend: session.backend } : {}),
+    ...(session.executionMode ? { executionMode: session.executionMode } : {}),
+    ...(session.model ? { model: session.model } : {}),
+    captainSessionId: session.id,
+    ...(session.providerSessionId
+      ? { providerSessionId: session.providerSessionId }
+      : {}),
+    threadId: session.id,
   };
 }

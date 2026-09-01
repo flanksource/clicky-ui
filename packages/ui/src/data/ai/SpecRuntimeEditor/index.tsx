@@ -36,10 +36,10 @@ import {
   SPEC_RUNTIME_FAMILIES,
   familyForModel,
   firstMode,
-  runtimeBackendError,
-  runtimeBackendFromModel,
+  runtimeModeError,
+  runtimeModeFromModel,
   runtimeModelError,
-  modeForBackend,
+  modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
 import {
@@ -71,14 +71,14 @@ export type SpecRuntimeEditorProps = {
   models?: ChatModel[] | undefined;
   /** Provider families for the two-axis Family → Mode picker in the model section. */
   families?: SpecRuntimeFamily[] | undefined;
-  /** Resolved backend used to validate posture when this editable layer inherits backend. */
-  effectiveBackend?: string | undefined;
+  /** Resolved mode used to validate posture when this editable layer inherits it. */
+  effectiveMode?: string | undefined;
   /** Resolved model used to identify the inherited provider family. */
   effectiveModel?: string | undefined;
   tools?: ToolMeta[] | undefined;
   permissionCatalog?: AISpecRuntimePermissionCatalog | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
-  /** Schema for the backend's extra CLI args; enables the CLI flags section. */
+  /** Schema for the runtime's extra CLI args; enables the CLI flags section. */
   cliOptions?: SpecRuntimeCLIOptions | undefined;
   /** Sandbox adapter catalog; enables the Sandbox section. */
   sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
@@ -124,7 +124,7 @@ export function SpecRuntimeEditor({
   onChange,
   models = [],
   families,
-  effectiveBackend,
+  effectiveMode,
   effectiveModel,
   tools = [],
   permissionCatalog,
@@ -161,19 +161,19 @@ export function SpecRuntimeEditor({
     models,
     value.model || effectiveModel,
   );
-  const backend =
-    runtimeBackendFromModel(value.model) ||
-    value.backend?.trim() ||
-    effectiveBackend?.trim() ||
-    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).backend;
+  const specMode =
+    runtimeModeFromModel(value.model) ||
+    value.mode?.trim() ||
+    effectiveMode?.trim() ||
+    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).id;
   const runtimeError =
     runtimeModelError(value.model || effectiveModel) ??
-    runtimeBackendError(runtimeFamilies, backend, selectedFamily?.id);
+    runtimeModeError(runtimeFamilies, specMode, selectedFamily?.id);
   const selectedRuntime = runtimeError
     ? undefined
-    : modeForBackend(runtimeFamilies, backend, selectedFamily?.id);
+    : modeOptionFor(runtimeFamilies, specMode, selectedFamily?.id);
   const supports = selectedRuntime
-    ? runtimeFieldSupport(runtimeFamilies, backend, selectedFamily?.id)
+    ? runtimeFieldSupport(runtimeFamilies, specMode, selectedFamily?.id)
     : SUPPORT_ALL_RUNTIME_FIELDS;
   const runtimeSchema = selectedRuntime?.schema;
   const hasSandboxSection =
@@ -186,7 +186,7 @@ export function SpecRuntimeEditor({
   const skillsSection = selectedRuntime
     ? (runtimeFieldSection(
         runtimeFamilies,
-        backend,
+        specMode,
         "permissions.skills",
         selectedFamily?.id,
       ) ?? "model")
@@ -261,7 +261,7 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={commitChange}
             models={models}
-            effectiveBackend={effectiveBackend}
+            effectiveMode={effectiveMode}
             effectiveModel={effectiveModel}
             families={runtimeFamilies}
           />
@@ -405,7 +405,7 @@ export function SpecRuntimeEditor({
             role="alert"
             className="mb-density-3 rounded-md border border-destructive/40 bg-destructive/10 px-density-3 py-density-2 text-sm text-destructive"
           >
-            {runtimeError} Select a valid backend below or switch to Raw to
+            {runtimeError} Select a valid mode below or switch to Raw to
             repair the prompt source.
           </div>
         ) : null}

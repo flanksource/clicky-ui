@@ -10,7 +10,6 @@ const MODELS: ChatModel[] = [
     label: "Sonnet",
     reasoning: true,
     configured: true,
-    backends: ["api", "agent", "cli", "cmux"],
     runtime: { model: "sonnet" },
   },
   {
@@ -19,7 +18,6 @@ const MODELS: ChatModel[] = [
     label: "GPT-5",
     reasoning: true,
     configured: true,
-    backends: ["api", "agent", "cli", "cmux"],
     runtime: { model: "gpt-5" },
   },
   {
@@ -28,7 +26,6 @@ const MODELS: ChatModel[] = [
     label: "GPT-5 mini",
     reasoning: false,
     configured: false,
-    backends: ["api", "agent", "cli", "cmux"],
     runtime: { model: "gpt-5-mini" },
     availability: {
       state: "missing_executable",
@@ -49,7 +46,7 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "cli",
+          mode: "cli",
           model: "gpt-5",
           effort: "high",
         }}
@@ -61,7 +58,7 @@ describe("RuntimeBar", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Model and backend are locked for this conversation/,
+        name: /Model and mode are locked for this conversation/,
       }),
     );
     expect(
@@ -73,7 +70,7 @@ describe("RuntimeBar", () => {
     expect(effort).not.toBeDisabled();
     fireEvent.change(effort, { target: { value: "1" } });
     expect(onChange).toHaveBeenCalledWith({
-      backend: "cli",
+      mode: "cli",
       model: "gpt-5",
       effort: "low",
     });
@@ -84,7 +81,7 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "cli",
+          mode: "cli",
           model: "gpt-5",
           effort: "high",
         }}
@@ -119,13 +116,13 @@ describe("RuntimeBar", () => {
     ).toHaveAttribute("aria-valuetext", "High");
   });
 
-  it("renders an inherited backend without persisting it on unrelated edits", () => {
+  it("renders an inherited mode without persisting it on unrelated edits", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
         variant="combo"
         value={{ effort: "high" }}
-        effectiveBackend="cli"
+        effectiveMode="cli"
         effectiveModel="gpt-5"
         onChange={onChange}
         models={MODELS}
@@ -150,7 +147,7 @@ describe("RuntimeBar", () => {
       <RuntimeBar
         variant="combo"
         value={{
-          backend: "cli",
+          mode: "cli",
           model: "gpt-5",
           effort: "high",
         }}
@@ -169,7 +166,6 @@ describe("RuntimeBar", () => {
 
     fireEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     expect(onChange).toHaveBeenCalledWith({
-      backend: "claude-cli",
       mode: "cli",
       effort: "high",
     });
@@ -177,9 +173,8 @@ describe("RuntimeBar", () => {
 
     fireEvent.click(within(menu).getByRole("radio", { name: "cmux" }));
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cmux",
       mode: "cmux",
-      model: "codex-cli/gpt-5",
+      model: "gpt-5",
       effort: "high",
     });
     expect(menu).toBeInTheDocument();
@@ -189,7 +184,7 @@ describe("RuntimeBar", () => {
       { target: { value: "1" } },
     );
     expect(onChange).toHaveBeenCalledWith({
-      backend: "cli",
+      mode: "cli",
       model: "gpt-5",
       effort: "low",
     });
@@ -200,7 +195,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli", model: "sonnet" }}
+        value={{ mode: "cli", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -210,16 +205,15 @@ describe("RuntimeBar", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
       mode: "cli",
     });
   });
 
-  it("selects a model from the new family when providers share a backend", () => {
+  it("selects a model from the new family when providers share a mode", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "agent", model: "sonnet" }}
+        value={{ mode: "agent", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -229,7 +223,6 @@ describe("RuntimeBar", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-agent",
       mode: "agent",
     });
   });
@@ -239,7 +232,7 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         value={{
-          backend: "agent",
+          mode: "agent",
           model: "sonnet",
           id: "anthropic/sonnet",
         }}
@@ -252,7 +245,6 @@ describe("RuntimeBar", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
 
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-agent",
       mode: "agent",
     });
   });
@@ -262,7 +254,7 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         value={{
-          backend: "cli",
+          mode: "cli",
           model: "gpt-5",
           id: "openai/gpt-5",
         }}
@@ -277,7 +269,6 @@ describe("RuntimeBar", () => {
     });
 
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
       mode: "cli",
       model: "gpt-5.1",
     });
@@ -287,7 +278,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli", model: "gpt-5" }}
+        value={{ mode: "cli", model: "gpt-5" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -297,9 +288,8 @@ describe("RuntimeBar", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^cmux/ }));
 
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cmux",
       mode: "cmux",
-      model: "codex-cli/gpt-5",
+      model: "gpt-5",
       effort: "medium",
     });
   });
@@ -308,7 +298,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "agent", model: "sonnet" }}
+        value={{ mode: "agent", model: "sonnet" }}
         onChange={onChange}
         models={MODELS}
         families={[
@@ -317,8 +307,8 @@ describe("RuntimeBar", () => {
             label: "Claude",
             provider: "anthropic",
             modes: [
-              { id: "agent", label: "Agent", backend: "agent" },
-              { id: "cli", label: "CLI", backend: "cli" },
+              { id: "agent", label: "Agent", mode: "agent" },
+              { id: "cli", label: "CLI", mode: "cli" },
             ],
           },
         ]}
@@ -336,7 +326,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "api", model: "gemini-3-pro" }}
+        value={{ mode: "api", model: "gemini-3-pro" }}
         onChange={onChange}
         models={MODELS}
         families={[
@@ -344,7 +334,7 @@ describe("RuntimeBar", () => {
             id: "gemini",
             label: "Gemini",
             provider: "googleai",
-            modes: [{ id: "api", label: "API", backend: "api" }],
+            modes: [{ id: "api", label: "API", mode: "api" }],
           },
         ]}
       />,
@@ -359,9 +349,8 @@ describe("RuntimeBar", () => {
       target: { value: "gemini-3-pro-preview" },
     });
     expect(onChange).toHaveBeenCalledWith({
-      backend: "gemini",
       mode: "api",
-      model: "gemini-3-pro",
+      model: "gemini-3-pro-preview",
     });
   });
 
@@ -369,7 +358,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli" }}
+        value={{ mode: "cli" }}
         effectiveModel="gpt-5"
         onChange={onChange}
         models={MODELS}
@@ -387,9 +376,8 @@ describe("RuntimeBar", () => {
     fireEvent.click(items[1]!);
     // A reasoning model with unknown capabilities defaults to medium effort.
     expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
       mode: "cli",
-      model: "codex-cli/gpt-5",
+      model: "gpt-5",
       effort: "medium",
     });
   });
@@ -398,7 +386,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "agent", model: "sonnet" }}
+        value={{ mode: "agent", model: "sonnet" }}
         onChange={onChange}
         families={[
           {
@@ -406,11 +394,10 @@ describe("RuntimeBar", () => {
             label: "Claude",
             provider: "anthropic",
             modes: [
-              { id: "agent", label: "Agent", backend: "agent" },
+              { id: "agent", label: "Agent", mode: "agent" },
               {
                 id: "cmux",
                 label: "cmux",
-                backend: "cmux",
                 availability: {
                   state: "disabled",
                   reason: "Disabled by mode cmux in Captain configuration.",
@@ -436,7 +423,7 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         value={{
-          backend: "cli",
+          mode: "cli",
           model: "gpt-5-mini",
         }}
         onChange={vi.fn()}
@@ -457,7 +444,7 @@ describe("RuntimeBar", () => {
     render(
       <RuntimeBar
         variant="combo"
-        value={{ backend: "cli" }}
+        value={{ mode: "cli" }}
         effectiveModel="gpt-5"
         onChange={vi.fn()}
         models={MODELS}
@@ -480,7 +467,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "api" }}
+        value={{ mode: "api" }}
         onChange={onChange}
         models={[
           {
@@ -492,7 +479,7 @@ describe("RuntimeBar", () => {
             runtime: {
               model: "claude-sonnet-4-6",
               id: "anthropic/claude-sonnet-4-6",
-              backend: "api",
+              mode: "api",
             },
           },
         ]}
@@ -505,17 +492,16 @@ describe("RuntimeBar", () => {
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-sonnet-4-6",
       id: "anthropic/claude-sonnet-4-6",
-      backend: "anthropic",
       mode: "api",
       effort: "medium",
     });
   });
 
-  it("keeps the selected mode when one provider model serves several backends", () => {
+  it("keeps the selected mode when one provider model serves several modes", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli" }}
+        value={{ mode: "cli" }}
         onChange={onChange}
         families={[
           {
@@ -526,13 +512,11 @@ describe("RuntimeBar", () => {
               {
                 id: "agent",
                 label: "Agent",
-                backend: "agent",
                 provider: "anthropic",
               },
               {
                 id: "cli",
                 label: "CLI",
-                backend: "cli",
                 provider: "anthropic",
               },
             ],
@@ -545,7 +529,6 @@ describe("RuntimeBar", () => {
             label: "Opus 5",
             reasoning: true,
             configured: true,
-            backends: ["agent", "cli"],
             runtime: {
               model: "claude-opus-5",
             },
@@ -559,7 +542,7 @@ describe("RuntimeBar", () => {
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-opus-5",
-      backend: "cli",
+      mode: "cli",
       effort: "medium",
     });
   });
@@ -568,7 +551,7 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli", model: "gpt-5" }}
+        value={{ mode: "cli", model: "gpt-5" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -577,17 +560,14 @@ describe("RuntimeBar", () => {
     openSegment("Model — gpt-5");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Prompt default/ }));
 
-    expect(onChange).toHaveBeenCalledWith({
-      backend: "codex-cli",
-      mode: "cli",
-    });
+    expect(onChange).toHaveBeenCalledWith({ mode: "cli" });
   });
 
   it("clears the effort through the None entry", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        value={{ backend: "cli", model: "gpt-5", effort: "high" }}
+        value={{ mode: "cli", model: "gpt-5", effort: "high" }}
         onChange={onChange}
         models={MODELS}
       />,
@@ -596,13 +576,13 @@ describe("RuntimeBar", () => {
     openSegment("Reasoning effort");
     fireEvent.click(screen.getByRole("menuitem", { name: /^None/ }));
 
-    expect(onChange).toHaveBeenCalledWith({ backend: "cli", model: "gpt-5" });
+    expect(onChange).toHaveBeenCalledWith({ mode: "cli", model: "gpt-5" });
   });
 
   it("offers a tier the catalog omits when the spec already selects it", () => {
     render(
       <RuntimeBar
-        value={{ backend: "cli", model: "gpt-5", effort: "minimal" }}
+        value={{ mode: "cli", model: "gpt-5", effort: "minimal" }}
         onChange={vi.fn()}
         models={MODELS}
         reasoningEfforts={["low", "high"]}

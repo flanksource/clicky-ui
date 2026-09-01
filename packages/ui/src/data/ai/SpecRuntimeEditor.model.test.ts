@@ -10,14 +10,14 @@ describe("buildAISpecRuntimePayload", () => {
       buildAISpecRuntimePayload({
         model: " anthropic/claude-sonnet-4-5 ",
         id: "anthropic/claude-sonnet-4-5",
-        backend: "anthropic",
+        mode: "api",
         temperature: 0,
         effort: "medium",
         noCache: true,
         fallbacks: [
           {
             model: " gpt-5-codex ",
-            backend: " codex-cli ",
+            mode: " cli ",
             temperature: 0,
             effort: " low ",
             noCache: true,
@@ -105,14 +105,14 @@ describe("buildAISpecRuntimePayload", () => {
       spec: {
         model: "anthropic/claude-sonnet-4-5",
         id: "anthropic/claude-sonnet-4-5",
-        backend: "anthropic",
+        mode: "api",
         temperature: 0,
         effort: "medium",
         noCache: true,
         fallbacks: [
           {
             model: "gpt-5-codex",
-            backend: "codex-cli",
+            mode: "cli",
             temperature: 0,
             effort: "low",
             noCache: true,

@@ -20,7 +20,6 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
   model: ChatModel | undefined,
   fallbackEfforts: readonly string[],
   execution?: {
-    backend: string | undefined;
     mode: string | undefined;
   },
 ): T {
@@ -28,19 +27,13 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
   if (model?.runtime) {
     delete next.model;
     delete next.id;
-    delete next.backend;
     delete next.mode;
     Object.assign(next, model.runtime);
-    // Provider-specific model catalogs may describe execution metadata, but a
-    // prompt spec has one canonical runtime field: backend.
-    delete next.mode;
   } else if (model) {
     next.model = model.id;
   }
 
   if (execution) {
-    if (execution.backend) next.backend = execution.backend;
-    else delete next.backend;
     if (execution.mode) next.mode = execution.mode;
     else delete next.mode;
   }

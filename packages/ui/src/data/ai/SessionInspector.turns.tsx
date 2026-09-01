@@ -159,7 +159,7 @@ export function SessionTurnPickerItem({
 }
 
 function turnPresentation(turn: SessionTurn, session: UnifiedSessionInput) {
-  const runtime = runtimeDescriptor(turn.backend || session.backend);
+  const runtime = runtimeDescriptor(turn.mode || session.modelMode);
   const providerId = runtime?.family || session.provider;
   return {
     runtime,

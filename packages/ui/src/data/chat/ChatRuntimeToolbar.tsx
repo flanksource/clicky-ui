@@ -30,7 +30,7 @@ export function ChatRuntimeToolbar({
   const showRuntimeBar = Boolean(
     runtimeFamilies?.length ||
     models.length ||
-    runtime.backend ||
+    runtime.mode ||
     runtime.id ||
     runtime.model,
   );
@@ -39,7 +39,7 @@ export function ChatRuntimeToolbar({
 
   const contextWindow = usage?.maxTokens ?? 0;
   const usedTokens = usage?.usedTokens ?? 0;
-  const ModelGlyph = providerIcon(usage?.backend);
+  const ModelGlyph = providerIcon(usage?.provider);
 
   return (
     <div className="flex flex-1 items-center gap-2">
@@ -70,7 +70,7 @@ export function ChatRuntimeToolbar({
               ? { messageCount: usage.messageCount }
               : {})}
             {...(usage?.cost != null ? { cost: { total: usage.cost } } : {})}
-            {...(usage?.backend ? { backend: usage.backend } : {})}
+            {...(usage?.provider ? { provider: usage.provider } : {})}
             {...(usage?.executionMode
               ? { executionMode: usage.executionMode }
               : {})}
@@ -89,9 +89,9 @@ export function ChatRuntimeToolbar({
             {...(usage?.turnId ? { turnId: usage.turnId } : {})}
             {...(runtime.effort ? { effort: runtime.effort } : {})}
             {...(ModelGlyph ? { modelIcon: ModelGlyph } : {})}
-            {...(usage?.backend
+            {...(usage?.provider
               ? {
-                  modelIconClassName: providerIconColor(usage.backend),
+                  modelIconClassName: providerIconColor(usage.provider),
                 }
               : {})}
           />
