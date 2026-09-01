@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ClickyDocument } from "../data/Clicky";
@@ -266,7 +272,11 @@ describe("OperationEntityPage", () => {
 
     fireEvent.change(reasonInput, { target: { value: "manual" } });
     fireEvent.click(screen.getByLabelText("Drain"));
-    fireEvent.click(screen.getByRole("button", { name: "Execute request" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Restart widget" }),
+      ).getByRole("button", { name: "Restart widget" }),
+    );
 
     await waitFor(() =>
       expect(client.executeMock).toHaveBeenCalledWith(

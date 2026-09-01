@@ -16,6 +16,14 @@ type SandboxKindMeta = {
 };
 
 const SANDBOX_KIND_META: Record<string, SandboxKindMeta> = {
+  srt: {
+    label: "Sandbox Runtime",
+    icon: UiShieldCheck,
+  },
+  container: {
+    label: "Container",
+    icon: UiBox,
+  },
   off: {
     label: "Off",
     description: "Provider restrictions and approval prompts disabled",
