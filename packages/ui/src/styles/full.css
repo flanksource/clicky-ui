@@ -6,4 +6,20 @@
 @import "tailwindcss";
 @import "./fs-tokens.css";
 @source "../**/*.{ts,tsx}";
+
+/* Colour utilities that only ever appear at runtime, in markup no build-time
+ * scan can see: clicky's Go renderers carry a Tailwind class on api.Text and
+ * emit it as `className` in their MDX dialect, so the class reaches the DOM
+ * having never appeared in a .ts/.tsx source file.
+ *
+ * The whole palette ships rather than the shades in use today. The set is
+ * whatever `Style:` strings exist across the Go repos, so a list derived from
+ * today's usage would fail silently — and in a different repo from the one
+ * that changed — the first time a renderer reaches for a shade nobody listed.
+ * Emitting it here rather than in each consumer's entry CSS means one list
+ * instead of one per app, and it lands in the precompiled dist/styles.css that
+ * consumers already import. */
+@source inline("{text,bg}-{red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,slate,gray,zinc,neutral,stone}-{50,{100..900..100},950}");
+@source inline("{text,bg}-{black,white}");
+
 @import "./tokens.css";

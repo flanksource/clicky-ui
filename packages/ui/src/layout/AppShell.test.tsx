@@ -324,6 +324,27 @@ describe("AppShell", () => {
       );
     });
 
+    // The nav shrinks (min-w-0) while the actions cluster beside it does not,
+    // so a full actions row squeezes the nav to a sliver. Without a guard its
+    // tabs render outside that sliver and land on top of the toolbar — both
+    // unreadable, and the tabs unclickable where they overlap.
+    it("keeps a squeezed nav inside its own box", () => {
+      const { container } = render(
+        <AppShell
+          brand={<span>brand</span>}
+          nav={<span>tabs</span>}
+          actions={<button type="button">act</button>}
+        >
+          <p>content</p>
+        </AppShell>,
+      );
+      const nav = container.querySelector("[data-slot='app-shell-nav']");
+
+      expect(nav).not.toBeNull();
+      expect(nav?.className).toContain("overflow-x-auto");
+      expect(nav?.className).not.toContain("overflow-visible");
+    });
+
     it("ships no outline styles or debug marker when disabled", () => {
       const { container } = renderShell(false);
 

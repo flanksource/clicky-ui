@@ -56,6 +56,8 @@ export {
   type EntityContextSurfaceColor,
   type EntityContextGroupIcon,
   type EntityContextGroupColor,
+  type EntityContextSurfaceRenderer,
+  type EntityContextSurfaceRenderContext,
 } from "./rpc/OperationEntityContextPicker";
 export {
   entityContextItemID,

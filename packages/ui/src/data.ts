@@ -60,15 +60,22 @@ export {
   type DataTableSelectionAction,
   type DataTableSelectionConfirm,
   type DataTableSelectionContext,
+  type DataTableSelectionMenuContext,
+  type SelectionActionDisplay,
   type StatusOptions,
   type TagsOptions,
   type TimestampOptions,
 } from "./data/DataTable";
 export {
   SelectionActionBar,
-  splitSelectionActions,
   type SelectionActionBarProps,
 } from "./data/SelectionActionBar";
+export {
+  MAX_INLINE_SELECTION_ACTIONS,
+  resolveSelectionActionDisplay,
+  splitSelectionActions,
+  type SelectionActionSplit,
+} from "./data/selectionActionSplit";
 export {
   groupRecords,
   isGroupCollapsedByDefault,
@@ -365,6 +372,14 @@ export {
   taskSegments,
   bucketTasks,
 } from "./data/task-status";
+export {
+  isFailedOrWarn,
+  taskGroupErrorCount,
+  taskGroupErrors,
+  taskGroupJson,
+  taskGroupMarkdown,
+  taskMarkdown,
+} from "./data/task-copy";
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
 export {

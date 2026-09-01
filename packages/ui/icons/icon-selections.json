@@ -2893,6 +2893,62 @@
       "note": "Chart of accounts, account hierarchy"
     },
     {
+      "consumerName": "calendar-check",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:calendar-check-light",
+      "filled": "ph:calendar-check-fill",
+      "note": "Scheduled entitlement, leave, or completed period"
+    },
+    {
+      "consumerName": "factory",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:factory-light",
+      "filled": "ph:factory-fill",
+      "note": "Fixed assets and productive equipment"
+    },
+    {
+      "consumerName": "tax",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:calculator-thin",
+      "filled": "ph:calculator-fill",
+      "note": "Tax calculation paired with a jurisdiction flag"
+    },
+    {
+      "consumerName": "clock-countdown",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:clock-countdown-light",
+      "filled": "ph:clock-countdown-fill",
+      "note": "Period-end deadline or close cycle"
+    },
+    {
+      "consumerName": "invoice",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:invoice-light",
+      "filled": "ph:invoice-fill",
+      "note": "Receivable invoice and amount due"
+    },
+    {
+      "consumerName": "hand-coins",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:hand-coins-light",
+      "filled": "ph:hand-coins-fill",
+      "note": "Retained funds, deposits, and customer credits"
+    },
+    {
+      "consumerName": "chart-line-up",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:chart-line-up-light",
+      "filled": "ph:chart-line-up-fill",
+      "note": "Equity growth, valuation, and stock options"
+    },
+    {
       "consumerName": "cloud-upload",
       "group": "data-analytics",
       "status": "NEW",

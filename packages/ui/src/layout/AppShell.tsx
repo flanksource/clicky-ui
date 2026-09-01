@@ -373,7 +373,12 @@ export function AppShell(props: AppShellProps) {
               className={cn(
                 hasSidebar
                   ? "flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:h-14 md:flex-nowrap md:gap-density-3 md:px-density-4 md:py-0"
-                  : "flex h-14 items-center gap-density-3 px-density-4",
+                  : // Wraps rather than squeezing. The nav shrinks and the
+                    // actions cluster does not, so on a laptop a full actions
+                    // row left the nav a sliver — every tab but the first
+                    // scrolled out of sight. A second line costs 44px and only
+                    // appears when the row genuinely cannot fit.
+                    "flex min-h-14 flex-wrap items-center gap-density-3 px-density-4",
                 headerClassName,
               )}
             >
@@ -403,9 +408,15 @@ export function AppShell(props: AppShellProps) {
                 <div
                   data-slot="app-shell-nav"
                   className={cn(
-                    "flex min-w-0 items-center",
-                    hasSidebar &&
-                      "order-3 basis-full overflow-x-auto md:order-none md:basis-auto md:overflow-visible",
+                    // The nav is the only header slot that both shrinks
+                    // (min-w-0) and holds wide content, while the actions
+                    // cluster beside it is shrink-0. Give a full actions row
+                    // and this box collapses to a sliver — so it needs a guard,
+                    // or its tabs paint straight over the toolbar next to it
+                    // and both become unreadable. Scrolling keeps every tab
+                    // reachable; overflowing keeps none of them.
+                    "flex min-w-0 items-center overflow-x-auto",
+                    hasSidebar && "order-3 basis-full md:order-none md:basis-auto",
                   )}
                 >
                   {nav}

@@ -54,3 +54,4 @@ hack/
 .grite/
 packages/ui/src/generated/storybook/
 apps/playground/src/pages/makerprint/
+apps/playground/src/pages/
