@@ -3,14 +3,16 @@ import {
   buildReplyMap,
   getRoots,
   sortReplies,
-  type Comment,
 } from "@flanksource/clicky-ui/comments";
 
-import type { PageComment } from "./useComments";
+import type { PageComment, PlaygroundComment } from "./useComments";
 import { tallyAnchors } from "./useDomAnchors";
 
 /** One page's notes. A cross-page copy passes several; the toolbar passes one. */
-export type CommentPageSection = { page: string; comments: Comment[] };
+export type CommentPageSection = {
+  page: string;
+  comments: PlaygroundComment[];
+};
 
 export type CommentMarkdownOptions = {
   labels: Record<string, string>;
@@ -20,7 +22,7 @@ export type CommentMarkdownOptions = {
 
 /** Splits a cross-page listing into sections, in the order pages first appear. */
 export function groupByPage(comments: PageComment[]): CommentPageSection[] {
-  const sections = new Map<string, Comment[]>();
+  const sections = new Map<string, PlaygroundComment[]>();
   for (const { page, ...comment } of comments) {
     sections.set(page, [...(sections.get(page) ?? []), comment]);
   }
@@ -56,6 +58,9 @@ function renderSection(
   }
 
   const replies = buildReplyMap(comments);
+  const elementByComment = new Map(
+    comments.map((comment) => [comment.id, comment.element]),
+  );
   const rank = new Map(
     tallyAnchors(comments).map((tally, index) => [tally.anchor, index]),
   );
@@ -85,6 +90,23 @@ function renderSection(
         `  - ${reply.author?.name ?? "Anonymous"} replied: ${reply.body}`,
       );
     }
+    const element = elementByComment.get(root.id);
+    if (element) {
+      out.push("");
+      if (element.componentName) {
+        out.push(`**Component:** \`<${element.componentName}>\``, "");
+      }
+      out.push(
+        "```",
+        element.source,
+        "```",
+        "",
+        "**HTML:**",
+        "```html",
+        element.html,
+        "```",
+      );
+    }
     out.push("");
   });
 
@@ -93,7 +115,8 @@ function renderSection(
 
 /**
  * Renders feedback as a block you can paste straight into a coding agent.
- * react-grab hands the agent the *element*; this hands it the *notes*.
+ * Each new anchored root carries the React Grab element snapshot that was
+ * captured with it, so cross-page copies retain source and HTML context.
  *
  * `labels` are resolved from the live DOM and therefore only cover the page
  * currently rendered — sections for other pages fall back to the raw CSS-path

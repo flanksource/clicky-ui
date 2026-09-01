@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // vocabulary can be checked against the library's — see "status vocabulary".
 import { DEFAULT_COMMENT_STATUSES } from "@flanksource/clicky-ui/comments";
 
+import type { CommentElementContext } from "./comments-model";
+
 import {
   COMMENT_RATINGS,
   COMMENT_STATUSES,
@@ -26,18 +28,26 @@ import {
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratchRoot = join(appRoot, ".tmp");
+const ELEMENT_CONTEXT: CommentElementContext = {
+  componentName: "ReviewCard",
+  source: "ReviewCard at /workspace/src/ReviewCard.tsx:18:3",
+  html: '<section class="review-card">Review</section>',
+};
 
 function comment(
   overrides: Partial<StoredComment> & { id: string },
 ): StoredComment {
-  return {
+  const entry = {
     body: `note ${overrides.id}`,
     createdAt: "2026-01-01T00:00:00.000Z",
     author: { name: "Moshe", kind: "user" },
     status: "open",
     anchor: ":scope > div:nth-child(1)",
+    element: ELEMENT_CONTEXT,
     ...overrides,
-  };
+  } as StoredComment & { element?: CommentElementContext };
+  if (entry.parentId) delete entry.element;
+  return entry;
 }
 
 /** A comment stored with no status at all — every reply, and older roots. */
@@ -70,6 +80,71 @@ describe("comments-store", () => {
     addComment(dir, "welcome", comment({ id: "c1" }));
 
     expect(readAll(dir)).toEqual({ welcome: [comment({ id: "c1" })] });
+  });
+
+  it("rejects a newly created anchored root without element context", () => {
+    const root = comment({ id: "missing-context" }) as StoredComment & {
+      element?: CommentElementContext;
+    };
+    delete root.element;
+
+    expect(() => addComment(dir, "welcome", root)).toThrow(
+      /anchored root requires element context/,
+    );
+  });
+
+  it("accepts a page-level root without element context", () => {
+    const root = comment({
+      id: "page-level",
+      anchor: "__document__",
+    }) as StoredComment & { element?: CommentElementContext };
+    delete root.element;
+
+    expect(addComment(dir, "welcome", root)).toEqual(root);
+  });
+
+  it("keeps legacy anchored records without context readable", () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      commentsPath(dir),
+      `${JSON.stringify({
+        welcome: [
+          {
+            id: "legacy",
+            body: "old note",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            author: { name: "Moshe", kind: "user" },
+            status: "open",
+            anchor: ":scope > button:nth-child(1)",
+          },
+        ],
+      })}\n`,
+      "utf8",
+    );
+
+    expect(readPage(dir, "welcome")).toHaveLength(1);
+  });
+
+  it("rejects malformed element context", () => {
+    const root = comment({ id: "bad-context" }) as StoredComment & {
+      element?: CommentElementContext;
+    };
+    root.element = { source: "", html: "" };
+
+    expect(() => addComment(dir, "welcome", root)).toThrow(
+      /element source must be a non-empty string/,
+    );
+  });
+
+  it("rejects unexpected element context fields", () => {
+    const root = comment({ id: "extra-context" }) as StoredComment & {
+      element?: CommentElementContext & { selector?: string };
+    };
+    root.element = { ...ELEMENT_CONTEXT, selector: "#approve" };
+
+    expect(() => addComment(dir, "welcome", root)).toThrow(
+      /unexpected field "selector"/,
+    );
   });
 
   it("scopes comments to their page slug", () => {

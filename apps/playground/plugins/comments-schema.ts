@@ -22,6 +22,7 @@ export type JsonProperty = {
   default?: string | boolean;
   properties?: Record<string, JsonProperty>;
   required?: string[];
+  additionalProperties?: false;
 };
 
 export type CommentToolInputSchema = {
@@ -90,12 +91,34 @@ const RATING: JsonProperty = {
   enum: [...COMMENT_RATINGS],
 };
 
+const ELEMENT: JsonProperty = {
+  type: "object",
+  description:
+    "React Grab context for the anchored element. Required when anchor identifies an element; omitted for page-level comments.",
+  properties: {
+    componentName: {
+      type: "string",
+      description: "Nearest React component display name, when available.",
+    },
+    source: {
+      type: "string",
+      description: "React component stack, or the direct source location.",
+    },
+    html: {
+      type: "string",
+      description: "Raw outerHTML, capped at two kilobytes.",
+    },
+  },
+  required: ["source", "html"],
+  additionalProperties: false,
+};
+
 export const COMMENT_TOOLS: CommentTool[] = [
   {
     name: "list_comments",
     label: "List comments",
     description:
-      "List playground feedback across every artifact page. Each comment carries the page it was left on and, when anchored, a CSS path to the element it points at. Replies carry parentId and no status.",
+      "List playground feedback across every artifact page. New anchored roots carry the CSS path plus captured React component, source stack, and HTML context. Replies carry parentId and no status.",
     method: "GET",
     path: BASE,
     annotations: { readOnlyHint: true, idempotentHint: true },
@@ -125,7 +148,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "create_comment",
     label: "Create comment",
     description:
-      "Start a new comment thread or rating on a page. Supply body, rating, or both. Omit anchor for a page-level note; supply the CSS path from an existing comment to pin it to the same element. The server assigns id and createdAt.",
+      "Start a new comment thread or rating on a page. Supply body, rating, or both. Omit anchor for a page-level note; an anchored root also requires its React element context. The server assigns id and createdAt.",
     method: "POST",
     path: BASE,
     annotations: {},
@@ -144,6 +167,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
           description:
             "CSS path to the element this note is about. Omit for a page-level note.",
         },
+        element: ELEMENT,
         status: {
           ...STATUS,
           description: `${STATUS.description} Defaults to "open".`,

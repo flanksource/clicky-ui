@@ -3,6 +3,7 @@ import { DOCUMENT_ANCHOR, type Comment } from "@flanksource/clicky-ui/comments";
 
 import { commentsForFolder, commentsToMarkdown, groupByPage } from "./markdown";
 import type { PageComment } from "./useComments";
+import type { CommentElementContext } from "../../plugins/comments-model";
 
 const BUTTON_ANCHOR = ":scope > div:nth-child(1) > button:nth-child(2)";
 const HEADING_ANCHOR = ":scope > h1:nth-child(1)";
@@ -96,6 +97,36 @@ describe("commentsToMarkdown", () => {
     );
 
     expect(markdown).toContain("- rating: negative");
+  });
+
+  it("includes the captured React component, source stack, and HTML", () => {
+    const rich = comment({
+      id: "c1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      body: "make the action clearer",
+    }) as Comment & { element: CommentElementContext };
+    rich.element = {
+      componentName: "ApproveButton",
+      source: [
+        "ApproveButton at /workspace/src/ApproveButton.tsx:27:5",
+        "ReviewPage at /workspace/src/ReviewPage.tsx:14:3",
+      ].join("\n"),
+      html: '<button class="btn-primary">Approve</button>',
+    };
+
+    const markdown = commentsToMarkdown(
+      page("welcome", [rich]),
+      MARKDOWN_OPTIONS,
+    );
+
+    expect(markdown).toContain("**Component:** `<ApproveButton>`");
+    expect(markdown).toContain(
+      "```\nApproveButton at /workspace/src/ApproveButton.tsx:27:5\n" +
+        "ReviewPage at /workspace/src/ReviewPage.tsx:14:3\n```",
+    );
+    expect(markdown).toContain(
+      '**HTML:**\n```html\n<button class="btn-primary">Approve</button>\n```',
+    );
   });
 
   it("nests replies under their root", () => {

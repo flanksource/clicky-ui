@@ -49,6 +49,11 @@ describe("page management", () => {
       status: "open",
       parentId: null,
       anchor: ":scope",
+      element: {
+        componentName: "OldPage",
+        source: "OldPage at /workspace/src/old-page.tsx:3:1",
+        html: "<h1>Body stays old</h1>",
+      },
     });
 
     expect(
@@ -74,7 +79,16 @@ describe("page management", () => {
       "<h1>Body stays old</h1>",
     );
     expect(readAll(commentsDir)).toEqual({
-      "designs/renamed-page": [expect.objectContaining({ id: "comment-1" })],
+      "designs/renamed-page": [
+        expect.objectContaining({
+          id: "comment-1",
+          element: {
+            componentName: "OldPage",
+            source: "OldPage at /workspace/src/old-page.tsx:3:1",
+            html: "<h1>Body stays old</h1>",
+          },
+        }),
+      ],
     });
   });
 

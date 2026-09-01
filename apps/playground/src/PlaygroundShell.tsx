@@ -3,10 +3,10 @@ import {
   lazy,
   useCallback,
   useEffect,
-  useRef,
   useState,
   type ComponentType,
   type LazyExoticComponent,
+  type RefObject,
 } from "react";
 import {
   AppShell,
@@ -77,6 +77,7 @@ function lazyPage(entry: PageEntry): LazyExoticComponent<ComponentType> {
 export type PlaygroundShellProps = {
   active: PageEntry | undefined;
   allComments: PageComment[];
+  contentRef: RefObject<HTMLDivElement>;
   query: string;
   onQueryChange: (next: string) => void;
   commentsError: string | null;
@@ -131,6 +132,7 @@ function EmptyPages() {
 export function PlaygroundShell({
   active,
   allComments,
+  contentRef,
   query,
   onQueryChange,
   commentsError,
@@ -142,7 +144,6 @@ export function PlaygroundShell({
   onNavigate,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
-  const contentRef = useRef<HTMLDivElement | null>(null);
   const [commentMode, setCommentMode] = useState(false);
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
