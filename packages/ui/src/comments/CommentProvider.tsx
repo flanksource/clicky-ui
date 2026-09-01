@@ -36,6 +36,11 @@ export type CommentProviderProps = CommentCallbacks & {
   resolveAnchor?: AnchorResolver;
   /** Reports rail actions so a host can synchronize external visibility state. */
   onRailModeChange?: (mode: CommentRailMode) => void;
+  /**
+   * Rail mode on mount. Use "all" where the host already decided the rail is
+   * visible, so the reader is not asked to open it a second time.
+   */
+  initialRailMode?: CommentRailMode;
 };
 
 /**
@@ -57,15 +62,16 @@ export function CommentProvider({
   onDelete,
   onChecklistToggle,
   onMention,
+  initialRailMode = "closed",
 }: CommentProviderProps) {
-  const [railMode, setRailMode] = useState<CommentRailMode>("closed");
+  const [railMode, setRailMode] = useState<CommentRailMode>(initialRailMode);
   const [focusedAnchor, setFocusedAnchor] = useState<CommentAnchor | null>(
     null,
   );
   const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(
     null,
   );
-  const railModeRef = useRef<CommentRailMode>("closed");
+  const railModeRef = useRef<CommentRailMode>(initialRailMode);
   const onRailModeChangeRef = useRef(onRailModeChange);
   const resolveAnchorRef = useRef(resolveAnchor);
   const anchorEls = useRef<Record<string, HTMLElement>>({});

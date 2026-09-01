@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Badge } from "../data/Badge";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { Modal } from "../overlay/Modal";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
 import {
   parseTimestamp,
@@ -70,6 +69,12 @@ export type CommentCardProps = {
   onReply?: () => void;
   /** Advance the checklist item at `index` to its next status. */
   onChecklistToggle?: (index: number) => void;
+  /**
+   * Open this card's thread in a larger view. Owned by the caller because a
+   * card knows only itself, while maximizing shows the root and its replies.
+   * Omit to drop the action (e.g. inside an already-maximized thread).
+   */
+  onMaximize?: () => void;
 };
 
 function RatingChip({ rating }: { rating: CommentRating | undefined }) {
@@ -280,7 +285,7 @@ function CommentBody({
   onChecklistToggle,
   onCollapse,
   onMaximize,
-}: CommentCardProps & { onCollapse?: () => void; onMaximize?: () => void }) {
+}: CommentCardProps & { onCollapse?: () => void }) {
   const [statusError, setStatusError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
@@ -402,13 +407,13 @@ function CommentBody({
 
 /**
  * A single comment, collapsible between a compact one-line preview and a full
- * card. The full view can be maximized into a modal. Fully controlled — all
- * mutations are delegated to the supplied callbacks.
+ * card. Offers a Maximize action when `onMaximize` is supplied — the owner
+ * enlarges the whole thread. Fully controlled — all mutations are delegated to
+ * the supplied callbacks.
  */
 export function CommentCard(props: CommentCardProps) {
-  const { comment, config, compact, defaultExpanded } = props;
+  const { comment, config, compact, defaultExpanded, onMaximize } = props;
   const [expanded, setExpanded] = useState(defaultExpanded ?? false);
-  const [maximized, setMaximized] = useState(false);
   const [collapsedStatusError, setCollapsedStatusError] = useState("");
   const isReply = Boolean(comment.parentId);
   const completion = completionStatus(config);
@@ -432,20 +437,8 @@ export function CommentCard(props: CommentCardProps) {
   const body = (
     <CommentBody
       {...props}
-      onMaximize={() => setMaximized(true)}
       {...(expanded ? { onCollapse: () => setExpanded(false) } : {})}
     />
-  );
-
-  const modal = (
-    <Modal
-      open={maximized}
-      onClose={() => setMaximized(false)}
-      title="Comment"
-      size="lg"
-    >
-      <CommentBody {...props} />
-    </Modal>
   );
 
   if (!expanded) {
@@ -522,11 +515,15 @@ export function CommentCard(props: CommentCardProps) {
               }
               items={[
                 { label: "Expand", onSelect: () => setExpanded(true) },
-                {
-                  label: "Maximize",
-                  icon: UiFullscreen,
-                  onSelect: () => setMaximized(true),
-                },
+                ...(onMaximize
+                  ? [
+                      {
+                        label: "Maximize",
+                        icon: UiFullscreen,
+                        onSelect: onMaximize,
+                      },
+                    ]
+                  : []),
               ]}
             />
           </span>
@@ -539,7 +536,6 @@ export function CommentCard(props: CommentCardProps) {
             Couldn't update comment: {collapsedStatusError}
           </div>
         )}
-        {modal}
       </>
     );
   }
@@ -560,7 +556,6 @@ export function CommentCard(props: CommentCardProps) {
       >
         {body}
       </div>
-      {modal}
     </>
   );
 }

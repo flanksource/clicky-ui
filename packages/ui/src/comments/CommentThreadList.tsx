@@ -1,6 +1,7 @@
 import { useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Button } from "../components/button";
+import { Modal } from "../overlay/Modal";
 import { CommentCard } from "./CommentCard";
 import { buildReplyMap, getRoots, sortReplies } from "./comment-utils";
 import type { Comment, CommentConfig } from "./comment-types";
@@ -9,8 +10,8 @@ export type CommentThreadListProps = {
   comments: Comment[];
   config: CommentConfig;
   compact?: boolean;
-  /** Expand root comments immediately, exposing actions such as Reply. */
-  defaultExpandedRoots?: boolean;
+  /** Expand each thread immediately (roots and their replies), exposing actions such as Reply. */
+  defaultExpanded?: boolean;
   /** Extra content rendered above each root card (e.g. an anchor label). */
   renderRootMeta?: (comment: Comment) => ReactNode;
   /** Props merged onto each thread wrapper (e.g. for scroll anchoring). */
@@ -85,7 +86,7 @@ export function CommentThreadList({
   comments,
   config,
   compact = false,
-  defaultExpandedRoots = false,
+  defaultExpanded = false,
   renderRootMeta,
   getThreadProps,
   renderBody,
@@ -95,10 +96,22 @@ export function CommentThreadList({
   onReply,
 }: CommentThreadListProps) {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  // Maximizing is owned here, not by the card: a thread is the unit a reader
+  // wants enlarged, and only this list knows a root's replies.
+  const [maximizedRootId, setMaximizedRootId] = useState<string | null>(null);
+  // Which message in the maximized thread has its reply composer open.
+  const [modalReplyTo, setModalReplyTo] = useState<string | null>(null);
   const roots = getRoots(comments);
   const replyMap = buildReplyMap(comments);
 
   if (roots.length === 0) return null;
+
+  const maximizedRoot = roots.find((root) => root.id === maximizedRootId);
+
+  function closeMaximized() {
+    setMaximizedRootId(null);
+    setModalReplyTo(null);
+  }
 
   function cardHandlers(id: string) {
     return {
@@ -113,6 +126,7 @@ export function CommentThreadList({
   }
 
   return (
+    <>
     <div className="space-y-2">
       {roots.map((root) => {
         const replies = sortReplies(replyMap.get(root.id) ?? []);
@@ -132,7 +146,8 @@ export function CommentThreadList({
               comment={root}
               config={config}
               compact={compact}
-              defaultExpanded={defaultExpandedRoots}
+              defaultExpanded={defaultExpanded}
+              onMaximize={() => setMaximizedRootId(root.id)}
               {...(renderBody ? { renderBody } : {})}
               {...cardHandlers(root.id)}
               {...(onReply ? { onReply: () => setReplyingTo(root.id) } : {})}
@@ -145,6 +160,8 @@ export function CommentThreadList({
                     comment={reply}
                     config={config}
                     compact={compact}
+                    defaultExpanded={defaultExpanded}
+                    onMaximize={() => setMaximizedRootId(root.id)}
                     {...(renderBody ? { renderBody } : {})}
                     {...cardHandlers(reply.id)}
                   />
@@ -164,5 +181,46 @@ export function CommentThreadList({
         );
       })}
     </div>
+    {maximizedRoot && (
+      <Modal
+        open
+        onClose={closeMaximized}
+        title="Comment thread"
+        size="lg"
+      >
+        {/* No onMaximize inside: the thread is already maximized. */}
+        <div className="space-y-2" data-testid="comment-thread-modal">
+          {[
+            maximizedRoot,
+            ...sortReplies(replyMap.get(maximizedRoot.id) ?? []),
+          ].map((message) => (
+            <div key={message.id} className="space-y-1.5">
+              <CommentCard
+                comment={message}
+                config={config}
+                defaultExpanded
+                {...(renderBody ? { renderBody } : {})}
+                {...cardHandlers(message.id)}
+                {...(onReply
+                  ? { onReply: () => setModalReplyTo(message.id) }
+                  : {})}
+              />
+              {onReply && modalReplyTo === message.id && (
+                <ReplyInput
+                  onCancel={() => setModalReplyTo(null)}
+                  onSubmit={async (body) => {
+                    // Always the root: the store nests messages under a
+                    // comment, never under another message.
+                    await onReply(maximizedRoot, body);
+                    setModalReplyTo(null);
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </Modal>
+    )}
+    </>
   );
 }

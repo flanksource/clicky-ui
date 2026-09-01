@@ -90,6 +90,50 @@ export function buildReplyMap(comments: Comment[]): Map<string, Comment[]> {
   return map;
 }
 
+/**
+ * Comments forming the threads rooted at `anchor`: matching roots plus their
+ * descendants. Replies carry no anchor of their own — they belong to a thread,
+ * not to a location — so selecting by anchor equality alone would drop them.
+ */
+export function selectAnchorThreads(
+  comments: Comment[],
+  anchor: CommentAnchor,
+): Comment[] {
+  const roots = comments.filter(
+    (c) => !c.parentId && (c.anchor ?? DOCUMENT_ANCHOR) === anchor,
+  );
+  const ids = new Set(roots.map((c) => String(c.id)));
+  const descendants: Comment[] = [];
+  // Fixed point, so a reply to a reply is kept when replies are not flattened.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of comments) {
+      if (!c.parentId || ids.has(String(c.id))) continue;
+      if (!ids.has(String(c.parentId))) continue;
+      ids.add(String(c.id));
+      descendants.push(c);
+      grew = true;
+    }
+  }
+  return [...roots, ...descendants];
+}
+
+/**
+ * Threads whose root is not yet resolved. A root carrying no status has not
+ * been acted on, so it counts as unresolved; replies follow their root.
+ */
+export function selectUnresolvedThreads(
+  comments: Comment[],
+  config: CommentConfig,
+): Comment[] {
+  const keep = new Set(
+    getRoots(comments)
+      .filter((root) => root.status == null || isUnresolved(config, root.status))
+      .map((root) => String(root.id)),
+  );
+  return comments.filter((c) => keep.has(String(c.parentId ?? c.id)));
+}
+
 /** Stable reply ordering: by creation time, then id. */
 export function sortReplies(replies: Comment[]): Comment[] {
   return [...replies].sort((a, b) => {

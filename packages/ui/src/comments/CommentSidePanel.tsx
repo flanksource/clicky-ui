@@ -11,6 +11,8 @@ import {
 import {
   buildThreadListHandlers,
   getRoots,
+  selectAnchorThreads,
+  selectUnresolvedThreads,
   sortReplies,
   buildReplyMap,
 } from "./comment-utils";
@@ -124,15 +126,19 @@ function orderComments(
 
 function AllComments({
   ctx,
+  comments,
   label,
+  emptyLabel,
 }: {
   ctx: CommentContextValue;
+  comments: Comment[];
   label: (a: CommentAnchor) => string;
+  emptyLabel: string;
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
-    return orderComments(ctx.comments, anchorOrder);
-  }, [ctx]);
+    return orderComments(comments, anchorOrder);
+  }, [ctx, comments]);
   const handlers = buildThreadListHandlers(ordered, ctx.config, ctx.callbacks);
 
   function activateThread(
@@ -163,7 +169,7 @@ function AllComments({
   if (ordered.length === 0) {
     return (
       <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        No comments yet.
+        {emptyLabel}
       </p>
     );
   }
@@ -203,18 +209,18 @@ function AllComments({
 
 function FocusedComments({
   ctx,
+  comments: visible,
   anchor,
   label,
   compact,
 }: {
   ctx: CommentContextValue;
+  comments: Comment[];
   anchor: CommentAnchor;
   label: string;
   compact?: boolean;
 }) {
-  const comments = ctx.comments.filter(
-    (c) => (c.anchor ?? DOCUMENT_ANCHOR) === anchor,
-  );
+  const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
   return (
     <div className="space-y-3" data-comment-anchor={anchor}>
@@ -231,7 +237,7 @@ function FocusedComments({
         anchor={anchor}
         compact={compact ?? false}
         autoFocusComposer={!hasComments}
-        defaultExpandedRoots={hasComments}
+        defaultExpanded={hasComments}
         composerPlaceholder={
           hasComments ? "Add another top-level comment…" : "Add a comment…"
         }
@@ -252,6 +258,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
   const railRef = useRef<HTMLElement>(null);
   const focusedRef = useRef<HTMLDivElement>(null);
   const [focusedOffset, setFocusedOffset] = useState<number | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
   const focusedAnchor = ctx?.railMode === "focused" ? ctx.focusedAnchor : null;
 
   useEffect(() => {
@@ -292,8 +299,12 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
 
   if (!ctx) return null;
 
-  const total = Object.values(ctx.commentCounts).reduce((a, b) => a + b, 0);
-  if (ctx.railMode === "closed" && total === 0) return null;
+  // Threads, not cards: a reply is part of its root, never a separate entry.
+  const unresolved = selectUnresolvedThreads(ctx.comments, ctx.config);
+  const visible = showResolved ? ctx.comments : unresolved;
+  const total = getRoots(visible).length;
+  const resolvedCount = getRoots(ctx.comments).length - getRoots(unresolved).length;
+  if (ctx.railMode === "closed" && total === 0 && resolvedCount === 0) return null;
 
   return (
     <aside
@@ -301,22 +312,53 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
       data-testid="comment-side-panel"
       className={cn("relative w-[320px] space-y-3", props.className)}
     >
+      <div
+        data-testid="comment-rail-header"
+        className="sticky top-0 z-20 flex items-center gap-2 bg-background py-2"
+      >
+        {(total > 0 || ctx.railMode === "all") && (
+          <RailToggle
+            active={ctx.railMode === "all"}
+            onClick={ctx.openCommentList}
+            testId="comment-open-all"
+          >
+            {ctx.railMode === "closed"
+              ? `Open comments (${total})`
+              : `All comments (${total})`}
+          </RailToggle>
+        )}
+        {resolvedCount > 0 && (
+          <button
+            type="button"
+            aria-pressed={showResolved}
+            onClick={() => setShowResolved((shown) => !shown)}
+            className={cn(
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              showResolved
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Resolved ({resolvedCount})
+          </button>
+        )}
+        {ctx.railMode !== "closed" && (
+          <button
+            type="button"
+            onClick={ctx.closeRail}
+            className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            {ctx.railMode === "all" ? "Close" : "Hide"}
+          </button>
+        )}
+      </div>
       {ctx.railMode === "all" ? (
-        <>
-          <div className="flex items-center gap-2">
-            <RailToggle active onClick={ctx.openCommentList}>
-              All comments ({total})
-            </RailToggle>
-            <button
-              type="button"
-              onClick={ctx.closeRail}
-              className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              Close
-            </button>
-          </div>
-          <AllComments ctx={ctx} label={label} />
-        </>
+        <AllComments
+          ctx={ctx}
+          comments={visible}
+          label={label}
+          emptyLabel={resolvedCount > 0 ? "No open comments." : "No comments yet."}
+        />
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
         <div
           ref={focusedRef}
@@ -324,35 +366,15 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           className="relative space-y-3"
           style={focusedOffset == null ? undefined : { top: focusedOffset }}
         >
-          <div className="flex items-center gap-2">
-            {total > 0 && (
-              <RailToggle
-                onClick={ctx.openCommentList}
-                testId="comment-open-all"
-              >
-                All comments ({total})
-              </RailToggle>
-            )}
-            <button
-              type="button"
-              onClick={ctx.closeRail}
-              className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              Hide
-            </button>
-          </div>
           <FocusedComments
             ctx={ctx}
+            comments={visible}
             anchor={ctx.focusedAnchor}
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}
           />
         </div>
-      ) : (
-        <RailToggle onClick={ctx.openCommentList} testId="comment-open-all">
-          Open comments ({total})
-        </RailToggle>
-      )}
+      ) : null}
     </aside>
   );
 }

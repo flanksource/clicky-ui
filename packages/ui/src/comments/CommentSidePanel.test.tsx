@@ -192,4 +192,116 @@ describe("CommentSidePanel anchor navigation", () => {
       });
     });
   });
+
+  it("renders an agent reply in the focused rail even though replies carry no anchor", () => {
+    const reply: Comment = {
+      id: "reply-1",
+      body: "Done — the cell now renders a checkmark.",
+      createdAt: "2026-01-01T01:00:00.000Z",
+      parentId: "comment-1",
+      author: { name: "Claude Code", kind: "agent" },
+    };
+    render(
+      <CommentProvider
+        comments={[...comments, reply]}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} />
+      </CommentProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getAllByTestId("comment-card")[0]);
+
+    const focused = screen.getByTestId("comment-focused-rail");
+    expect(focused).toHaveTextContent("Claude Code");
+    expect(focused).toHaveTextContent(reply.body);
+  });
+
+  it("opens straight into the comment list when seeded with a rail mode", () => {
+    render(
+      <CommentProvider
+        comments={comments}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+        initialRailMode="all"
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} />
+      </CommentProvider>,
+    );
+
+    expect(screen.getByTestId("comment-all-rail")).toBeInTheDocument();
+    expect(screen.getByText("Review this amount")).toBeVisible();
+  });
+
+  it("hides resolved threads until the resolved toggle is used", () => {
+    const statusConfig = {
+      statuses: [
+        { value: "open", label: "Open", unresolved: true },
+        { value: "resolved", label: "Resolved" },
+      ],
+    };
+    const mixed: Comment[] = [
+      {
+        id: "c-open",
+        body: "Still open",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        anchor: "cell-1",
+        status: "open",
+        author: { name: "Ada" },
+      },
+      {
+        id: "c-done",
+        body: "Already resolved",
+        createdAt: "2026-01-02T00:00:00.000Z",
+        anchor: "cell-1",
+        status: "resolved",
+        author: { name: "Bo" },
+      },
+    ];
+    render(
+      <CommentProvider
+        comments={mixed}
+        config={statusConfig}
+        resolveAnchor={strictAnchorResolver}
+        initialRailMode="all"
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} />
+      </CommentProvider>,
+    );
+
+    expect(screen.getByText("Still open")).toBeVisible();
+    expect(screen.queryByText("Already resolved")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolved (1)" }));
+    expect(screen.getByText("Already resolved")).toBeVisible();
+    expect(screen.getByText("Still open")).toBeVisible();
+  });
+
+  it("pins the rail header outside the anchor-offset box", () => {
+    render(
+      <CommentProvider
+        comments={comments}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} />
+      </CommentProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getByTestId("comment-card"));
+
+    const header = screen.getByTestId("comment-rail-header");
+    expect(header).toHaveClass("sticky");
+    expect(
+      screen.getByTestId("comment-focused-rail").contains(header),
+    ).toBe(false);
+    expect(screen.getByTestId("comment-side-panel").contains(header)).toBe(true);
+  });
 });
