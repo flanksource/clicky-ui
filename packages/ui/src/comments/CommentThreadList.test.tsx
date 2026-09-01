@@ -35,6 +35,56 @@ function deferred() {
 }
 
 describe("CommentThreadList", () => {
+  it.each([
+    ["root", 0],
+    ["reply", 1],
+  ])("maximizes the whole thread from the %s card", (_kind, index) => {
+    render(<CommentThreadList comments={comments} config={config} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Comment actions" })[index]);
+    fireEvent.click(screen.getByText("Maximize"));
+
+    const modal = screen.getByTestId("comment-thread-modal");
+    expect(modal).toHaveTextContent("root comment");
+    expect(modal).toHaveTextContent("a reply");
+  });
+
+  it.each([
+    ["root", 0, "root comment"],
+    ["reply", 1, "a reply"],
+  ])(
+    "replies inline to the %s from the maximized thread",
+    async (_kind, index, replyingToBody) => {
+      const onReply = vi.fn().mockResolvedValue(undefined);
+      render(
+        <CommentThreadList
+          comments={comments}
+          config={config}
+          onReply={onReply}
+        />,
+      );
+
+      fireEvent.click(screen.getAllByRole("button", { name: "Comment actions" })[0]);
+      fireEvent.click(screen.getByText("Maximize"));
+
+      const modal = screen.getByTestId("comment-thread-modal");
+      expect(modal).toHaveTextContent(replyingToBody);
+
+      const replyButtons = screen.getAllByRole("button", { name: "Reply" });
+      expect(replyButtons).toHaveLength(2);
+      fireEvent.click(replyButtons[index]);
+
+      const input = screen.getByPlaceholderText("Write a reply…");
+      fireEvent.change(input, { target: { value: "answering inline" } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      });
+
+      // The store nests messages under a comment, so every reply targets the root.
+      expect(onReply).toHaveBeenCalledWith(comments[0], "answering inline");
+    },
+  );
+
   it("renders a card per root and reply", () => {
     render(<CommentThreadList comments={comments} config={config} />);
     const cards = screen.getAllByTestId("comment-card");
