@@ -26,6 +26,7 @@ const entry = {
   profiles: resolve(__dirname, "src/profiles.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
+  "runtime-profile": resolve(__dirname, "src/runtime-profile.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
   styles: resolve(__dirname, "src/styles.ts"),
 };

@@ -112,6 +112,11 @@
       "import": "./dist/ai.js",
       "require": "./dist/ai.cjs"
     },
+    "./ai/runtime-profile": {
+      "types": "./dist/runtime-profile.d.ts",
+      "import": "./dist/runtime-profile.js",
+      "require": "./dist/runtime-profile.cjs"
+    },
     "./oxlint-plugins": "./oxlint-plugins/clicky-ui.js",
     "./styles.css": "./dist/styles.css",
     "./mdx-editor.css": "./dist/mdx-editor.css",

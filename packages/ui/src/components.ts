@@ -19,6 +19,8 @@ export {
 } from "./components/loading";
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
+export { CopyButton, type CopyButtonProps } from "./components/CopyButton";
+export { copyText, useCopyFlash, type CopyFlashState } from "./components/clipboard";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
 export {

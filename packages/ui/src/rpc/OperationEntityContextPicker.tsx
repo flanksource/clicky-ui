@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import type { ClickyDocument, ClickyNode, ClickyRow } from "../data/Clicky";
@@ -63,6 +63,35 @@ export type EntityContextGroupIcon = (
 
 export type EntityContextGroupColor = (group: string) => string | undefined;
 
+// EntityContextSurfaceRenderContext is handed to a host-supplied surfaceRenderer
+// so it can replace the picker dialog for selected surfaces, the way
+// ResultRenderer replaces a result surface. The generic dialog lists whatever
+// the entity's list operation returns, which is the right default and the wrong
+// answer for a surface the host already browses with a purpose-built UI — a
+// document tree, a map, a calendar. `defaultView` is the standard dialog;
+// return it unchanged to keep it.
+//
+// The whole dialog is replaced rather than only its body: a replacement that
+// owns selection has to own the confirm button too, or the footer would count
+// rows the host is no longer tracking.
+export type EntityContextSurfaceRenderContext = {
+  surface: ClickySurface;
+  listOperation: ResolvedOperation;
+  detailOperation?: ResolvedOperation;
+  /** Already-attached items, so a replacement can disable them. */
+  items: ChatContextItem[];
+  onAdd: (item: ChatContextItem) => void;
+  onAddMany: (items: ChatContextItem[]) => void;
+  /** True while this surface is the one chosen from the dropdown. */
+  open: boolean;
+  close: () => void;
+  defaultView: ReactNode;
+};
+
+export type EntityContextSurfaceRenderer = (
+  ctx: EntityContextSurfaceRenderContext,
+) => ReactNode;
+
 export type OperationEntityContextPickerProps = {
   client: OperationsApiClient;
   items: ChatContextItem[];
@@ -77,6 +106,8 @@ export type OperationEntityContextPickerProps = {
   surfaceGroupIcon?: EntityContextGroupIcon;
   /** Icon colour for a top-level provider/group row. */
   surfaceGroupColor?: EntityContextGroupColor;
+  /** Replaces the picker dialog for surfaces the host browses its own way. */
+  surfaceRenderer?: EntityContextSurfaceRenderer;
   triggerLabel?: string;
 };
 
@@ -98,6 +129,7 @@ export function OperationEntityContextPicker({
   surfaceColor,
   surfaceGroupIcon,
   surfaceGroupColor,
+  surfaceRenderer,
   triggerLabel = "Add context",
 }: OperationEntityContextPickerProps) {
   const {
@@ -399,30 +431,32 @@ export function OperationEntityContextPicker({
       selected.surface.title)
     : "records";
 
-  return (
-    <>
-      <DropdownMenu
-        label={triggerLabel}
-        icon={UiAdd}
-        variant="ghost"
-        size="sm"
-        align="left"
-        menuLabel="Context entity types"
-        menuClassName="min-w-56"
-        items={
-          menuItems.length > 0
-            ? menuItems
-            : [
-                {
-                  label: operationsLoading
-                    ? "Loading entity types…"
-                    : "No entity listings available",
-                  disabled: true,
-                  onSelect: () => {},
-                },
-              ]
-        }
-      />
+  const trigger = (
+    <DropdownMenu
+      label={triggerLabel}
+      icon={UiAdd}
+      variant="ghost"
+      size="sm"
+      align="left"
+      menuLabel="Context entity types"
+      menuClassName="min-w-56"
+      items={
+        menuItems.length > 0
+          ? menuItems
+          : [
+              {
+                label: operationsLoading
+                  ? "Loading entity types…"
+                  : "No entity listings available",
+                disabled: true,
+                onSelect: () => {},
+              },
+            ]
+      }
+    />
+  );
+
+  const defaultDialog = (
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -550,6 +584,27 @@ export function OperationEntityContextPicker({
           ) : null}
         </div>
       </Modal>
+  );
+
+  return (
+    <>
+      {trigger}
+      {selected && surfaceRenderer
+        ? surfaceRenderer({
+            surface: selected.surface,
+            listOperation: selected.listOperation,
+            ...(selected.detailOperation
+              ? { detailOperation: selected.detailOperation }
+              : {}),
+            items,
+            onAdd,
+            onAddMany: (added) =>
+              onAddMany ? onAddMany(added) : added.forEach(onAdd),
+            open,
+            close: () => setOpen(false),
+            defaultView: defaultDialog,
+          })
+        : defaultDialog}
     </>
   );
 }
