@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
 import type { ClickyCommandRuntime } from "../data/Clicky";
-import { MethodBadge } from "../data/MethodBadge";
+import type { ClickyRow } from "../data/Clicky";
+import { SelectionActionBar } from "../data/SelectionActionBar";
 import { Modal } from "../overlay/Modal";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
@@ -14,7 +15,11 @@ import {
 } from "./SchemaActionForm";
 import { getOperationClickyMeta, surfaceActionLabel } from "./clickyMetadata";
 import { packParameterValues } from "./formMetadata";
-import type { ExecutionResponse, ResolvedOperation } from "./types";
+import type {
+  ExecutionResponse,
+  OperationRequestValues,
+  ResolvedOperation,
+} from "./types";
 import { type OperationsApiClient } from "./useOperations";
 import type {
   PreExtension,
@@ -45,6 +50,14 @@ export type OperationActionBarProps = {
   actionLabels?: Record<string, string>;
   // Layout placement only — the bar's own styling stays consistent across pages.
   className?: string;
+  selection?: {
+    selectedRowIds: string[];
+    selectedRows: ClickyRow[];
+    clearSelection: () => void;
+  };
+  getRequestValues?: (action: ResolvedOperation) => OperationRequestValues;
+  excludedParameterNames?: string[];
+  initialValuesByAction?: Record<string, Record<string, string>>;
 };
 
 // OperationActionBar is the single render path for entity action buttons shared
@@ -65,15 +78,28 @@ export function OperationActionBar({
   formActions,
   actionLabels,
   className,
+  selection,
+  getRequestValues,
+  excludedParameterNames,
+  initialValuesByAction,
 }: OperationActionBarProps) {
   const queryClient = useQueryClient();
-  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(null);
-  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(null);
+  const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(
+    null
+  );
+  const [actionResult, setActionResult] = useState<ExecutionResponse | null>(
+    null
+  );
   const [actionError, setActionError] = useState("");
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const fallbackFormId = useId();
 
-  const activeMeta = activeAction ? getOperationClickyMeta(activeAction) : undefined;
-  const lockedValues = activeAction ? (getLockedValues?.(activeAction) ?? {}) : {};
+  const activeMeta = activeAction
+    ? getOperationClickyMeta(activeAction)
+    : undefined;
+  const lockedValues = activeAction
+    ? getLockedValues?.(activeAction) ?? {}
+    : {};
 
   function openAction(op: ResolvedOperation) {
     setActiveAction(op);
@@ -104,14 +130,22 @@ export function OperationActionBar({
       const response = await client.executeCommand(
         activeAction.path,
         activeAction.method,
-        packParameterValues(values, activeAction.operation.parameters ?? []),
-        { Accept: "application/json+clicky" },
+        {
+          ...packParameterValues(
+            values,
+            activeAction.operation.parameters ?? []
+          ),
+          ...getRequestValues?.(activeAction),
+        },
+        { Accept: "application/json+clicky" }
       );
       setActionResult(response);
       if (!response.error) await refreshDiscovery();
     } catch (err) {
       setActionResult(null);
-      setActionError(err instanceof Error ? err.message : String(err ?? "Unknown error"));
+      setActionError(
+        err instanceof Error ? err.message : String(err ?? "Unknown error")
+      );
     } finally {
       setIsExecutingAction(false);
     }
@@ -119,12 +153,25 @@ export function OperationActionBar({
 
   return (
     <>
-      {actions.length > 0 && (
+      {selection && selection.selectedRowIds.length > 0 ? (
+        <SelectionActionBar
+          actions={actions.map((op) => ({
+            id: op.operation.operationId || `${op.method}:${op.path}`,
+            label: actionLabel(op),
+            onSelect: () => openAction(op),
+            ...(getOperationClickyMeta(op)?.toolHints?.destructiveHint
+              ? { variant: "destructive" as const }
+              : {}),
+          }))}
+          context={selection}
+        />
+      ) : actions.length > 0 && !selection ? (
         <div className={cn("flex flex-wrap gap-2", className)}>
           {actions.map((op) => {
             const label = actionLabel(op);
             const summary = op.operation.summary || op.operation.description;
-            const tooltip = summary && summary !== label ? `${label} — ${summary}` : label;
+            const tooltip =
+              summary && summary !== label ? `${label} — ${summary}` : label;
             return (
               <Button
                 key={`${op.method}:${op.path}`}
@@ -139,7 +186,7 @@ export function OperationActionBar({
             );
           })}
         </div>
-      )}
+      ) : null}
 
       {activeAction && (
         <SchemaActionForm
@@ -147,7 +194,16 @@ export function OperationActionBar({
           action={activeAction}
           lockedValues={lockedValues}
           submitLabel={actionLabel(activeAction)}
-          {...(initialValue ? { initialValue } : {})}
+          {...(initialValuesByAction?.[
+            activeMeta?.actionName || activeMeta?.verb || ""
+          ] ?? initialValue
+            ? {
+                initialValue:
+                  initialValuesByAction?.[
+                    activeMeta?.actionName || activeMeta?.verb || ""
+                  ] ?? initialValue!,
+              }
+            : {})}
           {...(formPre ? { formPre } : {})}
           {...(formPost ? { formPost } : {})}
           {...(formActions ? { footerActions: formActions } : {})}
@@ -163,11 +219,19 @@ export function OperationActionBar({
               method={activeAction.method}
               parameters={activeAction.operation.parameters ?? []}
               lockedValues={lockedValues}
+              initialValues={
+                initialValuesByAction?.[
+                  activeMeta?.actionName || activeMeta?.verb || ""
+                ] ?? {}
+              }
               enableLookup={Boolean(activeMeta?.supportsLookup)}
-              submitLabel="Execute request"
+              submitLabel={actionLabel(activeAction)}
               submittingLabel="Executing…"
               isSubmitting={isExecutingAction}
               onSubmit={executeAction}
+              formId={fallbackFormId}
+              showSubmit={false}
+              {...(excludedParameterNames ? { excludedParameterNames } : {})}
               {...(hideLockedInForm ? { hideLocked: true } : {})}
             />
           }
@@ -184,15 +248,28 @@ export function OperationActionBar({
         onClose={() => setActiveAction(null)}
         title={actionLabel(activeAction)}
         size="2xl"
-        {...(footer ? { footer } : {})}
+        footer={
+          footer ?? (
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setActiveAction(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form={fallbackFormId}
+                disabled={isExecutingAction}
+              >
+                {isExecutingAction ? "Executing…" : actionLabel(activeAction)}
+              </Button>
+            </div>
+          )
+        }
       >
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <MethodBadge method={activeAction.method} />
-            <code className="rounded-md bg-muted px-2 py-1 text-sm">
-              {activeAction.path}
-            </code>
-          </div>
           {body}
           {actionError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">

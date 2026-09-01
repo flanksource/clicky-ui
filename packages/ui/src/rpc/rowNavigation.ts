@@ -57,7 +57,7 @@ export function apiPathToRoutePath(path: string): string {
 export function hrefForOperation(
   operation: ResolvedOperation,
   args: string[] = [],
-  flags: Record<string, string> = {},
+  flags: Record<string, string> = {}
 ): string | undefined {
   let route = apiPathToRoutePath(operation.path);
   const consumedFlags = new Set<string>();
@@ -86,7 +86,10 @@ export function hrefForOperation(
 // API path segment (e.g. surface "connections" vs path /connection/{id}), so
 // deriving the route from the path alone yields an unknown-surface route. Falls
 // back to the path-derived route when the operation carries no surface meta.
-export function hrefForDetail(detailOperation: ResolvedOperation, id: string): string | undefined {
+export function hrefForDetail(
+  detailOperation: ResolvedOperation,
+  id: string
+): string | undefined {
   const surface = getOperationClickyMeta(detailOperation)?.surface;
   if (surface) {
     return `/${encodeURIComponent(surface)}/${encodeURIComponent(id)}`;
@@ -106,17 +109,19 @@ export type RowDetailNavigation = {
 // list catalog and the operation runner so row navigation behaves identically.
 export function useRowDetailNavigation(
   detailOperation: ResolvedOperation | undefined,
+  getDetailHref?: (id: string) => string | undefined
 ): RowDetailNavigation {
   const { navigate } = useRouter();
 
   const getRowHref = useCallback<ClickyTableRowHref>(
     (row) => {
-      if (!detailOperation) return undefined;
       const id = getClickyRowId(row);
       if (!id) return undefined;
+      if (getDetailHref) return getDetailHref(id);
+      if (!detailOperation) return undefined;
       return hrefForDetail(detailOperation, id);
     },
-    [detailOperation],
+    [detailOperation, getDetailHref]
   );
 
   const onRowClick = useCallback<ClickyTableRowClick>(
@@ -124,12 +129,12 @@ export function useRowDetailNavigation(
       const href = getRowHref(row);
       if (href) navigate(href);
     },
-    [getRowHref, navigate],
+    [getRowHref, navigate]
   );
 
   const isRowClickable = useCallback<ClickyTableRowPredicate>(
     (row) => Boolean(getRowHref(row)),
-    [getRowHref],
+    [getRowHref]
   );
 
   return { getRowHref, onRowClick, isRowClickable };

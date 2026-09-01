@@ -143,6 +143,11 @@ function makeSpec(): OpenAPISpec {
             idParam: "id",
             supportsFilterMode: true,
           },
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string" } },
+            { name: "filter", in: "query", schema: { type: "string" } },
+            { name: "dry-run", in: "query", schema: { type: "boolean" } },
+          ],
           responses: {},
         },
       },
@@ -195,7 +200,7 @@ const ambiguousPlanResponse: ExecutionResponse = {
 
 function clickyTablePageResponse(
   rowCount: number,
-  pagination: NonNullable<ExecutionResponse["pagination"]>,
+  pagination: NonNullable<ExecutionResponse["pagination"]>
 ): ExecutionResponse {
   const offset = pagination.offset ?? 0;
   return {
@@ -265,7 +270,7 @@ function deferred<T>() {
 }
 
 function makeClient(
-  executeResponse: ExecutionResponse = clickyTableResponse,
+  executeResponse: ExecutionResponse = clickyTableResponse
 ): OperationsApiClient & {
   executeMock: ReturnType<typeof vi.fn>;
   lookupMock: ReturnType<typeof vi.fn>;
@@ -341,7 +346,7 @@ const renderFakeLink: RenderLink = ({
 
 function renderCatalog(
   client: OperationsApiClient,
-  actionLabels?: Record<string, string>,
+  actionLabels?: Record<string, string>
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -360,7 +365,7 @@ function renderCatalog(
         renderLink={renderFakeLink}
         {...(actionLabels ? { actionLabels } : {})}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 }
 
@@ -373,7 +378,7 @@ describe("OperationCatalog", () => {
     });
     const catalog = document.querySelector('[data-slot="operation-catalog"]');
     const results = document.querySelector(
-      '[data-slot="operation-catalog-results"]',
+      '[data-slot="operation-catalog-results"]'
     );
 
     expect(catalog).toHaveClass("h-full", "min-h-0", "flex-col");
@@ -383,8 +388,8 @@ describe("OperationCatalog", () => {
       expect(document.querySelector(".detail-output")).toHaveClass(
         "min-h-0",
         "flex-1",
-        "flex-col",
-      ),
+        "flex-col"
+      )
     );
   });
 
@@ -406,7 +411,7 @@ describe("OperationCatalog", () => {
       "/api/v1/widgets",
       "get",
       {},
-      { Accept: "application/json+clicky" },
+      { Accept: "application/json+clicky" }
     );
     // ID cell rendered as a link-command node (no command runtime in the
     // test harness, so it falls back to an inline span containing the id).
@@ -421,7 +426,7 @@ describe("OperationCatalog", () => {
     const value = await screen.findByText("First");
     fireEvent.mouseEnter(value.closest("span.relative")!);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Include First" }),
+      await screen.findByRole("button", { name: "Include First" })
     );
 
     await waitFor(() =>
@@ -429,11 +434,11 @@ describe("OperationCatalog", () => {
         "/api/v1/widgets",
         "get",
         { "filter.Name": "first.raw", offset: "0" },
-        { Accept: "application/json+clicky" },
-      ),
+        { Accept: "application/json+clicky" }
+      )
     );
     expect(new URLSearchParams(window.location.search).get("filter.Name")).toBe(
-      "first.raw",
+      "first.raw"
     );
   });
 
@@ -471,7 +476,7 @@ describe("OperationCatalog", () => {
     window.history.replaceState(
       null,
       "",
-      "/?workload=payments%2FDeployment%2Fapi",
+      "/?workload=payments%2FDeployment%2Fapi"
     );
     renderCatalog(client);
 
@@ -483,11 +488,11 @@ describe("OperationCatalog", () => {
 
     fireEvent.mouseEnter(value.closest("span.relative")!);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Include First" }),
+      await screen.findByRole("button", { name: "Include First" })
     );
 
     await waitFor(() =>
-      expect(client.lookupMock.mock.calls.length).toBeGreaterThan(1),
+      expect(client.lookupMock.mock.calls.length).toBeGreaterThan(1)
     );
     // …and it still is one after a filter change, the window the reported bug
     // was seen in.
@@ -505,10 +510,10 @@ describe("OperationCatalog", () => {
     const table = within(region).getByRole("table");
     expect(alert).toHaveTextContent(ambiguousPlanResponse.error!);
     expect(
-      within(table).getByRole("columnheader", { name: "Error" }),
+      within(table).getByRole("columnheader", { name: "Error" })
     ).toBeInTheDocument();
     expect(
-      within(table).queryByRole("button", { name: "Error" }),
+      within(table).queryByRole("button", { name: "Error" })
     ).not.toBeInTheDocument();
     expect(within(region).queryByText("Success")).not.toBeInTheDocument();
     expect(within(region).queryByText("ExitCode")).not.toBeInTheDocument();
@@ -535,7 +540,7 @@ describe("OperationCatalog", () => {
     renderCatalog(client);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      ambiguousPlanResponse.error!,
+      ambiguousPlanResponse.error!
     );
     fireEvent.change(screen.getByLabelText("Q"), {
       target: { value: "11111111-1111-1111-1111-111111111111" },
@@ -555,20 +560,20 @@ describe("OperationCatalog", () => {
     // Collection-scoped actions belong on the list: create + the bulk pause
     // (which acts on the filtered set).
     expect(
-      await screen.findByRole("button", { name: "Create" }),
+      await screen.findByRole("button", { name: "Create" })
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
 
     // Entity-scoped actions require an {id} and live on the detail page; they
     // must not leak onto the list action bar.
     expect(
-      screen.queryByRole("button", { name: "Update" }),
+      screen.queryByRole("button", { name: "Update" })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Delete" }),
+      screen.queryByRole("button", { name: "Delete" })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Restart" }),
+      screen.queryByRole("button", { name: "Restart" })
     ).not.toBeInTheDocument();
   });
 
@@ -577,11 +582,51 @@ describe("OperationCatalog", () => {
     renderCatalog(client, { create: "Add Widget" });
 
     expect(
-      await screen.findByRole("button", { name: "Add Widget" }),
+      await screen.findByRole("button", { name: "Add Widget" })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Create" }),
+      screen.queryByRole("button", { name: "Create" })
     ).not.toBeInTheDocument();
+  });
+
+  it("selects current-page rows and executes a bulk action with args", async () => {
+    const client = makeClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCatalog
+          definition={{ key: "widgets", title: "Widgets", description: "" }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          renderLink={renderFakeLink}
+          getRowDetailHref={(id) => `/sql-server?tab=plan-cache&plan=${id}`}
+          actionInitialValues={{ pause: { "dry-run": "true" } }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select row one" })
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Pause" })[1]!);
+
+    const dialog = await screen.findByRole("dialog", { name: "Pause" });
+    expect(within(dialog).getByLabelText("Dry Run")).toBeChecked();
+    expect(within(dialog).queryByLabelText("Args")).toBeNull();
+    expect(within(dialog).queryByText("/api/v1/widgets/pause")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pause" }));
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenCalledWith(
+        "/api/v1/widgets/pause",
+        "post",
+        { args: ["one"], "dry-run": "true" },
+        { Accept: "application/json+clicky" }
+      )
+    );
   });
 
   it("uses a wide modal for schema actions and places controls in its footer", async () => {
@@ -593,11 +638,11 @@ describe("OperationCatalog", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Create" }));
     await waitFor(() =>
       expect(
-        document.querySelector('[data-slot="modal-footer"]'),
-      ).not.toBeNull(),
+        document.querySelector('[data-slot="modal-footer"]')
+      ).not.toBeNull()
     );
     expect(screen.getByRole("dialog", { name: "Create" })).toHaveClass(
-      "max-w-6xl",
+      "max-w-6xl"
     );
     const footer = document.querySelector('[data-slot="modal-footer"]');
     const body = document.querySelector('[data-slot="modal-body"]');
@@ -628,13 +673,12 @@ describe("OperationCatalog", () => {
           renderLink={renderFakeLink}
           actionLabels={{ create: "Add Widget" }}
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Add Widget" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Execute request" }),
-    );
+    const dialog = await screen.findByRole("dialog", { name: "Add Widget" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add Widget" }));
 
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ["openapi-spec"] });
@@ -671,11 +715,11 @@ describe("OperationCatalog", () => {
             return <div data-testid="custom-result">custom logs view</div>;
           }}
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId("custom-result")).toBeInTheDocument(),
+      expect(screen.getByTestId("custom-result")).toBeInTheDocument()
     );
     // The renderer is re-invoked once the list response resolves.
     await waitFor(() => expect(seenSuccess).toBe(true));
@@ -704,7 +748,7 @@ describe("OperationCatalog", () => {
           renderLink={renderFakeLink}
           resultRenderer={({ defaultView }) => defaultView}
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
 
     await waitFor(() => expect(screen.getByText("First")).toBeInTheDocument());
@@ -729,7 +773,7 @@ describe("OperationCatalog", () => {
           total: 14,
           limit: 10,
           offset: 0,
-        }),
+        })
       );
     renderCatalog(client);
 
@@ -751,7 +795,7 @@ describe("OperationCatalog", () => {
       "/api/v1/widgets",
       "get",
       { limit: "5", offset: "5" },
-      { Accept: "application/json+clicky" },
+      { Accept: "application/json+clicky" }
     );
 
     secondPage.resolve(
@@ -759,13 +803,13 @@ describe("OperationCatalog", () => {
         total: 14,
         limit: 5,
         offset: 5,
-      }),
+      })
     );
     expect(await screen.findByText("Widget 6")).toBeInTheDocument();
     expect(screen.queryByText("Widget 1")).not.toBeInTheDocument();
     expect(screen.getByText("6-10 of 14")).toBeInTheDocument();
     expect(
-      screen.queryByTestId("data-table-loading-bar"),
+      screen.queryByTestId("data-table-loading-bar")
     ).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Rows per page"), {
@@ -778,7 +822,7 @@ describe("OperationCatalog", () => {
       "/api/v1/widgets",
       "get",
       { limit: "10", offset: "0" },
-      { Accept: "application/json+clicky" },
+      { Accept: "application/json+clicky" }
     );
   });
 
@@ -796,7 +840,7 @@ describe("OperationCatalog", () => {
 
     // No Apply button exists.
     expect(
-      screen.queryByRole("button", { name: /apply/i }),
+      screen.queryByRole("button", { name: /apply/i })
     ).not.toBeInTheDocument();
 
     await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2), {
@@ -808,7 +852,7 @@ describe("OperationCatalog", () => {
       // A filter change returns to the first page, so the position travels
       // with the request that changed the result set.
       { q: "foobar", offset: "0" },
-      { Accept: "application/json+clicky" },
+      { Accept: "application/json+clicky" }
     );
   });
 
@@ -844,10 +888,10 @@ describe("OperationCatalog", () => {
     expect(screen.getByLabelText("Tags")).toHaveRole("combobox");
     expect(screen.getByLabelText("Include archived")).toHaveAttribute(
       "type",
-      "checkbox",
+      "checkbox"
     );
     expect(
-      screen.getByRole("button", { name: /date range filter/i }),
+      screen.getByRole("button", { name: /date range filter/i })
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("To")).not.toBeInTheDocument();
@@ -871,9 +915,9 @@ describe("OperationCatalog", () => {
           "/api/v1/widgets",
           "get",
           { team: "team/platform", offset: "0" },
-          { Accept: "application/json+clicky" },
+          { Accept: "application/json+clicky" }
         ),
-      { timeout: 2_000 },
+      { timeout: 2_000 }
     );
   });
 });

@@ -79,8 +79,12 @@ const COLUMNS = [
   { name: "stock", label: "Stock", align: "right" as const, sortable: true, shrink: true },
 ];
 
-function intParam(raw: string | undefined, fallback: number): number {
-  if (raw === undefined || raw.trim() === "") return fallback;
+function intParam(raw: string | string[] | undefined, fallback: number): number {
+  if (raw === undefined) return fallback;
+  if (Array.isArray(raw)) {
+    throw new Error("pagination parameter must be a scalar value");
+  }
+  if (raw.trim() === "") return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
 }

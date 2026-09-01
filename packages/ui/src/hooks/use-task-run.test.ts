@@ -46,6 +46,16 @@ const taskSnap = (status: string): TaskSnapshot => ({
   status,
 });
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done;
+    }),
+    resolve,
+  };
+}
+
 describe("useTaskRun (SSE)", () => {
   beforeEach(() => {
     vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
@@ -153,6 +163,38 @@ describe("useTaskRun (polling fallback)", () => {
     );
     expect(result.current.snapshots).toHaveLength(2);
   });
+
+  it("ignores an older polling response after the run id changes", async () => {
+    vi.stubGlobal("EventSource", undefined);
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, rerender } = renderHook(
+      ({ id }) => useTaskRun({ id, forcePoll: true }),
+      { initialProps: { id: "older-run" } },
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    rerender({ id: "newer-run" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      second.resolve(new Response(JSON.stringify([
+        { ...groupSnap("success"), id: "newer-run", groupId: "newer-run" },
+      ])));
+    });
+    await waitFor(() => expect(result.current.snapshots.map(({ id }) => id)).toEqual(["newer-run"]));
+
+    await act(async () => {
+      first.resolve(new Response(JSON.stringify([
+        { ...groupSnap("success"), id: "older-run", groupId: "older-run" },
+      ])));
+    });
+    expect(result.current.snapshots.map(({ id }) => id)).toEqual(["newer-run"]);
+  });
 });
 
 const runMeta = (id: string, status: string): TaskRunMeta => ({
@@ -231,5 +273,33 @@ describe("useTaskRuns (polling fallback)", () => {
     await waitFor(() => expect(result.current.runs).toHaveLength(1));
     expect(MockEventSource.last).toBeNull();
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("ignores an older listing response after the filters change", async () => {
+    vi.stubGlobal("EventSource", undefined);
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, rerender } = renderHook(
+      ({ kind }) => useTaskRuns({ kind, forcePoll: true }),
+      { initialProps: { kind: "older-kind" } },
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    rerender({ kind: "newer-kind" });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      second.resolve(new Response(JSON.stringify([runMeta("newer-run", "success")])));
+    });
+    await waitFor(() => expect(result.current.runs.map(({ id }) => id)).toEqual(["newer-run"]));
+
+    await act(async () => {
+      first.resolve(new Response(JSON.stringify([runMeta("older-run", "success")])));
+    });
+    expect(result.current.runs.map(({ id }) => id)).toEqual(["newer-run"]);
   });
 });

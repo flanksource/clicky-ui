@@ -5,7 +5,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useOperationPages } from "./useOperationPages";
 import { filterOperationsByDomain } from "./classify";
@@ -20,10 +19,11 @@ import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
   ClickyRemoteFormat,
+  ClickyRow,
 } from "../data/Clicky";
 import type { CellFilterChange } from "../data/cells/CellFilterActions";
 import { EndpointList, type RenderLink } from "./EndpointList";
-import { OperationActionBar } from "./OperationActionBar";
+import { OperationCatalogActions } from "./OperationCatalogActions";
 import { OperationsApiClientError } from "./apiClient";
 import { renderOperationError } from "./operationErrorDiagnostics";
 import {
@@ -59,6 +59,11 @@ import {
   serializeMultiFilterValue,
 } from "../data/data-table-filter-values";
 import { Loading } from "../components/loading";
+import { getClickyRowId } from "./rowNavigation";
+import {
+  readOperationFiltersFromUrl,
+  writeOperationFiltersToUrl,
+} from "./operationCatalogUrl";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -97,6 +102,8 @@ export type OperationCatalogProps = {
    * existing consumers are unaffected.
    */
   actionsContainer?: Element | null;
+  getRowDetailHref?: (id: string) => string | undefined;
+  actionInitialValues?: Record<string, Record<string, string>>;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -118,19 +125,18 @@ export function OperationCatalog({
   actionLabels,
   resultRenderer,
   actionsContainer,
+  getRowDetailHref,
+  actionInitialValues,
 }: OperationCatalogProps) {
   const { operations, spec, isLoading } = useOperations(client);
   const filterShapes = spec?.components?.["x-clicky-filters"];
 
   const surfaceOps = useMemo(
     () => filterOperationsBySurface(operations, surfaceKey),
-    [operations, surfaceKey],
+    [operations, surfaceKey]
   );
   const useSurfaceMetadata = surfaceOps.length > 0;
 
-  // domainOps are the operations scoped to this domain: a surface's operations
-  // when surfaceKey resolves, otherwise the entity-tagged operations — used only
-  // to render the generic operation-page fallback, never to guess a table.
   const domainOps = useMemo(() => {
     if (useSurfaceMetadata) return surfaceOps;
     return allOperations
@@ -138,30 +144,26 @@ export function OperationCatalog({
       : filterOperationsByDomain(operations, entities);
   }, [allOperations, entities, operations, surfaceOps, useSurfaceMetadata]);
 
-  // The list table is driven solely by x-clicky surface metadata. Without a
-  // surface there is no authoritative list op, so listEndpoint stays undefined
-  // and the catalog renders the generic EndpointList fallback instead of
-  // guessing a table from operationId/path conventions.
   const listEndpoint = useMemo(() => {
     if (!useSurfaceMetadata) return undefined;
     return findSurfaceListOperation(domainOps, surfaceKey);
   }, [domainOps, surfaceKey, useSurfaceMetadata]);
-  // The detail op turns each list row into a link to /<surface>/<id>; absent it
-  // (no surface metadata) rows stay non-navigable.
   const detailOperation = useMemo(
     () =>
       useSurfaceMetadata
         ? findSurfaceDetailOperation(domainOps, surfaceKey)
         : undefined,
-    [domainOps, surfaceKey, useSurfaceMetadata],
+    [domainOps, surfaceKey, useSurfaceMetadata]
   );
   const [filters, setFilters] = useState<Record<string, string>>(() =>
-    readFiltersFromUrl(),
+    readOperationFiltersFromUrl()
   );
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [selectedRows, setSelectedRows] = useState<ClickyRow[]>([]);
   const listParameters = listEndpoint?.operation.parameters ?? [];
   const lookupParameters = useMemo(
     () => packLookupParameterValues(filters, listParameters),
-    [filters, listParameters],
+    [filters, listParameters]
   );
   const download = useMemo<ClickyDownloadOptions | undefined>(() => {
     const meta = listEndpoint?.operation["x-clicky"]?.export;
@@ -184,8 +186,11 @@ export function OperationCatalog({
   }, [definition.title, listEndpoint]);
 
   useEffect(() => {
-    writeFiltersToUrl(filters);
-  }, [filters]);
+    writeOperationFiltersToUrl(
+      filters,
+      listParameters.map((parameter) => parameter.name)
+    );
+  }, [filters, listParameters]);
 
   const list = useOperationPages({
     client,
@@ -194,9 +199,6 @@ export function OperationCatalog({
     filters,
   });
 
-  // Only reaches a cursor the form itself holds — an offset-mode surface that
-  // stepped onto a cursor near the depth limit. A walk keeps its position in the
-  // query rather than in the form, and restarts itself from inside the hook.
   useCursorStaleRecovery({
     error: list.error,
     parameters: listParameters,
@@ -216,36 +218,34 @@ export function OperationCatalog({
         listEndpoint!.path,
         listEndpoint!.method,
         lookupParameters,
-        { Accept: "application/json+clicky" },
+        { Accept: "application/json+clicky" }
       )) ?? { filters: {} },
     enabled: !!listEndpoint && !!client.lookupFilters,
-    // Options are the answer to "what can this filter be set to now", so the
-    // previous answer stays on screen while the next one is fetched rather than
-    // the dropdowns emptying and refilling on every selection.
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
   });
 
-  // The list action bar shows only collection-scoped actions (create + bulk
-  // actions that operate on the filtered set). Entity-scoped actions
-  // (update/delete and per-id custom actions) need an {id}, so they live on the
-  // detail page (OperationEntityPage) instead. In the generic fallback the
-  // EndpointList already exposes every operation as a runnable card, so there is
-  // no separate action bar to guess at.
   const actionOps = useMemo(
     () =>
       useSurfaceMetadata
         ? findSurfaceCollectionActions(domainOps, surfaceKey)
         : [],
-    [domainOps, surfaceKey, useSurfaceMetadata],
+    [domainOps, surfaceKey, useSurfaceMetadata]
+  );
+  const selectionActionOps = useMemo(
+    () =>
+      actionOps.filter(
+        (operation) => getOperationClickyMeta(operation)?.supportsFilterMode
+      ),
+    [actionOps]
   );
 
   const lookupSearch = useOperationFilterSearch(
     client,
     listEndpoint,
     filters,
-    listParameters,
+    listParameters
   );
 
   const filterBarConfig = useMemo(() => {
@@ -260,15 +260,16 @@ export function OperationCatalog({
     return parametersToFormConfig(listParameters, filters, setFilters, options);
   }, [filters, filterShapes, listParameters, lookupQuery.data, lookupSearch]);
   const dataTablePagination = useMemo(
-    () => dataTablePaginationFromForm(filterBarConfig.pagination, list.response),
-    [filterBarConfig.pagination, list.response],
+    () =>
+      dataTablePaginationFromForm(filterBarConfig.pagination, list.response),
+    [filterBarConfig.pagination, list.response]
   );
   const decoratedFilters = useMemo(
     () =>
       filterBarConfig.filters.map((filter) =>
-        applyFilterExtensions(filter, filterPre),
+        applyFilterExtensions(filter, filterPre)
       ),
-    [filterBarConfig.filters, filterPre],
+    [filterBarConfig.filters, filterPre]
   );
   const cellFilters = useMemo(
     () =>
@@ -278,20 +279,20 @@ export function OperationCatalog({
           .map((parameter) => [
             parameter.name,
             parseMultiFilterValue(filters[parameter.name] ?? ""),
-          ]),
+          ])
       ),
-    [filters, listParameters],
+    [filters, listParameters]
   );
   const onCellFilterChange = useCallback(
     ({ key, value, mode }: CellFilterChange) => {
       if (
         !listParameters.some(
           (parameter) =>
-            parameter.name === key && parameter["x-clicky"]?.role === "filter",
+            parameter.name === key && parameter["x-clicky"]?.role === "filter"
         )
       ) {
         throw new Error(
-          `Clicky table column references unknown filter parameter ${key}`,
+          `Clicky table column references unknown filter parameter ${key}`
         );
       }
 
@@ -311,11 +312,8 @@ export function OperationCatalog({
           delete next[key];
         }
 
-        // Both positions go, for the reason rewind gives: filtering from a cell
-        // changes which rows exist, so an offset names different rows and a
-        // cursor minted under the old filters is refused outright.
         const offset = listParameters.find(
-          (parameter) => parameter["x-clicky"]?.role === "offset",
+          (parameter) => parameter["x-clicky"]?.role === "offset"
         );
         if (offset) next[offset.name] = "0";
         const cursor = cursorParameterName(listParameters);
@@ -323,7 +321,7 @@ export function OperationCatalog({
         return next;
       });
     },
-    [listParameters],
+    [listParameters]
   );
   const resultFilterConfig = useMemo<OperationResultFilterConfig>(
     () => ({
@@ -341,7 +339,7 @@ export function OperationCatalog({
       filterBarConfig.search,
       filterBarConfig.timeRange,
       onCellFilterChange,
-    ],
+    ]
   );
 
   const showTable = !!listEndpoint;
@@ -350,9 +348,6 @@ export function OperationCatalog({
     if (list.isError) {
       listError = list.error;
     } else if (list.response?.success === false) {
-      // A non-2xx that still carries a clicky envelope never throws, so this
-      // branch has to rebuild the error the client would have raised — with the
-      // request identity and raw body intact, not just the message.
       listError = new OperationsApiClientError(
         list.response.error ||
           list.response.message ||
@@ -364,7 +359,7 @@ export function OperationCatalog({
           responseBody: list.response.stdout,
           responseData: list.response.parsed,
           responseHeaders: list.response.responseHeaders,
-        },
+        }
       );
     }
   }
@@ -372,69 +367,15 @@ export function OperationCatalog({
     listError !== undefined
       ? renderError(listError, `Failed to load ${listEndpoint?.path ?? ""}`)
       : undefined;
-  const tableResponse =
-    list.response?.success === false ? null : list.response;
-  // The walk is handed on only while there is one. Outside cursor mode `pages`
-  // would be a one-element array restating `response`, and a renderer reading
-  // it as "the surface is accumulating" would be wrong.
+  const tableResponse = list.response?.success === false ? null : list.response;
   const walkProps = list.infinite
     ? { pages: list.pages, infinite: list.infinite }
     : {};
-  // Lock the current list filters into a bulk action (supportsFilterMode), so a
-  // collection action like "pause" runs against the same set the table shows.
-  // Entity-scoped actions never reach here (they live on the detail page).
-  function getActionLockedValues(
-    op: ResolvedOperation,
-  ): Record<string, string> {
-    const meta = getOperationClickyMeta(op);
-    if (meta == null || !meta.supportsFilterMode) {
-      return {};
-    }
-
-    const locked: Record<string, string> = {};
-    for (const param of op.operation.parameters ?? []) {
-      const value = filters[param.name];
-      if (param.in === "query" && value) {
-        locked[param.name] = value;
-      }
-    }
-
-    if (meta.idParam) {
-      locked[meta.idParam] = "all";
-    }
-
-    if (
-      (op.operation.parameters ?? []).some((param) => param.name === "filter")
-    ) {
-      locked.filter =
-        Object.entries(filters)
-          .filter(([, value]) => value)
-          .map(([key, value]) => `${key}=${value}`)
-          .join(", ") || "current list filters";
-    }
-
-    return locked;
-  }
-
   if (isLoading || (showTable && list.isPending && list.response == null)) {
     return (
       <Loading variant="centered" label={`Loading ${definition.title}…`} />
     );
   }
-
-  const actionBar = (
-    <OperationActionBar
-      actions={actionOps}
-      client={client}
-      getLockedValues={getActionLockedValues}
-      onExecuted={() => list.refetch()}
-      {...(commandRuntime ? { commandRuntime } : {})}
-      {...(formPre ? { formPre } : {})}
-      {...(formPost ? { formPost } : {})}
-      {...(formActions ? { formActions } : {})}
-      {...(actionLabels ? { actionLabels } : {})}
-    />
-  );
 
   return (
     <div
@@ -444,7 +385,31 @@ export function OperationCatalog({
       {/* No title/description here by design: page headers and breadcrumbs are
           the host's to define (e.g. an app shell's bodyHeader), so the catalog
           never invents chrome the consumer would have to fight or duplicate. */}
-      {actionsContainer ? createPortal(actionBar, actionsContainer) : actionBar}
+      <OperationCatalogActions
+        actions={actionOps}
+        selectionActions={selectionActionOps}
+        filters={filters}
+        filterParameterNames={listParameters.map(
+          (parameter) => parameter.name
+        )}
+        selectedRowIds={selectedRowIds}
+        selectedRows={selectedRows}
+        clearSelection={() => {
+          setSelectedRowIds([]);
+          setSelectedRows([]);
+        }}
+        onExecuted={() => list.refetch()}
+        {...(actionsContainer ? { actionsContainer } : {})}
+        {...(actionInitialValues
+          ? { initialValuesByAction: actionInitialValues }
+          : {})}
+        {...(commandRuntime ? { commandRuntime } : {})}
+        {...(formPre ? { formPre } : {})}
+        {...(formPost ? { formPost } : {})}
+        {...(formActions ? { formActions } : {})}
+        {...(actionLabels ? { actionLabels } : {})}
+        client={client}
+      />
 
       {showTable ? (
         <div className="min-h-0 flex-1" data-slot="operation-catalog-results">
@@ -458,6 +423,32 @@ export function OperationCatalog({
                 ariaLabel={`${definition.title} results`}
                 className="mt-0 h-full min-h-0"
                 detailOperation={detailOperation}
+                {...(getRowDetailHref ? { getRowDetailHref } : {})}
+                {...(selectionActionOps.length > 0
+                  ? {
+                      rowSelection: {
+                        selectedRowIds,
+                        onSelectionChange: (
+                          ids: string[],
+                          rows: ClickyRow[]
+                        ) => {
+                          setSelectedRowIds(ids);
+                          setSelectedRows(rows);
+                        },
+                        getRowId: (row: ClickyRow) => {
+                          const id = getClickyRowId(row);
+                          if (!id) {
+                            throw new Error(
+                              "Clicky bulk action row is missing an _id or id cell"
+                            );
+                          }
+                          return id;
+                        },
+                        isRowSelectable: (row: ClickyRow) =>
+                          getClickyRowId(row) != null,
+                      },
+                    }
+                  : {})}
                 filterConfig={resultFilterConfig}
                 {...(tableError ? { error: tableError } : {})}
                 {...(commandRuntime ? { commandRuntime } : {})}
@@ -505,42 +496,4 @@ export function OperationCatalog({
       )}
     </div>
   );
-}
-
-function readFiltersFromUrl(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const search = new URLSearchParams(window.location.search);
-  const values: Record<string, string> = {};
-  for (const [key, value] of search.entries()) {
-    if (key.startsWith("__")) continue;
-    if (value !== "") values[key] = value;
-  }
-  return values;
-}
-
-function writeFiltersToUrl(filters: Record<string, string>) {
-  if (typeof window === "undefined") return;
-  const search = reservedSearchParamsFromUrl();
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== "") search.set(key, value);
-  }
-  const query = search.toString();
-  const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-  if (
-    next !==
-    `${window.location.pathname}${window.location.search}${window.location.hash}`
-  ) {
-    window.history.replaceState(window.history.state, "", next);
-  }
-}
-
-function reservedSearchParamsFromUrl() {
-  const current = new URLSearchParams(window.location.search);
-  const next = new URLSearchParams();
-  for (const [key, value] of current.entries()) {
-    if (!key.startsWith("__")) continue;
-    if (key === "__autoRun" || key.startsWith("__arg")) continue;
-    next.append(key, value);
-  }
-  return next;
 }

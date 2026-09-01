@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
@@ -69,28 +69,36 @@ export function ThreadPicker({
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; title: string }>();
+  const loadRequest = useRef(0);
   const canRename = source ? Boolean(source.rename) : Boolean(api);
 
   const listUrl = query ? `${api}?${query}` : api;
 
   const fetchThreads = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true);
     try {
+      let loaded: ThreadSummary[];
       if (source) {
-        setThreads(await source.load());
+        loaded = await source.load();
       } else {
         const res = await fetch(listUrl);
-        if (res.ok) setThreads(await res.json());
+        if (!res.ok) throw new Error(`load failed with status ${res.status}`);
+        loaded = await res.json();
       }
+      if (request === loadRequest.current) setThreads(loaded);
     } catch (err) {
       console.warn("clicky-ui: failed to load threads", err);
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }, [source, listUrl]);
 
   useEffect(() => {
     void fetchThreads();
+    return () => {
+      loadRequest.current += 1;
+    };
   }, [fetchThreads, refreshToken]);
 
   const commitRename = useCallback(async () => {
@@ -123,8 +131,7 @@ export function ThreadPicker({
   }, [api, renaming, source, threads]);
 
   const handleDelete = useCallback(
-    async (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
+    async (id: string) => {
       try {
         if (source) {
           await source.remove?.(id);
@@ -188,57 +195,60 @@ export function ThreadPicker({
           {threads.map((t) => (
             <div
               key={t.id}
-              role="button"
-              tabIndex={0}
               className={cn(
-                "group/thread flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent",
+                "group/thread flex w-full items-center gap-1 px-1 py-0.5 text-left text-xs hover:bg-accent",
                 t.id === threadId && "font-semibold",
               )}
-              onClick={() => {
-                onSelect(t.id);
-                closeMenu();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelect(t.id);
-                  closeMenu();
-                }
-              }}
             >
-              <Icon icon={UiComment} className="size-3 shrink-0" />
               {renaming?.id === t.id ? (
-                <input
-                  autoFocus
-                  aria-label="Conversation title"
-                  className="flex-1 rounded border border-border bg-background px-1 py-0.5 text-xs"
-                  value={renaming.title}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    setRenaming({ id: t.id, title: e.target.value })
-                  }
-                  onBlur={() => setRenaming(undefined)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter") void commitRename();
-                    if (e.key === "Escape") setRenaming(undefined);
-                  }}
-                />
+                <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1">
+                  <Icon icon={UiComment} className="size-3 shrink-0" />
+                  <input
+                    autoFocus
+                    aria-label="Conversation title"
+                    className="min-w-0 flex-1 rounded border border-border bg-background px-1 py-0.5 text-xs"
+                    value={renaming.title}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) =>
+                      setRenaming({ id: t.id, title: e.target.value })
+                    }
+                    onBlur={() => setRenaming(undefined)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") void commitRename();
+                      if (e.key === "Escape") setRenaming(undefined);
+                    }}
+                  />
+                  {t.totalCostUsd != null && t.totalCostUsd > 0 && (
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      ${t.totalCostUsd.toFixed(2)}
+                    </span>
+                  )}
+                </div>
               ) : (
-                <span className="flex-1 truncate">{t.title || "Untitled"}</span>
-              )}
-              {t.totalCostUsd != null && t.totalCostUsd > 0 && (
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  ${t.totalCostUsd.toFixed(2)}
-                </span>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
+                  onClick={() => {
+                    onSelect(t.id);
+                    closeMenu();
+                  }}
+                >
+                  <Icon icon={UiComment} className="size-3 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{t.title || "Untitled"}</span>
+                  {t.totalCostUsd != null && t.totalCostUsd > 0 && (
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      ${t.totalCostUsd.toFixed(2)}
+                    </span>
+                  )}
+                </button>
               )}
               {canRename && renaming?.id !== t.id && (
                 <button
                   type="button"
                   aria-label="Rename conversation"
                   className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground group-hover/thread:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     setRenaming({ id: t.id, title: t.title ?? "" });
                   }}
                 >
@@ -249,7 +259,7 @@ export function ThreadPicker({
                 type="button"
                 aria-label="Delete conversation"
                 className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-destructive group-hover/thread:opacity-100"
-                onClick={(e) => void handleDelete(t.id, e)}
+                onClick={() => void handleDelete(t.id)}
               >
                 <Icon icon={UiTrash} className="size-3" />
               </button>

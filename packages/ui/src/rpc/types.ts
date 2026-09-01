@@ -1,12 +1,12 @@
 import type { ClickyNode } from "../data/Clicky";
 import type { TimeRangePresetGroup } from "../components/TimeRange";
 
+export type OperationRequestValues = Record<string, string | string[]>;
+
 export interface ExecutionRequest {
   args?: string[];
-  flags?: Record<string, string>;
+  flags?: OperationRequestValues;
 }
-
-export type OperationRequestValues = Record<string, string | string[]>;
 
 export interface ExecutionPagination {
   total?: number;
