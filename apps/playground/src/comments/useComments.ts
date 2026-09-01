@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import {
   DEFAULT_COMMENT_STATUSES,
+  DOCUMENT_ANCHOR,
   type Comment,
   type CommentConfig,
   type CommentCreateInput,
   type CommentRating,
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
+
+import type { CommentElementContext } from "../../plugins/comments-model";
+import { resolveAnchor } from "./dom-anchor";
+import { captureElementContext } from "./element-context";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -24,7 +29,10 @@ export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
 };
 
 /** A comment as the API returns it: tagged with the page it was left on. */
-export type PageComment = Comment & { page: string };
+export type PlaygroundComment = Comment & {
+  element?: CommentElementContext;
+};
+export type PageComment = PlaygroundComment & { page: string };
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -70,7 +78,7 @@ export async function fetchComments(
 }
 
 export type PlaygroundComments = {
-  comments: Comment[];
+  comments: PlaygroundComment[];
   allComments: PageComment[];
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
@@ -81,8 +89,11 @@ export type PlaygroundComments = {
   remove: (id: string) => Promise<void>;
 };
 
-export function useComments(page: string): PlaygroundComments {
-  const [comments, setComments] = useState<Comment[]>([]);
+export function useComments(
+  page: string,
+  contentRef: RefObject<HTMLDivElement>,
+): PlaygroundComments {
+  const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,12 +117,16 @@ export function useComments(page: string): PlaygroundComments {
   }, [refresh]);
 
   const mutate = useCallback(
-    async (run: () => Promise<unknown>) => {
+    async (
+      run: () => Promise<unknown>,
+      options: { rethrow?: boolean } = {},
+    ) => {
       try {
         await run();
         setError(null);
       } catch (cause) {
         setError(describeError(cause));
+        if (options.rethrow) throw cause;
       }
       await refresh();
     },
@@ -130,17 +145,39 @@ export function useComments(page: string): PlaygroundComments {
 
   const create = useCallback(
     (input: CommentCreateInput) =>
-      mutate(() =>
-        post(COMMENTS_ROUTE, {
-          page,
-          body: input.body,
-          author: PLAYGROUND_COMMENT_AUTHOR,
-          status: DEFAULT_STATUS,
-          anchor: input.anchor ?? null,
-          ...(input.rating ? { rating: input.rating } : {}),
-        }),
+      mutate(
+        async () => {
+          const anchor = input.anchor ?? null;
+          let element: CommentElementContext | undefined;
+          if (anchor !== null && anchor !== DOCUMENT_ANCHOR) {
+            const content = contentRef.current;
+            if (!content) {
+              throw new Error(
+                "Playground content is not mounted for comment capture",
+              );
+            }
+            const target = resolveAnchor(content, anchor);
+            if (!target) {
+              throw new Error(
+                `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
+              );
+            }
+            element = await captureElementContext(target);
+          }
+
+          await post(COMMENTS_ROUTE, {
+            page,
+            body: input.body,
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            status: DEFAULT_STATUS,
+            anchor,
+            ...(input.rating ? { rating: input.rating } : {}),
+            ...(element ? { element } : {}),
+          });
+        },
+        { rethrow: true },
       ),
-    [mutate, page, post],
+    [contentRef, mutate, page, post],
   );
 
   const reply = useCallback(

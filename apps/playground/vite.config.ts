@@ -21,8 +21,8 @@ export default defineConfig({
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundComments({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
-      operationsURL: "http://localhost:9092/api/openapi.json",
       runtimesURL: "http://localhost:9020/api/chat/runtimes",
+      resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
     }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
@@ -59,6 +59,10 @@ export default defineConfig({
       {
         find: /^@flanksource\/clicky-ui\/ai$/,
         replacement: resolve(uiSrc, "ai.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/ai\/runtime-profile$/,
+        replacement: resolve(uiSrc, "runtime-profile.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/utils$/,

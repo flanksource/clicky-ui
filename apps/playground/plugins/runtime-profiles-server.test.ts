@@ -1,287 +1,103 @@
-import { describe, expect, it } from "vitest";
-import { resolveRuntimeProfile } from "./runtime-profiles-server";
-import type { RuntimeProfileResolveRequest } from "../src/pages/_runtime-profiles/contract";
-import type { ToolMeta } from "../../../packages/ui/src/data/chat/types";
-import type { RuntimeCatalogFamily } from "../../../packages/ui/src/data/runtime/runtime-mode";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+  ResolvedRuntimeProfile,
+  RuntimeProfileResolveRequest,
+} from "../../../packages/ui/src/data/ai/runtime-profile";
+import { resolveRuntimeProfileFromCaptain } from "./runtime-profiles-server";
 
-const TOOLS: ToolMeta[] = [
-  {
-    name: "billing_invoice_list",
-    label: "List invoices",
-    group: "billing.read",
-    method: "GET",
-    annotations: { readOnlyHint: true, destructiveHint: false },
+const request: RuntimeProfileResolveRequest = {
+  profile: {
+    id: "review",
+    name: "Review",
+    spec: { backend: "codex-agent" },
+    presets: ["guardrails"],
   },
-  {
-    name: "billing_invoice_update",
-    label: "Update invoice",
-    group: "billing.write",
-    method: "PATCH",
-  },
-  {
-    name: "workspace_search",
-    label: "Search workspace",
-    group: "workspace.read",
-    method: "POST",
-    annotations: { readOnlyHint: true, openWorldHint: true },
-  },
-];
+  presets: [
+    {
+      id: "guardrails",
+      name: "Guardrails",
+      scope: "global",
+      spec: { toolPolicy: [{ destructive: true, policy: "ask" }] },
+    },
+  ],
+};
 
-const RUNTIMES: RuntimeCatalogFamily[] = [
-  {
-    family: "codex",
-    provider: "openai",
-    catalogPrefix: "codex-agent",
-    modes: [
+const resolution: ResolvedRuntimeProfile = {
+  resolved: {
+    spec: {
+      backend: "codex-agent",
+      toolPolicy: [{ destructive: true, policy: "ask" }],
+    },
+    constraints: {},
+    trace: [
       {
-        mode: "agent",
-        backend: "codex-agent",
-        permissions: {
-          modes: {
-            default: { kind: "approximated" },
-            plan: { kind: "native" },
-            dontAsk: { kind: "unsupported" },
-          },
-          toolPolicies: {},
-          resources: {},
-        },
+        id: "guardrails",
+        source: "preset",
+        name: "Guardrails",
+        scope: "global",
+        spec: { toolPolicy: [{ destructive: true, policy: "ask" }] },
+        constraints: {},
+      },
+      {
+        id: "review:spec",
+        source: "profile",
+        name: "Review run spec",
+        scope: "surface",
+        spec: { backend: "codex-agent" },
+        constraints: {},
       },
     ],
   },
-];
+  tools: [{ name: "invoice_update", label: "Update invoice" }],
+  permissions: { invoice_update: "ask" },
+  permissionSupport: { invoice_update: { kind: "requires-broker" } },
+  effectivePolicy: [{ destructive: true, policy: "ask" }],
+};
 
-const resolve = (input: RuntimeProfileResolveRequest) =>
-  resolveRuntimeProfile(input, { tools: TOOLS, runtimes: RUNTIMES });
+describe("resolveRuntimeProfileFromCaptain", () => {
+  afterEach(() => vi.unstubAllGlobals());
 
-function request(
-  presets: RuntimeProfileResolveRequest["presets"],
-  selectedPresetIds: RuntimeProfileResolveRequest["profile"]["presets"] = presets.map(
-    (preset) => preset.id,
-  ),
-): RuntimeProfileResolveRequest {
-  return {
-    presets,
-    profile: {
-      id: "profile",
-      name: "Profile",
-      spec: {},
-      presets: selectedPresetIds,
-    },
-  };
-}
-
-describe("resolveRuntimeProfile", () => {
-  it("sorts scopes stably and lets later same-scope presets win", () => {
-    const result = resolve(
-      request([
-        {
-          id: "surface-review",
-          name: "Review",
-          scope: "surface",
-          spec: {
-            model: "openai/gpt-5.6-luna",
-            toolPolicy: [{ group: "billing.write", policy: "ask" }],
-          },
-        },
-        {
-          id: "global-defaults",
-          name: "Defaults",
-          scope: "global",
-          spec: { model: "openai/gpt-5.6-terra", budget: { maxTurns: 8 } },
-        },
-        {
-          id: "surface-autonomy",
-          name: "Autonomy",
-          scope: "surface",
-          spec: {
-            model: "openai/gpt-5.6-sol",
-            toolPolicy: [{ group: "billing.write", policy: "allow" }],
-          },
-        },
-      ]),
+  it("forwards the complete request to Captain and returns its authoritative result", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(resolution), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
     );
+    vi.stubGlobal("fetch", fetch);
 
-    expect(result.resolved.trace.map((layer) => layer.id)).toEqual([
-      "global-defaults",
-      "surface-review",
-      "surface-autonomy",
-      "profile:spec",
-    ]);
-    expect(result.resolved.spec).toMatchObject({
-      model: "openai/gpt-5.6-sol",
-      budget: { maxTurns: 8 },
-      toolPolicy: [{ group: ["billing.write"], policy: "allow" }],
-    });
-    expect(result.permissions["billing_invoice_update"]).toBe("allow");
-  });
-
-  it("resolves ordered preset references and applies the profile spec as the override", () => {
-    const input = request([
-      {
-        id: "balanced",
-        name: "Balanced",
-        scope: "surface",
-        spec: { model: "openai/gpt-5.6-terra", effort: "medium" },
-      },
-    ]);
-    input.profile.spec = { effort: "high" };
-    const result = resolve(input);
-
-    expect(result.resolved.spec).toMatchObject({
-      model: "openai/gpt-5.6-terra",
-      effort: "high",
-    });
-    expect(result.resolved.trace[0]).toMatchObject({
-      id: "balanced",
-      name: "Balanced",
-      scope: "surface",
-    });
-  });
-
-  it("materializes the full profile spec after surface presets and before user guardrails", () => {
-    const input = request([
-      {
-        id: "surface",
-        name: "Surface behavior",
-        scope: "surface",
-        spec: { model: "openai/gpt-5.6-terra", effort: "medium" },
-      },
-      {
-        id: "user",
-        name: "User guardrails",
-        scope: "user",
-        spec: { toolPolicy: [{ destructive: true, policy: "ask" }] },
-      },
-    ]);
-    input.profile.spec = {
-      model: "openai/gpt-5.6-sol",
-      prompt: { user: "Implement the requested change" },
-      setup: { cwd: ".", checkout: { path: ".", ref: "HEAD" } },
-      workflow: { verify: { fixture: "- [ ] focused tests pass" } },
-    };
-
-    const result = resolve(input);
-
-    expect(
-      result.resolved.trace.map(({ id, source, scope }) => [id, source, scope]),
-    ).toEqual([
-      ["surface", "preset", "surface"],
-      ["profile:spec", "profile", "surface"],
-      ["user", "preset", "user"],
-    ]);
-    expect(result.resolved.spec).toMatchObject({
-      model: "openai/gpt-5.6-sol",
-      effort: "medium",
-      prompt: { user: "Implement the requested change" },
-      setup: { cwd: ".", checkout: { path: ".", ref: "HEAD" } },
-      workflow: { verify: { fixture: "- [ ] focused tests pass" } },
-    });
-  });
-
-  it("rejects task-specific fields in presets", () => {
-    const presetRequest = request([
-      {
-        id: "invalid",
-        name: "Invalid",
-        scope: "surface",
-        spec: { prompt: { user: "task prompt" } } as never,
-      },
-    ]);
-    expect(() => resolve(presetRequest)).toThrow(
-      'runtime preset field "presets[0].spec.prompt" is not allowed',
-    );
-  });
-
-  it("rejects Captain-level constraints on presets", () => {
-    expect(() =>
-      resolve(
-        request([
-          {
-            id: "global",
-            name: "Global",
-            scope: "global",
-            spec: {},
-            constraints: { models: ["openai/gpt-5.6-terra"] },
-          } as never,
-        ]),
+    await expect(
+      resolveRuntimeProfileFromCaptain(
+        "http://captain/api/chat/runtime-profiles/resolve",
+        request,
       ),
-    ).toThrow('runtime preset field "presets[0].constraints" is not allowed');
+    ).resolves.toEqual(resolution);
+    expect(fetch).toHaveBeenCalledWith(
+      "http://captain/api/chat/runtime-profiles/resolve",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
   });
 
-  it("does not infer allow from a read-only hint without explicit non-destructive metadata", () => {
-    const result = resolve(request([]));
-
-    expect(result.permissions["billing_invoice_list"]).toBe("allow");
-    expect(result.permissions["workspace_search"]).toBe("ask");
-  });
-
-  it("rejects duplicate preset references instead of silently resolving ambiguous state", () => {
-    expect(() =>
-      resolve(
-        request(
-          [
-            { id: "one", name: "One", scope: "global", spec: {} },
-            { id: "two", name: "Two", scope: "user", spec: {} },
-          ],
-          ["one", "one"],
-        ),
+  it("surfaces Captain validation failures without resolving locally", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("permission settings require a resolved backend\n", {
+          status: 400,
+          statusText: "Bad Request",
+        }),
       ),
-    ).toThrow('runtime profile repeats preset "one"');
-  });
-
-  it("returns only the effective spec and trace at the profile boundary", () => {
-    const result = resolve(request([]));
-
-    expect(result.resolved).toEqual({
-      spec: {},
-      trace: [
-        expect.objectContaining({ id: "profile:spec", source: "profile" }),
-      ],
-    });
-  });
-
-  it("validates an inherited permission posture against the final backend", () => {
-    const result = resolve(
-      request([
-        {
-          id: "backend",
-          name: "Codex backend",
-          scope: "global",
-          spec: { backend: "codex-agent" },
-        },
-        {
-          id: "posture",
-          name: "Plan posture",
-          scope: "surface",
-          spec: { permissions: { mode: "plan" } },
-        },
-      ]),
     );
 
-    expect(result.resolved.spec).toMatchObject({
-      backend: "codex-agent",
-      permissions: { mode: "plan" },
-    });
-  });
-
-  it("rejects a posture the resolved backend does not implement", () => {
-    const input = request([]);
-    input.profile.spec = {
-      backend: "codex-agent",
-      permissions: { mode: "dontAsk" },
-    };
-
-    expect(() => resolve(input)).toThrow(
-      'permission posture "dontAsk" is not available for backend "codex-agent"',
-    );
-  });
-
-  it("rejects a posture without a final backend", () => {
-    const input = request([]);
-    input.profile.spec = { permissions: { mode: "plan" } };
-
-    expect(() => resolve(input)).toThrow(
-      'permission posture "plan" requires a resolved backend',
-    );
+    await expect(
+      resolveRuntimeProfileFromCaptain(
+        "http://captain/api/chat/runtime-profiles/resolve",
+        request,
+      ),
+    ).rejects.toThrow("permission settings require a resolved backend");
   });
 });

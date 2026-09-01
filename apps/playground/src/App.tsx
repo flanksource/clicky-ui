@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CommentProvider,
   DensityProvider,
@@ -30,13 +30,14 @@ export function App() {
   // history + dispatches popstate, which useHistoryRoute above re-parses.
   const router = useBrowserRouter();
   const [query, setQuery] = useState("");
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Nav labels start from the filename and settle once each `meta` has loaded;
   // PlaygroundShell subscribes to the resulting store updates.
   useEffect(() => preloadMeta(PAGES), []);
 
   const active = findPage(route.page);
-  const comments = useComments(active?.slug ?? "");
+  const comments = useComments(active?.slug ?? "", contentRef);
 
   return (
     <ThemeProvider>
@@ -55,6 +56,7 @@ export function App() {
             <PlaygroundShell
               active={active}
               allComments={comments.allComments}
+              contentRef={contentRef}
               query={query}
               onQueryChange={setQuery}
               commentsError={comments.error}

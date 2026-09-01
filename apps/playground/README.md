@@ -51,7 +51,7 @@ Two complementary tools:
 
 **react-grab** — hover any element, press `⌘C`. Copies the element plus its React component stack and source location, formatted for a coding agent. Dev-only, loaded behind `import.meta.env.DEV` in `src/main.tsx`.
 
-**Comment pins** — press `c` (or the Comment button), click an element, write a note. The note is anchored to that element by a CSS path and persisted to `.playground/comments.json` (gitignored), so it survives reloads and can be read straight off disk by an agent. The Comment split-button also starts a whole-page thread without picking an element.
+**Comment pins** — press `c` (or the Comment button), click an element, write a note. The note is anchored by a CSS path and persisted to `.playground/comments.json` (gitignored) together with the React component name, source/component stack, and up to 2 KB of the element's raw HTML. The Comment split-button starts a whole-page thread without element context. Existing comments created before element capture remain readable with their original anchor-only data.
 
 Comments can carry a positive or negative rating, with or without text. `BestPractice` and `ReviewVariant` in `src/review/ReviewComponents.tsx` build on that same store: each requires a stable fragment id, exposes a permalink, and renders aggregate rating controls. Variants additionally require an explicit discard handler.
 
@@ -65,7 +65,7 @@ Comments can carry a positive or negative rating, with or without text. `BestPra
 | _Copy all open comments_          | unresolved notes from **every** page                      |
 | _Copy all comments_               | every note from every page, resolved included             |
 
-Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so they only exist for the page you are looking at; the cross-page actions fall back to the raw CSS path, which is still what an agent needs to find the element.
+Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so they only exist for the page you are looking at; cross-page actions fall back to the raw CSS path for the heading. New anchored comments still include their persisted React component, source stack, and HTML snapshot on every copy path.
 
 Sidebar pages with feedback show their open root-comment count in a badge. Replies and resolved or closed comments do not increase the badge.
 
@@ -81,16 +81,16 @@ The same comments are a REST API, so a coding agent can read feedback, act on it
 curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, description}'
 ```
 
-| Method   | Path                                  | Body                                               | Purpose                                                                   |
-| -------- | ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GET`    | `/__playground/comments`              | —                                                  | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true` |
-| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, anchor?, status?}` | Start a thread; at least one of body or rating is required                |
-| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                   | Reply — page and anchor inherited from the root                           |
-| `POST`   | `/__playground/comments/{id}/resolve` | `{status?}`                                        | Mark done (defaults to `resolved`)                                        |
-| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                        | Edit text, rating, or status                                              |
-| `DELETE` | `/__playground/comments/{id}`         | —                                                  | Remove, cascading to replies                                              |
+| Method   | Path                                  | Body                                                         | Purpose                                                                   |
+| -------- | ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `GET`    | `/__playground/comments`              | —                                                            | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true` |
+| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, anchor?, element?, status?}` | Start a thread; anchored roots require React element context              |
+| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                             | Reply — page and anchor inherited from the root                           |
+| `POST`   | `/__playground/comments/{id}/resolve` | `{status?}`                                                  | Mark done (defaults to `resolved`)                                        |
+| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                                  | Edit text, rating, or status                                              |
+| `DELETE` | `/__playground/comments/{id}`         | —                                                            | Remove, cascading to replies                                              |
 
-Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two count as unresolved. Ratings are `positive` or `negative`. Anything else is a 400 naming the valid values — the same for a missing `author`, which is never inferred so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
+Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two count as unresolved. Ratings are `positive` or `negative`. An anchored root's `element` is `{componentName?, source, html}`; `html` is bounded to the same 2 KB capture used by Gavel's React Grab plugin. Invalid context is a 400 rather than an anchor-only write. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 
 ```bash
 # What still needs doing, and where
@@ -116,6 +116,7 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 | Anchor ↔ library registry        | `src/comments/useDomAnchors.ts`                                      |
 | Pins and element picker          | `src/comments/CommentOverlay.tsx`                                    |
 | Comment persistence              | `plugins/comments-store.ts`, `plugins/comments-server.ts`            |
+| Persisted element context        | `plugins/comments-model.ts`, `src/comments/element-context.ts`       |
 | Comment API tool schema          | `plugins/comments-schema.ts`                                         |
 | Feedback → markdown for an agent | `src/comments/markdown.ts`                                           |
 | Routable review components       | `src/review/ReviewComponents.tsx`                                    |

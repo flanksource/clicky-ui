@@ -100,6 +100,21 @@ describe("comments-schema", () => {
     }
   });
 
+  it("documents the React element context required for anchored roots", () => {
+    const create = COMMENT_TOOLS.find(
+      (entry) => entry.name === "create_comment",
+    );
+    const element = create?.inputSchema.properties["element"];
+
+    expect(element).toMatchObject({
+      type: "object",
+      required: ["source", "html"],
+      additionalProperties: false,
+    });
+    expect(element?.properties).toHaveProperty("componentName");
+    expect(create?.description).toContain("element context");
+  });
+
   it.each(["create_comment", "update_comment"])(
     "%s enumerates positive and negative ratings",
     (name) => {

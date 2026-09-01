@@ -7,6 +7,7 @@ import {
   RESOLVED_STATUS,
   addComment,
   addReply,
+  assertElementContext,
   assertPage,
   assertRating,
   listComments,
@@ -174,6 +175,7 @@ function handle(
         const anchor = optionalText(body, "anchor");
         const rating = optionalText(body, "rating");
         const status = optionalText(body, "status");
+        const element = body["element"];
         sendJson(
           res,
           201,
@@ -183,6 +185,9 @@ function handle(
             parentId: null,
             anchor: anchor ?? null,
             ...(rating === undefined ? {} : { rating: assertRating(rating) }),
+            ...(element === undefined
+              ? {}
+              : { element: assertElementContext(element) }),
           }),
         );
       });

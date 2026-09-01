@@ -5,6 +5,7 @@ import {
   UiFileText,
   UiForm,
   UiLayoutDashboard,
+  UiCoins,
   UiRows,
   UiScan,
   UiScroll,
@@ -36,7 +37,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource",
     title: "Flanksource",
-    description: "The foundations and repeatable patterns behind Flanksource product interfaces.",
+    description:
+      "The foundations and repeatable patterns behind Flanksource product interfaces.",
     group: "Flanksource",
     icon: UiLayoutDashboard,
     groupOrder: 0,
@@ -46,7 +48,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/page-anatomy",
     title: "Page anatomy",
-    description: "The shell regions a product page is assembled from, and what belongs in each.",
+    description:
+      "The shell regions a product page is assembled from, and what belongs in each.",
     group: "Flanksource · Patterns",
     icon: UiColumns,
     groupOrder: 10,
@@ -56,7 +59,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/collections",
     title: "Collections",
-    description: "Every way to present many things at once, and which question each one answers.",
+    description:
+      "Every way to present many things at once, and which question each one answers.",
     group: "Flanksource · Patterns",
     icon: UiTable,
     groupOrder: 10,
@@ -66,7 +70,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/forms",
     title: "Forms",
-    description: "Field controls, progressive disclosure, adornments, and validation that lands.",
+    description:
+      "Field controls, progressive disclosure, adornments, and validation that lands.",
     group: "Flanksource · Patterns",
     icon: UiForm,
     groupOrder: 10,
@@ -76,7 +81,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/object-arrays",
     title: "Object arrays",
-    description: "Accordion editors with identity-rich summaries and details on demand.",
+    description:
+      "Accordion editors with identity-rich summaries and details on demand.",
     group: "Flanksource · Patterns",
     icon: UiRows,
     groupOrder: 10,
@@ -86,7 +92,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/feedback-states",
     title: "Feedback states",
-    description: "Loading, empty, success, warning, error, and recovery treatments.",
+    description:
+      "Loading, empty, success, warning, error, and recovery treatments.",
     group: "Flanksource · Patterns",
     icon: UiWarningCircle,
     groupOrder: 10,
@@ -96,7 +103,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/stats",
     title: "Stats",
-    description: "Stat tiles, deltas, gauges and sparklines — and when a number should not be a tile at all.",
+    description:
+      "Stat tiles, deltas, gauges and sparklines — and when a number should not be a tile at all.",
     group: "Flanksource · Patterns",
     icon: UiTrendUp,
     groupOrder: 10,
@@ -117,7 +125,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/patterns/reports",
     title: "Reports",
-    description: "Documents handed to someone else: fixed scope, direct labels, and every figure carrying its table.",
+    description:
+      "Documents handed to someone else: fixed scope, direct labels, and every figure carrying its table.",
     group: "Flanksource · Patterns",
     icon: UiFileText,
     groupOrder: 10,
@@ -127,7 +136,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/supply-chain",
     title: "Supply chain",
-    description: "The threat-model layer: category hues, severity ramp, and the grey-means-unobserved rule.",
+    description:
+      "The threat-model layer: category hues, severity ramp, and the grey-means-unobserved rule.",
     group: "Flanksource · Systems",
     icon: UiShield,
     groupOrder: 20,
@@ -137,7 +147,8 @@ export const DESIGN_SYSTEM_PAGES = [
   {
     slug: "flanksource/oipa",
     title: "OIPA",
-    description: "Entity marks for a policy-administration domain whose own names mislead.",
+    description:
+      "Entity marks for a policy-administration domain whose own names mislead.",
     group: "Flanksource · Systems",
     icon: UiScroll,
     groupOrder: 20,
@@ -153,6 +164,17 @@ export const DESIGN_SYSTEM_PAGES = [
     icon: UiScan,
     groupOrder: 20,
     navOrder: 30,
+    section: "systems",
+  },
+  {
+    slug: "flanksource/merivio",
+    title: "Merivio",
+    description:
+      "The accounting workspace: warm-paper surfaces, Geist typography, semantic finance tones, and a distinct mark for every built-in module.",
+    group: "Flanksource · Systems",
+    icon: UiCoins,
+    groupOrder: 20,
+    navOrder: 40,
     section: "systems",
   },
 ] as const satisfies readonly DesignSystemPage[];

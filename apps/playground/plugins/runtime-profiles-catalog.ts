@@ -1,47 +1,9 @@
-import { clickyOperationsToTools } from "../../../packages/ui/src/data/chat/clickyOperationsToTools";
-import type { ToolMeta } from "../../../packages/ui/src/data/chat/types";
 import type {
   RuntimeCatalogFamily,
   RuntimePermissionCapabilities,
   RuntimePermissionSupport,
   RuntimePermissionSupportKind,
 } from "../../../packages/ui/src/data/runtime/runtime-mode";
-import type {
-  OpenAPISpec,
-  ResolvedOperation,
-} from "../../../packages/ui/src/rpc/types";
-
-export function runtimeProfileToolsFromSpec(spec: OpenAPISpec): ToolMeta[] {
-  const operations: ResolvedOperation[] = [];
-  for (const [path, methods] of Object.entries(spec.paths)) {
-    for (const [method, operation] of Object.entries(methods)) {
-      operations.push({ path, method, operation });
-    }
-  }
-  const tools = clickyOperationsToTools(operations, spec["x-clicky"]?.surfaces);
-  if (tools.length === 0) {
-    throw new Error(
-      "the Clicky OpenAPI document contains no callable operations",
-    );
-  }
-  return tools;
-}
-
-export async function loadRuntimeProfileToolCatalog(
-  operationsURL: string,
-): Promise<ToolMeta[]> {
-  const response = await fetch(operationsURL);
-  if (!response.ok) {
-    throw new Error(
-      `Gavel OpenAPI request failed with ${response.status} ${response.statusText}`,
-    );
-  }
-  const document: unknown = await response.json();
-  if (!isOpenAPISpec(document)) {
-    throw new Error("Gavel OpenAPI response is missing a paths object");
-  }
-  return runtimeProfileToolsFromSpec(document);
-}
 
 export async function loadRuntimeProfileRuntimeCatalog(
   runtimesURL: string,
@@ -83,9 +45,21 @@ function assertRuntimeCatalog(value: unknown): RuntimeCatalogFamily[] {
         `runtime family "${family}" mode ${modeIndex} backend`,
       );
       assertPermissionCapabilities(mode.permissions, backend);
+      assertRuntimeSchema(mode.schema, backend);
     }
   }
   return value as RuntimeCatalogFamily[];
+}
+
+function assertRuntimeSchema(value: unknown, backend: string): void {
+  if (!isRecord(value)) {
+    throw new Error(`runtime mode "${backend}" is missing its JSON schema`);
+  }
+  if (value.type !== "object" || !isRecord(value.properties)) {
+    throw new Error(
+      `runtime mode "${backend}" JSON schema must be an object with properties`,
+    );
+  }
 }
 
 function assertPermissionCapabilities(
@@ -130,10 +104,4 @@ function requiredString(value: unknown, context: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isOpenAPISpec(value: unknown): value is OpenAPISpec {
-  if (!value || typeof value !== "object") return false;
-  const paths = (value as { paths?: unknown }).paths;
-  return !!paths && typeof paths === "object" && !Array.isArray(paths);
 }

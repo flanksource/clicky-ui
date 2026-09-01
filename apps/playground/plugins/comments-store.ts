@@ -7,6 +7,12 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 
+import {
+  COMMENT_ELEMENT_HTML_LIMIT,
+  COMMENT_ELEMENT_HTML_TRUNCATION,
+  type CommentElementContext,
+} from "./comments-model";
+
 export const COMMENT_RATINGS = ["positive", "negative"] as const;
 export type CommentRating = (typeof COMMENT_RATINGS)[number];
 
@@ -31,6 +37,7 @@ export type StoredComment = {
   parentId?: string | null;
   anchor?: string | null;
   rating?: CommentRating;
+  element?: CommentElementContext;
 };
 
 /** Page slug → the comments left on that page. */
@@ -152,6 +159,49 @@ export function assertRating(rating: unknown): CommentRating {
   return rating as CommentRating;
 }
 
+export function assertElementContext(input: unknown): CommentElementContext {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("comment element context must be an object");
+  }
+  const candidate = input as Record<string, unknown>;
+  const allowedFields = new Set(["componentName", "source", "html"]);
+  const unexpected = Object.keys(candidate).find(
+    (key) => !allowedFields.has(key),
+  );
+  if (unexpected) {
+    throw new Error(
+      `comment element context has unexpected field ${JSON.stringify(unexpected)}`,
+    );
+  }
+  const source = candidate["source"];
+  const html = candidate["html"];
+  if (typeof source !== "string" || source === "") {
+    throw new Error("comment element source must be a non-empty string");
+  }
+  if (typeof html !== "string" || html === "") {
+    throw new Error("comment element html must be a non-empty string");
+  }
+  const truncatedLength =
+    COMMENT_ELEMENT_HTML_LIMIT + COMMENT_ELEMENT_HTML_TRUNCATION.length;
+  if (
+    html.length > COMMENT_ELEMENT_HTML_LIMIT &&
+    (html.length !== truncatedLength ||
+      !html.endsWith(COMMENT_ELEMENT_HTML_TRUNCATION))
+  ) {
+    throw new Error(
+      `comment element html exceeds the ${COMMENT_ELEMENT_HTML_LIMIT}-character capture limit`,
+    );
+  }
+  const componentName = candidate["componentName"];
+  if (
+    componentName !== undefined &&
+    (typeof componentName !== "string" || componentName === "")
+  ) {
+    throw new Error("comment element componentName must be a non-empty string");
+  }
+  return input as CommentElementContext;
+}
+
 export function assertComment(input: unknown): StoredComment {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("comment payload must be an object");
@@ -177,6 +227,19 @@ export function assertComment(input: unknown): StoredComment {
     throw new Error('comment payload requires an "author" object or null');
   }
   if (candidate["status"] !== undefined) assertStatus(candidate["status"]);
+  if (candidate["element"] !== undefined) {
+    assertElementContext(candidate["element"]);
+  }
+  const isReply = typeof candidate["parentId"] === "string";
+  const anchor = candidate["anchor"];
+  const isAnchoredRoot =
+    !isReply && typeof anchor === "string" && anchor !== "__document__";
+  if (isAnchoredRoot && candidate["element"] === undefined) {
+    throw new Error("an anchored root requires element context");
+  }
+  if (isReply && candidate["element"] !== undefined) {
+    throw new Error("replies inherit their root element context");
+  }
   return input as StoredComment;
 }
 
@@ -332,8 +395,9 @@ export function addReply(
   reply: StoredComment,
 ): StoredComment {
   const root = rootOf(dir, parentId);
+  const { element: _rootOnly, ...replyFields } = reply;
   return addComment(dir, root.page, {
-    ...reply,
+    ...replyFields,
     parentId: root.comment.id,
     anchor: root.comment.anchor ?? null,
   });
