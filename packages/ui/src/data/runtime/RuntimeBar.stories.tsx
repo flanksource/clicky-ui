@@ -9,32 +9,32 @@ import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
 // families that carry their own models, plus a hosted-API family that does not.
 const MODELS: ChatModel[] = [
   {
-    id: "claude-agent/claude-sonnet-4-6",
-    provider: "claude-agent",
+    id: "anthropic/claude-sonnet-4-6",
+    provider: "anthropic",
     label: "Claude Sonnet 4.6",
     reasoning: true,
     configured: true,
     contextWindow: 200_000,
   },
   {
-    id: "claude-agent/claude-opus-4-1",
-    provider: "claude-agent",
+    id: "anthropic/claude-opus-4-1",
+    provider: "anthropic",
     label: "Claude Opus 4.1",
     reasoning: true,
     configured: true,
     contextWindow: 200_000,
   },
   {
-    id: "codex-cli/gpt-5-codex",
-    provider: "codex-cli",
+    id: "openai/gpt-5-codex",
+    provider: "openai",
     label: "GPT-5 Codex",
     reasoning: true,
     configured: true,
     contextWindow: 400_000,
   },
   {
-    id: "codex-cli/gpt-5-mini",
-    provider: "codex-cli",
+    id: "openai/gpt-5-mini",
+    provider: "openai",
     label: "GPT-5 mini",
     reasoning: true,
     configured: false,
@@ -45,9 +45,11 @@ const MODELS: ChatModel[] = [
 function RuntimeBarStory({
   initial,
   variant = "segmented",
+  families,
 }: {
   initial: AISpecRuntimeValue;
   variant?: RuntimeBarProps["variant"];
+  families?: RuntimeBarProps["families"];
 }) {
   const [value, setValue] = useState<AISpecRuntimeValue>(initial);
   return (
@@ -56,6 +58,7 @@ function RuntimeBarStory({
         value={value}
         onChange={setValue}
         models={MODELS}
+        families={families}
         variant={variant}
       />
       <pre className="rounded-md border border-border bg-muted/30 p-3 font-mono text-xs text-muted-foreground">
@@ -103,7 +106,7 @@ export const WithModelAndEffort: Story = {
       variant={variant}
       initial={{
         mode: "cli",
-        model: "codex-cli/gpt-5-codex",
+        model: "openai/gpt-5-codex",
         effort: "high",
       }}
     />
@@ -119,7 +122,7 @@ export const Combo: Story = {
       variant={variant}
       initial={{
         mode: "cli",
-        model: "codex-cli/gpt-5-codex",
+        model: "openai/gpt-5-codex",
         effort: "high",
       }}
     />
@@ -149,8 +152,8 @@ export const Combo: Story = {
     const modelChoice = within(menu).getByRole("button", {
       name: "GPT-5 Codex",
     });
-    await expect(modelChoice).toHaveAttribute("title", "codex-cli/gpt-5-codex");
-    await expect(modelChoice).not.toHaveTextContent("codex-cli/gpt-5-codex");
+    await expect(modelChoice).toHaveAttribute("title", "openai/gpt-5-codex");
+    await expect(modelChoice).not.toHaveTextContent("openai/gpt-5-codex");
 
     await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     await expect(
@@ -160,10 +163,10 @@ export const Combo: Story = {
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
 
-    // Claude has no API mode, so the unavailable choice is omitted.
+    // The canonical Claude family includes its hosted API runtime.
     await expect(
-      within(menu).queryByRole("radio", { name: "API" }),
-    ).not.toBeInTheDocument();
+      within(menu).getByRole("radio", { name: "API" }),
+    ).toBeInTheDocument();
 
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("menu")).not.toBeInTheDocument();
@@ -199,7 +202,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
   render: ({ variant }) => (
     <RuntimeBarStory
       variant={variant}
-      initial={{ mode: "cli", model: "claude-opus-4-1" }}
+      initial={{ mode: "cli", model: "anthropic/claude-opus-4-1" }}
     />
   ),
   play: async ({ canvasElement }) => {
@@ -222,7 +225,31 @@ export const SwitchingFamilyKeepsTheMode: Story = {
 export const UnavailableModesAreOmitted: Story = {
   args: { variant: "segmented" },
   render: ({ variant }) => (
-    <RuntimeBarStory initial={{ mode: "agent" }} variant={variant} />
+    <RuntimeBarStory
+      initial={{ mode: "agent" }}
+      variant={variant}
+      families={[
+        {
+          id: "claude",
+          label: "Claude",
+          provider: "anthropic",
+          modes: [
+            {
+              id: "agent",
+              label: "Agent",
+              mode: "agent",
+              title: "Claude Agent SDK",
+            },
+            {
+              id: "cli",
+              label: "CLI",
+              mode: "cli",
+              title: "Claude Code CLI",
+            },
+          ],
+        },
+      ]}
+    />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

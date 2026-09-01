@@ -77,7 +77,7 @@ export const WithRuntimeBar: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const runtime = canvas.getByRole("button", {
-      name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+      name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
     });
     const meter = canvas.getByLabelText("Context 0% used");
     await userEvent.hover(meter);

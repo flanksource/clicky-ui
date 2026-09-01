@@ -153,7 +153,7 @@ describe("SandboxCreateWizard", () => {
 
     fireEvent.focus(screen.getByRole("combobox", { name: "Sandbox type" }));
 
-    for (const name of ["Sandbox Runtime", "Container", "Git agent"]) {
+    for (const name of ["Sandbox Runtime", "Container", "Git Agent"]) {
       expect(
         screen.getByRole("option", { name: new RegExp(name) }),
       ).toContainHTML("<svg");

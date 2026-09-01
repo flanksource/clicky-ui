@@ -130,7 +130,7 @@ export const MultiWindow: Story = {
     await waitFor(() =>
       expect(
         canvas.getByRole("button", {
-          name: "Runtime: Anthropic, API, Claude Sonnet 4.5, effort Medium",
+          name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
         }),
       ).toBeInTheDocument(),
     );
