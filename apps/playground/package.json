@@ -8,8 +8,7 @@
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "lint": "oxlint src plugins vite.config.ts --deny-warnings",
-    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint",
-    "test": "vitest run"
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
@@ -22,16 +21,13 @@
   "devDependencies": {
     "@iconify-icons/ph": "1.2.5",
     "@tailwindcss/vite": "catalog:",
-    "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
-    "jsdom": "catalog:",
     "react-grab": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "vite": "catalog:"
   }
 }

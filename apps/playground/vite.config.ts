@@ -77,13 +77,6 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@flanksource/clicky-ui"],
   },
-  test: {
-    server: {
-      deps: {
-        inline: ["@floating-ui/react"],
-      },
-    },
-  },
   server: {
     // Bind every interface so the playground is reachable from other devices
     // on the LAN; allowedHosts keeps hostname (.local, tunnel) access working,

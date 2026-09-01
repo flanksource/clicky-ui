@@ -258,9 +258,6 @@ importers:
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.3(vite@6.4.3(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.8.3))
-      '@testing-library/react':
-        specifier: 'catalog:'
-        version: 16.3.2(@testing-library/dom@10.4.0)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
@@ -273,9 +270,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 5.2.0(supports-color@8.1.1)(vite@6.4.3(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.8.3))
-      jsdom:
-        specifier: 'catalog:'
-        version: 26.1.0(supports-color@8.1.1)
       react-grab:
         specifier: 'catalog:'
         version: 0.1.50(react@18.3.1)
@@ -288,9 +282,6 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 6.4.3(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.8.3)
-      vitest:
-        specifier: 'catalog:'
-        version: 3.2.6(@types/debug@4.1.13)(@types/node@24.12.2)(@vitest/browser@3.2.6)(jiti@2.7.0)(jsdom@26.1.0(supports-color@8.1.1))(lightningcss@1.32.0)(supports-color@8.1.1)(tsx@4.22.3)(yaml@2.8.3)
 
   apps/storybook:
     dependencies:
