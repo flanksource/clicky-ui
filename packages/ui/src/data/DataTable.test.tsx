@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { DataTable, type DataTableColumn } from "./DataTable";
@@ -158,7 +165,10 @@ describe("DataTable", () => {
         rowSelection={{
           selectedRowIds: ["api", "worker", "cron"],
           onSelectionChange: vi.fn(),
-          selectAllPages: { scopes: [{ total: 3706, onSelectAll: vi.fn() }], noun: "requests" },
+          selectAllPages: {
+            scopes: [{ total: 3706, onSelectAll: vi.fn() }],
+            noun: "requests",
+          },
         }}
         selectionActions={() => <button type="button">Restart selected</button>}
       />,
@@ -175,26 +185,37 @@ describe("DataTable", () => {
       within(cluster).getByRole("button", { name: "Restart selected" }),
     ).toBeInTheDocument();
     expect(
-      within(cluster).getByRole("button", { name: "Select all 3,706 requests" }),
+      within(cluster).getByRole("button", {
+        name: "Select all 3,706 requests",
+      }),
     ).toBeInTheDocument();
   });
 
   it("offers the rows past the page only once the whole page is selected", () => {
     const onSelectAll = vi.fn();
     const onSelectionChange = vi.fn();
-    const selectAllPages = { scopes: [{ total: 3706, onSelectAll }], noun: "requests" };
+    const selectAllPages = {
+      scopes: [{ total: 3706, onSelectAll }],
+      noun: "requests",
+    };
     const { rerender } = render(
       <DataTable
         data={rows}
         columns={columns}
         getRowId={(row) => row.service}
-        rowSelection={{ selectedRowIds: ["api"], onSelectionChange, selectAllPages }}
+        rowSelection={{
+          selectedRowIds: ["api"],
+          onSelectionChange,
+          selectAllPages,
+        }}
       />,
     );
 
     // A partial page still gets the count — it is the offer that waits.
     const partial = within(screen.getByTestId("data-table-selection-scope"));
-    expect(partial.getByText("1 of 3,706 requests selected.")).toBeInTheDocument();
+    expect(
+      partial.getByText("1 of 3,706 requests selected."),
+    ).toBeInTheDocument();
     expect(partial.queryByRole("button", { name: /Select all/ })).toBeNull();
 
     rerender(
@@ -211,8 +232,12 @@ describe("DataTable", () => {
     );
 
     const notice = within(screen.getByTestId("data-table-selection-scope"));
-    expect(notice.getByText("3 of 3,706 requests selected.")).toBeInTheDocument();
-    fireEvent.click(notice.getByRole("button", { name: "Select all 3,706 requests" }));
+    expect(
+      notice.getByText("3 of 3,706 requests selected."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      notice.getByRole("button", { name: "Select all 3,706 requests" }),
+    );
     expect(onSelectAll).toHaveBeenCalledTimes(1);
   });
 
@@ -220,7 +245,11 @@ describe("DataTable", () => {
     const selectGroup = vi.fn();
     const selectEverything = vi.fn();
     const scopes = [
-      { total: 12, onSelectAll: selectGroup, label: "Select all 12 in this group" },
+      {
+        total: 12,
+        onSelectAll: selectGroup,
+        label: "Select all 12 in this group",
+      },
       { total: 3706, onSelectAll: selectEverything },
     ];
     const { rerender } = render(
@@ -237,8 +266,12 @@ describe("DataTable", () => {
     );
 
     const narrow = within(screen.getByTestId("data-table-selection-scope"));
-    expect(narrow.getByText("3 of 3,706 requests selected.")).toBeInTheDocument();
-    fireEvent.click(narrow.getByRole("button", { name: "Select all 12 in this group" }));
+    expect(
+      narrow.getByText("3 of 3,706 requests selected."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      narrow.getByRole("button", { name: "Select all 12 in this group" }),
+    );
     expect(selectGroup).toHaveBeenCalledTimes(1);
     expect(selectEverything).not.toHaveBeenCalled();
 
@@ -249,11 +282,10 @@ describe("DataTable", () => {
         columns={columns}
         getRowId={(row) => row.service}
         rowSelection={{
-          selectedRowIds: Array.from({ length: 12 }, (_, index) => `row-${index}`).concat([
-            "api",
-            "worker",
-            "cron",
-          ]),
+          selectedRowIds: Array.from(
+            { length: 12 },
+            (_, index) => `row-${index}`,
+          ).concat(["api", "worker", "cron"]),
           onSelectionChange: vi.fn(),
           selectAllPages: { scopes, noun: "requests" },
         }}
@@ -262,7 +294,9 @@ describe("DataTable", () => {
 
     const wide = within(screen.getByTestId("data-table-selection-scope"));
     expect(wide.queryByRole("button", { name: /in this group/ })).toBeNull();
-    fireEvent.click(wide.getByRole("button", { name: "Select all 3,706 requests" }));
+    fireEvent.click(
+      wide.getByRole("button", { name: "Select all 3,706 requests" }),
+    );
     expect(selectEverything).toHaveBeenCalledTimes(1);
   });
 
@@ -277,7 +311,10 @@ describe("DataTable", () => {
         rowSelection={{
           selectedRowIds: ["api", "worker", "cron"],
           onSelectionChange,
-          selectAllPages: { scopes: [{ total: 3, onSelectAll }], noun: "requests" },
+          selectAllPages: {
+            scopes: [{ total: 3, onSelectAll }],
+            noun: "requests",
+          },
         }}
       />,
     );
@@ -299,15 +336,17 @@ describe("DataTable", () => {
         rowSelection={{
           selectedRowIds: ["api", "worker", "cron"],
           onSelectionChange: vi.fn(),
-          selectAllPages: { scopes: [{ total: 3706, onSelectAll }], loading: true },
+          selectAllPages: {
+            scopes: [{ total: 3706, onSelectAll }],
+            loading: true,
+          },
         }}
       />,
     );
 
-    const pending = within(screen.getByTestId("data-table-selection-scope")).getByRole(
-      "button",
-      { name: "Selecting…" },
-    );
+    const pending = within(
+      screen.getByTestId("data-table-selection-scope"),
+    ).getByRole("button", { name: "Selecting…" });
     expect(pending).toBeDisabled();
     fireEvent.click(pending);
     expect(onSelectAll).not.toHaveBeenCalled();
@@ -324,14 +363,23 @@ describe("DataTable", () => {
           onSelectionChange: vi.fn(),
           selectAllPages: { scopes: [{ onSelectAll: vi.fn() }] },
         }}
-        pagination={{ page: 0, pageSize: 3, total: 42, onPageChange: vi.fn(), onPageSizeChange: vi.fn() }}
+        pagination={{
+          page: 0,
+          pageSize: 3,
+          total: 42,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
       />,
     );
 
     expect(
-      within(screen.getByTestId("data-table-selection-scope")).getByRole("button", {
-        name: "Select all 42 rows",
-      }),
+      within(screen.getByTestId("data-table-selection-scope")).getByRole(
+        "button",
+        {
+          name: "Select all 42 rows",
+        },
+      ),
     ).toBeInTheDocument();
   });
 
@@ -341,8 +389,17 @@ describe("DataTable", () => {
         data={rows}
         columns={columns}
         getRowId={(row) => row.service}
-        rowSelection={{ selectedRowIds: ["api", "worker", "cron"], onSelectionChange: vi.fn() }}
-        pagination={{ page: 0, pageSize: 3, total: 42, onPageChange: vi.fn(), onPageSizeChange: vi.fn() }}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange: vi.fn(),
+        }}
+        pagination={{
+          page: 0,
+          pageSize: 3,
+          total: 42,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
       />,
     );
 
@@ -397,7 +454,10 @@ describe("DataTable", () => {
         data={rows}
         columns={columns}
         getRowId={(row) => row.service}
-        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange: vi.fn() }}
+        rowSelection={{
+          selectedRowIds: ["api", "cron"],
+          onSelectionChange: vi.fn(),
+        }}
         selectionActions={[
           { id: "archive", label: "Archive", onSelect: onArchive },
           { id: "restart", label: "Restart", onSelect: vi.fn() },
@@ -417,6 +477,132 @@ describe("DataTable", () => {
     ]);
   });
 
+  it("keeps the cluster beside the filters unless asked to take the row", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        showGlobalFilter
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          { id: "archive", label: "Archive", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+
+    expect(
+      document.querySelector('[data-slot="filter-bar-overlay"]'),
+    ).toBeNull();
+    expect(screen.getByTestId("data-table-selection-actions")).toBeTruthy();
+  });
+
+  it("takes over the filter row while rows are selected, and gives it back", () => {
+    const onSelectionChange = vi.fn();
+    const props = {
+      data: rows,
+      columns,
+      getRowId: (row: ServiceRow) => row.service,
+      showGlobalFilter: true,
+      selectionBar: "takeover" as const,
+      selectionActions: [
+        { id: "archive", label: "Archive", onSelect: vi.fn() },
+      ],
+    };
+
+    const { rerender } = render(
+      <DataTable
+        {...props}
+        rowSelection={{ selectedRowIds: [], onSelectionChange }}
+      />,
+    );
+
+    // Nothing selected: the filter row is the row.
+    expect(
+      document.querySelector('[data-slot="filter-bar-overlay"]'),
+    ).toBeNull();
+    expect(screen.getByPlaceholderText("Search all columns…")).toBeTruthy();
+
+    rerender(
+      <DataTable
+        {...props}
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange }}
+      />,
+    );
+
+    expect(
+      document.querySelector('[data-slot="filter-bar-overlay"]'),
+    ).toBeTruthy();
+    // The filters are hidden, not unmounted — a half-typed search survives the
+    // takeover — but they are out of the accessibility tree while hidden.
+    expect(
+      document
+        .querySelector('[data-slot="filter-bar"]')
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+
+    rerender(
+      <DataTable
+        {...props}
+        rowSelection={{ selectedRowIds: [], onSelectionChange }}
+      />,
+    );
+
+    expect(
+      document.querySelector('[data-slot="filter-bar-overlay"]'),
+    ).toBeNull();
+    expect(
+      document
+        .querySelector('[data-slot="filter-bar"]')
+        ?.getAttribute("aria-hidden"),
+    ).toBeNull();
+  });
+
+  // A render-prop cluster is the caller's own markup start to finish, so the
+  // table cannot claim the row on its behalf.
+  it("never takes over for the render-prop form", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        showGlobalFilter
+        selectionBar="takeover"
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={() => <button type="button">Bespoke</button>}
+      />,
+    );
+
+    expect(
+      document.querySelector('[data-slot="filter-bar-overlay"]'),
+    ).toBeNull();
+    expect(screen.getByRole("button", { name: "Bespoke" })).toBeTruthy();
+  });
+
+  // Losing fullscreen or the column menu the moment a box is ticked would be a
+  // regression, not a simplification: they are view controls, and regrouping
+  // does not invalidate an id-keyed selection.
+  it("keeps the table's own controls reachable during a takeover", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        showGlobalFilter
+        selectionBar="takeover"
+        rowSelection={{ selectedRowIds: ["api"], onSelectionChange: vi.fn() }}
+        selectionActions={[
+          { id: "archive", label: "Archive", onSelect: vi.fn() },
+        ]}
+        filterBarProps={{ trailing: <button type="button">Fullscreen</button> }}
+      />,
+    );
+
+    const bar = within(screen.getByTestId("data-table-selection-actions"));
+    expect(bar.getByRole("button", { name: "Fullscreen" })).toBeTruthy();
+    expect(bar.getByRole("button", { name: "Archive" })).toBeTruthy();
+  });
+
   it("states the count itself so the caller stops writing it", () => {
     const onSelectionChange = vi.fn();
     render(
@@ -425,7 +611,9 @@ describe("DataTable", () => {
         columns={columns}
         getRowId={(row) => row.service}
         rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange }}
-        selectionActions={[{ id: "archive", label: "Archive", onSelect: vi.fn() }]}
+        selectionActions={[
+          { id: "archive", label: "Archive", onSelect: vi.fn() },
+        ]}
       />,
     );
 
@@ -456,14 +644,18 @@ describe("DataTable", () => {
           onPageChange: vi.fn(),
           onPageSizeChange: vi.fn(),
         }}
-        selectionActions={[{ id: "archive", label: "Archive", onSelect: vi.fn() }]}
+        selectionActions={[
+          { id: "archive", label: "Archive", onSelect: vi.fn() },
+        ]}
       />,
     );
 
     // Two counts and two Clears in one row reads as two selections.
     expect(screen.queryByTestId("data-table-selection-count")).toBeNull();
     expect(screen.getByTestId("data-table-selection-scope")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Clear selection" })).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: "Clear selection" }),
+    ).toHaveLength(1);
   });
 
   it("keeps three actions on the toolbar and collapses the rest into the overflow menu", () => {
@@ -511,10 +703,30 @@ describe("DataTable", () => {
           { id: "pin1", label: "pin1", primary: true, onSelect: vi.fn() },
           { id: "pin2", label: "pin2", primary: true, onSelect: vi.fn() },
           { id: "pin3", label: "pin3", primary: true, onSelect: vi.fn() },
-          { id: "status", label: "status", section: "Status", onSelect: vi.fn() },
-          { id: "labels", label: "labels", section: "Labels", onSelect: vi.fn() },
-          { id: "comment", label: "comment", section: "Status", onSelect: vi.fn() },
-          { id: "delete", label: "delete", section: "Danger", onSelect: vi.fn() },
+          {
+            id: "status",
+            label: "status",
+            section: "Status",
+            onSelect: vi.fn(),
+          },
+          {
+            id: "labels",
+            label: "labels",
+            section: "Labels",
+            onSelect: vi.fn(),
+          },
+          {
+            id: "comment",
+            label: "comment",
+            section: "Status",
+            onSelect: vi.fn(),
+          },
+          {
+            id: "delete",
+            label: "delete",
+            section: "Danger",
+            onSelect: vi.fn(),
+          },
         ]}
       />,
     );
@@ -583,7 +795,9 @@ describe("DataTable", () => {
     expect(archive.getAttribute("aria-busy")).toBe("true");
     // The rows underneath are already being rewritten; a second bulk call
     // against a half-changed selection is the one nobody can put back.
-    expect(bar.getByRole("button", { name: "Restart" }).hasAttribute("disabled")).toBe(true);
+    expect(
+      bar.getByRole("button", { name: "Restart" }).hasAttribute("disabled"),
+    ).toBe(true);
     fireEvent.click(archive);
     expect(onSelect).toHaveBeenCalledTimes(1);
 
@@ -604,14 +818,18 @@ describe("DataTable", () => {
         data={rows}
         columns={columns}
         getRowId={(row) => row.service}
-        rowSelection={{ selectedRowIds: ["api", "cron"], onSelectionChange: vi.fn() }}
+        rowSelection={{
+          selectedRowIds: ["api", "cron"],
+          onSelectionChange: vi.fn(),
+        }}
         selectionActions={[
           {
             id: "delete",
             label: "Delete",
             variant: "destructive",
             confirm: {
-              message: (context) => `Delete ${context.selectedRowIds.length} services?`,
+              message: (context) =>
+                `Delete ${context.selectedRowIds.length} services?`,
             },
             onSelect,
           },
@@ -627,7 +845,9 @@ describe("DataTable", () => {
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByText("Delete 2 services?")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByText("Delete 2 services?")).toBeNull(),
+    );
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(bar.getByRole("button", { name: "Delete" }));
@@ -658,7 +878,9 @@ describe("DataTable", () => {
 
     const context = onSelect.mock.calls[0]![0];
     expect(context.selectedRowIds).toEqual(["api", "beyond-the-page"]);
-    expect(context.selectedRows.map((row: ServiceRow) => row.service)).toEqual(["api"]);
+    expect(context.selectedRows.map((row: ServiceRow) => row.service)).toEqual([
+      "api",
+    ]);
   });
 
   it("applies getRowClassName to the matching row", () => {
@@ -741,7 +963,11 @@ describe("DataTable", () => {
         data={rows}
         columns={columns}
         getRowId={(row) => row.service}
-        grouping={{ ...grouping, metaAlign: "start", metaClassName: "font-mono" }}
+        grouping={{
+          ...grouping,
+          metaAlign: "start",
+          metaClassName: "font-mono",
+        }}
       />,
     );
 
@@ -1365,7 +1591,12 @@ describe("DataTable", () => {
             section: "",
             onSelect: parent,
             children: [
-              { id: "view-clicky", label: "Clicky", disabled: true, onSelect: vi.fn() },
+              {
+                id: "view-clicky",
+                label: "Clicky",
+                disabled: true,
+                onSelect: vi.fn(),
+              },
               { id: "view-json", label: "JSON", onSelect: chooseJson },
             ],
           },
@@ -1382,7 +1613,9 @@ describe("DataTable", () => {
       within(menu).queryByRole("menuitem", { name: "JSON" }),
     ).not.toBeInTheDocument();
 
-    const trigger = within(menu).getByRole("menuitem", { name: /^View: Clicky/ });
+    const trigger = within(menu).getByRole("menuitem", {
+      name: /^View: Clicky/,
+    });
     expect(trigger).toHaveAttribute("aria-haspopup", "menu");
 
     // Hovering past the row must not open it: a flyout nobody asked for covers
@@ -1469,6 +1702,20 @@ describe("DataTable", () => {
     // more useful than replacing it with a second loading message.
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     expect(screen.getByText("1-2 of 2")).toBeInTheDocument();
+  });
+
+  it("keyboard-activates rows backed by an onRowClick handler", () => {
+    const onRowClick = vi.fn();
+    render(<DataTable data={rows} columns={columns} onRowClick={onRowClick} />);
+
+    const row = screen.getByText("api").closest("tr");
+    expect(row).toHaveAttribute("tabindex", "0");
+
+    fireEvent.keyDown(row!, { key: "Enter" });
+    fireEvent.keyDown(row!, { key: " " });
+
+    expect(onRowClick).toHaveBeenNthCalledWith(1, rows[0]);
+    expect(onRowClick).toHaveBeenNthCalledWith(2, rows[0]);
   });
 
   it("renders each row as a real stretched anchor and routes plain clicks client-side", () => {
@@ -3113,7 +3360,11 @@ describe("DataTable caller-owned FilterBar inputs", () => {
       const infinite = { hasMore: true, loading: false, onLoadMore };
 
       const view = render(
-        <DataTable data={pageRows(0, 3)} columns={columns} infinite={infinite} />,
+        <DataTable
+          data={pageRows(0, 3)}
+          columns={columns}
+          infinite={infinite}
+        />,
       );
 
       intersect(2);
@@ -3133,7 +3384,11 @@ describe("DataTable caller-owned FilterBar inputs", () => {
       // The page landed and the rows grew, so the next intersection is a new
       // request rather than a repeat of the one already answered.
       view.rerender(
-        <DataTable data={pageRows(0, 6)} columns={columns} infinite={infinite} />,
+        <DataTable
+          data={pageRows(0, 6)}
+          columns={columns}
+          infinite={infinite}
+        />,
       );
       intersect(1);
       expect(onLoadMore).toHaveBeenCalledTimes(2);

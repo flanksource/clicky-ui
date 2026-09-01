@@ -18,6 +18,7 @@ import { scalarItemsType } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { TableArray } from "./json-schema-form-table-array";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
+import { CompactListArray } from "./json-schema-form-list-array";
 import {
   hasObjectItemProperties,
   seedFromSchema,
@@ -52,6 +53,19 @@ export function ArrayControl({
   // a value span).
   const readOnly = ctx.readOnly || field.readOnly === true;
   const choices = enumItemOptions(field);
+  const scalarType = scalarItemsType(field.itemSchema);
+  if (field.arrayDisplay === "list") {
+    if (scalarType !== "string") {
+      throw new Error(`${field.key} uses x-array-display list without string items`);
+    }
+    return (
+      <CompactListArray
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+      />
+    );
+  }
   if (field.arrayDisplay === "filter-pills" && choices.length > 0) {
     return (
       <FilterPillArray
@@ -80,7 +94,6 @@ export function ArrayControl({
   // A flat list of scalars is the same gesture as the enum list above — type a
   // value, get a pill — so it takes the same control, with no options to pick
   // from and a comma as a second commit key. Numeric items commit numbers.
-  const scalarType = scalarItemsType(field.itemSchema);
   if (field.arrayDisplay !== "stacked" && scalarType) {
     return (
       <TagsComboboxControl
@@ -261,4 +274,3 @@ function FilterPillArray({
     </div>
   );
 }
-

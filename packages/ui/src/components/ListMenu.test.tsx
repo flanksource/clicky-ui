@@ -27,6 +27,16 @@ describe("ListMenu", () => {
     expect(screen.getByText("Pull request")).toHaveClass("border-l-2", "border-transparent", "hover:bg-muted");
   });
 
+  it("renders the compact item variant with list-row density", () => {
+    render(<ListMenuItem variant="compact">Writable root</ListMenuItem>);
+
+    expect(screen.getByText("Writable root")).toHaveClass(
+      "px-density-2",
+      "py-1",
+      "text-xs",
+    );
+  });
+
   it("prioritizes active and selected row states over the inactive accent", () => {
     render(
       <>

@@ -84,6 +84,40 @@ export const WithFailure: Story = {
   },
 };
 
+// The header split button copies the whole run as Markdown, with JSON and
+// errors-only in its menu; each row reveals a copy glyph on hover.
+export const CopyRunDetails: Story = {
+  args: {
+    snapshots: run("failed", [
+      { name: "Measure dev", status: "success", duration: "527ms" },
+      {
+        name: "Export from dev",
+        status: "failed",
+        duration: "15.298s",
+        error: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
+        logs: [
+          { level: "error", message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled" },
+        ],
+      },
+      { name: "Verify dev", status: "canceled", duration: "15.899s", error: "dependency failed" },
+    ]),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Real chromium denies writeText without the clipboard-write permission,
+    // so stub it and assert the affordance rather than the OS clipboard.
+    const writeText = fn();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    await userEvent.click(canvas.getByRole("button", { name: "Copy" }));
+
+    await expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled"),
+    );
+    await expect(canvas.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+  },
+};
+
 export const Complete: Story = {
   args: {
     snapshots: run("success", [

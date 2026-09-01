@@ -74,8 +74,9 @@ export interface JsonSchemaProperty {
   // Force an array's presentation. "filter-pills" renders each enum item as a
   // compact toggle (an empty stored array means all options); "accordion" and
   // "cards" render object items as summary rows or titled cards, both reading
-  // `x-item` for the summary. Object items default to the accordion, so this is
-  // only needed to say "cards" or to opt out with "stacked".
+  // `x-item` for the summary; "list" renders scalar values as compact editable
+  // list items. Object items default to the accordion, so this is only needed to
+  // say "cards" or to opt out with "stacked".
   "x-array-display"?: ArrayDisplay;
   // Force how this field's description is presented, overriding the form-level
   // `FormLayout.help`. Defaults to "inline" (a paragraph under the control).
@@ -225,7 +226,7 @@ export type ScalarItemType = "string" | "integer" | "number";
 // keep every item open under a titled, hue-edged header. An object-item array
 // renders as an accordion without being asked; "stacked" is the opt-out back to
 // one full sub-form per item, labelled *Item N*.
-export type ArrayDisplay = "filter-pills" | "accordion" | "cards" | "stacked";
+export type ArrayDisplay = "filter-pills" | "accordion" | "cards" | "stacked" | "list";
 
 // A per-item editing action an object-array row can offer. "reorder" covers both
 // the up and the down button — a list where only one direction moved would be a

@@ -113,7 +113,11 @@ function enumDisplay(prop: JsonSchemaProperty): EnumDisplay | undefined {
 
 function arrayDisplay(prop: JsonSchemaProperty): ArrayDisplay | undefined {
   const d = prop["x-array-display"];
-  return d === "filter-pills" || d === "accordion" || d === "cards" || d === "stacked"
+  return d === "filter-pills" ||
+    d === "accordion" ||
+    d === "cards" ||
+    d === "stacked" ||
+    d === "list"
     ? d
     : undefined;
 }

@@ -900,6 +900,25 @@ describe("FilterBar", () => {
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
   });
 
+  // The default pins the row to one line above md. `wrap` has to remove that
+  // breakpoint rather than add a plain flex-wrap beside it: the two are
+  // different variant groups, so twMerge keeps both and md:flex-nowrap still
+  // wins — leaving a crowded bar overflowing the viewport on exactly the
+  // desktop widths the caller opted out for.
+  it("drops the no-wrap breakpoint in wrap mode", () => {
+    const filters: FilterBarFilter[] = [
+      { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+    ];
+
+    const { container, rerender } = render(<FilterBar filters={filters} />);
+    const row = () => container.querySelector("[data-slot='filter-bar']")!;
+    expect(row().className).toContain("md:flex-nowrap");
+
+    rerender(<FilterBar overflowMode="wrap" filters={filters} />);
+    expect(row().className).toContain("flex-wrap");
+    expect(row().className).not.toContain("md:flex-nowrap");
+  });
+
   it("renders an 'and N more' hint for a truncated multi filter", () => {
     render(
       <FilterBar
