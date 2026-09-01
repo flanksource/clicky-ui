@@ -37,7 +37,7 @@ export type FixtureFrontmatterParseResult =
     };
 
 const AI_RUNTIME_KEYS = new Set([
-  "backend",
+  "mode",
   "budget",
   "effort",
   "id",
@@ -49,7 +49,7 @@ const AI_RUNTIME_KEYS = new Set([
 ]);
 
 const AI_MODEL_KEYS = new Set([
-  "backend",
+  "mode",
   "budget",
   "effort",
   "id",

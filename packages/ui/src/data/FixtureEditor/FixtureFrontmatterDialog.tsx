@@ -200,7 +200,7 @@ export function FixtureFrontmatterDialog({
 function hasRuntimeModelOverride(value: FixtureFrontmatterState["runtime"]) {
   return Boolean(
     value.model ||
-      value.backend ||
+      value.mode ||
       value.id ||
       value.effort ||
       value.temperature != null ||
