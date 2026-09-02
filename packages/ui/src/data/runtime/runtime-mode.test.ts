@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatModel } from "../chat/types";
 import {
   SPEC_RUNTIME_FAMILIES,
+  familyForModel,
   familiesFromRuntimeCatalog,
   modelBelongsToFamily,
   modelsForFamily,
@@ -63,7 +64,12 @@ describe("runtime model filtering", () => {
       modelBelongsToFamily("claude-opus-cmux", models, claudeFamily, "agent"),
     ).toBe(false);
     expect(
-      modelBelongsToFamily("claude-sonnet-agent", models, claudeFamily, "agent"),
+      modelBelongsToFamily(
+        "claude-sonnet-agent",
+        models,
+        claudeFamily,
+        "agent",
+      ),
     ).toBe(true);
     expect(
       modelBelongsToFamily("gpt-codex-agent", models, claudeFamily, "agent"),
@@ -82,6 +88,13 @@ describe("runtime model filtering", () => {
       family: "codex",
       mode: "agent",
     });
+  });
+
+  it("uses a canonical provider/model id when the host has no model catalog", () => {
+    expect(
+      familyForModel(SPEC_RUNTIME_FAMILIES, [], "anthropic/claude-sonnet-5")
+        ?.id,
+    ).toBe("claude");
   });
 });
 
@@ -205,9 +218,16 @@ describe("familiesFromRuntimeCatalog", () => {
       reason: "Disabled by mode cmux in Captain configuration.",
       remediation: "Enable mode cmux on the Whoami page, then refresh.",
     });
-    // The catalog prefix, not the provider key: it is what ChatModel.provider
-    // carries, so modelsForFamily can filter on it.
-    expect(families[1]!.provider).toBe("googleai");
+    // Model rows carry the canonical provider key. The separate catalog prefix
+    // only namespaces fully-qualified model ids.
+    const gemini = families[1]!;
+    expect(gemini.provider).toBe("google");
+    expect(
+      modelsForFamily(
+        [{ id: "gemini-live", provider: "google", configured: true }],
+        gemini,
+      ).map((model) => model.id),
+    ).toEqual(["gemini-live"]);
   });
 
   it("derives labels from ids without a served label field", () => {

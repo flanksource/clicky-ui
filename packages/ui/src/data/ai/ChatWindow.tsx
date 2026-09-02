@@ -121,6 +121,7 @@ export function ChatWindow({
   } = useChatWindowCatalogs({
     models: chat?.models,
     modelsApi,
+    runtimeFamilies: chat?.runtimeFamilies,
     runtimesApi,
   });
   const {
