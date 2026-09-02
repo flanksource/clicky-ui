@@ -14,7 +14,7 @@ import {
   updateCondition,
   updatePatternCondition,
   type MatchField,
-} from "./PermissionStrategiesEditor.model";
+} from "../../../lib/permission-strategies";
 
 export function PermissionStrategyConditionRow({
   rule,
@@ -60,7 +60,9 @@ export function PermissionStrategyConditionRow({
           value={multiple ? "in" : "is"}
           onChange={(event) => {
             const values = patternValues(rule[field]);
-            setPattern(event.target.value === "in" ? values : (values[0] ?? ""));
+            setPattern(
+              event.target.value === "in" ? values : (values[0] ?? ""),
+            );
           }}
           options={[
             { value: "is", label: "is" },

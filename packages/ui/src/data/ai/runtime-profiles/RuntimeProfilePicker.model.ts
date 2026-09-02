@@ -1,11 +1,18 @@
-import type { AIPromptRunSpec, AIPromptRunValue } from "../PromptRunEditor/model";
+import type {
+  AIPromptRunSpec,
+  AIPromptRunValue,
+} from "../PromptRunEditor/model";
 import type {
   ResolvedRuntimeSpec,
   RuntimePreset,
   RuntimeProfile,
 } from "../runtime-profile";
 import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
-import { authoredRuntimeSpec, duplicateName, mergeRuntimeSpec } from "./model";
+import {
+  authoredRuntimeSpec,
+  duplicateName,
+  mergeRuntimeSpec,
+} from "../../../lib/runtime-profile-model";
 
 export type RuntimeProfileLayer = "run" | "profile";
 
@@ -107,8 +114,12 @@ export function inheritedRuntime({
 }): Pick<AISpecRuntimeSpec, "model" | "mode"> {
   const authored = authoredRuntimeSpec(draft, presets);
   const runtime: Pick<AISpecRuntimeSpec, "model" | "mode"> = {};
-  const model = resolution?.spec.model?.trim() ? resolution.spec.model : authored.model;
-  const mode = resolution?.spec.mode?.trim() ? resolution.spec.mode : authored.mode;
+  const model = resolution?.spec.model?.trim()
+    ? resolution.spec.model
+    : authored.model;
+  const mode = resolution?.spec.mode?.trim()
+    ? resolution.spec.mode
+    : authored.mode;
   if (model) runtime.model = model;
   if (mode) runtime.mode = mode;
   return runtime;
@@ -122,7 +133,10 @@ export function saveAsNewDraft(
   return {
     ...structuredClone(draft),
     id,
-    name: duplicateName(draft.name, profiles.map((profile) => profile.name)),
+    name: duplicateName(
+      draft.name,
+      profiles.map((profile) => profile.name),
+    ),
   };
 }
 

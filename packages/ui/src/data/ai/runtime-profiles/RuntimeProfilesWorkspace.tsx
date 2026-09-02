@@ -16,7 +16,7 @@ import {
   newProfileRecord,
   referencedBy,
   selectionAfterDelete,
-} from "./model";
+} from "../../../lib/runtime-profile-model";
 import { PresetWorkspace } from "./PresetWorkspace";
 import { ProfileWorkspace } from "./ProfileWorkspace";
 import { RuntimePersistenceBar } from "./RuntimePersistenceBar";
@@ -104,9 +104,7 @@ export function RuntimeProfilesWorkspace({
     const preset = presets.find((item) => item.id === id);
     const references = preset ? referencedBy(preset, profiles) : [];
     if (references.length > 0) {
-      throw new Error(
-        `cannot delete preset used by ${references.join(", ")}`,
-      );
+      throw new Error(`cannot delete preset used by ${references.join(", ")}`);
     }
     store.deletePreset(id);
     onSelectPreset(selectionAfterDelete(presets, id, selectedPresetId));

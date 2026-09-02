@@ -18,7 +18,7 @@ import type {
 } from "../SpecRuntimeEditor/types";
 import { withUserRule } from "../ToolPreferences.model";
 import { ToolSchemaBrowser } from "../ToolSchemaBrowser";
-import { referencedBy, uniqueName } from "./model";
+import { referencedBy, uniqueName } from "../../../lib/runtime-profile-model";
 import { PermissionStrategiesEditor } from "./PermissionStrategiesEditor";
 import { PresetSpecEditor } from "./PresetSpecEditor";
 import { RuntimeLibraryList } from "./RuntimeLibraryList";

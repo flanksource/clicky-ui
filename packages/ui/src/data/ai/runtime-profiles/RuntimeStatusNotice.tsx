@@ -31,7 +31,7 @@ export function RuntimeStatusNotice({
       role="alert"
       className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
     >
-      <span>{error}</span>
+      <span>{error ?? "Unable to load runtime data."}</span>
       <Button size="sm" variant="outline" onClick={onRetry}>
         <Icon icon={UiRefresh} className="size-3.5" />
         {retryLabel}

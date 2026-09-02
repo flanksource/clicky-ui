@@ -2,8 +2,8 @@ import {
   matchesTool,
   type MatchPatterns,
   type PermissionRule,
-} from "../../chat/tool-policy";
-import type { ToolMeta } from "../../chat/types";
+} from "../data/chat/tool-policy";
+import type { ToolMeta } from "../data/chat/types";
 
 export const PATTERN_FIELDS = [
   "name",

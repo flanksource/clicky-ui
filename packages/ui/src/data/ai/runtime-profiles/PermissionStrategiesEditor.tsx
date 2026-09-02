@@ -33,7 +33,7 @@ import {
   strategyPreset,
   type MatchField,
   type StrategyPreset,
-} from "./PermissionStrategiesEditor.model";
+} from "../../../lib/permission-strategies";
 import { PermissionStrategyConditionRow } from "./PermissionStrategyConditionRow";
 
 export function PermissionStrategiesEditor({

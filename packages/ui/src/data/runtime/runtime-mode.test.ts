@@ -96,6 +96,21 @@ describe("runtime model filtering", () => {
         ?.id,
     ).toBe("claude");
   });
+
+  it("matches a runtime family's catalog prefix without a model catalog", () => {
+    const families = familiesFromRuntimeCatalog([
+      {
+        family: "gemini",
+        provider: "google",
+        catalogPrefix: "googleai",
+        modes: [{ mode: "api", schema: { type: "object", properties: {} } }],
+      },
+    ]);
+
+    expect(
+      familyForModel(families, [], "api:googleai/gemini-3.5-flash")?.id,
+    ).toBe("gemini");
+  });
 });
 
 // The served catalog captain projects from its model registry. Claude carries

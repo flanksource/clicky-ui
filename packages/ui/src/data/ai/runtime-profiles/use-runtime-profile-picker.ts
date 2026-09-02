@@ -6,7 +6,7 @@ import type {
   RuntimeProfile,
   RuntimeProfileResolveRequest,
 } from "../runtime-profile";
-import { presetsOf } from "./model";
+import { presetsOf } from "../../../lib/runtime-profile-model";
 import {
   afterSave,
   detachedValue,
@@ -58,10 +58,16 @@ export function useRuntimeProfilePicker({
   onChange: (value: AIPromptRunValue) => void;
   profiles: RuntimeProfile[];
   presets: RuntimePreset[];
-  onSaveProfile?: ((profile: RuntimeProfile) => Promise<RuntimeProfile>) | undefined;
-  onCreateProfile?: ((profile: RuntimeProfile) => Promise<RuntimeProfile>) | undefined;
+  onSaveProfile?:
+    | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
+    | undefined;
+  onCreateProfile?:
+    | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
+    | undefined;
   onResolveProfile?:
-    | ((request: RuntimeProfileResolveRequest) => Promise<ResolvedRuntimeProfile>)
+    | ((
+        request: RuntimeProfileResolveRequest,
+      ) => Promise<ResolvedRuntimeProfile>)
     | undefined;
   newId?: (() => string) | undefined;
 }): RuntimeProfilePickerController {
@@ -75,7 +81,8 @@ export function useRuntimeProfilePicker({
 
   useEffect(() => {
     const refChanged = value.runtimeProfile !== state.selectedRef;
-    const draftMissing = saved !== undefined && state.draft?.id !== saved.id && !dirty;
+    const draftMissing =
+      saved !== undefined && state.draft?.id !== saved.id && !dirty;
     if (!refChanged && !draftMissing) return;
     setState(pickerStateFor(value, profiles));
     setPending(undefined);

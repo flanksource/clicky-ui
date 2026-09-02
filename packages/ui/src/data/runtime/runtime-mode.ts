@@ -8,28 +8,25 @@ import {
   isUnavailable,
   unsupportedAvailability,
 } from "./availability";
+import {
+  familyForModel,
+  isSpecRuntimeMode,
+  type SpecRuntimeMode,
+} from "../../lib/runtime-family";
+export {
+  familyForModel,
+  isSpecRuntimeMode,
+  modeOptionFor,
+  runtimeModeFromModel,
+  SPEC_RUNTIME_MODES,
+  type SpecRuntimeMode,
+} from "../../lib/runtime-family";
 
 // A runtime has two independent axes: the model selects a provider family and
 // `spec.mode` selects api | agent | cli | cmux. The mode never contains a
 // provider name. This file used to call that axis `backend`, which is also what
 // captain called the composite adapter id it once served — so a value read from
 // one and posted back as the other type-checked and ran the wrong runtime.
-
-export const SPEC_RUNTIME_MODES = ["api", "agent", "cli", "cmux"] as const;
-export type SpecRuntimeMode = (typeof SPEC_RUNTIME_MODES)[number];
-
-export function isSpecRuntimeMode(
-  value: string | undefined,
-): value is SpecRuntimeMode {
-  return SPEC_RUNTIME_MODES.some((mode) => mode === value);
-}
-
-export function runtimeModeFromModel(
-  model: string | undefined,
-): SpecRuntimeMode | undefined {
-  const [prefix] = (model ?? "").trim().toLowerCase().split(":");
-  return isSpecRuntimeMode(prefix) ? prefix : undefined;
-}
 
 export function runtimeModelError(
   model: string | undefined,
@@ -132,6 +129,8 @@ export type SpecRuntimeFamily = {
   label: string;
   /** The model-catalog provider (`ChatModel.provider`) whose models this family runs. */
   provider: string;
+  /** Namespace used by fully-qualified model ids when it differs from provider. */
+  catalogPrefix?: string | undefined;
   modes: SpecRuntimeModeOption[];
 };
 
@@ -212,6 +211,7 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
     id: "gemini",
     label: "Gemini",
     provider: "google",
+    catalogPrefix: "googleai",
     modes: [
       { id: "api", label: "API", icon: UiCloud, title: "Gemini API" },
       { id: "cli", label: "CLI", icon: UiTerminal, title: "Gemini CLI" },
@@ -331,6 +331,7 @@ export function familiesFromRuntimeCatalog(
       id: entry.family,
       label,
       provider: entry.provider,
+      catalogPrefix: entry.catalogPrefix,
       modes,
     });
   }
@@ -447,36 +448,6 @@ export function selectionForMode(
   return { family: first.id, mode: firstMode(first).id };
 }
 
-export function familyForModel(
-  families: SpecRuntimeFamily[],
-  models: ChatModel[],
-  modelId: string | undefined,
-): SpecRuntimeFamily | undefined {
-  if (!modelId) return undefined;
-  const selected = models.find(
-    (model) =>
-      model.id === modelId ||
-      model.runtime?.model === modelId ||
-      model.runtime?.id === modelId,
-  );
-  const compact = modelId.split(",")[0]?.trim() ?? "";
-  const [prefix, inlineModel] = compact.split(":");
-  const canonicalModel =
-    isSpecRuntimeMode(prefix?.toLowerCase()) && inlineModel
-      ? inlineModel
-      : compact;
-  const slash = canonicalModel.indexOf("/");
-  const provider =
-    selected?.provider ??
-    (slash > 0 ? canonicalModel.slice(0, slash) : undefined);
-  if (!provider) return undefined;
-  return families.find(
-    (family) =>
-      family.provider === provider ||
-      family.modes.some((mode) => mode.provider === provider),
-  );
-}
-
 export function selectionForRuntime(
   families: SpecRuntimeFamily[],
   mode: string | undefined,
@@ -509,28 +480,6 @@ export function familyForMode(
 // The mode option a `spec.mode` names, or undefined when the catalog does not
 // declare it. Unlike `selectionForMode` this does not fall back to the first
 // family, so a summary can stay silent about a runtime it cannot identify.
-export function modeOptionFor(
-  families: SpecRuntimeFamily[],
-  mode: string | undefined,
-  preferredFamily?: string | undefined,
-): SpecRuntimeModeOption | undefined {
-  const target = (mode ?? "").toLowerCase();
-  if (!target) return undefined;
-  const ordered = preferredFamily
-    ? [
-        ...families.filter((family) => family.id === preferredFamily),
-        ...families.filter((family) => family.id !== preferredFamily),
-      ]
-    : families;
-  for (const family of ordered) {
-    const entry = family.modes.find(
-      (candidate) => candidate.id.toLowerCase() === target,
-    );
-    if (entry) return entry;
-  }
-  return undefined;
-}
-
 // `mode` is provider-independent, so a family is needed for a full label.
 export function labelForMode(
   mode: string | undefined,

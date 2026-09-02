@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { JsonSchemaForm } from "../../../components/JsonSchemaForm";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
 
@@ -19,6 +19,14 @@ export function VariablesField({
   const idPrefix = useId();
   const [rawText, setRawText] = useState(() => stringifyVariables(value));
   const [rawError, setRawError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const serializedValue = stringifyVariables(value);
+
+  useEffect(() => {
+    if (editing) return;
+    setRawText(serializedValue);
+    setRawError(null);
+  }, [editing, serializedValue]);
 
   if (schema) {
     return (
@@ -60,6 +68,8 @@ export function VariablesField({
     <div className="space-y-1">
       <textarea
         value={rawText}
+        onFocus={() => setEditing(true)}
+        onBlur={() => setEditing(false)}
         onChange={(event) => commit(event.target.value)}
         spellCheck={false}
         placeholder="{}"

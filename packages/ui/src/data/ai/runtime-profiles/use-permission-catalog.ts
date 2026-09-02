@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
-import { permissionTarget } from "./model";
+import { permissionTarget } from "../../../lib/runtime-profile-model";
 import type {
   RuntimePermissionCatalogState,
   RuntimeProfilesClient,
@@ -28,16 +28,21 @@ export function useRuntimePermissionCatalog(
     }
     const controller = new AbortController();
     setState({ status: "loading" });
-    void client.loadPermissionCatalog({ provider, mode }, controller.signal).then(
-      (catalog) => setState({ status: "resolved", catalog }),
-      (error: unknown) => {
-        if (controller.signal.aborted) return;
-        setState({
-          status: "error",
-          error: error instanceof Error ? error.message : String(error),
-        });
-      },
-    );
+    void client
+      .loadPermissionCatalog({ provider, mode }, controller.signal)
+      .then(
+        (catalog) => {
+          if (controller.signal.aborted) return;
+          setState({ status: "resolved", catalog });
+        },
+        (error: unknown) => {
+          if (controller.signal.aborted) return;
+          setState({
+            status: "error",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        },
+      );
     return () => controller.abort();
   }, [attempt, client, mode, provider]);
 
