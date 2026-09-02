@@ -211,7 +211,7 @@ export const SPEC_RUNTIME_FAMILIES: SpecRuntimeFamily[] = [
   {
     id: "gemini",
     label: "Gemini",
-    provider: "googleai",
+    provider: "google",
     modes: [
       { id: "api", label: "API", icon: UiCloud, title: "Gemini API" },
       { id: "cli", label: "CLI", icon: UiTerminal, title: "Gemini CLI" },
@@ -254,7 +254,7 @@ export type RuntimeCatalogFamily = {
   family: string;
   /** The canonical provider key: anthropic | openai | google | deepseek. */
   provider: string;
-  /** The namespace this provider's model ids carry (`ChatModel.provider`). */
+  /** The namespace used in fully-qualified model ids. */
   catalogPrefix: string;
   modes: RuntimeCatalogMode[];
 };
@@ -307,7 +307,7 @@ export function familiesFromRuntimeCatalog(
       label: MODE_LABELS[mode.mode] ?? titleCase(mode.mode),
       icon: MODE_ICONS[mode.mode],
       title: `${label} ${MODE_TITLES[mode.mode] ?? titleCase(mode.mode)}`,
-      provider: mode.catalogProvider ?? entry.catalogPrefix,
+      provider: mode.catalogProvider ?? entry.provider,
       ...(mode.defaultModel ? { defaultModel: mode.defaultModel } : {}),
       ...(mode.permissions ? { permissions: mode.permissions } : {}),
       ...(mode.schema ? { schema: mode.schema } : {}),
@@ -330,7 +330,7 @@ export function familiesFromRuntimeCatalog(
     families.push({
       id: entry.family,
       label,
-      provider: entry.catalogPrefix,
+      provider: entry.provider,
       modes,
     });
   }
@@ -459,11 +459,21 @@ export function familyForModel(
       model.runtime?.model === modelId ||
       model.runtime?.id === modelId,
   );
-  if (!selected) return undefined;
+  const compact = modelId.split(",")[0]?.trim() ?? "";
+  const [prefix, inlineModel] = compact.split(":");
+  const canonicalModel =
+    isSpecRuntimeMode(prefix?.toLowerCase()) && inlineModel
+      ? inlineModel
+      : compact;
+  const slash = canonicalModel.indexOf("/");
+  const provider =
+    selected?.provider ??
+    (slash > 0 ? canonicalModel.slice(0, slash) : undefined);
+  if (!provider) return undefined;
   return families.find(
     (family) =>
-      family.provider === selected.provider ||
-      family.modes.some((mode) => mode.provider === selected.provider),
+      family.provider === provider ||
+      family.modes.some((mode) => mode.provider === provider),
   );
 }
 

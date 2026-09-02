@@ -135,6 +135,74 @@ describe("ChatWindow model fetching", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("uses host-provided runtime families in Advanced settings without fetching a second catalog", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ChatWindowManagerProvider storageId="provided-catalog">
+        <OpenChatWindowOnMount>
+          <ChatWindowLayer
+            sessionsApi={null}
+            toolsApi={null}
+            chat={{
+              modelsApi: null,
+              models: [{
+                id: "gpt-whoami",
+                provider: "openai",
+                label: "GPT Whoami",
+                runtime: { model: "gpt-whoami", mode: "cli" },
+                reasoning: false,
+                configured: true,
+              }],
+              runtimeFamilies: [{
+                id: "captain-codex",
+                label: "Captain Codex",
+                provider: "openai",
+                modes: [{ id: "cli", label: "CLI", provider: "openai" }],
+              }],
+              transport: mockChatTransport(),
+            }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByTestId("tool-preferences-btn");
+    await waitFor(() =>
+      expect(document.querySelector(".react-draggable")).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByTestId("tool-preferences-btn"));
+    fireEvent.click(await screen.findByText("Advanced"));
+    const dialog = await screen.findByRole("dialog", { name: "Advanced Chat Settings" });
+    expect(within(dialog).getByRole("button", { name: "Captain Codex" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "CLI" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("selects the served default when host-provided models arrive after mount", async () => {
+    const view = (models: ChatModel[]) => (
+      <ChatWindowManagerProvider storageId="late-provided-catalog">
+        <OpenChatWindowOnMount>
+          <ChatWindowLayer
+            sessionsApi={null}
+            toolsApi={null}
+            chat={{ modelsApi: null, models, transport: mockChatTransport() }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>
+    );
+    const { rerender } = render(view([]));
+    const servedDefault = {
+      ...model("anthropic/claude-default", "Served Default", true),
+      default: true,
+    };
+
+    rerender(view([servedDefault]));
+
+    await expectRuntimeModel("Served Default");
+  });
 });
 
 // The runtime control mounts with the stored model and settles after the
