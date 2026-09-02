@@ -458,6 +458,8 @@ export type DataTableSelectAllPages = {
    * row the filters allow. One scope is the ordinary case.
    */
   scopes: readonly DataTableSelectAllScope[];
+  /** The caller-selected logical scope. Its rows need not be materialized. */
+  selectedScopeId?: string;
   /** True while a scope is still resolving. */
   loading?: boolean;
   /** Plural noun for the rows, used in the notice. Defaults to "rows". */
@@ -465,6 +467,8 @@ export type DataTableSelectAllPages = {
 };
 
 export type DataTableSelectAllScope = {
+  /** Stable identity used when this scope becomes the logical selection. */
+  id?: string;
   /** Rows this scope covers. Defaults to `pagination.total`. */
   total?: number;
   /**
@@ -484,6 +488,8 @@ export type DataTableSelectionContext<
   selectedRowIds: string[];
   /** The selected rows currently loaded, in render order. */
   selectedRows: T[];
+  /** A server-owned selection whose rows have deliberately not been fetched. */
+  selectedScope?: { id: string; total: number };
   /** Empties the selection through the same `onSelectionChange` callback. */
   clearSelection: () => void;
 };
@@ -1784,18 +1790,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       ),
     [rowSelection, visibleSorted],
   );
-  const selectedVisibleCount = selectableVisibleRows.filter((record) =>
-    selectedRowIDs.has(record.id),
-  ).length;
-  const allVisibleSelected =
-    selectableVisibleRows.length > 0 &&
-    selectedVisibleCount === selectableVisibleRows.length;
-  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
-  const selectAllRef = useRef<HTMLInputElement>(null);
   const selectAllPages = rowSelection?.selectAllPages;
-  // Scopes resolved against the pager, then read as a ladder: the sentence
-  // measures the selection against the widest scope, and the button offers the
-  // narrowest one the selection has not covered yet.
   const selectAllScopes = useMemo(
     () =>
       (selectAllPages?.scopes ?? []).flatMap((scope) => {
@@ -1804,14 +1799,39 @@ function DataTableInner<T extends Record<string, unknown>>({
       }),
     [pagination?.total, selectAllPages?.scopes],
   );
+  const selectedScope = selectAllPages?.selectedScopeId
+    ? selectAllScopes.find(
+        (scope) => scope.id === selectAllPages.selectedScopeId,
+      )
+    : undefined;
+  if (selectAllPages?.selectedScopeId && !selectedScope) {
+    throw new Error(
+      `Selected table scope ${selectAllPages.selectedScopeId} is not present in selectAllPages.scopes`,
+    );
+  }
+  const selectedVisibleCount = selectedScope
+    ? selectableVisibleRows.length
+    : selectableVisibleRows.filter((record) => selectedRowIDs.has(record.id))
+        .length;
+  const allVisibleSelected =
+    selectableVisibleRows.length > 0 &&
+    selectedVisibleCount === selectableVisibleRows.length;
+  const someVisibleSelected =
+    !selectedScope && selectedVisibleCount > 0 && !allVisibleSelected;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  // Scopes resolved against the pager, then read as a ladder: the sentence
+  // measures the selection against the widest scope, and the button offers the
+  // narrowest one the selection has not covered yet.
   const widestScope = selectAllScopes[selectAllScopes.length - 1];
   // The offer waits until the whole page is selected: "select all 3,706" beside
   // three ticked rows invites a click nobody meant to make. The count itself
   // shows for any selection, so the actions never have to restate it.
-  const nextScope = allVisibleSelected
-    ? selectAllScopes.find((scope) => scope.total > selectedRowIDs.size)
-    : undefined;
-  const showSelectionScope = !!widestScope && selectedRowIDs.size > 0;
+  const nextScope =
+    allVisibleSelected && !selectedScope
+      ? selectAllScopes.find((scope) => scope.total > selectedRowIDs.size)
+      : undefined;
+  const showSelectionScope =
+    !!widestScope && (!!selectedScope || selectedRowIDs.size > 0);
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -1834,18 +1854,18 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   const toggleRowSelection = useCallback(
     (record: InternalRow<T>) => {
-      if (!rowSelection) return;
+      if (!rowSelection || selectedScope) return;
       if (rowSelection.isRowSelectable?.(record.row) === false) return;
       const next = new Set(selectedRowIDs);
       if (next.has(record.id)) next.delete(record.id);
       else next.add(record.id);
       notifySelection(next);
     },
-    [notifySelection, rowSelection, selectedRowIDs],
+    [notifySelection, rowSelection, selectedRowIDs, selectedScope],
   );
 
   const toggleVisibleSelection = useCallback(() => {
-    if (!rowSelection) return;
+    if (!rowSelection || selectedScope) return;
     const next = new Set(selectedRowIDs);
     if (allVisibleSelected) {
       for (const record of selectableVisibleRows) next.delete(record.id);
@@ -1859,10 +1879,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     rowSelection,
     selectableVisibleRows,
     selectedRowIDs,
+    selectedScope,
   ]);
 
   const selectionContext = useMemo<DataTableSelectionContext<T> | null>(() => {
-    if (!rowSelection || selectedRowIDs.size === 0) return null;
+    if (!rowSelection || (!selectedScope && selectedRowIDs.size === 0))
+      return null;
     return {
       // The ids are the caller's, not the page's. A cross-page selection covers
       // rows this table never fetched, and an action about to say what it will
@@ -1870,12 +1892,29 @@ function DataTableInner<T extends Record<string, unknown>>({
       // Filtering the ids down to loaded rows instead would make the whole
       // cluster vanish at the moment the selection got big enough to matter.
       selectedRowIds: Array.from(selectedRowIDs),
-      selectedRows: rows
-        .filter((record) => selectedRowIDs.has(record.id))
-        .map((record) => record.row),
+      selectedRows: selectedScope
+        ? selectableVisibleRows.map((record) => record.row)
+        : rows
+            .filter((record) => selectedRowIDs.has(record.id))
+            .map((record) => record.row),
+      ...(selectedScope
+        ? {
+            selectedScope: {
+              id: selectedScope.id!,
+              total: selectedScope.total,
+            },
+          }
+        : {}),
       clearSelection: () => notifySelection(new Set()),
     };
-  }, [notifySelection, rowSelection, rows, selectedRowIDs]);
+  }, [
+    notifySelection,
+    rowSelection,
+    rows,
+    selectableVisibleRows,
+    selectedRowIDs,
+    selectedScope,
+  ]);
 
   // The render-prop form keeps its own path: it is the caller's markup, and the
   // table has nothing to add to it.
@@ -1989,7 +2028,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             noun={selectAllPages?.noun ?? "rows"}
             {...(selectAllPages?.loading ? { loading: true } : {})}
             total={widestScope.total}
-            selectedCount={selectedRowIDs.size}
+            selectedCount={selectedScope?.total ?? selectedRowIDs.size}
             {...(nextScope ? { nextScope } : {})}
             onClear={() => notifySelection(new Set())}
           />
@@ -2052,7 +2091,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           noun={selectAllPages?.noun ?? "rows"}
           {...(selectAllPages?.loading ? { loading: true } : {})}
           total={widestScope.total}
-          selectedCount={selectedRowIDs.size}
+          selectedCount={selectedScope?.total ?? selectedRowIDs.size}
           {...(nextScope ? { nextScope } : {})}
           onClear={() => notifySelection(new Set())}
         />
@@ -2087,7 +2126,7 @@ function DataTableInner<T extends Record<string, unknown>>({
 
   const toggleGroupSelection = useCallback(
     (records: InternalRow<T>[]) => {
-      if (!rowSelection) return;
+      if (!rowSelection || selectedScope) return;
       const selectable = records.filter(
         (record) => rowSelection.isRowSelectable?.(record.row) ?? true,
       );
@@ -2101,7 +2140,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       }
       notifySelection(next);
     },
-    [notifySelection, rowSelection, selectedRowIDs],
+    [notifySelection, rowSelection, selectedRowIDs, selectedScope],
   );
 
   const revealSentinelRef = useCallback(
@@ -2317,7 +2356,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                         type="checkbox"
                         aria-label="Select all visible rows"
                         checked={allVisibleSelected}
-                        disabled={selectableVisibleRows.length === 0}
+                        disabled={
+                          !!selectedScope || selectableVisibleRows.length === 0
+                        }
                         onChange={toggleVisibleSelection}
                         className="size-3.5 rounded border-border accent-primary"
                       />
@@ -2481,9 +2522,12 @@ function DataTableInner<T extends Record<string, unknown>>({
                                         record.row,
                                       ) ?? true,
                                   ).length,
-                                  selectedCount: item.group.records.filter(
-                                    (record) => selectedRowIDs.has(record.id),
-                                  ).length,
+                                  selectedCount: selectedScope
+                                    ? item.group.records.length
+                                    : item.group.records.filter((record) =>
+                                        selectedRowIDs.has(record.id),
+                                      ).length,
+                                  disabled: !!selectedScope,
                                   onToggle: () =>
                                     toggleGroupSelection(item.group.records),
                                 },
@@ -2509,7 +2553,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                     const rowSelectable =
                       rowSelection?.isRowSelectable?.(record.row) ?? true;
                     const selectionClickEnabled =
-                      !!rowSelection?.toggleOnRowClick && rowSelectable;
+                      !!rowSelection?.toggleOnRowClick &&
+                      rowSelectable &&
+                      !selectedScope;
                     const clickable =
                       !!href ||
                       rowClickEnabled ||
@@ -2536,7 +2582,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                             clickable &&
                               !href &&
                               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                            selectedRowIDs.has(record.id) && "bg-accent/50",
+                            (selectedScope || selectedRowIDs.has(record.id)) &&
+                              "bg-accent/50",
                             getRowClassName?.(record.row),
                           )}
                           tabIndex={clickable && !href ? 0 : undefined}
@@ -2563,8 +2610,11 @@ function DataTableInner<T extends Record<string, unknown>>({
                               <input
                                 type="checkbox"
                                 aria-label={`Select row ${record.id}`}
-                                checked={selectedRowIDs.has(record.id)}
-                                disabled={!rowSelectable}
+                                checked={
+                                  !!selectedScope ||
+                                  selectedRowIDs.has(record.id)
+                                }
+                                disabled={!!selectedScope || !rowSelectable}
                                 onChange={() => toggleRowSelection(record)}
                                 className="size-3.5 rounded border-border accent-primary"
                               />
@@ -3073,6 +3123,7 @@ function DataTableGroupHeaderRow({
   selection?: {
     selectableCount: number;
     selectedCount: number;
+    disabled?: boolean;
     onToggle: () => void;
   };
 }) {
@@ -3098,7 +3149,7 @@ function DataTableGroupHeaderRow({
               type="checkbox"
               aria-label={`Select group ${typeof label === "string" ? label : count}`}
               checked={allSelected}
-              disabled={selection.selectableCount === 0}
+              disabled={selection.disabled || selection.selectableCount === 0}
               onChange={selection.onToggle}
               className="size-3.5 rounded border-border accent-primary"
             />

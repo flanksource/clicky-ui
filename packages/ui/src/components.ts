@@ -369,6 +369,11 @@ export {
   type AppShellNavSection,
 } from "./layout/AppShell";
 export {
+  type AppShellNavDrag,
+  type AppShellNavDropKind,
+  type AppShellNavDropTarget,
+} from "./layout/AppShell.nav.drag";
+export {
   AppSidebar,
   AppLayout,
   type AppSidebarProps,

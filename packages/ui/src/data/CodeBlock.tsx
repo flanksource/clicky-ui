@@ -57,7 +57,8 @@ export function CodeBlock({
   const [themeOverride, setThemeOverride] = useState<ResolvedTheme | null>(null);
   const effectiveTheme = themeOverride ?? globalTheme;
   const [shikiHtml, setShikiHtml] = useState<string | null>(null);
-  const wantsClientHighlight = !chromaHtml && !!language && !!source;
+  const wantsClientHighlight =
+    parsedJson === JSON_PARSE_FAILED && !chromaHtml && !!language && !!source;
 
   useEffect(() => {
     if (!wantsClientHighlight) {

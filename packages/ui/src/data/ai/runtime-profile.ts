@@ -60,12 +60,18 @@ export type RuntimeProfile = {
   presets: string[];
 };
 
+export type RuntimeResolutionLayerSource =
+  | "preset"
+  | "profile"
+  | "prompt"
+  | "request";
+
 export type RuntimeResolutionLayer = {
-  id: string;
+  id?: string;
   name: string;
   description?: string;
   scope: RuntimeProfileScope;
-  source: "preset" | "profile";
+  source: RuntimeResolutionLayerSource;
   spec: AISpecRuntimeSpec;
   constraints: RuntimeProfileConstraints;
 };
@@ -92,12 +98,14 @@ export type RuntimeProfileResolveRequest = {
   presets: RuntimePreset[];
 };
 
+export type ResolvedRuntimeSpec = {
+  spec: AISpecRuntimeSpec;
+  constraints: RuntimeProfileConstraints;
+  trace: RuntimeResolutionLayer[];
+};
+
 export type ResolvedRuntimeProfile = {
-  resolved: {
-    spec: AISpecRuntimeSpec;
-    constraints: RuntimeProfileConstraints;
-    trace: RuntimeResolutionLayer[];
-  };
+  resolved: ResolvedRuntimeSpec;
   tools: ToolMeta[];
   permissions: Record<string, ToolPolicy>;
   permissionSupport: Record<string, RuntimePermissionSupport>;

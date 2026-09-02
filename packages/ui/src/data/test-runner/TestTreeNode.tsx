@@ -25,6 +25,8 @@ const NAME_TONE: Record<string, string> = {
   passed: "text-foreground",
 };
 
+const MESSAGE_STATUSES = new Set(["failed", "timedout", "warned", "skipped"]);
+
 /** Per-status roll-up count badges shown on a container row. */
 function CountBadges({ node }: { node: Test }) {
   const s = sum(node);
@@ -58,6 +60,9 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const dur = node.duration || (hasChildren ? totalDuration(node) : 0);
   const canRerun = !!runner.onRerun && node.framework !== "task";
   const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
+  // A verdict line under the name for rows that need explaining; green,
+  // running, and queued rows stay single-line.
+  const message = status && MESSAGE_STATUSES.has(status) ? (node.message ?? "").trim() : "";
 
   return (
     <>
@@ -71,14 +76,17 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
 
       {leadingAdapter?.renderRowLeading?.({ node, runner })}
 
-      <span
-        className={cn(
-          "truncate",
-          selected ? "font-semibold" : "font-medium",
-          (status && NAME_TONE[status]) || "text-foreground",
-        )}
-      >
-        {humanizeName(node.name, node.framework)}
+      <span className="flex min-w-0 flex-col" title={message || undefined}>
+        <span
+          className={cn(
+            "truncate",
+            selected ? "font-semibold" : "font-medium",
+            (status && NAME_TONE[status]) || "text-foreground",
+          )}
+        >
+          {humanizeName(node.name, node.framework)}
+        </span>
+        {message && <span className="truncate text-xs text-muted-foreground">{message}</span>}
       </span>
 
       <span className="flex-1" />

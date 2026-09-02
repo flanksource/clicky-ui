@@ -83,6 +83,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   const modelOptions = modelsForFamily(models, family, specMode);
   const resolvedModel = runtimeModelForValue(models, value, isSelectableModel);
   const selectedModelUnavailable = Boolean(
+    !resolvedModel &&
     (value.id || value.model) &&
     runtimeModelForValue(models, value, (entry) => !isSelectableModel(entry)),
   );
