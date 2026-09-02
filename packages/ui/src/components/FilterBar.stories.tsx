@@ -151,7 +151,7 @@ const meta = {
       control: "inline-radio",
       options: ["responsive", "wrap"],
       description:
-        "`responsive` moves hidden filters into an overflow popover; `wrap` lets them wrap to the next line.",
+        "`responsive` moves hidden filters into an anchored popover on desktop and a full-page filter view on mobile; `wrap` lets them wrap to the next line.",
       table: { category: "Layout", defaultValue: { summary: "responsive" } },
     },
     applyLabel: {
@@ -186,7 +186,7 @@ const meta = {
           "- Set `autoSubmit={false}` to stage edits locally and fire one request from the Apply button (`onApply`).",
           "",
           "**Overflow**",
-          '- `overflowMode="responsive"` collapses filters that don\'t fit into an overflow popover; `"wrap"` lets them wrap.',
+          '- `overflowMode="responsive"` collapses filters that don\'t fit into an anchored desktop popover or a full-page mobile filter view; `"wrap"` lets them wrap.',
           "",
           "**Usage**",
           "```tsx",

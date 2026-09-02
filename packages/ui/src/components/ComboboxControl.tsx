@@ -52,7 +52,7 @@ export function ComboboxControl({
   tagValues,
   tags,
 }: {
-  anchorRef: RefObject<HTMLDivElement>;
+  anchorRef: RefObject<HTMLDivElement | null>;
   ariaLabel: string | undefined;
   ariaRequired: boolean | undefined;
   closedLabel: string;
@@ -62,10 +62,10 @@ export function ComboboxControl({
   effectivePrefix: ReactNode;
   highlighted: number;
   id: string | undefined;
-  inputRef: RefObject<HTMLInputElement>;
+  inputRef: RefObject<HTMLInputElement | null>;
   invalid: boolean | undefined;
   label: ReactNode;
-  labelRef: RefObject<HTMLSpanElement>;
+  labelRef: RefObject<HTMLSpanElement | null>;
   labelWidth: number;
   listId: string | undefined;
   loading: boolean | undefined;
@@ -172,6 +172,7 @@ export function ComboboxControl({
             : size
               ? inputSizeClass[size]
               : "h-control-h px-control-px text-sm",
+          "max-sm:text-base",
           !tags && effectivePrefix && "pl-8",
           !tags &&
             (suffix
