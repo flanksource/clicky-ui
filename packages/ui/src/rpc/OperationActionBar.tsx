@@ -5,6 +5,8 @@ import { cn } from "../lib/utils";
 import type { ClickyCommandRuntime } from "../data/Clicky";
 import type { ClickyRow } from "../data/Clicky";
 import { SelectionActionBar } from "../data/SelectionActionBar";
+import { Icon } from "../data/Icon";
+import type { DataTableSelectionContext } from "../data/DataTable";
 import { Modal } from "../overlay/Modal";
 import { ExecutionResult } from "./ExecutionResult";
 import { FilterForm } from "./FilterForm";
@@ -25,6 +27,7 @@ import type {
   PreExtension,
   PostExtension,
 } from "../components/json-schema-form-types";
+import { resolveActionIcon } from "./actionIconMap";
 
 export type OperationActionBarProps = {
   // Operations rendered as buttons. The list page passes collection-scoped
@@ -50,11 +53,7 @@ export type OperationActionBarProps = {
   actionLabels?: Record<string, string>;
   // Layout placement only — the bar's own styling stays consistent across pages.
   className?: string;
-  selection?: {
-    selectedRowIds: string[];
-    selectedRows: ClickyRow[];
-    clearSelection: () => void;
-  };
+  selection?: DataTableSelectionContext<ClickyRow>;
   getRequestValues?: (action: ResolvedOperation) => OperationRequestValues;
   excludedParameterNames?: string[];
   initialValuesByAction?: Record<string, Record<string, string>>;
@@ -98,7 +97,7 @@ export function OperationActionBar({
     ? getOperationClickyMeta(activeAction)
     : undefined;
   const lockedValues = activeAction
-    ? getLockedValues?.(activeAction) ?? {}
+    ? (getLockedValues?.(activeAction) ?? {})
     : {};
 
   function openAction(op: ResolvedOperation) {
@@ -153,22 +152,31 @@ export function OperationActionBar({
 
   return (
     <>
-      {selection && selection.selectedRowIds.length > 0 ? (
+      {selection &&
+      (selection.selectedScope || selection.selectedRowIds.length > 0) ? (
         <SelectionActionBar
-          actions={actions.map((op) => ({
-            id: op.operation.operationId || `${op.method}:${op.path}`,
-            label: actionLabel(op),
-            onSelect: () => openAction(op),
-            ...(getOperationClickyMeta(op)?.toolHints?.destructiveHint
-              ? { variant: "destructive" as const }
-              : {}),
-          }))}
+          actions={actions.map((op) => {
+            const hints = getOperationClickyMeta(op)?.toolHints;
+            const icon = resolveActionIcon(hints?.icon);
+            return {
+              id: op.operation.operationId || `${op.method}:${op.path}`,
+              label: actionLabel(op),
+              onSelect: () => openAction(op),
+              ...(icon ? { icon } : {}),
+              ...(hints?.destructiveHint
+                ? { variant: "destructive" as const }
+                : {}),
+            };
+          })}
           context={selection}
         />
       ) : actions.length > 0 && !selection ? (
         <div className={cn("flex flex-wrap gap-2", className)}>
           {actions.map((op) => {
             const label = actionLabel(op);
+            const icon = resolveActionIcon(
+              getOperationClickyMeta(op)?.toolHints?.icon
+            );
             const summary = op.operation.summary || op.operation.description;
             const tooltip =
               summary && summary !== label ? `${label} — ${summary}` : label;
@@ -181,6 +189,7 @@ export function OperationActionBar({
                 title={tooltip}
                 onClick={() => openAction(op)}
               >
+                {icon ? <Icon icon={icon} /> : null}
                 {label}
               </Button>
             );
@@ -194,9 +203,9 @@ export function OperationActionBar({
           action={activeAction}
           lockedValues={lockedValues}
           submitLabel={actionLabel(activeAction)}
-          {...(initialValuesByAction?.[
+          {...((initialValuesByAction?.[
             activeMeta?.actionName || activeMeta?.verb || ""
-          ] ?? initialValue
+          ] ?? initialValue)
             ? {
                 initialValue:
                   initialValuesByAction?.[
