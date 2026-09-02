@@ -12,7 +12,7 @@ export type CommandPaletteListProps = {
   optionId: (item: CommandItem) => string;
   onActivate: (item: CommandItem) => void;
   onHover: (index: number) => void;
-  listRef: RefObject<HTMLDivElement>;
+  listRef: RefObject<HTMLDivElement | null>;
   loading?: boolean | undefined;
   emptyState?: React.ReactNode;
   listMaxHeight: string | number;

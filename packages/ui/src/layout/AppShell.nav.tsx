@@ -9,6 +9,12 @@ import type {
   AppShellNavItem,
   AppShellNavSection,
 } from "./AppShell";
+import {
+  NAV_DRAG_ROW_CLASS,
+  NAV_DRAG_ZONE_CLASS,
+  useNavDrag,
+  type NavDragState,
+} from "./AppShell.nav.drag";
 
 // Per-group collapsed state. Owned by AppShell (see `useGroupCollapsed` there)
 // and passed down, because AppShell renders NavSections twice — the desktop
@@ -31,7 +37,6 @@ export function NavSections({
   groupState: GroupState;
   onNavigate?: () => void;
 }) {
-  const { renderLink } = useRouter();
   return (
     <nav
       className={cn(
@@ -40,66 +45,99 @@ export function NavSections({
       )}
     >
       {sections.map((section, index) => (
-        <div
+        <NavSection
           key={section.label ?? `section-${index}`}
-          className="flex flex-col"
-        >
-          {section.label &&
-            (collapsed ? (
-              <div className="mx-2 mb-1 mt-3 border-t border-sidebar-border first:mt-1" />
-            ) : (
-              <div className="mb-0.5 mt-3 px-density-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55 first:mt-1">
-                {section.label}
-              </div>
-            ))}
-          {section.variant !== "tree" &&
-            section.items?.map((item) => (
-              <NavItemRow
-                key={item.key}
-                item={item}
-                collapsed={collapsed}
-                renderLink={renderLink}
-                {...(onNavigate ? { onNavigate } : {})}
-              />
-            ))}
-          {section.groups?.map((group) =>
-            // A collapsed rail has no room for group headings, so the whole
-            // subtree flattens into the icon strip rather than hiding behind
-            // toggles the user cannot see.
-            collapsed ? (
-              flattenGroup(group).map((item) => (
-                <NavItemRow
-                  key={item.key}
-                  item={item}
-                  collapsed
-                  renderLink={renderLink}
-                  {...(onNavigate ? { onNavigate } : {})}
-                />
-              ))
-            ) : (
-              <NavGroupRows
-                key={group.key}
-                group={group}
-                variant={section.variant ?? "list"}
-                renderLink={renderLink}
-                groupState={groupState}
-                {...(onNavigate ? { onNavigate } : {})}
-              />
-            ),
-          )}
-          {section.variant === "tree" &&
-            section.items?.map((item) => (
-              <NavItemRow
-                key={item.key}
-                item={item}
-                collapsed={collapsed}
-                renderLink={renderLink}
-                {...(onNavigate ? { onNavigate } : {})}
-              />
-            ))}
-        </div>
+          section={section}
+          collapsed={collapsed}
+          groupState={groupState}
+          {...(onNavigate ? { onNavigate } : {})}
+        />
       ))}
     </nav>
+  );
+}
+
+function NavSection({
+  section,
+  collapsed,
+  groupState,
+  onNavigate,
+}: {
+  section: AppShellNavSection;
+  collapsed: boolean;
+  groupState: GroupState;
+  onNavigate?: () => void;
+}) {
+  const { renderLink } = useRouter();
+  // A collapsed rail shows icons with no folder rows, so there is nothing
+  // legible to aim a drop at — the rail must be expanded to rearrange it.
+  const dragState = useNavDrag(collapsed ? undefined : section.drag);
+  const rootDrop = dragState.props({
+    drop: { key: section.drag?.rootKey ?? "", kind: "section" },
+  });
+  return (
+    <div
+      className={cn("flex flex-col", rootDrop && NAV_DRAG_ZONE_CLASS)}
+      {...rootDrop}
+    >
+      {section.label &&
+        (collapsed ? (
+          <div className="mx-2 mb-1 mt-3 border-t border-sidebar-border first:mt-1" />
+        ) : (
+          <div className="mb-0.5 mt-3 px-density-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55 first:mt-1">
+            {section.label}
+          </div>
+        ))}
+      {section.variant !== "tree" &&
+        section.items?.map((item) => (
+          <NavItemRow
+            key={item.key}
+            item={item}
+            collapsed={collapsed}
+            renderLink={renderLink}
+            dragState={dragState}
+            {...(onNavigate ? { onNavigate } : {})}
+          />
+        ))}
+      {section.groups?.map((group) =>
+        // A collapsed rail has no room for group headings, so the whole
+        // subtree flattens into the icon strip rather than hiding behind
+        // toggles the user cannot see.
+        collapsed ? (
+          flattenGroup(group).map((item) => (
+            <NavItemRow
+              key={item.key}
+              item={item}
+              collapsed
+              renderLink={renderLink}
+              dragState={dragState}
+              {...(onNavigate ? { onNavigate } : {})}
+            />
+          ))
+        ) : (
+          <NavGroupRows
+            key={group.key}
+            group={group}
+            variant={section.variant ?? "list"}
+            renderLink={renderLink}
+            groupState={groupState}
+            dragState={dragState}
+            {...(onNavigate ? { onNavigate } : {})}
+          />
+        ),
+      )}
+      {section.variant === "tree" &&
+        section.items?.map((item) => (
+          <NavItemRow
+            key={item.key}
+            item={item}
+            collapsed={collapsed}
+            renderLink={renderLink}
+            dragState={dragState}
+            {...(onNavigate ? { onNavigate } : {})}
+          />
+        ))}
+    </div>
   );
 }
 
@@ -118,16 +156,26 @@ function NavGroupRows({
   variant,
   renderLink,
   groupState,
+  dragState,
   onNavigate,
 }: {
   group: AppShellNavGroup;
   variant: "list" | "tree";
   renderLink: RenderLink;
   groupState: GroupState;
+  dragState: NavDragState;
   onNavigate?: () => void;
 }) {
   const [contextTarget, setContextTarget] = useState<HTMLElement | null>(null);
   const hasChildren = group.items.length > 0 || (group.groups?.length ?? 0) > 0;
+  const folder = { key: group.key, kind: "group" } as const;
+  const folderDrag = dragState.props({ drag: folder, drop: folder });
+  const leafFolderDrag = group.item
+    ? dragState.props({
+        drag: { key: group.item.key, kind: "item" },
+        drop: folder,
+      })
+    : undefined;
   const fallback = group.defaultCollapsed ?? false;
   const collapsed =
     !group.forceExpanded && groupState.isCollapsed(group.key, fallback);
@@ -151,7 +199,11 @@ function NavGroupRows({
       <>
         <div
           ref={setContextTarget}
-          className="flex items-center gap-2.5 rounded-md px-density-2 py-1.5 text-[13px] text-sidebar-foreground"
+          className={cn(
+            "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 text-[13px] text-sidebar-foreground",
+            folderDrag && NAV_DRAG_ROW_CLASS,
+          )}
+          {...folderDrag}
         >
           {groupIcon}
           <span className="flex-1 truncate text-left">{group.label}</span>
@@ -175,6 +227,7 @@ function NavGroupRows({
             item={group.item}
             collapsed={false}
             renderLink={renderLink}
+            dragState={dragState}
             {...(onNavigate ? { onNavigate } : {})}
           />
         </div>
@@ -190,9 +243,15 @@ function NavGroupRows({
         // click target ambiguous.
         <div
           ref={setContextTarget}
-          className="group/nav flex items-center gap-1"
+          className={cn(
+            "group/nav flex items-center gap-1",
+            leafFolderDrag && NAV_DRAG_ROW_CLASS,
+          )}
+          {...leafFolderDrag}
         >
           <div className="min-w-0 flex-1">
+            {/* The row's drag lives on this container, not the link: the same
+                row is dragged as the leaf and dropped on as the folder. */}
             <NavItemRow
               item={group.item}
               collapsed={false}
@@ -232,7 +291,9 @@ function NavGroupRows({
               variant === "tree"
                 ? "text-[13px] text-sidebar-foreground"
                 : "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+              folderDrag && NAV_DRAG_ROW_CLASS,
             )}
+            {...folderDrag}
           >
             {groupIcon}
             <span className="flex-1 truncate text-left">{group.label}</span>
@@ -257,6 +318,7 @@ function NavGroupRows({
                 item={item}
                 collapsed={false}
                 renderLink={renderLink}
+                dragState={dragState}
                 {...(onNavigate ? { onNavigate } : {})}
               />
             ))}
@@ -267,6 +329,7 @@ function NavGroupRows({
               variant={variant}
               renderLink={renderLink}
               groupState={groupState}
+              dragState={dragState}
               {...(onNavigate ? { onNavigate } : {})}
             />
           ))}
@@ -277,6 +340,7 @@ function NavGroupRows({
                 item={item}
                 collapsed={false}
                 renderLink={renderLink}
+                dragState={dragState}
                 {...(onNavigate ? { onNavigate } : {})}
               />
             ))}
@@ -290,14 +354,19 @@ function NavItemRow({
   item,
   collapsed,
   renderLink,
+  dragState,
   onNavigate,
 }: {
   item: AppShellNavItem;
   collapsed: boolean;
   renderLink: RenderLink;
+  /** Omitted where an ancestor row owns this item's drag (a folder-and-leaf). */
+  dragState?: NavDragState;
   onNavigate?: () => void;
 }) {
   const [contextTarget, setContextTarget] = useState<HTMLElement | null>(null);
+  const target = { key: item.key, kind: "item" } as const;
+  const dragProps = dragState?.props({ drag: target, drop: target });
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md px-density-2 py-1.5 text-left text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
     collapsed && "justify-center px-0",
@@ -334,15 +403,21 @@ function NavItemRow({
         {children}
       </a>
     );
-    if (!item.contextMenu) return externalLink;
+    if (!item.contextMenu && !dragProps) return externalLink;
     return (
-      <div ref={setContextTarget} className="w-full">
+      <div
+        ref={setContextTarget}
+        className={cn("w-full", dragProps && NAV_DRAG_ROW_CLASS)}
+        {...dragProps}
+      >
         {externalLink}
-        <ContextMenu
-          contextTarget={contextTarget}
-          menuLabel={item.contextMenuLabel ?? `${String(item.label)} actions`}
-          menuItems={item.contextMenu}
-        />
+        {item.contextMenu && (
+          <ContextMenu
+            contextTarget={contextTarget}
+            menuLabel={item.contextMenuLabel ?? `${String(item.label)} actions`}
+            menuItems={item.contextMenu}
+          />
+        )}
       </div>
     );
   }
@@ -354,12 +429,13 @@ function NavItemRow({
     ...(title ? { title } : {}),
   });
 
-  if (!onNavigate && !item.contextMenu) return link;
+  if (!onNavigate && !item.contextMenu && !dragProps) return link;
   return (
     <div
       ref={item.contextMenu ? setContextTarget : undefined}
-      className="w-full"
+      className={cn("w-full", dragProps && NAV_DRAG_ROW_CLASS)}
       {...(onNavigate ? { onClick: onNavigate } : {})}
+      {...dragProps}
     >
       {link}
       {item.contextMenu && (
