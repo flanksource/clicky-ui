@@ -3,7 +3,12 @@ import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { Button } from "../components/button";
-import { UiClose, UiFullscreen, UiFullscreenFilled } from "../icons";
+import {
+  UiArrowLeft,
+  UiClose,
+  UiFullscreen,
+  UiFullscreenFilled,
+} from "../icons";
 import { useEscapeLayer, useModalStack } from "./modalStack";
 import { zIndex } from "./zIndex";
 
@@ -84,6 +89,10 @@ const DEFAULT_CONFIRM: Required<ConfirmCloseOptions> = {
   cancelLabel: "Keep editing",
 };
 
+const MOBILE_QUERY = "(max-width: 639px)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+const MOBILE_TRANSITION_MS = 200;
+
 export function Modal({
   open,
   onClose,
@@ -102,7 +111,11 @@ export function Modal({
   children,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { depth } = useModalStack(open);
+  const closeTimerRef = useRef<number | undefined>(undefined);
+  const openFrameRef = useRef<number | undefined>(undefined);
+  const [present, setPresent] = useState(open);
+  const [mobileVisible, setMobileVisible] = useState(false);
+  const { depth } = useModalStack(present);
   const [expanded, setExpanded] = useState(false);
   // When confirmClose is active, a close request opens this prompt instead of
   // closing outright; onClose only fires once the user confirms the discard.
@@ -114,6 +127,40 @@ export function Modal({
     if (confirmClose) setConfirming(true);
     else onClose();
   };
+
+  useEffect(() => {
+    window.clearTimeout(closeTimerRef.current);
+    window.cancelAnimationFrame(openFrameRef.current ?? 0);
+    const animateMobile =
+      window.matchMedia(MOBILE_QUERY).matches &&
+      !window.matchMedia(REDUCED_MOTION_QUERY).matches;
+
+    if (open) {
+      setPresent(true);
+      if (animateMobile) {
+        setMobileVisible(false);
+        openFrameRef.current = window.requestAnimationFrame(() => {
+          setMobileVisible(true);
+        });
+      } else {
+        setMobileVisible(true);
+      }
+    } else if (animateMobile) {
+      setMobileVisible(false);
+      closeTimerRef.current = window.setTimeout(
+        () => setPresent(false),
+        MOBILE_TRANSITION_MS,
+      );
+    } else {
+      setMobileVisible(false);
+      setPresent(false);
+    }
+
+    return () => {
+      window.clearTimeout(closeTimerRef.current);
+      window.cancelAnimationFrame(openFrameRef.current ?? 0);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -145,12 +192,12 @@ export function Modal({
     return () => prev?.focus?.();
   }, [open]);
 
-  if (!open) return null;
+  if (!present) return null;
 
   const overlay = (
     <div
       className={cn(
-        "fixed inset-0 flex items-center justify-center p-density-2 sm:p-density-4",
+        "fixed inset-0 flex items-center justify-center p-density-2 sm:p-density-4 max-sm:items-stretch max-sm:justify-end max-sm:p-0 max-sm:!bg-transparent",
         // Nested modals dim less so the dialog they opened over stays visible.
         depth === 0 ? "bg-black/40" : "bg-black/20",
       )}
@@ -168,8 +215,12 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
+        data-state={mobileVisible ? "open" : "closed"}
         className={cn(
           "relative flex w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
+          "max-sm:!h-dvh max-sm:!max-h-dvh max-sm:!max-w-none max-sm:!rounded-none max-sm:!border-0 max-sm:shadow-none",
+          "max-sm:transition-transform max-sm:duration-200 max-sm:ease-out max-sm:motion-reduce:transition-none",
+          "max-sm:data-[state=closed]:translate-x-full max-sm:data-[state=open]:translate-x-0",
           expanded ? sizeClass.full : sizeClass[size],
           className,
         )}
@@ -184,10 +235,24 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {(title || subtitle || headerSlot || expandable || !hideClose) && (
-          <div className="shrink-0 px-density-4 py-density-3 border-b border-border">
+          <div className="shrink-0 px-density-4 py-density-3 border-b border-border max-sm:min-h-14 max-sm:bg-background">
             <div className="flex items-center gap-density-2">
+              {!hideClose && (
+                <Button
+                  type="button"
+                  onClick={requestClose}
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Back"
+                  className="-ml-2 text-foreground sm:hidden"
+                >
+                  <Icon icon={UiArrowLeft} />
+                </Button>
+              )}
               {title ? (
-                <h2 className="text-sm font-semibold flex-1">{title}</h2>
+                <h2 className="text-sm font-semibold flex-1 max-sm:text-base max-sm:leading-6">
+                  {title}
+                </h2>
               ) : (
                 <span className="flex-1" />
               )}
@@ -199,7 +264,7 @@ export function Modal({
                   aria-label={
                     expanded ? "Restore size" : "Expand to fullscreen"
                   }
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground max-sm:hidden"
                 >
                   <Icon icon={expanded ? UiFullscreenFilled : UiFullscreen} />
                 </button>
@@ -209,7 +274,7 @@ export function Modal({
                   type="button"
                   onClick={requestClose}
                   aria-label="Close"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground max-sm:hidden"
                 >
                   <Icon icon={UiClose} />
                 </button>
@@ -221,7 +286,7 @@ export function Modal({
         <div
           data-slot="modal-body"
           className={cn(
-            "min-h-0 flex-1 px-density-4 py-density-3",
+            "min-h-0 flex-1 px-density-4 py-density-3 max-sm:py-density-4",
             scrollBody
               ? "overflow-auto"
               : "flex flex-col overflow-hidden",
@@ -232,7 +297,7 @@ export function Modal({
         {footer && (
           <div
             data-slot="modal-footer"
-            className="shrink-0 px-density-4 py-density-3 border-t border-border"
+            className="shrink-0 px-density-4 py-density-3 border-t border-border max-sm:py-density-4"
           >
             {footer}
           </div>
@@ -275,7 +340,7 @@ function ConfirmClosePrompt({
 }) {
   return (
     <div
-      className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 p-density-4"
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80 p-density-4 max-sm:rounded-none"
       role="alertdialog"
       aria-modal="true"
       aria-label={
