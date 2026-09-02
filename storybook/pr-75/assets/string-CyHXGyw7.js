@@ -1,0 +1,1 @@
+function i(n){let t=n.length;for(;t>0&&n[t-1]==="/";)t--;return n.slice(0,t)}function s(n){let t=0,e=n.length;for(;t<e&&n[t]==="-";)t++;for(;e>t&&n[e-1]==="-";)e--;return n.slice(t,e)}export{s as a,i as s};
