@@ -2523,9 +2523,19 @@ function DataTableInner<T extends Record<string, unknown>>({
                                       ) ?? true,
                                   ).length,
                                   selectedCount: selectedScope
-                                    ? item.group.records.length
-                                    : item.group.records.filter((record) =>
-                                        selectedRowIDs.has(record.id),
+                                    ? item.group.records.filter(
+                                        (record) =>
+                                          rowSelection.isRowSelectable?.(
+                                            record.row,
+                                          ) ?? true,
+                                      ).length
+                                    : item.group.records.filter(
+                                        (record) =>
+                                          (rowSelection.isRowSelectable?.(
+                                            record.row,
+                                          ) ??
+                                            true) &&
+                                          selectedRowIDs.has(record.id),
                                       ).length,
                                   disabled: !!selectedScope,
                                   onToggle: () =>
@@ -2582,7 +2592,8 @@ function DataTableInner<T extends Record<string, unknown>>({
                             clickable &&
                               !href &&
                               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                            (selectedScope || selectedRowIDs.has(record.id)) &&
+                            ((selectedScope && rowSelectable) ||
+                              selectedRowIDs.has(record.id)) &&
                               "bg-accent/50",
                             getRowClassName?.(record.row),
                           )}
@@ -2611,7 +2622,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                                 type="checkbox"
                                 aria-label={`Select row ${record.id}`}
                                 checked={
-                                  !!selectedScope ||
+                                  (!!selectedScope && rowSelectable) ||
                                   selectedRowIDs.has(record.id)
                                 }
                                 disabled={!!selectedScope || !rowSelectable}

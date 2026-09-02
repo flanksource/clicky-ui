@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Combobox } from "./Combobox";
-import { calculateComboboxMenuPosition } from "./combobox-utils";
+import { calculateComboboxMenuPosition } from "../lib/combobox";
 
 const MOBILE_WIDTH = 390;
 const MOBILE_HEIGHT = 844;
@@ -38,7 +38,9 @@ describe("Combobox mobile menu layout", () => {
     );
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(MOBILE_WIDTH);
     vi.spyOn(window, "innerHeight", "get").mockReturnValue(MOBILE_HEIGHT);
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(ANCHOR_RECT);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      ANCHOR_RECT,
+    );
 
     render(
       <Combobox
@@ -56,7 +58,10 @@ describe("Combobox mobile menu layout", () => {
 
     const listbox = screen.getByRole("listbox");
     const viewportLayer = listbox.parentElement;
-    expect(viewportLayer).toHaveAttribute("data-slot", "combobox-viewport-layer");
+    expect(viewportLayer).toHaveAttribute(
+      "data-slot",
+      "combobox-viewport-layer",
+    );
     expect(viewportLayer).toHaveStyle({
       position: "fixed",
       inset: "0",
@@ -81,7 +86,9 @@ describe("Combobox mobile menu layout", () => {
       mobile: true,
     };
 
-    expect(calculateComboboxMenuPosition({ ...input, naturalHeight: 120 })).toEqual({
+    expect(
+      calculateComboboxMenuPosition({ ...input, naturalHeight: 120 }),
+    ).toEqual({
       strategy: "mobile",
       top: 636,
       left: 16,
@@ -89,7 +96,9 @@ describe("Combobox mobile menu layout", () => {
       maxWidth: 358,
       maxHeight: 200,
     });
-    expect(calculateComboboxMenuPosition({ ...input, naturalHeight: 320 })).toEqual({
+    expect(
+      calculateComboboxMenuPosition({ ...input, naturalHeight: 320 }),
+    ).toEqual({
       strategy: "mobile",
       bottom: 248,
       left: 16,
@@ -97,5 +106,16 @@ describe("Combobox mobile menu layout", () => {
       maxWidth: 358,
       maxHeight: 588,
     });
+  });
+
+  it("reserves the anchor gap when calculating desktop menu height", () => {
+    expect(
+      calculateComboboxMenuPosition({
+        anchor: { top: 8, bottom: 40, left: 20, width: 120 },
+        viewportWidth: 400,
+        viewportHeight: 100,
+        mobile: false,
+      }),
+    ).toMatchObject({ strategy: "desktop", top: 44, maxHeight: 48 });
   });
 });

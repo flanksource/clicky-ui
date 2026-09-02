@@ -12,7 +12,7 @@ import {
   type FormSize,
 } from "./json-schema-form-size";
 import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
-import { comboboxLabelPadding } from "./combobox-utils";
+import { comboboxLabelPadding } from "../lib/combobox-values";
 import { ComboboxActions } from "./ComboboxActions";
 import { ComboboxTags } from "./ComboboxTags";
 

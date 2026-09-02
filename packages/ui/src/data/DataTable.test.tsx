@@ -1065,6 +1065,36 @@ describe("DataTable", () => {
     expect(onSelectionChange).toHaveBeenLastCalledWith(["api"], [rows[0]]);
   });
 
+  it("does not mark rejected rows or count them selected for a selected scope", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        grouping={{ getGroupKey: (row) => row.status }}
+        rowSelection={{
+          selectedRowIds: [],
+          onSelectionChange: vi.fn(),
+          isRowSelectable: (row) => row.service !== "cron",
+          selectAllPages: {
+            scopes: [{ id: "all", total: 2, onSelectAll: vi.fn() }],
+            selectedScopeId: "all",
+          },
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("checkbox", { name: "Select row api" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Select row cron" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Select group healthy" }),
+    ).toBeChecked();
+  });
+
   it("orders groups by compareGroups and starts matching groups collapsed", () => {
     render(
       <DataTable

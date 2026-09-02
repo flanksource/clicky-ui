@@ -4,11 +4,8 @@ import { FilterPill } from "../data/FilterPill";
 import { Icon, LabelIcon } from "../data/Icon";
 import { UiCheck } from "../icons";
 import { cn } from "../lib/utils";
-import type {
-  ComboboxOption,
-  ComboboxTriStateMode,
-} from "./combobox-types";
-import type { ComboboxMenuPosition } from "./combobox-utils";
+import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
+import type { ComboboxMenuPosition } from "../lib/combobox";
 
 export function ComboboxMenu({
   customEntry,
@@ -89,8 +86,7 @@ export function ComboboxMenu({
         const selected = isSelected(option.value);
         const mode = tristate ? modes[option.value] : undefined;
         const showHeader =
-          option.group != null &&
-          option.group !== filtered[index - 1]?.group;
+          option.group != null && option.group !== filtered[index - 1]?.group;
         return (
           <Fragment key={option.value}>
             {showHeader && (
@@ -114,9 +110,7 @@ export function ComboboxMenu({
                   }
                 : {})}
               {...(option.title !== undefined ? { title: option.title } : {})}
-              {...(tristate
-                ? { "data-filter-option": option.value }
-                : {})}
+              {...(tristate ? { "data-filter-option": option.value } : {})}
               onMouseDown={(event) => {
                 event.preventDefault();
                 if (!tristate && !option.disabled) onSelect(option);
@@ -214,7 +208,12 @@ export function ComboboxMenu({
     mobile ? (
       <div
         data-slot="combobox-viewport-layer"
-        style={{ position: "fixed", inset: 0, zIndex: floatingZ, pointerEvents: "none" }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: floatingZ,
+          pointerEvents: "none",
+        }}
       >
         {listbox}
       </div>
@@ -234,7 +233,11 @@ function ComboboxOptionText({ option }: { option: ComboboxOption }) {
   );
 }
 
-function ComboboxOptionDescription({ description }: { description: string | undefined }) {
+function ComboboxOptionDescription({
+  description,
+}: {
+  description: string | undefined;
+}) {
   return description ? (
     <span className="mt-0.5 block whitespace-pre-line text-xs font-normal leading-4 text-muted-foreground">
       {description}
