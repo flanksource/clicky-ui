@@ -11,10 +11,10 @@ export function MonacoSchemaEditor(props: MonacoSchemaEditorProps) {
   const { value, language, path, schema, schemaUri, onValidationChange } = props;
   const [retry, setRetry] = useState(0);
   const workers = useMonacoWorkerFactory();
-  const cleanup = useRef<(() => void) | undefined>();
-  const markerCleanup = useRef<(() => void) | undefined>();
-  const disposeTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const initialValidationTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const cleanup = useRef<(() => void) | undefined>(undefined);
+  const markerCleanup = useRef<(() => void) | undefined>(undefined);
+  const disposeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const initialValidationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const model = useRef<editor.ITextModel | null>(null);
   const normalized = useMemo(() => normalizeSchemaForMonaco(schema), [schema]);
 
