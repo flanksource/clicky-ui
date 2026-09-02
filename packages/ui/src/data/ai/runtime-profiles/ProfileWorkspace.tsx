@@ -11,14 +11,11 @@ import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeSpec,
 } from "../SpecRuntimeEditor.model";
-import { uniqueName } from "./model";
+import { uniqueName } from "../../../lib/runtime-profile-model";
 import { ProfileSpecEditor } from "./ProfileSpecEditor";
 import { ResolutionInspector } from "./ResolutionInspector";
 import { RuntimeLibraryList } from "./RuntimeLibraryList";
-import type {
-  RuntimeProfileResolutionState,
-  RuntimeRecordMeta,
-} from "./types";
+import type { RuntimeProfileResolutionState, RuntimeRecordMeta } from "./types";
 
 const EMPTY_PROFILE: RuntimeProfile = {
   id: "empty",
@@ -147,7 +144,11 @@ function ProfileHeader({
           onChange={(name) => onChange({ ...profile, name })}
         />
       </Field>
-      <Field label="Description" htmlFor={descriptionId} labelClassName="text-xs">
+      <Field
+        label="Description"
+        htmlFor={descriptionId}
+        labelClassName="text-xs"
+      >
         <InputField
           id={descriptionId}
           value={profile.description ?? ""}

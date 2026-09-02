@@ -39,7 +39,7 @@ import type {
   RuntimeProfile,
   RuntimeProfileResolveRequest,
 } from "../runtime-profile";
-import { authoredRuntimeSpec } from "../runtime-profiles/model";
+import { authoredRuntimeSpec } from "../../../lib/runtime-profile-model";
 import { RuntimeProfilePicker } from "../runtime-profiles/RuntimeProfilePicker";
 import {
   inheritedRuntime,
@@ -92,12 +92,16 @@ export type PromptRunEditorProps = {
   profiles?: RuntimeProfile[] | undefined;
   /** Presets the profiles reference, for ordering and inherited model/mode. */
   presets?: RuntimePreset[] | undefined;
-  onSaveProfile?: ((profile: RuntimeProfile) => Promise<RuntimeProfile>) | undefined;
+  onSaveProfile?:
+    | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
+    | undefined;
   onCreateProfile?:
     | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
     | undefined;
   onResolveProfile?:
-    | ((request: RuntimeProfileResolveRequest) => Promise<ResolvedRuntimeProfile>)
+    | ((
+        request: RuntimeProfileResolveRequest,
+      ) => Promise<ResolvedRuntimeProfile>)
     | undefined;
   /** The last render's resolved spec and layer trace. */
   resolution?: ResolvedRuntimeSpec | undefined;
@@ -417,4 +421,3 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-

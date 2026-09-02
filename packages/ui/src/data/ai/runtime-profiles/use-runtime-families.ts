@@ -20,7 +20,10 @@ export function useRuntimeFamilies(
     const controller = new AbortController();
     setState({ families: [], status: "loading" });
     void loadFamilies(controller.signal).then(
-      (families) => setState({ families, status: "resolved" }),
+      (families) => {
+        if (controller.signal.aborted) return;
+        setState({ families, status: "resolved" });
+      },
       (error: unknown) => {
         if (controller.signal.aborted) return;
         setState({

@@ -16,7 +16,7 @@ import type {
 } from "../runtime-profile";
 import { Disclosure } from "../SpecRuntimeEditor/fields";
 import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
-import { uniqueName } from "./model";
+import { uniqueName } from "../../../lib/runtime-profile-model";
 import { OrderedPresetSelect } from "./OrderedPresetSelect";
 import { ResolutionTrace } from "./ResolutionTrace";
 import type { RuntimeProfileLayer } from "./RuntimeProfilePicker.model";
@@ -74,7 +74,9 @@ export function RuntimeProfilePicker({
                 : {}),
             })),
           ]}
-          onChange={(next) => controller.select(next === NONE ? undefined : next)}
+          onChange={(next) =>
+            controller.select(next === NONE ? undefined : next)
+          }
           allowCustomValue={false}
           required
           className="min-w-56 flex-1"
@@ -88,10 +90,18 @@ export function RuntimeProfilePicker({
           <span className="flex-1">
             Discard changes to «{pendingProfile?.name ?? draft?.name}»?
           </span>
-          <Button size="sm" variant="outline" onClick={controller.cancelPending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={controller.cancelPending}
+          >
             Keep editing
           </Button>
-          <Button size="sm" variant="destructive" onClick={controller.confirmPending}>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={controller.confirmPending}
+          >
             Discard
           </Button>
         </div>
@@ -111,7 +121,9 @@ export function RuntimeProfilePicker({
                 label="Profile name"
                 htmlFor={nameId}
                 labelClassName="text-xs"
-                error={nameTaken ? "A unique profile name is required." : undefined}
+                error={
+                  nameTaken ? "A unique profile name is required." : undefined
+                }
               >
                 <InputField
                   id={nameId}
@@ -132,7 +144,12 @@ export function RuntimeProfilePicker({
           <div className="flex flex-wrap items-center gap-density-2">
             <Button
               size="sm"
-              disabled={!controller.canSave || !controller.dirty || nameTaken || Boolean(controller.busy)}
+              disabled={
+                !controller.canSave ||
+                !controller.dirty ||
+                nameTaken ||
+                Boolean(controller.busy)
+              }
               onClick={() => void controller.save()}
             >
               <Icon icon={UiSave} className="size-3.5" />
@@ -174,10 +191,7 @@ export function RuntimeProfilePicker({
           {controller.notice}
         </p>
       )}
-      <Disclosure
-        label="Resolution"
-        hint={effectiveLabel(effectiveRuntime)}
-      >
+      <Disclosure label="Resolution" hint={effectiveLabel(effectiveRuntime)}>
         <ResolutionTrace trace={resolution?.trace ?? []} />
       </Disclosure>
     </section>

@@ -26,9 +26,15 @@ export function useRuntimeProfileResolution(
     setState({ status: "loading" });
     const timer = window.setTimeout(() => {
       void client
-        .resolve({ profile: profile ?? EMPTY_PROFILE, presets }, controller.signal)
+        .resolve(
+          { profile: profile ?? EMPTY_PROFILE, presets },
+          controller.signal,
+        )
         .then(
-          (result) => setState({ status: "resolved", result }),
+          (result) => {
+            if (controller.signal.aborted) return;
+            setState({ status: "resolved", result });
+          },
           (error: unknown) => {
             if (controller.signal.aborted) return;
             setState({

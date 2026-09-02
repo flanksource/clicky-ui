@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SPEC_RUNTIME_FAMILIES } from "../../runtime/runtime-mode";
-import type { RuntimePreset, RuntimeProfile } from "../runtime-profile";
+import { SPEC_RUNTIME_FAMILIES } from "../data/runtime/runtime-mode";
+import type { RuntimePreset, RuntimeProfile } from "../data/ai/runtime-profile";
 import {
   authoredRuntimeSpec,
   duplicateName,
@@ -11,7 +11,7 @@ import {
   referencedBy,
   reorderProfilePresets,
   uniqueName,
-} from "./model";
+} from "./runtime-profile-model";
 
 const PRESETS: RuntimePreset[] = [
   {
@@ -64,7 +64,12 @@ describe("runtime profile model", () => {
   });
 
   it("reports references by id or name and generates unique names", () => {
-    const byName: RuntimeProfile = { ...PROFILE, id: "p2", name: "Named", presets: ["DEFAULTS"] };
+    const byName: RuntimeProfile = {
+      ...PROFILE,
+      id: "p2",
+      name: "Named",
+      presets: ["DEFAULTS"],
+    };
     expect(referencedBy(PRESETS[0]!, [PROFILE, byName])).toEqual(["Named"]);
     expect(
       referencedBy({ id: "surface-a", name: "Surface A" }, [PROFILE, byName]),
@@ -95,11 +100,19 @@ describe("runtime profile model", () => {
       ),
     ).toEqual({ provider: "anthropic", mode: "cli" });
     expect(
-      permissionTarget({ model: "cli:anthropic/claude-sonnet-5" }, SPEC_RUNTIME_FAMILIES),
+      permissionTarget(
+        { model: "cli:anthropic/claude-sonnet-5" },
+        SPEC_RUNTIME_FAMILIES,
+      ),
     ).toEqual({ provider: "anthropic", mode: "cli" });
-    expect(permissionTarget({ mode: "cli" }, SPEC_RUNTIME_FAMILIES)).toBeUndefined();
     expect(
-      permissionTarget({ model: "anthropic/claude-sonnet-5" }, SPEC_RUNTIME_FAMILIES),
+      permissionTarget({ mode: "cli" }, SPEC_RUNTIME_FAMILIES),
+    ).toBeUndefined();
+    expect(
+      permissionTarget(
+        { model: "anthropic/claude-sonnet-5" },
+        SPEC_RUNTIME_FAMILIES,
+      ),
     ).toBeUndefined();
   });
 

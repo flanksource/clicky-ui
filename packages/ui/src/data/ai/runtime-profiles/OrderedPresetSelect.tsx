@@ -3,7 +3,7 @@ import { MultiSelect } from "../../../components/MultiSelect";
 import { UiChevronDown, UiChevronUp, UiTrash } from "../../../icons";
 import { moveItem } from "../../../lib/collections";
 import type { RuntimePreset } from "../runtime-profile";
-import { presetForRef } from "./model";
+import { presetForRef } from "../../../lib/runtime-profile-model";
 
 export function OrderedPresetSelect({
   presets,
@@ -14,7 +14,10 @@ export function OrderedPresetSelect({
   value: string[];
   onChange: (value: string[]) => void;
 }) {
-  const rows = value.map((ref) => ({ ref, preset: presetForRef(ref, presets) }));
+  const rows = value.map((ref) => ({
+    ref,
+    preset: presetForRef(ref, presets),
+  }));
   const selectedIds = rows.map(({ ref, preset }) => preset?.id ?? ref);
 
   return (
@@ -78,7 +81,9 @@ export function OrderedPresetSelect({
                   label={`Remove missing preset ${ref}`}
                   className="hover:text-destructive"
                   onClick={() =>
-                    onChange(value.filter((_, itemIndex) => itemIndex !== index))
+                    onChange(
+                      value.filter((_, itemIndex) => itemIndex !== index),
+                    )
                   }
                 />
               )}

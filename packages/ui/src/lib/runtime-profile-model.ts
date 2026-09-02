@@ -1,13 +1,15 @@
-import { isPlainObject, moveItem } from "../../../lib/collections";
+import { isPlainObject, moveItem } from "./collections";
+import {
+  type SpecRuntimeFamily,
+} from "../data/runtime/runtime-mode";
 import {
   familyForModel,
   modeOptionFor,
   runtimeModeFromModel,
-  type SpecRuntimeFamily,
-} from "../../runtime/runtime-mode";
-import type { RuntimePreset, RuntimeProfile } from "../runtime-profile";
-import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
-import type { RuntimePermissionTarget } from "./types";
+} from "./runtime-family";
+import type { RuntimePreset, RuntimeProfile } from "../data/ai/runtime-profile";
+import type { AISpecRuntimeSpec } from "../data/ai/SpecRuntimeEditor.model";
+import type { RuntimePermissionTarget } from "../data/ai/runtime-profiles/types";
 
 export function reorderProfilePresets(
   profile: RuntimeProfile,
@@ -116,7 +118,10 @@ export function newProfileRecord(
   profiles: RuntimeProfile[],
   id: string,
 ): RuntimeProfile {
-  const name = nextNewName("New profile", profiles.map((item) => item.name));
+  const name = nextNewName(
+    "New profile",
+    profiles.map((item) => item.name),
+  );
   return { id, name, spec: {}, presets: [] };
 }
 
@@ -124,7 +129,10 @@ export function newPresetRecord(
   presets: RuntimePreset[],
   id: string,
 ): RuntimePreset {
-  const name = nextNewName("New preset", presets.map((item) => item.name));
+  const name = nextNewName(
+    "New preset",
+    presets.map((item) => item.name),
+  );
   return { id, name, scope: "surface", spec: {} };
 }
 
@@ -138,7 +146,10 @@ export function duplicateRecord<T extends { id: string; name: string }>(
   return {
     ...structuredClone(source),
     id,
-    name: duplicateName(source.name, records.map((record) => record.name)),
+    name: duplicateName(
+      source.name,
+      records.map((record) => record.name),
+    ),
   };
 }
 

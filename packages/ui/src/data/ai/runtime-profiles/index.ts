@@ -41,7 +41,7 @@ export {
   referencedBy,
   reorderProfilePresets,
   uniqueName,
-} from "./model";
+} from "../../../lib/runtime-profile-model";
 export type {
   RuntimeFamiliesState,
   RuntimePermissionCatalogState,

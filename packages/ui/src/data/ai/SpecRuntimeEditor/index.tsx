@@ -34,7 +34,6 @@ import {
 } from "./types";
 import {
   SPEC_RUNTIME_FAMILIES,
-  familyForModel,
   firstMode,
   runtimeModeError,
   runtimeModeFromModel,
@@ -42,6 +41,7 @@ import {
   modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
+import { familyForModel } from "../../../lib/runtime-family";
 import {
   runtimeFieldSection,
   runtimeFieldSupport,
@@ -405,8 +405,8 @@ export function SpecRuntimeEditor({
             role="alert"
             className="mb-density-3 rounded-md border border-destructive/40 bg-destructive/10 px-density-3 py-density-2 text-sm text-destructive"
           >
-            {runtimeError} Select a valid mode below or switch to Raw to
-            repair the prompt source.
+            {runtimeError} Select a valid mode below or switch to Raw to repair
+            the prompt source.
           </div>
         ) : null}
         {beforeSections}

@@ -32,7 +32,6 @@ import {
 } from "../../runtime/runtime-field-support";
 import {
   SPEC_RUNTIME_FAMILIES,
-  familyForModel,
   firstMode,
   modeOptionFor,
   runtimeModeError,
@@ -40,6 +39,7 @@ import {
   runtimeModelError,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
+import { familyForModel } from "../../../lib/runtime-family";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 
