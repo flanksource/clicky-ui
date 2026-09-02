@@ -1,0 +1,517 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap");
+
+.merivio-system {
+  --mv-paper: #f3f1ea;
+  --mv-paper-2: #ebe7dc;
+  --mv-surface: #ffffff;
+  --mv-surface-2: #faf8f3;
+  --mv-ink: #0f1413;
+  --mv-ink-2: #2a2f2e;
+  --mv-ink-3: #4a514e;
+  --mv-muted: #7a8077;
+  --mv-muted-2: #a3a89e;
+  --mv-border: #e3dfd2;
+  --mv-border-strong: #d2cdbb;
+  --mv-hair: #ecead9;
+  --mv-accent: #114c40;
+  --mv-accent-2: #1c6b59;
+  --mv-accent-soft: #dde9e2;
+  --mv-positive: #1f6b48;
+  --mv-positive-soft: #dbe9df;
+  --mv-warm: #b8642e;
+  --mv-warm-soft: #f2e3d3;
+  --mv-negative: #b13427;
+  --mv-negative-soft: #f6ddd6;
+  --mv-info: #2a4f74;
+  --mv-info-soft: #dde7f0;
+
+  /* Accounting category palette.
+     Mirrors FINANCIAL_CATEGORY_COLORS, but resolved through custom properties
+     so the dark palette below can take over. Components must consume these via
+     categoryTokens() rather than the literal hex in financial-icons.ts —
+     inline hex outranks every cascade layer and strands the page in light mode.
+     `accent` is the control colour and clears 4.5:1 on the page surface;
+     `ink` is text drawn on `soft`. */
+  --mv-cat-inflow-accent: #047857;
+  --mv-cat-inflow-soft: #ecfdf5;
+  --mv-cat-inflow-line: #a7f3d0;
+  --mv-cat-inflow-ink: #065f46;
+  --mv-cat-outflow-accent: #be123c;
+  --mv-cat-outflow-soft: #fff1f2;
+  --mv-cat-outflow-line: #fecdd3;
+  --mv-cat-outflow-ink: #9f1239;
+  --mv-cat-bank-accent: #0369a1;
+  --mv-cat-bank-soft: #f0f9ff;
+  --mv-cat-bank-line: #bae6fd;
+  --mv-cat-bank-ink: #075985;
+  --mv-cat-journal-accent: #6d28d9;
+  --mv-cat-journal-soft: #f5f3ff;
+  --mv-cat-journal-line: #ddd6fe;
+  --mv-cat-journal-ink: #5b21b6;
+  --mv-cat-asset-accent: #0f766e;
+  --mv-cat-asset-soft: #f0fdfa;
+  --mv-cat-asset-line: #99f6e4;
+  --mv-cat-asset-ink: #115e59;
+  --mv-cat-fx-accent: #b45309;
+  --mv-cat-fx-soft: #fffbeb;
+  --mv-cat-fx-line: #fde68a;
+  --mv-cat-fx-ink: #92400e;
+  --mv-cat-report-accent: #4338ca;
+  --mv-cat-report-soft: #eef0fe;
+  --mv-cat-report-line: #c7cbf8;
+  --mv-cat-report-ink: #3730a3;
+  --mv-cat-contact-accent: #0369a1;
+  --mv-cat-contact-soft: #f0f9ff;
+  --mv-cat-contact-line: #bae6fd;
+  --mv-cat-contact-ink: #075985;
+  --mv-cat-rule-accent: #4b5563;
+  --mv-cat-rule-soft: #f3f4f6;
+  --mv-cat-rule-line: #d1d5db;
+  --mv-cat-rule-ink: #374151;
+
+  /* Execution-state tint, used by the D3 status rail. Keyed by what the row is
+     doing, never by which account class it belongs to. */
+  --mv-exec-running-soft: #dbe9df;
+  --mv-exec-running-line: #a9cdb8;
+  --mv-exec-paused-soft: #f2e3d3;
+  --mv-exec-paused-line: #e0bf9a;
+  --mv-exec-stopped-soft: #faf8f3;
+  --mv-exec-stopped-line: #e3dfd2;
+  --mv-exec-inactive-soft: #f3f2ee;
+  --mv-exec-inactive-line: #dedad0;
+
+  --background: var(--mv-surface);
+  --foreground: var(--mv-ink);
+  --card: var(--mv-surface);
+  --card-foreground: var(--mv-ink);
+  --muted: var(--mv-surface-2);
+  --muted-foreground: var(--mv-muted);
+  --border: var(--mv-border);
+  /* Matches webapp/src/merivio-theme.css in xero-cli. The playground previously
+     mapped this to --mv-accent (green), so any review of a `default` Button was
+     judging a control that does not exist in the product. */
+  --primary: var(--mv-ink);
+  --primary-foreground: var(--mv-paper);
+  --accent: var(--mv-accent-soft);
+  --accent-foreground: var(--mv-accent);
+  --destructive: var(--mv-negative);
+  --destructive-foreground: var(--mv-paper);
+  background: var(--mv-paper);
+  color: var(--mv-ink);
+  font-family: "Geist", var(--fs-font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+}
+
+.merivio-system :where(.font-mono, code, kbd, pre) {
+  font-family: "Geist Mono", var(--fs-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.merivio-serif,
+.merivio-display {
+  font-family: "Instrument Serif", Georgia, serif;
+}
+
+.merivio-hero {
+  padding: 3rem 1.5rem 2.5rem;
+  border-bottom: 1px solid var(--mv-hair);
+}
+
+.merivio-brand-mark {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: var(--mv-paper);
+  background: var(--mv-ink);
+}
+
+.merivio-source-chip,
+.merivio-status-chip,
+.merivio-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--mv-hair);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.merivio-source-chip {
+  margin-left: auto;
+  color: var(--mv-ink-3);
+  background: var(--mv-surface-2);
+  font-family: "Geist Mono", var(--fs-font-mono);
+}
+
+.merivio-status-chip {
+  color: var(--mv-positive);
+  background: var(--mv-positive-soft);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.merivio-display {
+  max-width: 18ch;
+  margin-bottom: 0;
+  color: var(--mv-ink);
+  font-size: clamp(2.75rem, 6vw, 4rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.merivio-display em {
+  color: var(--mv-accent);
+}
+
+.merivio-card {
+  color: var(--mv-ink);
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-border);
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 0 rgb(15 20 19 / 4%), 0 1px 2px rgb(15 20 19 / 4%);
+}
+
+.merivio-search {
+  display: flex;
+  width: min(100%, 28rem);
+  height: 2.25rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.75rem;
+  color: var(--mv-muted);
+  background: var(--mv-surface);
+  border: 1px solid var(--mv-border);
+  border-radius: 0.625rem;
+}
+
+.merivio-search:focus-within {
+  border-color: var(--mv-accent);
+  box-shadow: 0 0 0 3px rgb(17 76 64 / 10%);
+}
+
+.merivio-search input {
+  min-width: 0;
+  flex: 1;
+  color: var(--mv-ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 0.8rem;
+}
+
+.merivio-search button {
+  padding: 0 0.15rem;
+  color: var(--mv-muted);
+  background: transparent;
+  border: 0;
+  font-size: 1rem;
+}
+
+.merivio-count {
+  color: var(--mv-muted);
+  background: var(--mv-surface-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.merivio-catalog-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--mv-border);
+}
+
+.merivio-catalog-header h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.merivio-catalog-header p {
+  color: var(--mv-muted);
+  font-size: 0.75rem;
+}
+
+.merivio-catalog-header span {
+  margin-left: auto;
+  color: var(--mv-muted-2);
+  font-family: "Geist Mono", var(--fs-font-mono);
+  font-size: 0.68rem;
+}
+
+.merivio-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.merivio-icon-cell {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+}
+
+.merivio-icon-cell:hover {
+  background: var(--mv-surface);
+  border-color: var(--mv-border);
+}
+
+.merivio-icon-mark {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  color: var(--icon-accent);
+  background: var(--icon-soft);
+  border: 1px solid var(--icon-line);
+  border-radius: 0.5rem;
+}
+
+.merivio-icon-cell strong,
+.merivio-icon-cell small,
+.merivio-icon-cell code {
+  display: block;
+}
+
+.merivio-icon-cell strong {
+  color: var(--mv-ink);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.merivio-icon-cell small {
+  margin-top: 0.08rem;
+  color: var(--mv-muted);
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.merivio-icon-cell code {
+  margin-top: 0.18rem;
+  color: var(--mv-muted-2);
+  font-size: 0.63rem;
+}
+
+.merivio-badge,
+.merivio-account-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.merivio-badge {
+  padding: 0.2rem 0.55rem;
+}
+
+.merivio-badge.posted {
+  color: var(--mv-positive);
+  background: var(--mv-positive-soft);
+}
+
+.merivio-badge.draft {
+  color: var(--mv-warm);
+  background: var(--mv-warm-soft);
+}
+
+.merivio-badge.void {
+  color: var(--mv-negative);
+  background: var(--mv-negative-soft);
+}
+
+.merivio-badge.imported {
+  color: var(--mv-info);
+  background: var(--mv-info-soft);
+}
+
+.merivio-badge.muted {
+  color: var(--mv-muted);
+  background: var(--mv-surface-2);
+}
+
+.merivio-account-tag {
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  font-family: "Geist Mono", var(--fs-font-mono);
+  text-transform: uppercase;
+}
+
+.merivio-segment {
+  display: inline-flex;
+  padding: 0.125rem;
+  background: var(--mv-paper-2);
+  border: 1px solid var(--mv-border);
+  border-radius: 0.625rem;
+}
+
+.merivio-primary-button,
+.merivio-ghost-button {
+  display: inline-flex;
+  height: 2rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.merivio-primary-button {
+  color: var(--mv-paper);
+  background: var(--mv-ink);
+  border: 1px solid var(--mv-ink);
+}
+
+.merivio-primary-button:hover {
+  background: var(--mv-ink-2);
+}
+
+.merivio-ghost-button {
+  color: var(--mv-ink-2);
+  background: transparent;
+  border: 1px solid var(--mv-border);
+}
+
+.merivio-ghost-button:hover {
+  background: var(--mv-surface-2);
+  border-color: var(--mv-border-strong);
+}
+
+.merivio-segment button {
+  padding: 0.3rem 0.65rem;
+  color: var(--mv-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+}
+
+.merivio-segment button.active {
+  color: var(--mv-ink);
+  background: var(--mv-surface);
+  box-shadow: 0 1px 2px rgb(15 20 19 / 6%);
+  font-weight: 500;
+}
+
+.merivio-rule-do,
+.merivio-rule-dont {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.merivio-rule-do {
+  color: var(--mv-positive);
+}
+
+.merivio-rule-dont {
+  color: var(--mv-negative);
+}
+
+[data-theme="dark"] .merivio-system {
+  --mv-paper: #12140f;
+  --mv-paper-2: #1a1d16;
+  --mv-surface: #191c16;
+  --mv-surface-2: #20241c;
+  --mv-ink: #ecead9;
+  --mv-ink-2: #d3d1c0;
+  --mv-ink-3: #b8baa9;
+  --mv-muted: #8b8f80;
+  --mv-muted-2: #6f7467;
+  --mv-border: #2f3429;
+  --mv-border-strong: #41483a;
+  --mv-hair: #262a20;
+  --mv-accent: #6fcfb2;
+  --mv-accent-2: #83dec2;
+  --mv-accent-soft: #16332b;
+  --mv-positive: #7fc9a3;
+  --mv-positive-soft: #17332a;
+  --mv-warm: #dda06a;
+  --mv-warm-soft: #33261a;
+  --mv-negative: #ec8878;
+  --mv-negative-soft: #3a201c;
+  --mv-info: #8fb6dd;
+  --mv-info-soft: #1c2a38;
+
+  --mv-cat-inflow-accent: #6ec89f;
+  --mv-cat-inflow-soft: #12291f;
+  --mv-cat-inflow-line: #2b5a44;
+  --mv-cat-inflow-ink: #a8dfc3;
+  --mv-cat-outflow-accent: #ec8878;
+  --mv-cat-outflow-soft: #331b18;
+  --mv-cat-outflow-line: #6b342b;
+  --mv-cat-outflow-ink: #f4b0a4;
+  --mv-cat-bank-accent: #8fb6dd;
+  --mv-cat-bank-soft: #182430;
+  --mv-cat-bank-line: #33506b;
+  --mv-cat-bank-ink: #b3d1ec;
+  --mv-cat-journal-accent: #b49ae8;
+  --mv-cat-journal-soft: #221d33;
+  --mv-cat-journal-line: #453a6b;
+  --mv-cat-journal-ink: #cebbf3;
+  --mv-cat-asset-accent: #6fcfb2;
+  --mv-cat-asset-soft: #102925;
+  --mv-cat-asset-line: #235a4f;
+  --mv-cat-asset-ink: #a5e0cd;
+  --mv-cat-fx-accent: #dda06a;
+  --mv-cat-fx-soft: #302317;
+  --mv-cat-fx-line: #63482b;
+  --mv-cat-fx-ink: #eec49b;
+  --mv-cat-report-accent: #9aa3ee;
+  --mv-cat-report-soft: #1e2138;
+  --mv-cat-report-line: #3b4173;
+  --mv-cat-report-ink: #bcc2f4;
+  --mv-cat-contact-accent: #7cc3e8;
+  --mv-cat-contact-soft: #14242e;
+  --mv-cat-contact-line: #2a5068;
+  --mv-cat-contact-ink: #a8d8f0;
+  --mv-cat-rule-accent: #a3a99c;
+  --mv-cat-rule-soft: #21241c;
+  --mv-cat-rule-line: #414636;
+  --mv-cat-rule-ink: #c2c7b9;
+
+  --mv-exec-running-soft: #17332a;
+  --mv-exec-running-line: #2f5f4b;
+  --mv-exec-paused-soft: #33261a;
+  --mv-exec-paused-line: #63482b;
+  --mv-exec-stopped-soft: #20241c;
+  --mv-exec-stopped-line: #33362a;
+  --mv-exec-inactive-soft: #1c1f18;
+  --mv-exec-inactive-line: #2f3329;
+}
+
+@media (min-width: 640px) {
+  .merivio-hero {
+    padding: 4rem 2.5rem 2.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .merivio-source-chip {
+    margin-left: 0;
+  }
+
+  .merivio-catalog-header p {
+    display: none;
+  }
+}

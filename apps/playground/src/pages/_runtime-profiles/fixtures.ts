@@ -1,4 +1,4 @@
-import type { RuntimePreset, RuntimeProfileRecord } from "./contract";
+import type { RuntimePreset, RuntimeProfile } from "@flanksource/clicky-ui/ai";
 
 export const INITIAL_RUNTIME_PRESETS: RuntimePreset[] = [
   {
@@ -7,8 +7,8 @@ export const INITIAL_RUNTIME_PRESETS: RuntimePreset[] = [
     description: "Shared model and budget defaults for every run.",
     scope: "global",
     spec: {
-      model: "openai/gpt-5.6-terra",
-      backend: "codex-agent",
+      model: "anthropic/claude-sonnet-5",
+      mode: "cli",
       effort: "medium",
       budget: { maxTurns: 8, cost: 6 },
       setup: {
@@ -50,9 +50,11 @@ export const INITIAL_RUNTIME_PRESETS: RuntimePreset[] = [
     description: "Ask before write operations and use the balanced runtime.",
     scope: "surface",
     spec: {
-      model: "openai/gpt-5.6-terra",
+      model: "anthropic/claude-sonnet-5",
+      mode: "cli",
       permissions: { mode: "plan" },
-      toolPolicy: [{ group: "projects", policy: "ask" }],
+      sandbox: { mode: "native" },
+      toolPolicy: [{ name: "*", policy: "auto" }],
     },
   },
   {
@@ -63,21 +65,11 @@ export const INITIAL_RUNTIME_PRESETS: RuntimePreset[] = [
     spec: {
       model: "openai/gpt-5.6-sol",
       effort: "high",
-      toolPolicy: [{ group: "projects", policy: "allow" }],
-    },
-  },
-  {
-    id: "personal-guardrails",
-    name: "Personal guardrails",
-    description: "Keep destructive tools behind explicit approval.",
-    scope: "user",
-    spec: {
-      toolPolicy: [{ destructive: true, policy: "ask" }],
     },
   },
 ];
 
-export const INITIAL_RUNTIME_PROFILES: RuntimeProfileRecord[] = [
+export const INITIAL_RUNTIME_PROFILES: RuntimeProfile[] = [
   {
     id: "review-profile",
     name: "Plan and review",
@@ -104,8 +96,7 @@ export const INITIAL_RUNTIME_PROFILES: RuntimeProfileRecord[] = [
   {
     id: "coding-profile",
     name: "Autonomous coding",
-    description:
-      "Focused implementation with personal destructive-operation guardrails.",
+    description: "Focused implementation with repository defaults.",
     spec: {
       prompt: { user: "Implement the requested change in this checkout." },
       setup: { cwd: ".", checkout: { path: ".", ref: "HEAD" } },
@@ -121,7 +112,6 @@ export const INITIAL_RUNTIME_PROFILES: RuntimeProfileRecord[] = [
       "organization-defaults",
       "repository-context",
       "autonomous-coding",
-      "personal-guardrails",
     ],
   },
 ];

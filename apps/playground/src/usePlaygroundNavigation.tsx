@@ -4,7 +4,11 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Badge, type AppShellNavSection } from "@flanksource/clicky-ui";
+import {
+  Badge,
+  type AppShellNavDrag,
+  type AppShellNavSection,
+} from "@flanksource/clicky-ui";
 import {
   UiFilePlus,
   UiFolder,
@@ -17,9 +21,9 @@ import { PLAYGROUND_COMMENT_CONFIG, type PageComment } from "./comments/useComme
 import type { PageAction } from "./editor/PageManagement";
 import { buildPlaygroundNavSections } from "./navigation";
 import {
-  PAGES,
   getMetaVersion,
   pageMeta,
+  pages,
   subscribeMeta,
   type PageEntry,
 } from "./registry";
@@ -38,6 +42,7 @@ export function usePlaygroundNavigation({
   pageHref,
   actionsDisabled,
   disabledReason,
+  drag,
   setPageAction,
 }: {
   active: PageEntry | undefined;
@@ -47,6 +52,7 @@ export function usePlaygroundNavigation({
   pageHref: (slug: string) => string;
   actionsDisabled: boolean;
   disabledReason: string | undefined;
+  drag: AppShellNavDrag;
   setPageAction: Dispatch<SetStateAction<PageActionState | null>>;
 }): AppShellNavSection[] {
   const metaVersion = useSyncExternalStore(
@@ -61,15 +67,16 @@ export function usePlaygroundNavigation({
 
   return useMemo(
     () =>
-      buildPlaygroundNavSections(PAGES, folders, {
+      buildPlaygroundNavSections(pages(), folders, {
         activeSlug: active?.slug,
         query,
         pageHref,
+        drag,
         metaFor: pageMeta,
         badgeFor: (entry) => commentBadge(openCommentCounts.get(entry.slug) ?? 0),
-        folderBadgeFor: (_folder, pages) =>
+        folderBadgeFor: (_folder, folderPages) =>
           commentBadge(
-            pages.reduce(
+            folderPages.reduce(
               (total, page) => total + (openCommentCounts.get(page.slug) ?? 0),
               0,
             ),
@@ -116,12 +123,21 @@ export function usePlaygroundNavigation({
             onSelect: () =>
               setPageAction({ action: "new-folder", initialFolder: folder }),
           },
+          {
+            label: "Delete folder",
+            icon: UiTrash,
+            disabled: actionsDisabled,
+            ...(disabledReason ? { title: disabledReason } : {}),
+            onSelect: () =>
+              setPageAction({ action: "delete-folder", initialFolder: folder }),
+          },
         ],
       }),
     [
       active?.slug,
       actionsDisabled,
       disabledReason,
+      drag,
       folders,
       metaVersion,
       openCommentCounts,

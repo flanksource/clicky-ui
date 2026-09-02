@@ -32,6 +32,7 @@ import {
   PageManagementDialogs,
 } from "./editor/PageManagement";
 import { usePageFolders } from "./editor/usePageFolders";
+import { usePageMoveDrag } from "./editor/usePageMoveDrag";
 import { useSource } from "./editor/useSource";
 import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
@@ -49,12 +50,12 @@ import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { type PageComment } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
-  PAGES,
   fallbackPageSlug,
   loadPage,
   pageDescription,
   pageGroup,
   pageTitle,
+  pages,
   type PageEntry,
 } from "./registry";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
@@ -77,7 +78,7 @@ function lazyPage(entry: PageEntry): LazyExoticComponent<ComponentType> {
 export type PlaygroundShellProps = {
   active: PageEntry | undefined;
   allComments: PageComment[];
-  contentRef: RefObject<HTMLDivElement>;
+  contentRef: RefObject<HTMLDivElement | null>;
   query: string;
   onQueryChange: (next: string) => void;
   commentsError: string | null;
@@ -162,6 +163,12 @@ export function PlaygroundShell({
     ctx.registerAnchor,
   );
 
+  const pageMove = usePageMoveDrag({
+    disabled: filesystemActionsDisabled,
+    activeSlug: active?.slug,
+    onNavigate,
+  });
+
   const navSections = usePlaygroundNavigation({
     active,
     allComments,
@@ -170,6 +177,7 @@ export function PlaygroundShell({
     pageHref,
     actionsDisabled: filesystemActionsDisabled,
     disabledReason: filesystemActionsDisabledReason,
+    drag: pageMove.drag,
     setPageAction,
   });
 
@@ -223,6 +231,18 @@ export function PlaygroundShell({
   useEffect(() => setCommentMode(false), [active?.slug, view]);
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
+
+  const folderImpact = (folder: string) => {
+    const inFolder = pages().filter((entry) =>
+      entry.slug.startsWith(`${folder}/`),
+    );
+    return {
+      pages: inFolder.length,
+      comments: allComments.filter((comment) =>
+        inFolder.some((entry) => entry.slug === comment.page),
+      ).length,
+    };
+  };
 
   const PageComponent = active ? lazyPage(active) : null;
   const activeTitle = active ? pageTitle(active) : "";
@@ -385,6 +405,11 @@ export function PlaygroundShell({
             {pageFolders.error && (
               <Banner tone="danger">{pageFolders.error}</Banner>
             )}
+            {pageMove.error && (
+              <Banner tone="danger">
+                The page was not moved — {pageMove.error}
+              </Banner>
+            )}
             {commentsError && <Banner tone="danger">{commentsError}</Banner>}
             {feedback.copyError && (
               <Banner tone="danger">
@@ -465,14 +490,20 @@ export function PlaygroundShell({
                 .length
             : 0
         }
+        {...(pageAction?.initialFolder
+          ? { folderImpact: folderImpact(pageAction.initialFolder) }
+          : {})}
         onClose={() => setPageAction(null)}
         onFolderCreated={pageFolders.add}
+        onFolderDeleted={pageFolders.remove}
         onNavigate={onNavigate}
-        fallbackAfterDelete={(deletedSlug) =>
-          deletedSlug === active?.slug
-            ? fallbackPageSlug(PAGES, deletedSlug)
-            : active?.slug
-        }
+        fallbackAfterDelete={({ slug, folder }) => {
+          const activeSlug = active?.slug;
+          const gone =
+            slug === activeSlug ||
+            (folder !== undefined && activeSlug?.startsWith(`${folder}/`));
+          return gone ? fallbackPageSlug(pages(), activeSlug) : activeSlug;
+        }}
       />
     </AppShell>
   );

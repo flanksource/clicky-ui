@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   CommentProvider,
   DensityProvider,
@@ -11,16 +11,24 @@ import {
 
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
-import { PAGES, fallbackPageSlug, findPage, preloadMeta } from "./registry";
+import {
+  PAGES,
+  fallbackPageSlug,
+  findPage,
+  getMetaVersion,
+  pages,
+  preloadMeta,
+  subscribeMeta,
+} from "./registry";
 import { buildPlaygroundRoute, parsePlaygroundRoute, type PlaygroundRoute } from "./route";
 
 export function App() {
   const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
     parse: (_pathname, search) => {
-      const parsed = parsePlaygroundRoute(search, fallbackPageSlug(PAGES) ?? "");
+      const parsed = parsePlaygroundRoute(search, fallbackPageSlug(pages()) ?? "");
       return {
         ...parsed,
-        page: findPage(parsed.page)?.slug ?? fallbackPageSlug(PAGES) ?? "",
+        page: findPage(parsed.page)?.slug ?? fallbackPageSlug(pages()) ?? "",
       };
     },
     build: buildPlaygroundRoute,
@@ -33,7 +41,10 @@ export function App() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Nav labels start from the filename and settle once each `meta` has loaded;
-  // PlaygroundShell subscribes to the resulting store updates.
+  // PlaygroundShell subscribes to the resulting store updates. The same store
+  // carries optimistic renames/moves/deletes, so the active page has to be
+  // re-resolved when it fires — the route is unchanged by a rename.
+  useSyncExternalStore(subscribeMeta, getMetaVersion, getMetaVersion);
   useEffect(() => preloadMeta(PAGES), []);
 
   const active = findPage(route.page);

@@ -9,11 +9,17 @@ import type {
 } from "@flanksource/clicky-ui/ai";
 
 export const PLAYGROUND_SANDBOX_CATALOG: SpecRuntimeSandboxCatalog = {
-  default: "local",
+  default: "off",
   kinds: [
     {
-      kind: "local",
-      description: "Run on the Captain host with path policy enforcement.",
+      kind: "off",
+      description: "Disable provider-native restrictions and approval prompts.",
+      capabilities: [],
+      modes: ["api", "cli", "agent", "cmux"],
+    },
+    {
+      kind: "native",
+      description: "Translate the unified policy to provider-native settings.",
       capabilities: ["wrap-command"],
       modes: ["cli", "agent", "cmux"],
     },
@@ -22,12 +28,22 @@ export const PLAYGROUND_SANDBOX_CATALOG: SpecRuntimeSandboxCatalog = {
       description: "Isolate the run in a disposable container workspace.",
       capabilities: ["wrap-command", "isolate-workspace"],
       modes: ["cli", "agent"],
+      backends: [{ name: "local-docker", kind: "docker" }],
     },
     {
       kind: "git-agent",
       description: "Dispatch to an enrolled remote Captain agent.",
       capabilities: ["remote-exec", "isolate-workspace"],
       modes: ["agent"],
+      backends: [
+        {
+          name: "development-agents",
+          kind: "git-agent",
+          agents: [
+            { name: "worker-01", status: "enrolled", dispatchable: true },
+          ],
+        },
+      ],
     },
   ],
 };

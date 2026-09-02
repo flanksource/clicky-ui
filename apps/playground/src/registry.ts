@@ -81,14 +81,16 @@ export function buildRegistry(
         loadGuidance: guidanceModules[key] ?? (() => Promise.resolve({ blocks: [] })),
       };
     })
-    .sort((a, b) => {
-      if (a.group !== b.group) {
-        if (a.group === ROOT_GROUP) return -1;
-        if (b.group === ROOT_GROUP) return 1;
-        return a.group.localeCompare(b.group);
-      }
-      return a.title.localeCompare(b.title);
-    });
+    .sort(compareEntries);
+}
+
+function compareEntries(a: PageEntry, b: PageEntry): number {
+  if (a.group !== b.group) {
+    if (a.group === ROOT_GROUP) return -1;
+    if (b.group === ROOT_GROUP) return 1;
+    return a.group.localeCompare(b.group);
+  }
+  return a.title.localeCompare(b.title);
 }
 
 /**
@@ -131,7 +133,89 @@ export function fallbackPageSlug(
 
 export function findPage(slug: string | null | undefined): PageEntry | undefined {
   if (!slug) return undefined;
-  return PAGES.find((entry) => entry.slug === slug);
+  return pages().find((entry) => entry.slug === slug);
+}
+
+/*
+ * Optimistic overlay over the glob.
+ *
+ * A page renamed, moved or deleted through the sources endpoint is already
+ * gone from disk while `import.meta.glob` still reports it: the glob is baked
+ * into this module at transform time, so it only catches up when the dev
+ * server re-evaluates the module. Until then the nav would show a page at a
+ * path that no longer exists. These overrides are applied on top of `PAGES`
+ * and need no cleanup — the re-evaluation that makes them redundant is also
+ * what discards them.
+ */
+const removedSlugs = new Set<string>();
+const movedSlugs = new Map<string, string>();
+/**
+ * Titles from a rename, which outrank the module's own `meta`: the module at
+ * the old path is already in the browser's cache and still reports the title
+ * the file had before the rename rewrote it.
+ */
+const movedTitles = new Map<string, string>();
+
+/** The glob entry currently presenting as `slug`, for a page moved twice. */
+function globSlugFor(slug: string): string {
+  for (const [from, to] of movedSlugs) if (to === slug) return from;
+  return slug;
+}
+
+/** Every artifact the app should show right now, newest edits included. */
+export function pages(): PageEntry[] {
+  if (removedSlugs.size === 0 && movedSlugs.size === 0) return PAGES;
+  return PAGES.flatMap((entry) => {
+    const slug = movedSlugs.get(entry.slug) ?? entry.slug;
+    if (removedSlugs.has(slug)) return [];
+    return [
+      slug === entry.slug
+        ? entry
+        : {
+            ...entry,
+            slug,
+            title: humanizeSlug(slug),
+            group: groupFromSlug(slug),
+          },
+    ];
+  }).sort(compareEntries);
+}
+
+export function applyPageMoved(
+  slug: string,
+  nextSlug: string,
+  title?: string,
+): void {
+  const origin = globSlugFor(slug);
+  if (nextSlug === origin) movedSlugs.delete(origin);
+  else movedSlugs.set(origin, nextSlug);
+  removedSlugs.delete(nextSlug);
+
+  // Everything keyed by slug has to follow the page to its new one.
+  const meta = metaCache.get(slug);
+  if (meta !== undefined) cacheMeta(nextSlug, meta);
+  const carried = title ?? movedTitles.get(slug);
+  movedTitles.delete(slug);
+  if (carried !== undefined) movedTitles.set(nextSlug, carried);
+  emit();
+}
+
+export function applyPageDeleted(slug: string): void {
+  removedSlugs.add(slug);
+  emit();
+}
+
+export function applyFolderDeleted(folder: string): void {
+  for (const entry of pages()) {
+    if (entry.slug.startsWith(`${folder}/`)) removedSlugs.add(entry.slug);
+  }
+  emit();
+}
+
+/** Un-hides a slug that an earlier delete in this session is still hiding. */
+export function applyPageCreated(slug: string): void {
+  if (!removedSlugs.delete(slug)) return;
+  emit();
 }
 
 /*
@@ -164,7 +248,9 @@ export function getMetaVersion(): number {
 }
 
 export function pageTitle(entry: PageEntry): string {
-  return metaCache.get(entry.slug)?.title ?? entry.title;
+  return (
+    movedTitles.get(entry.slug) ?? metaCache.get(entry.slug)?.title ?? entry.title
+  );
 }
 
 export function pageGroup(entry: PageEntry): string {
@@ -176,7 +262,10 @@ export function pageDescription(entry: PageEntry): string | undefined {
 }
 
 export function pageMeta(entry: PageEntry): PageMeta | undefined {
-  return metaCache.get(entry.slug);
+  const meta = metaCache.get(entry.slug);
+  const title = movedTitles.get(entry.slug);
+  if (title === undefined) return meta;
+  return { ...meta, title };
 }
 
 /** Warms `meta` for every page once the browser is idle, so nav labels settle. */

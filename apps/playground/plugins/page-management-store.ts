@@ -3,10 +3,11 @@ import {
   existsSync,
   mkdirSync,
   renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import { readAll, writeAll, type CommentsFile } from "./comments-store";
 import {
@@ -18,6 +19,8 @@ import {
 import { rewritePageTitle } from "./page-source";
 import {
   PageStoreError,
+  folderPath,
+  listFolderPages,
   pagePath,
   readSource,
   sourceExists,
@@ -58,6 +61,20 @@ export type DeletePageOptions = {
   pagesDir: string;
   commentsDir: string;
   slug: string;
+};
+
+export type DeleteFolderOptions = {
+  pagesDir: string;
+  commentsDir: string;
+  folder: string;
+  /** Seam for exercising the rollback, mirroring `movePage.writeReference`. */
+  writeComments?: (dir: string, comments: CommentsFile) => void;
+};
+
+export type DeleteFolderResult = {
+  folder: string;
+  deletedPages: string[];
+  deletedComments: number;
 };
 
 function commentsAfterMove(
@@ -235,4 +252,53 @@ export function deletePage(options: DeletePageOptions): {
   }
 
   return { slug, deletedComments };
+}
+
+/**
+ * Deletes a folder and everything under it — pages, helpers and nested folders
+ * — along with the feedback filed against those pages.
+ *
+ * The tree is moved aside before anything is destroyed, and moved back if the
+ * comment rewrite fails, so a half-deleted folder can never be the outcome. The
+ * holding area sits beside `src/pages/` rather than inside it: a backup under
+ * the pages directory would be a directory full of `.tsx` files that the
+ * registry glob would happily list as artifacts while it exists.
+ */
+export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
+  const { pagesDir, commentsDir, folder } = options;
+  const target = folderPath(pagesDir, folder);
+  if (!existsSync(target)) {
+    throw new PageStoreError(`folder "${folder}" does not exist`, 404);
+  }
+
+  const deletedPages = listFolderPages(pagesDir, folder);
+  const comments = readAll(commentsDir);
+  const nextComments = { ...comments };
+  let deletedComments = 0;
+  for (const slug of deletedPages) {
+    deletedComments += comments[slug]?.length ?? 0;
+    delete nextComments[slug];
+  }
+  const changed = deletedPages.some((slug) => Object.hasOwn(comments, slug));
+  const backup = join(dirname(pagesDir), `.${randomUUID()}.folder-delete.tmp`);
+  const writeComments = options.writeComments ?? writeAll;
+
+  renameSync(target, backup);
+  try {
+    if (changed) writeComments(commentsDir, nextComments);
+    rmSync(backup, { recursive: true, force: true });
+  } catch (cause) {
+    try {
+      if (existsSync(backup)) renameSync(backup, target);
+      if (changed) writeAll(commentsDir, comments);
+    } catch (rollbackCause) {
+      throw new PageStoreError(
+        `folder deletion failed (${String(cause)}) and rollback failed (${String(rollbackCause)})`,
+        500,
+      );
+    }
+    throw new PageStoreError(`folder deletion failed and was rolled back: ${String(cause)}`, 500);
+  }
+
+  return { folder, deletedPages, deletedComments };
 }

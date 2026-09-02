@@ -2,6 +2,7 @@ import {
   UiFileCode,
   UiFolder,
   buildPathTree,
+  type AppShellNavDrag,
   type AppShellNavGroup,
   type AppShellNavItem,
   type AppShellNavSection,
@@ -25,6 +26,8 @@ type BuildNavOptions = {
   contextMenuForPage?: (entry: PageEntry) => DropdownMenuItem[];
   contextMenuForFolder?: (folder: string) => DropdownMenuItem[];
   pageHref?: (slug: string) => string;
+  /** Enables drag-and-drop of page rows between folders. */
+  drag?: AppShellNavDrag;
 };
 
 function pageMatches(
@@ -209,6 +212,7 @@ export function buildPlaygroundNavSections(
     {
       label: "Pages",
       variant: "tree",
+      ...(options.drag ? { drag: options.drag } : {}),
       items: nodes
         .filter((node) => !isFolder(node))
         .flatMap((node) =>

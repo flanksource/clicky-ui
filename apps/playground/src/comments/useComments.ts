@@ -91,7 +91,7 @@ export type PlaygroundComments = {
 
 export function useComments(
   page: string,
-  contentRef: RefObject<HTMLDivElement>,
+  contentRef: RefObject<HTMLDivElement | null>,
 ): PlaygroundComments {
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
