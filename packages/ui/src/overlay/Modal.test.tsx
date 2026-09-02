@@ -41,13 +41,21 @@ describe("Modal", () => {
         <p>body</p>
       </Modal>,
     );
-    expect(screen.getByRole("button", { name: "Expand to fullscreen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Expand to fullscreen" }),
+    ).toBeInTheDocument();
     expect(getDialog().className).toMatch(/max-w-2xl/);
   });
 
   it("renders as full-page navigation on mobile while preserving body scrolling", () => {
     render(
-      <Modal open onClose={() => {}} size="lg" title="Detail" footer={<button>Save</button>}>
+      <Modal
+        open
+        onClose={() => {}}
+        size="lg"
+        title="Detail"
+        footer={<button>Save</button>}
+      >
         <p>body</p>
       </Modal>,
     );
@@ -80,12 +88,12 @@ describe("Modal", () => {
     expect(screen.getByRole("heading", { name: "Detail" })).toHaveClass(
       "max-sm:text-base",
     );
-    expect(
-      document.querySelector("[data-slot='modal-body']"),
-    ).toHaveClass("min-h-0");
-    expect(
-      document.querySelector("[data-slot='modal-footer']"),
-    ).toHaveClass("shrink-0");
+    expect(document.querySelector("[data-slot='modal-body']")).toHaveClass(
+      "min-h-0",
+    );
+    expect(document.querySelector("[data-slot='modal-footer']")).toHaveClass(
+      "shrink-0",
+    );
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
@@ -112,6 +120,29 @@ describe("Modal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("contains Tab focus within the dialog", () => {
+    render(
+      <Modal
+        open
+        onClose={() => {}}
+        hideClose
+        expandable={false}
+        title="Detail"
+      >
+        <button type="button">First</button>
+        <button type="button">Last</button>
+      </Modal>,
+    );
+
+    const first = screen.getByRole("button", { name: "First" });
+    const last = screen.getByRole("button", { name: "Last" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(first).toHaveFocus();
   });
 
   it("unmounts immediately when reduced motion is requested", () => {
@@ -157,7 +188,12 @@ describe("Modal", () => {
 
   it("renders a subtitle beneath the title without displacing the close button", () => {
     render(
-      <Modal open onClose={() => {}} title="Detail" subtitle={<nav>tab switcher</nav>}>
+      <Modal
+        open
+        onClose={() => {}}
+        title="Detail"
+        subtitle={<nav>tab switcher</nav>}
+      >
         <p>body</p>
       </Modal>,
     );
@@ -173,7 +209,9 @@ describe("Modal", () => {
         <p>body</p>
       </Modal>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Expand to fullscreen" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Expand to fullscreen" }),
+    );
     expect(getDialog().className).toMatch(/max-w-\[95vw\]/);
     expect(getDialog().className).not.toMatch(/max-w-2xl/);
 
@@ -184,11 +222,19 @@ describe("Modal", () => {
 
   it("hides the toggle when expandable is false", () => {
     render(
-      <Modal open onClose={() => {}} size="lg" title="Detail" expandable={false}>
+      <Modal
+        open
+        onClose={() => {}}
+        size="lg"
+        title="Detail"
+        expandable={false}
+      >
         <p>body</p>
       </Modal>,
     );
-    expect(screen.queryByRole("button", { name: "Expand to fullscreen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Expand to fullscreen" }),
+    ).not.toBeInTheDocument();
   });
 
   it("portals the overlay to document.body so it escapes a transformed ancestor", () => {
@@ -212,7 +258,12 @@ describe("Modal", () => {
     function ConfirmHarness({ confirmClose }: { confirmClose: boolean }) {
       const [open, setOpen] = useState(true);
       return (
-        <Modal open={open} onClose={() => setOpen(false)} confirmClose={confirmClose} title="Edit">
+        <Modal
+          open={open}
+          onClose={() => setOpen(false)}
+          confirmClose={confirmClose}
+          title="Edit"
+        >
           <p>body</p>
         </Modal>
       );
@@ -343,10 +394,32 @@ describe("Modal", () => {
       expect(screen.queryByText("outer body")).not.toBeInTheDocument();
     });
 
+    it("keeps Escape on an exiting mobile child until its transition completes", () => {
+      vi.useFakeTimers();
+      mockMotionPreferences({ mobile: true, reduced: false });
+      render(<NestedHarness />);
+      act(() => vi.advanceTimersByTime(20));
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.getByText("inner body")).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.getByText("outer body")).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(200));
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(
+        screen.getByText("outer body").closest("[role='dialog']"),
+      ).toHaveAttribute("data-state", "closed");
+      act(() => vi.advanceTimersByTime(200));
+      expect(screen.queryByText("outer body")).not.toBeInTheDocument();
+    });
+
     it("renders the topmost modal above the one beneath it", () => {
       render(<NestedHarness />);
       const zIndex = (text: string) => {
-        const backdrop = screen.getByText(text).closest("[role='presentation']") as HTMLElement;
+        const backdrop = screen
+          .getByText(text)
+          .closest("[role='presentation']") as HTMLElement;
         return Number(backdrop.style.zIndex);
       };
       expect(zIndex("inner body")).toBeGreaterThan(zIndex("outer body"));
@@ -359,7 +432,12 @@ describe("Modal", () => {
       return (
         <>
           <button onClick={() => setOpen(true)}>reopen</button>
-          <Modal open={open} onClose={() => setOpen(false)} size="lg" title="Detail">
+          <Modal
+            open={open}
+            onClose={() => setOpen(false)}
+            size="lg"
+            title="Detail"
+          >
             <p>body</p>
           </Modal>
         </>
@@ -367,13 +445,17 @@ describe("Modal", () => {
     }
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Expand to fullscreen" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Expand to fullscreen" }),
+    );
     expect(getDialog().className).toMatch(/max-w-\[95vw\]/);
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "reopen" }));
 
     expect(getDialog().className).toMatch(/max-w-2xl/);
-    expect(screen.getByRole("button", { name: "Expand to fullscreen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Expand to fullscreen" }),
+    ).toBeInTheDocument();
   });
 });

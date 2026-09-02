@@ -92,6 +92,27 @@ const DEFAULT_CONFIRM: Required<ConfirmCloseOptions> = {
 const MOBILE_QUERY = "(max-width: 639px)";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const MOBILE_TRANSITION_MS = 200;
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function visibleFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((element) => {
+    const style = window.getComputedStyle(element);
+    return (
+      !element.hidden &&
+      style.display !== "none" &&
+      style.visibility !== "hidden"
+    );
+  });
+}
 
 export function Modal({
   open,
@@ -175,15 +196,12 @@ export function Modal({
     if (!confirmClose) setConfirming(false);
   }, [confirmClose]);
 
-  useEscapeLayer(
-    open,
-    () => {
-      // While the prompt is up, Escape dismisses the prompt rather than the modal.
-      if (confirming) setConfirming(false);
-      else requestClose();
-    },
-    closeOnEsc,
-  );
+  useEscapeLayer(present, () => {
+    if (!open || !closeOnEsc) return;
+    // While the prompt is up, Escape dismisses the prompt rather than the modal.
+    if (confirming) setConfirming(false);
+    else requestClose();
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -233,6 +251,28 @@ export function Modal({
           ...(expanded ? { height: "calc(100dvh - 2rem)" } : {}),
         }}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const scope = confirming
+            ? dialogRef.current?.querySelector<HTMLElement>(
+                "[role='alertdialog']",
+              )
+            : dialogRef.current;
+          if (!scope) return;
+          const focusable = visibleFocusableElements(scope);
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (!first || !last) {
+            event.preventDefault();
+            scope.focus();
+          } else if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
       >
         {(title || subtitle || headerSlot || expandable || !hideClose) && (
           <div className="shrink-0 px-density-4 py-density-3 border-b border-border max-sm:min-h-14 max-sm:bg-background">
@@ -287,9 +327,7 @@ export function Modal({
           data-slot="modal-body"
           className={cn(
             "min-h-0 flex-1 px-density-4 py-density-3 max-sm:py-density-4",
-            scrollBody
-              ? "overflow-auto"
-              : "flex flex-col overflow-hidden",
+            scrollBody ? "overflow-auto" : "flex flex-col overflow-hidden",
           )}
         >
           {children}

@@ -7,7 +7,7 @@ import { RouterProvider } from "../rpc/RouterProvider";
 import { useMemoryRouter } from "../rpc/router";
 import { UiFileCode, UiFolder } from "../icons";
 
-const meta: Meta<typeof AppShell> = {
+const meta = {
   title: "Layout/AppShell Nav Drag",
   component: AppShell,
   parameters: {
@@ -19,7 +19,7 @@ const meta: Meta<typeof AppShell> = {
       },
     },
   },
-};
+} satisfies Meta<typeof AppShell>;
 
 export default meta;
 type Story = StoryObj<typeof AppShell>;
@@ -83,7 +83,10 @@ function DraggableNavBody() {
   };
 
   return (
-    <AppShell brand={<span className="font-semibold">Docs</span>} navSections={[section]}>
+    <AppShell
+      brand={<span className="font-semibold">Docs</span>}
+      navSections={[section]}
+    >
       <p className="p-density-4 text-sm text-muted-foreground">{log}</p>
     </AppShell>
   );
@@ -103,7 +106,9 @@ export const DragPagesBetweenFolders: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const row = (name: string) =>
-      canvas.getByRole("link", { name }).closest("[data-nav-row]") as HTMLElement;
+      canvas
+        .getByRole("link", { name })
+        .closest("[data-nav-row]") as HTMLElement;
 
     // `userEvent` cannot express a native HTML5 drag, so the play test drives
     // the same DragEvents the browser would, with a real DataTransfer.
