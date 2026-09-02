@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -104,6 +105,8 @@ export type OperationCatalogProps = {
   actionsContainer?: Element | null;
   getRowDetailHref?: (id: string) => string | undefined;
   actionInitialValues?: Record<string, Record<string, string>>;
+  /** Plural noun used by the cross-page selection notice. */
+  selectionNoun?: string;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -127,6 +130,7 @@ export function OperationCatalog({
   actionsContainer,
   getRowDetailHref,
   actionInitialValues,
+  selectionNoun,
 }: OperationCatalogProps) {
   const { operations, spec, isLoading } = useOperations(client);
   const filterShapes = spec?.components?.["x-clicky-filters"];
@@ -160,7 +164,39 @@ export function OperationCatalog({
   );
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<ClickyRow[]>([]);
+  const [selectedScopeId, setSelectedScopeId] = useState<string>();
   const listParameters = listEndpoint?.operation.parameters ?? [];
+  const membershipFilterParameterNames = useMemo(
+    () =>
+      listParameters
+        .filter(
+          (parameter) =>
+            !["limit", "offset", "cursor", "sort", "order"].includes(
+              parameter["x-clicky"]?.role ?? ""
+            )
+        )
+        .map((parameter) => parameter.name),
+    [listParameters]
+  );
+  const membershipFilterKey = useMemo(
+    () =>
+      JSON.stringify(
+        membershipFilterParameterNames.map((name) => [
+          name,
+          filters[name] ?? "",
+        ])
+      ),
+    [filters, membershipFilterParameterNames]
+  );
+  const previousMembershipFilterKey = useRef(membershipFilterKey);
+  useEffect(() => {
+    if (previousMembershipFilterKey.current !== membershipFilterKey) {
+      setSelectedRowIds([]);
+      setSelectedRows([]);
+      setSelectedScopeId(undefined);
+      previousMembershipFilterKey.current = membershipFilterKey;
+    }
+  }, [membershipFilterKey]);
   const lookupParameters = useMemo(
     () => packLookupParameterValues(filters, listParameters),
     [filters, listParameters]
@@ -237,6 +273,13 @@ export function OperationCatalog({
     () =>
       actionOps.filter(
         (operation) => getOperationClickyMeta(operation)?.supportsFilterMode
+      ),
+    [actionOps]
+  );
+  const collectionActionOps = useMemo(
+    () =>
+      actionOps.filter(
+        (operation) => !getOperationClickyMeta(operation)?.supportsFilterMode
       ),
     [actionOps]
   );
@@ -386,17 +429,25 @@ export function OperationCatalog({
           the host's to define (e.g. an app shell's bodyHeader), so the catalog
           never invents chrome the consumer would have to fight or duplicate. */}
       <OperationCatalogActions
-        actions={actionOps}
+        actions={collectionActionOps}
         selectionActions={selectionActionOps}
         filters={filters}
-        filterParameterNames={listParameters.map(
-          (parameter) => parameter.name
-        )}
+        filterParameterNames={listParameters.map((parameter) => parameter.name)}
+        membershipFilterParameterNames={membershipFilterParameterNames}
         selectedRowIds={selectedRowIds}
         selectedRows={selectedRows}
+        {...(selectedScopeId && dataTablePagination?.total != null
+          ? {
+              selectedScope: {
+                id: selectedScopeId,
+                total: dataTablePagination.total,
+              },
+            }
+          : {})}
         clearSelection={() => {
           setSelectedRowIds([]);
           setSelectedRows([]);
+          setSelectedScopeId(undefined);
         }}
         onExecuted={() => list.refetch()}
         {...(actionsContainer ? { actionsContainer } : {})}
@@ -434,7 +485,27 @@ export function OperationCatalog({
                         ) => {
                           setSelectedRowIds(ids);
                           setSelectedRows(rows);
+                          setSelectedScopeId(undefined);
                         },
+                        ...(dataTablePagination?.total != null &&
+                        dataTablePagination.totalRelation === "eq"
+                          ? {
+                              selectAllPages: {
+                                ...(selectedScopeId ? { selectedScopeId } : {}),
+                                noun:
+                                  selectionNoun ??
+                                  definition.title.toLocaleLowerCase(),
+                                scopes: [
+                                  {
+                                    id: "all-matching",
+                                    total: dataTablePagination.total,
+                                    onSelectAll: () =>
+                                      setSelectedScopeId("all-matching"),
+                                  },
+                                ],
+                              },
+                            }
+                          : {}),
                         getRowId: (row: ClickyRow) => {
                           const id = getClickyRowId(row);
                           if (!id) {

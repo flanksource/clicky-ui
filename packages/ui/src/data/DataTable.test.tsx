@@ -326,6 +326,53 @@ describe("DataTable", () => {
     expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
   });
 
+  it("represents an all-pages scope without materializing every row id", () => {
+    const onSelect = vi.fn();
+    const onSelectionChange = vi.fn();
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        rowSelection={{
+          selectedRowIds: ["api", "worker", "cron"],
+          onSelectionChange,
+          selectAllPages: {
+            selectedScopeId: "all-matching",
+            scopes: [{ id: "all-matching", total: 3706, onSelectAll: vi.fn() }],
+            noun: "requests",
+          },
+        }}
+        selectionActions={[{ id: "archive", label: "Archive", onSelect }]}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("data-table-selection-scope")).getByText(
+        "All 3,706 requests selected.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Select all visible rows" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Select all visible rows" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "Select row api" }),
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedScope: { id: "all-matching", total: 3706 },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(onSelectionChange).toHaveBeenCalledWith([], []);
+  });
+
   it("holds the cross-page offer while the caller is still resolving it", () => {
     const onSelectAll = vi.fn();
     render(

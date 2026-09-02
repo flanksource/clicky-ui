@@ -142,9 +142,16 @@ function makeSpec(): OpenAPISpec {
             scope: "collection",
             idParam: "id",
             supportsFilterMode: true,
+            toolHints: {
+              icon: "database-trash",
+              destructiveHint: true,
+            },
           },
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer" } },
+            { name: "offset", in: "query", schema: { type: "integer" } },
+            { name: "count", in: "query", schema: { type: "string" } },
             { name: "filter", in: "query", schema: { type: "string" } },
             { name: "dry-run", in: "query", schema: { type: "boolean" } },
           ],
@@ -557,12 +564,12 @@ describe("OperationCatalog", () => {
     const client = makeClient();
     renderCatalog(client);
 
-    // Collection-scoped actions belong on the list: create + the bulk pause
-    // (which acts on the filtered set).
+    // Ordinary collection actions belong on the list. A filter-capable bulk
+    // action appears only after the operator creates a selection.
     expect(
       await screen.findByRole("button", { name: "Create" })
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
 
     // Entity-scoped actions require an {id} and live on the detail page; they
     // must not leak onto the list action bar.
@@ -611,7 +618,9 @@ describe("OperationCatalog", () => {
     fireEvent.click(
       await screen.findByRole("checkbox", { name: "Select row one" })
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "Pause" })[1]!);
+    const pauseButton = screen.getByRole("button", { name: "Pause" });
+    expect(pauseButton.querySelector("svg")).not.toBeNull();
+    fireEvent.click(pauseButton);
 
     const dialog = await screen.findByRole("dialog", { name: "Pause" });
     expect(within(dialog).getByLabelText("Dry Run")).toBeChecked();
@@ -624,6 +633,71 @@ describe("OperationCatalog", () => {
         "/api/v1/widgets/pause",
         "post",
         { args: ["one"], "dry-run": "true" },
+        { Accept: "application/json+clicky" }
+      )
+    );
+  });
+
+  it("executes an all-pages selection with a count guard and locked bound", async () => {
+    const client = makeClient(
+      clickyTablePageResponse(1, {
+        limit: 1,
+        offset: 0,
+        total: 3,
+        totalRelation: "eq",
+        hasMore: true,
+      })
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OperationCatalog
+          definition={{ key: "widgets", title: "Widgets", description: "" }}
+          entities={["widget"]}
+          surfaceKey="widgets"
+          client={client}
+          renderLink={renderFakeLink}
+          selectionNoun="widgets"
+          actionInitialValues={{ pause: { "dry-run": "true" } }}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.change(await screen.findByLabelText("Q"), {
+      target: { value: "batch" },
+    });
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(2));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select row widget-1" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Select all 3 widgets" })
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Select row widget-1" })
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    const dialog = await screen.findByRole("dialog", { name: "Pause" });
+    const count = within(dialog).getByLabelText("Count");
+    expect(count).toHaveValue("3");
+    fireEvent.change(count, { target: { value: "> 2" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pause" }));
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenLastCalledWith(
+        "/api/v1/widgets/pause",
+        "post",
+        {
+          q: "batch",
+          filter: "q=batch",
+          count: "> 2",
+          limit: "3",
+          offset: "0",
+          "dry-run": "true",
+        },
         { Accept: "application/json+clicky" }
       )
     );

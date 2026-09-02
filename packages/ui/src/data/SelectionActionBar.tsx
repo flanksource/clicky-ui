@@ -64,7 +64,7 @@ function SelectionConfirmModal<T extends Record<string, unknown>>({
   // object customises the prompt.
   const options: DataTableSelectionConfirm<T> =
     typeof action.confirm === "object" ? action.confirm : {};
-  const count = context.selectedRowIds.length;
+  const count = context.selectedScope?.total ?? context.selectedRowIds.length;
   const message =
     typeof options.message === "function"
       ? options.message(context)
@@ -140,9 +140,8 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
   className,
 }: SelectionActionBarProps<T>) {
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<DataTableSelectionAction<T> | null>(
-    null,
-  );
+  const [confirming, setConfirming] =
+    useState<DataTableSelectionAction<T> | null>(null);
   const running = useRef(false);
 
   // A bulk action is a request: it can be slow, it can fail, and it must not be
@@ -194,7 +193,9 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
   // Every sibling locks while one action runs. The rows underneath are already
   // being rewritten, and a second bulk call against a selection that is halfway
   // through changing is the one nobody can put back.
-  const toMenuItem = (action: DataTableSelectionAction<T>): DropdownMenuItem => ({
+  const toMenuItem = (
+    action: DataTableSelectionAction<T>,
+  ): DropdownMenuItem => ({
     label: action.label,
     onSelect: () => begin(action),
     disabled: action.disabled || busy,
@@ -227,7 +228,7 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
     <>
       {showCount ? (
         <SelectionCountNotice
-          count={context.selectedRowIds.length}
+          count={context.selectedScope?.total ?? context.selectedRowIds.length}
           onClear={context.clearSelection}
         />
       ) : null}
