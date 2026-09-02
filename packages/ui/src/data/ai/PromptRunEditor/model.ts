@@ -16,6 +16,8 @@ export type AIPromptRunValue = {
   spec?: AIPromptRunSpec;
   runtimes?: AISpecRuntimeModel[];
   chat?: boolean;
+  /** Saved runtime profile (id or name) layered under `spec` by the host. */
+  runtimeProfile?: string;
 };
 
 const MODEL_KEYS = [

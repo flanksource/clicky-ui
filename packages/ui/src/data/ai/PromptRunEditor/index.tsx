@@ -1,8 +1,7 @@
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/button";
-import { JsonSchemaForm } from "../../../components/JsonSchemaForm";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
-import { UiAdd, UiGearSix, UiTrash } from "../../../icons";
+import { UiAdd, UiGearSix, UiLayers, UiTrash } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
 import { Icon } from "../../Icon";
@@ -33,7 +32,22 @@ import type {
 } from "../SpecRuntimeEditor/types";
 import { withPrompt } from "../SpecRuntimeEditor/update";
 import type { AISpecRuntimePermissionCatalog } from "../SpecRuntimeEditor.model";
+import type {
+  ResolvedRuntimeProfile,
+  ResolvedRuntimeSpec,
+  RuntimePreset,
+  RuntimeProfile,
+  RuntimeProfileResolveRequest,
+} from "../runtime-profile";
+import { authoredRuntimeSpec } from "../runtime-profiles/model";
+import { RuntimeProfilePicker } from "../runtime-profiles/RuntimeProfilePicker";
+import {
+  inheritedRuntime,
+  profileForRef,
+} from "../runtime-profiles/RuntimeProfilePicker.model";
+import { useRuntimeProfilePicker } from "../runtime-profiles/use-runtime-profile-picker";
 import { runtimeRows, withRuntimeRows, type AIPromptRunValue } from "./model";
+import { VariablesField } from "./VariablesField";
 
 export type PromptRunEditorProps = {
   value: AIPromptRunValue;
@@ -73,6 +87,20 @@ export type PromptRunEditorProps = {
   specModalTitle?: string | undefined;
   /** Restrict which SpecRuntimeEditor sections the "Edit spec" modal shows. */
   specSections?: readonly SpecSectionId[] | undefined;
+
+  /** Saved runtime profiles; enables the profile picker inside the spec modal. */
+  profiles?: RuntimeProfile[] | undefined;
+  /** Presets the profiles reference, for ordering and inherited model/mode. */
+  presets?: RuntimePreset[] | undefined;
+  onSaveProfile?: ((profile: RuntimeProfile) => Promise<RuntimeProfile>) | undefined;
+  onCreateProfile?:
+    | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
+    | undefined;
+  onResolveProfile?:
+    | ((request: RuntimeProfileResolveRequest) => Promise<ResolvedRuntimeProfile>)
+    | undefined;
+  /** The last render's resolved spec and layer trace. */
+  resolution?: ResolvedRuntimeSpec | undefined;
 };
 
 // The inline "prompt + variables + runtime" composer shared by captain's prompt
@@ -107,11 +135,40 @@ export function PromptRunEditor({
   editSpecLabel = "Edit spec",
   specModalTitle = "Runtime spec",
   specSections,
+  profiles,
+  presets = [],
+  onSaveProfile,
+  onCreateProfile,
+  onResolveProfile,
+  resolution,
 }: PromptRunEditorProps) {
   const [specOpen, setSpecOpen] = useState(false);
   const spec = value.spec ?? {};
   const rows = runtimeRows(value);
   const selectedModel = runtimeModelForValue(models, spec);
+  const picker = useRuntimeProfilePicker({
+    value,
+    onChange,
+    profiles: profiles ?? [],
+    presets,
+    onSaveProfile,
+    onCreateProfile,
+    onResolveProfile,
+  });
+  const profileDraft =
+    profiles !== undefined && picker.state.layer === "profile"
+      ? picker.state.draft
+      : undefined;
+  const runRuntime = inheritedRuntime({
+    draft: picker.state.draft,
+    presets,
+    resolution,
+  });
+  const presetRuntime = profileDraft
+    ? authoredRuntimeSpec({ ...profileDraft, spec: {} }, presets)
+    : {};
+  const editorRuntime = profileDraft ? presetRuntime : runRuntime;
+  const selectedProfile = profileForRef(value.runtimeProfile, profiles ?? []);
   const resolvedAttachmentUpload = useMemo(
     () => attachmentUpload ?? createAttachmentUploadAdapter(),
     [attachmentUpload],
@@ -206,6 +263,15 @@ export function PromptRunEditor({
               <Icon icon={UiGearSix} className="size-4" />
               {editSpecLabel}
             </Button>
+            {value.runtimeProfile && (
+              <span
+                data-testid="runtime-profile-chip"
+                className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-300"
+              >
+                <Icon icon={UiLayers} className="size-3.5" />
+                Profile · {selectedProfile?.name ?? value.runtimeProfile}
+              </span>
+            )}
           </div>
         </div>
         {children}
@@ -297,21 +363,44 @@ export function PromptRunEditor({
         className="h-[95vh]"
       >
         <SpecRuntimeEditor
-          value={spec}
-          onChange={(next) => onChange({ ...value, spec: next })}
+          value={profileDraft ? profileDraft.spec : spec}
+          onChange={(next) =>
+            profileDraft
+              ? picker.editDraft({ ...profileDraft, spec: next })
+              : onChange({ ...value, spec: next })
+          }
           models={models}
           families={families}
           tools={tools}
+          effectiveModel={editorRuntime.model}
+          effectiveMode={editorRuntime.mode}
           {...(permissionCatalog ? { permissionCatalog } : {})}
           {...(secretSelector ? { secretSelector } : {})}
           {...(cliOptions ? { cliOptions } : {})}
           {...(sandboxCatalog ? { sandboxCatalog } : {})}
           {...(sandboxCreate ? { sandboxCreate } : {})}
           {...(specSections ? { sections: specSections } : {})}
+          {...(profiles !== undefined
+            ? {
+                beforeSections: (
+                  <RuntimeProfilePicker
+                    controller={picker}
+                    profiles={profiles}
+                    presets={presets}
+                    resolution={resolution}
+                    effectiveRuntime={runRuntime}
+                  />
+                ),
+              }
+            : {})}
           onSave={() => setSpecOpen(false)}
           onCancel={() => setSpecOpen(false)}
           saveLabel="Done"
-          footerStatus={labelForMode(spec.mode, families)}
+          footerStatus={
+            profileDraft
+              ? `Editing profile «${profileDraft.name}»`
+              : labelForMode(spec.mode, families)
+          }
         />
       </Modal>
     </div>
@@ -329,76 +418,3 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// Variables are edited via the prompt's declared schema when present, otherwise
-// as a raw JSON object; the raw text is held locally and only committed to the
-// host when it parses to an object.
-function VariablesField({
-  schema,
-  value,
-  onChange,
-  onValidityChange,
-}: {
-  schema?: JsonSchemaObject | undefined;
-  value: Record<string, unknown>;
-  onChange: (next: Record<string, unknown>) => void;
-  onValidityChange?: ((valid: boolean) => void) | undefined;
-}) {
-  const idPrefix = useId();
-  const [rawText, setRawText] = useState(() => stringifyVariables(value));
-  const [rawError, setRawError] = useState<string | null>(null);
-
-  if (schema) {
-    return (
-      <JsonSchemaForm
-        idPrefix={`prompt-vars-${idPrefix}`}
-        schema={schema}
-        value={value}
-        onChange={(next) => onChange(next as Record<string, unknown>)}
-        size="sm"
-      />
-    );
-  }
-
-  const commit = (text: string) => {
-    setRawText(text);
-    if (!text.trim()) {
-      setRawError(null);
-      onValidityChange?.(true);
-      onChange({});
-      return;
-    }
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        setRawError(null);
-        onValidityChange?.(true);
-        onChange(parsed as Record<string, unknown>);
-      } else {
-        setRawError("Expected a JSON object");
-        onValidityChange?.(false);
-      }
-    } catch (error) {
-      setRawError(error instanceof Error ? error.message : "Invalid JSON");
-      onValidityChange?.(false);
-    }
-  };
-
-  return (
-    <div className="space-y-1">
-      <textarea
-        value={rawText}
-        onChange={(event) => commit(event.target.value)}
-        spellCheck={false}
-        placeholder="{}"
-        aria-label="Variables JSON"
-        className="h-28 w-full resize-y rounded-md border border-border bg-background px-density-2 py-density-1 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
-      />
-      {rawError && <div className="text-xs text-destructive">{rawError}</div>}
-    </div>
-  );
-}
-
-function stringifyVariables(value: Record<string, unknown>) {
-  if (!value || Object.keys(value).length === 0) return "{}";
-  return JSON.stringify(value, null, 2);
-}

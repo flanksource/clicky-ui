@@ -440,6 +440,48 @@ describe("RuntimeBar", () => {
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
   });
 
+  it("does not let an unavailable API alias hide the selected CLI model", () => {
+    render(
+      <RuntimeBar
+        value={{ mode: "cli", model: "gemini-3.6-flash" }}
+        onChange={vi.fn()}
+        families={[
+          {
+            id: "gemini",
+            label: "Gemini",
+            provider: "google",
+            modes: [
+              { id: "api", label: "API", provider: "google" },
+              { id: "cli", label: "CLI", provider: "google" },
+            ],
+          },
+        ]}
+        models={[
+          {
+            id: "googleai/gemini-3.6-flash",
+            provider: "google",
+            label: "Gemini 3.6 Flash API",
+            reasoning: true,
+            configured: false,
+            runtime: { model: "gemini-3.6-flash", mode: "api" },
+          },
+          {
+            id: "gemini-3.6-flash",
+            provider: "google",
+            label: "Gemini 3.6 Flash",
+            reasoning: true,
+            configured: true,
+            runtime: { model: "gemini-3.6-flash", mode: "cli" },
+          },
+        ]}
+      />,
+    );
+
+    const bar = screen.getByRole("group", { name: "Runtime" });
+    expect(within(bar).getByText("Gemini 3.6 Flash")).toBeInTheDocument();
+    expect(within(bar).queryByText("Unavailable selection")).not.toBeInTheDocument();
+  });
+
   it("omits unavailable models from the combo picker", () => {
     render(
       <RuntimeBar

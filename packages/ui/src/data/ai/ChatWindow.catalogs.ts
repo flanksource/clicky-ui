@@ -9,6 +9,7 @@ import {
 export type ChatWindowCatalogOptions = {
   models?: ChatModel[] | undefined;
   modelsApi?: string | null | undefined;
+  runtimeFamilies?: SpecRuntimeFamily[] | undefined;
   runtimesApi?: string | null | undefined;
 };
 
@@ -23,6 +24,7 @@ export type ChatWindowCatalogs = {
 export function useChatWindowCatalogs({
   models: providedModels,
   modelsApi,
+  runtimeFamilies: providedRuntimeFamilies,
   runtimesApi,
 }: ChatWindowCatalogOptions): ChatWindowCatalogs {
   const [models, setModels] = useState<ChatModel[]>(providedModels ?? []);
@@ -58,7 +60,7 @@ export function useChatWindowCatalogs({
   }, [attempt, modelsApi, providedModels]);
 
   useEffect(() => {
-    if (!runtimesApi) return;
+    if (providedRuntimeFamilies || !runtimesApi) return;
     let active = true;
     setRuntimesLoading(true);
     setRuntimesError(null);
@@ -75,15 +77,26 @@ export function useChatWindowCatalogs({
     return () => {
       active = false;
     };
-  }, [attempt, runtimesApi]);
+  }, [attempt, providedRuntimeFamilies, runtimesApi]);
 
   return {
     models,
-    ...(runtimes
-      ? { runtimeFamilies: familiesFromRuntimeCatalog(runtimes) }
+    ...(providedRuntimeFamilies || runtimes
+      ? {
+          runtimeFamilies:
+            providedRuntimeFamilies ?? familiesFromRuntimeCatalog(runtimes),
+        }
       : {}),
-    loading: modelsLoading || runtimesLoading,
-    error: [modelsError, runtimesError].filter(Boolean).join(" ") || null,
+    loading:
+      (modelsLoading && !providedModels) ||
+      (runtimesLoading && !providedRuntimeFamilies),
+    error:
+      [
+        providedModels ? null : modelsError,
+        providedRuntimeFamilies ? null : runtimesError,
+      ]
+        .filter(Boolean)
+        .join(" ") || null,
     retry: () => setAttempt((current) => current + 1),
   };
 }

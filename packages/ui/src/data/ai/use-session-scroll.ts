@@ -58,8 +58,8 @@ export interface SessionScrollOptions {
 }
 
 export interface SessionScrollState {
-  scrollRef: RefObject<HTMLDivElement>;
-  contentRef: RefObject<HTMLDivElement>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  contentRef: RefObject<HTMLDivElement | null>;
   startIndex: number;
   hasMore: boolean;
 }
