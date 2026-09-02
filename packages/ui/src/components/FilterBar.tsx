@@ -55,6 +55,7 @@ import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
 import { cn } from "../lib/utils";
+import { Modal } from "../overlay/Modal";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
 import { Combobox, type ComboboxOption } from "./Combobox";
@@ -448,6 +449,7 @@ export function FilterBar({
   const allFilters = filters ?? [];
   const responsiveOverflow = overflowMode === "responsive" && allFilters.length > 0;
   const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
+  const mobilePageOverflow = useMediaQuery("(max-width: 639px)");
   const filterListRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
@@ -621,6 +623,7 @@ export function FilterBar({
             triggerRef={overflowTriggerRef}
             filters={overflowFilters}
             activeHidden={activeOverflowCount}
+            mobilePage={mobilePageOverflow}
             {...(onApply ? { onApply } : {})}
           />
         )}
@@ -781,11 +784,13 @@ function OverflowFiltersMenu({
   triggerRef,
   filters,
   activeHidden,
+  mobilePage,
   onApply,
 }: {
-  triggerRef: RefObject<HTMLButtonElement>;
+  triggerRef: RefObject<HTMLButtonElement | null>;
   filters: FilterBarFilter[];
   activeHidden: number;
+  mobilePage: boolean;
   onApply?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -799,7 +804,7 @@ function OverflowFiltersMenu({
   // discarded, preserving the prior close behaviour.
   const { refs, floatingStyles, context, floatingZ, getReferenceProps, getFloatingProps } =
     useAnchoredPopup(
-      open,
+      open && !mobilePage,
       (next) => {
         setStagedValues(createFilterValueMap(filters));
         setOpen(next);
@@ -838,6 +843,24 @@ function OverflowFiltersMenu({
         })),
     ),
   );
+  const applyOverflowFilters = () => {
+    applyStagedFilterValues(filters, stagedValues);
+    onApply?.();
+    setOpen(false);
+  };
+  const clearAll = (
+    <button
+      type="button"
+      className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
+      onClick={() => stagedFilters.forEach(clearFilterBarFilter)}
+      disabled={stagedFilters.every((filter) => !isFilterBarFilterActive(filter))}
+    >
+      Clear all
+    </button>
+  );
+  const actions = (
+    <OverflowFilterActions onClose={closeOverflowMenu} onApply={applyOverflowFilters} />
+  );
 
   return (
     <div
@@ -857,6 +880,7 @@ function OverflowFiltersMenu({
           activeHidden > 0 && "border-primary/40 text-primary",
         )}
         {...getReferenceProps()}
+        aria-expanded={open}
       >
         <Icon icon={UiFilter} className="text-[14px]" />
         {activeHidden > 0 && (
@@ -866,7 +890,20 @@ function OverflowFiltersMenu({
         )}
       </Button>
 
-      {hasHidden && open && (
+      {mobilePage && (
+        <Modal
+          open={hasHidden && open}
+          onClose={closeOverflowMenu}
+          title="Filters"
+          headerSlot={clearAll}
+          footer={actions}
+          scrollBody={false}
+        >
+          <OverflowFilterRows filters={stagedFilters} mobilePage />
+        </Modal>
+      )}
+
+      {!mobilePage && hasHidden && open && (
         <FloatingPortal>
           <FloatingFocusManager context={context} modal={false}>
             <div
@@ -882,14 +919,7 @@ function OverflowFiltersMenu({
               Filters
             </div>
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
-                onClick={() => stagedFilters.forEach(clearFilterBarFilter)}
-                disabled={stagedFilters.every((filter) => !isFilterBarFilterActive(filter))}
-              >
-                Clear all
-              </button>
+              {clearAll}
               <button
                 type="button"
                 aria-label="Close overflow filters"
@@ -901,74 +931,84 @@ function OverflowFiltersMenu({
               </button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 divide-y divide-border/70 overflow-y-auto rounded-md border border-border/70">
-            {stagedFilters.map((filter) => {
-              const active = isFilterBarFilterActive(filter);
-              return (
-                <div
-                  key={filter.key}
-                  data-overflow-filter-row={filter.key}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 overflow-visible p-3 md:h-12 md:grid-cols-[minmax(7rem,10rem)_auto_minmax(0,1fr)_auto] md:items-center md:p-2"
-                >
-                  <label
-                    htmlFor={filterInputId(filter)}
-                    className="flex min-w-0 items-center gap-1 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-                    title={filter.description ?? filter.label}
-                  >
-                    <LabelIcon
-                      icon={sizedIcon(filter.icon, 12)}
-                      className="text-[12px] normal-case"
-                    />
-                    <span className="truncate">{filter.label}</span>
-                  </label>
-                  <span className="hidden text-sm text-muted-foreground md:block">=</span>
-                  <div className="col-span-2 min-w-0 overflow-visible md:col-span-1">
-                    <FilterBarContext.Provider value={{ autoSubmit: false }}>
-                      <FilterBarKeyValueControl filter={filter} />
-                    </FilterBarContext.Provider>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`Clear ${filter.label}`}
-                    title={`Clear ${filter.label}`}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none disabled:text-muted-foreground/40"
-                    onClick={() => clearFilterBarFilter(filter)}
-                    disabled={!active}
-                  >
-                    <Icon icon={UiClose} className="text-sm" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              onClick={closeOverflowMenu}
-            >
-              Close
-            </Button>
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              onClick={() => {
-                applyStagedFilterValues(filters, stagedValues);
-                onApply?.();
-                setOpen(false);
-              }}
-            >
-              Apply
-            </Button>
-          </div>
+          <OverflowFilterRows filters={stagedFilters} />
+          <div className="mt-3">{actions}</div>
             </div>
           </FloatingFocusManager>
         </FloatingPortal>
       )}
+    </div>
+  );
+}
+
+function OverflowFilterRows({
+  filters,
+  mobilePage = false,
+}: {
+  filters: FilterBarFilter[];
+  mobilePage?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "min-h-0 flex-1 divide-y divide-border/70 overflow-y-auto",
+        mobilePage ? "bg-background" : "rounded-md border border-border/70",
+      )}
+    >
+      {filters.map((filter) => {
+        const active = isFilterBarFilterActive(filter);
+        return (
+          <div
+            key={filter.key}
+            data-overflow-filter-row={filter.key}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 overflow-visible p-4 md:h-12 md:grid-cols-[minmax(7rem,10rem)_auto_minmax(0,1fr)_auto] md:items-center md:p-2"
+          >
+            <label
+              htmlFor={filterInputId(filter)}
+              className="col-span-2 flex min-w-0 items-center gap-1 truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:col-span-1"
+              title={filter.description ?? filter.label}
+            >
+              <LabelIcon icon={sizedIcon(filter.icon, 12)} className="text-[12px] normal-case" />
+              <span className="truncate">{filter.label}</span>
+            </label>
+            <span className="hidden text-sm text-muted-foreground md:block">=</span>
+            <div className="min-w-0 overflow-visible">
+              <FilterBarContext.Provider value={{ autoSubmit: false }}>
+                <FilterBarKeyValueControl filter={filter} />
+              </FilterBarContext.Provider>
+            </div>
+            <button
+              type="button"
+              aria-label={`Clear ${filter.label}`}
+              title={`Clear ${filter.label}`}
+              className="inline-flex h-6 w-6 self-center items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none disabled:text-muted-foreground/40"
+              onClick={() => clearFilterBarFilter(filter)}
+              disabled={!active}
+            >
+              <Icon icon={UiClose} className="text-sm" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OverflowFilterActions({
+  onClose,
+  onApply,
+}: {
+  onClose: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <div className="flex justify-end gap-2">
+      <Button type="button" variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={onClose}>
+        Close
+      </Button>
+      <Button type="button" variant="default" size="sm" className="h-8 px-3 text-xs" onClick={onApply}>
+        Apply
+      </Button>
     </div>
   );
 }

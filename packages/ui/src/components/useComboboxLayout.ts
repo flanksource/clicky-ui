@@ -1,18 +1,19 @@
 import {
+  useCallback,
   useLayoutEffect,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
 import {
-  COMBOBOX_MENU_MAX_HEIGHT_PX,
-  COMBOBOX_MENU_MAX_WIDTH_PX,
+  calculateComboboxMenuPosition,
+  COMBOBOX_MOBILE_QUERY,
   type ComboboxMenuPosition,
 } from "./combobox-utils";
 
 export function useComboboxLabelWidth(
   label: ReactNode,
-  labelRef: RefObject<HTMLSpanElement>,
+  labelRef: RefObject<HTMLSpanElement | null>,
 ): number {
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -27,41 +28,28 @@ export function useComboboxLabelWidth(
 
 export function useComboboxMenuPosition(
   open: boolean,
-  anchorRef: RefObject<HTMLDivElement>,
+  anchorRef: RefObject<HTMLDivElement | null>,
+  listRef: RefObject<HTMLDivElement | null>,
 ): ComboboxMenuPosition | null {
   const [position, setPosition] = useState<ComboboxMenuPosition | null>(null);
+  const update = useCallback(() => {
+    const anchor = anchorRef.current;
+    if (!open || !anchor) return;
+    const next = calculateComboboxMenuPosition({
+      anchor: anchor.getBoundingClientRect(),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      mobile: window.matchMedia(COMBOBOX_MOBILE_QUERY).matches,
+      ...(listRef.current ? { naturalHeight: listRef.current.scrollHeight } : {}),
+    });
+    setPosition((current) => (sameComboboxMenuPosition(current, next) ? current : next));
+  }, [anchorRef, listRef, open]);
+
   useLayoutEffect(() => {
     if (!open) {
       setPosition(null);
       return;
     }
-    const update = () => {
-      const anchor = anchorRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom - 8;
-      const spaceAbove = rect.top - 8;
-      const openUp =
-        spaceBelow < COMBOBOX_MENU_MAX_HEIGHT_PX && spaceAbove > spaceBelow;
-      setPosition({
-        ...(openUp
-          ? { bottom: window.innerHeight - rect.top + 4 }
-          : { top: rect.bottom + 4 }),
-        left: rect.left,
-        width: rect.width,
-        maxWidth: Math.max(
-          rect.width,
-          Math.min(
-            COMBOBOX_MENU_MAX_WIDTH_PX,
-            window.innerWidth - rect.left - 8,
-          ),
-        ),
-        maxHeight: Math.min(
-          COMBOBOX_MENU_MAX_HEIGHT_PX,
-          openUp ? spaceAbove : spaceBelow,
-        ),
-      });
-    };
     update();
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
@@ -69,6 +57,37 @@ export function useComboboxMenuPosition(
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [anchorRef, open]);
+  }, [open, update]);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!open || !position || !list) return;
+    update();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    const mutationObserver = new MutationObserver(update);
+    resizeObserver?.observe(list);
+    mutationObserver.observe(list, { childList: true, characterData: true, subtree: true });
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [listRef, open, position, update]);
+
   return position;
+}
+
+function sameComboboxMenuPosition(
+  current: ComboboxMenuPosition | null,
+  next: ComboboxMenuPosition,
+) {
+  return (
+    current?.strategy === next.strategy &&
+    current.top === next.top &&
+    current.bottom === next.bottom &&
+    current.left === next.left &&
+    current.width === next.width &&
+    current.maxWidth === next.maxWidth &&
+    current.maxHeight === next.maxHeight
+  );
 }

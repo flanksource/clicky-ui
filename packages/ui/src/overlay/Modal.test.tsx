@@ -1,11 +1,38 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { useState } from "react";
 import { Modal } from "./Modal";
 
 function getDialog() {
   return screen.getByRole("dialog");
 }
+
+function mockMotionPreferences({
+  mobile,
+  reduced,
+}: {
+  mobile: boolean;
+  reduced: boolean;
+}) {
+  vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === "(max-width: 639px)" ? mobile : reduced,
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  );
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("Modal", () => {
   it("renders the expand toggle by default and starts at the configured size", () => {
@@ -18,7 +45,7 @@ describe("Modal", () => {
     expect(getDialog().className).toMatch(/max-w-2xl/);
   });
 
-  it("bounds the dialog to the mobile viewport with internal scrolling", () => {
+  it("renders as full-page navigation on mobile while preserving body scrolling", () => {
     render(
       <Modal open onClose={() => {}} size="lg" title="Detail" footer={<button>Save</button>}>
         <p>body</p>
@@ -26,9 +53,33 @@ describe("Modal", () => {
     );
 
     const overlay = getDialog().closest("[role='presentation']") as HTMLElement;
-    expect(overlay.className).toContain("p-density-2");
-    expect(getDialog().style.maxHeight).toBe("calc(100dvh - 2rem)");
-    expect(getDialog()).toHaveClass("w-full", "overflow-hidden");
+    expect(overlay).toHaveClass(
+      "max-sm:p-0",
+      "max-sm:items-stretch",
+      "max-sm:!bg-transparent",
+    );
+    expect(getDialog()).toHaveClass(
+      "w-full",
+      "overflow-hidden",
+      "max-sm:!h-dvh",
+      "max-sm:!max-h-dvh",
+      "max-sm:!max-w-none",
+      "max-sm:!rounded-none",
+      "max-sm:!border-0",
+      "max-sm:shadow-none",
+    );
+    expect(
+      screen.getByRole("button", { name: "Expand to fullscreen" }),
+    ).toHaveClass("max-sm:hidden");
+    expect(screen.getByRole("button", { name: "Back" })).toHaveClass(
+      "sm:hidden",
+    );
+    expect(screen.getByRole("button", { name: "Close" })).toHaveClass(
+      "max-sm:hidden",
+    );
+    expect(screen.getByRole("heading", { name: "Detail" })).toHaveClass(
+      "max-sm:text-base",
+    );
     expect(
       document.querySelector("[data-slot='modal-body']"),
     ).toHaveClass("min-h-0");
@@ -36,6 +87,47 @@ describe("Modal", () => {
       document.querySelector("[data-slot='modal-footer']"),
     ).toHaveClass("shrink-0");
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("keeps a mobile dialog mounted for its 200ms exit transition", () => {
+    vi.useFakeTimers();
+    mockMotionPreferences({ mobile: true, reduced: false });
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+
+    act(() => vi.advanceTimersByTime(20));
+    expect(getDialog()).toHaveAttribute("data-state", "open");
+
+    rerender(
+      <Modal open={false} onClose={() => {}} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+    expect(getDialog()).toHaveAttribute("data-state", "closed");
+
+    act(() => vi.advanceTimersByTime(199));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("unmounts immediately when reduced motion is requested", () => {
+    mockMotionPreferences({ mobile: true, reduced: true });
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+
+    rerender(
+      <Modal open={false} onClose={() => {}} title="Detail">
+        <p>body</p>
+      </Modal>,
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("scrolls the body by default but lets a child own the scroll when scrollBody is false", () => {

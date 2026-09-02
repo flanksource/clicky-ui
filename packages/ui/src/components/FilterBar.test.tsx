@@ -583,6 +583,8 @@ describe("FilterBar", () => {
     fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveClass("rounded-md", "shadow-lg");
+    expect(within(dialog).queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
     expect(screen.queryByLabelText("Overflow filter")).not.toBeInTheDocument();
@@ -626,10 +628,20 @@ describe("FilterBar", () => {
     expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
-    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    const dialog = screen.getByRole("dialog", { name: "Filters" });
+    expect(dialog).toHaveClass("max-sm:!h-dvh", "max-sm:!rounded-none", "max-sm:shadow-none");
+    expect(within(dialog).getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(dialog.querySelector('[data-slot="modal-body"]')).toBeInTheDocument();
+    expect(dialog.querySelector('[data-slot="modal-footer"]')).toBeInTheDocument();
     expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(2);
     expect(within(dialog).getByLabelText("Team")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Owner")).toBeInTheDocument();
+    const teamRow = dialog.querySelector('[data-overflow-filter-row="team"]');
+    expect(teamRow).not.toBeNull();
+    const [label, , control, clear] = Array.from(teamRow!.children);
+    expect(label).toHaveClass("col-span-2", "md:col-span-1");
+    expect(control).not.toHaveClass("col-span-2");
+    expect(clear).toHaveClass("self-center");
 
     media.mockRestore();
   });

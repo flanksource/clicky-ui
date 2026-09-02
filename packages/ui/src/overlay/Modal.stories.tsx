@@ -75,6 +75,7 @@ const meta: Meta<typeof Modal> = {
           "- Nests cleanly: a modal opened over another renders above it without hiding it, and Escape closes one layer at a time (topmost first).",
           "- Restores focus to the previously-focused element on close.",
           "- When `title` is a string it becomes the dialog's accessible label.",
+          "- Below 640px, the modal becomes a full mobile page: it slides over the previous view, uses a back-navigation header, and keeps its header and footer pinned while the body scrolls.",
           "",
           "**Usage**",
           "```tsx",
@@ -171,6 +172,12 @@ export const MobileScrollable: Story = {
   parameters: {
     viewport: {
       defaultViewport: "mobile1",
+    },
+    docs: {
+      description: {
+        story:
+          "On mobile the modal becomes a borderless, shadowless page with back navigation. Its header and footer stay visible while this long form scrolls inside the body.",
+      },
     },
   },
   render: () => (

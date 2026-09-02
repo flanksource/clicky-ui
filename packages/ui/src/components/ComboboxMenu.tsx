@@ -38,7 +38,7 @@ export function ComboboxMenu({
   highlighted: number;
   isSelected: (value: string) => boolean;
   listId: string | undefined;
-  listRef: RefObject<HTMLDivElement>;
+  listRef: RefObject<HTMLDivElement | null>;
   loading: boolean | undefined;
   menuPos: ComboboxMenuPosition;
   modes: Record<string, ComboboxTriStateMode>;
@@ -48,24 +48,29 @@ export function ComboboxMenu({
   onSetMode: (value: string, mode: string) => void;
   tristate: boolean;
 }) {
-  return createPortal(
+  const mobile = menuPos.strategy === "mobile";
+  const listbox = (
     <div
       id={listId}
       ref={listRef}
       role="listbox"
       aria-multiselectable={multiple || undefined}
       style={{
-        position: "fixed",
+        position: mobile ? "absolute" : "fixed",
         ...(menuPos.top != null
           ? { top: menuPos.top }
           : { bottom: menuPos.bottom }),
         left: menuPos.left,
-        minWidth: menuPos.width,
+        ...(mobile ? { width: menuPos.width } : { minWidth: menuPos.width }),
         maxWidth: menuPos.maxWidth,
         maxHeight: menuPos.maxHeight,
-        zIndex: floatingZ,
+        zIndex: mobile ? undefined : floatingZ,
+        pointerEvents: mobile ? "auto" : undefined,
       }}
-      className="w-max overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5"
+      className={cn(
+        "overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5",
+        !mobile && "w-max",
+      )}
     >
       {loading && filtered.length === 0 && (
         <div className="px-2 py-4 text-center text-sm text-muted-foreground">
@@ -203,7 +208,19 @@ export function ComboboxMenu({
           {footer}
         </div>
       )}
-    </div>,
+    </div>
+  );
+  return createPortal(
+    mobile ? (
+      <div
+        data-slot="combobox-viewport-layer"
+        style={{ position: "fixed", inset: 0, zIndex: floatingZ, pointerEvents: "none" }}
+      >
+        {listbox}
+      </div>
+    ) : (
+      listbox
+    ),
     document.body,
   );
 }

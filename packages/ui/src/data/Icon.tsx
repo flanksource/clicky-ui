@@ -1,4 +1,4 @@
-import type { CSSProperties, ElementType, ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactElement, ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
@@ -82,7 +82,7 @@ function renderImportedGlyph(
   inline: boolean | undefined,
   glyphClassName: string | undefined,
   title: string | undefined,
-): JSX.Element {
+): ReactElement {
   const transform = [
     typeof rotate === "number" ? `rotate(${rotate}deg)` : typeof rotate === "string" ? rotate : "",
     flip === "horizontal" || flip === "both" ? "scaleX(-1)" : "",
@@ -109,7 +109,7 @@ function renderRuntimeGlyph(
   glyphHeight: number | string | undefined,
   glyphClassName: string | undefined,
   title: string | undefined,
-): JSX.Element {
+): ReactElement {
   const fallbackIcon = getFallbackIconProvider();
   if (fallbackIcon) {
     const Fallback = fallbackIcon;
@@ -220,7 +220,7 @@ export function LabelIcon({
 }: {
   icon?: LabelIconSpec;
   className?: string;
-}): JSX.Element | null {
+}): ReactElement | null {
   if (icon == null || icon === "" || icon === false) return null;
   if (typeof icon === "string") {
     return <Icon name={icon} className={cn("shrink-0", className)} />;

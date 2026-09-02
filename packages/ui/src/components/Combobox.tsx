@@ -86,7 +86,7 @@ export function Combobox(props: ComboboxProps) {
   const labelRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const floatingZ = useFloatingZIndex();
-  const menuPos = useComboboxMenuPosition(open, anchorRef);
+  const menuPos = useComboboxMenuPosition(open, anchorRef, listRef);
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(-1);
   const labelWidth = useComboboxLabelWidth(label, labelRef);
