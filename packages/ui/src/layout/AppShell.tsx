@@ -7,6 +7,7 @@ import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { SplitPane } from "./SplitPane";
 import { AppShellSlotOutlines } from "./AppShell.debug";
 import { NavSections, type GroupState } from "./AppShell.nav";
+import type { AppShellNavDrag } from "./AppShell.nav.drag";
 import { contentWidthClassName, type ContentWidth } from "./content-width";
 
 // AppShell is a sidebar-first application shell. The full-height DARK nav rail
@@ -95,6 +96,13 @@ export type AppShellNavSection = {
    * would make two nodes of the same kind look like different things.
    */
   variant?: "list" | "tree";
+  /**
+   * Makes the section's rows draggable onto one another, so a hierarchy can be
+   * rearranged in place. The section stays the boundary — a row never lands in
+   * a different section — and the consumer owns what a move means. Ignored
+   * while the rail is collapsed, where there are no folder rows to aim at.
+   */
+  drag?: AppShellNavDrag;
 };
 
 export type AppShellProps = {
