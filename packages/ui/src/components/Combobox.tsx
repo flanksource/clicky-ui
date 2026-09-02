@@ -25,7 +25,7 @@ import {
   multipleComboboxLabel,
   splitOnComboboxSeparators,
   withSelectedComboboxOptions,
-} from "./combobox-utils";
+} from "../lib/combobox-values";
 
 export type {
   ComboboxMultiProps,
@@ -264,7 +264,8 @@ export function Combobox(props: ComboboxProps) {
       const trimmed = entry.trim();
       if (!trimmed || next.includes(trimmed)) continue;
       const existing = options.find((option) => option.value === trimmed);
-      const candidate = existing ?? onNew?.(trimmed) ?? { value: trimmed, label: trimmed };
+      const candidate = existing ??
+        onNew?.(trimmed) ?? { value: trimmed, label: trimmed };
       const created = existing ? existing.value : createOptionValue(candidate);
       if (created !== null && !next.includes(created)) next.push(created);
     }

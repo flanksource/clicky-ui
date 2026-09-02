@@ -9,7 +9,7 @@ import {
   calculateComboboxMenuPosition,
   COMBOBOX_MOBILE_QUERY,
   type ComboboxMenuPosition,
-} from "./combobox-utils";
+} from "../lib/combobox";
 
 export function useComboboxLabelWidth(
   label: ReactNode,
@@ -40,9 +40,13 @@ export function useComboboxMenuPosition(
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
       mobile: window.matchMedia(COMBOBOX_MOBILE_QUERY).matches,
-      ...(listRef.current ? { naturalHeight: listRef.current.scrollHeight } : {}),
+      ...(listRef.current
+        ? { naturalHeight: listRef.current.scrollHeight }
+        : {}),
     });
-    setPosition((current) => (sameComboboxMenuPosition(current, next) ? current : next));
+    setPosition((current) =>
+      sameComboboxMenuPosition(current, next) ? current : next,
+    );
   }, [anchorRef, listRef, open]);
 
   useLayoutEffect(() => {
@@ -67,7 +71,11 @@ export function useComboboxMenuPosition(
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     const mutationObserver = new MutationObserver(update);
     resizeObserver?.observe(list);
-    mutationObserver.observe(list, { childList: true, characterData: true, subtree: true });
+    mutationObserver.observe(list, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
     return () => {
       resizeObserver?.disconnect();
       mutationObserver.disconnect();

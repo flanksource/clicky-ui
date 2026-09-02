@@ -1,5 +1,5 @@
 import { Combobox } from "./Combobox";
-import { withSelectedComboboxOptions } from "./combobox-utils";
+import { withSelectedComboboxOptions } from "../lib/combobox-values";
 import {
   comboboxAriaProps,
   defaultPlaceholder,
@@ -54,9 +54,13 @@ export function TagsComboboxControl({
       // value stays visible and de-selectable in the menu (a lookup's head set is
       // a page, not the whole table). A free scalar list has no option set to pin
       // into, and a menu echoing the pills above it says nothing.
-      options={options.length === 0 ? [] : withSelectedComboboxOptions(options, values)}
+      options={
+        options.length === 0 ? [] : withSelectedComboboxOptions(options, values)
+      }
       value={values}
-      onChange={(next) => field.onChange(next.map((v) => coerceScalarItem(v, itemType)))}
+      onChange={(next) =>
+        field.onChange(next.map((v) => coerceScalarItem(v, itemType)))
+      }
       disabled={readOnly}
       size={size}
       // An enum (or a strict lookup) is a closed set: typed text matching no
