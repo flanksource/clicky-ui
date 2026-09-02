@@ -17,8 +17,22 @@ import {
 } from "@flanksource/clicky-ui/icons";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-import { pageTitle, type PageEntry } from "../registry";
-import { createFolder, createPage, deletePage, movePage } from "./page-api";
+import {
+  applyFolderDeleted,
+  applyPageCreated,
+  applyPageDeleted,
+  applyPageMoved,
+  pageTitle,
+  type PageEntry,
+} from "../registry";
+import {
+  PageApiError,
+  createFolder,
+  createPage,
+  deleteFolder,
+  deletePage,
+  movePage,
+} from "./page-api";
 import {
   joinPageSlug,
   pageFilename,
@@ -31,7 +45,8 @@ export type PageAction =
   | "new-folder"
   | "rename"
   | "move"
-  | "delete";
+  | "delete"
+  | "delete-folder";
 
 type FolderNode = PathTreeNode<string> & { children: FolderNode[] };
 
@@ -213,15 +228,22 @@ type DialogProps = {
   initialFolder?: string;
   folders: readonly string[];
   commentCount: number;
+  /** What a folder delete would take with it, for the confirmation copy. */
+  folderImpact?: { pages: number; comments: number };
   onClose: () => void;
   onFolderCreated: (folder: string) => void;
+  onFolderDeleted: (folder: string) => void;
   onNavigate: (slug?: string) => void;
-  fallbackAfterDelete: (deletedSlug: string) => string | undefined;
+  /** Where to go when the page being read is the one that just disappeared. */
+  fallbackAfterDelete: (removed: { slug?: string; folder?: string }) => string | undefined;
 };
 
 export function PageManagementDialogs(props: DialogProps) {
   const { action, active, initialFolder, folders, commentCount, onClose } =
     props;
+  // A folder action is always launched from that folder's own menu, so the
+  // folder it targets is the one the menu passed in.
+  const targetFolder = action === "delete-folder" ? initialFolder : undefined;
   const [folder, setFolder] = useState("");
   const [filename, setFilename] = useState("");
   const [title, setTitle] = useState("");
@@ -247,6 +269,24 @@ export function PageManagementDialogs(props: DialogProps) {
       onClose();
       if (navigate) props.onNavigate(slug);
     } catch (cause) {
+      // Files under src/pages/ are also edited by agents and editors, so the
+      // nav can be holding a row whose file is already gone. That is the nav
+      // being stale, not the action failing: drop the row and move on.
+      if (cause instanceof PageApiError && cause.missing) {
+        if (targetFolder) {
+          applyFolderDeleted(targetFolder);
+          props.onFolderDeleted(targetFolder);
+          onClose();
+          props.onNavigate(props.fallbackAfterDelete({ folder: targetFolder }));
+          return;
+        }
+        if (active) {
+          applyPageDeleted(active.slug);
+          onClose();
+          props.onNavigate(props.fallbackAfterDelete({ slug: active.slug }));
+          return;
+        }
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
       setBusy(false);
     }
@@ -256,10 +296,11 @@ export function PageManagementDialogs(props: DialogProps) {
     event.preventDefault();
     if (action === "new-page") {
       const slug = joinPageSlug(folder, filename.trim());
-      void finish(
-        async () =>
-          (await createPage(slug, pageTemplate(slug, title.trim()))).slug,
-      );
+      void finish(async () => {
+        const result = await createPage(slug, pageTemplate(slug, title.trim()));
+        applyPageCreated(result.slug);
+        return result.slug;
+      });
     } else if (action === "new-folder") {
       const nextFolder = joinPageSlug(folder, filename.trim());
       void finish(async () => {
@@ -269,26 +310,42 @@ export function PageManagementDialogs(props: DialogProps) {
       }, false);
     } else if (action === "rename" && active) {
       const nextSlug = joinPageSlug(pageFolder(active.slug), filename.trim());
-      void finish(
-        async () =>
-          (await movePage({ slug: active.slug, nextSlug, title: title.trim() }))
-            .slug,
-      );
+      const nextTitle = title.trim();
+      void finish(async () => {
+        const result = await movePage({
+          slug: active.slug,
+          nextSlug,
+          title: nextTitle,
+        });
+        applyPageMoved(active.slug, result.slug, nextTitle);
+        return result.slug;
+      });
     } else if (action === "move" && active) {
       const nextSlug = joinPageSlug(folder, pageFilename(active.slug));
-      void finish(
-        async () => (await movePage({ slug: active.slug, nextSlug })).slug,
-      );
+      void finish(async () => {
+        const result = await movePage({ slug: active.slug, nextSlug });
+        applyPageMoved(active.slug, result.slug);
+        return result.slug;
+      });
     } else if (action === "delete" && active) {
       void finish(async () => {
         await deletePage(active.slug);
-        return props.fallbackAfterDelete(active.slug);
+        applyPageDeleted(active.slug);
+        return props.fallbackAfterDelete({ slug: active.slug });
+      });
+    } else if (action === "delete-folder" && targetFolder) {
+      void finish(async () => {
+        await deleteFolder(targetFolder);
+        applyFolderDeleted(targetFolder);
+        props.onFolderDeleted(targetFolder);
+        return props.fallbackAfterDelete({ folder: targetFolder });
       });
     }
   };
 
   const needsTitle = action === "new-page" || action === "rename";
-  const needsFilename = action !== "move" && action !== "delete";
+  const needsFilename =
+    action === "new-page" || action === "new-folder" || action === "rename";
   const invalid =
     busy ||
     (needsFilename && filename.trim() === "") ||
@@ -301,6 +358,7 @@ export function PageManagementDialogs(props: DialogProps) {
       rename: "Rename page",
       move: "Move page",
       delete: "Delete page",
+      "delete-folder": "Delete folder",
     }[action];
 
   return (
@@ -319,15 +377,21 @@ export function PageManagementDialogs(props: DialogProps) {
             type="submit"
             form="page-management-form"
             size="sm"
-            variant={action === "delete" ? "destructive" : "default"}
+            variant={
+              action === "delete" || action === "delete-folder"
+                ? "destructive"
+                : "default"
+            }
             loading={busy}
             disabled={invalid}
           >
             {action === "delete"
               ? "Delete page"
-              : action === "move"
-                ? "Move page"
-                : "Save"}
+              : action === "delete-folder"
+                ? "Delete folder"
+                : action === "move"
+                  ? "Move page"
+                  : "Save"}
           </Button>
         </div>
       }
@@ -371,6 +435,17 @@ export function PageManagementDialogs(props: DialogProps) {
             value={title}
             onChange={setTitle}
           />
+        )}
+        {action === "delete-folder" && targetFolder && (
+          <p className="text-sm text-muted-foreground">
+            Delete{" "}
+            <code className="text-foreground">src/pages/{targetFolder}/</code>{" "}
+            and everything under it — {props.folderImpact?.pages ?? 0} page
+            {props.folderImpact?.pages === 1 ? "" : "s"} and{" "}
+            {props.folderImpact?.comments ?? 0} feedback comment
+            {props.folderImpact?.comments === 1 ? "" : "s"}? Pages here are not
+            in git, so this cannot be undone.
+          </p>
         )}
         {action === "delete" && active && (
           <p className="text-sm text-muted-foreground">

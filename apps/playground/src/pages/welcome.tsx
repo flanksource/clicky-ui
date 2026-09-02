@@ -48,21 +48,21 @@ export default function Welcome() {
           it into Claude Code.
         </Step>
 
-        <Step n={3} title="Leave anchored feedsadsadback">
+        <Step n={3} title="Leave anchored feedback">
           Press <kbd className="rounded border border-border px-1 text-xs">c</kbd> (or the Comment
           button), click an element, and write a note. Pins are anchored to the element and persist
           to{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             apps/playground/.playground/comments.json
           </code>
-          , which an agent can read directly.
+          , together with its React component, source stack, and bounded HTML snapshot.
         </Step>
 
         <Step n={4} title="Hand the notes over">
           <span className="font-medium text-foreground">Copy feedback</span> puts every note on this
-          page — anchor, status, author and replies — on the clipboard as markdown. Its dropdown
-          widens that to the unresolved notes on this page, or to every page at once. An agent can
-          also skip the clipboard entirely and call{" "}
+          page — note, status, replies, React source context, and HTML — on the clipboard as
+          markdown. Its dropdown widens that to the unresolved notes on this page, or to every page
+          at once. An agent can also skip the clipboard entirely and call{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">/__playground/comments</code> to
           list, reply to and resolve notes directly — see the playground README.
         </Step>

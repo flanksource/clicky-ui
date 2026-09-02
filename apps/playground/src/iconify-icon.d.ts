@@ -1,9 +1,9 @@
-import type React from "react";
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
 
-declare global {
+declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "iconify-icon": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      "iconify-icon": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
         icon?: string;
         width?: string | number;
         height?: string | number;
@@ -12,5 +12,3 @@ declare global {
     }
   }
 }
-
-export {};

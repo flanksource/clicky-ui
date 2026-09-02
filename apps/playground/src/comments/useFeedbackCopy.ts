@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { DropdownMenuItem } from "@flanksource/clicky-ui";
 import type { Comment } from "@flanksource/clicky-ui/comments";
 
-import { PAGES, folderForPage, type PageEntry } from "../registry";
+import { folderForPage, pages, type PageEntry } from "../registry";
 import { writeClipboard } from "./clipboard";
 import {
   commentsForFolder,
@@ -55,7 +55,7 @@ export function useFeedbackCopy({
     void copyMarkdown(() => [{ page: active.slug, comments }]);
   }, [active, comments, copyMarkdown]);
 
-  const activeFolder = active ? folderForPage(active.slug, PAGES) : undefined;
+  const activeFolder = active ? folderForPage(active.slug, pages()) : undefined;
   const activeFolderLabel = activeFolder
     ?.split("/")
     .map((part) => part.replace(/[-_]+/g, " "))

@@ -1,17 +1,25 @@
-import type {
-  ResolvedRuntimeProfile,
-  RuntimeProfileResolveRequest,
-} from "./contract";
 import {
   familiesFromRuntimeCatalog,
+  type AISpecRuntimePermissionCatalog,
+  type ResolvedRuntimeProfile,
   type RuntimeCatalogFamily,
+  type RuntimePermissionTarget,
+  type RuntimeProfileResolveRequest,
+  type RuntimeProfilesClient,
   type SpecRuntimeFamily,
 } from "@flanksource/clicky-ui/ai";
 
 const RESOLVE_ROUTE = "/__playground/runtime-profiles/resolve";
 const RUNTIMES_ROUTE = "/__playground/runtime-profiles/runtimes";
+const PERMISSIONS_ROUTE = "/__playground/runtime-profiles/permissions";
 
-export async function loadRuntimeProfileFamilies(
+export const PLAYGROUND_RUNTIME_PROFILES_CLIENT: RuntimeProfilesClient = {
+  resolve: resolveRuntimeProfile,
+  loadFamilies: loadRuntimeProfileFamilies,
+  loadPermissionCatalog: loadRuntimePermissionCatalog,
+};
+
+async function loadRuntimeProfileFamilies(
   signal?: AbortSignal,
 ): Promise<SpecRuntimeFamily[]> {
   const response = await fetch(RUNTIMES_ROUTE, {
@@ -28,7 +36,7 @@ export async function loadRuntimeProfileFamilies(
   return familiesFromRuntimeCatalog(payload);
 }
 
-export async function resolveRuntimeProfile(
+async function resolveRuntimeProfile(
   body: RuntimeProfileResolveRequest,
   signal?: AbortSignal,
 ): Promise<ResolvedRuntimeProfile> {
@@ -42,6 +50,19 @@ export async function resolveRuntimeProfile(
     response,
     `POST ${RESOLVE_ROUTE}`,
   );
+}
+
+async function loadRuntimePermissionCatalog(
+  target: RuntimePermissionTarget,
+  signal?: AbortSignal,
+): Promise<AISpecRuntimePermissionCatalog> {
+  const query = new URLSearchParams(target);
+  const route = `${PERMISSIONS_ROUTE}?${query}`;
+  const response = await fetch(route, {
+    method: "GET",
+    ...(signal ? { signal } : {}),
+  });
+  return readJsonResponse<AISpecRuntimePermissionCatalog>(response, route);
 }
 
 async function readJsonResponse<T>(

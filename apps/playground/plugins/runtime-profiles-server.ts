@@ -5,11 +5,16 @@ import type {
   RuntimeProfileResolveRequest,
 } from "../../../packages/ui/src/data/ai/runtime-profile";
 import { normalizeToolCatalog } from "../../../packages/ui/src/data/ai/ChatWindow.tool-catalog";
-import { loadRuntimeProfileRuntimeCatalog } from "./runtime-profiles-catalog";
+import {
+  loadRuntimeProfilePermissionCatalog,
+  loadRuntimeProfileRuntimeCatalog,
+} from "./runtime-profiles-catalog";
 
 export const RUNTIME_PROFILES_ROUTE = "/__playground/runtime-profiles/resolve";
 export const RUNTIME_PROFILES_RUNTIMES_ROUTE =
   "/__playground/runtime-profiles/runtimes";
+export const RUNTIME_PROFILES_PERMISSIONS_ROUTE =
+  "/__playground/runtime-profiles/permissions";
 
 export async function resolveRuntimeProfileFromCaptain(
   resolveURL: string,
@@ -52,15 +57,19 @@ function normalizeResolution(value: unknown): ResolvedRuntimeProfile {
   }
   const tools = normalizeToolCatalog(value.tools);
   if (tools.length !== value.tools.length) {
-    throw new Error("Captain runtime profile response contains an invalid tool");
+    throw new Error(
+      "Captain runtime profile response contains an invalid tool",
+    );
   }
   return { ...value, tools } as ResolvedRuntimeProfile;
 }
 
 export function playgroundRuntimeProfiles({
+  permissionsURL,
   resolveURL,
   runtimesURL,
 }: {
+  permissionsURL: string;
   resolveURL: string;
   runtimesURL: string;
 }): Plugin {
@@ -101,6 +110,37 @@ export function playgroundRuntimeProfiles({
           })();
         },
       );
+      server.middlewares.use(
+        RUNTIME_PROFILES_PERMISSIONS_ROUTE,
+        (request, response) => {
+          void (async () => {
+            try {
+              if (request.method !== "GET") {
+                sendJson(response, 405, {
+                  error: `GET ${RUNTIME_PROFILES_PERMISSIONS_ROUTE} is required`,
+                });
+                return;
+              }
+              sendJson(
+                response,
+                200,
+                await loadRuntimeProfilePermissionCatalog(
+                  permissionsURL,
+                  permissionTarget(request),
+                ),
+              );
+            } catch (error) {
+              const message = errorMessage(error);
+              server.config.logger.error(`[runtime-profiles] ${message}`);
+              sendJson(
+                response,
+                error instanceof RuntimeProfileRequestError ? 400 : 502,
+                { error: message },
+              );
+            }
+          })();
+        },
+      );
       server.middlewares.use(RUNTIME_PROFILES_ROUTE, (request, response) => {
         void (async () => {
           try {
@@ -135,6 +175,18 @@ export function playgroundRuntimeProfiles({
       });
     },
   };
+}
+
+function permissionTarget(request: IncomingMessage) {
+  const query = new URL(request.url ?? "/", "http://playground").searchParams;
+  const provider = query.get("provider")?.trim();
+  const mode = query.get("mode")?.trim();
+  if (!provider || !mode) {
+    throw new RuntimeProfileRequestError(
+      "permission catalog requires provider and mode",
+    );
+  }
+  return { provider, mode };
 }
 
 async function readJsonBody(
@@ -178,7 +230,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 class CaptainResolutionError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }

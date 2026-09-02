@@ -21,6 +21,8 @@ export default defineConfig({
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundComments({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
+      permissionsURL:
+        "http://localhost:9020/api/captain/ai/permissions/catalog",
       runtimesURL: "http://localhost:9020/api/chat/runtimes",
       resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
     }),
@@ -77,6 +79,17 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@flanksource/clicky-ui"],
   },
+<<<<<<< Updated upstream
+=======
+  test: {
+    setupFiles: ["./src/test/setup.ts"],
+    server: {
+      deps: {
+        inline: ["@floating-ui/react"],
+      },
+    },
+  },
+>>>>>>> Stashed changes
   server: {
     // Bind every interface so the playground is reachable from other devices
     // on the LAN; allowedHosts keeps hostname (.local, tunnel) access working,

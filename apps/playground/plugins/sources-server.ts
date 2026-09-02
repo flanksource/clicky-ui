@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, isAbsolute, relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
-import { deletePage, movePage } from "./page-management-store";
+import { deleteFolder, deletePage, movePage } from "./page-management-store";
 import {
   PageStoreError,
   assertSlug,
@@ -23,25 +23,31 @@ export type SourceRoute =
   | "read"
   | "create-page"
   | "create-folder"
+  | "delete-folder"
   | "write"
   | "move"
   | "delete";
 
+/**
+ * `hasTarget` is whether the request names what it acts on — `?slug=` under
+ * `/`, `?folder=` under `/folders`. Every destructive route needs one.
+ */
 export function matchSourceRoute(
   method: string,
   pathname: string,
-  hasSlug: boolean,
+  hasTarget: boolean,
 ): SourceRoute | undefined {
   if (pathname === "/folders") {
-    return method === "POST" ? "create-folder" : undefined;
+    if (method === "POST") return "create-folder";
+    return method === "DELETE" && hasTarget ? "delete-folder" : undefined;
   }
   if (pathname !== "/") return undefined;
 
-  if (method === "GET") return hasSlug ? "read" : "folders";
+  if (method === "GET") return hasTarget ? "read" : "folders";
   if (method === "POST") return "create-page";
-  if (method === "PUT" && hasSlug) return "write";
+  if (method === "PUT" && hasTarget) return "write";
   if (method === "PATCH") return "move";
-  if (method === "DELETE" && hasSlug) return "delete";
+  if (method === "DELETE" && hasTarget) return "delete";
   return undefined;
 }
 
@@ -107,6 +113,7 @@ type SourceEvents = {
   changed: (file: string) => void;
   deleted: (file: string) => void;
   folderCreated: (folder: string) => void;
+  folderDeleted: (folder: string) => void;
 };
 
 export function announcePageMove(
@@ -133,7 +140,12 @@ function handle(
 ): Promise<void> | void {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const slugParam = url.searchParams.get("slug");
-  const route = matchSourceRoute(req.method ?? "", url.pathname, slugParam !== null);
+  const folderParam = url.searchParams.get("folder");
+  const route = matchSourceRoute(
+    req.method ?? "",
+    url.pathname,
+    slugParam !== null || folderParam !== null,
+  );
   if (!route) {
     return sendJson(res, 405, {
       error: `${req.method} ${SOURCES_ROUTE}${url.pathname} is not supported`,
@@ -198,6 +210,18 @@ function handle(
       events.deleted(file);
       return sendJson(res, 200, result);
     }
+
+    case "delete-folder": {
+      const folder = assertSlug(folderParam);
+      const directory = folderPath(pagesDir, folder);
+      const result = deleteFolder({ pagesDir, commentsDir, folder });
+      // One unlink per page so the glob drops each module, then the directory.
+      for (const slug of result.deletedPages) {
+        events.deleted(pagePath(pagesDir, slug));
+      }
+      events.folderDeleted(directory);
+      return sendJson(res, 200, result);
+    }
   }
 }
 
@@ -227,6 +251,7 @@ export function playgroundSources(options: { pagesDir: string; commentsDir: stri
         changed: (file) => server.watcher.emit("change", file),
         deleted: (file) => server.watcher.emit("unlink", file),
         folderCreated: (folder) => server.watcher.emit("addDir", folder),
+        folderDeleted: (folder) => server.watcher.emit("unlinkDir", folder),
       };
 
       server.middlewares.use(SOURCES_ROUTE, (req, res, next) => {

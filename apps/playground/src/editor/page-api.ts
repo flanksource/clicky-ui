@@ -1,5 +1,25 @@
 export const SOURCES_ROUTE = "/__playground/sources";
 
+/**
+ * Carries the status so callers can tell "gone" from "broken". Files under
+ * `src/pages/` are edited by agents and editors as well as by the playground,
+ * so a 404 usually means the nav is holding a row the glob has not caught up
+ * on yet — recoverable, not a failure to report and leave on screen.
+ */
+export class PageApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "PageApiError";
+  }
+
+  get missing(): boolean {
+    return this.status === 404;
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
@@ -10,7 +30,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
-    throw new Error(payload.error ?? `${init?.method ?? "GET"} ${url} failed (${response.status})`);
+    throw new PageApiError(
+      payload.error ?? `${init?.method ?? "GET"} ${url} failed (${response.status})`,
+      response.status,
+    );
   }
   return payload;
 }
@@ -60,6 +83,19 @@ export function deletePage(
   return request(`${SOURCES_ROUTE}?slug=${encodeURIComponent(slug)}`, {
     method: "DELETE",
   });
+}
+
+export type DeleteFolderResult = {
+  folder: string;
+  deletedPages: string[];
+  deletedComments: number;
+};
+
+export function deleteFolder(folder: string): Promise<DeleteFolderResult> {
+  return request(
+    `${SOURCES_ROUTE}/folders?folder=${encodeURIComponent(folder)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function readPage(slug: string): Promise<{ source: string }> {

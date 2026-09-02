@@ -1,0 +1,337 @@
+/* ==========================================================================
+   reconctl — cyber-noc palette candidates
+
+   Follows the merivio precedent (apps/kitchen-sink/src/demos/approvals/
+   merivio.css), which is the only worked example of a scoped product theme in
+   this repo. Three jobs, in this order:
+
+     1. Declare a candidate's private palette as `--rc-*` primitives, restated
+        per theme so the whole thing flips with `data-theme` for free.
+     2. Re-point clicky-ui's own semantic tokens at those primitives, so every
+        library component rendered inside the scope — DataTable, Panel, Button,
+        Badge, Callout — re-skins with no props at all.
+     3. Publish the chrome accent as three real classes, because a *computed*
+        arbitrary class (`bg-[var(--rc-chrome)]` assembled at runtime) is
+        invisible to Tailwind's scanner and would ship as nothing.
+
+   Everything here is playground-local. Nothing in packages/ui is touched, so
+   dist/styles.css is unchanged for every other consumer.
+
+   ## Why the per-theme blocks are ancestor selectors
+
+   `[data-theme="dark"] .rc-abyss` needs the attribute on an *ancestor*, which
+   is what lets the picker pin a dark specimen and a light specimen side by side
+   on the same page:
+
+       <div data-theme="dark"><div class="rc-abyss">…</div></div>
+
+   Two nested elements, not one — a combined `<div data-theme="dark"
+   class="rc-abyss">` would not match these rules. The nesting pays a second
+   dividend: `_recon/severity.ts` writes `dark:` classes, which the clicky-ui
+   preset binds to `[data-theme="dark"]`, so severity chips render their dark
+   variants inside a dark specimen even while the surrounding page is light.
+
+   ## Why this beats the library's own tokens
+
+   tokens.css aliases the semantic set on `:root, [data-theme]` inside
+   `@layer clicky-tokens`. This file is unlayered, and an unlayered rule beats a
+   layered one outright regardless of specificity — so no !important is needed
+   and none is used.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. The semantic re-point, identical for every candidate.
+
+   The FULL set is overridden on purpose. Any token left out keeps resolving to
+   the global --fs-* value inherited from :root, which is exactly how a subtree
+   ends up half-themed — a cyan page with a Flanksource-blue focus ring.
+   -------------------------------------------------------------------------- */
+.rc-abyss,
+.rc-carbon,
+.rc-nightwatch,
+.rc-violet-grid,
+.rc-sodium {
+  --background: var(--rc-bg);
+  --foreground: var(--rc-fg);
+  --card: var(--rc-surface);
+  --card-foreground: var(--rc-fg);
+  --popover: var(--rc-surface);
+  --popover-foreground: var(--rc-fg);
+  --primary: var(--rc-primary);
+  --primary-foreground: var(--rc-primary-fg);
+  --secondary: var(--rc-elevated);
+  --secondary-foreground: var(--rc-fg);
+  --muted: var(--rc-elevated);
+  --muted-foreground: var(--rc-fg-muted);
+  --accent: var(--rc-elevated);
+  --accent-foreground: var(--rc-fg);
+  /* Placeholders mean ABSENCE, so they keep their own token rather than
+     sharing --muted-foreground with helper text, which means content. Same
+     split tokens.css makes, preserved here. */
+  --placeholder: var(--rc-fg-subtle);
+  --destructive: var(--rc-destructive);
+  --destructive-foreground: var(--rc-primary-fg);
+  --border: var(--rc-border);
+  --input: var(--rc-input);
+  --ring: var(--rc-primary);
+  --sidebar: var(--rc-sidebar);
+  --sidebar-foreground: var(--rc-sidebar-fg);
+  --sidebar-border: var(--rc-sidebar-border);
+  --sidebar-accent: var(--rc-sidebar-accent);
+  --sidebar-accent-foreground: var(--rc-fg);
+  --sidebar-primary: var(--rc-sidebar-primary);
+  --sidebar-primary-foreground: var(--rc-primary-fg);
+  --sidebar-ring: var(--rc-primary);
+
+  background-color: var(--rc-bg);
+  color: var(--rc-fg);
+}
+
+/* --------------------------------------------------------------------------
+   2. The chrome accent as real classes.
+
+   `chrome` equals `primary` in every candidate but violet-grid, which is that
+   candidate's entire argument: structure and action can be two hues. These
+   three classes are what make the claim visible instead of asserted.
+   -------------------------------------------------------------------------- */
+.rc-chrome-bg {
+  background-color: var(--rc-chrome);
+}
+
+.rc-chrome-text {
+  color: var(--rc-chrome);
+}
+
+.rc-chrome-border {
+  border-color: var(--rc-chrome);
+}
+
+/* A hairline rule in the chrome hue, used for section marks in the specimen. */
+.rc-chrome-rule {
+  background-image: linear-gradient(
+    to right,
+    var(--rc-chrome) 0%,
+    var(--rc-chrome) 18%,
+    var(--rc-border) 18%,
+    var(--rc-border) 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   3. Per-candidate primitives.
+
+   Keep these in step with `palettes.ts` — that module is what the picker's
+   readout table reports, and a disagreement between the two shows up as a
+   swatch whose printed hex is wrong.
+   -------------------------------------------------------------------------- */
+
+/* ---- Abyss — cyan on blue-black ---------------------------------------- */
+[data-theme="dark"] .rc-abyss {
+  --rc-bg: #06090f;
+  --rc-surface: #0c1320;
+  --rc-elevated: #131c2e;
+  --rc-border: #1b2740;
+  --rc-input: #2a3a55;
+  --rc-fg: #dce8f7;
+  --rc-fg-muted: #7c8ca6;
+  --rc-fg-subtle: #4e5c74;
+  --rc-primary: #22d3ee;
+  --rc-primary-fg: #04141a;
+  --rc-destructive: #f87171;
+  --rc-chrome: #22d3ee;
+  --rc-sidebar: #050810;
+  --rc-sidebar-fg: #a9bcd4;
+  --rc-sidebar-border: #14203a;
+  --rc-sidebar-accent: #0f1b33;
+  --rc-sidebar-primary: #22d3ee;
+}
+
+[data-theme="light"] .rc-abyss {
+  --rc-bg: #f7fafc;
+  --rc-surface: #ffffff;
+  --rc-elevated: #eef3f9;
+  --rc-border: #dde5ee;
+  --rc-input: #c6d2e0;
+  --rc-fg: #0b1421;
+  --rc-fg-muted: #5a6b82;
+  --rc-fg-subtle: #93a2b5;
+  --rc-primary: #0e7490;
+  --rc-primary-fg: #ffffff;
+  --rc-destructive: #dc2626;
+  --rc-chrome: #0e7490;
+  --rc-sidebar: #0b1220;
+  --rc-sidebar-fg: #c2cfe0;
+  --rc-sidebar-border: #1d2a42;
+  --rc-sidebar-accent: #16223a;
+  --rc-sidebar-primary: #22d3ee;
+}
+
+/* ---- Carbon — cyan on neutral graphite --------------------------------- */
+[data-theme="dark"] .rc-carbon {
+  --rc-bg: #0b0b0d;
+  --rc-surface: #131316;
+  --rc-elevated: #1b1b1f;
+  --rc-border: #26262b;
+  --rc-input: #3a3a42;
+  --rc-fg: #e6e6ea;
+  --rc-fg-muted: #8b8b95;
+  --rc-fg-subtle: #5c5c66;
+  --rc-primary: #22d3ee;
+  --rc-primary-fg: #04141a;
+  --rc-destructive: #f87171;
+  --rc-chrome: #22d3ee;
+  --rc-sidebar: #08080a;
+  --rc-sidebar-fg: #b4b4be;
+  --rc-sidebar-border: #1e1e23;
+  --rc-sidebar-accent: #17171c;
+  --rc-sidebar-primary: #22d3ee;
+}
+
+[data-theme="light"] .rc-carbon {
+  --rc-bg: #fafafa;
+  --rc-surface: #ffffff;
+  --rc-elevated: #f4f4f5;
+  --rc-border: #e4e4e7;
+  --rc-input: #d4d4d8;
+  --rc-fg: #18181b;
+  --rc-fg-muted: #71717a;
+  --rc-fg-subtle: #a1a1aa;
+  --rc-primary: #0e7490;
+  --rc-primary-fg: #ffffff;
+  --rc-destructive: #dc2626;
+  --rc-chrome: #0e7490;
+  --rc-sidebar: #18181b;
+  --rc-sidebar-fg: #d4d4d8;
+  --rc-sidebar-border: #2a2a30;
+  --rc-sidebar-accent: #232329;
+  --rc-sidebar-primary: #22d3ee;
+}
+
+/* ---- Nightwatch — ice blue on Flanksource navy ------------------------- */
+[data-theme="dark"] .rc-nightwatch {
+  --rc-bg: #0b1220;
+  --rc-surface: #131f3b;
+  --rc-elevated: #1b2942;
+  --rc-border: #24334f;
+  --rc-input: #33425f;
+  --rc-fg: #e2e9f5;
+  --rc-fg-muted: #8494b0;
+  --rc-fg-subtle: #56657f;
+  --rc-primary: #7cb0ff;
+  --rc-primary-fg: #0b1220;
+  --rc-destructive: #f87171;
+  --rc-chrome: #7cb0ff;
+  --rc-sidebar: #1e2b48;
+  --rc-sidebar-fg: #c2cce0;
+  --rc-sidebar-border: #33425f;
+  --rc-sidebar-accent: #2c3c5e;
+  --rc-sidebar-primary: #7cb0ff;
+}
+
+[data-theme="light"] .rc-nightwatch {
+  --rc-bg: #f5f8fd;
+  --rc-surface: #ffffff;
+  --rc-elevated: #eaf0fa;
+  --rc-border: #d9e2f0;
+  --rc-input: #c2d0e6;
+  --rc-fg: #131f3b;
+  --rc-fg-muted: #5c6b87;
+  --rc-fg-subtle: #94a3bc;
+  --rc-primary: #3578e5;
+  --rc-primary-fg: #ffffff;
+  --rc-destructive: #dc2626;
+  --rc-chrome: #3578e5;
+  --rc-sidebar: #1e2b48;
+  --rc-sidebar-fg: #c2cce0;
+  --rc-sidebar-border: #33425f;
+  --rc-sidebar-accent: #2c3c5e;
+  --rc-sidebar-primary: #7cb0ff;
+}
+
+/* ---- Violet grid — violet chrome, cyan action --------------------------
+
+   The chosen palette. Applied via `RECON_SCOPE` (recon-scope.ts) on a recon
+   page's own root element — a subtree, never the document. Portaled overlays
+   (DropdownMenu, Modal, Toast) render at document.body and therefore keep the
+   shell's palette; that is a deliberate limit of page-scoped theming, not a
+   bug. */
+[data-theme="dark"] .rc-violet-grid {
+  --rc-bg: #0a0812;
+  --rc-surface: #14111f;
+  --rc-elevated: #1d1930;
+  --rc-border: #2a2440;
+  --rc-input: #3b3358;
+  --rc-fg: #e4dff5;
+  --rc-fg-muted: #8f86ab;
+  --rc-fg-subtle: #5f5880;
+  --rc-primary: #22d3ee;
+  --rc-primary-fg: #04141a;
+  --rc-destructive: #f87171;
+  --rc-chrome: #a78bfa;
+  --rc-sidebar: #07050d;
+  --rc-sidebar-fg: #b7aed0;
+  --rc-sidebar-border: #211b36;
+  --rc-sidebar-accent: #1a1430;
+  --rc-sidebar-primary: #a78bfa;
+}
+
+[data-theme="light"] .rc-violet-grid {
+  --rc-bg: #faf8ff;
+  --rc-surface: #ffffff;
+  --rc-elevated: #f3effc;
+  --rc-border: #e5e0f2;
+  --rc-input: #d3cbe8;
+  --rc-fg: #14111f;
+  --rc-fg-muted: #665e80;
+  --rc-fg-subtle: #9c93b8;
+  --rc-primary: #0e7490;
+  --rc-primary-fg: #ffffff;
+  --rc-destructive: #dc2626;
+  --rc-chrome: #7c3aed;
+  --rc-sidebar: #14111f;
+  --rc-sidebar-fg: #cfc7e4;
+  --rc-sidebar-border: #2a2440;
+  --rc-sidebar-accent: #211b36;
+  --rc-sidebar-primary: #a78bfa;
+}
+
+/* ---- Sodium — amber on warm charcoal (deliberate foil) ----------------- */
+[data-theme="dark"] .rc-sodium {
+  --rc-bg: #12100c;
+  --rc-surface: #1b1813;
+  --rc-elevated: #241f18;
+  --rc-border: #332c22;
+  --rc-input: #463c2e;
+  --rc-fg: #f0e7d8;
+  --rc-fg-muted: #a2947c;
+  --rc-fg-subtle: #6e6353;
+  --rc-primary: #f59e0b;
+  --rc-primary-fg: #1a1204;
+  --rc-destructive: #f87171;
+  --rc-chrome: #f59e0b;
+  --rc-sidebar: #0e0c09;
+  --rc-sidebar-fg: #cbbda3;
+  --rc-sidebar-border: #2a241c;
+  --rc-sidebar-accent: #221d16;
+  --rc-sidebar-primary: #f59e0b;
+}
+
+[data-theme="light"] .rc-sodium {
+  --rc-bg: #fbf8f2;
+  --rc-surface: #ffffff;
+  --rc-elevated: #f4efe4;
+  --rc-border: #e7dfcf;
+  --rc-input: #d8ccb5;
+  --rc-fg: #1f1a12;
+  --rc-fg-muted: #7a6b52;
+  --rc-fg-subtle: #a89877;
+  --rc-primary: #b45309;
+  --rc-primary-fg: #ffffff;
+  --rc-destructive: #dc2626;
+  --rc-chrome: #b45309;
+  --rc-sidebar: #1f1a12;
+  --rc-sidebar-fg: #dccfb6;
+  --rc-sidebar-border: #332c1f;
+  --rc-sidebar-accent: #2a241a;
+  --rc-sidebar-primary: #f59e0b;
+}

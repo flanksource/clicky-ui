@@ -105,6 +105,37 @@ export function listFolders(pagesDir: string): string[] {
   return folders.sort((left, right) => left.localeCompare(right));
 }
 
+/**
+ * Every page slug inside `folder`, at any depth. Mirrors the registry's glob:
+ * `_`-prefixed helpers and colocated tests/stories are not artifacts, so they
+ * have no slug and no feedback to clean up.
+ */
+export function listFolderPages(pagesDir: string, folder: string): string[] {
+  const root = folderPath(pagesDir, folder);
+  const slugs: string[] = [];
+
+  function walk(dir: string, prefix: string): void {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
+      if (entry.isSymbolicLink()) {
+        throw new PageStoreError(`refusing to traverse symbolic link ${join(dir, entry.name)}`, 400);
+      }
+      if (entry.isDirectory()) {
+        walk(join(dir, entry.name), `${prefix}${entry.name}/`);
+      } else if (
+        entry.name.endsWith(".tsx") &&
+        !/\.(test|stories)\.tsx$/.test(entry.name)
+      ) {
+        slugs.push(`${prefix}${entry.name.slice(0, -".tsx".length)}`);
+      }
+    }
+  }
+
+  if (!existsSync(root)) throw new PageStoreError(`folder "${folder}" does not exist`, 404);
+  walk(root, `${folder}/`);
+  return slugs.sort((left, right) => left.localeCompare(right));
+}
+
 export function createFolder(pagesDir: string, folder: string): string {
   const target = folderPath(pagesDir, folder);
   if (existsSync(target)) {
