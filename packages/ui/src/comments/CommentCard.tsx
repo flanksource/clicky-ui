@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
-import { Badge } from "../data/Badge";
-import { Icon, type StaticIconComponent } from "../data/Icon";
+import { Icon } from "../data/Icon";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
 import {
   parseTimestamp,
@@ -9,29 +8,26 @@ import {
 } from "../data/cells/timestamp-format";
 import {
   UiCheck,
-  UiClose,
+  UiCopy,
   UiDotsVertical,
   UiFullscreen,
-  UiThumbsDown,
-  UiThumbsUp,
+  UiRestart,
   UiTrash,
 } from "../icons";
 import { CommentAuthorAvatar } from "./CommentAuthor";
+import {
+  ChecklistChips,
+  FacetBadges,
+  RatingChip,
+  RefChips,
+} from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
 import {
   authorDisplayName,
   isUnresolved,
-  resolveFacetOption,
-  resolveStatusConfig,
-  toneToBadgeTone,
   truncatePlain,
 } from "./comment-utils";
-import type {
-  Comment,
-  CommentConfig,
-  CommentRating,
-  CommentStatusConfig,
-} from "./comment-types";
+import type { Comment, CommentConfig } from "./comment-types";
 
 function completionStatus(config: CommentConfig) {
   for (const completionName of ["resolved", "closed"]) {
@@ -45,11 +41,8 @@ function completionStatus(config: CommentConfig) {
   return undefined;
 }
 
-function completionActionLabel(status: CommentStatusConfig) {
-  return status.value.toLowerCase() === "closed" ||
-    status.label.toLowerCase() === "closed"
-    ? "Close comment"
-    : "Resolve comment";
+function reopenStatus(config: CommentConfig) {
+  return config.statuses.find((status) => status.unresolved);
 }
 
 export type CommentCardProps = {
@@ -65,6 +58,8 @@ export type CommentCardProps = {
   onUpdateStatus?: (status: string) => void | Promise<void>;
   /** Delete this comment. */
   onDelete?: () => void;
+  /** Copy this comment's whole thread in the caller's canonical format. */
+  onCopy?: () => void | Promise<void>;
   /** Begin a reply to this comment. */
   onReply?: () => void;
   /** Advance the checklist item at `index` to its next status. */
@@ -77,202 +72,38 @@ export type CommentCardProps = {
   onMaximize?: () => void;
 };
 
-function RatingChip({ rating }: { rating: CommentRating | undefined }) {
-  if (!rating) return null;
-  const positive = rating === "positive";
-  return (
-    <Badge
-      variant="soft"
-      tone={positive ? "success" : "danger"}
-      size="xs"
-      icon={positive ? UiThumbsUp : UiThumbsDown}
-    >
-      {positive ? "Positive rating" : "Negative rating"}
-    </Badge>
-  );
-}
-
-function StatusChip({
-  status,
-  config,
-  showLabel,
-}: {
-  status: string | undefined;
-  config: CommentConfig;
-  showLabel?: boolean;
-}) {
-  const cfg = resolveStatusConfig(config, status);
-  if (!cfg) return null;
-  return (
-    <Badge
-      variant="soft"
-      tone={toneToBadgeTone(cfg.tone)}
-      size="xs"
-      {...(cfg.icon ? { icon: cfg.icon } : {})}
-    >
-      {showLabel ? cfg.label : null}
-    </Badge>
-  );
-}
-
-function FacetBadges({
-  comment,
-  config,
-  compact,
-}: {
-  comment: Comment;
-  config: CommentConfig;
-  compact?: boolean;
-}) {
-  const facets = config.facets ?? [];
-  const chips = facets.flatMap((facet) => {
-    const value = comment.facets?.[facet.key];
-    const option = resolveFacetOption(facet, value);
-    if (!option) return [];
-    return [
-      <Badge
-        key={facet.key}
-        variant="soft"
-        tone={toneToBadgeTone(option.tone)}
-        size="xs"
-      >
-        {compact ? (option.short ?? option.label) : option.label}
-      </Badge>,
-    ];
-  });
-  return chips.length > 0 ? <>{chips}</> : null;
-}
-
-function ChecklistChips({
-  comment,
-  onChecklistToggle,
-}: {
-  comment: Comment;
-  onChecklistToggle?: (index: number) => void;
-}) {
-  if (!comment.checklist || comment.checklist.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {comment.checklist.map((item, i) => {
-        const done = /done|complete|resolved/i.test(item.status);
-        const active = /progress|doing/i.test(item.status);
-        return (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onChecklistToggle?.(i)}
-            disabled={!onChecklistToggle}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] transition-opacity",
-              onChecklistToggle && "cursor-pointer hover:opacity-80",
-              done
-                ? "bg-green-100 text-green-800 line-through dark:bg-green-500/20 dark:text-green-300"
-                : active
-                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300"
-                  : "bg-muted text-muted-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function RefChips({ comment }: { comment: Comment }) {
-  if (!comment.refs || comment.refs.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {comment.refs.map((group, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-        >
-          <span className="font-medium">{group.label}:</span>
-          <span className={group.mono ? "font-mono" : undefined}>
-            {group.items.join(", ")}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function statusMenuItems(
-  comment: Comment,
-  config: CommentConfig,
+function actionMenuItems(
   isReply: boolean,
   opts: {
-    onUpdateStatus?: (status: string) => void;
     onDelete?: () => void;
-    onCollapse?: () => void;
+    onToggleStatus?: () => void;
+    toggleStatusLabel?: "Resolve" | "Reopen";
+    onCopy?: () => void;
     onMaximize?: () => void;
-    completionStatus?: string;
   },
 ): DropdownMenuItem[] {
   const items: DropdownMenuItem[] = [];
+  if (opts.onDelete) {
+    items.push({ label: "Delete", icon: UiTrash, onSelect: opts.onDelete });
+  }
+  if (!isReply && opts.onToggleStatus && opts.toggleStatusLabel) {
+    items.push({
+      label: opts.toggleStatusLabel,
+      icon: opts.toggleStatusLabel === "Resolve" ? UiCheck : UiRestart,
+      onSelect: opts.onToggleStatus,
+    });
+  }
+  if (opts.onCopy) {
+    items.push({ label: "Copy", icon: UiCopy, onSelect: opts.onCopy });
+  }
   if (opts.onMaximize) {
     items.push({
-      label: "Maximize",
+      label: "Maximise",
       icon: UiFullscreen,
       onSelect: opts.onMaximize,
     });
   }
-  if (opts.onCollapse) {
-    items.push({ label: "Collapse", icon: UiClose, onSelect: opts.onCollapse });
-  }
-  if (!isReply && opts.onUpdateStatus) {
-    for (const status of config.statuses) {
-      if (status.value === opts.completionStatus) continue;
-      const current = status.value === comment.status;
-      items.push({
-        label: (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5",
-              current && "font-semibold",
-            )}
-          >
-            <StatusChip status={status.value} config={config} />
-            {status.label}
-          </span>
-        ),
-        onSelect: () => opts.onUpdateStatus?.(status.value),
-      });
-    }
-  }
-  if (opts.onDelete) {
-    items.push({ label: "Delete", icon: UiTrash, onSelect: opts.onDelete });
-  }
   return items;
-}
-
-function IconAction({
-  icon,
-  label,
-  onClick,
-  className,
-}: {
-  icon: StaticIconComponent;
-  label: string;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-        className,
-      )}
-    >
-      <Icon icon={icon} className="text-sm" />
-    </button>
-  );
 }
 
 function CommentBody({
@@ -281,38 +112,54 @@ function CommentBody({
   renderBody,
   onUpdateStatus,
   onDelete,
+  onCopy,
   onReply,
   onChecklistToggle,
-  onCollapse,
   onMaximize,
-}: CommentCardProps & { onCollapse?: () => void }) {
-  const [statusError, setStatusError] = useState("");
+}: CommentCardProps) {
+  const [actionError, setActionError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
   const completion = completionStatus(config);
-  const canComplete =
-    !isReply &&
-    onUpdateStatus != null &&
-    completion != null &&
-    isUnresolved(config, comment.status);
+  const reopen = reopenStatus(config);
+  const unresolved =
+    comment.status == null || isUnresolved(config, comment.status);
   const updateStatus = async (status: string) => {
-    setStatusError("");
+    setActionError("");
     try {
       await onUpdateStatus?.(status);
     } catch (error) {
-      setStatusError(
-        error instanceof Error ? error.message : "Unexpected error",
+      setActionError(
+        `Couldn't update comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
       );
     }
   };
-  const menuItems = statusMenuItems(comment, config, isReply, {
-    ...(onUpdateStatus
-      ? { onUpdateStatus: (status) => void updateStatus(status) }
-      : {}),
+  const copy = async () => {
+    setActionError("");
+    try {
+      await onCopy?.();
+    } catch (error) {
+      setActionError(
+        `Couldn't copy comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
+      );
+    }
+  };
+  const menuItems = actionMenuItems(isReply, {
     ...(onDelete ? { onDelete } : {}),
-    ...(onCollapse ? { onCollapse } : {}),
+    ...(!isReply && onUpdateStatus && completion && unresolved
+      ? {
+          onToggleStatus: () => void updateStatus(completion.value),
+          toggleStatusLabel: "Resolve" as const,
+        }
+      : {}),
+    ...(!isReply && onUpdateStatus && reopen && !unresolved
+      ? {
+          onToggleStatus: () => void updateStatus(reopen.value),
+          toggleStatusLabel: "Reopen" as const,
+        }
+      : {}),
+    ...(onCopy ? { onCopy: () => void copy() } : {}),
     ...(onMaximize ? { onMaximize } : {}),
-    ...(completion ? { completionStatus: completion.value } : {}),
   });
 
   return (
@@ -341,14 +188,6 @@ function CommentBody({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          {canComplete && (
-            <IconAction
-              icon={UiCheck}
-              label={completionActionLabel(completion)}
-              onClick={() => void updateStatus(completion.value)}
-              className="hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-500/20 dark:hover:text-green-300"
-            />
-          )}
           {menuItems.length > 0 && (
             <DropdownMenu
               align="right"
@@ -377,12 +216,12 @@ function CommentBody({
           )}
         </div>
       )}
-      {statusError && (
+      {actionError && (
         <div
           role="alert"
           className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
         >
-          Couldn't update comment: {statusError}
+          {actionError}
         </div>
       )}
       {!isReply && (
@@ -407,39 +246,43 @@ function CommentBody({
 
 /**
  * A single comment, collapsible between a compact one-line preview and a full
- * card. Offers a Maximize action when `onMaximize` is supplied — the owner
+ * card. Offers a Maximise action when `onMaximize` is supplied — the owner
  * enlarges the whole thread. Fully controlled — all mutations are delegated to
  * the supplied callbacks.
  */
 export function CommentCard(props: CommentCardProps) {
-  const { comment, config, compact, defaultExpanded, onMaximize } = props;
+  const { comment, config, compact, defaultExpanded } = props;
   const [expanded, setExpanded] = useState(defaultExpanded ?? false);
-  const [collapsedStatusError, setCollapsedStatusError] = useState("");
+  const [collapsedActionError, setCollapsedActionError] = useState("");
   const isReply = Boolean(comment.parentId);
-  const completion = completionStatus(config);
-  const canComplete =
-    !isReply &&
-    props.onUpdateStatus != null &&
-    completion != null &&
-    isUnresolved(config, comment.status);
-  const completeCollapsed = async () => {
-    if (!completion) return;
-    setCollapsedStatusError("");
+  const body = <CommentBody {...props} />;
+
+  async function updateCollapsedStatus() {
+    const completion = completionStatus(config);
+    const unresolved =
+      comment.status == null || isUnresolved(config, comment.status);
+    const next = unresolved ? completion : reopenStatus(config);
+    if (!next) return;
+    setCollapsedActionError("");
     try {
-      await props.onUpdateStatus?.(completion.value);
+      await props.onUpdateStatus?.(next.value);
     } catch (error) {
-      setCollapsedStatusError(
-        error instanceof Error ? error.message : "Unexpected error",
+      setCollapsedActionError(
+        `Couldn't update comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
       );
     }
-  };
+  }
 
-  const body = (
-    <CommentBody
-      {...props}
-      {...(expanded ? { onCollapse: () => setExpanded(false) } : {})}
-    />
-  );
+  async function copyCollapsed() {
+    setCollapsedActionError("");
+    try {
+      await props.onCopy?.();
+    } catch (error) {
+      setCollapsedActionError(
+        `Couldn't copy comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
+      );
+    }
+  }
 
   if (!expanded) {
     return (
@@ -482,20 +325,6 @@ export function CommentCard(props: CommentCardProps) {
                   ? "Negative rating"
                   : "Empty comment"}
           </span>
-          {canComplete && (
-            <span
-              role="presentation"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <IconAction
-                icon={UiCheck}
-                label={completionActionLabel(completion)}
-                onClick={() => void completeCollapsed()}
-                className="hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-500/20 dark:hover:text-green-300"
-              />
-            </span>
-          )}
           <span
             role="presentation"
             onClick={(e) => e.stopPropagation()}
@@ -513,27 +342,30 @@ export function CommentCard(props: CommentCardProps) {
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
               }
-              items={[
-                { label: "Expand", onSelect: () => setExpanded(true) },
-                ...(onMaximize
-                  ? [
-                      {
-                        label: "Maximize",
-                        icon: UiFullscreen,
-                        onSelect: onMaximize,
-                      },
-                    ]
-                  : []),
-              ]}
+              items={actionMenuItems(isReply, {
+                ...(props.onDelete ? { onDelete: props.onDelete } : {}),
+                ...(!isReply && props.onUpdateStatus && completionStatus(config)
+                  ? {
+                      onToggleStatus: () => void updateCollapsedStatus(),
+                      toggleStatusLabel:
+                        comment.status == null ||
+                        isUnresolved(config, comment.status)
+                          ? "Resolve"
+                          : "Reopen",
+                    }
+                  : {}),
+                ...(props.onCopy ? { onCopy: () => void copyCollapsed() } : {}),
+                ...(props.onMaximize ? { onMaximize: props.onMaximize } : {}),
+              })}
             />
           </span>
         </div>
-        {collapsedStatusError && (
+        {collapsedActionError && (
           <div
             role="alert"
             className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
           >
-            Couldn't update comment: {collapsedStatusError}
+            {collapsedActionError}
           </div>
         )}
       </>

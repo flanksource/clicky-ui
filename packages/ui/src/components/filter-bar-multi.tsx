@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FilterPill } from "../data/FilterPill";
-import { Icon, type LabelIconSpec } from "../data/Icon";
+import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiSearch } from "../icons";
 import { cn } from "../lib/utils";
 import { Combobox, type ComboboxOption } from "./Combobox";
@@ -168,6 +168,9 @@ function toComboboxOptions(options: MultiSelectOption[]): ComboboxOption[] {
       // the human-readable label — instead of the raw value.
       label: typeof option.label === "string" ? option.label : title,
       title,
+      ...(option.description !== undefined ? { description: option.description } : {}),
+      ...(option.selectedLabel !== undefined ? { selectedLabel: option.selectedLabel } : {}),
+      ...(option.icon !== undefined ? { icon: option.icon } : {}),
       ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
     };
   });
@@ -293,7 +296,19 @@ export function MultiFilterPanel({
             >
               <FilterPill
                 className="w-full justify-between"
-                label={option.label}
+                label={
+                  <span className="inline-flex min-w-0 items-start gap-1.5">
+                    <LabelIcon icon={option.icon} className="mt-0.5 shrink-0 text-sm text-muted-foreground" />
+                    <span className="min-w-0 text-left">
+                      <span className="block truncate">{option.label}</span>
+                      {option.description && (
+                        <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+                          {option.description}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                }
                 mode={mode}
                 title={title}
                 togglePosition="right"

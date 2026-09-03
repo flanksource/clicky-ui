@@ -27,6 +27,7 @@ export type CommentThreadProps = CommentCallbacks & {
   hideComposer?: boolean;
   renderRootMeta?: (comment: Comment) => ReactNode;
   renderBody?: (body: string) => ReactNode;
+  threadToMarkdown?: (thread: readonly Comment[]) => string;
 };
 
 /**
@@ -46,6 +47,7 @@ export function CommentThread({
   hideComposer = false,
   renderRootMeta,
   renderBody,
+  threadToMarkdown,
   onCreate,
   onReply,
   onUpdateStatus,
@@ -70,6 +72,7 @@ export function CommentThread({
         defaultExpanded={defaultExpanded}
         {...(renderRootMeta ? { renderRootMeta } : {})}
         {...(renderBody ? { renderBody } : {})}
+        {...(threadToMarkdown ? { threadToMarkdown } : {})}
         {...listHandlers}
       />
       {!hideComposer && onCreate && (
@@ -78,7 +81,9 @@ export function CommentThread({
             config={config}
             anchor={anchor ?? null}
             autoFocus={autoFocusComposer}
-            {...(composerPlaceholder ? { placeholder: composerPlaceholder } : {})}
+            {...(composerPlaceholder
+              ? { placeholder: composerPlaceholder }
+              : {})}
             onCreate={onCreate}
             {...(onMention ? { onMention } : {})}
           />

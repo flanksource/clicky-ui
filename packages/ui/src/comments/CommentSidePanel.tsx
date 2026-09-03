@@ -31,6 +31,8 @@ export type CommentSidePanelProps = {
   /** Position the focused thread beside its registered content anchor. */
   focusedAlignment?: "flow" | "anchor";
   className?: string;
+  /** Serialize one whole thread for Copy and its maximized Markdown tab. */
+  threadToMarkdown?: (thread: readonly Comment[]) => string;
 };
 
 function defaultAnchorLabel(anchor: CommentAnchor): string {
@@ -129,11 +131,13 @@ function AllComments({
   comments,
   label,
   emptyLabel,
+  threadToMarkdown,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
   label: (a: CommentAnchor) => string;
   emptyLabel: string;
+  threadToMarkdown?: (thread: readonly Comment[]) => string;
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
@@ -202,6 +206,7 @@ function AllComments({
             activateThread(event, c.anchor ?? DOCUMENT_ANCHOR),
         })}
         {...handlers}
+        {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
   );
@@ -213,12 +218,14 @@ function FocusedComments({
   anchor,
   label,
   compact,
+  threadToMarkdown,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
   anchor: CommentAnchor;
   label: string;
   compact?: boolean;
+  threadToMarkdown?: (thread: readonly Comment[]) => string;
 }) {
   const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
@@ -242,6 +249,7 @@ function FocusedComments({
           hasComments ? "Add another top-level comment…" : "Add a comment…"
         }
         {...ctx.callbacks}
+        {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
   );
@@ -303,8 +311,10 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
   const unresolved = selectUnresolvedThreads(ctx.comments, ctx.config);
   const visible = showResolved ? ctx.comments : unresolved;
   const total = getRoots(visible).length;
-  const resolvedCount = getRoots(ctx.comments).length - getRoots(unresolved).length;
-  if (ctx.railMode === "closed" && total === 0 && resolvedCount === 0) return null;
+  const resolvedCount =
+    getRoots(ctx.comments).length - getRoots(unresolved).length;
+  if (ctx.railMode === "closed" && total === 0 && resolvedCount === 0)
+    return null;
 
   return (
     <aside
@@ -357,7 +367,12 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           ctx={ctx}
           comments={visible}
           label={label}
-          emptyLabel={resolvedCount > 0 ? "No open comments." : "No comments yet."}
+          emptyLabel={
+            resolvedCount > 0 ? "No open comments." : "No comments yet."
+          }
+          {...(props.threadToMarkdown
+            ? { threadToMarkdown: props.threadToMarkdown }
+            : {})}
         />
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
         <div
@@ -372,6 +387,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             anchor={ctx.focusedAnchor}
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}
+            {...(props.threadToMarkdown
+              ? { threadToMarkdown: props.threadToMarkdown }
+              : {})}
           />
         </div>
       ) : null}

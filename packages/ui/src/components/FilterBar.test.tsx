@@ -1108,6 +1108,36 @@ describe("FilterBar", () => {
     vi.useRealTimers();
   });
 
+  it("renders multi-filter option icons and descriptions", () => {
+    render(
+      <FilterBar
+        filters={[
+          {
+            key: "status",
+            kind: "multi",
+            label: "Status",
+            value: {},
+            options: [
+              {
+                value: "01",
+                label: "Active",
+                description: "01",
+                selectedLabel: "Active (01)",
+                icon: <span data-testid="active-status-dot" />,
+              },
+            ],
+            onChange: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox", { name: "Status" }));
+
+    expect(screen.getByText("01")).toBeInTheDocument();
+    expect(screen.getByTestId("active-status-dot")).toBeInTheDocument();
+  });
+
   it("does not call onSearch for an empty query and filters the head client-side", () => {
     const onSearch = vi.fn();
     render(

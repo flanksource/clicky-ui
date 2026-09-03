@@ -14,7 +14,7 @@ import {
 } from "@floating-ui/react";
 import { Button } from "./button";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
+import { Icon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiChevronUp } from "../icons";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 
@@ -23,6 +23,12 @@ export type MultiSelectOption = {
   value: string;
   /** Visible option label in the menu and trigger summary. */
   label: ReactNode;
+  /** Secondary text rendered below the option label. */
+  description?: string;
+  /** Optional compact label used after the option is selected. */
+  selectedLabel?: string;
+  /** Leading glyph rendered with the option label. */
+  icon?: LabelIconSpec;
   /** Prevents selecting this option while still showing it in the menu. */
   disabled?: boolean;
   /** Optional browser tooltip for truncated or explanatory labels. */
