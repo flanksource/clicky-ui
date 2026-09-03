@@ -192,8 +192,12 @@ function errorReport(error: Error, componentStack: string | null) {
   ];
   if (error.name !== "Error") lines.push(`Type: ${error.name}`);
   if (error.cause !== undefined) lines.push(`Cause: ${String(error.cause)}`);
-  if (typeof window !== "undefined")
-    lines.push(`Page: ${window.location.href}`);
+  if (typeof window !== "undefined") {
+    // Origin and path only: an error report is pasted into issues and chats,
+    // and a query string or fragment routinely carries a session token, a
+    // signed URL or a search term the reporter did not mean to publish.
+    lines.push(`Page: ${window.location.origin}${window.location.pathname}`);
+  }
   if (typeof navigator !== "undefined" && navigator.userAgent) {
     lines.push(`User agent: ${navigator.userAgent}`);
   }

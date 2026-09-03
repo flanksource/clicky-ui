@@ -81,6 +81,42 @@ describe("ErrorWrapper", () => {
       ),
     );
   });
+
+  it("keeps the query string and fragment out of the copied report", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const original = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState(
+      {},
+      "",
+      "/accounts/42?access_token=sk-live-secret&q=invoice#billing",
+    );
+
+    try {
+      render(
+        <ErrorWrapper>
+          <BrokenPage />
+        </ErrorWrapper>,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Copy error report" }),
+      );
+      await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+
+      const report = writeText.mock.calls[0]?.[0];
+      expect(report).toEqual(
+        expect.stringContaining(`Page: ${window.location.origin}/accounts/42`),
+      );
+      expect(report).not.toEqual(expect.stringContaining("sk-live-secret"));
+      expect(report).not.toEqual(expect.stringContaining("#billing"));
+    } finally {
+      window.history.replaceState({}, "", original);
+    }
+  });
 });
 
 function liveRegion(fallback: HTMLElement): HTMLElement {
