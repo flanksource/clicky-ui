@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { render, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { Markdown } from "../Markdown";
 import {
   MARKDOWN_SYNTAX_DOCUMENT,
@@ -207,6 +207,13 @@ async function renderMarkdown(text: string) {
 }
 
 describe("markdown syntax reference", () => {
+  // <Markdown> loads Streamdown through a memoised dynamic import. Resolving it
+  // once here means no test body races that one-time module transform, which is
+  // what made these assertions time out under a fully parallel CI suite.
+  beforeAll(async () => {
+    await import("streamdown");
+  }, 60_000);
+
   it("names every section exactly once", () => {
     const ids = MARKDOWN_SYNTAX_SECTIONS.map((section) => section.id);
     expect(new Set(ids).size).toBe(ids.length);
