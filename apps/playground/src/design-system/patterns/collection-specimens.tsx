@@ -2,7 +2,9 @@ import { useState } from "react";
 import {
   AccordionList,
   Badge,
+  Button,
   DataTable,
+  Modal,
   Panel,
   StackedStatusBar,
   StatStrip,
@@ -12,7 +14,13 @@ import {
   cn,
   type DataTableColumn,
 } from "@flanksource/clicky-ui";
-import { UiActivity, UiRocket, UiWarningCircle } from "@flanksource/clicky-ui/icons";
+import {
+  UiActivity,
+  UiChevronDown,
+  UiChevronRight,
+  UiRocket,
+  UiWarningCircle,
+} from "@flanksource/clicky-ui/icons";
 
 import {
   SERVICES,
@@ -76,21 +84,98 @@ export function RowsSpecimen() {
 }
 
 export function CardsSpecimen() {
+  const groups = (["Healthy", "Warning", "Failed"] as const).map(
+    (status) =>
+      [status, SERVICES.slice(0, 6).filter((row) => row.status === status)] as const,
+  );
   return (
-    <div className="grid gap-density-3 sm:grid-cols-2 xl:grid-cols-3">
-      {SERVICES.slice(0, 6).map((row) => (
-        <article key={row.service} className="flex flex-col rounded-lg border border-border bg-card p-density-3">
-          <div className="flex items-center justify-between gap-density-2">
-            <span className="grid size-8 place-items-center rounded-lg bg-muted text-primary">
-              <UiActivity className="size-4" />
-            </span>
-            <StatusPill status={row.status} />
+    <div className="space-y-density-4">
+      <StatStrip
+        columns={4}
+        items={[
+          { label: "Services", value: SERVICES.length, sub: "3 states" },
+          { label: "Healthy", value: SERVICES.filter((row) => row.status === "Healthy").length, tone: "success" },
+          { label: "Warning", value: SERVICES.filter((row) => row.status === "Warning").length, tone: "warning" },
+          { label: "Failed", value: SERVICES.filter((row) => row.status === "Failed").length, tone: "danger" },
+        ]}
+      />
+      {groups.map(([status, rows]) => (
+        <section key={status} className="space-y-density-2">
+          <header className="flex items-center gap-density-2">
+            <StatusPill status={status as ServiceRow["status"]} />
+            <span className="text-xs text-muted-foreground">{rows.length} services</span>
+          </header>
+          <div className="grid gap-density-3 [grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
+            {rows.map((row) => (
+              <article key={row.service} className="flex min-h-36 flex-col rounded-lg border border-border bg-card p-density-3">
+                <span className="grid size-8 place-items-center rounded-lg bg-muted text-primary">
+                  <UiActivity className="size-4" />
+                </span>
+                <h4 className="mt-density-3 text-sm font-semibold text-foreground">{row.service}</h4>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{row.summary}</p>
+                <p className="mt-auto pt-density-3 text-[11px] text-muted-foreground">{row.owner} · {row.checked}</p>
+              </article>
+            ))}
           </div>
-          <h4 className="mt-density-3 text-sm font-semibold text-foreground">{row.service}</h4>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{row.summary}</p>
-          <p className="mt-density-3 text-[11px] text-muted-foreground">{row.owner} · {row.checked}</p>
-        </article>
+        </section>
       ))}
+    </div>
+  );
+}
+
+function ServiceDetail({ service }: { service: ServiceRow }) {
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-density-4 gap-y-density-2 text-sm">
+      <dt className="text-muted-foreground">Status</dt><dd><StatusPill status={service.status} /></dd>
+      <dt className="text-muted-foreground">Namespace</dt><dd>{service.namespace}</dd>
+      <dt className="text-muted-foreground">Owner</dt><dd>{service.owner}</dd>
+      <dt className="text-muted-foreground">Last checked</dt><dd>{service.checked}</dd>
+      <dt className="text-muted-foreground">Summary</dt><dd>{service.summary}</dd>
+    </dl>
+  );
+}
+
+export function MasterDialogSpecimen() {
+  const [selected, setSelected] = useState<ServiceRow>();
+  return (
+    <>
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+        {SERVICES.slice(0, 5).map((row) => (
+          <button key={row.service} type="button" onClick={() => setSelected(row)} className="flex w-full items-center gap-density-3 px-density-3 py-density-2 text-left hover:bg-muted/40">
+            <UiActivity className="size-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.service}</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">{row.namespace}</span>
+            <StatusPill status={row.status} />
+            <UiChevronRight className="size-4 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <Modal open onClose={() => setSelected(undefined)} title={selected.service} size="sm">
+          <ServiceDetail service={selected} />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+export function MasterRowDetailSpecimen() {
+  const [selected, setSelected] = useState(SERVICES[0]!.service);
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      {SERVICES.slice(0, 5).map((row) => {
+        const open = selected === row.service;
+        return (
+          <article key={row.service}>
+            <Button type="button" variant="ghost" onClick={() => setSelected(open ? "" : row.service)} className="h-auto w-full justify-start rounded-none px-density-3 py-density-2 text-left">
+              {open ? <UiChevronDown className="size-4" /> : <UiChevronRight className="size-4" />}
+              <span className="min-w-0 flex-1 truncate">{row.service}</span>
+              <StatusPill status={row.status} />
+            </Button>
+            {open && <div className="border-t border-border bg-muted/20 p-density-3"><ServiceDetail service={row} /></div>}
+          </article>
+        );
+      })}
     </div>
   );
 }

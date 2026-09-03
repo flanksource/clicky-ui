@@ -18,11 +18,7 @@ import {
   cn,
   useCommentContext,
 } from "@flanksource/clicky-ui";
-import {
-  UiCode2,
-  UiComment,
-  UiFileText,
-} from "@flanksource/clicky-ui/icons";
+import { UiCode2, UiComment, UiFileText } from "@flanksource/clicky-ui/icons";
 
 import { CommentOverlay } from "./comments/CommentOverlay";
 import { AnnotationVisibilityProvider } from "./annotations";
@@ -248,7 +244,8 @@ export function PlaygroundShell({
   const activeTitle = active ? pageTitle(active) : "";
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
-    view === "preview" && (ctx.railMode !== "closed" || ctx.comments.length > 0);
+    view === "preview" &&
+    (ctx.railMode !== "closed" || ctx.comments.length > 0);
   const editorOpen = editing && active !== undefined;
   const actionPage = pageAction?.page ?? active;
 
@@ -473,6 +470,7 @@ export function PlaygroundShell({
               anchorLabels={labels}
               formatAnchorLabel={shortAnchorLabel}
               compact
+              threadToMarkdown={feedback.threadToMarkdown}
             />
           </div>
         )}

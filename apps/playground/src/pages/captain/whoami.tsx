@@ -1,3 +1,11 @@
+import { useState } from "react";
+
+import { ReviewVariant } from "../../review/ReviewComponents";
+import {
+  CapabilityMatrix,
+  ProviderLanes,
+  ResolutionPath,
+} from "./_whoami/approaches";
 import { CapabilityTopology } from "./_whoami/topology";
 
 export const meta = {
@@ -8,6 +16,16 @@ export const meta = {
 };
 
 export default function WhoamiTopology() {
+  const [visible, setVisible] = useState(() =>
+    new Set(["topology", "matrix", "lanes", "resolution"]),
+  );
+  const discard = (id: string) =>
+    setVisible((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+
   return (
     <div className="space-y-density-6">
       <header className="max-w-4xl space-y-density-2">
@@ -30,7 +48,47 @@ export default function WhoamiTopology() {
         </p>
       </header>
 
-      <CapabilityTopology />
+      {visible.has("topology") && (
+        <ReviewVariant
+          id="whoami-topology"
+          title="A · Policy topology"
+          verdict="Best for editing inheritance. Provider, runtime, and model policy stay visible as one expandable hierarchy with a resolved-value inspector."
+          selected
+          onDiscard={() => discard("topology")}
+        >
+          <CapabilityTopology />
+        </ReviewVariant>
+      )}
+      {visible.has("matrix") && (
+        <ReviewVariant
+          id="whoami-matrix"
+          title="B · Capability matrix"
+          verdict="Best for fleet comparison. Providers are rows and runtime modes are stable columns, making missing or disabled adapters immediately obvious."
+          onDiscard={() => discard("matrix")}
+        >
+          <CapabilityMatrix />
+        </ReviewVariant>
+      )}
+      {visible.has("lanes") && (
+        <ReviewVariant
+          id="whoami-provider-lanes"
+          title="C · Provider lanes"
+          verdict="Best for ownership and setup. Each provider becomes a self-contained lane containing its authentication, runtime adapters, and representative models."
+          onDiscard={() => discard("lanes")}
+        >
+          <ProviderLanes />
+        </ReviewVariant>
+      )}
+      {visible.has("resolution") && (
+        <ReviewVariant
+          id="whoami-resolution-path"
+          title="D · Resolution path"
+          verdict="Best for explaining one choice. It traces a selected model through provider policy, runtime readiness, model policy, and the resulting Captain catalog entry."
+          onDiscard={() => discard("resolution")}
+        >
+          <ResolutionPath />
+        </ReviewVariant>
+      )}
     </div>
   );
 }

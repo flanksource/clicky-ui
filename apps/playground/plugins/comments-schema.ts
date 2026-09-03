@@ -94,7 +94,7 @@ const RATING: JsonProperty = {
 const ELEMENT: JsonProperty = {
   type: "object",
   description:
-    "React Grab context for the anchored element. Required when anchor identifies an element; omitted for page-level comments.",
+    "Captured component path, HTML, and screenshot result. Required for every new root, including page-level comments.",
   properties: {
     componentName: {
       type: "string",
@@ -106,10 +106,33 @@ const ELEMENT: JsonProperty = {
     },
     html: {
       type: "string",
-      description: "Raw outerHTML, capped at two kilobytes.",
+      description: "Raw outerHTML, capped at four kilobytes.",
+    },
+    screenshot: {
+      type: "object",
+      description:
+        'Screenshot attempt. Use status "captured" with a PNG dataUrl, or status "unavailable" with a reason.',
+      properties: {
+        status: {
+          type: "string",
+          description: "Whether the browser captured a PNG.",
+          enum: ["captured", "unavailable"],
+        },
+        dataUrl: {
+          type: "string",
+          description: "Base64 data:image/png URL when captured.",
+        },
+        reason: {
+          type: "string",
+          description: "Why capture was unavailable.",
+          enum: ["unsupported", "cancelled", "failed"],
+        },
+      },
+      required: ["status"],
+      additionalProperties: false,
     },
   },
-  required: ["source", "html"],
+  required: ["source", "html", "screenshot"],
   additionalProperties: false,
 };
 
@@ -118,7 +141,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "list_comments",
     label: "List comments",
     description:
-      "List playground feedback across every artifact page. New anchored roots carry the CSS path plus captured React component, source stack, and HTML context. Replies carry parentId and no status.",
+      "List playground feedback across every artifact page. New roots carry captured component/source, HTML, and screenshot context. Replies carry parentId and no status.",
     method: "GET",
     path: BASE,
     annotations: { readOnlyHint: true, idempotentHint: true },
@@ -148,7 +171,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "create_comment",
     label: "Create comment",
     description:
-      "Start a new comment thread or rating on a page. Supply body, rating, or both. Omit anchor for a page-level note; an anchored root also requires its React element context. The server assigns id and createdAt.",
+      "Start a new comment thread or rating on a page. Supply body, rating, or both, plus capture context for the element or whole page. The server assigns id and createdAt and persists captured PNG data separately.",
     method: "POST",
     path: BASE,
     annotations: {},
@@ -173,7 +196,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
           description: `${STATUS.description} Defaults to "open".`,
         },
       },
-      required: ["page", "author"],
+      required: ["page", "author", "element"],
       additionalProperties: false,
     },
   },

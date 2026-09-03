@@ -9,9 +9,13 @@ import {
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
 
-import type { CommentElementContext } from "../../plugins/comments-model";
+import type {
+  CommentElementCaptureContext,
+  CommentElementContext,
+} from "../../plugins/comments-model";
 import { resolveAnchor } from "./dom-anchor";
-import { captureElementContext } from "./element-context";
+import { captureElementContext, captureElementHtml } from "./element-context";
+import { captureScreenshot } from "./screenshot";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -148,22 +152,39 @@ export function useComments(
       mutate(
         async () => {
           const anchor = input.anchor ?? null;
-          let element: CommentElementContext | undefined;
-          if (anchor !== null && anchor !== DOCUMENT_ANCHOR) {
-            const content = contentRef.current;
-            if (!content) {
-              throw new Error(
-                "Playground content is not mounted for comment capture",
-              );
-            }
-            const target = resolveAnchor(content, anchor);
-            if (!target) {
-              throw new Error(
-                `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
-              );
-            }
-            element = await captureElementContext(target);
+          const content = contentRef.current;
+          if (!content) {
+            throw new Error(
+              "Playground content is not mounted for comment capture",
+            );
           }
+          const target =
+            anchor === null || anchor === DOCUMENT_ANCHOR
+              ? content
+              : resolveAnchor(content, anchor);
+          if (!target) {
+            throw new Error(
+              `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
+            );
+          }
+
+          // Start capture while the submit click still supplies browser activation.
+          const screenshot = captureScreenshot(target);
+          const context =
+            anchor === null || anchor === DOCUMENT_ANCHOR
+              ? Promise.resolve({
+                  source: `apps/playground/src/pages/${page}.tsx`,
+                  html: captureElementHtml(target),
+                })
+              : captureElementContext(target);
+          const [capturedContext, capturedScreenshot] = await Promise.all([
+            context,
+            screenshot,
+          ]);
+          const element: CommentElementCaptureContext = {
+            ...capturedContext,
+            screenshot: capturedScreenshot,
+          };
 
           await post(COMMENTS_ROUTE, {
             page,
@@ -172,7 +193,7 @@ export function useComments(
             status: DEFAULT_STATUS,
             anchor,
             ...(input.rating ? { rating: input.rating } : {}),
-            ...(element ? { element } : {}),
+            element,
           });
         },
         { rethrow: true },

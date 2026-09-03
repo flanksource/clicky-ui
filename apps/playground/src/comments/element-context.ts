@@ -31,7 +31,7 @@ function resolveStack(
   });
 }
 
-function captureHtml(element: Element): string {
+export function captureElementHtml(element: Element): string {
   if (element.outerHTML.length <= COMMENT_ELEMENT_HTML_LIMIT) {
     return element.outerHTML;
   }
@@ -62,6 +62,6 @@ export async function captureElementContext(
   return {
     ...(componentName ? { componentName } : {}),
     source,
-    html: captureHtml(element),
+    html: captureElementHtml(element),
   };
 }

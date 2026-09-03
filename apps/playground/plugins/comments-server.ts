@@ -3,6 +3,14 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 import { COMMENT_TOOLS } from "./comments-schema";
+import type { CommentElementContext } from "./comments-model";
+import {
+  assertScreenshotCapture,
+  discardScreenshot,
+  persistScreenshot,
+  serveScreenshot,
+  stageScreenshotRemoval,
+} from "./comments-screenshots";
 import {
   RESOLVED_STATUS,
   addComment,
@@ -24,6 +32,7 @@ export const COMMENTS_ROUTE = "/__playground/comments";
 export type CommentRoute =
   | "list"
   | "schema"
+  | "screenshot"
   | "create"
   | "reply"
   | "resolve"
@@ -64,6 +73,9 @@ export function matchRoute(
     if (second === "replies") return { route: "reply", id: first };
     if (second === "resolve") return { route: "resolve", id: first };
   }
+  if (segments.length === 2 && first === "screenshots" && method === "GET") {
+    return { route: "screenshot", id: second ?? "" };
+  }
   return undefined;
 }
 
@@ -71,7 +83,16 @@ async function readJsonBody(
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let bytes = 0;
+  const limit = 48 * 1024 * 1024;
+  for await (const chunk of req) {
+    const buffer = chunk as Buffer;
+    bytes += buffer.byteLength;
+    if (bytes > limit) {
+      throw new Error(`request body exceeds the ${limit}-byte limit`);
+    }
+    chunks.push(buffer);
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (raw === "") return {};
 
@@ -147,6 +168,31 @@ function draft(body: Record<string, unknown>, text: string): StoredComment {
   };
 }
 
+function persistElementContext(
+  dir: string,
+  id: string,
+  input: unknown,
+): CommentElementContext {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("every root comment requires element context");
+  }
+  const candidate = input as Record<string, unknown>;
+  if (candidate["screenshot"] === undefined) {
+    throw new Error("every root comment requires a screenshot capture result");
+  }
+  const screenshot = persistScreenshot(
+    dir,
+    id,
+    assertScreenshotCapture(candidate["screenshot"]),
+  );
+  try {
+    return assertElementContext({ ...candidate, screenshot });
+  } catch (cause) {
+    discardScreenshot(dir, id, screenshot);
+    throw cause;
+  }
+}
+
 function handle(
   dir: string,
   req: IncomingMessage,
@@ -162,6 +208,12 @@ function handle(
   const { route, id } = matched;
 
   switch (route) {
+    case "screenshot":
+      if (!serveScreenshot(dir, url.pathname, res)) {
+        return sendJson(res, 404, { error: `screenshot "${id}" not found` });
+      }
+      return;
+
     case "list":
       return sendJson(res, 200, {
         comments: listComments(dir, parseCommentFilter(url.searchParams)),
@@ -175,21 +227,23 @@ function handle(
         const anchor = optionalText(body, "anchor");
         const rating = optionalText(body, "rating");
         const status = optionalText(body, "status");
-        const element = body["element"];
-        sendJson(
-          res,
-          201,
-          addComment(dir, assertPage(body["page"]), {
-            ...draft(body, optionalText(body, "body") ?? ""),
-            status: status ?? "open",
-            parentId: null,
-            anchor: anchor ?? null,
-            ...(rating === undefined ? {} : { rating: assertRating(rating) }),
-            ...(element === undefined
-              ? {}
-              : { element: assertElementContext(element) }),
-          }),
-        );
+        const comment = draft(body, optionalText(body, "body") ?? "");
+        const element = persistElementContext(dir, comment.id, body["element"]);
+        const stored: StoredComment = {
+          ...comment,
+          status: status ?? "open",
+          parentId: null,
+          anchor: anchor ?? null,
+          ...(rating === undefined ? {} : { rating: assertRating(rating) }),
+          element,
+        };
+        try {
+          sendJson(res, 201, addComment(dir, assertPage(body["page"]), stored));
+        } catch (cause) {
+          const removal = stageScreenshotRemoval(dir, [stored]);
+          removal.commit();
+          throw cause;
+        }
       });
 
     case "reply":
