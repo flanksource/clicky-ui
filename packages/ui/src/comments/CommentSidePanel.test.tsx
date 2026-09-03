@@ -6,7 +6,14 @@ import { strictAnchorResolver, useCommentContext } from "./comment-context";
 import type { Comment } from "./comment-types";
 
 const config = {
-  statuses: [{ value: "open", label: "Open", unresolved: true }],
+  statuses: [
+    {
+      value: "open",
+      label: "Open",
+      unresolved: true,
+      stage: "active" as const,
+    },
+  ],
 };
 
 const comments: Comment[] = [
@@ -237,11 +244,25 @@ describe("CommentSidePanel anchor navigation", () => {
     expect(screen.getByText("Review this amount")).toBeVisible();
   });
 
-  it("hides resolved threads until the resolved toggle is used", () => {
+  it("shows open, resolved, and closed threads as separate stages", () => {
     const statusConfig = {
       statuses: [
-        { value: "open", label: "Open", unresolved: true },
-        { value: "resolved", label: "Resolved" },
+        {
+          value: "open",
+          label: "Open",
+          unresolved: true,
+          stage: "active" as const,
+        },
+        {
+          value: "resolved",
+          label: "Resolved",
+          stage: "resolved" as const,
+        },
+        {
+          value: "closed",
+          label: "Closed",
+          stage: "closed" as const,
+        },
       ],
     };
     const mixed: Comment[] = [
@@ -261,6 +282,14 @@ describe("CommentSidePanel anchor navigation", () => {
         status: "resolved",
         author: { name: "Bo" },
       },
+      {
+        id: "c-closed",
+        body: "Human approved",
+        createdAt: "2026-01-03T00:00:00.000Z",
+        anchor: "cell-1",
+        status: "closed",
+        author: { name: "Cy" },
+      },
     ];
     render(
       <CommentProvider
@@ -276,10 +305,16 @@ describe("CommentSidePanel anchor navigation", () => {
 
     expect(screen.getByText("Still open")).toBeVisible();
     expect(screen.queryByText("Already resolved")).not.toBeInTheDocument();
+    expect(screen.queryByText("Human approved")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Resolved (1)" }));
     expect(screen.getByText("Already resolved")).toBeVisible();
-    expect(screen.getByText("Still open")).toBeVisible();
+    expect(screen.queryByText("Still open")).not.toBeInTheDocument();
+    expect(screen.queryByText("Human approved")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Closed (1)" }));
+    expect(screen.getByText("Human approved")).toBeVisible();
+    expect(screen.queryByText("Already resolved")).not.toBeInTheDocument();
   });
 
   it("pins the rail header outside the anchor-offset box", () => {
@@ -299,9 +334,11 @@ describe("CommentSidePanel anchor navigation", () => {
 
     const header = screen.getByTestId("comment-rail-header");
     expect(header).toHaveClass("sticky");
-    expect(
-      screen.getByTestId("comment-focused-rail").contains(header),
-    ).toBe(false);
-    expect(screen.getByTestId("comment-side-panel").contains(header)).toBe(true);
+    expect(screen.getByTestId("comment-focused-rail").contains(header)).toBe(
+      false,
+    );
+    expect(screen.getByTestId("comment-side-panel").contains(header)).toBe(
+      true,
+    );
   });
 });

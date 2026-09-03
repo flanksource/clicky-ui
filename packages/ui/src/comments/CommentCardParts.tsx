@@ -1,7 +1,11 @@
 import { Badge } from "../data/Badge";
 import { cn } from "../lib/utils";
 import { UiThumbsDown, UiThumbsUp } from "../icons";
-import { resolveFacetOption, toneToBadgeTone } from "./comment-utils";
+import {
+  resolveFacetOption,
+  resolveStatusConfig,
+  toneToBadgeTone,
+} from "./comment-utils";
 import type { Comment, CommentConfig, CommentRating } from "./comment-types";
 
 export function RatingChip({ rating }: { rating: CommentRating | undefined }) {
@@ -15,6 +19,31 @@ export function RatingChip({ rating }: { rating: CommentRating | undefined }) {
       icon={positive ? UiThumbsUp : UiThumbsDown}
     >
       {positive ? "Positive rating" : "Negative rating"}
+    </Badge>
+  );
+}
+
+export function StatusChip({
+  comment,
+  config,
+}: {
+  comment: Comment;
+  config: CommentConfig;
+}) {
+  const status = resolveStatusConfig(config, comment.status);
+  if (!status) return null;
+  const closedBy = status.stage === "closed" ? comment.closedBy : undefined;
+  return (
+    <Badge
+      variant="soft"
+      tone={toneToBadgeTone(status.tone)}
+      size="xs"
+      {...(status.icon ? { icon: status.icon } : {})}
+      {...(comment.closedAt
+        ? { title: new Date(comment.closedAt).toLocaleString() }
+        : {})}
+    >
+      {closedBy ? `Closed by ${closedBy.name}` : status.label}
     </Badge>
   );
 }

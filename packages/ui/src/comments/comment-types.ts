@@ -10,6 +10,9 @@ export type CommentTone =
   | "danger"
   | "neutral";
 
+/** Product lifecycle stage represented by one or more stored statuses. */
+export type CommentStatusStage = "active" | "resolved" | "closed";
+
 /** A single selectable status (e.g. "open", "resolved"). Consumer-defined. */
 export type CommentStatusConfig = {
   /** Stable value stored on a comment's `status`. */
@@ -20,6 +23,8 @@ export type CommentStatusConfig = {
   tone?: CommentTone;
   /** Optional leading glyph. */
   icon?: string | StaticIconComponent;
+  /** Lifecycle stage used by review queues and status actions. */
+  stage?: CommentStatusStage;
   /**
    * Whether this status counts as "unresolved/open" — drives progress tallies
    * and which groups start expanded. Defaults to false.
@@ -122,6 +127,10 @@ export type Comment = {
   anchor?: CommentAnchor | null;
   /** Optional positive/negative review signal; roots only. */
   rating?: CommentRating;
+  /** ISO-8601 time when a human closed the resolved comment. */
+  closedAt?: string;
+  /** Human who closed the comment. */
+  closedBy?: CommentAuthor;
   /** facet.key → selected option value. */
   facets?: Record<string, string>;
   refs?: CommentRefGroup[];
@@ -153,6 +162,8 @@ export type CommentCallbacks = {
   onCreate?: (input: CommentCreateInput) => void | Promise<void>;
   onReply?: (input: CommentReplyInput) => void | Promise<void>;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
+  /** Human-only transition from resolved to closed. */
+  onClose?: (id: string) => void | Promise<void>;
   onUpdateRating?: (id: string, rating: CommentRating) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
   onChecklistToggle?: (
@@ -199,17 +210,29 @@ export type CommentRenderOptions = {
   renderBody?: (body: string) => ReactNode;
 };
 
-/** A domain-free default status set: open / in progress / resolved. */
+/** A domain-free default status set: open / in progress / resolved / closed. */
 export const DEFAULT_COMMENT_STATUSES: CommentStatusConfig[] = [
-  { value: "open", label: "Open", tone: "info", unresolved: true },
+  {
+    value: "open",
+    label: "Open",
+    tone: "info",
+    unresolved: true,
+    stage: "active",
+  },
   {
     value: "in_progress",
     label: "In progress",
     tone: "warning",
     unresolved: true,
+    stage: "active",
   },
-  { value: "resolved", label: "Resolved", tone: "success" },
-  { value: "closed", label: "Closed", tone: "neutral" },
+  {
+    value: "resolved",
+    label: "Resolved",
+    tone: "success",
+    stage: "resolved",
+  },
+  { value: "closed", label: "Closed", tone: "neutral", stage: "closed" },
 ];
 
 /** Default checklist status cycle used when a consumer omits one. */

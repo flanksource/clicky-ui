@@ -11,8 +11,9 @@ import {
 import {
   buildThreadListHandlers,
   getRoots,
+  resolveCommentStage,
   selectAnchorThreads,
-  selectUnresolvedThreads,
+  selectCommentThreadsByStage,
   sortReplies,
   buildReplyMap,
 } from "./comment-utils";
@@ -20,6 +21,7 @@ import {
   DOCUMENT_ANCHOR,
   type Comment,
   type CommentAnchor,
+  type CommentStatusStage,
 } from "./comment-types";
 
 export type CommentSidePanelProps = {
@@ -266,7 +268,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
   const railRef = useRef<HTMLElement>(null);
   const focusedRef = useRef<HTMLDivElement>(null);
   const [focusedOffset, setFocusedOffset] = useState<number | null>(null);
-  const [showResolved, setShowResolved] = useState(false);
+  const [stage, setStage] = useState<CommentStatusStage>("active");
   const focusedAnchor = ctx?.railMode === "focused" ? ctx.focusedAnchor : null;
 
   useEffect(() => {
@@ -308,13 +310,25 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
   if (!ctx) return null;
 
   // Threads, not cards: a reply is part of its root, never a separate entry.
-  const unresolved = selectUnresolvedThreads(ctx.comments, ctx.config);
-  const visible = showResolved ? ctx.comments : unresolved;
-  const total = getRoots(visible).length;
-  const resolvedCount =
-    getRoots(ctx.comments).length - getRoots(unresolved).length;
-  if (ctx.railMode === "closed" && total === 0 && resolvedCount === 0)
+  const counts = getRoots(ctx.comments).reduce(
+    (result, root) => {
+      const rootStage = resolveCommentStage(ctx.config, root.status);
+      if (rootStage) result[rootStage] += 1;
+      return result;
+    },
+    { active: 0, resolved: 0, closed: 0 },
+  );
+  const visible = selectCommentThreadsByStage(ctx.comments, ctx.config, stage);
+  if (
+    ctx.railMode === "closed" &&
+    counts.active + counts.resolved + counts.closed === 0
+  )
     return null;
+
+  function selectStage(next: CommentStatusStage) {
+    setStage(next);
+    if (ctx?.railMode !== "all") ctx?.openCommentList();
+  }
 
   return (
     <aside
@@ -326,30 +340,47 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
         data-testid="comment-rail-header"
         className="sticky top-0 z-20 flex items-center gap-2 bg-background py-2"
       >
-        {(total > 0 || ctx.railMode === "all") && (
+        {(counts.active > 0 || ctx.railMode === "all") && (
           <RailToggle
-            active={ctx.railMode === "all"}
-            onClick={ctx.openCommentList}
+            active={ctx.railMode === "all" && stage === "active"}
+            onClick={() => selectStage("active")}
             testId="comment-open-all"
           >
             {ctx.railMode === "closed"
-              ? `Open comments (${total})`
-              : `All comments (${total})`}
+              ? `Open comments (${counts.active})`
+              : ctx.railMode === "focused"
+                ? `All comments (${counts.active})`
+                : `Open (${counts.active})`}
           </RailToggle>
         )}
-        {resolvedCount > 0 && (
+        {counts.resolved > 0 && (
           <button
             type="button"
-            aria-pressed={showResolved}
-            onClick={() => setShowResolved((shown) => !shown)}
+            aria-pressed={ctx.railMode === "all" && stage === "resolved"}
+            onClick={() => selectStage("resolved")}
             className={cn(
               "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
-              showResolved
+              ctx.railMode === "all" && stage === "resolved"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-muted-foreground hover:text-foreground",
             )}
           >
-            Resolved ({resolvedCount})
+            Resolved ({counts.resolved})
+          </button>
+        )}
+        {counts.closed > 0 && (
+          <button
+            type="button"
+            aria-pressed={ctx.railMode === "all" && stage === "closed"}
+            onClick={() => selectStage("closed")}
+            className={cn(
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              ctx.railMode === "all" && stage === "closed"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Closed ({counts.closed})
           </button>
         )}
         {ctx.railMode !== "closed" && (
@@ -368,7 +399,11 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           comments={visible}
           label={label}
           emptyLabel={
-            resolvedCount > 0 ? "No open comments." : "No comments yet."
+            stage === "active"
+              ? "No open comments."
+              : stage === "resolved"
+                ? "No resolved comments."
+                : "No closed comments."
           }
           {...(props.threadToMarkdown
             ? { threadToMarkdown: props.threadToMarkdown }
@@ -383,7 +418,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
         >
           <FocusedComments
             ctx={ctx}
-            comments={visible}
+            comments={ctx.comments}
             anchor={ctx.focusedAnchor}
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}

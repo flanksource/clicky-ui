@@ -11,6 +11,7 @@ import {
   UiCopy,
   UiDotsVertical,
   UiFullscreen,
+  UiLock,
   UiRestart,
   UiTrash,
 } from "../icons";
@@ -20,30 +21,16 @@ import {
   FacetBadges,
   RatingChip,
   RefChips,
+  StatusChip,
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
 import {
   authorDisplayName,
-  isUnresolved,
+  resolveCommentStage,
+  statusForCommentStage,
   truncatePlain,
 } from "./comment-utils";
 import type { Comment, CommentConfig } from "./comment-types";
-
-function completionStatus(config: CommentConfig) {
-  for (const completionName of ["resolved", "closed"]) {
-    const status = config.statuses.find(
-      (candidate) =>
-        candidate.value.toLowerCase() === completionName ||
-        candidate.label.toLowerCase() === completionName,
-    );
-    if (status) return status;
-  }
-  return undefined;
-}
-
-function reopenStatus(config: CommentConfig) {
-  return config.statuses.find((status) => status.unresolved);
-}
 
 export type CommentCardProps = {
   comment: Comment;
@@ -56,6 +43,8 @@ export type CommentCardProps = {
   renderBody?: (body: string) => ReactNode;
   /** Change this comment's status (roots only). */
   onUpdateStatus?: (status: string) => void | Promise<void>;
+  /** Close a resolved root comment. */
+  onClose?: () => void | Promise<void>;
   /** Delete this comment. */
   onDelete?: () => void;
   /** Copy this comment's whole thread in the caller's canonical format. */
@@ -76,8 +65,7 @@ function actionMenuItems(
   isReply: boolean,
   opts: {
     onDelete?: () => void;
-    onToggleStatus?: () => void;
-    toggleStatusLabel?: "Resolve" | "Reopen";
+    statusActions?: DropdownMenuItem[];
     onCopy?: () => void;
     onMaximize?: () => void;
   },
@@ -86,13 +74,7 @@ function actionMenuItems(
   if (opts.onDelete) {
     items.push({ label: "Delete", icon: UiTrash, onSelect: opts.onDelete });
   }
-  if (!isReply && opts.onToggleStatus && opts.toggleStatusLabel) {
-    items.push({
-      label: opts.toggleStatusLabel,
-      icon: opts.toggleStatusLabel === "Resolve" ? UiCheck : UiRestart,
-      onSelect: opts.onToggleStatus,
-    });
-  }
+  if (!isReply) items.push(...(opts.statusActions ?? []));
   if (opts.onCopy) {
     items.push({ label: "Copy", icon: UiCopy, onSelect: opts.onCopy });
   }
@@ -111,6 +93,7 @@ function CommentBody({
   config,
   renderBody,
   onUpdateStatus,
+  onClose,
   onDelete,
   onCopy,
   onReply,
@@ -120,10 +103,10 @@ function CommentBody({
   const [actionError, setActionError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
-  const completion = completionStatus(config);
-  const reopen = reopenStatus(config);
-  const unresolved =
-    comment.status == null || isUnresolved(config, comment.status);
+  const resolved = statusForCommentStage(config, "resolved");
+  const active = statusForCommentStage(config, "active");
+  const closed = statusForCommentStage(config, "closed");
+  const stage = resolveCommentStage(config, comment.status);
   const updateStatus = async (status: string) => {
     setActionError("");
     try {
@@ -131,6 +114,16 @@ function CommentBody({
     } catch (error) {
       setActionError(
         `Couldn't update comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
+      );
+    }
+  };
+  const close = async () => {
+    setActionError("");
+    try {
+      await onClose?.();
+    } catch (error) {
+      setActionError(
+        `Couldn't close comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
       );
     }
   };
@@ -146,18 +139,37 @@ function CommentBody({
   };
   const menuItems = actionMenuItems(isReply, {
     ...(onDelete ? { onDelete } : {}),
-    ...(!isReply && onUpdateStatus && completion && unresolved
-      ? {
-          onToggleStatus: () => void updateStatus(completion.value),
-          toggleStatusLabel: "Resolve" as const,
-        }
-      : {}),
-    ...(!isReply && onUpdateStatus && reopen && !unresolved
-      ? {
-          onToggleStatus: () => void updateStatus(reopen.value),
-          toggleStatusLabel: "Reopen" as const,
-        }
-      : {}),
+    statusActions: [
+      ...(stage === "active" && onUpdateStatus && resolved
+        ? [
+            {
+              label: "Resolve",
+              icon: UiCheck,
+              onSelect: () => void updateStatus(resolved.value),
+            },
+          ]
+        : []),
+      ...(stage === "resolved" && onClose && closed
+        ? [
+            {
+              label: "Close",
+              icon: UiLock,
+              onSelect: () => void close(),
+            },
+          ]
+        : []),
+      ...((stage === "resolved" || stage === "closed") &&
+      onUpdateStatus &&
+      active
+        ? [
+            {
+              label: "Reopen",
+              icon: UiRestart,
+              onSelect: () => void updateStatus(active.value),
+            },
+          ]
+        : []),
+    ],
     ...(onCopy ? { onCopy: () => void copy() } : {}),
     ...(onMaximize ? { onMaximize } : {}),
   });
@@ -182,6 +194,7 @@ function CommentBody({
           </div>
           {!isReply && (
             <div className="mt-1 flex flex-wrap gap-1">
+              <StatusChip comment={comment} config={config} />
               <RatingChip rating={comment.rating} />
               <FacetBadges comment={comment} config={config} />
             </div>
@@ -257,18 +270,21 @@ export function CommentCard(props: CommentCardProps) {
   const isReply = Boolean(comment.parentId);
   const body = <CommentBody {...props} />;
 
-  async function updateCollapsedStatus() {
-    const completion = completionStatus(config);
-    const unresolved =
-      comment.status == null || isUnresolved(config, comment.status);
-    const next = unresolved ? completion : reopenStatus(config);
-    if (!next) return;
+  async function runCollapsedAction(action: "resolve" | "close" | "reopen") {
     setCollapsedActionError("");
     try {
-      await props.onUpdateStatus?.(next.value);
+      if (action === "close") {
+        await props.onClose?.();
+        return;
+      }
+      const next = statusForCommentStage(
+        config,
+        action === "resolve" ? "resolved" : "active",
+      );
+      if (next) await props.onUpdateStatus?.(next.value);
     } catch (error) {
       setCollapsedActionError(
-        `Couldn't update comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
+        `${action === "close" ? "Couldn't close comment" : "Couldn't update comment"}: ${error instanceof Error ? error.message : "Unexpected error"}`,
       );
     }
   }
@@ -312,6 +328,7 @@ export function CommentCard(props: CommentCardProps) {
           </span>
           {!isReply && (
             <>
+              <StatusChip comment={comment} config={config} />
               <RatingChip rating={comment.rating} />
               <FacetBadges comment={comment} config={config} compact />
             </>
@@ -344,16 +361,45 @@ export function CommentCard(props: CommentCardProps) {
               }
               items={actionMenuItems(isReply, {
                 ...(props.onDelete ? { onDelete: props.onDelete } : {}),
-                ...(!isReply && props.onUpdateStatus && completionStatus(config)
-                  ? {
-                      onToggleStatus: () => void updateCollapsedStatus(),
-                      toggleStatusLabel:
-                        comment.status == null ||
-                        isUnresolved(config, comment.status)
-                          ? "Resolve"
-                          : "Reopen",
-                    }
-                  : {}),
+                statusActions: [
+                  ...(resolveCommentStage(config, comment.status) ===
+                    "active" &&
+                  props.onUpdateStatus &&
+                  statusForCommentStage(config, "resolved")
+                    ? [
+                        {
+                          label: "Resolve",
+                          icon: UiCheck,
+                          onSelect: () => void runCollapsedAction("resolve"),
+                        },
+                      ]
+                    : []),
+                  ...(resolveCommentStage(config, comment.status) ===
+                    "resolved" &&
+                  props.onClose &&
+                  statusForCommentStage(config, "closed")
+                    ? [
+                        {
+                          label: "Close",
+                          icon: UiLock,
+                          onSelect: () => void runCollapsedAction("close"),
+                        },
+                      ]
+                    : []),
+                  ...((resolveCommentStage(config, comment.status) ===
+                    "resolved" ||
+                    resolveCommentStage(config, comment.status) === "closed") &&
+                  props.onUpdateStatus &&
+                  statusForCommentStage(config, "active")
+                    ? [
+                        {
+                          label: "Reopen",
+                          icon: UiRestart,
+                          onSelect: () => void runCollapsedAction("reopen"),
+                        },
+                      ]
+                    : []),
+                ],
                 ...(props.onCopy ? { onCopy: () => void copyCollapsed() } : {}),
                 ...(props.onMaximize ? { onMaximize: props.onMaximize } : {}),
               })}

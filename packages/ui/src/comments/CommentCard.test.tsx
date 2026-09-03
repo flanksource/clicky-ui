@@ -58,6 +58,51 @@ describe("CommentCard", () => {
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
   });
 
+  it("offers a human close action only for a resolved root", () => {
+    const onClose = vi.fn();
+    const onUpdateStatus = vi.fn();
+    render(
+      <CommentCard
+        comment={{ ...root, status: "resolved" }}
+        config={config}
+        defaultExpanded
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    expect(screen.getByText("Resolved")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Close", "Reopen"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it("renders human closure attribution and never offers close twice", () => {
+    render(
+      <CommentCard
+        comment={{
+          ...root,
+          status: "closed",
+          closedAt: "2026-01-02T00:00:00.000Z",
+          closedBy: { name: "Bo", kind: "user" },
+        }}
+        config={config}
+        defaultExpanded
+        onClose={vi.fn()}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Closed by Bo")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Close" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Reopen" })).toBeVisible();
+  });
+
   it("resolves an open root from the collapsed actions menu without expanding", () => {
     const onUpdateStatus = vi.fn();
     render(
@@ -85,8 +130,13 @@ describe("CommentCard", () => {
         comment={root}
         config={{
           statuses: [
-            { value: "open", label: "Open", unresolved: true },
-            { value: "closed", label: "Closed" },
+            {
+              value: "open",
+              label: "Open",
+              unresolved: true,
+              stage: "active",
+            },
+            { value: "closed", label: "Closed", stage: "resolved" },
           ],
         }}
         onUpdateStatus={onUpdateStatus}
