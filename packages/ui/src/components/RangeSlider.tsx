@@ -92,6 +92,7 @@ export function RangeSlider({
             min={min}
             max={upper}
             step={step}
+            stepBase={min}
             value={lower}
             onChange={(next) => onChange([next, upper])}
           />
@@ -101,6 +102,7 @@ export function RangeSlider({
             min={lower}
             max={max}
             step={step}
+            stepBase={min}
             value={upper}
             onChange={(next) => onChange([lower, next])}
           />
@@ -116,6 +118,7 @@ function EditableBound({
   min,
   max,
   step,
+  stepBase,
   value,
   onChange,
 }: {
@@ -124,6 +127,8 @@ function EditableBound({
   min: number;
   max: number;
   step: number;
+  /** Origin the `step` grid is measured from — the slider's own `min`. */
+  stepBase: number;
   value: number;
   onChange: (value: number) => void;
 }) {
@@ -142,7 +147,7 @@ function EditableBound({
           if (event.currentTarget.value === "") return;
           const next = Number(event.currentTarget.value);
           if (!Number.isFinite(next)) throw new Error(`${ariaLabel} must be a finite number`);
-          onChange(clampNumber(next, min, max));
+          onChange(snapToStep(next, { base: stepBase, step, min, max }));
         }}
       />
     </label>
@@ -160,6 +165,26 @@ function normalizeRangeValue(value: RangeSliderValue, min: number, max: number):
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Nearest `step`-aligned value measured from `base`, kept inside `[min, max]`.
+ * Mirrors what the range inputs enforce, so typed entry cannot produce a value
+ * the thumbs could never reach.
+ */
+function snapToStep(
+  value: number,
+  { base, step, min, max }: { base: number; step: number; min: number; max: number },
+): number {
+  if (!(step > 0)) return clampNumber(value, min, max);
+  const aligned = base + Math.round((value - base) / step) * step;
+  if (aligned < min) {
+    return clampNumber(base + Math.ceil((min - base) / step) * step, min, max);
+  }
+  if (aligned > max) {
+    return clampNumber(base + Math.floor((max - base) / step) * step, min, max);
+  }
+  return aligned;
 }
 
 function valueToPercent(value: number, min: number, max: number) {

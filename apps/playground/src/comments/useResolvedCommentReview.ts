@@ -49,23 +49,26 @@ export function useResolvedCommentReview(options: {
     queue,
   ]);
 
+  const { setHighlightAnchor, scrollToAnchor, contentRef } = options.context;
+
   useEffect(() => {
     if (!options.active || !item) return;
     const anchor = item.anchor ?? DOCUMENT_ANCHOR;
-    options.context.setHighlightAnchor(anchor);
+    setHighlightAnchor(anchor);
     if (anchor === DOCUMENT_ANCHOR) {
-      options.context.contentRef.current?.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
+      contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      options.context.scrollToAnchor(anchor, {
-        behavior: "smooth",
-        block: "center",
-      });
+      scrollToAnchor(anchor, { behavior: "smooth", block: "center" });
     }
-    return () => options.context.setHighlightAnchor(null);
-  }, [item, options.active, options.context, options.pinsVersion]);
+    return () => setHighlightAnchor(null);
+  }, [
+    contentRef,
+    item,
+    options.active,
+    options.pinsVersion,
+    scrollToAnchor,
+    setHighlightAnchor,
+  ]);
 
   return { queue, item, selectItem };
 }
