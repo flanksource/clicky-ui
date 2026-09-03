@@ -160,9 +160,10 @@ export function FieldControlGuide() {
     {
       shape: "A bounded numeric range",
       control: "RangeSlider",
-      why: "Two coupled numbers where the relationship — and the distance between them — matters more than the exact values.",
+      why: "Two coupled numbers where the relationship — and the distance between them — matters. Enable exact inputs when users also need to type precise endpoints.",
       example: (
         <RangeSlider
+          editable
           min={0}
           max={10}
           value={severity}

@@ -20,12 +20,19 @@ import {
   preloadMeta,
   subscribeMeta,
 } from "./registry";
-import { buildPlaygroundRoute, parsePlaygroundRoute, type PlaygroundRoute } from "./route";
+import {
+  buildPlaygroundRoute,
+  parsePlaygroundRoute,
+  type PlaygroundRoute,
+} from "./route";
 
 export function App() {
   const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
     parse: (_pathname, search) => {
-      const parsed = parsePlaygroundRoute(search, fallbackPageSlug(pages()) ?? "");
+      const parsed = parsePlaygroundRoute(
+        search,
+        fallbackPageSlug(pages()) ?? "",
+      );
       return {
         ...parsed,
         page: findPage(parsed.page)?.slug ?? fallbackPageSlug(pages()) ?? "",
@@ -49,6 +56,10 @@ export function App() {
 
   const active = findPage(route.page);
   const comments = useComments(active?.slug ?? "", contentRef);
+  const standardRoute = (
+    page: string,
+    view: PlaygroundRoute["view"] = route.view,
+  ): PlaygroundRoute => ({ page, view, annotations: route.annotations });
 
   return (
     <ThemeProvider>
@@ -61,6 +72,7 @@ export function App() {
             onCreate={comments.create}
             onReply={comments.reply}
             onUpdateStatus={comments.updateStatus}
+            onClose={comments.close}
             onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
@@ -73,12 +85,27 @@ export function App() {
               commentsError={comments.error}
               view={route.view}
               annotations={route.annotations}
-              pageHref={(slug) => buildPlaygroundRoute({ ...route, page: slug })}
-              onViewChange={(view) => navigateRoute({ ...route, view })}
+              {...(route.review ? { review: route.review } : {})}
+              {...(route.comment ? { selectedCommentId: route.comment } : {})}
+              pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
+              onViewChange={(view) =>
+                navigateRoute(standardRoute(route.page, view))
+              }
               onAnnotationsChange={(annotations) =>
                 navigateRoute({ ...route, annotations })
               }
-              onNavigate={(slug) => navigateRoute({ ...route, page: slug ?? "" })}
+              onNavigate={(slug) => navigateRoute(standardRoute(slug ?? ""))}
+              onReviewNavigate={(page, comment) =>
+                navigateRoute({
+                  ...route,
+                  page,
+                  view: "preview",
+                  review: "resolved",
+                  ...(comment ? { comment } : {}),
+                })
+              }
+              onReviewExit={() => navigateRoute(standardRoute(route.page))}
+              onCommentAndReopen={comments.commentAndReopen}
             />
           </CommentProvider>
         </RouterProvider>

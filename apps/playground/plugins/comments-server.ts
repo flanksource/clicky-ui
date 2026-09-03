@@ -3,7 +3,15 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 import { COMMENT_TOOLS } from "./comments-schema";
+import {
+  CommentHttpError,
+  assertActiveStatusTransition,
+  closeComment,
+  reopenComment,
+  resolveComment,
+} from "./comments-lifecycle";
 import type { CommentElementContext } from "./comments-model";
+import { listComments, parseCommentFilter } from "./comments-query";
 import {
   assertScreenshotCapture,
   discardScreenshot,
@@ -12,14 +20,11 @@ import {
   stageScreenshotRemoval,
 } from "./comments-screenshots";
 import {
-  RESOLVED_STATUS,
   addComment,
   addReply,
   assertElementContext,
   assertPage,
   assertRating,
-  listComments,
-  parseCommentFilter,
   patchComment,
   removeComment,
   type CommentPatch,
@@ -36,11 +41,14 @@ export type CommentRoute =
   | "create"
   | "reply"
   | "resolve"
+  | "close"
+  | "reopen"
   | "update"
   | "delete";
 
 /**
- * Resolves a request against the endpoints `comments-schema.ts` advertises.
+ * Resolves a request against the comment endpoints. Human-only lifecycle
+ * routes are intentionally absent from `comments-schema.ts`.
  * `pathname` is what the middleware sees — everything after `COMMENTS_ROUTE`.
  * Pure, so the routing table an agent depends on is unit-tested.
  */
@@ -72,6 +80,8 @@ export function matchRoute(
   if (segments.length === 2 && method === "POST") {
     if (second === "replies") return { route: "reply", id: first };
     if (second === "resolve") return { route: "resolve", id: first };
+    if (second === "close") return { route: "close", id: first };
+    if (second === "reopen") return { route: "reopen", id: first };
   }
   if (segments.length === 2 && first === "screenshots" && method === "GET") {
     return { route: "screenshot", id: second ?? "" };
@@ -158,6 +168,18 @@ function optionalText(
   return value;
 }
 
+function assertOnlyFields(
+  body: Record<string, unknown>,
+  allowed: readonly string[],
+): void {
+  const unexpected = Object.keys(body).find((key) => !allowed.includes(key));
+  if (unexpected) {
+    throw new Error(
+      `request body has unexpected field ${JSON.stringify(unexpected)}`,
+    );
+  }
+}
+
 /** The server owns identity and creation time so two callers cannot collide. */
 function draft(body: Record<string, unknown>, text: string): StoredComment {
   return {
@@ -202,7 +224,7 @@ function handle(
   const matched = matchRoute(req.method ?? "", url.pathname);
   if (!matched) {
     return sendJson(res, 405, {
-      error: `${req.method} ${COMMENTS_ROUTE}${url.pathname} is not an endpoint — GET ${COMMENTS_ROUTE}/schema lists them`,
+      error: `${req.method} ${COMMENTS_ROUTE}${url.pathname} is not a comment endpoint`,
     });
   }
   const { route, id } = matched;
@@ -224,14 +246,21 @@ function handle(
 
     case "create":
       return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, [
+          "page",
+          "body",
+          "rating",
+          "author",
+          "anchor",
+          "element",
+        ]);
         const anchor = optionalText(body, "anchor");
         const rating = optionalText(body, "rating");
-        const status = optionalText(body, "status");
         const comment = draft(body, optionalText(body, "body") ?? "");
         const element = persistElementContext(dir, comment.id, body["element"]);
         const stored: StoredComment = {
           ...comment,
-          status: status ?? "open",
+          status: "open",
           parentId: null,
           anchor: anchor ?? null,
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
@@ -248,6 +277,7 @@ function handle(
 
     case "reply":
       return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["body", "author"]);
         sendJson(
           res,
           201,
@@ -257,16 +287,43 @@ function handle(
 
     case "resolve":
       return readJsonBody(req).then((body) => {
-        sendJson(res, 200, {
-          ...patchComment(dir, id, {
-            status: optionalText(body, "status") ?? RESOLVED_STATUS,
-            updatedAt: new Date().toISOString(),
-          }),
-        });
+        assertOnlyFields(body, []);
+        sendJson(res, 200, resolveComment(dir, id));
+      });
+
+    case "close":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author"]);
+        sendJson(res, 200, closeComment(dir, id, requireAuthor(body)));
+      });
+
+    case "reopen":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author", "body"]);
+        const actor = requireAuthor(body);
+        const replyBody = optionalText(body, "body");
+        sendJson(
+          res,
+          200,
+          reopenComment(
+            dir,
+            id,
+            actor,
+            replyBody === undefined
+              ? undefined
+              : {
+                  id: randomUUID(),
+                  createdAt: new Date().toISOString(),
+                  body: requireText(body, "body"),
+                  author: actor,
+                },
+          ),
+        );
       });
 
     case "update":
       return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["body", "status", "rating"]);
         // A non-string field is a caller bug, not an omission: naming it in a
         // 400 (as every other route does) beats a 200 that silently wrote
         // nothing but `updatedAt`.
@@ -281,6 +338,9 @@ function handle(
             : { rating: assertRating(nextRating) }),
           updatedAt: new Date().toISOString(),
         };
+        if (nextStatus !== undefined) {
+          assertActiveStatusTransition(dir, id, nextStatus);
+        }
         sendJson(res, 200, patchComment(dir, id, patch));
       });
 
@@ -292,7 +352,8 @@ function handle(
 /**
  * Persists playground feedback to `<dir>/comments.json` so notes survive a
  * reload and stay readable in-repo by a coding agent, and exposes the same data
- * as an API a model can call — `GET <route>/schema` describes every endpoint.
+ * as an API a model can call — `GET <route>/schema` describes every endpoint
+ * available to agents. Human-only lifecycle routes remain UI-owned.
  * Dev-server only: the production `vite build` output has no comment backend by
  * design.
  */
@@ -315,7 +376,11 @@ export function playgroundComments(options: { dir: string }): Plugin {
               next(error);
               return;
             }
-            sendJson(res, 400, { error: message });
+            sendJson(
+              res,
+              error instanceof CommentHttpError ? error.statusCode : 400,
+              { error: message },
+            );
           }
         })();
       });

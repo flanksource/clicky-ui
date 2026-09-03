@@ -41,6 +41,8 @@ export type StoredComment = {
   parentId?: string | null;
   anchor?: string | null;
   rating?: CommentRating;
+  closedAt?: string;
+  closedBy?: StoredAuthor;
   element?: CommentElementContext;
 };
 
@@ -55,13 +57,8 @@ export type CommentPatch = {
   status?: string;
   rating?: CommentRating;
   updatedAt?: string;
-};
-
-/** Narrows a listing. An absent field means "no restriction". */
-export type CommentFilter = {
-  page?: string;
-  /** Matched against thread roots; a matching root brings its replies. */
-  statuses?: readonly string[];
+  closedAt?: string | null;
+  closedBy?: StoredAuthor | null;
 };
 
 /**
@@ -82,9 +79,6 @@ export const UNRESOLVED_STATUSES = ["open", "in_progress"] as const;
 
 /** Status a comment moves to when an agent resolves it. */
 export const RESOLVED_STATUS = "resolved";
-
-/** Status a root is treated as when it was stored without one. */
-const IMPLICIT_STATUS = "open";
 
 export const COMMENTS_FILENAME = "comments.json";
 
@@ -260,83 +254,6 @@ export function assertComment(input: unknown): StoredComment {
  * vocabulary an agent has to get right is unit-tested, leaving the middleware a
  * thin HTTP shell.
  */
-export function parseCommentFilter(params: URLSearchParams): CommentFilter {
-  const filter: CommentFilter = {};
-
-  const page = params.get("page");
-  if (page !== null) filter.page = assertPage(page);
-
-  const statuses = params
-    .getAll("status")
-    .flatMap((value) => value.split(","))
-    .map((value) => value.trim())
-    .filter((value) => value !== "")
-    .map(assertStatus);
-
-  const unresolved = params.get("unresolved");
-  if (unresolved !== null) {
-    if (unresolved !== "true" && unresolved !== "false") {
-      throw new Error(
-        `"unresolved" must be "true" or "false", got ${JSON.stringify(unresolved)}`,
-      );
-    }
-    if (unresolved === "true") statuses.push(...UNRESOLVED_STATUSES);
-  }
-
-  if (statuses.length > 0) filter.statuses = [...new Set(statuses)];
-  return filter;
-}
-
-/** Roots matching `statuses`, each followed by every comment beneath it. */
-function selectThreads(
-  list: StoredComment[],
-  statuses: readonly string[],
-): StoredComment[] {
-  const kept = new Set(
-    list
-      .filter(
-        (entry) =>
-          !entry.parentId && statuses.includes(entry.status ?? IMPLICIT_STATUS),
-      )
-      .map((entry) => entry.id),
-  );
-
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const entry of list) {
-      if (entry.parentId && kept.has(entry.parentId) && !kept.has(entry.id)) {
-        kept.add(entry.id);
-        grew = true;
-      }
-    }
-  }
-  return list.filter((entry) => kept.has(entry.id));
-}
-
-/**
- * Every comment the filter admits, tagged with its page. Pages come out in slug
- * order; within a page the stored (creation) order is preserved so a thread
- * reads root-first.
- */
-export function listComments(
-  dir: string,
-  filter: CommentFilter = {},
-): ListedComment[] {
-  const data = readAll(dir);
-  const pages =
-    filter.page === undefined ? Object.keys(data).sort() : [filter.page];
-
-  return pages.flatMap((page) => {
-    const list = data[page] ?? [];
-    const selected =
-      filter.statuses === undefined
-        ? list
-        : selectThreads(list, filter.statuses);
-    return selected.map((comment) => ({ ...comment, page }));
-  });
-}
-
 /** Ids are UUIDs, so a comment is addressable without knowing its page. */
 export function findComment(
   dir: string,
@@ -427,19 +344,23 @@ export function patchComment(
   const data = readAll(dir);
   const list = data[page] ?? [];
 
-  const next = list.map((entry) =>
-    entry.id === id
-      ? {
-          ...entry,
-          ...(patch.body !== undefined ? { body: patch.body } : {}),
-          ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
-          ...(patch.updatedAt !== undefined
-            ? { updatedAt: patch.updatedAt }
-            : {}),
-        }
-      : entry,
-  );
+  const next = list.map((entry) => {
+    if (entry.id !== id) return entry;
+    const updated: StoredComment = {
+      ...entry,
+      ...(patch.body !== undefined ? { body: patch.body } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
+      ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
+      ...(typeof patch.closedAt === "string"
+        ? { closedAt: patch.closedAt }
+        : {}),
+      ...(patch.closedBy ? { closedBy: patch.closedBy } : {}),
+    };
+    if (patch.closedAt === null) delete updated.closedAt;
+    if (patch.closedBy === null) delete updated.closedBy;
+    return updated;
+  });
   data[page] = next;
   writeAll(dir, data);
   return next.find((entry) => entry.id === id) as StoredComment;
