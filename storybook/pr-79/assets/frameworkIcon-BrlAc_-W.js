@@ -1,0 +1,1 @@
+import{aC as a,a6 as r,aO as t,ag as s,b8 as i}from"./iframe-lrV_tcxP.js";function c(e){switch(e){case"go test":case"ginkgo":return i;case"jest":case"vitest":return s;case"playwright":return t;case"fixture":return r;case"task":return a;default:return null}}export{c as f};
