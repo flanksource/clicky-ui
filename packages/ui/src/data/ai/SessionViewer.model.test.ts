@@ -7,6 +7,7 @@ import {
   type SessionEntry,
 } from "./SessionViewer.model";
 import { SAMPLE_SESSION, SAMPLE_SESSION_JSONL } from "./SessionViewer.fixtures";
+import { WORKFLOW_PHASES } from "./agent-action-icons";
 import { UiAsterisk, UiEye, UiPalette, UiProhibit, UiStrategy, UiWrench } from "../../icons";
 
 describe("normalizeSession", () => {
@@ -67,6 +68,70 @@ describe("normalizeSession", () => {
   it("returns no events for empty input", () => {
     expect(normalizeSession("")).toEqual([]);
     expect(normalizeSession([])).toEqual([]);
+  });
+
+  it("maps a verified role to a system row with the verify glyph and a passing tone", () => {
+    const events = normalizeSession({
+      messages: [{ id: "v1", role: "verified", parts: [{ type: "text", text: "All checks passed" }] }],
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: "system",
+        text: "All checks passed",
+        verifyPassed: true,
+        tone: "emerald",
+        icon: WORKFLOW_PHASES.verify.icon,
+      }),
+    ]);
+  });
+
+  it("maps a verify_failed role to a system row with a failing tone", () => {
+    const events = normalizeSession({
+      messages: [{ id: "v1", role: "verify_failed", parts: [{ type: "text", text: "2 checks failed" }] }],
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: "system",
+        text: "2 checks failed",
+        verifyPassed: false,
+        tone: "rose",
+        icon: WORKFLOW_PHASES.verify.icon,
+      }),
+    ]);
+  });
+
+  it("maps a verified role to the same verify row on the legacy SessionEntry path, not assistant", () => {
+    const entries: SessionEntry[] = [
+      { message: { role: "verified", content: [{ type: "text", text: "All checks passed" }] } },
+    ];
+
+    expect(normalizeSession(entries)).toEqual([
+      expect.objectContaining({
+        kind: "system",
+        text: "All checks passed",
+        verifyPassed: true,
+        tone: "emerald",
+        icon: WORKFLOW_PHASES.verify.icon,
+      }),
+    ]);
+  });
+
+  it("maps a verify_failed role to the same verify row on the legacy SessionEntry path", () => {
+    const entries: SessionEntry[] = [
+      { message: { role: "verify_failed", content: [{ type: "text", text: "2 checks failed" }] } },
+    ];
+
+    expect(normalizeSession(entries)).toEqual([
+      expect.objectContaining({
+        kind: "system",
+        text: "2 checks failed",
+        verifyPassed: false,
+        tone: "rose",
+        icon: WORKFLOW_PHASES.verify.icon,
+      }),
+    ]);
   });
 });
 

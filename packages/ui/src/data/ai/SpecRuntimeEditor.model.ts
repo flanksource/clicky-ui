@@ -292,6 +292,10 @@ export type AISpecRuntimeVerify = {
   fixture?: string;
   scope?: SpecVerifyScope | "";
   maxIterations?: number;
+  /** Shell commands run as part of verification, alongside the fixture. */
+  commands?: string[];
+  /** Named prompt templates run as part of verification. */
+  prompts?: string[];
 };
 
 // Mirrors captain's api.Commit: one commit policy keyed to a lifecycle phase.
@@ -406,6 +410,10 @@ function compactVerify(
   ) {
     verify.maxIterations = Math.trunc(value.maxIterations);
   }
+  const commands = compactList(value.commands);
+  if (commands) verify.commands = commands;
+  const prompts = compactList(value.prompts);
+  if (prompts) verify.prompts = prompts;
   return hasKeys(verify) ? verify : undefined;
 }
 

@@ -388,7 +388,7 @@ describe("buildAISpecRuntimePayload", () => {
         },
         workflow: {
           verify: {
-            commands: ["pnpm test"],
+            unknownField: "nope",
             fixture: "- [ ] passes",
           },
           commits: [{ on: "run", keepWorktree: true }],
@@ -404,5 +404,37 @@ describe("buildAISpecRuntimePayload", () => {
         },
       },
     });
+  });
+
+  it("round-trips verify commands and prompts, trimming and de-duplicating each list", () => {
+    expect(
+      buildAISpecRuntimePayload({
+        workflow: {
+          verify: {
+            fixture: "- [ ] passes",
+            commands: [" pnpm test ", "pnpm lint", "pnpm test"],
+            prompts: [" review.prompt ", ""],
+          },
+        },
+      }),
+    ).toEqual({
+      spec: {
+        workflow: {
+          verify: {
+            fixture: "- [ ] passes",
+            commands: ["pnpm test", "pnpm lint"],
+            prompts: ["review.prompt"],
+          },
+        },
+      },
+    });
+  });
+
+  it("omits empty commands/prompts lists from the compacted verify stanza", () => {
+    expect(
+      buildAISpecRuntimePayload({
+        workflow: { verify: { commands: [""], prompts: [] } },
+      }),
+    ).toEqual({});
   });
 });

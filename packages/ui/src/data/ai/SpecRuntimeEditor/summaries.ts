@@ -80,6 +80,12 @@ export function summarizeVerify(value: AISpecRuntimeValue): string {
       `${verify.maxIterations} iteration${verify.maxIterations !== 1 ? "s" : ""}`,
     );
   }
+  if (verify.commands?.length) {
+    parts.push(`${verify.commands.length} command${verify.commands.length !== 1 ? "s" : ""}`);
+  }
+  if (verify.prompts?.length) {
+    parts.push(`${verify.prompts.length} prompt${verify.prompts.length !== 1 ? "s" : ""}`);
+  }
   return parts.length > 0 ? parts.join(" · ") : "No fixture";
 }
 

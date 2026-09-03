@@ -1,4 +1,5 @@
 import type { StaticIconComponent } from "../Icon";
+import { WORKFLOW_PHASES } from "./agent-action-icons";
 import type {
   SessionBudget,
   SessionCapabilities,
@@ -168,6 +169,14 @@ export interface SessionEvent {
   raw?: unknown;
   errorType?: string;
   errorStatus?: number;
+  /** Set for a `verified`/`verify_failed` role — the workflow verify verdict. */
+  verifyPassed?: boolean;
+  /** Row icon override (e.g. the verify glyph). Renderers fall back to the
+   *  kind's default icon when absent. */
+  icon?: StaticIconComponent;
+  /** Row tone override (e.g. pass/fail for a verify row). Renderers fall back
+   *  to the kind's default tone when absent. */
+  tone?: SessionTone;
 }
 
 export function truncate(text: string, max: number): string {
@@ -206,8 +215,16 @@ function parseEntries(input: string | SessionEntry[]): SessionEntry[] {
     });
 }
 
+// "verified"/"verify_failed" pass through unchanged — the legacy SessionEntry
+// path needs the raw role to route to the same verify row `normalizeMessages`
+// builds for the unified path (see the call site below), not just a
+// system/user/assistant kind.
 function roleFromType(type: string | undefined): string {
-  return type === "system" || type === "user" || type === "assistant"
+  return type === "system" ||
+    type === "user" ||
+    type === "assistant" ||
+    type === "verified" ||
+    type === "verify_failed"
     ? type
     : "assistant";
 }
@@ -263,6 +280,7 @@ function blockEvent(
   id: string,
   timestamp: string | undefined,
   cwd: string | undefined,
+  verifyPassed: boolean | undefined,
 ): SessionEvent | null {
   if (block.type === "tool_use" || (block.name && block.input)) {
     if (!block.name) return null;
@@ -278,12 +296,26 @@ function blockEvent(
       : null;
   }
   if (block.text) {
+    // A verify step reports its verdict as a `verified`/`verify_failed` role —
+    // rendered as a system-style row carrying the pass/fail tone and the
+    // workflow verify glyph, mirroring `normalizeMessages`'s unified-path rows.
     return {
       id,
       kind:
-        role === "system" ? "system" : role === "user" ? "user" : "assistant",
+        role === "system" || verifyPassed !== undefined
+          ? "system"
+          : role === "user"
+            ? "user"
+            : "assistant",
       text: block.text,
       ...(timestamp ? { timestamp } : {}),
+      ...(verifyPassed !== undefined
+        ? {
+            verifyPassed,
+            tone: verifyPassed ? "emerald" : "rose",
+            icon: WORKFLOW_PHASES.verify.icon,
+          }
+        : {}),
     };
   }
   return null;
@@ -343,6 +375,8 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
     }
 
     const role = roleFromType(entry.message?.role ?? entry.type);
+    const verifyPassed =
+      role === "verified" ? true : role === "verify_failed" ? false : undefined;
     for (const [i, block] of (entry.message?.content ?? []).entries()) {
       const ev = blockEvent(
         block,
@@ -350,6 +384,7 @@ export function normalizeSession(input: SessionInput): SessionEvent[] {
         `${baseId}-${i}`,
         entry.timestamp,
         entry.cwd,
+        verifyPassed,
       );
       if (ev) events.push(ev);
     }
@@ -451,6 +486,7 @@ function partEvent(
     agentId?: string;
     sessionId?: string;
     raw?: unknown;
+    verifyPassed?: boolean;
   },
 ): SessionEvent | null {
   if (isUnifiedToolPart(part)) {
@@ -503,6 +539,13 @@ function partEvent(
           ...(meta.turnId ? { turnId: meta.turnId } : {}),
           ...(meta.agentId ? { agentId: meta.agentId } : {}),
           ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+          ...(meta.verifyPassed !== undefined
+            ? {
+                verifyPassed: meta.verifyPassed,
+                tone: meta.verifyPassed ? "emerald" : "rose",
+                icon: WORKFLOW_PHASES.verify.icon,
+              }
+            : {}),
         }
       : null;
   }
@@ -545,8 +588,13 @@ export function normalizeMessages(
       });
       return;
     }
+    // A verify step reports its verdict as a `verified`/`verify_failed` role —
+    // rendered as a system-style row (not a fourth top-level kind) carrying the
+    // pass/fail tone and the workflow verify glyph as data.
+    const verifyPassed =
+      msg.role === "verified" ? true : msg.role === "verify_failed" ? false : undefined;
     const role: "system" | "user" | "assistant" =
-      msg.role === "system"
+      msg.role === "system" || verifyPassed !== undefined
         ? "system"
         : msg.role === "user"
           ? "user"
@@ -563,6 +611,7 @@ export function normalizeMessages(
       ...(prov?.agentId ? { agentId: prov.agentId } : {}),
       ...(prov?.sessionId ? { sessionId: prov.sessionId } : {}),
       ...(msg.raw !== undefined ? { raw: msg.raw } : {}),
+      ...(verifyPassed !== undefined ? { verifyPassed } : {}),
     };
     msg.parts.forEach((part, i) => {
       const ev = partEvent(part, role, `${baseId}-${i}`, meta);

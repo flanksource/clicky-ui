@@ -1,5 +1,5 @@
 import { SegmentedControl } from "../../../components/SegmentedControl";
-import { UiRepeat } from "../../../icons";
+import { UiChatDots, UiRepeat, UiTerminal } from "../../../icons";
 import { FixtureEditor } from "../../FixtureEditor";
 import type { ChatModel } from "../../chat/types";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
@@ -8,7 +8,7 @@ import {
   type AISpecRuntimeValue,
   type SpecVerifyScope,
 } from "../SpecRuntimeEditor.model";
-import { NumberField, SpecField } from "./fields";
+import { ListField, NumberField, SpecField } from "./fields";
 import type { SpecRuntimeSecretSelectorConfig } from "./types";
 import { withVerify } from "./update";
 
@@ -71,6 +71,20 @@ export function VerifySection({
           />
         </div>
       </div>
+      <ListField
+        label="Commands"
+        value={value.workflow?.verify?.commands}
+        onChange={(commands) => onChange(withVerify(value, { commands }))}
+        placeholder="pnpm test"
+        icon={UiTerminal}
+      />
+      <ListField
+        label="Prompts"
+        value={value.workflow?.verify?.prompts}
+        onChange={(prompts) => onChange(withVerify(value, { prompts }))}
+        placeholder="review.prompt"
+        icon={UiChatDots}
+      />
     </div>
   );
 }
