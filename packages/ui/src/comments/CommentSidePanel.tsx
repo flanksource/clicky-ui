@@ -11,12 +11,14 @@ import {
 import {
   buildThreadListHandlers,
   getRoots,
-  resolveCommentStage,
   selectAnchorThreads,
-  selectCommentThreadsByStage,
   sortReplies,
   buildReplyMap,
 } from "./comment-utils";
+import {
+  resolveCommentStage,
+  selectCommentThreadsByStage,
+} from "../lib/comment-stage";
 import {
   DOCUMENT_ANCHOR,
   type Comment,

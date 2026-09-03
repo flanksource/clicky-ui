@@ -14,13 +14,15 @@ import {
   isUnresolved,
   matchMentionsInBody,
   nextChecklistStatus,
-  resolveCommentStage,
   resolveStatusConfig,
-  selectCommentThreadsByStage,
   sortReplies,
   toneToBadgeTone,
   truncatePlain,
 } from "./comment-utils";
+import {
+  resolveCommentStage,
+  selectCommentThreadsByStage,
+} from "../lib/comment-stage";
 import {
   DOCUMENT_ANCHOR,
   type Comment,

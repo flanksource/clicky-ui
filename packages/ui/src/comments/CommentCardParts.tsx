@@ -6,6 +6,7 @@ import {
   resolveStatusConfig,
   toneToBadgeTone,
 } from "./comment-utils";
+import { resolveCommentStage } from "../lib/comment-stage";
 import type { Comment, CommentConfig, CommentRating } from "./comment-types";
 
 export function RatingChip({ rating }: { rating: CommentRating | undefined }) {
@@ -32,7 +33,10 @@ export function StatusChip({
 }) {
   const status = resolveStatusConfig(config, comment.status);
   if (!status) return null;
-  const closedBy = status.stage === "closed" ? comment.closedBy : undefined;
+  const closedBy =
+    resolveCommentStage(config, comment.status) === "closed"
+      ? comment.closedBy
+      : undefined;
   return (
     <Badge
       variant="soft"

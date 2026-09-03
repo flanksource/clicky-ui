@@ -24,12 +24,11 @@ import {
   StatusChip,
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
+import { authorDisplayName, truncatePlain } from "./comment-utils";
 import {
-  authorDisplayName,
   resolveCommentStage,
   statusForCommentStage,
-  truncatePlain,
-} from "./comment-utils";
+} from "../lib/comment-stage";
 import type { Comment, CommentConfig } from "./comment-types";
 
 export type CommentCardProps = {

@@ -97,8 +97,8 @@ export function App() {
               onNavigate={(slug) => navigateRoute(standardRoute(slug ?? ""))}
               onReviewNavigate={(page, comment) =>
                 navigateRoute({
-                  ...route,
                   page,
+                  annotations: route.annotations,
                   view: "preview",
                   review: "resolved",
                   ...(comment ? { comment } : {}),
