@@ -196,10 +196,14 @@ async function renderMarkdown(text: string) {
   const { container } = render(<Markdown text={text} />);
   // Streamdown is loaded lazily; importing it can exceed Testing Library's
   // one-second default while the complete CI suite is transforming in parallel.
-  await waitFor(() => expect(container.querySelector(".prose")).not.toBeNull(), {
-    timeout: 5_000,
-  });
-  return container.querySelector<HTMLElement>(".prose") as HTMLElement;
+  return waitFor(
+    () => {
+      const root = container.querySelector<HTMLElement>(".prose");
+      if (!root) throw new Error("Markdown renderer has not loaded");
+      return root;
+    },
+    { timeout: 5_000 },
+  );
 }
 
 describe("markdown syntax reference", () => {
