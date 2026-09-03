@@ -43,7 +43,7 @@ describe("CommentCard", () => {
     expect(screen.getByText("Ada")).toBeInTheDocument();
   });
 
-  it("resolves an open root from the visible check action", () => {
+  it("resolves an open root from the actions menu", () => {
     const onUpdateStatus = vi.fn();
     render(
       <CommentCard
@@ -53,11 +53,12 @@ describe("CommentCard", () => {
         onUpdateStatus={onUpdateStatus}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resolve" }));
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
   });
 
-  it("resolves an open root from the collapsed check action without expanding", () => {
+  it("resolves an open root from the collapsed actions menu without expanding", () => {
     const onUpdateStatus = vi.fn();
     render(
       <CommentCard
@@ -68,7 +69,8 @@ describe("CommentCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resolve" }));
 
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
     expect(
@@ -91,7 +93,8 @@ describe("CommentCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Close comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resolve" }));
 
     expect(onUpdateStatus).toHaveBeenCalledWith("closed");
   });
@@ -113,6 +116,26 @@ describe("CommentCard", () => {
     },
   );
 
+  it.each(["resolved", "closed"])(
+    "reopens a %s root to the first unresolved status",
+    (status) => {
+      const onUpdateStatus = vi.fn();
+      render(
+        <CommentCard
+          comment={{ ...root, status }}
+          config={config}
+          defaultExpanded
+          onUpdateStatus={onUpdateStatus}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Reopen" }));
+
+      expect(onUpdateStatus).toHaveBeenCalledWith("open");
+    },
+  );
+
   it("shows a status update error when resolving fails", async () => {
     render(
       <CommentCard
@@ -123,7 +146,8 @@ describe("CommentCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resolve" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -141,7 +165,8 @@ describe("CommentCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Resolve comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resolve" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -150,7 +175,7 @@ describe("CommentCard", () => {
     );
   });
 
-  it("keeps non-resolve statuses and delete in the actions menu", async () => {
+  it("orders the root actions as Delete, Resolve, Copy, Maximise", async () => {
     render(
       <CommentCard
         comment={root}
@@ -158,21 +183,18 @@ describe("CommentCard", () => {
         defaultExpanded
         onUpdateStatus={vi.fn()}
         onDelete={vi.fn()}
+        onCopy={vi.fn()}
+        onMaximize={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("menuitem", { name: /In progress/ }),
-      ).toBeInTheDocument(),
+      expect(screen.getAllByRole("menuitem")).toHaveLength(4),
     );
     expect(
-      screen.queryByRole("menuitem", { name: /Resolved/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Delete" }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Delete", "Resolve", "Copy", "Maximise"]);
   });
 
   it("invokes onDelete from the actions menu", () => {

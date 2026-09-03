@@ -1,4 +1,4 @@
-import { Icon } from "../data/Icon";
+import { Icon, LabelIcon } from "../data/Icon";
 import { FilterPill } from "../data/FilterPill";
 import { UiClose } from "../icons";
 import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
@@ -48,7 +48,12 @@ export function ComboboxTags({
         >
           <FilterPill
             mode={mode}
-            label={label}
+            label={
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <LabelIcon icon={option?.icon} className="shrink-0 text-muted-foreground" />
+                <span className="truncate">{label}</span>
+              </span>
+            }
             title={mode === "include" ? `${label} included` : `${label} excluded`}
             className="max-w-full"
             {...(disabled
@@ -69,6 +74,7 @@ export function ComboboxTags({
         data-combobox-tag={value}
         className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-muted px-2 text-xs"
       >
+        <LabelIcon icon={option?.icon} className="shrink-0 text-muted-foreground" />
         <span className="truncate">{label}</span>
         {remove}
       </span>

@@ -137,7 +137,12 @@ export function ComboboxMenu({
                     mode={mode ?? "neutral"}
                     togglePosition="right"
                     interactive={false}
-                    label={option.label}
+                    label={
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <LabelIcon icon={option.icon} className="shrink-0 text-sm text-muted-foreground" />
+                        <span className="truncate">{option.label}</span>
+                      </span>
+                    }
                     onModeChange={(next) => onSetMode(option.value, next)}
                     className="w-full justify-between"
                   />

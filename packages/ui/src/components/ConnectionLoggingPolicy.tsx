@@ -16,6 +16,10 @@ const LEVEL_OPTIONS = CONNECTION_LOG_LEVELS.map((level) => ({
   value: level,
   label: level === "off" ? "Off" : level[0]?.toUpperCase() + level.slice(1),
 }));
+const LEVEL_SEGMENTS = LEVEL_OPTIONS.map(({ value, label }) => ({
+  id: value,
+  label,
+}));
 
 const THRESHOLD_PROPERTY = "log.slowThreshold";
 type PreviewFormat = "pretty" | "json";
@@ -66,7 +70,7 @@ export function ConnectionLoggingPolicy({
             Payloads are bounded and credentials are sanitized before logging.
           </p>
         </div>
-        <span className="rounded-full border border-border bg-muted px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {definition.family}
         </span>
       </header>
@@ -92,53 +96,40 @@ export function ConnectionLoggingPolicy({
               return (
                 <div
                   key={event.event}
-                  className="grid gap-density-3 border-b border-border p-density-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_8rem]"
+                  className="grid gap-density-2 border-b border-border px-density-3 py-density-2 last:border-b-0 xl:grid-cols-[minmax(12rem,1fr)_auto] xl:items-center"
                 >
-                  <div className="min-w-0 space-y-1.5">
+                  <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-foreground">
                         {event.label}
                       </span>
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <span className="font-mono text-[10px] text-muted-foreground">
                         {event.property}
                       </span>
                     </div>
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      {event.description}
+                    <p className="text-xs text-muted-foreground">{event.description}</p>
+                    <p className="text-[10px] text-muted-foreground/80">
+                      Captures {event.captures.join(", ")}
                     </p>
-                    <div
-                      className="flex flex-wrap gap-1.5"
-                      aria-label={`${event.label} captured fields`}
-                    >
-                      {event.captures.map((capture) => (
-                        <span
-                          key={capture}
-                          className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                        >
-                          {capture}
-                        </span>
-                      ))}
-                    </div>
                   </div>
-                  <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                    <span className="sr-only">{event.label} level</span>
-                    <Select
+                  <div className="flex flex-wrap items-center gap-density-2">
+                    <SegmentedControl<ConnectionLogLevel>
                       aria-label={`${event.label} level`}
                       value={level}
-                      disabled={readOnly}
-                      options={LEVEL_OPTIONS}
-                      onChange={(input) =>
-                        updateOverride(
-                          event.property,
-                          input.target.value,
-                          event.default,
-                        )
+                      options={LEVEL_SEGMENTS.map((option) => ({
+                        ...option,
+                        disabled: readOnly,
+                      }))}
+                      onChange={(next) =>
+                        updateOverride(event.property, next, event.default)
                       }
+                      size="sm"
+                      wrap
                     />
-                    <span className="block text-[10px] font-normal">
-                      Default: {event.default}
+                    <span className="text-[10px] text-muted-foreground">
+                      Default {event.default}
                     </span>
-                  </label>
+                  </div>
                 </div>
               );
             })}

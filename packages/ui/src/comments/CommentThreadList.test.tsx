@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import * as clipboard from "../components/clipboard";
 import { CommentThreadList } from "./CommentThreadList";
 import {
   DEFAULT_COMMENT_STATUSES,
@@ -41,12 +42,55 @@ describe("CommentThreadList", () => {
   ])("maximizes the whole thread from the %s card", (_kind, index) => {
     render(<CommentThreadList comments={comments} config={config} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Comment actions" })[index]);
-    fireEvent.click(screen.getByText("Maximize"));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Comment actions" })[index],
+    );
+    fireEvent.click(screen.getByText("Maximise"));
 
     const modal = screen.getByTestId("comment-thread-modal");
     expect(modal).toHaveTextContent("root comment");
     expect(modal).toHaveTextContent("a reply");
+  });
+
+  it("copies the whole thread through the supplied Markdown serializer", async () => {
+    const copy = vi.spyOn(clipboard, "copyText").mockResolvedValue(undefined);
+    const threadToMarkdown = vi.fn(() => "# Whole thread\n\nroot and reply");
+    render(
+      <CommentThreadList
+        comments={comments}
+        config={config}
+        threadToMarkdown={threadToMarkdown}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Comment actions" })[1]!,
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy" }));
+
+    await act(async () => undefined);
+    expect(threadToMarkdown).toHaveBeenCalledWith(comments);
+    expect(copy).toHaveBeenCalledWith("# Whole thread\n\nroot and reply");
+  });
+
+  it("previews the exact copied Markdown in a tab of the maximized thread", async () => {
+    const markdown = "# Whole thread\n\nroot and reply";
+    render(
+      <CommentThreadList
+        comments={comments}
+        config={config}
+        threadToMarkdown={() => markdown}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Comment actions" })[0]!,
+    );
+    fireEvent.click(screen.getByText("Maximise"));
+    fireEvent.click(screen.getByRole("tab", { name: "Markdown" }));
+
+    expect(await screen.findByText("Whole thread")).toBeInTheDocument();
+    expect(screen.getByText("root and reply")).toBeInTheDocument();
   });
 
   it.each([
@@ -64,8 +108,10 @@ describe("CommentThreadList", () => {
         />,
       );
 
-      fireEvent.click(screen.getAllByRole("button", { name: "Comment actions" })[0]);
-      fireEvent.click(screen.getByText("Maximize"));
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Comment actions" })[0],
+      );
+      fireEvent.click(screen.getByText("Maximise"));
 
       const modal = screen.getByTestId("comment-thread-modal");
       expect(modal).toHaveTextContent(replyingToBody);

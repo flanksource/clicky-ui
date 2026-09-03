@@ -37,6 +37,27 @@ describe("Combobox tags variant", () => {
     expect(onChange).toHaveBeenCalledWith(["PrimaryDB", "custom-db"]);
   });
 
+  it("renders the selected option icon inside its pill", () => {
+    render(
+      <Combobox
+        multiple
+        variant="tags"
+        value={["PrimaryDB"]}
+        onChange={vi.fn()}
+        options={[
+          {
+            value: "PrimaryDB",
+            label: "Primary database",
+            selectedLabel: "Primary",
+            icon: <span data-testid="primary-database-icon" />,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("primary-database-icon")).toBeInTheDocument();
+  });
+
   it("removes the last pill with Backspace when the query is empty", () => {
     const onChange = vi.fn();
     render(

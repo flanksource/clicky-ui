@@ -100,16 +100,20 @@ describe("ConnectionLoggingPolicy", () => {
   it("stores only explicit level and threshold overrides", () => {
     render(<ControlledPolicy />);
 
-    fireEvent.change(screen.getByLabelText("Response body level"), {
-      target: { value: "off" },
-    });
+    fireEvent.click(
+      within(
+        screen.getByRole("radiogroup", { name: "Response body level" }),
+      ).getByRole("radio", { name: "Off" }),
+    );
     expect(screen.getByTestId("value")).toHaveTextContent(
       JSON.stringify({ "log.level.http.response.body": "off" }),
     );
 
-    fireEvent.change(screen.getByLabelText("Response body level"), {
-      target: { value: "trace2" },
-    });
+    fireEvent.click(
+      within(
+        screen.getByRole("radiogroup", { name: "Response body level" }),
+      ).getByRole("radio", { name: "Trace2" }),
+    );
     expect(screen.getByTestId("value")).toHaveTextContent("{}");
 
     fireEvent.change(screen.getByLabelText("Slow threshold value"), {
@@ -118,6 +122,21 @@ describe("ConnectionLoggingPolicy", () => {
     expect(screen.getByTestId("value")).toHaveTextContent(
       JSON.stringify({ "log.slowThreshold": "2s" }),
     );
+  });
+
+  it("uses compact segmented level controls without capture tags", () => {
+    render(<ControlledPolicy />);
+
+    const control = screen.getByRole("radiogroup", { name: "Errors level" });
+    expect(within(control).getAllByRole("radio")).toHaveLength(10);
+    expect(within(control).getByRole("radio", { name: "Error" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("Captures error, duration")).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Errors captured fields"),
+    ).not.toBeInTheDocument();
   });
 
   it("rejects an invalid slow threshold from the capability", () => {
