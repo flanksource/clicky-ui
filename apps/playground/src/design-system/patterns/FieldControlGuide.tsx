@@ -2,13 +2,16 @@ import { useState, type ReactNode } from "react";
 import type { RangeSliderValue } from "@flanksource/clicky-ui";
 import {
   Combobox,
+  CountryPicker,
   DateField,
+  DateTimePicker,
+  DimensionField,
   InputField,
   MultiSelect,
   RangeSlider,
-  Select,
   SegmentedControl,
   Switch,
+  TriStateToggle,
 } from "@flanksource/clicky-ui";
 import { UiKey, UiSearch } from "@flanksource/clicky-ui/icons";
 
@@ -38,6 +41,10 @@ export function FieldControlGuide() {
   const [after, setAfter] = useState("2026-08-01");
   const [severity, setSeverity] = useState<RangeSliderValue>([3, 8]);
   const [secret, setSecret] = useState("");
+  const [dimension, setDimension] = useState(24);
+  const [timestamp, setTimestamp] = useState("2026-08-23T09:30");
+  const [country, setCountry] = useState("ZA");
+  const [inherited, setInherited] = useState<boolean>();
 
   const GUIDES: ControlGuide[] = [
     {
@@ -85,13 +92,13 @@ export function FieldControlGuide() {
     },
     {
       shape: "A closed set of 5–20 options",
-      control: "Select",
-      why: "Too many to show at once, few enough that scanning the open menu is faster than typing.",
+      control: "Combobox",
+      why: "Too many to show at once, few enough that scanning the open menu is faster than typing. Use Clicky UI Combobox rather than a native select so search, keyboard behavior, and overlay styling stay consistent.",
       example: (
-        <Select
-          aria-label="Namespace"
+        <Combobox
+          ariaLabel="Namespace"
           value={namespace}
-          onChange={(event) => setNamespace(event.target.value)}
+          onChange={setNamespace}
           options={NAMESPACES.map((value) => ({ value, label: value }))}
         />
       ),
@@ -163,6 +170,65 @@ export function FieldControlGuide() {
           ariaLabelMin="Minimum severity"
           ariaLabelMax="Maximum severity"
         />
+      ),
+    },
+    {
+      shape: "A physical dimension",
+      control: "DimensionField",
+      why: "A number, unit, minimum, maximum, and step form one domain value. Keep those constraints together instead of validating a generic number input elsewhere.",
+      example: (
+        <DimensionField
+          label="Panel width"
+          value={dimension}
+          onChange={setDimension}
+          unit="mm"
+          min={1}
+          max={2400}
+          step={0.1}
+        />
+      ),
+    },
+    {
+      shape: "A date and time",
+      control: "DateTimePicker",
+      why: "Accept direct typing and a native picker through one styled control. Use DateField when the time portion has no meaning.",
+      example: (
+        <DateTimePicker
+          value={timestamp}
+          onChange={setTimestamp}
+          aria-label="Run after"
+        />
+      ),
+    },
+    {
+      shape: "A country code",
+      control: "CountryPicker",
+      why: "Country values need a canonical ISO code, searchable country names, and recognisable flags. A generic string or duplicated local catalog loses that contract.",
+      example: (
+        <CountryPicker
+          value={country}
+          onChange={setCountry}
+          ariaLabel="Country"
+        />
+      ),
+    },
+    {
+      shape: "A nullable boolean",
+      control: "TriStateToggle",
+      why: "True, false, and inherit are three real states. A switch cannot express unset, and a pair of booleans creates invalid combinations.",
+      example: (
+        <div className="flex items-center gap-density-2">
+          <TriStateToggle
+            value={inherited}
+            onChange={setInherited}
+            label="Cache policy"
+            labels={{ unset: "Inherit", on: "Enabled", off: "Disabled" }}
+            size="md"
+          />
+          <span className="text-xs text-muted-foreground">
+            {inherited === undefined ? "Inherit" : inherited ? "Enabled" : "Disabled"}
+          </span>
+        </div>
       ),
     },
     {

@@ -10,7 +10,11 @@ import {
   groupByPage,
   type CommentPageSection,
 } from "./markdown";
-import { fetchComments } from "./useComments";
+import {
+  COMMENTS_ROUTE,
+  fetchComments,
+  type PlaygroundComment,
+} from "./useComments";
 
 export function useFeedbackCopy({
   active,
@@ -23,21 +27,41 @@ export function useFeedbackCopy({
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const markdownOptions = useMemo(
+    () => ({
+      labels,
+      pageUrl: (page: string) => {
+        const url = new URL(window.location.origin);
+        url.searchParams.set("page", page);
+        return url.href;
+      },
+      pagePath: (page: string) => `apps/playground/src/pages/${page}.tsx`,
+      screenshotUrl: (url: string) => new URL(url, window.location.origin).href,
+      commentActionUrls: (commentId: string) => {
+        const encodedId = encodeURIComponent(commentId);
+        return {
+          reply: new URL(
+            `${COMMENTS_ROUTE}/${encodedId}/replies`,
+            window.location.origin,
+          ).href,
+          resolve: new URL(
+            `${COMMENTS_ROUTE}/${encodedId}/resolve`,
+            window.location.origin,
+          ).href,
+        };
+      },
+    }),
+    [labels],
+  );
 
   const copyMarkdown = useCallback(
-    async (load: () => CommentPageSection[] | Promise<CommentPageSection[]>) => {
+    async (
+      load: () => CommentPageSection[] | Promise<CommentPageSection[]>,
+    ) => {
       try {
         await writeClipboard(
           Promise.resolve(load()).then((sections) =>
-            commentsToMarkdown(sections, {
-              labels,
-              pageUrl: (page) => {
-                const url = new URL(window.location.origin);
-                url.searchParams.set("page", page);
-                return url.href;
-              },
-              pagePath: (page) => `apps/playground/src/pages/${page}.tsx`,
-            }),
+            commentsToMarkdown(sections, markdownOptions),
           ),
         );
         setCopyError(null);
@@ -47,7 +71,24 @@ export function useFeedbackCopy({
         setCopyError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [labels],
+    [markdownOptions],
+  );
+
+  const threadToMarkdown = useCallback(
+    (thread: readonly Comment[]) => {
+      if (!active)
+        throw new Error("Cannot copy feedback without an active page");
+      return commentsToMarkdown(
+        [
+          {
+            page: active.slug,
+            comments: [...thread] as PlaygroundComment[],
+          },
+        ],
+        markdownOptions,
+      );
+    },
+    [active, markdownOptions],
   );
 
   const copyFeedback = useCallback(() => {
@@ -71,7 +112,10 @@ export function useFeedbackCopy({
           void copyMarkdown(async () => [
             {
               page: active.slug,
-              comments: await fetchComments({ page: active.slug, unresolved: true }),
+              comments: await fetchComments({
+                page: active.slug,
+                unresolved: true,
+              }),
             },
           ]);
         },
@@ -106,5 +150,11 @@ export function useFeedbackCopy({
     [active, activeFolder, activeFolderLabel, copyMarkdown],
   );
 
-  return { copied, copyError, copyFeedback, copyActions };
+  return {
+    copied,
+    copyError,
+    copyFeedback,
+    copyActions,
+    threadToMarkdown,
+  };
 }

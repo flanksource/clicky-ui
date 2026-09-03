@@ -12,6 +12,10 @@ import {
   COMMENT_ELEMENT_HTML_TRUNCATION,
   type CommentElementContext,
 } from "./comments-model";
+import {
+  assertStoredScreenshot,
+  stageScreenshotRemoval,
+} from "./comments-screenshots";
 
 export const COMMENT_RATINGS = ["positive", "negative"] as const;
 export type CommentRating = (typeof COMMENT_RATINGS)[number];
@@ -164,7 +168,12 @@ export function assertElementContext(input: unknown): CommentElementContext {
     throw new Error("comment element context must be an object");
   }
   const candidate = input as Record<string, unknown>;
-  const allowedFields = new Set(["componentName", "source", "html"]);
+  const allowedFields = new Set([
+    "componentName",
+    "source",
+    "html",
+    "screenshot",
+  ]);
   const unexpected = Object.keys(candidate).find(
     (key) => !allowedFields.has(key),
   );
@@ -198,6 +207,9 @@ export function assertElementContext(input: unknown): CommentElementContext {
     (typeof componentName !== "string" || componentName === "")
   ) {
     throw new Error("comment element componentName must be a non-empty string");
+  }
+  if (candidate["screenshot"] !== undefined) {
+    assertStoredScreenshot(candidate["screenshot"]);
   }
   return input as CommentElementContext;
 }
@@ -455,7 +467,25 @@ export function removeComment(dir: string, id: string): number {
     }
   }
 
+  const removed = list.filter((entry) => doomed.has(entry.id));
+  const screenshotRemoval = stageScreenshotRemoval(dir, removed);
   data[page] = list.filter((entry) => !doomed.has(entry.id));
-  writeAll(dir, data);
+  try {
+    writeAll(dir, data);
+    screenshotRemoval.commit();
+  } catch (cause) {
+    try {
+      screenshotRemoval.rollback();
+      data[page] = list;
+      writeAll(dir, data);
+    } catch (rollbackCause) {
+      throw new Error(
+        `comment deletion failed (${String(cause)}) and rollback failed (${String(rollbackCause)})`,
+      );
+    }
+    throw new Error(
+      `comment deletion failed and was rolled back: ${String(cause)}`,
+    );
+  }
   return doomed.size;
 }

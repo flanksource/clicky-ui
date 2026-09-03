@@ -79,8 +79,6 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@flanksource/clicky-ui"],
   },
-<<<<<<< Updated upstream
-=======
   test: {
     setupFiles: ["./src/test/setup.ts"],
     server: {
@@ -89,7 +87,6 @@ export default defineConfig({
       },
     },
   },
->>>>>>> Stashed changes
   server: {
     // Bind every interface so the playground is reachable from other devices
     // on the LAN; allowedHosts keeps hostname (.local, tunnel) access working,

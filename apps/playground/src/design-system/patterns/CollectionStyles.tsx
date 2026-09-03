@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SegmentedControl, cn } from "@flanksource/clicky-ui";
 
 import { useAnnotationsHidden } from "../../annotations";
@@ -14,16 +14,22 @@ import {
 } from "@flanksource/clicky-ui/icons";
 import type { StaticIconComponent } from "@flanksource/clicky-ui";
 
-import { CollectionsPattern } from "./CollectionsPattern";
 import {
   AccordionSpecimen,
   AggregateSpecimen,
   CardsSpecimen,
+  MasterDialogSpecimen,
+  MasterRowDetailSpecimen,
   RowsSpecimen,
   TableSpecimen,
   TimelineSpecimen,
   TreeSpecimen,
 } from "./collection-specimens";
+import { ObjectArrayPattern } from "./ObjectArrayPattern";
+import {
+  InfiniteScrollDemo,
+  LiveTailDemo,
+} from "../../pages/components/logs-live-tail";
 
 // Choosing a collection style is choosing which question the screen answers.
 // Each entry below names that question first, because "which is prettier" is the
@@ -92,20 +98,36 @@ export const COLLECTION_STYLES: readonly CollectionStyle[] = [
     render: () => <CardsSpecimen />,
   },
   {
-    id: "master-detail",
-    label: "Master–detail",
+    id: "master-dialog",
+    label: "Master → dialog",
     icon: UiColumns,
-    question: "What is this one, without losing my place?",
+    question: "What is this one, without leaving the collection?",
     useWhen: [
       "The reader inspects items one after another inside the same filtered set",
-      "Detail is too big for a row but not big enough for its own page",
-      "Filters and scroll position must survive the inspection",
+      "Detail is large enough to need focus but still belongs to the current task",
+      "The reader should dismiss the detail and continue at the same scroll position",
     ],
     avoidWhen: [
       "Detail needs the full width (long logs, wide diffs, editors)",
-      "The viewport is narrow — collapse to a list that pushes to a detail route instead",
+      "The detail contains its own deep navigation or needs a shareable URL",
     ],
-    render: () => <CollectionsPattern />,
+    render: () => <MasterDialogSpecimen />,
+  },
+  {
+    id: "master-row-detail",
+    label: "Master → row detail",
+    icon: UiColumns,
+    question: "What extra context belongs directly beneath this row?",
+    useWhen: [
+      "The detail is short and directly explains the selected row",
+      "Readers compare a few expanded records without leaving the list",
+      "Opening a row should preserve the surrounding order and context",
+    ],
+    avoidWhen: [
+      "The expanded body is a full editor or wide report",
+      "Many rows need to remain expanded at once",
+    ],
+    render: () => <MasterRowDetailSpecimen />,
   },
   {
     id: "tree",
@@ -156,6 +178,54 @@ export const COLLECTION_STYLES: readonly CollectionStyle[] = [
     render: () => <AccordionSpecimen />,
   },
   {
+    id: "object-array",
+    label: "Object array editor",
+    icon: UiRows,
+    question: "How do I edit ordered, identity-rich objects?",
+    useWhen: [
+      "Each array item has a stable human label and a multi-field form",
+      "Add, remove, reorder, and edit are all part of one configuration task",
+      "Collapsed summaries let the reader find an item before opening it",
+    ],
+    avoidWhen: [
+      "Items are scalar values that fit a multi-select or token input",
+      "The collection is read-only and never needs inline editing",
+    ],
+    render: () => <ObjectArrayPattern />,
+  },
+  {
+    id: "infinite-feed",
+    label: "Infinite feed",
+    icon: UiListDashes,
+    question: "What happened before the currently loaded page?",
+    useWhen: [
+      "Rows are ordered events and readers naturally continue in one direction",
+      "A pager would interrupt investigation more than it helps navigation",
+      "The server can provide stable cursors and an explicit end condition",
+    ],
+    avoidWhen: [
+      "Readers must jump to an exact page or report a stable row position",
+      "Sorting changes frequently or the collection mutates ahead of the cursor",
+    ],
+    render: () => <InfiniteScrollDemo />,
+  },
+  {
+    id: "live-tail",
+    label: "Live tail",
+    icon: UiHistory,
+    question: "What is arriving right now?",
+    useWhen: [
+      "The source is actively producing ordered events",
+      "Following the newest item is the default but pausing must preserve position",
+      "Dropped history and reconnect state can be made explicit",
+    ],
+    avoidWhen: [
+      "The data is a current-state collection rather than an event stream",
+      "Background streaming cost is not bounded by session lifecycle",
+    ],
+    render: () => <LiveTailDemo />,
+  },
+  {
     id: "aggregate",
     label: "Aggregate first",
     icon: UiSigma,
@@ -174,22 +244,47 @@ export const COLLECTION_STYLES: readonly CollectionStyle[] = [
 ] as const;
 
 export function CollectionStyleGallery() {
-  const [styleId, setStyleId] = useState(COLLECTION_STYLES[0]!.id);
-  const style = COLLECTION_STYLES.find((candidate) => candidate.id === styleId)!;
+  const [styleId, setStyleId] = useState(() => {
+    const hash = typeof window === "undefined" ? "" : window.location.hash;
+    const requested = hash.startsWith("#style-") ? hash.slice(7) : "";
+    return COLLECTION_STYLES.some((style) => style.id === requested)
+      ? requested
+      : COLLECTION_STYLES[0]!.id;
+  });
+  const style = COLLECTION_STYLES.find((candidate) => candidate.id === styleId);
+  if (!style) throw new Error(`Unknown collection style: ${styleId}`);
+
+  useEffect(() => {
+    const selectHashStyle = () => {
+      const requested = window.location.hash.startsWith("#style-")
+        ? window.location.hash.slice(7)
+        : "";
+      if (COLLECTION_STYLES.some((candidate) => candidate.id === requested)) {
+        setStyleId(requested);
+      }
+    };
+    window.addEventListener("hashchange", selectHashStyle);
+    return () => window.removeEventListener("hashchange", selectHashStyle);
+  }, []);
+
+  const selectStyle = (next: string) => {
+    setStyleId(next);
+    window.history.replaceState(null, "", `#style-${next}`);
+  };
 
   return (
     <div className="space-y-density-3">
       <GuidanceCatalog styles={COLLECTION_STYLES} />
       <SegmentedControl
         value={styleId}
-        onChange={setStyleId}
+        onChange={selectStyle}
         aria-label="Collection style"
         wrap
         options={COLLECTION_STYLES.map(({ id, label, icon }) => ({ id, label, icon }))}
       />
 
       <div className="grid gap-density-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">{style.render()}</div>
+        <div id={`style-${style.id}`} className="min-w-0 scroll-mt-density-4">{style.render()}</div>
         <div className="space-y-density-3">
           <div className="rounded-xl border border-border bg-card p-density-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Answers</p>

@@ -90,6 +90,13 @@ export function PageAnatomyPattern() {
           </div>
         }
         search={<SearchInput value={query} onChange={setQuery} placeholder="Search resources…" />}
+        nav={
+          <nav data-practice="breadcrumbs" aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>Configuration</span>
+            <span aria-hidden>/</span>
+            <span className="font-medium text-foreground">Resources</span>
+          </nav>
+        }
         actions={
           <div data-practice="actions" className="flex items-center gap-density-2">
             <DensitySwitcher />
@@ -114,7 +121,6 @@ export function PageAnatomyPattern() {
         }
         bodyHeader={
           <div data-practice="body-header">
-            <p className="text-xs text-muted-foreground">Configuration / Resources</p>
             <h2 className="text-lg font-semibold text-foreground">Resources</h2>
           </div>
         }

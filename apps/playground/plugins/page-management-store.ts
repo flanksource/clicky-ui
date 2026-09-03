@@ -10,6 +10,7 @@ import {
 import { dirname, join } from "node:path";
 
 import { readAll, writeAll, type CommentsFile } from "./comments-store";
+import { stageScreenshotRemoval } from "./comments-screenshots";
 import {
   planPageReferenceUpdates,
   readTypeScriptSources,
@@ -86,25 +87,29 @@ function commentsAfterMove(
     return { comments, movedComments: 0, changed: false };
   }
   if (Object.hasOwn(comments, nextSlug)) {
-    throw new PageStoreError(`feedback already exists for page "${nextSlug}"`, 409);
+    throw new PageStoreError(
+      `feedback already exists for page "${nextSlug}"`,
+      409,
+    );
   }
 
   const moved = comments[slug];
-  if (!moved) throw new Error(`comments for "${slug}" disappeared during move planning`);
+  if (!moved)
+    throw new Error(`comments for "${slug}" disappeared during move planning`);
   const next = { ...comments, [nextSlug]: moved };
   delete next[slug];
   return { comments: next, movedComments: moved.length, changed: true };
 }
 
 function rollbackMove(options: {
-  pagesDir: string,
-  slug: string,
-  nextSlug: string,
-  source: string,
-  commentsDir: string,
-  comments: CommentsFile,
-  referenceEdits: readonly PageReferenceEdit[],
-  writeReference: (file: string, source: string) => void,
+  pagesDir: string;
+  slug: string;
+  nextSlug: string;
+  source: string;
+  commentsDir: string;
+  comments: CommentsFile;
+  referenceEdits: readonly PageReferenceEdit[];
+  writeReference: (file: string, source: string) => void;
 }): void {
   const {
     pagesDir,
@@ -138,7 +143,8 @@ function writeTextFile(file: string, source: string): void {
 function prepareMove(options: MovePageOptions): PreparedMove {
   const { sourceRoot, pagesDir, commentsDir, slug, nextSlug, title } = options;
   const source = readSource(pagesDir, slug);
-  const nextSource = title === undefined ? source : rewritePageTitle(source, title);
+  const nextSource =
+    title === undefined ? source : rewritePageTitle(source, title);
   const oldFile = pagePath(pagesDir, slug);
   const newFile = pagePath(pagesDir, nextSlug);
   const sources = readTypeScriptSources(sourceRoot).map((document) =>
@@ -163,14 +169,25 @@ function applyMove(options: {
 }): void {
   const { move, prepared, writeReference } = options;
   if (move.slug !== move.nextSlug) {
-    mkdirSync(dirname(pagePath(move.pagesDir, move.nextSlug)), { recursive: true });
-    renameSync(pagePath(move.pagesDir, move.slug), pagePath(move.pagesDir, move.nextSlug));
+    mkdirSync(dirname(pagePath(move.pagesDir, move.nextSlug)), {
+      recursive: true,
+    });
+    renameSync(
+      pagePath(move.pagesDir, move.slug),
+      pagePath(move.pagesDir, move.nextSlug),
+    );
   }
   if (prepared.referencePlan.movedSource !== prepared.source) {
-    writeSource(move.pagesDir, move.nextSlug, prepared.referencePlan.movedSource);
+    writeSource(
+      move.pagesDir,
+      move.nextSlug,
+      prepared.referencePlan.movedSource,
+    );
   }
-  for (const edit of prepared.referencePlan.edits) writeReference(edit.file, edit.nextSource);
-  if (prepared.commentMove.changed) writeAll(move.commentsDir, prepared.commentMove.comments);
+  for (const edit of prepared.referencePlan.edits)
+    writeReference(edit.file, edit.nextSource);
+  if (prepared.commentMove.changed)
+    writeAll(move.commentsDir, prepared.commentMove.comments);
 }
 
 export function movePage(options: MovePageOptions): MovePageResult {
@@ -204,7 +221,10 @@ export function movePage(options: MovePageOptions): MovePageResult {
         500,
       );
     }
-    throw new PageStoreError(`page move failed and was rolled back: ${String(cause)}`, 500);
+    throw new PageStoreError(
+      `page move failed and was rolled back: ${String(cause)}`,
+      500,
+    );
   }
 
   return {
@@ -233,13 +253,24 @@ export function deletePage(options: DeletePageOptions): {
   const changed = Object.hasOwn(comments, slug);
   const nextComments = { ...comments };
   delete nextComments[slug];
+  const screenshotRemoval = stageScreenshotRemoval(
+    commentsDir,
+    comments[slug] ?? [],
+  );
 
-  renameSync(file, backup);
+  try {
+    renameSync(file, backup);
+  } catch (cause) {
+    screenshotRemoval.rollback();
+    throw cause;
+  }
   try {
     if (changed) writeAll(commentsDir, nextComments);
     unlinkSync(backup);
+    screenshotRemoval.commit();
   } catch (cause) {
     try {
+      screenshotRemoval.rollback();
       if (existsSync(backup)) renameSync(backup, file);
       if (changed) writeAll(commentsDir, comments);
     } catch (rollbackCause) {
@@ -248,7 +279,10 @@ export function deletePage(options: DeletePageOptions): {
         500,
       );
     }
-    throw new PageStoreError(`page deletion failed and was rolled back: ${String(cause)}`, 500);
+    throw new PageStoreError(
+      `page deletion failed and was rolled back: ${String(cause)}`,
+      500,
+    );
   }
 
   return { slug, deletedComments };
@@ -282,13 +316,27 @@ export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
   const changed = deletedPages.some((slug) => Object.hasOwn(comments, slug));
   const backup = join(dirname(pagesDir), `.${randomUUID()}.folder-delete.tmp`);
   const writeComments = options.writeComments ?? writeAll;
+  const deletedPageComments = deletedPages.flatMap(
+    (slug) => comments[slug] ?? [],
+  );
+  const screenshotRemoval = stageScreenshotRemoval(
+    commentsDir,
+    deletedPageComments,
+  );
 
-  renameSync(target, backup);
+  try {
+    renameSync(target, backup);
+  } catch (cause) {
+    screenshotRemoval.rollback();
+    throw cause;
+  }
   try {
     if (changed) writeComments(commentsDir, nextComments);
     rmSync(backup, { recursive: true, force: true });
+    screenshotRemoval.commit();
   } catch (cause) {
     try {
+      screenshotRemoval.rollback();
       if (existsSync(backup)) renameSync(backup, target);
       if (changed) writeAll(commentsDir, comments);
     } catch (rollbackCause) {
@@ -297,7 +345,10 @@ export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
         500,
       );
     }
-    throw new PageStoreError(`folder deletion failed and was rolled back: ${String(cause)}`, 500);
+    throw new PageStoreError(
+      `folder deletion failed and was rolled back: ${String(cause)}`,
+      500,
+    );
   }
 
   return { folder, deletedPages, deletedComments };

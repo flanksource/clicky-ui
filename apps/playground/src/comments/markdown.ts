@@ -18,6 +18,11 @@ export type CommentMarkdownOptions = {
   labels: Record<string, string>;
   pageUrl: (page: string) => string;
   pagePath: (page: string) => string;
+  screenshotUrl?: (url: string) => string;
+  commentActionUrls?: (commentId: string) => {
+    reply: string;
+    resolve: string;
+  };
 };
 
 /** Splits a cross-page listing into sections, in the order pages first appear. */
@@ -42,7 +47,13 @@ export function commentsForFolder(
 
 function renderSection(
   { page, comments }: CommentPageSection,
-  { labels, pageUrl, pagePath }: CommentMarkdownOptions,
+  {
+    labels,
+    pageUrl,
+    pagePath,
+    screenshotUrl = (url) => url,
+    commentActionUrls,
+  }: CommentMarkdownOptions,
 ): string[] {
   const out = [
     `## Playground feedback — ${page}`,
@@ -80,6 +91,13 @@ function renderSection(
     if (!isDocument) out.push(`- anchor: \`${anchor}\``);
     out.push(`- status: ${root.status ?? "open"}`);
     if (root.rating) out.push(`- rating: ${root.rating}`);
+    const actionUrls = commentActionUrls?.(root.id);
+    if (actionUrls) {
+      out.push(
+        `- add comment: \`POST ${actionUrls.reply}\``,
+        `- mark resolved: \`POST ${actionUrls.resolve}\``,
+      );
+    }
     if (root.body.trim()) {
       out.push(`- ${root.author?.name ?? "Anonymous"}: ${root.body}`);
     } else {
@@ -106,6 +124,19 @@ function renderSection(
         element.html,
         "```",
       );
+      if (element.screenshot?.status === "captured") {
+        out.push(
+          "",
+          "## Attachments",
+          "",
+          `![${element.screenshot.filename}](${screenshotUrl(element.screenshot.url)})`,
+        );
+      } else if (element.screenshot?.status === "unavailable") {
+        out.push(
+          "",
+          `**Screenshot:** unavailable (${element.screenshot.reason})`,
+        );
+      }
     }
     out.push("");
   });
@@ -115,8 +146,8 @@ function renderSection(
 
 /**
  * Renders feedback as a block you can paste straight into a coding agent.
- * Each new anchored root carries the React Grab element snapshot that was
- * captured with it, so cross-page copies retain source and HTML context.
+ * Each new root carries its element or page snapshot, so cross-page copies
+ * retain source, HTML, and screenshot context.
  *
  * `labels` are resolved from the live DOM and therefore only cover the page
  * currently rendered — sections for other pages fall back to the raw CSS-path
