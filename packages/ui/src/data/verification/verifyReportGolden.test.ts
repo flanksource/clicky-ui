@@ -145,6 +145,7 @@ describe("verify report golden payload", () => {
             Skipped: 1,
             Pending: 0,
             Running: 0,
+            Timedout: 0,
             Duration: 0,
           },
         },

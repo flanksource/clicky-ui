@@ -81,6 +81,12 @@ export interface TestSummary {
   Skipped: number;
   Pending: number;
   Running?: number;
+  /**
+   * Timed-out count. Optional because gavel's Go `TestSummary`
+   * (testrunner/parsers) has no matching field yet — a projection that never
+   * observes a timed-out node simply omits the key.
+   */
+  Timedout?: number;
   Duration: number;
 }
 
