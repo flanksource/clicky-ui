@@ -340,7 +340,7 @@ describe("EndpointSelector", () => {
     ).toBeNull();
   });
 
-  it("assigns compact field bases and exposes the complete path", async () => {
+  it("stacks endpoint fields at narrow container widths and exposes the complete path", async () => {
     const onChange = vi.fn();
     const value: EndpointSelectorValue = {
       mode: "service",
@@ -371,11 +371,12 @@ describe("EndpointSelector", () => {
     expect(
       container.querySelector('[data-slot="endpoint-fields"]'),
     ).toHaveClass(
-      "flex",
       "w-full",
       "max-w-full",
       "min-w-0",
-      "flex-nowrap",
+      "grid",
+      "grid-cols-2",
+      "@min-[40rem]/endpoint:grid-cols-[minmax(14rem,1fr)_auto_auto]",
       "items-end",
     );
     expect(
@@ -386,36 +387,30 @@ describe("EndpointSelector", () => {
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-56",
-      "shrink",
-      "grow",
+      "col-span-2",
+      "@min-[40rem]/endpoint:col-span-1",
     );
     expect(
       container.querySelector('[data-slot="endpoint-scheme-field"]'),
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-32",
-      "shrink",
-      "grow-0",
+      "w-full",
     );
     expect(
       container.querySelector('[data-slot="endpoint-port-field"]'),
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-36",
-      "shrink",
-      "grow-0",
+      "w-full",
     );
     expect(
       container.querySelector('[data-slot="endpoint-path-field"]'),
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-56",
-      "shrink",
-      "grow",
+      "col-span-2",
+      "@min-[40rem]/endpoint:col-span-3",
     );
     expect(
       container.querySelector('[data-slot="endpoint-port-field"]'),

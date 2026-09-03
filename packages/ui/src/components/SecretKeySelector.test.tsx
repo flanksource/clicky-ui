@@ -52,7 +52,7 @@ function baseProps(overrides = {}) {
 }
 
 describe("SecretKeySelector references", () => {
-  it("sizes source, resource, and key by their content roles without wrapping", async () => {
+  it("stacks long reference fields in narrow containers while preserving hover text", async () => {
     const { container } = render(
       <SecretKeySelector
         value={{ kind: "secret", name: "db", key: "host" }}
@@ -70,7 +70,7 @@ describe("SecretKeySelector references", () => {
     await waitFor(() =>
       expect(fields.querySelectorAll('[role="combobox"]')).toHaveLength(2),
     );
-    expect(selector).toHaveClass("@container", "w-full", "min-w-0");
+    expect(selector).toHaveClass("@container/secret", "w-full", "min-w-0");
     expect(selector).not.toHaveClass("w-fit");
     expect(row).toHaveClass(
       "flex",
@@ -95,26 +95,31 @@ describe("SecretKeySelector references", () => {
       "min-w-0",
       "shrink",
       "grow",
-      "flex-nowrap",
+      "flex-col",
+      "@min-[22rem]/secret:flex-row",
     );
-    expect(fields).not.toHaveClass("grid", "w-fit", "flex-1");
+    expect(fields).not.toHaveClass("grid", "w-fit", "flex-1", "flex-nowrap");
     expect(
       container.querySelector('[data-slot="secret-resource-field"]'),
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-40",
+      "basis-auto",
+      "@min-[22rem]/secret:basis-40",
       "shrink",
       "grow-0",
+      "w-full",
     );
     expect(
       container.querySelector('[data-slot="secret-key-field"]'),
     ).toHaveClass(
       "max-w-full",
       "min-w-0",
-      "basis-72",
+      "basis-auto",
+      "@min-[22rem]/secret:basis-72",
       "shrink",
       "grow",
+      "w-full",
     );
     await waitFor(() =>
       expect(within(fields).getAllByRole("combobox")[1]).toHaveAttribute(

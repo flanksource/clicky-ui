@@ -42,13 +42,11 @@ const DEFAULT_MODE_KINDS: Record<EndpointWorkloadMode, WorkloadKind[]> = {
   "port-forward": ["service", "deployment"],
 };
 const WORKLOAD_FIELD =
-  "max-w-full min-w-0 basis-56 shrink grow";
-const SCHEME_FIELD =
-  "max-w-full min-w-0 basis-32 shrink grow-0";
-const PORT_FIELD =
-  "max-w-full min-w-0 basis-36 shrink grow-0";
+  "col-span-2 max-w-full min-w-0 @min-[40rem]/endpoint:col-span-1";
+const SCHEME_FIELD = "max-w-full min-w-0 w-full";
+const PORT_FIELD = "max-w-full min-w-0 w-full";
 const PATH_FIELD =
-  "max-w-full min-w-0 basis-56 shrink grow";
+  "col-span-2 max-w-full min-w-0 @min-[40rem]/endpoint:col-span-3 @min-[56rem]/endpoint:col-span-1";
 function isWorkloadValue(
   value: EndpointSelectorValue | undefined,
 ): value is EndpointWorkloadValue {
@@ -344,7 +342,7 @@ export function EndpointSelector({
     activeMode !== "url" && (activeMode !== "ingress" || showIngressPort);
 
   return (
-    <div className={cn("space-y-density-2", className)}>
+    <div className={cn("@container/endpoint space-y-density-2", className)}>
       <SegmentedControl
         value={activeMode}
         options={modeOptions}
@@ -371,7 +369,7 @@ export function EndpointSelector({
       ) : (
         <div className="space-y-density-2">
           <div
-            className="flex w-full max-w-full min-w-0 flex-nowrap items-end gap-density-2"
+            className="grid w-full max-w-full min-w-0 grid-cols-2 items-end gap-density-2 @min-[40rem]/endpoint:grid-cols-[minmax(14rem,1fr)_auto_auto] @min-[56rem]/endpoint:grid-cols-[minmax(14rem,1fr)_auto_auto_minmax(14rem,1fr)]"
             data-slot="endpoint-fields"
           >
             <div

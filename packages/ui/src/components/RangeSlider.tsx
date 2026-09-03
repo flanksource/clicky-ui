@@ -10,6 +10,8 @@ export type RangeSliderProps = {
   step?: number;
   ariaLabelMin?: string;
   ariaLabelMax?: string;
+  /** Shows number fields below the track for exact keyboard entry. */
+  editable?: boolean;
   className?: string;
   trackClassName?: string;
   rangeClassName?: string;
@@ -27,6 +29,7 @@ export function RangeSlider({
   step = 1,
   ariaLabelMin = "Minimum value",
   ariaLabelMax = "Maximum value",
+  editable = false,
   className,
   trackClassName,
   rangeClassName,
@@ -35,51 +38,114 @@ export function RangeSlider({
   const [lower, upper] = normalizeRangeValue(value, min, max);
 
   return (
-    <div className={cn("relative h-6", className)}>
-      <div
-        className={cn(
-          "absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border",
-          trackClassName,
-        )}
-      />
-      <div
-        className={cn(
-          "absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary/70",
-          rangeClassName,
-        )}
-        style={{
-          left: `${valueToPercent(lower, min, max)}%`,
-          right: `${100 - valueToPercent(upper, min, max)}%`,
-        }}
-      />
-      <input
-        type="range"
-        aria-label={ariaLabelMin}
-        min={min}
-        max={max}
-        step={step}
-        value={lower}
-        className={cn(baseSliderClassName, thumbClassName, thumbOverrideClassName)}
-        style={{ zIndex: lower >= max ? 30 : 20 }}
-        onChange={(event) => {
-          const nextLower = clampNumber(Number(event.target.value), min, max);
-          onChange([Math.min(nextLower, upper), upper]);
-        }}
-      />
-      <input
-        type="range"
-        aria-label={ariaLabelMax}
-        min={min}
-        max={max}
-        step={step}
-        value={upper}
-        className={cn(baseSliderClassName, thumbClassName, thumbOverrideClassName)}
-        onChange={(event) => {
-          const nextUpper = clampNumber(Number(event.target.value), min, max);
-          onChange([lower, Math.max(nextUpper, lower)]);
-        }}
-      />
+    <div className={cn(editable && "space-y-2", className)}>
+      <div className="relative h-6">
+        <div
+          className={cn(
+            "absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border",
+            trackClassName,
+          )}
+        />
+        <div
+          className={cn(
+            "absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-primary/70",
+            rangeClassName,
+          )}
+          style={{
+            left: `${valueToPercent(lower, min, max)}%`,
+            right: `${100 - valueToPercent(upper, min, max)}%`,
+          }}
+        />
+        <input
+          type="range"
+          aria-label={ariaLabelMin}
+          min={min}
+          max={max}
+          step={step}
+          value={lower}
+          className={cn(baseSliderClassName, thumbClassName, thumbOverrideClassName)}
+          style={{ zIndex: lower >= max ? 30 : 20 }}
+          onChange={(event) => {
+            const nextLower = clampNumber(Number(event.target.value), min, max);
+            onChange([Math.min(nextLower, upper), upper]);
+          }}
+        />
+        <input
+          type="range"
+          aria-label={ariaLabelMax}
+          min={min}
+          max={max}
+          step={step}
+          value={upper}
+          className={cn(baseSliderClassName, thumbClassName, thumbOverrideClassName)}
+          onChange={(event) => {
+            const nextUpper = clampNumber(Number(event.target.value), min, max);
+            onChange([lower, Math.max(nextUpper, lower)]);
+          }}
+        />
+      </div>
+      {editable ? (
+        <div className="grid grid-cols-2 gap-2">
+          <EditableBound
+            label="Min"
+            ariaLabel={`Edit ${lowercaseFirst(ariaLabelMin)}`}
+            min={min}
+            max={upper}
+            step={step}
+            value={lower}
+            onChange={(next) => onChange([next, upper])}
+          />
+          <EditableBound
+            label="Max"
+            ariaLabel={`Edit ${lowercaseFirst(ariaLabelMax)}`}
+            min={lower}
+            max={max}
+            step={step}
+            value={upper}
+            onChange={(next) => onChange([lower, next])}
+          />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function EditableBound({
+  label,
+  ariaLabel,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span>{label}</span>
+      <input
+        aria-label={ariaLabel}
+        className="h-7 min-w-0 rounded-md border border-input bg-background px-2 text-right font-mono text-xs tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        max={max}
+        min={min}
+        step={step}
+        type="number"
+        value={value}
+        onChange={(event) => {
+          if (event.currentTarget.value === "") return;
+          const next = Number(event.currentTarget.value);
+          if (!Number.isFinite(next)) throw new Error(`${ariaLabel} must be a finite number`);
+          onChange(clampNumber(next, min, max));
+        }}
+      />
+    </label>
   );
 }
 
@@ -99,4 +165,8 @@ function clampNumber(value: number, min: number, max: number) {
 function valueToPercent(value: number, min: number, max: number) {
   if (max <= min) return 0;
   return ((value - min) / (max - min)) * 100;
+}
+
+function lowercaseFirst(value: string): string {
+  return value.charAt(0).toLowerCase() + value.slice(1);
 }
