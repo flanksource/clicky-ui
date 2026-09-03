@@ -19,6 +19,15 @@ import { TestFilterBar } from "./TestFilterBar";
 
 export type TestRunnerProps = {
   tests: Test[];
+  /**
+   * The full, unfiltered forest driving the filter bar's pills/counts and the
+   * header summary — falls back to `tests` when omitted (every existing
+   * caller pre-filters `tests` itself). Pass this explicitly when `tests` is a
+   * filtered subset of a larger report, so toggling a status filter (e.g.
+   * excluding the only failed node) can't make its own pill — or the whole
+   * filter bar, once every pill's count reads zero — disappear.
+   */
+  allTests?: Test[];
   selected: Test | null;
   filters: TestFilters;
   expandAll: boolean | null;
@@ -86,6 +95,7 @@ function toRegistry(
  */
 export function TestRunner({
   tests,
+  allTests,
   selected,
   filters,
   expandAll,
@@ -155,9 +165,10 @@ export function TestRunner({
     ],
   );
 
-  const frameworks = useMemo(() => collectFrameworks(tests), [tests]);
-  const filterCounts = useMemo(() => aggregateStatusCounts(tests), [tests]);
-  const hasContent = tests.length > 0;
+  const summaryTests = allTests ?? tests;
+  const frameworks = useMemo(() => collectFrameworks(summaryTests), [summaryTests]);
+  const filterCounts = useMemo(() => aggregateStatusCounts(summaryTests), [summaryTests]);
+  const hasContent = summaryTests.length > 0;
 
   return (
     <TestRunnerProvider value={ctx}>
@@ -180,7 +191,7 @@ export function TestRunner({
                 {headerSlot}
                 {showSummary && (
                   <TestRunSummary
-                    tests={tests}
+                    tests={summaryTests}
                     startTime={startTime}
                     endTime={endTime}
                     done={done}

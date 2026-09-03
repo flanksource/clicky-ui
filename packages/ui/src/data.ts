@@ -337,6 +337,7 @@ export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHead
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
 export * from "./data/git";
 export * from "./data/test-runner";
+export * from "./data/verification";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
 export {

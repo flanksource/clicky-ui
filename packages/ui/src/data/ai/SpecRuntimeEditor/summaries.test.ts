@@ -122,6 +122,17 @@ describe("summaries", () => {
     ).toBe("Fixture");
   });
 
+  it("counts verify commands and prompts", () => {
+    expect(
+      summarizeVerify({
+        workflow: { verify: { commands: ["pnpm test", "pnpm lint"], prompts: ["review.prompt"] } },
+      }),
+    ).toBe("2 commands · 1 prompt");
+    expect(summarizeVerify({ workflow: { verify: { commands: ["pnpm test"] } } })).toBe(
+      "1 command",
+    );
+  });
+
   it("summarizes commit intent", () => {
     expect(summarizeCommit(VALUE)).toBe("Commit changes");
     expect(summarizeCommit({})).toBe("Leave uncommitted");

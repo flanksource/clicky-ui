@@ -231,7 +231,11 @@ interface EventVisual {
   summaryOnly: boolean;
 }
 
-function eventVisual(event: SessionEvent): EventVisual {
+// Base visuals per event kind. A row's `icon`/`tone` fields (set for a
+// `verified`/`verify_failed` system row — see SessionViewer.model.ts) override
+// these defaults; eventVisual applies that override uniformly below rather
+// than special-casing it inside the switch.
+function baseEventVisual(event: SessionEvent): EventVisual {
   switch (event.kind) {
     case "tool": {
       const action = getSessionAction(event.tool ?? "");
@@ -278,6 +282,15 @@ function eventVisual(event: SessionEvent): EventVisual {
         summaryOnly: false,
       };
   }
+}
+
+function eventVisual(event: SessionEvent): EventVisual {
+  const base = baseEventVisual(event);
+  return {
+    ...base,
+    icon: event.icon ?? base.icon,
+    tone: event.tone ?? base.tone,
+  };
 }
 
 function EventBody({
