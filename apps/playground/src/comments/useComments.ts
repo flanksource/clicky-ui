@@ -25,9 +25,6 @@ export const PLAYGROUND_COMMENT_AUTHOR = {
   kind: "user",
 } as const;
 
-const DEFAULT_STATUS =
-  DEFAULT_COMMENT_STATUSES.find((status) => status.unresolved)?.value ?? "open";
-
 export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
 };
@@ -89,6 +86,8 @@ export type PlaygroundComments = {
   create: (input: CommentCreateInput) => Promise<void>;
   reply: (input: CommentReplyInput) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
+  close: (id: string) => Promise<void>;
+  commentAndReopen: (id: string, body: string) => Promise<void>;
   updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
 };
@@ -190,7 +189,6 @@ export function useComments(
             page,
             body: input.body,
             author: PLAYGROUND_COMMENT_AUTHOR,
-            status: DEFAULT_STATUS,
             anchor,
             ...(input.rating ? { rating: input.rating } : {}),
             element,
@@ -217,14 +215,53 @@ export function useComments(
 
   const updateStatus = useCallback(
     (id: string, status: string) =>
-      mutate(() =>
-        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
-        }),
+      mutate(
+        () => {
+          if (status === "resolved") {
+            return post(
+              `${COMMENTS_ROUTE}/${encodeURIComponent(id)}/resolve`,
+              {},
+            );
+          }
+          if (status === "open") {
+            return post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/reopen`, {
+              author: PLAYGROUND_COMMENT_AUTHOR,
+            });
+          }
+          return request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          });
+        },
+        { rethrow: true },
       ),
-    [mutate],
+    [mutate, post],
+  );
+
+  const close = useCallback(
+    (id: string) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/close`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const commentAndReopen = useCallback(
+    (id: string, body: string) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/reopen`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            body,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
   );
 
   const updateRating = useCallback(
@@ -256,6 +293,8 @@ export function useComments(
     create,
     reply,
     updateStatus,
+    close,
+    commentAndReopen,
     updateRating,
     remove,
   };

@@ -2,6 +2,7 @@ import type { StaticIconComponent } from "@flanksource/clicky-ui";
 import { Badge, Callout, DensitySwitcher } from "@flanksource/clicky-ui";
 import {
   UiActivity,
+  UiCheck,
   UiCloud,
   UiDatabase,
   UiFilter,
@@ -13,6 +14,7 @@ import {
   UiSearch,
   UiServer,
   UiTable,
+  UiClose,
 } from "@flanksource/clicky-ui/icons";
 
 import { SpecimenSection } from "../DesignSystemPage";
@@ -42,16 +44,16 @@ export function ColorsSection() {
     <SpecimenSection
       id="colors"
       title="Colors"
-      description="Consume the role token. The active theme owns its value and its contrast relationship; brand color marks interaction and location, semantic tones carry state."
+      description="Use Tailwind's semantic utilities. The active theme owns their values and contrast relationships; brand color marks interaction and location, semantic tones carry state."
     >
       <div className="grid gap-density-3 sm:grid-cols-2 xl:grid-cols-3">
         {SEMANTIC_COLORS.map((color) => (
-          <article key={color.token} className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="h-16 border-b border-border" style={{ backgroundColor: `var(${color.token})` }} />
+          <article key={color.utility} className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className={`h-16 border-b border-border ${color.swatch}`} />
             <div className="space-y-1 p-density-3">
               <div className="flex items-baseline justify-between gap-density-2">
                 <h3 className="text-sm font-semibold text-foreground">{color.name}</h3>
-                <code className="text-[11px] text-muted-foreground">{color.token}</code>
+                <code className="text-[11px] text-muted-foreground">{color.utility}</code>
               </div>
               <p className="text-xs text-muted-foreground">{color.use}</p>
             </div>
@@ -105,14 +107,14 @@ export function SpacingSection() {
     <SpecimenSection
       id="spacing"
       title="Spacing & density"
-      description="A four-pixel base rhythm scales from icon gaps to page regions. Switch density to check that hierarchy survives every setting."
+      description="Tailwind's four-pixel spacing scale runs from icon gaps to page regions. Switch density to check that hierarchy survives every setting."
     >
       <div className="grid gap-density-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div className="space-y-density-2 rounded-xl border border-border bg-card p-density-4">
           {SPACE_TOKENS.map((space) => (
-            <div key={space.token} className="grid grid-cols-[8rem_1fr_3rem] items-center gap-density-3">
-              <code className="text-[11px] text-muted-foreground">{space.token}</code>
-              <div className="h-3 rounded-sm bg-primary" style={{ width: `var(${space.token})` }} />
+            <div key={space.utility} className="grid grid-cols-[8rem_1fr_3rem] items-center gap-density-3">
+              <code className="text-[11px] text-muted-foreground">{space.utility}</code>
+              <div className={`h-3 rounded-sm bg-primary ${space.width}`} />
               <span className="text-right text-xs text-muted-foreground">{space.pixels}px</span>
             </div>
           ))}
@@ -172,6 +174,40 @@ export function IconsSection() {
             <code className="text-[11px] text-muted-foreground">{size}</code>
           </div>
         ))}
+      </div>
+      <div className="grid gap-density-3 lg:grid-cols-2">
+        <article className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-density-4">
+          <div className="flex items-center gap-density-2 text-sm font-semibold text-foreground">
+            <UiCheck className="size-4 text-emerald-600" /> Interface glyphs
+          </div>
+          <p className="mt-density-2 text-xs leading-5 text-muted-foreground">
+            Import named <code>Ui*</code> components from <code>@flanksource/clicky-ui/icons</code> and render the component directly, for example <code>&lt;UiSearch /&gt;</code>.
+          </p>
+        </article>
+        <article className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-density-4">
+          <div className="flex items-center gap-density-2 text-sm font-semibold text-foreground">
+            <UiCheck className="size-4 text-emerald-600" /> Domain marks and tones
+          </div>
+          <p className="mt-density-2 text-xs leading-5 text-muted-foreground">
+            Product concepts live in named, typed sets such as <code>SC_ICONS</code> and the OIPA entity marks, where one key owns both its glyph and semantic tone.
+          </p>
+        </article>
+        <article className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-density-4">
+          <div className="flex items-center gap-density-2 text-sm font-semibold text-foreground">
+            <UiCheck className="size-4 text-emerald-600" /> Product logos
+          </div>
+          <p className="mt-density-2 text-xs leading-5 text-muted-foreground">
+            Import product and provider logos from <code>@flanksource/icons</code>. Logos identify a brand; they do not replace interface actions or status glyphs.
+          </p>
+        </article>
+        <article className="rounded-xl border border-destructive/30 bg-destructive/5 p-density-4">
+          <div className="flex items-center gap-density-2 text-sm font-semibold text-foreground">
+            <UiClose className="size-4 text-destructive" /> Runtime icon names
+          </div>
+          <p className="mt-density-2 text-xs leading-5 text-muted-foreground">
+            Avoid <code>{'<Icon name="search" />'}</code> and <code>{'<iconify-icon icon="ph:search" />'}</code>. String lookup hides missing glyphs until runtime and prevents the bundler and type checker from proving the asset exists.
+          </p>
+        </article>
       </div>
     </SpecimenSection>
   );

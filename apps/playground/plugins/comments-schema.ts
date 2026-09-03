@@ -1,7 +1,6 @@
 import {
   COMMENT_RATINGS,
   COMMENT_STATUSES,
-  RESOLVED_STATUS,
   UNRESOLVED_STATUSES,
 } from "./comments-store";
 
@@ -52,6 +51,7 @@ export type CommentTool = {
 const BASE = "/__playground/comments";
 
 const STATUS_VALUES = [...COMMENT_STATUSES];
+const ACTIVE_STATUS_VALUES = [...UNRESOLVED_STATUSES];
 
 const AUTHOR: JsonProperty = {
   type: "object",
@@ -191,10 +191,6 @@ export const COMMENT_TOOLS: CommentTool[] = [
             "CSS path to the element this note is about. Omit for a page-level note.",
         },
         element: ELEMENT,
-        status: {
-          ...STATUS,
-          description: `${STATUS.description} Defaults to "open".`,
-        },
       },
       required: ["page", "author", "element"],
       additionalProperties: false,
@@ -227,10 +223,6 @@ export const COMMENT_TOOLS: CommentTool[] = [
       type: "object",
       properties: {
         id: ID,
-        status: {
-          ...STATUS,
-          description: `${STATUS.description} Defaults to "${RESOLVED_STATUS}".`,
-        },
       },
       required: ["id"],
       additionalProperties: false,
@@ -240,13 +232,22 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "update_comment",
     label: "Update comment",
     description:
-      "Edit a comment's text or move it to any status, including back to open. Sets updatedAt.",
+      "Edit a comment's text, rating, or active work status. Resolve uses the dedicated resolve_comment operation; closing and reopening are human review actions.",
     method: "PATCH",
     path: `${BASE}/{id}`,
     annotations: { idempotentHint: true },
     inputSchema: {
       type: "object",
-      properties: { id: ID, body: BODY, status: STATUS, rating: RATING },
+      properties: {
+        id: ID,
+        body: BODY,
+        status: {
+          ...STATUS,
+          description: "Active work status only.",
+          enum: ACTIVE_STATUS_VALUES,
+        },
+        rating: RATING,
+      },
       required: ["id"],
       additionalProperties: false,
     },

@@ -11,28 +11,26 @@ import {
 import {
   AppShell,
   CommentSidePanel,
-  DensitySwitcher,
   DOCUMENT_ANCHOR,
-  SplitButton,
-  ThemeSwitcher,
   cn,
   useCommentContext,
 } from "@flanksource/clicky-ui";
-import { UiCode2, UiComment, UiFileText } from "@flanksource/clicky-ui/icons";
 
 import { CommentOverlay } from "./comments/CommentOverlay";
+import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
+import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
-import {
-  NewPageMenu,
-  PageActions,
-  PageManagementDialogs,
-} from "./editor/PageManagement";
+import { PageActions, PageManagementDialogs } from "./editor/PageManagement";
 import { usePageFolders } from "./editor/usePageFolders";
 import { usePageMoveDrag } from "./editor/usePageMoveDrag";
 import { useSource } from "./editor/useSource";
 import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
-import { PlaygroundViewActions } from "./PlaygroundViewActions";
+import {
+  EmptyPlayground,
+  PlaygroundBanner as Banner,
+} from "./PlaygroundShellParts";
+import { PlaygroundShellActions } from "./PlaygroundShellActions";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -80,50 +78,20 @@ export type PlaygroundShellProps = {
   commentsError: string | null;
   view: PlaygroundView;
   annotations: AnnotationVisibility;
+  review?: "resolved";
+  selectedCommentId?: string;
   pageHref: (slug: string) => string;
   onViewChange: (view: PlaygroundView) => void;
   onAnnotationsChange: (annotations: AnnotationVisibility) => void;
   onNavigate: (slug?: string) => void;
+  onReviewNavigate: (page: string, comment?: string) => void;
+  onReviewExit: () => void;
+  onCommentAndReopen: (id: string, body: string) => Promise<void>;
 };
 
 function shortAnchorLabel(anchor: string): string {
   const last = anchor.split(" > ").pop() ?? anchor;
   return last === ":scope" ? "Whole page" : last;
-}
-
-function Banner({
-  tone,
-  children,
-}: {
-  tone: "danger" | "warning";
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      role="status"
-      className={cn(
-        "mb-density-3 rounded-md border px-3 py-2 text-xs",
-        tone === "danger"
-          ? "border-destructive/40 bg-destructive/10 text-destructive"
-          : "border-amber-500/40 bg-amber-500/10 text-amber-700 [[data-theme=dark]_&]:text-amber-300",
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function EmptyPages() {
-  return (
-    <div className="mx-auto max-w-prose space-y-density-3 p-density-4 text-sm">
-      <h1 className="text-lg font-semibold">No artifacts yet</h1>
-      <p className="text-muted-foreground">
-        Create{" "}
-        <code className="rounded bg-muted px-1">src/pages/my-idea.tsx</code>{" "}
-        with a default export and it appears here — no registration step.
-      </p>
-    </div>
-  );
 }
 
 export function PlaygroundShell({
@@ -135,10 +103,15 @@ export function PlaygroundShell({
   commentsError,
   view,
   annotations,
+  review,
+  selectedCommentId,
   pageHref,
   onViewChange,
   onAnnotationsChange,
   onNavigate,
+  onReviewNavigate,
+  onReviewExit,
+  onCommentAndReopen,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
   const [commentMode, setCommentMode] = useState(false);
@@ -227,6 +200,16 @@ export function PlaygroundShell({
   useEffect(() => setCommentMode(false), [active?.slug, view]);
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
+  const { queue: reviewQueue, selectItem: selectReviewItem } =
+    useResolvedCommentReview({
+      allComments,
+      activeSlug: active?.slug,
+      selectedId: selectedCommentId,
+      active: review === "resolved",
+      pinsVersion: pins.length,
+      context: ctx,
+      onNavigate: onReviewNavigate,
+    });
 
   const folderImpact = (folder: string) => {
     const inFolder = pages().filter((entry) =>
@@ -245,7 +228,9 @@ export function PlaygroundShell({
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
     view === "preview" &&
-    (ctx.railMode !== "closed" || ctx.comments.length > 0);
+    (review === "resolved" ||
+      ctx.railMode !== "closed" ||
+      ctx.comments.length > 0);
   const editorOpen = editing && active !== undefined;
   const actionPage = pageAction?.page ?? active;
 
@@ -273,74 +258,45 @@ export function PlaygroundShell({
         />
       }
       actions={
-        <>
-          <PlaygroundViewActions
-            view={view}
-            annotations={annotations}
-            copyDisabled={pageGuidance.markdown === null}
-            copied={pageGuidance.copied}
-            onViewChange={onViewChange}
-            onAnnotationsChange={onAnnotationsChange}
-            onCopy={() => void pageGuidance.copyPage()}
-          />
-          <NewPageMenu
-            disabled={filesystemActionsDisabled}
-            disabledReason={filesystemActionsDisabledReason}
-            onSelect={(action) => setPageAction({ action })}
-          />
-          <button
-            type="button"
-            onClick={() => setEditing((on) => !on)}
-            aria-pressed={editing}
-            disabled={!active}
-            title="Edit this artifact's source"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-40",
-              editing
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <UiCode2 className="size-3.5" />
-            Edit
-            {source.dirty && (
-              <span className="size-1.5 rounded-full bg-amber-500" />
-            )}
-          </button>
-          {view === "preview" && (
-            <SplitButton
-              label={commentMode ? "Pick an element…" : "Comment"}
-              icon={UiComment}
-              onClick={() => setCommentMode((on) => !on)}
-              items={[
-                {
-                  label: "Comment on whole page",
-                  icon: UiFileText,
-                  onSelect: () => {
-                    setCommentMode(false);
-                    ctx.focusAnchor(DOCUMENT_ANCHOR);
-                  },
-                },
-              ]}
-              variant={commentMode ? "default" : "outline"}
-              size="sm"
-              title="Choose comment scope"
-            />
-          )}
-          <SplitButton
-            label={feedback.copied ? "Copied" : "Copy feedback"}
-            onClick={feedback.copyFeedback}
-            items={feedback.copyActions}
-            variant="outline"
-            size="sm"
-            // Only the primary half depends on this page having notes — the
-            // cross-page actions stay reachable from an empty artifact.
-            primaryDisabled={ctx.comments.length === 0}
-            title="More copy actions"
-          />
-          <ThemeSwitcher />
-          <DensitySwitcher />
-        </>
+        <PlaygroundShellActions
+          view={view}
+          annotations={annotations}
+          copyDisabled={pageGuidance.markdown === null}
+          pageMarkdownCopied={pageGuidance.copied}
+          onViewChange={onViewChange}
+          onAnnotationsChange={onAnnotationsChange}
+          onCopyPage={() => void pageGuidance.copyPage()}
+          filesystemActionsDisabled={filesystemActionsDisabled}
+          {...(filesystemActionsDisabledReason
+            ? { filesystemActionsDisabledReason }
+            : {})}
+          onNewPage={(action) => setPageAction({ action })}
+          active={Boolean(active)}
+          editing={editing}
+          sourceDirty={source.dirty}
+          onToggleEditing={() => setEditing((on) => !on)}
+          reviewActive={review === "resolved"}
+          reviewCount={reviewQueue.length}
+          onToggleReview={() =>
+            review === "resolved"
+              ? onReviewExit()
+              : selectReviewItem(
+                  reviewQueue.find(
+                    (comment) => comment.page === active?.slug,
+                  ) ?? reviewQueue[0],
+                )
+          }
+          commentMode={commentMode}
+          onToggleCommentMode={() => setCommentMode((on) => !on)}
+          onCommentWholePage={() => {
+            setCommentMode(false);
+            ctx.focusAnchor(DOCUMENT_ANCHOR);
+          }}
+          feedbackCopied={feedback.copied}
+          onCopyFeedback={feedback.copyFeedback}
+          feedbackCopyActions={feedback.copyActions}
+          pageCommentCount={ctx.comments.length}
+        />
       }
       navSections={navSections}
       collapsedStorageKey="playground:sidebar:collapsed"
@@ -444,7 +400,7 @@ export function PlaygroundShell({
                 </AnnotationVisibilityProvider>
               </Suspense>
             ) : (
-              <EmptyPages />
+              <EmptyPlayground />
             )}
           </div>
 
@@ -465,13 +421,45 @@ export function PlaygroundShell({
 
         {railVisible && (
           <div className="shrink-0 overflow-y-auto border-l border-border p-density-3">
-            <CommentSidePanel
-              focusedAlignment="anchor"
-              anchorLabels={labels}
-              formatAnchorLabel={shortAnchorLabel}
-              compact
-              threadToMarkdown={feedback.threadToMarkdown}
-            />
+            {review === "resolved" ? (
+              <PlaygroundCommentReview
+                allComments={allComments}
+                selectedId={selectedCommentId}
+                config={ctx.config}
+                anchorLabels={labels}
+                formatAnchorLabel={shortAnchorLabel}
+                threadToMarkdown={feedback.threadToMarkdown}
+                onSelect={selectReviewItem}
+                onClose={async (id) => {
+                  if (!ctx.callbacks.onClose) {
+                    throw new Error("Comment closing is not configured");
+                  }
+                  await ctx.callbacks.onClose(id);
+                }}
+                onCommentAndReopen={onCommentAndReopen}
+                onReply={async (parent, body) => {
+                  if (!ctx.callbacks.onReply) {
+                    throw new Error("Comment replies are not configured");
+                  }
+                  await ctx.callbacks.onReply({
+                    parentId: parent.id,
+                    body,
+                    ...(parent.anchor !== undefined
+                      ? { anchor: parent.anchor }
+                      : {}),
+                  });
+                }}
+                onExit={onReviewExit}
+              />
+            ) : (
+              <CommentSidePanel
+                focusedAlignment="anchor"
+                anchorLabels={labels}
+                formatAnchorLabel={shortAnchorLabel}
+                compact
+                threadToMarkdown={feedback.threadToMarkdown}
+              />
+            )}
           </div>
         )}
       </div>
