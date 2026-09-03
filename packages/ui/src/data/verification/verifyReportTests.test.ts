@@ -120,7 +120,7 @@ describe("verifyReportTests", () => {
       skipped: 1,
       pending: 0,
       running: 0,
-      timedout: 0,
+      timedout: 2,
     };
 
     it("maps VerifySummary onto the test-runner's PascalCase TestSummary shape", () => {
@@ -136,6 +136,7 @@ describe("verifyReportTests", () => {
         Skipped: 1,
         Pending: 0,
         Running: 0,
+        Timedout: 2,
         Duration: 0,
       });
     });
@@ -146,13 +147,21 @@ describe("verifyReportTests", () => {
       );
 
       expect(tests[0]?.children).toBeUndefined();
-      expect(sum(tests[0]!)).toMatchObject({ total: 20, passed: 15, failed: 3, warned: 1, skipped: 1 });
+      expect(sum(tests[0]!)).toMatchObject({
+        total: 20,
+        passed: 15,
+        failed: 3,
+        warned: 1,
+        skipped: 1,
+        timedout: 2,
+      });
       expect(aggregateStatusCounts(tests)).toMatchObject({
         total: 20,
         passed: 15,
         failed: 3,
         warned: 1,
         skipped: 1,
+        timedout: 2,
       });
     });
 

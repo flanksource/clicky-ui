@@ -65,7 +65,7 @@ const countsFromSummary = (summary: TestSummary): StatusCounts => ({
   skipped: summary.Skipped,
   pending: summary.Pending || 0,
   running: summary.Running || 0,
-  timedout: 0,
+  timedout: summary.Timedout || 0,
 });
 
 const countsFromLeaf = (t: Test): StatusCounts => {

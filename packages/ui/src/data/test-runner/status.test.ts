@@ -62,10 +62,18 @@ describe("sum", () => {
   it("prefers an explicit summary over walking children", () => {
     const node: Test = {
       name: "pkg",
-      summary: { Total: 9, Passed: 7, Failed: 2, Skipped: 0, Pending: 0, Duration: 0 },
+      summary: { Total: 9, Passed: 7, Failed: 2, Skipped: 0, Pending: 0, Timedout: 1, Duration: 0 },
       children: [leaf("ignored", { passed: true })],
     };
-    expect(sum(node)).toMatchObject({ total: 9, passed: 7, failed: 2 });
+    expect(sum(node)).toMatchObject({ total: 9, passed: 7, failed: 2, timedout: 1 });
+  });
+
+  it("defaults a summary's timedout count to 0 when the field is absent", () => {
+    const node: Test = {
+      name: "pkg",
+      summary: { Total: 3, Passed: 3, Failed: 0, Skipped: 0, Pending: 0, Duration: 0 },
+    };
+    expect(sum(node)).toMatchObject({ total: 3, passed: 3, timedout: 0 });
   });
 
   it("counts a timed-out leaf only as timedout, never as its underlying verdict", () => {

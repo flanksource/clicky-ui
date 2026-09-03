@@ -194,8 +194,11 @@ function alignmentsOf(table: Element | undefined) {
 
 async function renderMarkdown(text: string) {
   const { container } = render(<Markdown text={text} />);
-  // Streamdown is loaded lazily; the `prose` wrapper only appears once it lands.
-  await waitFor(() => expect(container.querySelector(".prose")).not.toBeNull());
+  // Streamdown is loaded lazily; importing it can exceed Testing Library's
+  // one-second default while the complete CI suite is transforming in parallel.
+  await waitFor(() => expect(container.querySelector(".prose")).not.toBeNull(), {
+    timeout: 5_000,
+  });
   return container.querySelector<HTMLElement>(".prose") as HTMLElement;
 }
 

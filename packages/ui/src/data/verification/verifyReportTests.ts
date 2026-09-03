@@ -20,10 +20,7 @@ function coerceDuration(duration: unknown): number | undefined {
  * `status.ts`) read a summary-carrying node's counts directly instead of
  * recursing into (possibly elided) children.
  *
- * `TestSummary` has no `timedout` counter — `countsFromSummary` in
- * `status.ts` always reports 0 for it — so a non-zero `VerifySummary.timedout`
- * does not survive this projection. `Duration` is likewise not carried by
- * `VerifySummary`, so it is reported as 0.
+ * `Duration` is not carried by `VerifySummary`, so it is reported as 0.
  */
 function verifySummaryToTestSummary(summary: VerifySummary): TestSummary {
   return {
@@ -34,6 +31,7 @@ function verifySummaryToTestSummary(summary: VerifySummary): TestSummary {
     Skipped: summary.skipped,
     Pending: summary.pending,
     Running: summary.running,
+    Timedout: summary.timedout,
     Duration: 0,
   };
 }
