@@ -14,7 +14,9 @@ import {
   isUnresolved,
   matchMentionsInBody,
   nextChecklistStatus,
+  resolveCommentStage,
   resolveStatusConfig,
+  selectCommentThreadsByStage,
   sortReplies,
   toneToBadgeTone,
   truncatePlain,
@@ -28,8 +30,20 @@ import {
 
 const config: CommentConfig = {
   statuses: [
-    { value: "open", label: "Open", tone: "info", unresolved: true },
-    { value: "resolved", label: "Resolved", tone: "success" },
+    {
+      value: "open",
+      label: "Open",
+      tone: "info",
+      unresolved: true,
+      stage: "active",
+    },
+    {
+      value: "resolved",
+      label: "Resolved",
+      tone: "success",
+      stage: "resolved",
+    },
+    { value: "closed", label: "Closed", stage: "closed" },
   ],
   facets: [
     {
@@ -56,14 +70,27 @@ function comment(over: Partial<Comment> & Pick<Comment, "id">): Comment {
 describe("buildReplyMap / sortReplies / getRoots", () => {
   const comments: Comment[] = [
     comment({ id: "r1", status: "open" }),
-    comment({ id: "c2", parentId: "r1", createdAt: "2026-01-02T00:00:00.000Z" }),
-    comment({ id: "c1", parentId: "r1", createdAt: "2026-01-01T05:00:00.000Z" }),
+    comment({
+      id: "c2",
+      parentId: "r1",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }),
+    comment({
+      id: "c1",
+      parentId: "r1",
+      createdAt: "2026-01-01T05:00:00.000Z",
+    }),
     comment({ id: "r2", status: "resolved" }),
   ];
 
   it("indexes replies under their parent id", () => {
     const map = buildReplyMap(comments);
-    expect(map.get("r1")?.map((c) => c.id).sort()).toEqual(["c1", "c2"]);
+    expect(
+      map
+        .get("r1")
+        ?.map((c) => c.id)
+        .sort(),
+    ).toEqual(["c1", "c2"]);
     expect(map.has("r2")).toBe(false);
   });
 
@@ -96,7 +123,12 @@ describe("groupByFacet", () => {
 
 describe("deriveAnchorCounts / deriveAnchorMeta", () => {
   const comments: Comment[] = [
-    comment({ id: "a", anchor: "row.1", author: { name: "Ada" }, status: "open" }),
+    comment({
+      id: "a",
+      anchor: "row.1",
+      author: { name: "Ada" },
+      status: "open",
+    }),
     comment({
       id: "b",
       anchor: "row.1",
@@ -108,7 +140,10 @@ describe("deriveAnchorCounts / deriveAnchorMeta", () => {
   ];
 
   it("counts comments per anchor, null → document anchor", () => {
-    expect(deriveAnchorCounts(comments)).toEqual({ "row.1": 2, [DOCUMENT_ANCHOR]: 1 });
+    expect(deriveAnchorCounts(comments)).toEqual({
+      "row.1": 2,
+      [DOCUMENT_ANCHOR]: 1,
+    });
   });
 
   it("aggregates distinct authors and the latest status", () => {
@@ -151,10 +186,28 @@ describe("truncatePlain", () => {
 
 describe("applyCommentFilters", () => {
   const comments: Comment[] = [
-    comment({ id: "r1", status: "open", facets: { area: "ui" }, author: { name: "Ada", kind: "user" } }),
-    comment({ id: "r1c", parentId: "r1", author: { name: "Bot", kind: "agent" } }),
-    comment({ id: "r2", status: "resolved", facets: { area: "api" }, author: { name: "Bo" } }),
-    comment({ id: "r3", status: "open", author: { name: "AI", kind: "agent" } }),
+    comment({
+      id: "r1",
+      status: "open",
+      facets: { area: "ui" },
+      author: { name: "Ada", kind: "user" },
+    }),
+    comment({
+      id: "r1c",
+      parentId: "r1",
+      author: { name: "Bot", kind: "agent" },
+    }),
+    comment({
+      id: "r2",
+      status: "resolved",
+      facets: { area: "api" },
+      author: { name: "Bo" },
+    }),
+    comment({
+      id: "r3",
+      status: "open",
+      author: { name: "AI", kind: "agent" },
+    }),
   ];
 
   it("filters by status and keeps the replies of passing roots", () => {
@@ -188,8 +241,15 @@ describe("applyCommentFilters", () => {
 describe("hasActiveFilters", () => {
   it("is false for an empty filter and true once an axis is set", () => {
     expect(hasActiveFilters(emptyCommentFilters())).toBe(false);
-    expect(hasActiveFilters({ ...emptyCommentFilters(), statuses: new Set(["open"]) })).toBe(true);
-    expect(hasActiveFilters({ ...emptyCommentFilters(), authorKind: "agent" })).toBe(true);
+    expect(
+      hasActiveFilters({
+        ...emptyCommentFilters(),
+        statuses: new Set(["open"]),
+      }),
+    ).toBe(true);
+    expect(
+      hasActiveFilters({ ...emptyCommentFilters(), authorKind: "agent" }),
+    ).toBe(true);
   });
 });
 
@@ -200,9 +260,9 @@ describe("matchMentionsInBody", () => {
   ];
 
   it("returns mentionables whose @name appears in the body", () => {
-    expect(matchMentionsInBody("hey @claude please check", mentionables)).toEqual([
-      { id: "a1", name: "claude", kind: "agent" },
-    ]);
+    expect(
+      matchMentionsInBody("hey @claude please check", mentionables),
+    ).toEqual([{ id: "a1", name: "claude", kind: "agent" }]);
   });
 
   it("returns nothing when no mention token is present", () => {
@@ -226,6 +286,28 @@ describe("status helpers", () => {
   it("resolves a status config by value", () => {
     expect(resolveStatusConfig(config, "resolved")?.label).toBe("Resolved");
     expect(resolveStatusConfig(config, "nope")).toBeUndefined();
+  });
+
+  it("resolves lifecycle stages and defaults a missing root status to active", () => {
+    expect(resolveCommentStage(config, undefined)).toBe("active");
+    expect(resolveCommentStage(config, "resolved")).toBe("resolved");
+    expect(resolveCommentStage(config, "closed")).toBe("closed");
+  });
+
+  it("selects whole threads by their root lifecycle stage", () => {
+    const comments = [
+      comment({ id: "open-root", status: "open" }),
+      comment({ id: "open-reply", parentId: "open-root" }),
+      comment({ id: "resolved-root", status: "resolved" }),
+      comment({ id: "resolved-reply", parentId: "resolved-root" }),
+      comment({ id: "closed-root", status: "closed" }),
+    ];
+
+    expect(
+      selectCommentThreadsByStage(comments, config, "resolved").map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["resolved-root", "resolved-reply"]);
   });
 
   it("names an author with an Unknown fallback", () => {

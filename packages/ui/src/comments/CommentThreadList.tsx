@@ -23,7 +23,8 @@ export type CommentThreadListProps = {
   renderBody?: (body: string) => ReactNode;
   /** Serialize a root and its replies for Copy and the Markdown preview. */
   threadToMarkdown?: (thread: readonly Comment[]) => string;
-  onUpdateStatus?: (id: string, status: string) => void;
+  onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
+  onClose?: (id: string) => void | Promise<void>;
   onChecklistToggle?: (id: string, index: number) => void;
   onDelete?: (id: string) => void;
   /** Submit a reply to `parent`. Presence enables the inline reply affordance. */
@@ -97,6 +98,7 @@ export function CommentThreadList({
   renderBody,
   threadToMarkdown,
   onUpdateStatus,
+  onClose,
   onChecklistToggle,
   onDelete,
   onReply,
@@ -131,6 +133,7 @@ export function CommentThreadList({
       ...(onUpdateStatus
         ? { onUpdateStatus: (status: string) => onUpdateStatus(id, status) }
         : {}),
+      ...(onClose ? { onClose: () => onClose(id) } : {}),
       ...(onChecklistToggle
         ? { onChecklistToggle: (index: number) => onChecklistToggle(id, index) }
         : {}),

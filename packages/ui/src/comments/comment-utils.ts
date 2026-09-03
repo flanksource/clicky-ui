@@ -14,6 +14,7 @@ import {
   type CommentMentionable,
   type CommentMentionKind,
   type CommentStatusConfig,
+  type CommentStatusStage,
   type CommentTone,
   DOCUMENT_ANCHOR,
 } from "./comment-types";
@@ -73,6 +74,35 @@ export function isUnresolved(
   return resolveStatusConfig(config, status)?.unresolved ?? false;
 }
 
+/** Resolves a stored status to its lifecycle stage. */
+export function resolveCommentStage(
+  config: CommentConfig,
+  status: string | undefined,
+): CommentStatusStage | undefined {
+  if (status == null) return "active";
+  const resolved = resolveStatusConfig(config, status);
+  if (!resolved) return undefined;
+  if (resolved.stage) return resolved.stage;
+  if (resolved.unresolved) return "active";
+  if (
+    resolved.value.toLowerCase() === "closed" ||
+    resolved.label.toLowerCase() === "closed"
+  ) {
+    return "closed";
+  }
+  return "resolved";
+}
+
+/** Returns the first configured stored status for a lifecycle stage. */
+export function statusForCommentStage(
+  config: CommentConfig,
+  stage: CommentStatusStage,
+): CommentStatusConfig | undefined {
+  return config.statuses.find(
+    (status) => resolveCommentStage(config, status.value) === stage,
+  );
+}
+
 /** Returns the root (non-reply) comments in input order. */
 export function getRoots(comments: Comment[]): Comment[] {
   return comments.filter((c) => !c.parentId);
@@ -128,10 +158,28 @@ export function selectUnresolvedThreads(
 ): Comment[] {
   const keep = new Set(
     getRoots(comments)
-      .filter((root) => root.status == null || isUnresolved(config, root.status))
+      .filter(
+        (root) => root.status == null || isUnresolved(config, root.status),
+      )
       .map((root) => String(root.id)),
   );
   return comments.filter((c) => keep.has(String(c.parentId ?? c.id)));
+}
+
+/** Selects roots in one lifecycle stage together with every descendant reply. */
+export function selectCommentThreadsByStage(
+  comments: Comment[],
+  config: CommentConfig,
+  stage: CommentStatusStage,
+): Comment[] {
+  const keep = new Set(
+    getRoots(comments)
+      .filter((root) => resolveCommentStage(config, root.status) === stage)
+      .map((root) => String(root.id)),
+  );
+  return comments.filter((comment) =>
+    keep.has(String(comment.parentId ?? comment.id)),
+  );
 }
 
 /** Stable reply ordering: by creation time, then id. */
@@ -298,7 +346,8 @@ export function matchMentionsInBody(
 
 /** Per-id handlers consumed by CommentThreadList. */
 export type ThreadListHandlers = {
-  onUpdateStatus?: (id: string, status: string) => void;
+  onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
+  onClose?: (id: string) => void | Promise<void>;
   onChecklistToggle?: (id: string, index: number) => void;
   onDelete?: (id: string) => void;
   onReply?: (parent: Comment, body: string) => void | Promise<void>;
@@ -317,6 +366,7 @@ export function buildThreadListHandlers(
 ): ThreadListHandlers {
   const handlers: ThreadListHandlers = {};
   if (cb.onUpdateStatus) handlers.onUpdateStatus = cb.onUpdateStatus;
+  if (cb.onClose) handlers.onClose = cb.onClose;
   if (cb.onDelete) handlers.onDelete = cb.onDelete;
   if (cb.onChecklistToggle) {
     const toggle = cb.onChecklistToggle;
