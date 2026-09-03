@@ -1,5 +1,10 @@
 export { cn } from "./lib/utils";
 export {
+  resolveCommentStage,
+  selectCommentThreadsByStage,
+  statusForCommentStage,
+} from "./lib/comment-stage";
+export {
   duplicateIndex,
   isPlainObject,
   moveItem,

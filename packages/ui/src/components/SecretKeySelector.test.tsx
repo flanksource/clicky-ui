@@ -79,7 +79,8 @@ describe("SecretKeySelector references", () => {
       "min-w-0",
       "flex-nowrap",
     );
-    expect(row).not.toHaveClass("w-fit", "flex-wrap");
+    expect(row).not.toHaveClass("w-fit");
+    expect(row).not.toHaveClass("flex-wrap");
     expect(
       container.querySelector('[data-slot="secret-source-combobox"]'),
     ).toHaveClass(
@@ -98,7 +99,10 @@ describe("SecretKeySelector references", () => {
       "flex-col",
       "@min-[22rem]/secret:flex-row",
     );
-    expect(fields).not.toHaveClass("grid", "w-fit", "flex-1", "flex-nowrap");
+    expect(fields).not.toHaveClass("grid");
+    expect(fields).not.toHaveClass("w-fit");
+    expect(fields).not.toHaveClass("flex-1");
+    expect(fields).not.toHaveClass("flex-nowrap");
     expect(
       container.querySelector('[data-slot="secret-resource-field"]'),
     ).toHaveClass(

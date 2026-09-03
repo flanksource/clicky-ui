@@ -1,5 +1,10 @@
 export * from "./comments/comment-types";
 export * from "./comments/comment-utils";
+export {
+  resolveCommentStage,
+  selectCommentThreadsByStage,
+  statusForCommentStage,
+} from "./lib/comment-stage";
 
 export {
   CommentMarkdown,
