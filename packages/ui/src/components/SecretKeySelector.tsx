@@ -88,8 +88,8 @@ const DEFAULT_SOURCES: SecretValueSource[] = ["secret", "configmap", "value"];
 
 const SHRINKABLE_FIELD = "max-w-full min-w-0 shrink";
 const SOURCE_FIELD = `${SHRINKABLE_FIELD} basis-40 grow-0`;
-const RESOURCE_FIELD = `${SHRINKABLE_FIELD} basis-40 grow-0`;
-const KEY_FIELD = `${SHRINKABLE_FIELD} basis-72 grow`;
+const RESOURCE_FIELD = `${SHRINKABLE_FIELD} w-full basis-auto grow-0 @min-[22rem]/secret:basis-40`;
+const KEY_FIELD = `${SHRINKABLE_FIELD} w-full basis-auto grow @min-[22rem]/secret:basis-72`;
 const VALUE_FIELD = `${SHRINKABLE_FIELD} basis-64 grow`;
 
 export function SecretKeySelector({
@@ -249,7 +249,7 @@ export function SecretKeySelector({
   return (
     <div
       data-slot="secret-key-selector"
-      className={cn("@container w-full min-w-0", className)}
+      className={cn("@container/secret w-full min-w-0", className)}
     >
       <div
         className="flex w-full max-w-full min-w-0 flex-nowrap items-center gap-2"
@@ -323,7 +323,7 @@ export function SecretKeySelector({
         ) : (
           <div
             className={cn(
-              "flex flex-nowrap items-center gap-2",
+              "flex flex-col items-center gap-2 @min-[22rem]/secret:flex-row",
               SHRINKABLE_FIELD,
               "grow",
             )}

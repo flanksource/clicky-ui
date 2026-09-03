@@ -49,4 +49,31 @@ describe("RangeSlider", () => {
     });
     expect(onChange).toHaveBeenCalledWith([7, 7]);
   });
+
+  it("optionally exposes editable minimum and maximum values", () => {
+    const onChange = vi.fn();
+
+    render(
+      <RangeSlider
+        editable
+        min={0}
+        max={10}
+        step={1}
+        value={[3, 8]}
+        onChange={onChange}
+        ariaLabelMin="Minimum severity"
+        ariaLabelMax="Maximum severity"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Edit minimum severity"), {
+      target: { value: "5" },
+    });
+    expect(onChange).toHaveBeenCalledWith([5, 8]);
+
+    fireEvent.change(screen.getByLabelText("Edit maximum severity"), {
+      target: { value: "7" },
+    });
+    expect(onChange).toHaveBeenCalledWith([3, 7]);
+  });
 });
