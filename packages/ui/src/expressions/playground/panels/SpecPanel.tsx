@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { Badge, DataTable } from "@flanksource/clicky-ui";
-import type { DataTableColumn } from "@flanksource/clicky-ui";
+import { Badge } from "../../../data/Badge";
+import { DataTable, type DataTableColumn } from "../../../data/DataTable";
 import type { GomplateSpec, SpecFunction } from "../../lang/index.ts";
 
 interface SpecPanelProps {
@@ -28,7 +28,8 @@ interface FunctionRow extends Record<string, unknown> {
  */
 export function SpecPanel({ flavour, spec }: SpecPanelProps) {
   const rows = useMemo(() => {
-    const functions = flavour === "cel" ? spec.cel.functions : spec.gotemplate.functions;
+    const functions =
+      flavour === "cel" ? spec.cel.functions : spec.gotemplate.functions;
     return functions.map(toRow);
   }, [flavour, spec]);
 
@@ -47,7 +48,11 @@ export function SpecPanel({ flavour, spec }: SpecPanelProps) {
       filterable: true,
       shrink: true,
       render: (value) =>
-        value ? String(value) : <span className="text-muted-foreground">—</span>,
+        value ? (
+          String(value)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       key: "kind",

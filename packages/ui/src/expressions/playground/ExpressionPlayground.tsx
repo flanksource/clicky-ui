@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Combobox, Tabs } from "@flanksource/clicky-ui";
-import { MonacoEditor } from "@flanksource/clicky-ui/monaco";
-import type { Monaco } from "@flanksource/clicky-ui/monaco";
+import { Combobox } from "../../components/Combobox";
+import { Tabs } from "../../layout/Tabs";
+import { MonacoEditor } from "../../monaco/MonacoEditor";
+import type { Monaco } from "@monaco-editor/react";
 import * as monacoEditor from "monaco-editor";
 
-import { mergeSpec, registerGomplateLanguages, spec as packagedSpec } from "../lang/index.ts";
+import {
+  mergeSpec,
+  registerGomplateLanguages,
+  spec as packagedSpec,
+} from "../lang/index.ts";
 import type { GomplateSpec, RegisteredLanguages } from "../lang/index.ts";
 import { DEFAULT_API_BASE, fetchExamples, fetchSpec } from "./api.ts";
 import type { EvalResponse, Example } from "./api.ts";
@@ -19,7 +24,8 @@ import { registerRunAction } from "./runAction.ts";
 import { useEditorTheme } from "./useEditorTheme.ts";
 import { useEvaluator } from "./useEvaluator.ts";
 import { useParsedInput } from "./useParsedInput.ts";
-import { VerticalSplit, rowsToPaneHeight } from "./VerticalSplit.tsx";
+import { VerticalSplit } from "./VerticalSplit.tsx";
+import { rowsToPaneHeight } from "./verticalSplitModel";
 
 /** What the author is editing. Hosts persist this wherever suits them. */
 export interface PlaygroundState {
@@ -163,12 +169,15 @@ export function ExpressionPlayground({
   // current `run` through a ref rather than capturing it.
   const runRef = useRef(evaluator.run);
   runRef.current = evaluator.run;
-  const sourceEditor = useRef<Parameters<typeof registerRunAction>[0] | null>(null);
+  const sourceEditor = useRef<Parameters<typeof registerRunAction>[0] | null>(
+    null,
+  );
   const onEditorMount = useCallback(
     (editor: Parameters<typeof registerRunAction>[0], monaco: Monaco) => {
       applyTheme();
       registerRunAction(editor, monaco, () => runRef.current());
-      if (editor.getModel()?.uri.toString() === SOURCE_MODEL_PATH) sourceEditor.current = editor;
+      if (editor.getModel()?.uri.toString() === SOURCE_MODEL_PATH)
+        sourceEditor.current = editor;
     },
     [applyTheme],
   );
@@ -184,7 +193,9 @@ export function ExpressionPlayground({
     editor.focus();
   }, []);
 
-  const catalogue = language.catalogue ? activeSpec[language.catalogue].functions : [];
+  const catalogue = language.catalogue
+    ? activeSpec[language.catalogue].functions
+    : [];
 
   return (
     <div className={`flex h-full min-h-0 ${className ?? ""}`}>
@@ -209,8 +220,14 @@ export function ExpressionPlayground({
                     ariaLabel="Load an example"
                     className="w-56"
                     onChange={(name) => {
-                      const example = forLanguage.find((candidate) => candidate.name === name);
-                      if (example) update({ source: example.source, input: example.input });
+                      const example = forLanguage.find(
+                        (candidate) => candidate.name === name,
+                      );
+                      if (example)
+                        update({
+                          source: example.source,
+                          input: example.input,
+                        });
                     }}
                   />
                 ) : undefined
@@ -233,7 +250,9 @@ export function ExpressionPlayground({
               hint={
                 <span
                   className={`truncate text-[11px] ${
-                    parsedInput.error ? "text-destructive" : "text-muted-foreground/70"
+                    parsedInput.error
+                      ? "text-destructive"
+                      : "text-muted-foreground/70"
                   }`}
                   title={parsedInput.error ?? undefined}
                 >
@@ -287,7 +306,10 @@ export function ExpressionPlayground({
             />
           ) : null}
           {outputTab === "tokens" ? (
-            <TokensPanel source={state.source} languageId={language.editorLanguage} />
+            <TokensPanel
+              source={state.source}
+              languageId={language.editorLanguage}
+            />
           ) : null}
           {outputTab === "spec" && language.catalogue ? (
             <SpecPanel flavour={language.catalogue} spec={activeSpec} />

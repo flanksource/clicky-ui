@@ -1,6 +1,6 @@
 name: Vendor gomplate languages
 
-# The tokenizers under packages/expressions/src/lang are generated from cel-go's
+# The tokenizers under packages/ui/src/expressions/lang are generated from cel-go's
 # ANTLR grammar, text/template's lexer and gomplate's live function registries.
 # Only a Go toolchain can read any of that, so this job runs gomplate's own
 # generator and opens a PR when the result changes.
@@ -19,16 +19,16 @@ on:
     # Only when the vendored tree is touched. Regenerating needs Go and a clone
     # of gomplate, which is not worth paying for on every unrelated PR.
     paths:
-      - packages/expressions/src/lang/**
-      - packages/expressions/VENDOR
-      - packages/expressions/scripts/vendor-lang.ts
+      - packages/ui/src/expressions/lang/**
+      - packages/ui/src/expressions/VENDOR
+      - packages/ui/scripts/vendor-expressions.ts
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    # Catches a hand-edit under src/lang, which would be silently overwritten by
+    # Catches a hand-edit under src/expressions/lang, which would be overwritten by
     # the next scheduled vendoring.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -48,9 +48,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Check the vendored tree is generated, not hand-edited
-        working-directory: packages/expressions
-        run: pnpm vendor:check
-
+        working-directory: packages/ui
+        run: pnpm vendor:expressions:check
 
   vendor:
     if: github.event_name != 'pull_request'
@@ -85,13 +84,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Vendor
-        working-directory: packages/expressions
-        run: pnpm vendor --ref "${{ inputs.ref || 'main' }}"
+        working-directory: packages/ui
+        run: pnpm vendor:expressions --ref "${{ inputs.ref || 'main' }}"
 
       # The vendored tree is source: it has to typecheck and its tests have to
       # pass before a PR is worth anyone's attention.
-      - name: Verify
-        run: pnpm --filter @flanksource/expressions run check && pnpm --filter @flanksource/expressions run test
+      - name: Check UI package
+        run: pnpm --filter @flanksource/clicky-ui run check
+      - name: Test expression support
+        run: pnpm --filter @flanksource/clicky-ui exec vitest run src/expressions.test.ts
 
       - name: Open a pull request
         uses: peter-evans/create-pull-request@v7
@@ -101,8 +102,8 @@ jobs:
           title: "chore(expressions): vendor gomplate language definitions"
           commit-message: "chore(expressions): vendor gomplate language definitions"
           body: |
-            Regenerated `packages/expressions/src/lang` from gomplate.
-            See `packages/expressions/VENDOR` for the commit it came from.
+            Regenerated `packages/ui/src/expressions/lang` from gomplate.
+            See `packages/ui/src/expressions/VENDOR` for the commit it came from.
           add-paths: |
-            packages/expressions/src/lang
-            packages/expressions/VENDOR
+            packages/ui/src/expressions/lang
+            packages/ui/src/expressions/VENDOR

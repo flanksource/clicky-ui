@@ -1,6 +1,8 @@
-import type { ObjectGraphNode } from "@flanksource/clicky-ui/data";
-import { literalSegments } from "@flanksource/clicky-ui/components";
-import type { JSONPathNode } from "@flanksource/clicky-ui/components";
+import {
+  literalSegments,
+  type JSONPathNode,
+} from "../../../components/jsonPathTree";
+import type { ObjectGraphNode } from "../../../data/ObjectGraph";
 import { kindOf } from "../../lang/index.ts";
 
 /** An `ObjectGraphNode` that keeps the tree node it came from, for lazy loading. */

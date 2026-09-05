@@ -79,6 +79,10 @@ The root `@flanksource/clicky-ui` barrel remains supported for compatibility and
 
 The published package uses plain semver dependency ranges and does not require pnpm workspace or catalog protocols. The package ships ESM and CommonJS entrypoints for the public subpaths above.
 
+## Expression language support
+
+Import gomplate-compatible Monaco language support from `@flanksource/clicky-ui/expressions`, or the optional React playground from `@flanksource/clicky-ui/expressions/playground`. The language entry registers CEL, Go templates, JSONPath, and templates embedded in YAML, JSON, or text without importing the playground UI. See [the expressions guide](./docs/expressions.md).
+
 UI subpaths that render icons are intended for browser bundlers such as Vite, Rollup, Webpack, Rspack, and Bun's bundler. The Iconify React packages expose `.jsx` modules and CSS imports, so plain Node `import`/`require` of icon-heavy subpaths is not a supported verification target.
 
 Markdown and code highlighting use optional peer dependencies (`marked`, `shiki`, and `@shikijs/*`). Install them in applications that render those components.

@@ -1,5 +1,5 @@
 import type * as monacoEditor from "monaco-editor";
-import type { Monaco } from "@flanksource/clicky-ui/monaco";
+import type { Monaco } from "@monaco-editor/react";
 
 /**
  * Registers Cmd/Ctrl+Enter inside a Monaco editor.

@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { DataTable } from "@flanksource/clicky-ui";
-import type { DataTableColumn } from "@flanksource/clicky-ui";
+import { DataTable, type DataTableColumn } from "../../../data/DataTable";
 import * as monaco from "monaco-editor";
 
 interface TokensPanelProps {
@@ -23,10 +22,19 @@ interface TokenRow extends Record<string, unknown> {
  * `function` rather than falling through to `identifier`.
  */
 export function TokensPanel({ source, languageId }: TokensPanelProps) {
-  const rows = useMemo(() => tokenize(source, languageId), [source, languageId]);
+  const rows = useMemo(
+    () => tokenize(source, languageId),
+    [source, languageId],
+  );
 
   const columns: DataTableColumn<TokenRow>[] = [
-    { key: "line", label: "Line", align: "right", shrink: true, sortable: true },
+    {
+      key: "line",
+      label: "Line",
+      align: "right",
+      shrink: true,
+      sortable: true,
+    },
     {
       key: "text",
       label: "Text",
@@ -42,7 +50,13 @@ export function TokensPanel({ source, languageId }: TokensPanelProps) {
       // An `identifier` is the fallback every unmatched word lands on, so it is
       // the one class worth de-emphasising: what stands out is what matched.
       render: (value) => (
-        <span className={String(value).startsWith("identifier") ? "text-muted-foreground" : ""}>
+        <span
+          className={
+            String(value).startsWith("identifier")
+              ? "text-muted-foreground"
+              : ""
+          }
+        >
           {String(value)}
         </span>
       ),
