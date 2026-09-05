@@ -6,26 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-
-/** Monaco's line height, as clicky-ui's MonacoEditor configures it. */
-export const EDITOR_LINE_HEIGHT = 20;
-
-/** Height of an EditorPane header row (text-xs on py-2). */
-const PANE_HEADER_HEIGHT = 33;
-
-/** Slack for Monaco's own chrome: the horizontal scrollbar and top padding. */
-const EDITOR_CHROME = 12;
-
-/**
- * Pane height that shows `rows` lines of code without scrolling.
- *
- * Expressed in rows because that is how the size is actually reasoned about --
- * a CEL expression is one or two lines, a templated manifest is a screenful --
- * and it keeps the default honest if the editor's line height ever changes.
- */
-export function rowsToPaneHeight(rows: number): number {
-  return PANE_HEADER_HEIGHT + rows * EDITOR_LINE_HEIGHT + EDITOR_CHROME;
-}
+import { EDITOR_LINE_HEIGHT, rowsToPaneHeight } from "./verticalSplitModel";
 
 export interface VerticalSplitProps {
   top: ReactNode;
@@ -57,7 +38,9 @@ export function VerticalSplit({
   storageKey,
 }: VerticalSplitProps) {
   const container = useRef<HTMLDivElement>(null);
-  const [topHeight, setTopHeight] = useState(() => readStored(storageKey) ?? defaultTopHeight);
+  const [topHeight, setTopHeight] = useState(
+    () => readStored(storageKey) ?? defaultTopHeight,
+  );
   const [dragging, setDragging] = useState(false);
 
   // Only follow the language's default while the reader has not chosen a size:
@@ -93,7 +76,8 @@ export function VerticalSplit({
       if (!rect) return;
 
       setDragging(true);
-      const onMove = (moveEvent: PointerEvent) => commit(moveEvent.clientY - rect.top);
+      const onMove = (moveEvent: PointerEvent) =>
+        commit(moveEvent.clientY - rect.top);
       const onUp = () => {
         setDragging(false);
         document.removeEventListener("pointermove", onMove);
@@ -126,7 +110,10 @@ export function VerticalSplit({
 
   return (
     <div ref={container} className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 shrink-0 overflow-hidden" style={{ height: topHeight }}>
+      <div
+        className="min-h-0 shrink-0 overflow-hidden"
+        style={{ height: topHeight }}
+      >
         {top}
       </div>
 

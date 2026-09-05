@@ -10,7 +10,7 @@
     "noEmit": false,
     "composite": true
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",

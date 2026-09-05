@@ -23,6 +23,8 @@ const entry = {
   rpc: resolve(__dirname, "src/rpc.ts"),
   monaco: resolve(__dirname, "src/monaco.ts"),
   "monaco-schema": resolve(__dirname, "src/monaco-schema.ts"),
+  expressions: resolve(__dirname, "src/expressions.ts"),
+  "expressions/playground": resolve(__dirname, "src/expressions/playground.ts"),
   profiles: resolve(__dirname, "src/profiles.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
@@ -33,9 +35,20 @@ const entry = {
 
 export default defineConfig(({ mode }) => {
   const isCjs = mode === "cjs";
+  const isTest = mode === "test";
   const jsExt = isCjs ? "cjs" : "js";
 
   return {
+    resolve: {
+      alias: isTest
+        ? [
+            {
+              find: /^monaco-editor$/,
+              replacement: "monaco-editor/esm/vs/editor/editor.api",
+            },
+          ]
+        : [],
+    },
     define: {
       __CLICKY_COMMIT__: JSON.stringify(build.commit),
       __CLICKY_TAG__: JSON.stringify(build.tag),
@@ -81,7 +94,8 @@ export default defineConfig(({ mode }) => {
           entryFileNames: `[name].${jsExt}`,
           chunkFileNames: `chunks/[name]-[hash].${jsExt}`,
           assetFileNames: (asset) => {
-            if (asset.names?.some((n) => n.endsWith(".css"))) return "styles.css";
+            if (asset.names?.some((n) => n.endsWith(".css")))
+              return "styles.css";
             return "assets/[name][extname]";
           },
         },

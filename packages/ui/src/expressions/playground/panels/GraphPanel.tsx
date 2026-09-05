@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
-import { ObjectGraph } from "@flanksource/clicky-ui/data";
-import { createLazyJSONPathTree, literalSegments } from "@flanksource/clicky-ui/components";
-import type { JSONPathNode, LazyJSONPathTree } from "@flanksource/clicky-ui/components";
+import {
+  createLazyJSONPathTree,
+  literalSegments,
+  type JSONPathNode,
+  type LazyJSONPathTree,
+} from "../../../components/jsonPathTree";
+import { ObjectGraph } from "../../../data/ObjectGraph";
 import { pathExpression } from "../../lang/index.ts";
 import { toGraphNode } from "./graphNodes.ts";
 import type { GraphNode } from "./graphNodes.ts";
@@ -23,7 +27,11 @@ interface GraphPanelProps {
  * written, which is the step that otherwise means reading YAML and retyping it
  * by hand.
  */
-export function GraphPanel({ document, languageId, onInsert }: GraphPanelProps) {
+export function GraphPanel({
+  document,
+  languageId,
+  onInsert,
+}: GraphPanelProps) {
   const [selectedId, setSelectedId] = useState<string>();
   const [note, setNote] = useState<string>();
 
@@ -35,13 +43,16 @@ export function GraphPanel({ document, languageId, onInsert }: GraphPanelProps) 
     [document],
   );
 
-  const roots = useMemo(() => (tree ? tree.roots.map(toGraphNode) : []), [tree]);
+  const roots = useMemo(
+    () => (tree ? tree.roots.map(toGraphNode) : []),
+    [tree],
+  );
 
   if (!tree) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-        Nothing to show yet — write a YAML or JSON document in the input pane and its shape
-        appears here.
+        Nothing to show yet — write a YAML or JSON document in the input pane
+        and its shape appears here.
       </div>
     );
   }
@@ -62,7 +73,9 @@ export function GraphPanel({ document, languageId, onInsert }: GraphPanelProps) 
       return;
     }
     if (expression === "") {
-      setNote("The whole document has no name in this language — pick a key under it.");
+      setNote(
+        "The whole document has no name in this language — pick a key under it.",
+      );
       return;
     }
     setNote(undefined);
@@ -92,4 +105,3 @@ export function GraphPanel({ document, languageId, onInsert }: GraphPanelProps) 
     </div>
   );
 }
-

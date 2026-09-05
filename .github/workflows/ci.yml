@@ -60,8 +60,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
-      - name: Build expressions
-        run: pnpm --filter @flanksource/expressions run build
+      - name: Verify expression exports
+        run: pnpm --filter @flanksource/clicky-ui run check:expression-exports
       - name: Build Storybook
         run: pnpm --filter storybook exec storybook build --disable-telemetry
       - name: Build kitchen-sink
@@ -96,6 +96,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
+      - name: Verify expression exports
+        run: pnpm --filter @flanksource/clicky-ui run check:expression-exports
       - name: Run Playwright tests
         run: pnpm --filter e2e exec playwright test --project=chromium
       - name: Upload Playwright report

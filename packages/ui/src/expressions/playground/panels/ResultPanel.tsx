@@ -1,6 +1,9 @@
-import { Badge, Button, CodeBlock, JsonView } from "@flanksource/clicky-ui";
+import { Button } from "../../../components/button";
+import { Badge } from "../../../data/Badge";
+import { CodeBlock } from "../../../data/CodeBlock";
+import { JsonView } from "../../../data/JsonView";
 import type { EvalResponse } from "../api.ts";
-import { RUN_SHORTCUT_LABEL } from "../RunControls.tsx";
+import { RUN_SHORTCUT_LABEL } from "../runShortcut";
 
 interface ResultPanelProps {
   response: EvalResponse | null;
@@ -10,7 +13,12 @@ interface ResultPanelProps {
   onRun: () => void;
 }
 
-export function ResultPanel({ response, pending, stale, onRun }: ResultPanelProps) {
+export function ResultPanel({
+  response,
+  pending,
+  stale,
+  onRun,
+}: ResultPanelProps) {
   if (!response) {
     return (
       <div className="p-4">
@@ -45,7 +53,9 @@ export function ResultPanel({ response, pending, stale, onRun }: ResultPanelProp
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
         <Badge variant="outline">{response.durationMs.toFixed(2)} ms</Badge>
-        {response.type ? <Badge variant="outline">{response.type}</Badge> : null}
+        {response.type ? (
+          <Badge variant="outline">{response.type}</Badge>
+        ) : null}
         {/* Without this, a result that no longer matches what is on screen is
             indistinguishable from one that does. */}
         {stale ? (

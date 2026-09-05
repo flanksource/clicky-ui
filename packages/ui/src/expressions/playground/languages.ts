@@ -6,8 +6,8 @@ import {
   UiFileJson,
   UiFileText,
   UiFunction,
-} from "@flanksource/clicky-ui/icons";
-import type { StaticIconComponent } from "@flanksource/clicky-ui";
+} from "../../icons";
+import type { StaticIconComponent } from "../../data/Icon";
 
 /** An evaluator on the Go side. */
 export type EvalLanguage = "cel" | "gotemplate" | "jsonpath" | "javascript";
@@ -55,7 +55,8 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     editorLanguage: "cel",
     evalLanguage: "cel",
     catalogue: "cel",
-    description: "Common Expression Language, with gomplate's k8s, aws and math helpers",
+    description:
+      "Common Expression Language, with gomplate's k8s, aws and math helpers",
     editorRows: EXPRESSION_ROWS,
   },
   {
@@ -97,7 +98,8 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     editorLanguage: "yaml-gomplate",
     evalLanguage: "gotemplate",
     catalogue: "gotemplate",
-    description: "YAML with templates embedded in it, as real configuration is written",
+    description:
+      "YAML with templates embedded in it, as real configuration is written",
     editorRows: TEMPLATE_ROWS,
   },
   {

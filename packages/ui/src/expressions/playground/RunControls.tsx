@@ -1,10 +1,9 @@
 import { useEffect } from "react";
-import { Button, Switch } from "@flanksource/clicky-ui";
-import { UiPlay } from "@flanksource/clicky-ui/icons";
+import { Button } from "../../components/button";
+import { Switch } from "../../components/Switch";
+import { UiPlay } from "../../icons";
+import { RUN_SHORTCUT_LABEL } from "./runShortcut";
 import type { Evaluator } from "./useEvaluator.ts";
-
-/** The accelerator, spelled the way the platform spells it. */
-export const RUN_SHORTCUT_LABEL = isApple() ? "⌘⏎" : "Ctrl+↵";
 
 interface RunControlsProps {
   evaluator: Evaluator;
@@ -60,9 +59,4 @@ function useGlobalRunShortcut(run: () => void) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [run]);
-}
-
-function isApple(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /mac|iphone|ipad/i.test(navigator.userAgent);
 }
