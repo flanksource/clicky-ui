@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FixtureEditor } from "./FixtureEditor";
@@ -387,6 +387,11 @@ describe("FixtureEditor", () => {
     expect(screen.queryByLabelText("Threshold")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Set runtime" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("spec-runtime-editor")).toHaveTextContent(
+        "gpt-5",
+      ),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save frontmatter" }));
 
     const next = changes.at(-1) ?? "";

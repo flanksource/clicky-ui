@@ -41,7 +41,7 @@ jobs:
         env:
           STORYBOOK_BASE_PATH: /storybook/
       - name: Build documentation
-        run: pnpm --filter docs run build:site
+        run: pnpm --dir apps/docs run build:site
       - name: Build kitchen-sink
         run: pnpm --filter kitchen-sink exec vite build --base /kitchen-sink/
 
