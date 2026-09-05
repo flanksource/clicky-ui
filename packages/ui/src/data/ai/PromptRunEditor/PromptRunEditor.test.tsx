@@ -53,6 +53,28 @@ const VALUE: AIPromptRunValue = {
 };
 
 describe("PromptRunEditor", () => {
+  it.each([
+    { spec: {}, family: 'Profile runtime', mode: 'cmux' },
+    { spec: { model: 'operator-model', mode: 'api' }, family: 'Explicit runtime', mode: 'API' },
+  ])('uses resolved profile identity for display while preserving $spec overrides', ({ spec, family, mode }) => {
+    const initial = { runtimeProfile: 'review-profile', spec };
+    render(<Harness initial={initial}
+      models={[
+        { id: 'preset-model', provider: 'anthropic', label: 'Preset model', reasoning: true },
+        { id: 'operator-model', provider: 'openai', label: 'Operator model', reasoning: true },
+      ]}
+      families={[
+        { id: 'explicit', label: 'Explicit runtime', provider: 'openai', modes: [{ id: 'api', label: 'API' }] },
+        { id: 'profile', label: 'Profile runtime', provider: 'anthropic', modes: [{ id: 'cmux', label: 'cmux' }] },
+      ]}
+      resolution={{ spec: { model: 'preset-model', mode: 'cmux' }, constraints: {}, trace: [] }}
+    />);
+    const runtime = within(screen.getByRole('group', { name: 'Runtime 1 controls' }));
+    expect(runtime.getByTitle(`Family — ${family}`)).toBeInTheDocument();
+    expect(runtime.getByText(mode)).toBeInTheDocument();
+    expect(currentValue()).toEqual(initial);
+  });
+
   it("edits the canonical prompt run request without dropping untouched spec fields", () => {
     const onChange = vi.fn();
     render(<PromptRunEditor value={VALUE} onChange={onChange} />);
@@ -102,6 +124,42 @@ describe("PromptRunEditor", () => {
       screen.queryByRole("combobox", { name: "Runtime profile" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("runtime-profile-chip")).not.toBeInTheDocument();
+  });
+
+  it("adds a host-defined verification fence through the runtime spec modal", () => {
+    const initial: AIPromptRunValue = {
+      ...VALUE,
+      spec: {
+        ...VALUE.spec,
+        workflow: { verify: { fixture: "# Verification\n", commands: ["check-policy"] } },
+      },
+    };
+    render(
+      <Harness
+        initial={initial}
+        specSections={["verify"]}
+        fixtureSchemas={{
+          "yaml contract": { type: "object", properties: { policy: { type: "string" } } },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit spec" }));
+    fireEvent.click(screen.getByText("Add fence"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "yaml contract" }));
+
+    expect(currentValue()).toEqual({
+      ...initial,
+      spec: {
+        ...initial.spec,
+        workflow: {
+          verify: {
+            fixture: "# Verification\n```yaml contract\n{}\n```\n",
+            commands: ["check-policy"],
+          },
+        },
+      },
+    });
   });
 
   it("selects a profile by reference and edits its draft without touching the run spec", async () => {

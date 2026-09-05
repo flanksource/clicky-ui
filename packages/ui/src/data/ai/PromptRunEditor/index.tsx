@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/button";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
+import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
 import { UiAdd, UiGearSix, UiLayers, UiTrash } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
@@ -58,6 +59,8 @@ export type PromptRunEditorProps = {
   permissionCatalog?: AISpecRuntimePermissionCatalog | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   cliOptions?: SpecRuntimeCLIOptions | undefined;
+  /** Runner schemas keyed by fixture kind or fence info, used by the verification editor. */
+  fixtureSchemas?: FixtureFenceSchemas | undefined;
   /** Sandbox adapter catalog; enables the spec editor's Sandbox section. */
   sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
   /** Host-owned sandbox creation and credential-reference adapter. */
@@ -121,6 +124,7 @@ export function PromptRunEditor({
   permissionCatalog,
   secretSelector,
   cliOptions,
+  fixtureSchemas,
   sandboxCatalog,
   sandboxCreate,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
@@ -219,6 +223,8 @@ export function PromptRunEditor({
                   )
                 }
                 models={models}
+                effectiveModel={runRuntime.model}
+                effectiveMode={runRuntime.mode}
                 families={families}
                 reasoningEfforts={reasoningEfforts}
                 ariaLabel={`Runtime ${index + 1} controls`}
@@ -381,6 +387,7 @@ export function PromptRunEditor({
           {...(permissionCatalog ? { permissionCatalog } : {})}
           {...(secretSelector ? { secretSelector } : {})}
           {...(cliOptions ? { cliOptions } : {})}
+          {...(fixtureSchemas ? { fixtureSchemas } : {})}
           {...(sandboxCatalog ? { sandboxCatalog } : {})}
           {...(sandboxCreate ? { sandboxCreate } : {})}
           {...(specSections ? { sections: specSections } : {})}

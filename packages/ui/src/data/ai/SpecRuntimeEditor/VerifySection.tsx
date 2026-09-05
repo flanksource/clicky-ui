@@ -1,6 +1,7 @@
 import { SegmentedControl } from "../../../components/SegmentedControl";
 import { UiChatDots, UiRepeat, UiTerminal } from "../../../icons";
 import { FixtureEditor } from "../../FixtureEditor";
+import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
 import type { ChatModel } from "../../chat/types";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import {
@@ -24,12 +25,14 @@ export function VerifySection({
   models,
   families,
   secretSelector,
+  fixtureSchemas,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
+  fixtureSchemas?: FixtureFenceSchemas | undefined;
 }) {
   return (
     <div className="grid gap-density-3">
@@ -38,6 +41,7 @@ export function VerifySection({
           value={value.workflow?.verify?.fixture ?? ""}
           onChange={(fixture) => onChange(withVerify(value, { fixture }))}
           size="sm"
+          {...(fixtureSchemas ? { schemas: fixtureSchemas } : {})}
           placeholder="Write the verify fixture markdown..."
           frontmatterEditor={{
             mode: "verification",
