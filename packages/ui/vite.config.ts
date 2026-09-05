@@ -55,6 +55,7 @@ export default defineConfig(({ mode }) => {
               "src/test/**",
               "src/test/**/*",
             ],
+            aliasesExclude: [/^react(?:\/.*)?$/],
             rollupTypes: false,
             skipDiagnostics: true,
             logDiagnostics: false,
