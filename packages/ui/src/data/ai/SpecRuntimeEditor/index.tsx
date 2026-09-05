@@ -1,6 +1,7 @@
 import { useId, useMemo, type ReactNode } from "react";
 import { cn } from "../../../lib/utils";
 import type { ChatModel, ToolMeta } from "../../chat/types";
+import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
 import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeValue,
@@ -80,6 +81,8 @@ export type SpecRuntimeEditorProps = {
   secretSelector?: SpecRuntimeSecretSelectorConfig | undefined;
   /** Schema for the runtime's extra CLI args; enables the CLI flags section. */
   cliOptions?: SpecRuntimeCLIOptions | undefined;
+  /** Runner schemas keyed by fixture kind or fence info, used by the verification editor. */
+  fixtureSchemas?: FixtureFenceSchemas | undefined;
   /** Sandbox adapter catalog; enables the Sandbox section. */
   sandboxCatalog?: SpecRuntimeSandboxCatalog | undefined;
   /** Host-owned sandbox creation and credential-reference adapter. */
@@ -130,6 +133,7 @@ export function SpecRuntimeEditor({
   permissionCatalog,
   secretSelector,
   cliOptions,
+  fixtureSchemas,
   sandboxCatalog,
   sandboxCreate,
   sections: sectionFilter,
@@ -320,6 +324,7 @@ export function SpecRuntimeEditor({
             models={models}
             families={runtimeFamilies}
             {...(secretSelector ? { secretSelector } : {})}
+            {...(fixtureSchemas ? { fixtureSchemas } : {})}
           />
         );
       case "commit":
