@@ -5,7 +5,12 @@ import { Icon } from "../data/Icon";
 import { UiAdd, UiTrash } from "../icons";
 import { Button } from "./button";
 import { Combobox } from "./Combobox";
-import type { FieldControl, JsonSchemaObject, JsonSchemaProperty, RenderContext } from "./json-schema-form-types";
+import type {
+  FieldControl,
+  JsonSchemaObject,
+  JsonSchemaProperty,
+  RenderContext,
+} from "./json-schema-form-types";
 import {
   cssLength,
   DEFAULT_COLUMN_MIN_WIDTH,
@@ -15,24 +20,41 @@ import {
   normalizeColumns,
 } from "./json-schema-form-utils";
 import { FieldsGrid } from "./json-schema-form-layout";
+import { PropertyValueEditor } from "./json-schema-form-properties";
+import { propertyControlSize } from "./json-schema-form-properties-size";
 import { appendInstancePath } from "./json-schema-form-errors";
-import { controlHeightClass, fieldInnerGapClass, inputSizeClass } from "./json-schema-form-size";
+import {
+  controlHeightClass,
+  fieldInnerGapClass,
+  inputSizeClass,
+} from "./json-schema-form-size";
 
 // ObjectControl renders a nested structured object as a sub-form: its own
 // properties, required markers, if/then, soft errors — all via the shared
 // recursive renderer (ctx.render), so pre/post extensions apply at this depth too.
-export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: RenderContext }) {
-  const obj = isPlainObject(field.value) ? (field.value as Record<string, unknown>) : {};
+export function ObjectControl({
+  field,
+  ctx,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+}) {
+  const obj = isPlainObject(field.value)
+    ? (field.value as Record<string, unknown>)
+    : {};
   const subSchema: JsonSchemaObject = {
     type: "object",
     properties: field.objectProperties ?? {},
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
-    ...(Array.isArray(field.schema["x-order"]) ? { "x-order": field.schema["x-order"] } : {}),
+    ...(Array.isArray(field.schema["x-order"])
+      ? { "x-order": field.schema["x-order"] }
+      : {}),
     // Every object-level layout keyword must be copied here or it works at the
     // top level and silently dies one level down — which is exactly where these
     // matter (an array item's body is a nested object).
-    ...(typeof field.schema["x-columns"] === "number" || field.schema["x-columns"] === "auto"
+    ...(typeof field.schema["x-columns"] === "number" ||
+    field.schema["x-columns"] === "auto"
       ? { "x-columns": field.schema["x-columns"] }
       : {}),
     ...(typeof field.schema["x-column-min-width"] === "string"
@@ -41,7 +63,9 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
     ...(typeof field.schema["x-columns-max-width"] === "string"
       ? { "x-columns-max-width": field.schema["x-columns-max-width"] }
       : {}),
-    ...(typeof field.schema["x-classes"] === "string" ? { "x-classes": field.schema["x-classes"] } : {}),
+    ...(typeof field.schema["x-classes"] === "string"
+      ? { "x-classes": field.schema["x-classes"] }
+      : {}),
   };
   // No border/box: nested objects render as flat headed sections (see
   // ObjectSection in renderFieldRow) rather than progressively indented
@@ -54,17 +78,27 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
       layout={ctx.layout}
       size={ctx.size}
       columns={normalizeColumns(subSchema["x-columns"])}
-      columnMinWidth={cssLength(subSchema["x-column-min-width"], DEFAULT_COLUMN_MIN_WIDTH)}
+      columnMinWidth={cssLength(
+        subSchema["x-column-min-width"],
+        DEFAULT_COLUMN_MIN_WIDTH,
+      )}
       {...(typeof subSchema["x-columns-max-width"] === "string"
         ? { columnsMaxWidth: subSchema["x-columns-max-width"] }
         : {})}
-      {...(typeof subSchema["x-classes"] === "string" ? { className: subSchema["x-classes"] } : {})}
+      {...(typeof subSchema["x-classes"] === "string"
+        ? { className: subSchema["x-classes"] }
+        : {})}
     >
-      {ctx.render.renderObjectFields(subSchema, obj, (next) => field.onChange(next), {
-        ...ctx,
-        readOnly: ctx.readOnly || field.readOnly === true,
-        depth: ctx.depth + 1,
-      })}
+      {ctx.render.renderObjectFields(
+        subSchema,
+        obj,
+        (next) => field.onChange(next),
+        {
+          ...ctx,
+          readOnly: ctx.readOnly || field.readOnly === true,
+          depth: ctx.depth + 1,
+        },
+      )}
     </FieldsGrid>
   );
 }
@@ -74,18 +108,28 @@ export function ObjectControl({ field, ctx }: { field: FieldControl; ctx: Render
 // editable key/value pairs. "Add field" appears when extra keys are allowed.
 // Values recurse through the shared pipeline, so a value that is itself an object
 // or array renders structurally and pre/post extensions apply to it.
-export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: RenderContext }) {
+export function StringMapControl({
+  field,
+  ctx,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+}) {
   // A read-only map marks its whole subtree non-editable: no rename/remove/add
   // and value inputs disabled.
   const readOnly = ctx.readOnly || field.readOnly === true;
-  const map = isPlainObject(field.value) ? (field.value as Record<string, unknown>) : {};
+  const map = isPlainObject(field.value)
+    ? (field.value as Record<string, unknown>)
+    : {};
   const known = field.knownProperties ?? {};
   const knownKeys = Object.keys(known);
   const extraKeys = Object.keys(map).filter((k) => !(k in known));
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
+  const properties = ctx.layout.mode === "properties";
   // What the map key IS (e.g. "Address Role"), from the key-constraint schema.
   const pn = field.schema.propertyNames as JsonSchemaProperty | undefined;
-  const keyTitle = typeof pn?.title === "string" && pn.title ? pn.title : undefined;
+  const keyTitle =
+    typeof pn?.title === "string" && pn.title ? pn.title : undefined;
 
   // valueSchemaForKey picks an entry's value schema: the first patternProperties
   // entry whose regex matches the key, else the `additionalProperties` schema,
@@ -116,7 +160,8 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
   function renameEntry(oldKey: string, newKey: string) {
     if (newKey === oldKey) return;
     const next: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(map)) next[k === oldKey ? newKey : k] = v;
+    for (const [k, v] of Object.entries(map))
+      next[k === oldKey ? newKey : k] = v;
     field.onChange(next);
   }
   function removeEntry(key: string) {
@@ -129,7 +174,10 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
     field.onChange({ ...map, "": "" });
   }
 
-  function valueControlFor(key: string, valueSchema: JsonSchemaProperty): ReactNode {
+  function valueControlFor(
+    key: string,
+    valueSchema: JsonSchemaProperty,
+  ): ReactNode {
     const nodes = ctx.render.renderFieldNodes(
       {
         key,
@@ -150,40 +198,110 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
     return valueControlFor(key, valueSchemaForKey(key));
   }
 
+  function keyEditor({
+    key,
+    value,
+    onChange,
+  }: {
+    key: string;
+    value: string;
+    onChange: (next: string) => void;
+  }) {
+    const size = properties ? propertyControlSize[ctx.size] : ctx.size;
+    return field.keyOptions ? (
+      <Combobox
+        options={keyPickerOptions(
+          field.keyOptions,
+          [...knownKeys, ...extraKeys],
+          key,
+        )}
+        value={value}
+        disabled={readOnly}
+        size={size}
+        allowCustomValue={false}
+        onChange={onChange}
+        placeholder="Select…"
+      />
+    ) : (
+      <input
+        type="text"
+        aria-label="Field name"
+        className={cn(inputClass(size), "font-mono")}
+        value={value}
+        disabled={readOnly}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
   return (
-    <div className={cn("flex flex-col rounded-md border border-input p-2", fieldInnerGapClass[childCtx.size])}>
-      {knownKeys.map((key) => (
-        <div key={`known-${key}`} className="grid grid-cols-[10rem_1fr] items-center gap-2">
-          <label
-            htmlFor={fieldInputId(appendInstancePath(ctx.instancePath, key), childCtx.idPrefix)}
-            className="truncate text-xs text-muted-foreground"
-            title={key}
-          >
-            {key}
-          </label>
-          <div className="min-w-0">{valueControlFor(key, known[key] ?? { type: "string" })}</div>
-        </div>
-      ))}
-      {extraKeys.map((key) => {
-        const keyControl = field.keyOptions ? (
-          <Combobox
-            options={keyPickerOptions(field.keyOptions, extraKeys, key)}
-            value={key}
-            disabled={readOnly}
-            size={childCtx.size}
-            allowCustomValue={false}
-            onChange={(next) => renameEntry(key, next)}
-            placeholder="Select…"
-          />
+    <div
+      className={cn(
+        properties ? "col-span-full grid grid-cols-subgrid" : "flex flex-col",
+        !properties &&
+          !ctx.presentation &&
+          "rounded-md border border-input p-2",
+        !properties && fieldInnerGapClass[childCtx.size],
+      )}
+    >
+      {knownKeys.map((key) =>
+        properties ? (
+          <div key={`known-${key}`} className="contents">
+            {ctx.render.renderFieldRow(
+              {
+                key,
+                prop: known[key]!,
+                required:
+                  Array.isArray(field.schema.required) &&
+                  field.schema.required.includes(key),
+                value: map[key],
+                onChange: (next) => setEntry(key, next),
+                instancePath: appendInstancePath(ctx.instancePath, key),
+              },
+              childCtx,
+            )}
+          </div>
         ) : (
-          <input
-            type="text"
-            aria-label="Field name"
-            className={cn(inputClass(childCtx.size), "font-mono")}
-            value={key}
-            disabled={readOnly}
-            onChange={(e) => renameEntry(key, e.target.value)}
-          />
+          <div
+            key={`known-${key}`}
+            className="grid grid-cols-[10rem_1fr] items-center gap-2"
+          >
+            <label
+              htmlFor={fieldInputId(
+                appendInstancePath(ctx.instancePath, key),
+                childCtx.idPrefix,
+              )}
+              className="truncate text-xs text-muted-foreground"
+              title={key}
+            >
+              {key}
+            </label>
+            <div className="min-w-0">
+              {valueControlFor(key, known[key] ?? { type: "string" })}
+            </div>
+          </div>
+        ),
+      )}
+      {extraKeys.map((key) => {
+        const keyControl = ctx.presentation ? (
+          <span
+            className={cn(
+              "flex min-w-0 items-center break-words text-xs",
+              controlHeightClass[childCtx.size],
+              field.keyOptions
+                ? "text-foreground"
+                : "font-mono text-muted-foreground",
+            )}
+          >
+            {field.keyOptions?.find((option) => option.value === key)?.label ??
+              key}
+          </span>
+        ) : (
+          keyEditor({
+            key,
+            value: key,
+            onChange: (next) => renameEntry(key, next),
+          })
         );
         const removeButton = !readOnly ? (
           <button
@@ -198,6 +316,70 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
             <Icon icon={UiTrash} className="text-sm" />
           </button>
         ) : null;
+        if (properties) {
+          const instancePath = appendInstancePath(ctx.instancePath, key);
+          const keyLabel =
+            field.keyOptions?.find((option) => option.value === key)?.label ??
+            (key || "New field");
+          return (
+            <div key={`extra-${key}`} className="contents">
+              {ctx.render.renderFieldRow(
+                {
+                  key,
+                  prop: { ...valueSchemaForKey(key), title: keyLabel },
+                  required: false,
+                  value: map[key],
+                  onChange: (next) => setEntry(key, next),
+                  instancePath,
+                },
+                {
+                  ...childCtx,
+                  post: [
+                    ...childCtx.post,
+                    (entry, nodes, postCtx) =>
+                      postCtx?.instancePath !== instancePath
+                        ? nodes
+                        : {
+                            ...nodes,
+                            label: (
+                              <>
+                                <span className="sr-only">{nodes.label}</span>
+                                <PropertyValueEditor
+                                  actionsPlacement="row"
+                                  field={{
+                                    ...entry,
+                                    kind: "string",
+                                    label: `${keyLabel} key`,
+                                    value: key,
+                                    onChange: (next) =>
+                                      renameEntry(key, String(next)),
+                                  }}
+                                  fieldId={`${fieldInputId(instancePath, ctx.idPrefix)}-key`}
+                                  ctx={{
+                                    ...childCtx,
+                                    size: propertyControlSize[ctx.size],
+                                  }}
+                                  preview={<span>{keyLabel}</span>}
+                                  renderEditor={(draft) => (
+                                    <div className="flex min-w-0 items-center gap-1">
+                                      {keyEditor({
+                                        key,
+                                        value: String(draft.value),
+                                        onChange: draft.onChange,
+                                      })}
+                                      {removeButton}
+                                    </div>
+                                  )}
+                                />
+                              </>
+                            ),
+                          },
+                  ],
+                },
+              )}
+            </div>
+          );
+        }
         // When the value is stacked (`x-layout: "stack"` on the entry schema),
         // the key joins the stack: it sits full-width above its value as one
         // unit, rather than cramped in a fixed key column beside it. The key
@@ -205,8 +387,18 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
         // (e.g. an AsCode role) says what it is.
         if (entryIsStacked(key)) {
           return (
-            <div key={`extra-${key}`} className="space-y-1.5 rounded-md border border-input p-2">
-              {keyTitle && <span className="block text-xs font-medium text-muted-foreground">{keyTitle}</span>}
+            <div
+              key={`extra-${key}`}
+              className={cn(
+                "space-y-1.5",
+                !ctx.presentation && "rounded-md border border-input p-2",
+              )}
+            >
+              {keyTitle && (
+                <span className="block text-xs font-medium text-muted-foreground">
+                  {keyTitle}
+                </span>
+              )}
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">{keyControl}</div>
                 {removeButton}
@@ -216,7 +408,15 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
           );
         }
         return (
-          <div key={`extra-${key}`} className="grid grid-cols-[10rem_1fr_auto] items-center gap-2">
+          <div
+            key={`extra-${key}`}
+            className={cn(
+              "grid items-center gap-2",
+              ctx.presentation
+                ? "grid-cols-[minmax(0,10rem)_minmax(0,1fr)]"
+                : "grid-cols-[10rem_1fr_auto]",
+            )}
+          >
             {keyControl}
             <div className="min-w-0">{valueControlForKey(key)}</div>
             {removeButton}
@@ -226,9 +426,15 @@ export function StringMapControl({ field, ctx }: { field: FieldControl; ctx: Ren
       {!readOnly && field.allowExtraKeys !== false && (
         <Button
           type="button"
-          variant="outline"
+          variant={properties ? "ghost" : "outline"}
           onClick={addEntry}
-          className={cn("gap-1.5", inputSizeClass[childCtx.size])}
+          className={cn(
+            "gap-1.5",
+            properties && "col-span-full justify-self-start m-1",
+            inputSizeClass[
+              properties ? propertyControlSize[ctx.size] : childCtx.size
+            ],
+          )}
         >
           <Icon icon={UiAdd} className="text-sm" />
           Add field

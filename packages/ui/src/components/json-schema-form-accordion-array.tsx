@@ -1,5 +1,8 @@
 import { AccordionList } from "./AccordionList";
-import { appendInstancePath, errorCountUnderInstancePath } from "./json-schema-form-errors";
+import {
+  appendInstancePath,
+  errorCountUnderInstancePath,
+} from "./json-schema-form-errors";
 import {
   ItemBadge,
   ItemErrorMark,
@@ -16,6 +19,8 @@ import {
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
 import { fieldInputId, seedFromSchema } from "./json-schema-form-utils";
+import { cn } from "../lib/utils";
+import { controlMinHeightClass } from "./json-schema-form-size";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
 // AccordionArray is the JsonSchemaForm adapter over AccordionList: it turns
@@ -50,17 +55,84 @@ export function AccordionArray({
   };
 
   function summaryFor(item: unknown, index: number) {
-    return field.itemSummary?.({ item, index }) ?? itemSummaryFor({ item, index, spec, itemSchema });
+    return (
+      field.itemSummary?.({ item, index }) ??
+      itemSummaryFor({ item, index, spec, itemSchema })
+    );
   }
+
+  function renderSummary({
+    item,
+    index,
+    open,
+  }: {
+    item: unknown;
+    index: number;
+    open: boolean;
+  }) {
+    const summary = summaryFor(item, index);
+    return (
+      <>
+        <ItemGlyph glyph={summary.glyph} />
+        <span className="shrink-0 text-sm font-medium">{summary.title}</span>
+        <ItemBadge badge={summary.badge} />
+        {summary.flagged && <RequiredMark />}
+        {summary.summary && (
+          <code className="truncate font-mono text-xs text-muted-foreground">
+            {summary.summary}
+          </code>
+        )}
+        {!open && (
+          <ItemErrorMark
+            count={errorCountUnderInstancePath(
+              ctx.errors,
+              appendInstancePath(ctx.instancePath, index),
+            )}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (ctx.presentation)
+    return (
+      <div className="min-w-0 space-y-1">
+        <div className="text-xs text-muted-foreground">
+          {items.length === 0
+            ? noItemsLabel(spec)
+            : itemCountLabel(spec, items.length)}
+        </div>
+        {items.map((item, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex min-w-0 flex-wrap items-center gap-2 rounded px-2 py-1 even:bg-muted/40",
+              controlMinHeightClass[ctx.size],
+            )}
+          >
+            {renderSummary({ item, index, open: false })}
+          </div>
+        ))}
+        {items.length === 0 && emptyCopy && (
+          <p className="text-xs text-muted-foreground">{emptyCopy}</p>
+        )}
+      </div>
+    );
 
   return (
     <AccordionList<unknown>
       items={items}
       onChange={(next) => field.onChange(next)}
-      summary={items.length === 0 ? noItemsLabel(spec) : itemCountLabel(spec, items.length)}
+      summary={
+        items.length === 0
+          ? noItemsLabel(spec)
+          : itemCountLabel(spec, items.length)
+      }
       size={ctx.size}
       readOnly={readOnly}
-      itemId={(index) => fieldInputId(appendInstancePath(ctx.instancePath, index), ctx.idPrefix)}
+      itemId={(index) =>
+        fieldInputId(appendInstancePath(ctx.instancePath, index), ctx.idPrefix)
+      }
       // The panel's controls are the form's own inputs; anything else focusable
       // inside an item (a help disclosure, a remove button on a nested array)
       // would otherwise win the caret on add.
@@ -72,30 +144,7 @@ export function AccordionArray({
       onCreate={() => seedFromSchema(itemSchema)}
       addLabel={addItemLabel(spec)}
       {...(emptyCopy ? { addDescription: emptyCopy } : {})}
-      renderHeader={({ item, index, open }) => {
-        const summary = summaryFor(item, index);
-        return (
-          <>
-            <ItemGlyph glyph={summary.glyph} />
-            <span className="shrink-0 text-sm font-medium">{summary.title}</span>
-            <ItemBadge badge={summary.badge} />
-            {summary.flagged && <RequiredMark />}
-            {summary.summary && (
-              <code className="truncate font-mono text-xs text-muted-foreground">
-                {summary.summary}
-              </code>
-            )}
-            {!open && (
-              <ItemErrorMark
-                count={errorCountUnderInstancePath(
-                  ctx.errors,
-                  appendInstancePath(ctx.instancePath, index),
-                )}
-              />
-            )}
-          </>
-        );
-      }}
+      renderHeader={renderSummary}
       renderBody={({ item, index, onChange }) =>
         // Recurse through the shared pipeline so consumer pre/post extensions
         // still apply to the item and its properties.

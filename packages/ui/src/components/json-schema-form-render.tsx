@@ -40,7 +40,6 @@ import {
   fieldErrorId,
   fieldInputId,
   hasObjectItemProperties,
-  matchesFieldFilter,
   normalizeColSpan,
   normalizeColumns,
   orderByClickyOrder,
@@ -50,6 +49,10 @@ import {
   softError,
 } from "./json-schema-form-utils";
 import { labelSizeClass } from "./json-schema-form-size";
+import { PropertiesFieldRow, PropertyValueEditor } from "./json-schema-form-properties";
+import { PropertyValuePreview } from "./json-schema-form-property-preview";
+import { propertyControlSize } from "./json-schema-form-properties-size";
+import { matchesFieldFilter } from "./json-schema-form-filter";
 
 // This module is the top of the json-schema-form graph: it imports the control
 // components and dispatches into them, while container controls recurse back in
@@ -63,6 +66,9 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
   // ctx.instancePath is the field's own path here: buildField descends into the
   // child context before rendering the value.
   const fieldId = fieldInputId(ctx.instancePath, ctx.idPrefix);
+  if (ctx.presentation && field.kind !== "display" && field.kind !== "link") {
+    return <PropertyValuePreview field={field} fieldId={fieldId} ctx={ctx} />;
+  }
   // A field the schema marks `readOnly` is never editable: it shows its current
   // value as plain text, not a disabled input. (The form-level ctx.readOnly,
   // below, instead disables the real controls so the structure stays visible.)
@@ -159,6 +165,7 @@ function buildField(
   // Drop read-only fields entirely when the form opts out of displaying them.
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
   if (ctx.hideReadOnlyFields && field.readOnly) return null;
+  if (ctx.presentation) field = { ...field, readOnly: true };
 
   const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
   const fieldId = fieldInputId(instancePath, ctx.idPrefix);
@@ -179,17 +186,21 @@ function buildField(
   // to the permanent paragraph every form renders today.
   const help = field.helpDisplay ?? ctx.layout.help ?? "inline";
   let label: ReactNode = (
-    <FieldLabel field={field} fieldId={fieldId} size={ctx.size} helpDisplay={help} />
+    <FieldLabel field={field} fieldId={fieldId} size={ctx.layout.mode === "properties" ? propertyControlSize[ctx.size] : ctx.size} helpDisplay={help} />
   );
   // A field's `x-layout: inline|stack` overrides the form-level layout for its
   // own value subtree (the field's own row keeps the parent layout). "table" is
   // handled structurally inside the array/string-map controls, not here.
   const overrideMode =
     field.layout === "inline" ? "inline" : field.layout === "stack" ? "stacked" : undefined;
+  const nestedProperty = ctx.layout.mode === "properties" && (field.kind === "object" || field.kind === "string-map");
   const valueCtx: RenderContext = {
     ...ctx,
+    ...(ctx.layout.mode === "properties" && !nestedProperty ? { size: propertyControlSize[ctx.size] } : {}),
     instancePath,
-    ...(overrideMode ? { layout: { ...ctx.layout, mode: overrideMode } } : {}),
+    ...(overrideMode && !nestedProperty ? { layout: { ...ctx.layout, mode: overrideMode } } : {}),
+    ...(ctx.layout.mode === "properties" && field.kind === "array"
+      ? { layout: { ...ctx.layout, mode: overrideMode ?? "stacked" } } : {}),
   };
   let value: ReactNode = renderValueControl(field, valueCtx);
   const postCtx = {
@@ -203,6 +214,21 @@ function buildField(
     ctx.post,
     postCtx,
   ));
+  if (ctx.layout.mode === "properties" && !nestedProperty && field.kind !== "display" && field.kind !== "link") {
+    value = <PropertyValueEditor field={field} fieldId={fieldId} ctx={valueCtx}
+      preview={applyPostExtensions(
+        { ...field, readOnly: true },
+        { label, value: <PropertyValuePreview field={field} fieldId={`${fieldId}-preview`} ctx={{ ...valueCtx, idPrefix: `${ctx.idPrefix ?? ""}-preview` }} /> },
+        ctx.post,
+        postCtx,
+      ).value}
+      renderEditor={(draftField, draftCtx) => applyPostExtensions(
+        draftField,
+        { label, value: renderValueControl(draftField, draftCtx) },
+        draftCtx.post,
+        { ...postCtx, ...(draftCtx.rootValue ? { rootValue: draftCtx.rootValue } : {}), ...(draftCtx.onRootChange ? { onRootChange: draftCtx.onRootChange } : {}) },
+      ).value} />;
+  }
   return { field, fieldId, label, value, messages, help };
 }
 
@@ -240,6 +266,9 @@ export function renderFieldRow(
   const built = buildField(args, ctx);
   if (!built) return null;
   const { field } = built;
+  if (ctx.layout.mode === "properties" && field.kind !== "display") {
+    return <PropertiesFieldRow {...built} label={opts?.labelOverride ?? built.label} ctx={ctx} />;
+  }
   // Object fields — and table-laid-out arrays/string-maps — render as a flat
   // section: a header followed by their body at full width, rather than an
   // inline label + narrow value column. This keeps deep schemas (e.g. policy →
@@ -344,12 +373,12 @@ export function renderObjectFields(
   // object subtrees render in full so a matched parent keeps all its children.
   const entries =
     ctx.depth === 0 && ctx.fieldFilter
-      ? sorted.filter(([key, prop]) => matchesFieldFilter(key, prop, ctx.fieldFilter!))
+      ? sorted.filter(([key, prop]) => matchesFieldFilter({ key, prop, filter: ctx.fieldFilter!, value: value[key] }))
       : sorted;
   // Object-level `x-columns` lays the fields out in a multi-column stacked grid;
   // each field spans `x-col-span` columns (object sections/table arrays span the
   // full row). Only takes effect in stacked mode — inline owns its 2-track grid.
-  const columns = ctx.layout.mode === "inline" ? 1 : normalizeColumns(schema["x-columns"]);
+  const columns = ctx.layout.mode !== "stacked" ? 1 : normalizeColumns(schema["x-columns"]);
   return entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
     const row = renderFieldRow(

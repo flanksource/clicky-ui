@@ -4,7 +4,7 @@ import {
   scalarItemsType,
 } from "./json-schema-form-resolve";
 import { isPlainObject } from "../lib/collections";
-import { matchesFieldFilter } from "./json-schema-form-utils";
+import { matchesFieldFilter } from "./json-schema-form-filter";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import type {
   FieldControl,
@@ -101,7 +101,7 @@ function collectObjectPaths(
     if (
       options.root &&
       options.fieldFilter &&
-      !matchesFieldFilter(key, prop, options.fieldFilter)
+      !matchesFieldFilter({ key, prop, filter: options.fieldFilter, value: value[key] })
     ) {
       continue;
     }

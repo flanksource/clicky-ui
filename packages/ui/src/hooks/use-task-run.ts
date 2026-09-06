@@ -86,7 +86,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     const merge = (incoming: TaskSnapshot[]) => {
       setById((prev) => {
         const next = { ...prev };
-        for (const snap of incoming) next[snap.id] = snap;
+        for (const snap of incoming) next[snap.type === "group" ? `group:${snap.groupId ?? snap.id}` : snap.id] = snap;
         return next;
       });
     };
@@ -124,6 +124,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
             `${basePath}/tasks/${encodeURIComponent(runId)}`,
             { headers: { Accept: "application/json" } },
           )));
+          if (responses.some((response) => !response.ok)) throw new Error("Task request failed");
           if (responses.every((response) => response.ok)) {
             const snaps = (await Promise.all(responses.map(
               async (response) => (await response.json()) as TaskSnapshot[],
@@ -150,19 +151,21 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
 
     // SSE transport (default).
     const es = new EventSource(streamUrl(basePath, query));
-    setStatus("connected");
+    setStatus("connecting");
+    es.onopen = () => setStatus("connected");
     es.addEventListener("task", (e) => {
       try {
         merge([JSON.parse((e as MessageEvent).data) as TaskSnapshot]);
+        setStatus("connected");
       } catch {
-        /* ignore malformed frame */
+        setStatus("invalid task stream data");
       }
     });
     es.addEventListener("output", (e) => {
       try {
         mergeOutput(JSON.parse((e as MessageEvent).data) as Parameters<typeof mergeOutput>[0]);
       } catch {
-        /* ignore malformed frame */
+        setStatus("invalid task output data");
       }
     });
     es.addEventListener("done", () => {
@@ -245,6 +248,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
           const res = await fetch(`${basePath}/tasks${query ? `?${query}` : ""}`, {
             headers: { Accept: "application/json" },
           });
+          if (!res.ok) throw new Error(`Task listing failed with ${res.status}`);
           if (res.ok) {
             const next = (await res.json()) as TaskRunMeta[];
             if (stopped) return;
@@ -265,12 +269,14 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
 
     // SSE transport (default).
     const es = new EventSource(`${basePath}/tasks/runs/stream${query ? `?${query}` : ""}`);
-    setStatus("connected");
+    setStatus("connecting");
+    es.onopen = () => setStatus("connected");
     es.addEventListener("runs", (e) => {
       try {
         receive(JSON.parse((e as MessageEvent).data) as TaskRunMeta[]);
+        setStatus("connected");
       } catch {
-        /* ignore malformed frame */
+        setStatus("invalid task listing data");
       }
     });
     es.onerror = () => setStatus("connection lost — retrying");

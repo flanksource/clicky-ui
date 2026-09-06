@@ -38,13 +38,62 @@ export const Default: Story = {
   args: { items: baseItems },
 };
 
+export const NestedLabels: Story = {
+  render: () => (
+    <Properties
+      gridTemplateColumns="fit-content(30ch) minmax(0, 1fr)"
+      items={[
+        { key: "name", value: "Example service" },
+        {
+          key: "connection",
+          value: "2 properties",
+          expandable: true,
+          expanded: true,
+          renderChildren: () => (
+            <Properties
+              items={[
+                { key: "host", value: "localhost" },
+                {
+                  key: "credentials",
+                  value: "1 property",
+                  expandable: true,
+                  expanded: true,
+                  renderChildren: () => (
+                    <Properties items={[{ key: "username", value: "demo" }]} />
+                  ),
+                },
+              ]}
+            />
+          ),
+        },
+      ]}
+    />
+  ),
+};
+
 export const WithIconsAndSubtitles: Story = {
   args: {
     items: [
-      { key: "namespace", value: "claims-demo", subtitle: "Kubernetes namespace" },
-      { key: "pod", value: "policy-api-644b55c866-mg7tg", subtitle: "Source pod" },
-      { key: "container", value: "policy-api", subtitle: "Container name within pod" },
-      { key: "timestamp", value: "2026-05-03T10:09:30.288Z", subtitle: "ECS @timestamp" },
+      {
+        key: "namespace",
+        value: "claims-demo",
+        subtitle: "Kubernetes namespace",
+      },
+      {
+        key: "pod",
+        value: "policy-api-644b55c866-mg7tg",
+        subtitle: "Source pod",
+      },
+      {
+        key: "container",
+        value: "policy-api",
+        subtitle: "Container name within pod",
+      },
+      {
+        key: "timestamp",
+        value: "2026-05-03T10:09:30.288Z",
+        subtitle: "ECS @timestamp",
+      },
       {
         key: "logger",
         value: "com.example.policy.filter.ServiceRequestFilter",
@@ -120,7 +169,10 @@ export const Expandable: Story = {
       },
       {
         key: "attributes",
-        value: { "service.name": "policy-api", "process.thread.name": "http-nio-8080-exec-6" },
+        value: {
+          "service.name": "policy-api",
+          "process.thread.name": "http-nio-8080-exec-6",
+        },
         expandable: true,
         expanded: open.attributes ?? false,
         onToggle: (next) => setOpen((s) => ({ ...s, attributes: next })),
@@ -175,10 +227,21 @@ export const KitchenSink: Story = {
     const [open, setOpen] = useState<Record<string, boolean>>({});
     const items: PropertiesItem<unknown>[] = [
       { key: "namespace", value: "claims-demo" },
-      { key: "pod", value: "policy-api-644b55c866-mg7tg", subtitle: "Source pod" },
-      { key: "timestamp", value: "2026-05-03T10:09:30.288Z", subtitle: "ECS @timestamp" },
+      {
+        key: "pod",
+        value: "policy-api-644b55c866-mg7tg",
+        subtitle: "Source pod",
+      },
+      {
+        key: "timestamp",
+        value: "2026-05-03T10:09:30.288Z",
+        subtitle: "ECS @timestamp",
+      },
       { key: "thread", value: "http-nio-8080-exec-6" },
-      { key: "logger", value: "com.example.policy.filter.ServiceRequestFilter" },
+      {
+        key: "logger",
+        value: "com.example.policy.filter.ServiceRequestFilter",
+      },
       {
         key: "code",
         value: "GET /v1/policies?status=ACTIVE\nAccept: application/json",
@@ -193,7 +256,12 @@ export const KitchenSink: Story = {
         renderChildren: () => (
           <Properties
             density="compact"
-            items={["env=prod", "team=platform", "tier=api", "region=eu-west-1"].map((t, i) => ({
+            items={[
+              "env=prod",
+              "team=platform",
+              "tier=api",
+              "region=eu-west-1",
+            ].map((t, i) => ({
               key: `tags.${i}`,
               value: t,
             }))}
@@ -252,7 +320,10 @@ export const KitchenSink: Story = {
             icon: "copy",
             label: (key) => `Copy ${key}`,
             onClick: (_k, value) => {
-              if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+              if (
+                typeof navigator !== "undefined" &&
+                navigator.clipboard?.writeText
+              ) {
                 void navigator.clipboard.writeText(String(value));
               }
             },

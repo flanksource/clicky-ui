@@ -7,6 +7,7 @@ import { HoverCard } from "../overlay/HoverCard";
 import { Button } from "./button";
 import {
   controlHeightClass,
+  controlMinHeightClass,
   inputSizeClass,
 } from "./json-schema-form-size";
 import { schemaHelper } from "./json-schema-form-resolve";
@@ -68,20 +69,45 @@ export function TableArray({
       },
       childCtx,
     );
-    return nodes?.value ?? null;
+    return ctx.presentation ? (
+      <div
+        className={cn(
+          "flex min-w-0 items-center [overflow-wrap:anywhere] [&_span[data-jsf-readonly]]:h-auto [&_span[data-jsf-readonly]]:min-w-0",
+          controlMinHeightClass[ctx.size],
+        )}
+      >
+        {nodes?.value}
+      </div>
+    ) : (
+      (nodes?.value ?? null)
+    );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-input">
+    <div
+      className={cn(
+        "overflow-x-auto",
+        !ctx.presentation && "rounded-md border border-input",
+      )}
+    >
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-input bg-muted/40 text-left">
+          <tr
+            className={cn(
+              "border-b bg-muted/40 text-left",
+              ctx.presentation ? "border-border" : "border-input",
+            )}
+          >
             {columns.map(([col, prop]) => (
               <th
                 key={col}
-                className="px-2 py-1 text-xs font-medium text-muted-foreground"
+                className="px-2 py-1 text-xs font-medium text-muted-foreground [overflow-wrap:anywhere]"
               >
-                <TableColumnHeader name={col} schema={prop} />
+                {ctx.presentation ? (
+                  prop.title || col
+                ) : (
+                  <TableColumnHeader name={col} schema={prop} />
+                )}
               </th>
             ))}
             {!readOnly && <th className="w-10 px-2 py-1" />}
@@ -91,7 +117,10 @@ export function TableArray({
           {items.map((item, i) => (
             <tr
               key={i}
-              className="border-b border-input last:border-b-0 align-top"
+              className={cn(
+                "border-b last:border-b-0 align-top",
+                ctx.presentation ? "border-border" : "border-input",
+              )}
             >
               {columns.map(([col, prop]) => (
                 <td key={col} className="px-2 py-1">

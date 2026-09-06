@@ -56,13 +56,16 @@ export function ArrayControl({
   const scalarType = scalarItemsType(field.itemSchema);
   if (field.arrayDisplay === "list") {
     if (scalarType !== "string") {
-      throw new Error(`${field.key} uses x-array-display list without string items`);
+      throw new Error(
+        `${field.key} uses x-array-display list without string items`,
+      );
     }
     return (
       <CompactListArray
         field={field}
         fieldId={fieldId}
         readOnly={readOnly}
+        presentation={ctx.presentation === true}
       />
     );
   }
@@ -135,19 +138,31 @@ export function ArrayControl({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-md border border-input p-2",
+        "flex flex-col",
+        !ctx.presentation && "rounded-md border border-input p-2",
         fieldInnerGapClass[ctx.size],
       )}
     >
       {items.map((item, i) => (
-        <div key={i} className="grid grid-cols-[1fr_auto] items-start gap-2">
+        <div
+          key={i}
+          className={cn(
+            "grid items-start gap-2",
+            readOnly ? "grid-cols-1" : "grid-cols-[1fr_auto]",
+          )}
+        >
           {/* The item's row is a FieldWrapper (or a full-width ObjectSection),
               both of which are grid children of a FieldsGrid — inline mode's
               `grid-cols-subgrid` resolves to `none` without one, collapsing
               every item into a stacked column while the rest of the form stays
               aligned. Fixed at one column: an item is a single row, and any
               multi-column layout belongs to the item's own object body. */}
-          <FieldsGrid layout={ctx.layout} size={ctx.size} columns={1} className="min-w-0">
+          <FieldsGrid
+            layout={ctx.layout}
+            size={ctx.size}
+            columns={1}
+            className="min-w-0"
+          >
             {ctx.render.renderFieldRow(
               {
                 key: `${field.key}[${i}]`,

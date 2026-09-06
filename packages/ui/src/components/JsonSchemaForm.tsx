@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
-import { UiCheck, UiClose, UiEllipsisBold, UiSearch } from "../icons";
+import { UiCheck, UiEllipsisBold } from "../icons";
+import { FormFieldFilter } from "./json-schema-form-filter-input";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FieldsGrid } from "./json-schema-form-layout";
 import { FormErrorSummary } from "./json-schema-form-error-display";
@@ -46,6 +47,7 @@ function resolveFormLayout(
   const valueMaxWidth = layout?.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH;
   // `help` is orthogonal to mode, so it survives a menu-driven mode flip.
   const help = layout?.help ? { help: layout.help } : {};
+  if (mode === "properties") return { ...layout, mode, ...help };
   if (mode !== "inline") return { mode: "stacked", valueMaxWidth, ...help };
   return {
     mode: "inline",
@@ -77,6 +79,7 @@ export function JsonSchemaForm({
   pre,
   post,
   showPreferencesMenu = true,
+  showFilter,
   persistPreferences = true,
   preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
   lookupFetcher,
@@ -92,6 +95,7 @@ export function JsonSchemaForm({
 
   const effectiveSize = prefs.size ?? size;
   const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode);
+  const filterVisible = showFilter ?? (showPreferencesMenu && resolvedLayout.mode === "properties");
   // The `requiredFirst` prop sets the base sort; a menu selection overrides it.
   const effectiveSortMode = prefs.sortMode ?? (requiredFirst ? "required-first" : "schema");
 
@@ -155,13 +159,14 @@ export function JsonSchemaForm({
 
   return (
     <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
-      <div className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
+      <div data-json-schema-form className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
         {showPreferencesMenu && !inPickerPhase && (
           <PreferencesMenu
             size={effectiveSize}
             layoutMode={resolvedLayout.mode}
             sortMode={effectiveSortMode}
             fieldFilter={fieldFilter}
+            filterInMenu={!filterVisible}
             onFilterChange={setFieldFilter}
             onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
             onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
@@ -169,6 +174,11 @@ export function JsonSchemaForm({
           />
         )}
         {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
+        {filterVisible && !inPickerPhase && (
+          <div className="max-w-md pr-9">
+            <FormFieldFilter value={fieldFilter} onChange={setFieldFilter} />
+          </div>
+        )}
         <FormErrorSummary errors={unmatchedErrors} />
         <FieldsGrid
           layout={resolvedLayout}
@@ -213,6 +223,7 @@ const SIZE_OPTIONS: { value: FormSize; label: string }[] = [
 const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
   { value: "stacked", label: "Stacked" },
   { value: "inline", label: "Inline" },
+  { value: "properties", label: "Properties" },
 ];
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
@@ -230,6 +241,7 @@ function PreferencesMenu({
   layoutMode,
   sortMode,
   fieldFilter,
+  filterInMenu,
   onFilterChange,
   onSelectSize,
   onSelectLayout,
@@ -239,6 +251,7 @@ function PreferencesMenu({
   layoutMode: LayoutMode;
   sortMode: SortMode;
   fieldFilter: string;
+  filterInMenu: boolean;
   onFilterChange: (value: string) => void;
   onSelectSize: (size: FormSize) => void;
   onSelectLayout: (mode: LayoutMode) => void;
@@ -266,35 +279,9 @@ function PreferencesMenu({
     >
       {(closeMenu) => (
         <>
-          <div className="px-2 pb-1.5 pt-1">
-            <div className="relative">
-              <Icon
-                icon={UiSearch}
-                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
-              />
-              <input
-                type="text"
-                aria-label="Filter fields"
-                placeholder="Filter fields…"
-                value={fieldFilter}
-                onChange={(e) => onFilterChange(e.target.value)}
-                // Keep arrow/space/enter keys inside the input instead of driving
-                // the menu's list navigation or closing it.
-                onKeyDown={(e) => e.stopPropagation()}
-                className="w-full rounded-md border border-input bg-background py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-placeholder focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              {filterActive && (
-                <button
-                  type="button"
-                  aria-label="Clear filter"
-                  onClick={() => onFilterChange("")}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-                >
-                  <Icon icon={UiClose} className="text-xs" />
-                </button>
-              )}
-            </div>
-          </div>
+          {filterInMenu && <div className="px-2 pb-1.5 pt-1">
+            <FormFieldFilter value={fieldFilter} onChange={onFilterChange} />
+          </div>}
           <PreferenceSection title="Size" />
           {SIZE_OPTIONS.map((opt) => (
             <PreferenceItem

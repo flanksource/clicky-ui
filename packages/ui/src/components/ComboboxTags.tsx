@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Icon, LabelIcon } from "../data/Icon";
 import { FilterPill } from "../data/FilterPill";
 import { UiClose } from "../icons";
@@ -50,17 +51,25 @@ export function ComboboxTags({
             mode={mode}
             label={
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <LabelIcon icon={option?.icon} className="shrink-0 text-muted-foreground" />
+                <LabelIcon
+                  icon={option?.icon}
+                  className="shrink-0 text-muted-foreground"
+                />
                 <span className="truncate">{label}</span>
               </span>
             }
-            title={mode === "include" ? `${label} included` : `${label} excluded`}
+            title={
+              mode === "include" ? `${label} included` : `${label} excluded`
+            }
             className="max-w-full"
             {...(disabled
               ? {}
               : {
                   onClick: () =>
-                    onSetMode(value, mode === "include" ? "exclude" : "include"),
+                    onSetMode(
+                      value,
+                      mode === "include" ? "exclude" : "include",
+                    ),
                 })}
           />
           {remove}
@@ -69,15 +78,39 @@ export function ComboboxTags({
     }
 
     return (
-      <span
+      <ComboboxTag
         key={`${value}-${index}`}
-        data-combobox-tag={value}
-        className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-muted px-2 text-xs"
+        value={value}
+        {...(option ? { option } : {})}
       >
-        <LabelIcon icon={option?.icon} className="shrink-0 text-muted-foreground" />
-        <span className="truncate">{label}</span>
         {remove}
-      </span>
+      </ComboboxTag>
     );
   });
+}
+
+export function ComboboxTag({
+  value,
+  option,
+  children,
+}: {
+  value: string;
+  option?: ComboboxOption;
+  children?: ReactNode;
+}) {
+  return (
+    <span
+      data-combobox-tag={value}
+      className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-muted px-2 text-xs"
+    >
+      <LabelIcon
+        icon={option?.icon}
+        className="shrink-0 text-muted-foreground"
+      />
+      <span className="truncate">
+        {option?.selectedLabel ?? option?.label ?? value}
+      </span>
+      {children}
+    </span>
+  );
 }
