@@ -64,7 +64,14 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
-  const [preferredFamily, setPreferredFamily] = useState<string>();
+  const [preference, setPreference] = useState<{
+    model: string | undefined;
+    family: string | undefined;
+  }>({ model: effectiveModel, family: undefined });
+  if (preference.model !== effectiveModel) {
+    setPreference({ model: effectiveModel, family: undefined });
+  }
+  const preferredFamily = preference.model === effectiveModel ? preference.family : undefined;
   const specMode =
     runtimeModeFromModel(value.model) ||
     value.mode?.trim() ||
@@ -72,7 +79,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   const selection = selectionForRuntime(
     families,
     specMode,
-    value.model || effectiveModel,
+    value.model || (preferredFamily ? undefined : effectiveModel),
     models,
     preferredFamily,
   );
@@ -93,7 +100,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   );
 
   const applyMode = (familyId: string, modeId: string) => {
-    setPreferredFamily(familyId);
+    setPreference({ model: effectiveModel, family: familyId });
     const next = applyRuntimeMode(
       value,
       models,
