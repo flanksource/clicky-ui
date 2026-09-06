@@ -133,6 +133,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "pnpm run build:icons && vite build && vite build --mode cjs && node scripts/build-styles.mjs",
+    "prepack": "pnpm run build",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
     "build:storybook-schemas": "tsx scripts/build-storybook-schemas.ts",
