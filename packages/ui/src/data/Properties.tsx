@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { IconButton } from "../components/IconButton";
 import {
   UiCheck,
@@ -11,6 +17,7 @@ import { cn } from "../lib/utils";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "./Icon";
 import { formatPropertyLabel } from "./properties-utils";
+import { PropertiesContext } from "./properties-context";
 
 export type PropertiesAction<V = unknown> = {
   /** Stable action id. */
@@ -36,7 +43,7 @@ export type PropertiesItem<V = unknown> = {
   subtitle?: ReactNode;
   /** Hide this row without removing it from the item array. */
   hidden?: boolean;
-  /** Enables an expandable child area below the row value. */
+  /** Enables a child area spanning both columns, with nested labels indented. */
   expandable?: boolean;
   /** Controlled expanded state. */
   expanded?: boolean;
@@ -56,7 +63,9 @@ export type PropertiesProps<V = unknown> = {
   /** Custom value renderer. */
   renderValue?: (key: string, value: V, item: PropertiesItem<V>) => ReactNode;
   /** Static icon name or function that returns an icon name per row. */
-  labelIcon?: string | ((key: string, value: V, item: PropertiesItem<V>) => string | undefined);
+  labelIcon?:
+    | string
+    | ((key: string, value: V, item: PropertiesItem<V>) => string | undefined);
   /** Actions rendered before the value. */
   prefixActions?: PropertiesAction<V>[];
   /** Actions rendered after the value. */
@@ -134,6 +143,7 @@ export function Properties<V = unknown>({
   showDensityMenu = true,
   emptyMessage = "No properties",
 }: PropertiesProps<V>) {
+  const parent = useContext(PropertiesContext);
   const [densityOverride, setDensityOverride] = useState<PropertiesDensity>();
   useEffect(() => setDensityOverride(readStoredDensity(keyRef)), [keyRef]);
 
@@ -143,8 +153,11 @@ export function Properties<V = unknown>({
     return <div className="text-sm text-muted-foreground">{emptyMessage}</div>;
   }
 
-  const activeDensity = densityOverride ?? density;
+  const activeDensity = parent?.density ?? densityOverride ?? density;
   const styles = DENSITY_CLASSES[activeDensity];
+  const columns =
+    parent?.columns ?? gridTemplateColumns ?? styles.gridTemplateColumns;
+  const depth = parent?.depth ?? 0;
 
   const updateDensity = (next: PropertiesDensity) => {
     setDensityOverride(next);
@@ -154,61 +167,99 @@ export function Properties<V = unknown>({
   return (
     <dl
       className={cn(
-        "divide-y divide-border rounded-md border border-border bg-muted/20",
+        "grid gap-x-density-3 divide-y divide-border rounded-md border border-border bg-muted/20",
+        parent && "col-span-full rounded-none border-0 bg-transparent",
         className,
       )}
+      style={{ gridTemplateColumns: parent ? "subgrid" : columns }}
     >
-      {showDensityMenu ? (
-        <div className="flex items-center justify-end px-density-2 py-density-1">
+      {showDensityMenu && !parent ? (
+        <div className="col-span-full flex items-center justify-end px-density-2 py-density-1">
           <dt className="sr-only">Properties display options</dt>
           <dd>
-            <PropertiesDensityMenu density={activeDensity} onChange={updateDensity} />
+            <PropertiesDensityMenu
+              density={activeDensity}
+              onChange={updateDensity}
+            />
           </dd>
         </div>
       ) : null}
       {visible.map((item) => {
         const iconName =
-          typeof labelIcon === "function" ? labelIcon(item.key, item.value, item) : labelIcon;
+          typeof labelIcon === "function"
+            ? labelIcon(item.key, item.value, item)
+            : labelIcon;
         const renderedLabel = renderLabel
           ? renderLabel(item.key, item.value, item)
           : formatPropertyLabel(item.key);
-        const ariaLabel = typeof renderedLabel === "string" ? renderedLabel : item.key;
+        const ariaLabel =
+          typeof renderedLabel === "string" ? renderedLabel : item.key;
 
         return (
-          <div
-            key={item.key}
-            className={cn("grid min-w-0 gap-density-3", styles.row, rowClassName)}
-            style={{ gridTemplateColumns: gridTemplateColumns ?? styles.gridTemplateColumns }}
-          >
-            <dt
-              aria-label={ariaLabel}
-              className={cn("min-w-0 truncate", styles.label, labelClassName)}
+          <Fragment key={item.key}>
+            <div
+              className={cn(
+                "col-span-full grid min-w-0 grid-cols-subgrid gap-density-3",
+                styles.row,
+                rowClassName,
+              )}
             >
-              <div className="flex min-w-0 items-center gap-density-1">
-                {iconName ? <Icon name={iconName} className="text-xs shrink-0" /> : null}
-                <span className="min-w-0 truncate">{renderedLabel}</span>
-              </div>
-              {item.subtitle ? (
-                <div className="mt-0.5 text-[10px] font-normal text-muted-foreground/80">
-                  {item.subtitle}
+              <dt
+                aria-label={ariaLabel}
+                className={cn("min-w-0 truncate", styles.label, labelClassName)}
+                style={{ paddingInlineStart: depth * 16 }}
+              >
+                <div className="flex min-w-0 items-center gap-density-1">
+                  {iconName ? (
+                    <Icon name={iconName} className="text-xs shrink-0" />
+                  ) : null}
+                  <span className="min-w-0 truncate">{renderedLabel}</span>
                 </div>
-              ) : null}
-            </dt>
-            <dd className={cn("min-w-0 space-y-density-1", valueClassName)}>
-              <div className="flex min-w-0 items-start gap-density-1">
-                <ActionList actions={prefixActions} item={item} className="shrink-0 pt-0.5" />
-                <div className={cn("min-w-0 max-w-full flex-1", styles.value)}>
-                  {renderValue
-                    ? renderValue(item.key, item.value, item)
-                    : defaultRenderValue(item.value)}
+                {item.subtitle ? (
+                  <div className="mt-0.5 text-[10px] font-normal text-muted-foreground/80">
+                    {item.subtitle}
+                  </div>
+                ) : null}
+              </dt>
+              <dd className={cn("min-w-0 space-y-density-1", valueClassName)}>
+                <div className="flex min-w-0 items-start gap-density-1">
+                  <ActionList
+                    actions={prefixActions}
+                    item={item}
+                    className="shrink-0 pt-0.5"
+                  />
+                  <div
+                    className={cn("min-w-0 max-w-full flex-1", styles.value)}
+                  >
+                    {renderValue
+                      ? renderValue(item.key, item.value, item)
+                      : defaultRenderValue(item.value)}
+                  </div>
+                  <ActionList
+                    actions={suffixActions}
+                    item={item}
+                    className="shrink-0 pt-0.5"
+                  />
                 </div>
-                <ActionList actions={suffixActions} item={item} className="shrink-0 pt-0.5" />
+              </dd>
+            </div>
+            {item.expandable && item.expanded && item.renderChildren ? (
+              <div className="col-span-full grid grid-cols-subgrid">
+                <dt className="sr-only">{ariaLabel} properties</dt>
+                <dd className="col-span-full grid min-w-0 grid-cols-subgrid">
+                  <PropertiesContext.Provider
+                    value={{
+                      depth: depth + 1,
+                      columns,
+                      density: activeDensity,
+                    }}
+                  >
+                    {item.renderChildren()}
+                  </PropertiesContext.Provider>
+                </dd>
               </div>
-              {item.expandable && item.expanded && item.renderChildren
-                ? item.renderChildren()
-                : null}
-            </dd>
-          </div>
+            ) : null}
+          </Fragment>
         );
       })}
     </dl>
@@ -370,7 +421,9 @@ function PropertiesActionButton<V>({
       }}
     >
       <Icon
-        {...(typeof action.icon === "string" ? { name: action.icon } : { icon: action.icon })}
+        {...(typeof action.icon === "string"
+          ? { name: action.icon }
+          : { icon: action.icon })}
         className="text-xs"
       />
     </button>

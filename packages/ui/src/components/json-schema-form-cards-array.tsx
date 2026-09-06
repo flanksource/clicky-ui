@@ -1,4 +1,9 @@
-import { duplicateIndex, moveItem, removeIndex, setIndex } from "../lib/collections";
+import {
+  duplicateIndex,
+  moveItem,
+  removeIndex,
+  setIndex,
+} from "../lib/collections";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiAdd } from "../icons";
@@ -46,7 +51,9 @@ export function CardsArray({
     ...ctx,
     readOnly,
     depth: ctx.depth + 1,
-    ...(field.helpDisplay ? { layout: { ...ctx.layout, help: field.helpDisplay } } : {}),
+    ...(field.helpDisplay
+      ? { layout: { ...ctx.layout, help: field.helpDisplay } }
+      : {}),
   };
 
   function commit(next: unknown[]) {
@@ -63,15 +70,23 @@ export function CardsArray({
           <article
             key={i}
             className={cn(
-              "group rounded-lg border border-l-4 border-border shadow-sm",
+              "group rounded-lg border-l-4 border-border",
+              ctx.presentation ? "bg-muted/20" : "border shadow-sm",
               summary.glyph ? TONE_EDGE_CLASS[summary.glyph.tone] : undefined,
             )}
           >
-            <header className="flex items-center gap-2 rounded-tr-md border-b border-border bg-muted/40 px-3 py-2">
+            <header
+              className={cn(
+                "flex flex-wrap items-center gap-2 rounded-tr-md border-b border-border bg-muted/40",
+                ctx.presentation ? "px-2 py-1" : "px-3 py-2",
+              )}
+            >
               <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground">
                 {i + 1}
               </span>
-              <span className="shrink-0 text-sm font-semibold">{summary.title}</span>
+              <span className="shrink-0 text-sm font-semibold">
+                {summary.title}
+              </span>
               <ItemBadge badge={summary.badge} />
               {summary.flagged && <RequiredMark />}
               {summary.summary && (
@@ -97,7 +112,7 @@ export function CardsArray({
                 />
               )}
             </header>
-            <div className="p-3">
+            <div className={ctx.presentation ? "p-2" : "p-3"}>
               {/* Recurse through the shared pipeline so consumer pre/post
                   extensions still apply to the item and its properties — and so
                   the item's own x-columns reaches its ObjectControl. */}
@@ -117,7 +132,9 @@ export function CardsArray({
         );
       })}
       {items.length === 0 && emptyCopy && (
-        <p className="text-xs leading-snug text-muted-foreground">{emptyCopy}</p>
+        <p className="text-xs leading-snug text-muted-foreground">
+          {emptyCopy}
+        </p>
       )}
       {!readOnly && (
         <Button

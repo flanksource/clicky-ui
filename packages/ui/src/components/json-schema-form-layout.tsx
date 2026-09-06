@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { PropertiesContext } from "../data/properties-context";
 import { cn } from "../lib/utils";
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { UiQuestion } from "../icons";
@@ -58,13 +59,30 @@ export function FieldsGrid({
   className?: string;
   children: ReactNode;
 }) {
+  const propertiesParent = useContext(PropertiesContext);
+  if (layout.mode === "properties") {
+    return (
+      <div
+        className={cn(
+          "min-w-0 overflow-hidden rounded-md border border-border",
+          propertiesParent &&
+            "col-span-full grid grid-cols-subgrid rounded-none border-0",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    );
+  }
   if (layout.mode === "inline") {
     const labelMaxWidth = layout.labelMaxWidth ?? "40ch";
     const valueMaxWidth = layout.valueMaxWidth ?? "600px";
     return (
       <div
         className={cn("grid", inlineRowGapClass[size], className)}
-        style={{ gridTemplateColumns: `fit-content(${labelMaxWidth}) minmax(0, ${valueMaxWidth})` }}
+        style={{
+          gridTemplateColumns: `fit-content(${labelMaxWidth}) minmax(0, ${valueMaxWidth})`,
+        }}
       >
         {children}
       </div>
@@ -93,7 +111,11 @@ export function FieldsGrid({
       </div>
     );
   }
-  return <div className={cn("grid", stackedRowGapClass[size], className)}>{children}</div>;
+  return (
+    <div className={cn("grid", stackedRowGapClass[size], className)}>
+      {children}
+    </div>
+  );
 }
 
 // FieldWrapper lays out a single label + value (+ helper/error). In inline mode
@@ -124,10 +146,21 @@ export function FieldWrapper({
   if (layout.mode === "inline") {
     return (
       <div className="col-span-2 grid grid-cols-subgrid items-start gap-x-3 gap-y-0.5">
-        <div className={cn("flex min-w-0 items-center", controlMinHeightClass[size])}>{label}</div>
+        <div
+          className={cn(
+            "flex min-w-0 items-center",
+            controlMinHeightClass[size],
+          )}
+        >
+          {label}
+        </div>
         <div className="min-w-0">{value}</div>
-        {helper && <p className="col-start-2 text-xs text-muted-foreground">{helper}</p>}
-        {error && <p className="col-start-2 text-xs text-destructive">{error}</p>}
+        {helper && (
+          <p className="col-start-2 text-xs text-muted-foreground">{helper}</p>
+        )}
+        {error && (
+          <p className="col-start-2 text-xs text-destructive">{error}</p>
+        )}
       </div>
     );
   }
@@ -160,10 +193,20 @@ export function FieldLabel({
   return (
     <label
       htmlFor={fieldId}
-      className={cn("flex min-w-0 items-center gap-2 font-medium", labelSizeClass[size], field.labelClassName)}
+      className={cn(
+        "flex min-w-0 items-center gap-2 font-medium",
+        labelSizeClass[size],
+        field.labelClassName,
+      )}
     >
-      <LabelIcon icon={field.labelIcon} className="shrink-0 text-[15px] text-muted-foreground" />
-      <span className="truncate" title={field.label !== field.key ? field.key : undefined}>
+      <LabelIcon
+        icon={field.labelIcon}
+        className="shrink-0 text-[15px] text-muted-foreground"
+      />
+      <span
+        className="truncate"
+        title={field.label !== field.key ? field.key : undefined}
+      >
         {field.label}
       </span>
       {field.required && <span className="shrink-0 text-destructive">*</span>}
@@ -229,9 +272,22 @@ export function ObjectSection({
 }) {
   const hoverHelp = helpDisplay === "hover" && !!helper;
   return (
-    <div className={cn("col-span-full flex min-w-0 max-w-full flex-col", fieldInnerGapClass[size])}>
-      <div className={cn("flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold", labelSizeClass[size])}>
-        <LabelIcon icon={labelIcon} className="shrink-0 text-[15px] text-muted-foreground" />
+    <div
+      className={cn(
+        "col-span-full flex min-w-0 max-w-full flex-col",
+        fieldInnerGapClass[size],
+      )}
+    >
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold",
+          labelSizeClass[size],
+        )}
+      >
+        <LabelIcon
+          icon={labelIcon}
+          className="shrink-0 text-[15px] text-muted-foreground"
+        />
         <span className="min-w-0 truncate">{label}</span>
         {required && <span className="shrink-0 text-destructive">*</span>}
         {badge && (
@@ -242,7 +298,9 @@ export function ObjectSection({
         {hoverHelp && helper && <HelpHint label={label} helper={helper} />}
       </div>
       {helper && !hoverHelp && (
-        <p className="min-w-0 break-words text-xs text-muted-foreground">{helper}</p>
+        <p className="min-w-0 break-words text-xs text-muted-foreground">
+          {helper}
+        </p>
       )}
       {children}
     </div>

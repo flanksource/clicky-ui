@@ -9,7 +9,7 @@ export interface FormPreferences {
   sortMode?: SortMode;
 }
 
-export type LayoutMode = "stacked" | "inline";
+export type LayoutMode = "stacked" | "inline" | "properties";
 
 // SortMode controls the order fields render in at every object level:
 // - "schema": schema/x-order order (the default).
@@ -27,7 +27,7 @@ function isFormSize(value: unknown): value is FormSize {
 }
 
 function isLayoutMode(value: unknown): value is LayoutMode {
-  return value === "stacked" || value === "inline";
+  return value === "stacked" || value === "inline" || value === "properties";
 }
 
 function isSortMode(value: unknown): value is SortMode {

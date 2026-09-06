@@ -165,21 +165,6 @@ export function keyPickerOptions(
   return options.filter((o) => !taken.has(o.value));
 }
 
-// matchesFieldFilter reports whether a property should stay visible under the
-// display-options field filter: a case-insensitive substring match against the
-// field's key and its display label (`title` when set, otherwise the key). A
-// blank filter matches everything, so an empty box never hides fields.
-export function matchesFieldFilter(
-  key: string,
-  prop: JsonSchemaProperty,
-  filter: string,
-): boolean {
-  const query = filter.trim().toLowerCase();
-  if (!query) return true;
-  const label = typeof prop.title === "string" && prop.title ? prop.title : key;
-  return key.toLowerCase().includes(query) || label.toLowerCase().includes(query);
-}
-
 // orderByXOrder reorders property entries by the schema's `x-order` hint: keys
 // named there render first (in that order), the rest keep document order. A
 // missing/empty hint is a no-op, so document order remains the default.

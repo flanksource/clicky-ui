@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fieldInputId,
   isEmptyValue,
-  matchesFieldFilter,
   normalizeColSpan,
   normalizeColumns,
   orderByPriority,
@@ -11,6 +10,7 @@ import {
   softError,
 } from "./json-schema-form-utils";
 import type { FieldControl } from "./json-schema-form-types";
+import { matchesFieldFilter } from "./json-schema-form-filter";
 
 function field(over: Partial<FieldControl>): FieldControl {
   return {
@@ -90,20 +90,20 @@ describe("orderByPriority", () => {
 
 describe("matchesFieldFilter", () => {
   it("matches everything when the filter is blank or whitespace", () => {
-    expect(matchesFieldFilter("email", { type: "string" }, "")).toBe(true);
-    expect(matchesFieldFilter("email", { type: "string" }, "   ")).toBe(true);
+    expect(matchesFieldFilter({ key: "email", prop: { type: "string" }, filter: "" })).toBe(true);
+    expect(matchesFieldFilter({ key: "email", prop: { type: "string" }, filter: "   " })).toBe(true);
   });
   it("matches on the title case-insensitively", () => {
     const prop = { type: "string", title: "First Name" };
-    expect(matchesFieldFilter("firstName", prop, "name")).toBe(true);
-    expect(matchesFieldFilter("firstName", prop, "NAME")).toBe(true);
+    expect(matchesFieldFilter({ key: "firstName", prop, filter: "name" })).toBe(true);
+    expect(matchesFieldFilter({ key: "firstName", prop, filter: "NAME" })).toBe(true);
   });
   it("matches on the key when there is no title", () => {
-    expect(matchesFieldFilter("alpha", { type: "string" }, "alph")).toBe(true);
-    expect(matchesFieldFilter("beta", { type: "string" }, "alph")).toBe(false);
+    expect(matchesFieldFilter({ key: "alpha", prop: { type: "string" }, filter: "alph" })).toBe(true);
+    expect(matchesFieldFilter({ key: "beta", prop: { type: "string" }, filter: "alph" })).toBe(false);
   });
   it("returns false when neither key nor title contains the query", () => {
-    expect(matchesFieldFilter("email", { type: "string", title: "Email" }, "phone")).toBe(false);
+    expect(matchesFieldFilter({ key: "email", prop: { type: "string", title: "Email" }, filter: "phone" })).toBe(false);
   });
 });
 

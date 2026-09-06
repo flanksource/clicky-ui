@@ -34,9 +34,10 @@ describe("Properties", () => {
 
     const row = namespaceRow();
     expect(row).toHaveClass("px-density-4", "py-density-3");
-    expect(row).toHaveStyle({
+    expect(row.closest("dl")).toHaveStyle({
       gridTemplateColumns: "minmax(12rem, 20rem) minmax(0, 1fr)",
     });
+    expect(row).toHaveClass("grid-cols-subgrid");
     expect(row?.querySelector("dt")).toHaveClass("text-sm");
   });
 
@@ -79,14 +80,23 @@ describe("Properties", () => {
   });
 
   it("omits hidden items", () => {
-    render(<Properties items={[...items, { key: "secret", value: "shh", hidden: true }]} />);
+    render(
+      <Properties
+        items={[...items, { key: "secret", value: "shh", hidden: true }]}
+      />,
+    );
 
     expect(screen.queryByText("Secret")).not.toBeInTheDocument();
     expect(screen.queryByText("shh")).not.toBeInTheDocument();
   });
 
   it("shows the empty message when every item is hidden", () => {
-    render(<Properties items={[{ key: "x", value: "y", hidden: true }]} emptyMessage="nothing" />);
+    render(
+      <Properties
+        items={[{ key: "x", value: "y", hidden: true }]}
+        emptyMessage="nothing"
+      />,
+    );
     expect(screen.getByText("nothing")).toBeInTheDocument();
   });
 
@@ -118,7 +128,9 @@ describe("Properties", () => {
       />,
     );
 
-    expect(screen.getByTestId("custom-value").parentElement).toHaveClass("flex-1");
+    expect(screen.getByTestId("custom-value").parentElement).toHaveClass(
+      "flex-1",
+    );
   });
 
   it("invokes suffix action onClick with (key, value, item)", () => {
@@ -172,7 +184,9 @@ describe("Properties", () => {
     );
 
     expect(screen.getByLabelText("Expand expandable-row")).not.toBeDisabled();
-    expect(screen.queryByLabelText("Expand scalar-row")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Expand scalar-row"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders renderChildren only when expandable && expanded", () => {
@@ -205,12 +219,56 @@ describe("Properties", () => {
       />,
     );
     expect(screen.getByTestId("children")).toBeInTheDocument();
+    expect(screen.getByTestId("children").closest("dd")).toHaveClass(
+      "col-span-full",
+    );
+    expect(
+      screen.getByTestId("children").closest("dd")?.previousElementSibling,
+    ).toHaveClass("sr-only");
   });
 
   it("renders a labelIcon when provided as a string", () => {
     const { container } = render(
-      <Properties items={[{ key: "namespace", value: "demo" }]} labelIcon="k8s-namespace" />,
+      <Properties
+        items={[{ key: "namespace", value: "demo" }]}
+        labelIcon="k8s-namespace"
+      />,
     );
-    expect(container.querySelector('[title="k8s-namespace"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[title="k8s-namespace"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("inherits parent tracks and indents nested labels without indenting values", () => {
+    render(
+      <Properties
+        gridTemplateColumns="fit-content(30ch) minmax(0, 1fr)"
+        items={[
+          {
+            key: "parent",
+            value: "group",
+            expandable: true,
+            expanded: true,
+            renderChildren: () => (
+              <Properties
+                density="spacious"
+                items={[{ key: "child", value: "nested" }]}
+              />
+            ),
+          },
+        ]}
+      />,
+    );
+    const child = screen.getByText("Child").closest("dt");
+    expect(child).toHaveStyle({ paddingInlineStart: "16px" });
+    expect(child?.closest("dl")).toHaveStyle({
+      gridTemplateColumns: "subgrid",
+    });
+    expect(screen.getByText("nested").closest("dd")).not.toHaveAttribute(
+      "style",
+    );
+    expect(
+      screen.getAllByRole("button", { name: "Properties options" }),
+    ).toHaveLength(1);
   });
 });
