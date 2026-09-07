@@ -4,11 +4,10 @@ if (typeof window !== "undefined") {
   installStorageShimIfNeeded();
 }
 
-// jsdom ships no IntersectionObserver, and every scroll-driven surface — the
-// DataTable's reveal window and its server-driven infinite sentinel — attaches
-// one the moment it has more rows to offer. The stub never fires: a test that
-// wants the next page drives the load-more handle directly, which is the seam
-// the observer would have called anyway.
+// jsdom ships no IntersectionObserver, and the DataTable's server-driven
+// infinite sentinel attaches one the moment it has more rows to offer. The stub
+// never fires: a test that wants the next page drives the load-more handle
+// directly, which is the seam the observer would have called anyway.
 if (typeof window !== "undefined" && !("IntersectionObserver" in window)) {
   class NoopIntersectionObserver implements IntersectionObserver {
     readonly root = null;
@@ -23,6 +22,20 @@ if (typeof window !== "undefined" && !("IntersectionObserver" in window)) {
   }
   window.IntersectionObserver = NoopIntersectionObserver;
   globalThis.IntersectionObserver = NoopIntersectionObserver;
+}
+
+// jsdom ships no ResizeObserver either. A virtualized DataTable observes the
+// header so it can keep the sticky <thead>'s height out of its row offsets.
+// virtual-core guards its own use, but stubbing keeps jsdom runs deterministic
+// rather than dependent on that guard.
+if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+  class NoopResizeObserver implements ResizeObserver {
+    disconnect() {}
+    observe() {}
+    unobserve() {}
+  }
+  window.ResizeObserver = NoopResizeObserver;
+  globalThis.ResizeObserver = NoopResizeObserver;
 }
 
 if (typeof window !== "undefined" && !window.matchMedia) {

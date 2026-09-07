@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "../components/button";
 import {
   UiArrowRight,
@@ -1495,5 +1495,116 @@ export const NativeGrouping: Story = {
     await expect(
       canvas.getByRole("button", { name: /^Status: healthy/ }),
     ).toBeVisible();
+  },
+};
+
+// Virtualization is the one DataTable behaviour jsdom cannot judge: it depends
+// on real layout, real scrolling and real measurement. These run in headless
+// chromium via @storybook/addon-vitest, which is why the assertions live here
+// rather than in DataTable.test.tsx.
+const manyPeople: PersonRow[] = Array.from({ length: 5000 }, (_, index) => {
+  const source = people[index % people.length]!;
+  return { ...source, id: `person-${index + 1}`, name: `${source.name} #${index + 1}` };
+});
+
+function rowCount(canvasElement: HTMLElement): number {
+  return canvasElement.querySelectorAll("tbody tr:not([data-virtual-spacer])")
+    .length;
+}
+
+function scroller(canvasElement: HTMLElement): HTMLElement {
+  const el = canvasElement.querySelector<HTMLElement>(".overflow-auto");
+  if (!el) throw new Error("no scroll container");
+  return el;
+}
+
+export const Virtualized: Story = {
+  render: () => (
+    <DataTable
+      data={manyPeople}
+      columns={peopleColumns}
+      virtualize
+      scrollContainerClassName="max-h-[26rem]"
+    />
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`virtualize` keeps only the rows near the viewport in the DOM — 5,000 rows here cost a few dozen `<tr>`s plus two spacers. The data is not windowed: counts, grouping and select-all still see all 5,000.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText(/#1$/)).toBeVisible();
+
+    // A tiny fraction of 5,000 rows is in the DOM — that is the whole point.
+    await waitFor(() => expect(rowCount(canvasElement)).toBeLessThan(120));
+    await expect(rowCount(canvasElement)).toBeGreaterThan(0);
+
+    // Column widths must not shift as new windows scroll in.
+    const header = canvasElement.querySelector<HTMLElement>("thead th")!;
+    const widthBefore = header.getBoundingClientRect().width;
+
+    const el = scroller(canvasElement);
+    el.scrollTop = el.scrollHeight;
+    await waitFor(() =>
+      expect(canvasElement.querySelector("tbody")?.textContent).toContain(
+        "#5000",
+      ),
+    );
+    await expect(rowCount(canvasElement)).toBeLessThan(120);
+    await expect(header.getBoundingClientRect().width).toBeCloseTo(
+      widthBefore,
+      0,
+    );
+
+    // Scrolling back finds the first row again.
+    el.scrollTop = 0;
+    await waitFor(() =>
+      expect(canvasElement.querySelector("tbody")?.textContent).toContain("#1"),
+    );
+  },
+};
+
+export const VirtualizedKeepsRowsWhenDataIsRebuilt: Story = {
+  render: function Render() {
+    const [, force] = useState(0);
+    return (
+      <div className="flex flex-col gap-2">
+        <Button size="sm" onClick={() => force((n) => n + 1)}>
+          Rebuild rows array
+        </Button>
+        <DataTable
+          // A fresh array with identical contents on every render — the shape a
+          // parent produces with `rows.map(...)` in its render body. The old
+          // clientReveal window reset to its first batch here, throwing away
+          // everything the reader had scrolled to.
+          data={[...manyPeople]}
+          columns={peopleColumns}
+          virtualize
+          scrollContainerClassName="max-h-[26rem]"
+        />
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const el = scroller(canvasElement);
+
+    el.scrollTop = 4000;
+    await waitFor(() => expect(el.scrollTop).toBe(4000));
+    const textAtDepth = canvasElement.querySelector("tbody")!.textContent;
+
+    await userEvent.click(canvas.getByRole("button", { name: "Rebuild rows array" }));
+
+    // Same scroll offset, same rows: a new array identity is inert.
+    await expect(el.scrollTop).toBe(4000);
+    await waitFor(() =>
+      expect(canvasElement.querySelector("tbody")!.textContent).toBe(
+        textAtDepth,
+      ),
+    );
   },
 };

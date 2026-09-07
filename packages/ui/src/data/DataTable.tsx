@@ -45,6 +45,10 @@ import {
 } from "./data-table-utils";
 import { assertDataTableFilterProps } from "./data-table-server-filters";
 import { useInfiniteRows } from "./use-infinite-rows";
+import {
+  resolveVirtualizeOptions,
+  useDataTableVirtual,
+} from "./use-data-table-virtual";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
@@ -150,9 +154,14 @@ type GroupCollapseState = {
   groups: Record<string, boolean>;
 };
 
+// One renderable <tr>. An inline-expanded row contributes a second, separate
+// item rather than nesting inside the first: virtualization measures exactly one
+// DOM node per item, so an expansion tucked inside its row's fragment would be
+// invisible to the measurement and shift every offset below it.
 type RowStreamItem<T> =
   | { kind: "group"; group: ResolvedGroup<T> }
-  | { kind: "row"; record: InternalRow<T> };
+  | { kind: "row"; record: InternalRow<T> }
+  | { kind: "expansion"; record: InternalRow<T>; content: ReactNode };
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
@@ -385,11 +394,12 @@ function isSinglePage(
  * caller accumulates the pages it has fetched and hands the whole run in as
  * `data`, and the table asks for the next one as the reader reaches the end.
  *
- * It is distinct from `clientReveal`, which windows rows the caller already
- * holds. Here the rows do not exist yet, so the two facts that matter are the
- * server's — whether more follow, and whether the request for them is already
- * in flight. Inferring either from `data.length` is what turns a slow page into
- * a duplicate request, and the end of the data into a spinner that never stops.
+ * It is distinct from `virtualize`, which windows the DOM for rows the caller
+ * already holds. Here the rows do not exist yet, so the two facts that matter
+ * are the server's — whether more follow, and whether the request for them is
+ * already in flight. Inferring either from `data.length` is what turns a slow
+ * page into a duplicate request, and the end of the data into a spinner that
+ * never stops. The two compose: virtualizing accumulated pages is the point.
  *
  * Passing this alongside `pagination` is the normal case rather than a
  * conflict: the footer keeps reporting the count and page size, and only the
@@ -640,13 +650,19 @@ type DataTableInnerProps<
   /** Message used when there are no rows after filtering. */
   emptyMessage?: string;
   /**
-   * Client-side incremental reveal (infinite scroll). When set — and no server
-   * `pagination` is provided — the table renders `batchSize` rows at a time and
-   * grows by `batchSize` as a trailing sentinel scrolls into view. Use for
-   * large in-memory result sets (e.g. ad-hoc SQL output) to keep the first
-   * paint cheap without paginating.
+   * Row virtualization. Only the rows near the viewport stay in the DOM; the
+   * rest are represented by spacer rows above and below the window. Row heights
+   * are measured, so variable-height cells need no height hint.
+   *
+   * Reach for it above roughly 200 rows. Off by default because it changes what
+   * find-in-page, print and a screen reader see — that is the caller's call, not
+   * something to infer from `data.length`.
+   *
+   * Composes with `infinite` (virtualizing accumulated server pages is the point
+   * of both) and with `pagination`. Column widths are pinned on first measure
+   * once active, so they do not resize as you scroll.
    */
-  clientReveal?: { batchSize: number };
+  virtualize?: boolean | { overscan?: number; estimateRowHeight?: number };
   /** Classes applied to the table shell. */
   className?: string;
   /**
@@ -934,7 +950,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   loadingMessage = "Loading results…",
   loadingRowCount = 8,
   emptyMessage = "No data",
-  clientReveal,
+  virtualize,
   className,
   scrollContainerClassName,
   autoFilter = false,
@@ -1745,40 +1761,29 @@ function DataTableInner<T extends Record<string, unknown>>({
     !onSortChange &&
     !(isSinglePage(pagination, data.length) && !infinite?.hasMore);
 
-  // Client-side incremental reveal: when `clientReveal` is set (and the caller
-  // is not doing server pagination), only the first `visibleCount` sorted rows
-  // are rendered; a trailing sentinel grows the window as it scrolls into view.
-  // `infinite` is the same gesture aimed at the server rather than at memory, so
-  // it takes the sentinel outright: windowing rows the caller just paid a
-  // request for would hide them again the moment they arrived.
-  const revealEnabled = !!clientReveal && !pagination && !infinite;
-  const revealBatchSize = clientReveal?.batchSize ?? 0;
-  const [visibleCount, setVisibleCount] = useState(revealBatchSize);
-  const revealObserver = useRef<IntersectionObserver | null>(null);
+  // Every row the filters left is rendered — virtualization (below) decides
+  // which of them reach the DOM, and it holds no window state of its own.
+  //
+  // This used to be a `clientReveal` batch window kept in `useState` and reset
+  // by an effect keyed on `sorted`'s array identity. With `manualSort`/
+  // `manualFilter` that identity is the caller's `data` prop, so a parent that
+  // rebuilt its rows array — even with identical contents — silently threw away
+  // every row past the first batch and made the reader scroll for them again.
+  const visibleSorted = sorted;
 
-  useEffect(() => {
-    // Reset the window whenever the filtered/sorted set or batch size changes
-    // so a new query starts from the top rather than mid-scroll.
-    if (revealEnabled) setVisibleCount(revealBatchSize);
-  }, [revealEnabled, revealBatchSize, sorted]);
-
-  const visibleSorted = revealEnabled ? sorted.slice(0, visibleCount) : sorted;
-  const hasMoreRows = revealEnabled && visibleCount < sorted.length;
-
-  // Server-driven infinite scroll shares the sentinel and the observer with
-  // `clientReveal`; only what an intersection means differs. Unlike the reveal
-  // window it is not gated on `pagination` — a table paging the server is
-  // precisely the one that has more to fetch — and it has no window to reset,
-  // because the caller owns the accumulation and it only ever grows.
+  // Server-driven infinite scroll: unlike a DOM window it is not gated on
+  // `pagination` — a table paging the server is precisely the one that has more
+  // to fetch — and it has nothing to reset, because the caller owns the
+  // accumulation and it only ever grows.
   const requestMoreRows = useInfiniteRows(infinite, data.length);
-  const infiniteEnabled = !!infinite;
-  const sentinelActive = infinite ? infinite.hasMore : hasMoreRows;
-  // The sentinel names what it is waiting on. Client reveal holds the rows and
-  // only has to paint them, so it is always mid-load; the server variant sits
-  // idle until the reader reaches it, and announcing a fetch that has not
-  // started reads as a table that is permanently busy.
-  const sentinelLabel =
-    !infinite || infinite.loading ? "Loading more…" : "Scroll to load more…";
+  const infiniteObserver = useRef<IntersectionObserver | null>(null);
+  const sentinelActive = !!infinite && infinite.hasMore;
+  // The sentinel names what it is waiting on: it sits idle until the reader
+  // reaches it, and announcing a fetch that has not started reads as a table
+  // that is permanently busy.
+  const sentinelLabel = infinite?.loading
+    ? "Loading more…"
+    : "Scroll to load more…";
   const selectedRowIDs = useMemo(
     () => new Set(rowSelection?.selectedRowIds ?? []),
     [rowSelection?.selectedRowIds],
@@ -2110,19 +2115,147 @@ function DataTableInner<T extends Record<string, unknown>>({
     </div>
   ) : null;
 
-  // Group headers and data rows share one flat stream so the <tbody> keeps a
-  // single row renderer whether or not grouping is on.
+  // Group headers, data rows and inline expansions share one flat stream so the
+  // <tbody> keeps a single row renderer whether or not grouping is on — and so
+  // the virtualizer has one index space covering every <tr> it must measure.
+  //
+  // `renderExpandedRow` runs here only for rows that are actually expanded
+  // (usually none or one). The rows' own `expandable` flag still calls it inside
+  // the render loop, which under virtualization means only the rows on screen.
   const rowStream = useMemo<Array<RowStreamItem<T>>>(() => {
+    const withExpansion = (record: InternalRow<T>): RowStreamItem<T>[] => {
+      const row = { kind: "row", record } as const;
+      if (detailStyle !== "row" || !renderExpandedRow || !expandedRows[record.id]) {
+        return [row];
+      }
+      const content = renderExpandedRow(record.row, {
+        columns: effectiveColumns,
+        visibleColumns,
+        filterActionsByColumn,
+      });
+      return content ? [row, { kind: "expansion", record, content }] : [row];
+    };
     if (!groups) {
-      return visibleSorted.map((record) => ({ kind: "row", record }) as const);
+      return visibleSorted.flatMap(withExpansion);
     }
     return groups.flatMap((group) => [
       { kind: "group", group } as const,
-      ...(group.collapsed
-        ? []
-        : group.records.map((record) => ({ kind: "row", record }) as const)),
+      ...(group.collapsed ? [] : group.records.flatMap(withExpansion)),
     ]);
-  }, [groups, visibleSorted]);
+  }, [
+    groups,
+    visibleSorted,
+    detailStyle,
+    renderExpandedRow,
+    expandedRows,
+    effectiveColumns,
+    visibleColumns,
+    filterActionsByColumn,
+  ]);
+
+  // Stable per-item keys. The virtualizer caches a measured height per key, so
+  // these are what let a row keep its height across a re-sort or a re-filter —
+  // and what makes a same-content-new-identity `data` array cost nothing.
+  const virtualItemKey = useCallback(
+    (index: number) => {
+      const item = rowStream[index];
+      if (!item) return `row:${index}`;
+      if (item.kind === "group") return `group:${item.group.key}`;
+      if (item.kind === "expansion") return `expand:${item.record.id}`;
+      return `row:${item.record.id}`;
+    },
+    [rowStream],
+  );
+
+  const virtualOptions = useMemo(
+    () => resolveVirtualizeOptions(virtualize),
+    [virtualize],
+  );
+  const virtual = useDataTableVirtual({
+    count: rowStream.length,
+    options: virtualOptions,
+    getItemKey: virtualItemKey,
+  });
+
+  // Under `table-auto` a column is as wide as the widest cell *currently in the
+  // DOM* — so a virtualized table would resize its columns continuously as you
+  // scroll a new window into view. Measure the header once, pin those widths,
+  // and switch to `table-fixed` so later windows cannot move them.
+  //
+  // Kept apart from `columnWidths` on purpose: that state is the reader's own
+  // resizing and is persisted to storage. These are derived and must never be.
+  const [pinnedColumnWidths, setPinnedColumnWidths] = useState<
+    Record<string, number>
+  >({});
+  const headRowRef = useRef<HTMLTableRowElement | null>(null);
+  // Hiding or showing a column changes what width the rest should get, so
+  // the pins are keyed on the visible set rather than the declared one.
+  const visibleColumnKeysSignature = visibleColumns
+    .map((c) => c.key)
+    .join(" ");
+
+  useEffect(() => {
+    if (!virtualOptions) {
+      setPinnedColumnWidths({});
+      return;
+    }
+    const measure = () => {
+      const headRow = headRowRef.current;
+      if (!headRow) return;
+      const offset = rowSelection ? 1 : 0;
+      const next: Record<string, number> = {};
+      visibleColumns.forEach((column, index) => {
+        const cell = headRow.cells[index + offset];
+        const width = cell?.getBoundingClientRect().width ?? 0;
+        if (width > 0) next[column.key] = width;
+      });
+      if (Object.keys(next).length > 0) setPinnedColumnWidths(next);
+    };
+    // After paint, so the auto layout has settled on the first window.
+    const frame = requestAnimationFrame(measure);
+    if (typeof ResizeObserver === "undefined") {
+      return () => cancelAnimationFrame(frame);
+    }
+    // The available width changes what auto layout would have chosen, so a
+    // resized container has to re-measure rather than keep stale pins.
+    const observer = new ResizeObserver(measure);
+    if (headRowRef.current?.parentElement) {
+      observer.observe(headRowRef.current.parentElement);
+    }
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+    // Density changes cell padding, so it changes the natural widths too.
+  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density]);
+
+  // The virtualizer needs the scroll element during render, before a ref would
+  // be attached — hence the state-backed setter — while callers may also have
+  // asked for the same node via `scrollContainerRef`. Feed both.
+  const composeScrollRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      virtual.setScrollEl(node);
+      if (scrollContainerRef) {
+        (scrollContainerRef as { current: HTMLDivElement | null }).current =
+          node;
+      }
+    },
+    [virtual.setScrollEl, scrollContainerRef],
+  );
+
+  // What actually reaches the DOM: every item when the table is not virtualized,
+  // otherwise just the window the virtualizer picked. The index is carried
+  // alongside because measurement is keyed on it.
+  const renderedStream = useMemo(
+    () =>
+      virtual.enabled
+        ? virtual.virtualItems.flatMap((v) => {
+            const item = rowStream[v.index];
+            return item ? [{ item, index: v.index }] : [];
+          })
+        : rowStream.map((item, index) => ({ item, index })),
+    [virtual.enabled, virtual.virtualItems, rowStream],
+  );
 
   const toggleGroupSelection = useCallback(
     (records: InternalRow<T>[]) => {
@@ -2143,32 +2276,23 @@ function DataTableInner<T extends Record<string, unknown>>({
     [notifySelection, rowSelection, selectedRowIDs, selectedScope],
   );
 
-  const revealSentinelRef = useCallback(
+  // Asks the caller for the next server page when the end of the list comes into
+  // view. The sentinel is the last child of <tbody>, after the bottom spacer, so
+  // under virtualization it still marks the true end of the data rather than the
+  // end of the window.
+  const infiniteSentinelRef = useCallback(
     (node: HTMLTableRowElement | null) => {
-      if (revealObserver.current) revealObserver.current.disconnect();
+      if (infiniteObserver.current) infiniteObserver.current.disconnect();
       if (!node || !sentinelActive) return;
-      revealObserver.current = new IntersectionObserver(
+      infiniteObserver.current = new IntersectionObserver(
         (entries) => {
-          if (!entries[0]?.isIntersecting) return;
-          if (infiniteEnabled) {
-            requestMoreRows();
-            return;
-          }
-          setVisibleCount((current) =>
-            Math.min(current + revealBatchSize, sorted.length),
-          );
+          if (entries[0]?.isIntersecting) requestMoreRows();
         },
         { rootMargin: "200px" },
       );
-      revealObserver.current.observe(node);
+      infiniteObserver.current.observe(node);
     },
-    [
-      infiniteEnabled,
-      requestMoreRows,
-      revealBatchSize,
-      sentinelActive,
-      sorted.length,
-    ],
+    [requestMoreRows, sentinelActive],
   );
 
   const startColumnResize = (
@@ -2309,14 +2433,24 @@ function DataTableInner<T extends Record<string, unknown>>({
             // still type-checks against @types/react 18, where RefObject's
             // parameter is compared by variance rather than structurally. The
             // two shapes are the same object; the cast is what says so.
-            ref={scrollContainerRef as RefObject<HTMLDivElement> | undefined}
+            ref={composeScrollRef}
             className={cn(
               "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border bg-background",
               scrollContainerClassName,
             )}
             aria-busy={(loading && error == null) || undefined}
           >
-            <table className="w-max min-w-full table-auto text-left text-sm">
+            <table
+              className={cn(
+                "w-max min-w-full text-left text-sm",
+                // Only once the widths are pinned: switching to fixed layout
+                // before there is anything to fix them to would collapse every
+                // column to an equal share.
+                Object.keys(pinnedColumnWidths).length > 0
+                  ? "table-fixed"
+                  : "table-auto",
+              )}
+            >
               <colgroup>
                 {rowSelection && error == null ? (
                   <col className="w-10" />
@@ -2331,7 +2465,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                     // it, reachable only by scrolling sideways.
                     style={
                       error == null
-                        ? columnStyle(column, columnWidths)
+                        ? columnStyle(column, columnWidths, pinnedColumnWidths)
                         : undefined
                     }
                     className={
@@ -2343,7 +2477,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                 ))}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
-                <tr className="border-b border-border text-xs text-muted-foreground">
+                <tr
+                  ref={headRowRef}
+                  className="border-b border-border text-xs text-muted-foreground"
+                >
                   {rowSelection && error == null ? (
                     <th
                       className={cn(
@@ -2462,7 +2599,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={virtual.setTbodyEl}>
                 {error != null ? (
                   <DataTableErrorRow
                     colSpan={visibleColumns.length}
@@ -2485,11 +2622,62 @@ function DataTableInner<T extends Record<string, unknown>>({
                     </td>
                   </tr>
                 ) : (
-                  rowStream.map((item) => {
+                  <>
+                  {/* Spacers stand in for the rows outside the window so the
+                      scrollbar reflects the whole list. The height goes on the
+                      <td>: a <tr>'s height is only a minimum in CSS table
+                      layout, and browsers disagree about it. colSpan keeps them
+                      out of column sizing. */}
+                  {virtual.enabled && virtual.spacers.top > 0 && (
+                    <tr aria-hidden data-virtual-spacer="top">
+                      <td
+                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        style={{
+                          height: virtual.spacers.top,
+                          padding: 0,
+                          border: 0,
+                        }}
+                      />
+                    </tr>
+                  )}
+                  {renderedStream.map(({ item, index }) => {
+                    // Only a virtualized table measures and indexes its rows;
+                    // otherwise these stay undefined and the markup is unchanged.
+                    const rowHooks = virtual.enabled
+                      ? {
+                          ref: virtual.virtualizer.measureElement,
+                          "data-index": index,
+                        }
+                      : {};
+                    if (item.kind === "expansion") {
+                      return (
+                        <tr
+                          key={`expand:${item.record.id}`}
+                          {...rowHooks}
+                        >
+                          <td
+                            colSpan={
+                              visibleColumns.length + (rowSelection ? 1 : 0)
+                            }
+                            className="bg-muted/40 p-density-3"
+                          >
+                            <div className="rounded-md border border-border bg-background p-density-3">
+                              {item.content}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
                     if (item.kind === "group") {
                       return (
                         <DataTableGroupHeaderRow
                           key={`group:${item.group.key}`}
+                          {...(virtual.enabled
+                            ? {
+                                rowRef: virtual.virtualizer.measureElement,
+                                dataIndex: index,
+                              }
+                            : {})}
                           label={item.group.label}
                           meta={item.group.meta}
                           metaAlign={effectiveGrouping?.metaAlign ?? "end"}
@@ -2586,6 +2774,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                     return (
                       <Fragment key={record.id}>
                         <tr
+                          {...rowHooks}
+                          // The expansion is now a sibling row rather than a
+                          // child, so the relationship has to be stated.
+                          aria-expanded={expandsInline ? expanded : undefined}
                           className={cn(
                             "relative border-b border-border/60 align-top",
                             clickable && "cursor-pointer hover:bg-accent/40",
@@ -2741,26 +2933,28 @@ function DataTableInner<T extends Record<string, unknown>>({
                             );
                           })}
                         </tr>
-                        {expandsInline && expanded && expandedContent && (
-                          <tr>
-                            <td
-                              colSpan={
-                                visibleColumns.length + (rowSelection ? 1 : 0)
-                              }
-                              className="bg-muted/40 p-density-3"
-                            >
-                              <div className="rounded-md border border-border bg-background p-density-3">
-                                {expandedContent}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
+                        {/* The inline expansion is its own stream item (see
+                            rowStream) rather than a sibling here, so the
+                            virtualizer can measure it as one row. */}
                       </Fragment>
                     );
-                  })
+                  })}
+                  {virtual.enabled && virtual.spacers.bottom > 0 && (
+                    <tr aria-hidden data-virtual-spacer="bottom">
+                      <td
+                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        style={{
+                          height: virtual.spacers.bottom,
+                          padding: 0,
+                          border: 0,
+                        }}
+                      />
+                    </tr>
+                  )}
+                  </>
                 )}
                 {error == null && sentinelActive && (
-                  <tr ref={revealSentinelRef} aria-hidden>
+                  <tr ref={infiniteSentinelRef} aria-hidden>
                     <td
                       colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
                       className="p-density-2 text-center text-xs text-muted-foreground"
@@ -2784,7 +2978,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           <DataTablePaginationFooter
             pagination={pagination}
             visibleRowCount={sorted.length}
-            infinite={infiniteEnabled}
+            infinite={!!infinite}
           />
         ) : null}
         {detailStyle === "dialog" && renderExpandedRow && (
@@ -3122,6 +3316,8 @@ function DataTableGroupHeaderRow({
   collapsed,
   onToggleCollapsed,
   selection,
+  rowRef,
+  dataIndex,
 }: {
   label: ReactNode;
   meta: ReactNode;
@@ -3137,6 +3333,10 @@ function DataTableGroupHeaderRow({
     disabled?: boolean;
     onToggle: () => void;
   };
+  // Set only when the table is virtualized: a group header is one measured item
+  // in the same index space as the data rows, so it carries the same hooks.
+  rowRef?: (node: HTMLTableRowElement | null) => void;
+  dataIndex?: number;
 }) {
   const allSelected =
     !!selection &&
@@ -3151,7 +3351,11 @@ function DataTableGroupHeaderRow({
   }, [someSelected]);
 
   return (
-    <tr className="border-b border-border/60 bg-muted/40">
+    <tr
+      ref={rowRef}
+      data-index={dataIndex}
+      className="border-b border-border/60 bg-muted/40"
+    >
       <td colSpan={colSpan} className="px-density-2 py-density-1">
         <div className="flex items-center gap-2">
           {selection ? (
@@ -4207,8 +4411,11 @@ function menuStateFromTrigger(
 function columnStyle<T extends Record<string, unknown>>(
   column: DataTableColumn<T>,
   widths: Record<string, number>,
+  // Widths measured once when virtualization turned on. A width the reader
+  // dragged always wins over a measured one.
+  pinned: Record<string, number> = {},
 ): CSSProperties | undefined {
-  const width = widths[column.key];
+  const width = widths[column.key] ?? pinned[column.key];
   return width ? { width: `${width}px` } : undefined;
 }
 

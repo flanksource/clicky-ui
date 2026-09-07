@@ -13,6 +13,39 @@ import type { DataTableGroupingMode } from "./DataTable.grouping";
 import { RouterProvider } from "../rpc/RouterProvider";
 import type { RouterAdapter } from "../rpc/router";
 
+// jsdom reports every box as 0x0, so a virtualizer sees a viewport with no room
+// in it and windows down to nothing. Give the elements a plausible height for
+// the duration of a test so the window has something to select. This only makes
+// virtualization *observable* in jsdom — measurement, spacer geometry and sticky
+// behaviour still need a real browser, which is what the Storybook play tests
+// are for.
+function stubLayout({ viewport = 400, row = 40 } = {}) {
+  const rect = (height: number) =>
+    ({
+      height,
+      width: 800,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: height,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement) {
+      return rect(this.tagName === "TR" ? row : viewport);
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(
+    viewport,
+  );
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(
+    viewport,
+  );
+}
+
 type ServiceRow = {
   service: string;
   status: string;
@@ -3283,21 +3316,50 @@ describe("DataTable caller-owned FilterBar inputs", () => {
     expect(table.getAllByRole("row")[2]).toHaveTextContent("alpha");
   });
 
-  it("incrementally reveals rows on scroll when clientReveal is set", () => {
-    let latestCallback: IntersectionObserverCallback | null = null;
-    class MockIntersectionObserver {
-      constructor(callback: IntersectionObserverCallback) {
-        latestCallback = callback;
-      }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-      takeRecords() {
-        return [];
-      }
-    }
-    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+  // `virtualize` replaced an earlier `clientReveal` batch window whose row count
+  // lived in component state and was reset by an effect keyed on the sorted
+  // array's identity. A parent that rebuilt its rows array — even with byte-for
+  // byte identical contents, which is what a `.map()` in a render body produces
+  // — silently dropped every row past the first batch and made the reader scroll
+  // for them again. Virtualization keeps no such state, so a fresh array with
+  // the same contents must be inert.
+  it("keeps its rows when the data array is rebuilt with identical contents", () => {
+    stubLayout();
+    const manyRows: ServiceRow[] = Array.from({ length: 25 }, (_, index) => ({
+      service: `svc-${index}`,
+      status: "healthy",
+      restarts: index,
+      notes: "",
+      tags: [],
+    }));
 
+    const { rerender } = render(
+      <DataTable
+        data={manyRows}
+        columns={columns}
+        virtualize
+        defaultSort={{ key: "restarts" }}
+      />,
+    );
+    expect(screen.getByText("svc-0")).toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        data={[...manyRows]}
+        columns={columns}
+        virtualize
+        defaultSort={{ key: "restarts" }}
+      />,
+    );
+
+    expect(screen.getByText("svc-0")).toBeInTheDocument();
+    // The client window is gone, so nothing announces a load that isn't happening.
+    expect(screen.queryByText("Loading more…")).not.toBeInTheDocument();
+  });
+
+  // Without a reveal window, every filtered row is in the stream — grouping,
+  // select-all and the row count all see the whole set rather than a batch.
+  it("renders every row when not virtualized", () => {
     const manyRows: ServiceRow[] = Array.from({ length: 25 }, (_, index) => ({
       service: `svc-${index}`,
       status: "healthy",
@@ -3310,26 +3372,13 @@ describe("DataTable caller-owned FilterBar inputs", () => {
       <DataTable
         data={manyRows}
         columns={columns}
-        clientReveal={{ batchSize: 10 }}
         defaultSort={{ key: "restarts" }}
       />,
     );
 
-    // Only the first batch is rendered; a sentinel advertises more.
     expect(screen.getByText("svc-0")).toBeInTheDocument();
-    expect(screen.queryByText("svc-10")).not.toBeInTheDocument();
-    expect(screen.getByText("Loading more…")).toBeInTheDocument();
-
-    // Scrolling the sentinel into view reveals the next batch.
-    act(() => {
-      latestCallback?.(
-        [{ isIntersecting: true } as IntersectionObserverEntry],
-        {} as IntersectionObserver,
-      );
-    });
-
-    expect(screen.getByText("svc-10")).toBeInTheDocument();
-    vi.unstubAllGlobals();
+    expect(screen.getByText("svc-24")).toBeInTheDocument();
+    expect(screen.queryByText("Loading more…")).not.toBeInTheDocument();
   });
 
   describe("server-driven infinite scroll", () => {
@@ -3471,21 +3520,24 @@ describe("DataTable caller-owned FilterBar inputs", () => {
       expect(onLoadMore).toHaveBeenCalledTimes(2);
     });
 
-    it("keeps every accumulated row on screen instead of windowing them", () => {
-      // clientReveal windows rows the caller already holds; under infinite
-      // scroll the caller owns the accumulation, so the window would hide rows
-      // it just paid the server for.
+    it("composes with virtualize, keeping the sentinel at the end of the data", () => {
+      stubLayout();
+      // The two answer different questions — `virtualize` decides what reaches
+      // the DOM, `infinite` decides when to ask the server for more — so pairing
+      // them is the normal case for a long accumulated run. The sentinel is the
+      // last child of <tbody>, after the bottom spacer, so it still marks the end
+      // of the data rather than the end of the window.
       render(
         <DataTable
           data={pageRows(0, 25)}
           columns={columns}
-          clientReveal={{ batchSize: 10 }}
+          virtualize
           infinite={{ hasMore: true, loading: false, onLoadMore: vi.fn() }}
         />,
       );
 
       expect(screen.getByText("svc-0")).toBeInTheDocument();
-      expect(screen.getByText("svc-24")).toBeInTheDocument();
+      expect(screen.getByText("Scroll to load more…")).toBeInTheDocument();
     });
 
     it("drops the pager step controls but keeps the count and the page size", () => {
