@@ -89,6 +89,8 @@ export function taskSegments(counts: {
   fail: number;
   run: number;
   pending: number;
+  canceled?: number;
+  unstarted?: number;
 }): ProgressSegment[] {
   return [
     { count: counts.ok, color: "bg-green-500", label: "passed" },
@@ -96,6 +98,8 @@ export function taskSegments(counts: {
     { count: counts.fail, color: "bg-red-500", label: "failed" },
     { count: counts.run, color: "bg-blue-500", label: "running" },
     { count: counts.pending, color: "bg-gray-300", label: "pending" },
+    { count: counts.canceled ?? 0, color: "bg-gray-400", label: "canceled" },
+    { count: counts.unstarted ?? 0, color: "bg-gray-200", label: "unstarted" },
   ];
 }
 
@@ -106,12 +110,14 @@ export function bucketTasks(tasks: TaskSnapshot[]): {
   fail: number;
   run: number;
   pending: number;
+  canceled: number;
 } {
   let ok = 0;
   let warn = 0;
   let fail = 0;
   let run = 0;
   let pending = 0;
+  let canceled = 0;
   for (const t of tasks) {
     switch (t.status) {
       case "success":
@@ -132,9 +138,12 @@ export function bucketTasks(tasks: TaskSnapshot[]): {
       case "pending":
         pending += 1;
         break;
+      case "canceled":
+        canceled += 1;
+        break;
       default:
-        ok += 1; // SKIP / canceled / completed count as done
+        ok += 1; // SKIP and other terminal results count as done
     }
   }
-  return { ok, warn, fail, run, pending };
+  return { ok, warn, fail, run, pending, canceled };
 }

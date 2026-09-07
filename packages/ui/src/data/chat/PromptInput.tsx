@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
@@ -34,6 +36,9 @@ export type PromptInputProps = {
   attachmentUpload?: AttachmentUploadAdapter | undefined;
   acceptedMediaTypes?: string[] | undefined;
   attachmentLimits?: AttachmentLimits | undefined;
+  /** Text to seed the composer with, without submitting it. A new `id` re-seeds
+   *  even when the text repeats, so picking the same suggestion twice works. */
+  draft?: { id: number; text: string } | null | undefined;
   /** Toolbar content (e.g. model/effort selectors) rendered in the footer. */
   toolbar?: ReactNode;
   /** Compact host control rendered beside the textarea and submit button. */
@@ -57,6 +62,7 @@ export function PromptInput({
   attachmentUpload,
   acceptedMediaTypes,
   attachmentLimits,
+  draft,
   toolbar,
   inputAccessory,
   className,
@@ -64,7 +70,22 @@ export function PromptInput({
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<FileUIPart[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const seededDraftId = useRef<number | null>(null);
   const isGenerating = status === "submitted" || status === "streaming";
+
+  // A draft replaces whatever is in the box and puts the caret at the end, so
+  // the user can edit before sending. Keyed on `id` rather than `text` so the
+  // same suggestion picked twice re-seeds instead of doing nothing.
+  useEffect(() => {
+    if (!draft || seededDraftId.current === draft.id) return;
+    seededDraftId.current = draft.id;
+    setValue(draft.text);
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(draft.text.length, draft.text.length);
+  }, [draft]);
 
   const submit = () => {
     const text = value.trim();
@@ -118,6 +139,7 @@ export function PromptInput({
 
       <div className="flex items-end gap-2">
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

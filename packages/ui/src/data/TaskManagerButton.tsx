@@ -1,11 +1,11 @@
+import { resourceSummary, taskTransportConnected, type ResourceSummary } from "./task-resource-summary";
+import { useResourceClock } from "../hooks/use-resource-clock";
 import { Button } from "../components/button";
 import { UiActivity, UiListChecks, UiMemoryStick } from "../icons";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
 import { formatBytes } from "../lib/format";
 import { TaskManager } from "./TaskManager";
-import { isTaskProcessDetails } from "./task-process-details";
-import type { TaskSnapshot } from "./TaskSnapshot";
 import { taskStatusIcon } from "./task-status";
 
 export interface TaskManagerButtonProps {
@@ -31,15 +31,16 @@ export function TaskManagerButton({
   selectedId,
   onSelectRun,
 }: TaskManagerButtonProps) {
-  const { runs } = useTaskRuns({ basePath, kind, labels });
+  const { runs, status: runsStatus } = useTaskRuns({ basePath, kind, labels });
   const activeRuns = runs.filter((run) => run.status === "running" || run.status === "pending");
-  const { snapshots } = useTaskRun({
+  const { snapshots, status: snapshotStatus } = useTaskRun({
     ...(basePath ? { basePath } : {}),
     ids: activeRuns.map((run) => run.id),
     enabled: activeRuns.length > 0,
   });
-  const resources = resourceSummary(snapshots);
-  const trigger = <TaskTrigger active={activeRuns.length} {...(resources ? { resources } : {})} />;
+  const now = useResourceClock(activeRuns.length > 0);
+  const resources = resourceSummary(snapshots, { now, connected: taskTransportConnected(runsStatus) && taskTransportConnected(snapshotStatus) });
+  const trigger = <TaskTrigger active={activeRuns.length} {...(activeRuns.length ? { resources } : {})} />;
 
   return panel ? (
     <TaskPanelDropdown
@@ -133,54 +134,18 @@ function RecentTasksDropdown({
   );
 }
 
-type ResourceSummary = { cpu: number; rss: number; peakRss: number };
-
 function TaskTrigger({ active, resources }: { active: number; resources?: ResourceSummary }) {
   const label = `Tasks (${active} active)`;
   return (
     <Button type="button" variant="ghost" size={resources ? "sm" : "icon"} aria-label={label} title={label} className="relative gap-1.5">
       <UiListChecks className={active > 0 ? "animate-pulse" : undefined} />
-      {resources ? (
-        <>
-          <ResourceGauge icon={<UiActivity />} label="CPU" percent={resources.cpu} value={`${resources.cpu.toFixed(1)}%`} />
-          <ResourceGauge icon={<UiMemoryStick />} label="Memory" percent={resources.peakRss ? resources.rss / resources.peakRss * 100 : 0} value={formatBytes(resources.rss)} />
-        </>
-      ) : active > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-[9px] leading-4 text-primary-foreground">{active}</span>
+      {resources?.state === "unavailable" ? <span className="text-xs text-muted-foreground">Resources unavailable</span> : resources ? (
+        <span className="flex items-center gap-1.5 text-xs" title={`Sampled ${new Date(resources.sampledAt).toLocaleTimeString()}; CPU 100% equals one core`}>
+          <UiActivity /><span>{resources.cpu.toFixed(1)}%</span>
+          <UiMemoryStick /><span>{formatBytes(resources.rss)}</span>
+          {resources.state === "stale" && <span className="text-muted-foreground">Stale</span>}
+        </span>
       ) : null}
     </Button>
   );
-}
-
-function ResourceGauge({ icon, label, percent, value }: { icon: React.ReactNode; label: string; percent: number; value: string }) {
-  return (
-    <span aria-label={`${label} ${value}`} className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium" title={`${label} ${value}`}>
-      {icon}
-      <span aria-hidden className="h-1 w-5 overflow-hidden rounded bg-border">
-        <span className="block h-full rounded bg-primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
-      </span>
-      <span>{value}</span>
-    </span>
-  );
-}
-
-function resourceSummary(snapshots: TaskSnapshot[]): ResourceSummary | undefined {
-  const activeSnapshots = snapshots.filter(
-    (snapshot) => snapshot.status === "running" || snapshot.status === "pending",
-  );
-  const tasks = activeSnapshots.filter(
-    (snapshot) => snapshot.type === "task" && isTaskProcessDetails(snapshot.details),
-  );
-  const processes = tasks.length
-    ? tasks
-    : activeSnapshots.filter((snapshot) => isTaskProcessDetails(snapshot.details));
-  if (!processes.length) return undefined;
-  return processes.reduce<ResourceSummary>((total, snapshot) => {
-    if (!isTaskProcessDetails(snapshot.details)) return total;
-    return {
-      cpu: total.cpu + snapshot.details.latest.cpuPercent,
-      rss: total.rss + snapshot.details.latest.rssBytes,
-      peakRss: total.peakRss + snapshot.details.peak.rssBytes,
-    };
-  }, { cpu: 0, rss: 0, peakRss: 0 });
 }

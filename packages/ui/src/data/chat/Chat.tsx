@@ -51,6 +51,12 @@ import {
  *  part's `messageMetadata`. */
 type ChatUIMessage = UIMessage<ChatMessageMetadata>;
 
+// Composer seeds are keyed by a monotonic id so re-seeding the same text works.
+// Minted here rather than reusing a caller's `initialPrompt.id` so a host's id
+// space can never collide with one a suggestion pick produced.
+let _draftId = 0;
+const nextDraftId = () => ++_draftId;
+
 export type ChatProps = {
   /** Endpoint that speaks the AI SDK v6 UI Message Stream protocol.
    *  Ignored when `transport` is supplied. Defaults to "/api/chat". */
@@ -93,8 +99,17 @@ export type ChatProps = {
   /** Notified after each assistant turn with a usage snapshot (tokens used out
    *  of the model's context window + cumulative cost), for a usage gauge. */
   onUsage?: (usage: ChatUsageSummary) => void;
-  /** Suggested prompts shown on the empty state. */
+  /** Suggested prompts offered while the conversation is still empty. */
   suggestions?: Suggestion[];
+  /** Prompts proposed for this particular open — e.g. the opener a host's "Ask
+   *  AI" button rendered for the thing being asked about. Shown in place of
+   *  `suggestions`, and unlike them they stay offered once the conversation has
+   *  started, because a host may propose them into a chat that is already
+   *  running. Cleared through `onProposedPromptsConsumed`. */
+  proposedPrompts?: Suggestion[] | null;
+  /** Called once the proposed prompts have been acted on — one was picked, or
+   *  the user sent a message of their own. */
+  onProposedPromptsConsumed?: () => void;
   /** Enables file/image attachments. */
   enableAttachments?: boolean;
   /** Upload endpoint used before an attachment is added to a chat message. */
@@ -129,10 +144,12 @@ export type ChatProps = {
   transport?: ChatTransport<UIMessage>;
   /** Initial messages to seed the conversation. */
   initialMessages?: UIMessage[];
-  /** Prompt to send automatically once. A new `id` sends even when text repeats. */
+  /** Prompt to prefill the composer with once. It is never submitted on the
+   *  user's behalf — they read it, edit it if they want, and press send. A new
+   *  `id` re-seeds even when the text repeats. */
   initialPrompt?: { id: number; text: string } | null;
-  /** Called after `initialPrompt` has been handed to the chat transport. */
-  onInitialPromptSent?: () => void;
+  /** Called after `initialPrompt` has been placed in the composer. */
+  onInitialPromptConsumed?: () => void;
   placeholder?: string;
   emptyState?: React.ReactNode;
   className?: string;
@@ -163,6 +180,8 @@ export function Chat({
   onReasoningEffortChange,
   onUsage,
   suggestions,
+  proposedPrompts,
+  onProposedPromptsConsumed,
   enableAttachments = false,
   attachmentsApi = "/api/attachments",
   attachmentUpload,
@@ -179,7 +198,7 @@ export function Chat({
   transport,
   initialMessages,
   initialPrompt,
-  onInitialPromptSent,
+  onInitialPromptConsumed,
   placeholder,
   emptyState,
   className,
@@ -203,11 +222,11 @@ export function Chat({
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [approvalError, setApprovalError] = useState<Error | undefined>();
-  const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(
-    null,
-  );
   const lastDefaultModel = useRef(defaultModel);
-  const sentInitialPromptId = useRef<number | null>(null);
+  const [draft, setDraft] = useState<{ id: number; text: string } | null>(null);
+  const seededInitialPromptId = useRef<number | null>(null);
+  const hadProposals = useRef(false);
+  if (proposedPrompts?.length) hadProposals.current = true;
   const activeThreadRef = useRef(threadId);
   const onMessageCountChangeRef = useRef(onMessageCountChange);
   const onSessionHydratedRef = useRef(onSessionHydrated);
@@ -339,7 +358,6 @@ export function Chat({
   useEffect(() => {
     if (!sessionsApi || !threadId) return;
     let cancelled = false;
-    setHydratedSessionId(null);
     setApprovalError(undefined);
     hydratedUsageRef.current = null;
     setUsage(null);
@@ -356,7 +374,6 @@ export function Chat({
         hydratedUsageRef.current = snapshot;
         setUsage(snapshot);
         setMessagesRef.current(session.messages as ChatUIMessage[]);
-        setHydratedSessionId(session.id);
         onSessionHydratedRef.current?.(session);
       })
       .catch((cause) => {
@@ -376,24 +393,18 @@ export function Chat({
     );
   }, [messages]);
 
+  // An initial prompt is a draft, not a turn: it lands in the composer and
+  // waits for the user to send it. Unlike a send it needs no live transport and
+  // no hydrated session, so it seeds immediately.
   useEffect(() => {
-    if (!initialPrompt || status !== "ready") return;
-    if (sessionsApi && threadId && hydratedSessionId !== threadId) return;
-    if (sentInitialPromptId.current === initialPrompt.id) return;
+    if (!initialPrompt) return;
+    if (seededInitialPromptId.current === initialPrompt.id) return;
     const text = initialPrompt.text.trim();
     if (!text) return;
-    sentInitialPromptId.current = initialPrompt.id;
-    void sendMessage({ text });
-    onInitialPromptSent?.();
-  }, [
-    hydratedSessionId,
-    initialPrompt,
-    onInitialPromptSent,
-    sendMessage,
-    sessionsApi,
-    status,
-    threadId,
-  ]);
+    seededInitialPromptId.current = initialPrompt.id;
+    setDraft({ id: nextDraftId(), text });
+    onInitialPromptConsumed?.();
+  }, [initialPrompt, onInitialPromptConsumed]);
 
   // Surface a usage snapshot after each settled assistant turn. The backend
   // rides usage/cost on the finish part's messageMetadata; we read it off the
@@ -488,17 +499,26 @@ export function Chat({
   );
 
   const empty =
-    messages.length === 0 && (emptyState || suggestions?.length) ? (
-      <div className="flex flex-col items-center gap-4">
-        {emptyState}
-        {suggestions && suggestions.length > 0 && (
-          <Suggestions
-            suggestions={suggestions}
-            onSelect={(text) => void sendMessage({ text })}
-          />
-        )}
-      </div>
+    messages.length === 0 && emptyState ? (
+      <div className="flex flex-col items-center gap-4">{emptyState}</div>
     ) : undefined;
+
+  // Prompts proposed for this open outrank the static suggestions and survive a
+  // running conversation — a host can propose into a chat that already has one.
+  // The static list is an empty-state affordance and retires once a turn exists;
+  // it also never comes back after proposals were consumed, because falling back
+  // to the application's generic prompts under a chat opened about one cell
+  // reads as an unrelated non-sequitur.
+  const chips = proposedPrompts?.length
+    ? proposedPrompts
+    : messages.length === 0 && !hadProposals.current
+      ? suggestions
+      : undefined;
+
+  const pickSuggestion = (text: string) => {
+    setDraft({ id: nextDraftId(), text });
+    onProposedPromptsConsumed?.();
+  };
 
   return (
     <ToolRenderRegistryProvider value={toolRegistry}>
@@ -524,7 +544,10 @@ export function Chat({
           }
           {...(renderToolResult ? { renderToolResult } : {})}
         />
-        <div className="p-4 pt-0">
+        <div className="flex flex-col gap-2 p-4 pt-0">
+          {chips && chips.length > 0 && (
+            <Suggestions suggestions={chips} onSelect={pickSuggestion} />
+          )}
           <PromptInput
             status={status}
             onStop={() => void stop()}
@@ -535,8 +558,12 @@ export function Chat({
               ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
               : {})}
             {...(attachmentLimits ? { attachmentLimits } : {})}
+            draft={draft}
             toolbar={toolbar}
-            onSubmit={(text, files) => void sendMessage({ text, files })}
+            onSubmit={(text, files) => {
+              onProposedPromptsConsumed?.();
+              void sendMessage({ text, files });
+            }}
           />
         </div>
       </div>

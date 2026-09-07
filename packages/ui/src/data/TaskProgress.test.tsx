@@ -38,12 +38,12 @@ const RUN: TaskSnapshot[] = [
 describe("bucketTasks", () => {
   it("tallies child tasks by status bucket", () => {
     const counts = bucketTasks(RUN.filter((s) => s.type === "task"));
-    expect(counts).toEqual({ ok: 1, warn: 0, fail: 1, run: 1, pending: 1 });
+    expect(counts).toEqual({ ok: 1, warn: 0, fail: 1, run: 1, pending: 1, canceled: 0 });
   });
 });
 
 describe("taskSegments", () => {
-  it("emits segments in canonical pass/warn/fail/run/pending order", () => {
+  it("emits terminal, active, canceled, and unstarted segments in canonical order", () => {
     const segs = taskSegments({ ok: 2, warn: 0, fail: 1, run: 3, pending: 4 });
     expect(segs.map((s) => [s.label, s.count])).toEqual([
       ["passed", 2],
@@ -51,6 +51,8 @@ describe("taskSegments", () => {
       ["failed", 1],
       ["running", 3],
       ["pending", 4],
+      ["canceled", 0],
+      ["unstarted", 0],
     ]);
   });
 });
@@ -294,10 +296,20 @@ describe("TaskProgress", () => {
 
     expect(screen.getByText("12.5% CPU")).toBeInTheDocument();
     expect(screen.getByText("8 KB VMS")).toBeInTheDocument();
-    expect(screen.getByText("Peak 20.0% CPU · 4 KB RSS · 16 KB VMS · 10 files")).toBeInTheDocument();
+    expect(screen.getByText("Peak 20.0% CPU · 4 KB RSS")).toBeInTheDocument();
     expect(screen.getByText("worker")).toBeInTheDocument();
     expect(screen.getByText("pid 101")).toBeInTheDocument();
     expect(screen.getByText("1 restart")).toBeInTheDocument();
+  });
+
+  it("reports the completed and unstarted portions of a stopped managed run", () => {
+    const snapshots: TaskSnapshot[] = [{
+      id: "batch", groupId: "batch", name: "Slice models", type: "group", status: "canceled",
+      work: { total: 4, completed: 1, cached: 0, failed: 0, running: 0, canceled: 0, unstarted: 3 },
+    }];
+    render(<TaskProgress snapshots={snapshots} />);
+    expect(screen.getByText("1/4 done, 3 unstarted")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("title", "1 passed, 3 unstarted");
   });
 
   it("expands supervised child tasks with argv, resource gauges, and captured streams", () => {

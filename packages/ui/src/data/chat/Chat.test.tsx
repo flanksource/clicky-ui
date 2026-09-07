@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { Chat } from "./Chat";
@@ -183,15 +184,37 @@ describe("Chat runtime controls", () => {
   });
 });
 
+/** Types `text` into the composer and presses Send — the only way a turn now
+ *  starts, since nothing submits on the user's behalf. */
+function sendFromComposer(text: string) {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+}
+
 describe("Chat initialPrompt", () => {
-  it("waits for canonical session hydration before sending an initial prompt", async () => {
+  it("prefills the composer and sends nothing", async () => {
     const sendMessages = vi.fn();
-    let resolveHydration: ((response: Response) => void) | undefined;
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockReturnValue(
-      new Promise<Response>((resolve) => {
-        resolveHydration = resolve;
-      }),
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport(sendMessages)}
+        initialPrompt={{ id: 1, text: "Inspect the ledger" }}
+      />,
     );
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue("Inspect the ledger"),
+    );
+    expect(sendMessages).not.toHaveBeenCalled();
+  });
+
+  it("prefills without waiting for canonical session hydration", async () => {
+    const sendMessages = vi.fn();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockReturnValue(new Promise<Response>(() => {}));
 
     render(
       <Chat
@@ -205,16 +228,55 @@ describe("Chat initialPrompt", () => {
     );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(screen.getByRole("textbox")).toHaveValue("Inspect the ledger");
     expect(sendMessages).not.toHaveBeenCalled();
-    resolveHydration?.(
-      new Response(
-        JSON.stringify({ id: "session-1", revision: 1, messages: [] }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+    fetchMock.mockRestore();
+  });
+
+  it("consumes each initial prompt id once", async () => {
+    const onInitialPromptConsumed = vi.fn();
+    const transport = recordingTransport();
+    const prompt = { id: 1, text: "Fix this formula" };
+
+    const { rerender } = render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={transport}
+        initialPrompt={prompt}
+        onInitialPromptConsumed={onInitialPromptConsumed}
+      />,
     );
 
-    await waitFor(() => expect(sendMessages).toHaveBeenCalledOnce());
-    fetchMock.mockRestore();
+    const textbox = screen.getByRole("textbox");
+    await waitFor(() => expect(textbox).toHaveValue("Fix this formula"));
+    expect(onInitialPromptConsumed).toHaveBeenCalledTimes(1);
+
+    // The same id must not clobber what the user has since typed.
+    fireEvent.change(textbox, { target: { value: "my own words" } });
+    rerender(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={transport}
+        initialPrompt={prompt}
+        onInitialPromptConsumed={onInitialPromptConsumed}
+      />,
+    );
+    expect(textbox).toHaveValue("my own words");
+    expect(onInitialPromptConsumed).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={transport}
+        initialPrompt={{ id: 2, text: prompt.text }}
+        onInitialPromptConsumed={onInitialPromptConsumed}
+      />,
+    );
+    await waitFor(() => expect(textbox).toHaveValue("Fix this formula"));
+    expect(onInitialPromptConsumed).toHaveBeenCalledTimes(2);
   });
 
   it("uses the Captain thread id as the stable AI SDK chat id", async () => {
@@ -227,10 +289,10 @@ describe("Chat initialPrompt", () => {
         modelsApi={null}
         transport={transport}
         threadId="thread-1"
-        initialPrompt={{ id: 1, text: "Inspect account one" }}
       />,
     );
 
+    sendFromComposer("Inspect account one");
     await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
     expect(sendMessages.mock.calls[0]?.[0]).toMatchObject({
       chatId: "thread-1",
@@ -243,61 +305,16 @@ describe("Chat initialPrompt", () => {
         modelsApi={null}
         transport={transport}
         threadId="thread-2"
-        initialPrompt={{ id: 2, text: "Inspect account two" }}
       />,
     );
 
+    sendFromComposer("Inspect account two");
     await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(2));
     expect(sendMessages.mock.calls[1]?.[0]).toMatchObject({
       chatId: "thread-2",
       messages: [expect.objectContaining({ role: "user" })],
     });
     expect(sendMessages.mock.calls[1]?.[0].messages).toHaveLength(1);
-  });
-
-  it("sends each initial prompt id once", async () => {
-    const sendMessages = vi.fn();
-    const onInitialPromptSent = vi.fn();
-    const transport = recordingTransport(sendMessages);
-
-    const { rerender } = render(
-      <Chat
-        models={[]}
-        modelsApi={null}
-        transport={transport}
-        initialPrompt={{ id: 1, text: "Fix this formula" }}
-        onInitialPromptSent={onInitialPromptSent}
-      />,
-    );
-
-    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
-    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain(
-      "Fix this formula",
-    );
-    expect(onInitialPromptSent).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <Chat
-        models={[]}
-        modelsApi={null}
-        transport={transport}
-        initialPrompt={{ id: 1, text: "Fix this formula" }}
-        onInitialPromptSent={onInitialPromptSent}
-      />,
-    );
-    expect(sendMessages).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <Chat
-        models={[]}
-        modelsApi={null}
-        transport={transport}
-        initialPrompt={{ id: 2, text: "Fix this formula" }}
-        onInitialPromptSent={onInitialPromptSent}
-      />,
-    );
-    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(2));
-    expect(onInitialPromptSent).toHaveBeenCalledTimes(2);
   });
 
   it("submits the selected model's exact runtime without conflicting scalar fields", async () => {
@@ -325,10 +342,10 @@ describe("Chat initialPrompt", () => {
         models={[runtimeModel]}
         modelsApi={null}
         defaultModel={runtimeModel.id}
-        initialPrompt={{ id: 1, text: "Inspect the ledger" }}
       />,
     );
 
+    sendFromComposer("Inspect the ledger");
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const request = fetchMock.mock.calls[0]?.[1];
     expect(JSON.parse(String(request?.body))).toMatchObject({
@@ -336,6 +353,133 @@ describe("Chat initialPrompt", () => {
     });
     expect(JSON.parse(String(request?.body))).not.toHaveProperty("model");
     fetchMock.mockRestore();
+  });
+});
+
+describe("Chat proposed prompts", () => {
+  it("fills the composer from a chip instead of sending it", async () => {
+    const sendMessages = vi.fn();
+    const onProposedPromptsConsumed = vi.fn();
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport(sendMessages)}
+        proposedPrompts={[
+          { label: "Review this cell", prompt: "Help me review this cell." },
+          "Explain this figure",
+        ]}
+        onProposedPromptsConsumed={onProposedPromptsConsumed}
+      />,
+    );
+
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Review this cell" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue(
+        "Help me review this cell.",
+      ),
+    );
+    expect(sendMessages).not.toHaveBeenCalled();
+    expect(onProposedPromptsConsumed).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps proposed prompts offered once the conversation has started", () => {
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport()}
+        suggestions={["Show recent transactions"]}
+        proposedPrompts={["Explain this figure"]}
+        initialMessages={[
+          {
+            id: "m1",
+            role: "user",
+            parts: [{ type: "text", text: "earlier question" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Explain this figure" }),
+    ).toBeInTheDocument();
+    // The static empty-state list retires once a turn exists; the proposals do not.
+    expect(
+      screen.queryByRole("button", { name: "Show recent transactions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not fall back to the static suggestions after a proposal is picked", async () => {
+    // Mirrors ChatWindow, which clears the panel's proposals once consumed.
+    function ClearingHost() {
+      const [proposed, setProposed] = useState<string[] | null>([
+        "Explain this figure",
+      ]);
+      return (
+        <Chat
+          models={[]}
+          modelsApi={null}
+          transport={recordingTransport()}
+          suggestions={["Show recent transactions"]}
+          proposedPrompts={proposed}
+          onProposedPromptsConsumed={() => setProposed(null)}
+        />
+      );
+    }
+    render(<ClearingHost />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Explain this figure" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue("Explain this figure"),
+    );
+    // The panel was opened about one specific thing; the application's generic
+    // prompts are a non-sequitur underneath it.
+    expect(
+      screen.queryByRole("button", { name: "Show recent transactions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retires the static suggestions once a message exists", () => {
+    // `initialMessages` seeds the conversation at mount, so the empty and
+    // started cases are separate mounts rather than a rerender.
+    const { unmount } = render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport()}
+        suggestions={["Show recent transactions"]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Show recent transactions" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    render(
+      <Chat
+        models={[]}
+        modelsApi={null}
+        transport={recordingTransport()}
+        suggestions={["Show recent transactions"]}
+        initialMessages={[
+          {
+            id: "m1",
+            role: "user",
+            parts: [{ type: "text", text: "earlier question" }],
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Show recent transactions" }),
+    ).not.toBeInTheDocument();
   });
 });
 

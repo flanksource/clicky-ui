@@ -34,4 +34,34 @@ describe("PromptInput", () => {
     ).toBeInTheDocument();
     expect(onSubmit).toHaveBeenCalledWith("btw", []);
   });
+
+  it("seeds the composer from a draft without submitting it", () => {
+    const onSubmit = vi.fn();
+    render(
+      <PromptInput
+        onSubmit={onSubmit}
+        draft={{ id: 1, text: "Explain this figure" }}
+      />,
+    );
+
+    expect(screen.getByRole("textbox")).toHaveValue("Explain this figure");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("re-seeds on a new id even when the text repeats, and not on the same id", () => {
+    const draft = { id: 1, text: "Trace the formula" };
+    const { rerender } = render(
+      <PromptInput onSubmit={vi.fn()} draft={draft} />,
+    );
+    const textbox = screen.getByRole("textbox");
+
+    fireEvent.change(textbox, { target: { value: "my own words" } });
+    rerender(<PromptInput onSubmit={vi.fn()} draft={draft} />);
+    expect(textbox).toHaveValue("my own words");
+
+    rerender(
+      <PromptInput onSubmit={vi.fn()} draft={{ id: 2, text: draft.text }} />,
+    );
+    expect(textbox).toHaveValue("Trace the formula");
+  });
 });
