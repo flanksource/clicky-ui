@@ -158,6 +158,8 @@ export interface RenderContext extends FormErrorContext {
   // Drop fields whose resolved control is read-only (schema `readOnly: true`)
   // instead of rendering them as value displays. Applies at every depth.
   hideReadOnlyFields: boolean;
+  // Drop fields whose value is empty; see JsonSchemaFormProps.hideEmpty.
+  hideEmpty: boolean;
   // Resolved form layout (mode + inline width caps); see FormLayout.
   layout: FormLayout;
   // Form-wide size token scaling inputs and labels; see FormSize.
@@ -245,6 +247,20 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    * rendering them as read-only value displays. Applies at every depth.
    */
   hideReadOnlyFields?: boolean;
+  /**
+   * Omit fields the value says nothing about, at every depth. For a record that
+   * is finished being edited — an audit view of a submitted form — the blanks
+   * are noise: they say only that a field existed, and a schema wide enough to
+   * describe many records can leave far more blank than filled.
+   *
+   * Empty means `undefined`, `null`, `""`, `[]` or `{}`. `false` and `0` are
+   * answers and always render. An object whose fields are all empty is itself
+   * empty and goes with them.
+   *
+   * For an editable form this is usually wrong: there, a blank field is the
+   * question.
+   */
+  hideEmpty?: boolean;
   /** Property keys to omit from rendering. */
   hiddenKeys?: string[];
   /**

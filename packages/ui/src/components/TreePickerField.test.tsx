@@ -1,4 +1,4 @@
-import { fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useModalStack } from "../overlay/modalStack";
 import { zIndex } from "../overlay/zIndex";
@@ -96,6 +96,25 @@ describe("TreePickerField", () => {
     fireEvent.click(screen.getByText("P1")); // select leaf
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0]![0]).toMatchObject({ id: "p1" });
+    expect(panel()).toBeNull();
+  });
+
+  it("keeps a selected branch open when a footer owns the commit", () => {
+    const onSelect = vi.fn();
+    renderField({
+      closeOnSelect: false,
+      isSelectable: () => true,
+      onSelect,
+      renderFooter: ({ close }) => <button type="button" onClick={close}>Select folder</button>,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Select/ }));
+    fireEvent.click(screen.getByText("Co"));
+
+    expect(onSelect).toHaveBeenCalledWith(ROOTS[0]);
+    expect(screen.getByText("P1")).toBeInTheDocument();
+    expect(panel()).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Select folder" }));
     expect(panel()).toBeNull();
   });
 
@@ -228,5 +247,25 @@ describe("TreePickerField", () => {
     expect(
       screen.queryByRole("button", { name: /Expand all/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("loads lazy children through the picker tree", async () => {
+    const root: Node = { id: "root", label: "Models" };
+    const child: Node = { id: "archive", label: "Archive" };
+    const loadChildren = vi.fn().mockResolvedValue([child]);
+    renderField({
+      roots: [root],
+      getAriaLabel: (node) => node.label,
+      hasMoreChildren: (node) => node === root,
+      loadChildren,
+      triggerAriaLabel: "Destination folder",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Destination folder" }));
+    const rootItem = screen.getByRole("treeitem", { name: "Models" });
+    fireEvent.click(within(rootItem).getByRole("button", { name: "Expand" }));
+
+    await waitFor(() => expect(loadChildren).toHaveBeenCalledWith(root));
+    expect(await screen.findByRole("treeitem", { name: "Archive" })).toBeInTheDocument();
   });
 });

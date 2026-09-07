@@ -40,6 +40,7 @@ import {
   fieldErrorId,
   fieldInputId,
   hasObjectItemProperties,
+  isEmptyValue,
   normalizeColSpan,
   normalizeColumns,
   orderByClickyOrder,
@@ -165,6 +166,9 @@ function buildField(
   // Drop read-only fields entirely when the form opts out of displaying them.
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
   if (ctx.hideReadOnlyFields && field.readOnly) return null;
+  // Same placement, same reason: an extension that supplies a value decides
+  // whether the field has one.
+  if (ctx.hideEmpty && isEmptyValue(field.value)) return null;
   if (ctx.presentation) field = { ...field, readOnly: true };
 
   const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);

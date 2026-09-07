@@ -20,6 +20,8 @@ import { TableArray } from "./json-schema-form-table-array";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import { CompactListArray } from "./json-schema-form-list-array";
 import {
+  canAddItem,
+  canRemoveItem,
   hasObjectItemProperties,
   seedFromSchema,
   toStringArray,
@@ -148,7 +150,7 @@ export function ArrayControl({
           key={i}
           className={cn(
             "grid items-start gap-2",
-            readOnly ? "grid-cols-1" : "grid-cols-[1fr_auto]",
+              readOnly ? "grid-cols-1" : "grid-cols-[1fr_auto]",
           )}
         >
           {/* The item's row is a FieldWrapper (or a full-width ObjectSection),
@@ -184,12 +186,14 @@ export function ArrayControl({
               size={ctx.size}
               reveal={false}
               onMove={(to) => field.onChange(moveItem(items, i, to))}
-              onRemove={() => field.onChange(removeIndex(items, i))}
+              {...(canRemoveItem(field, items.length)
+                ? { onRemove: () => field.onChange(removeIndex(items, i)) }
+                : {})}
             />
           )}
         </div>
       ))}
-      {!readOnly && (
+      {!readOnly && canAddItem(field, items.length) && (
         <Button
           type="button"
           variant="outline"

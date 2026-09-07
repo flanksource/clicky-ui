@@ -18,7 +18,12 @@ import {
   noItemsLabel,
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
-import { fieldInputId, seedFromSchema } from "./json-schema-form-utils";
+import {
+  canAddItem,
+  canRemoveItem,
+  fieldInputId,
+  seedFromSchema,
+} from "./json-schema-form-utils";
 import { cn } from "../lib/utils";
 import { controlMinHeightClass } from "./json-schema-form-size";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
@@ -140,8 +145,12 @@ export function AccordionArray({
       itemLabel={({ item, index }) => summaryFor(item, index).title}
       allowReorder={itemActionsAllow(spec, "reorder")}
       allowDuplicate={itemActionsAllow(spec, "duplicate")}
-      allowRemove={itemActionsAllow(spec, "remove")}
-      onCreate={() => seedFromSchema(itemSchema)}
+      allowRemove={itemActionsAllow(spec, "remove") && canRemoveItem(field, items.length)}
+      // AccordionList shows its add row only when it is given something to
+      // create, so withholding onCreate at maxItems is how the bound reaches it.
+      {...(canAddItem(field, items.length)
+        ? { onCreate: () => seedFromSchema(itemSchema) }
+        : {})}
       addLabel={addItemLabel(spec)}
       {...(emptyCopy ? { addDescription: emptyCopy } : {})}
       renderHeader={renderSummary}

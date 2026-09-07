@@ -23,18 +23,25 @@ export interface TreePickerFieldProps<T> {
   roots: T[];
   getKey: (node: T) => string | number;
   getChildren: (node: T) => T[] | undefined;
+  getAriaLabel?: TreeProps<T>["getAriaLabel"];
   renderRow: TreeProps<T>["renderRow"];
   getSearchText?: (node: T) => string;
   defaultOpen?: (node: T, depth: number) => boolean;
+  /** Reports nodes whose children should be fetched when first expanded. */
+  hasMoreChildren?: TreeProps<T>["hasMoreChildren"];
+  /** Fetches a lazy node's children when it is first expanded. */
+  loadChildren?: TreeProps<T>["loadChildren"];
   /**
    * Decides which nodes commit a selection when clicked. A click on a
    * non-selectable node still toggles its expansion (it never closes the
    * picker). Defaults to every node selectable.
    */
   isSelectable?: (node: T) => boolean;
-  /** Fires for a selectable node, then closes the dropdown. */
+  /** Fires when a selectable node is clicked. */
   onSelect: (node: T) => void;
-  /** Highlights the committed node inside the open tree. */
+  /** Close after a row selection. Disable when a footer explicitly commits the pending node. */
+  closeOnSelect?: boolean;
+  /** Highlights the selected node inside the open tree. */
   selected?: T | null;
   /**
    * Force-opens the `selected` node's ancestors so the current value is always
@@ -63,6 +70,8 @@ export interface TreePickerFieldProps<T> {
    * always means leaving the dropdown behind.
    */
   renderFooter?: (props: { close: () => void }) => ReactNode;
+  /** Accessible name for the closed picker trigger. */
+  triggerAriaLabel?: string;
 }
 
 export interface TreePickerTriggerProps {
@@ -81,11 +90,15 @@ export function TreePickerField<T>({
   roots,
   getKey,
   getChildren,
+  getAriaLabel,
   renderRow,
   getSearchText,
   defaultOpen,
+  hasMoreChildren,
+  loadChildren,
   isSelectable,
   onSelect,
+  closeOnSelect = true,
   selected,
   revealSelected,
   showControls,
@@ -100,6 +113,7 @@ export function TreePickerField<T>({
   panelClassName,
   renderTrigger,
   renderFooter,
+  triggerAriaLabel,
 }: TreePickerFieldProps<T>) {
   const [open, setOpen] = useState(false);
   const floatingZ = useFloatingZIndex();
@@ -183,6 +197,7 @@ export function TreePickerField<T>({
           ref={anchorRef}
           type="button"
           disabled={disabled}
+          aria-label={triggerAriaLabel}
           aria-haspopup="tree"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
@@ -241,8 +256,11 @@ export function TreePickerField<T>({
                 getKey={getKey}
                 getChildren={getChildren}
                 renderRow={renderRow}
+                {...(getAriaLabel ? { getAriaLabel } : {})}
                 {...(getSearchText ? { getSearchText } : {})}
                 {...(defaultOpen ? { defaultOpen } : {})}
+                {...(hasMoreChildren ? { hasMoreChildren } : {})}
+                {...(loadChildren ? { loadChildren } : {})}
                 {...(selected !== undefined ? { selected } : {})}
                 {...(revealSelected !== undefined ? { revealSelected } : {})}
                 {...(showControls !== undefined ? { showControls } : {})}
@@ -251,7 +269,7 @@ export function TreePickerField<T>({
                 onSelect={(node) => {
                   if (!isSelectable || isSelectable(node)) {
                     onSelect(node);
-                    setOpen(false);
+                    if (closeOnSelect) setOpen(false);
                   }
                 }}
               />

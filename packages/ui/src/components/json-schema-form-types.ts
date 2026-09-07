@@ -29,6 +29,13 @@ export interface JsonSchemaProperty {
   // text input.
   multipleOf?: number;
   items?: JsonSchemaProperty;
+  // Standard JSON Schema array bounds. The form treats them as the limits they
+  // are: it stops offering "add" at maxItems and stops offering per-item
+  // "remove" at minItems, so an array whose length the producer owns (a fixed
+  // pair of journal lines, say) cannot be lengthened or shortened in the form
+  // while its cells stay editable.
+  minItems?: number;
+  maxItems?: number;
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
   // false = closed object; true = open; sub-schema = open string/typed map.
@@ -415,6 +422,11 @@ export interface FieldControl {
 
   // array — the schema each item is rendered against (recursively).
   itemSchema?: JsonSchemaProperty;
+  // array — resolved minItems/maxItems. Gate "add" and per-item "remove"; they
+  // are not validation, and an array already outside its bounds is left alone
+  // rather than trapped.
+  minItems?: number;
+  maxItems?: number;
   // array — optional presentation override resolved from x-array-display.
   arrayDisplay?: ArrayDisplay;
   // array — resolved `x-item`: how to summarize one item in a collapsed row.
