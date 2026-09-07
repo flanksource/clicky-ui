@@ -124,8 +124,10 @@ concepts leak in).
   consumer's Tailwind `@source` scans a file with that exact literal — which fails across a stale linked
   dist and leaves the SVG unsized (it then balloons under `h-full`). Rule: compute CSS via inline
   `style`, never a dynamic arbitrary class; static classes (`size-4`, `text-sm`) are fine.
-- **`DataTable`** carries `accessor`/`clientReveal`/`scrollContainerClassName`; consumer adapters stay
-  thin (empty-state + column inference belong consumer-side).
+- **`DataTable`** carries `accessor`/`virtualize`/`scrollContainerClassName`; consumer adapters stay
+  thin (empty-state + column inference belong consumer-side). Reach for `virtualize` above ~200 rows:
+  it windows the DOM without windowing the data, so grouping, select-all and counts still see every
+  filtered row.
 - **`Tree.revealSelected?: boolean`** force-opens the `selected` node's ancestor keys (via
   `forcedOpenKeys` + `ancestorPathKeys`/`mergeKeySets`) so a selection can't hide under a collapsed
   parent. `Tree` also supports async/lazy child loading — add such capabilities here, not in consumers.
