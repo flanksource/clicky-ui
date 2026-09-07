@@ -6,6 +6,7 @@
 import { createContext, useContext } from "react";
 import type { ChatContextItem } from "./context";
 import type { PermissionPolicy } from "../chat/tool-policy";
+import type { Suggestion } from "../chat/types";
 import { zIndex } from "../../overlay/zIndex";
 
 /** Live state of one floating chat window. Position/size/maximized are
@@ -20,9 +21,14 @@ export interface ChatWindowState {
   height: number;
   zIndex: number;
   maximized: boolean;
-  /** A prompt to auto-send when the window mounts (the `id` lets the window
-   *  detect a fresh request even if the text repeats). */
+  /** A prompt to prefill the composer with when the window mounts — never sent
+   *  on the user's behalf (the `id` lets the window detect a fresh request even
+   *  if the text repeats). */
   initialPrompt: { id: number; text: string } | null;
+  /** Prompts the opening surface proposes for this window, offered as chips
+   *  above the composer. Transient: cleared once one is picked or the user
+   *  sends something of their own. */
+  proposedPrompts: Suggestion[];
   contextItems: ChatContextItem[];
   /** The ordered rules the surface that opened this window declares. They sit
    *  under the user.s own rules and over the tool catalog.s defaults, so a
@@ -34,6 +40,8 @@ export interface OpenPanelOpts {
   threadId?: string | null;
   initialModel?: string | null;
   initialPrompt?: { id: number; text: string } | null;
+  /** See {@link ChatWindowState.proposedPrompts}. */
+  proposedPrompts?: Suggestion[];
   contextItems?: ChatContextItem[];
   /** See {@link ChatWindowState.toolPolicy}. */
   toolPolicy?: PermissionPolicy;
@@ -90,6 +98,7 @@ export function loadPanels(storageId: string): ChatWindowState[] {
       initialModel: null,
       zIndex: Z_BASE + i,
       initialPrompt: null,
+      proposedPrompts: [],
       contextItems: [],
       // A restored window is not attached to a surface yet, so tools fall back
       // to the catalog defaults until one reopens it.
@@ -119,8 +128,8 @@ export function nextPanelId(): string {
 }
 
 let _promptId = 0;
-/** A monotonic id stamped onto an `initialPrompt` so a window re-sends even when
- *  the same text is requested twice. */
+/** A monotonic id stamped onto an `initialPrompt` so a window re-seeds its
+ *  composer even when the same text is requested twice. */
 export function nextPromptId(): number {
   return ++_promptId;
 }

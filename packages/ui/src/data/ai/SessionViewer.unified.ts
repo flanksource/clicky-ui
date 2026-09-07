@@ -171,7 +171,30 @@ export interface SessionDenial {
 export interface SessionApprovalStats {
   approved?: number;
   denied?: number;
+  pending?: number;
+  cancelled?: number;
+  expired?: number;
   denials?: SessionDenial[];
+}
+
+/** One pending or resolved tool-approval gate on a prompt run — the row shape
+ *  `session.requests[]` carries (captain pkg/session Request, kind
+ *  "tool_approval"). A `pending` row with no matching transcript part is the
+ *  only signal an approval brokered outside the in-process chat (e.g. by an
+ *  external dashboard) ever gets — panels must key off this array directly,
+ *  never off transcript parts. */
+export interface SessionApprovalRequest {
+  id: string;
+  promptRunId?: string;
+  toolCallId?: string;
+  kind: string;
+  state: "pending" | "approved" | "denied" | "cancelled" | "expired";
+  tool: string;
+  input?: unknown;
+  requestedBy?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  resolvedAt?: string;
 }
 
 export interface SessionHealth {
@@ -223,6 +246,7 @@ export interface UnifiedSessionInput {
   files?: SessionChangedFiles;
   plan?: SessionPlan;
   approvals?: SessionApprovalStats;
+  requests?: SessionApprovalRequest[];
   health?: SessionHealth[];
   live?: SessionLiveProcess;
   prompt?: unknown;

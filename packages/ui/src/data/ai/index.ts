@@ -371,6 +371,12 @@ export {
   type SessionInspectorTab,
 } from "./SessionInspector";
 export {
+  SessionApprovalsPanel,
+  pendingApprovalRequests,
+  type ApprovalResolveAction,
+  type ApprovalResolveHandler,
+} from "./SessionInspector.approvals";
+export {
   SessionChatComposer,
   type SessionChatCapabilities,
   type SessionChatComposerProps,
@@ -427,6 +433,7 @@ export {
   type SessionProvenance,
   type SessionAgent,
   type SessionApproval,
+  type SessionApprovalRequest,
   type SessionApprovalStats,
   type SessionBudget,
   type SessionCapabilities,

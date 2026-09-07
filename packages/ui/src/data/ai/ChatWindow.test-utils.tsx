@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useChatWindowManager } from "./chat-window-context";
+import type { Suggestion } from "../chat/types";
 import type { ToolMeta } from "./ToolPreferences";
 
 export const CHAT_WINDOW_TEST_TOOLS: ToolMeta[] = [
@@ -10,19 +11,28 @@ export const CHAT_WINDOW_TEST_TOOLS: ToolMeta[] = [
 export function OpenChatWindowOnMount({
   children,
   initialPrompt,
+  proposedPrompts,
   threadId,
 }: {
   children: ReactNode;
   initialPrompt?: { id: number; text: string } | null;
+  proposedPrompts?: Suggestion[];
   threadId?: string | null;
 }): ReactNode {
   const { openPanel } = useChatWindowManager();
+  // Exactly one panel, as the name says. `openPanel`'s identity changes once the
+  // manager reschedules its save, which would otherwise open a second window
+  // and leave the assertions picking between two composers.
+  const opened = useRef(false);
   useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
     openPanel({
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
+      ...(proposedPrompts !== undefined ? { proposedPrompts } : {}),
       ...(threadId !== undefined ? { threadId } : {}),
     });
-  }, [initialPrompt, openPanel, threadId]);
+  }, [initialPrompt, openPanel, proposedPrompts, threadId]);
   return <>{children}</>;
 }
 

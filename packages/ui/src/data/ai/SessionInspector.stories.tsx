@@ -80,6 +80,58 @@ export const Costs: Story = {
   args: { session: INSPECTOR_SESSION, defaultTab: "costs" },
 };
 
+const PENDING_APPROVAL_SESSION = {
+  ...INSPECTOR_SESSION,
+  requests: [
+    {
+      id: "approval-pending-1",
+      promptRunId: "run-1",
+      toolCallId: "call-write-readme",
+      kind: "tool_approval",
+      state: "pending" as const,
+      tool: "Write",
+      input: {
+        file_path: "/repo/README.md",
+        content: "# Updated readme\n",
+      },
+      requestedBy: "agent-1",
+      createdAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    },
+  ],
+};
+
+// Reproduces the live bug this panel fixes: a TODO run blocked on an
+// unanswered Write approval with no visible signal anywhere in the session
+// page. The pending request comes straight from `session.requests[]`, so it
+// renders even when no chat transcript part exists for it (an approval
+// brokered outside this session's own chat, e.g. by an external dashboard).
+export const PendingApproval: Story = {
+  args: { session: PENDING_APPROVAL_SESSION, defaultTab: "approvals" },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("shows an urgent pending badge on the tab", async () => {
+      await expect(
+        canvas.getByRole("tab", { name: "Approvals 1" }),
+      ).toBeInTheDocument();
+    });
+
+    await step("lists the pending Write approval with age and countdown", async () => {
+      await expect(canvas.getByText("Write")).toBeInTheDocument();
+      await expect(canvas.getByText("Requested by agent-1")).toBeInTheDocument();
+      await expect(canvas.getByText(/ago/)).toBeInTheDocument();
+      await expect(canvas.getByText(/left/)).toBeInTheDocument();
+      await expect(
+        canvas.getByRole("button", { name: "Approve" }),
+      ).toBeInTheDocument();
+      await expect(
+        canvas.getByRole("button", { name: "Deny" }),
+      ).toBeInTheDocument();
+    });
+  },
+};
+
 export const Completed: Story = {
   args: {
     session: {
