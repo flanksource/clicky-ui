@@ -13,6 +13,8 @@ import {
 import { schemaHelper } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import {
+  canAddItem,
+  canRemoveItem,
   orderByClickyOrder,
   orderByXOrder,
   seedFromSchema,
@@ -46,6 +48,10 @@ export function TableArray({
     itemSchema["x-order"],
   );
   const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
+  // The trash column disappears with the buttons that would have filled it, so
+  // an array of a fixed length reads as a table rather than one with a blank
+  // gutter down the side.
+  const removable = !readOnly && canRemoveItem(field, items.length);
 
   function cell(
     item: unknown,
@@ -110,7 +116,7 @@ export function TableArray({
                 )}
               </th>
             ))}
-            {!readOnly && <th className="w-10 px-2 py-1" />}
+            {removable && <th className="w-10 px-2 py-1" />}
           </tr>
         </thead>
         <tbody>
@@ -127,7 +133,7 @@ export function TableArray({
                   {cell(item, i, col, prop)}
                 </td>
               ))}
-              {!readOnly && (
+              {removable && (
                 <td className="px-2 py-1">
                   <button
                     type="button"
@@ -146,7 +152,7 @@ export function TableArray({
           ))}
         </tbody>
       </table>
-      {!readOnly && (
+      {!readOnly && canAddItem(field, items.length) && (
         <div className="p-2">
           <Button
             type="button"

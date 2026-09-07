@@ -61,6 +61,15 @@ describe("isEmptyValue", () => {
     expect(isEmptyValue([1])).toBe(false);
     expect(isEmptyValue({ a: 1 })).toBe(false);
   });
+  // A section whose every field is blank carries no more data than a missing
+  // one, so it sinks and hides with them rather than standing as a titled,
+  // empty block.
+  it("looks inside a container rather than counting its keys", () => {
+    expect(isEmptyValue({ a: "", b: null, c: {} })).toBe(true);
+    expect(isEmptyValue([{ a: "" }, ""])).toBe(true);
+    expect(isEmptyValue({ a: "", b: "x" })).toBe(false);
+    expect(isEmptyValue({ a: { b: false } })).toBe(false);
+  });
 });
 
 describe("orderByPriority", () => {

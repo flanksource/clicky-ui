@@ -213,12 +213,17 @@ export function orderRequiredFirst<T>(
 }
 
 // isEmptyValue reports whether a field's value carries no data, so priority
-// sorting can sink unfilled fields. Empty = undefined/null/"" plus empty arrays
-// and empty plain objects; `false` and `0` count as filled (they are choices).
+// sorting can sink unfilled fields and `hideEmpty` can drop them. Empty =
+// undefined/null/"" plus empty arrays and objects; `false` and `0` count as
+// filled (they are choices).
+//
+// An object is empty when everything inside it is, not merely when it has no
+// keys: a section whose every field is blank carries no more data than a missing
+// one, and rendering it as a titled, empty block says otherwise.
 export function isEmptyValue(value: unknown): boolean {
   if (value === undefined || value === null || value === "") return true;
-  if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === "object") return Object.keys(value).length === 0;
+  if (Array.isArray(value)) return value.every(isEmptyValue);
+  if (typeof value === "object") return Object.values(value).every(isEmptyValue);
   return false;
 }
 
@@ -257,6 +262,23 @@ export function softError(field: FieldControl): string | undefined {
     if (!known) return "Unknown value (allowed)";
   }
   return undefined;
+}
+
+/**
+ * canAddItem / canRemoveItem read the array's maxItems/minItems bounds.
+ *
+ * The bounds gate the controls rather than validate the value: an array already
+ * at or past a bound offers no way to make it worse, but one that arrives
+ * outside its bounds is never trapped — removal stays available above minItems
+ * whatever the schema says, and an array the producer owns end to end simply
+ * declares min === max and offers neither.
+ */
+export function canAddItem(field: FieldControl, count: number): boolean {
+  return field.maxItems === undefined || count < field.maxItems;
+}
+
+export function canRemoveItem(field: FieldControl, count: number): boolean {
+  return field.minItems === undefined || count > field.minItems;
 }
 
 // seedFromSchema produces the initial value for a freshly-added array item or

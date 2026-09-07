@@ -4,6 +4,7 @@ import {
   scalarItemsType,
 } from "./json-schema-form-resolve";
 import { isPlainObject } from "../lib/collections";
+import { isEmptyValue } from "./json-schema-form-utils";
 import { matchesFieldFilter } from "./json-schema-form-filter";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import type {
@@ -48,6 +49,7 @@ export function unmatchedFormErrors({
   errors,
   hiddenKeys,
   hideReadOnlyFields,
+  hideEmpty,
   fieldFilter,
   pre,
 }: {
@@ -56,6 +58,7 @@ export function unmatchedFormErrors({
   errors: JsonSchemaFormError[];
   hiddenKeys?: string[];
   hideReadOnlyFields: boolean;
+  hideEmpty: boolean;
   fieldFilter?: string;
   pre: PreExtension[];
 }): JsonSchemaFormError[] {
@@ -63,6 +66,7 @@ export function unmatchedFormErrors({
   collectObjectPaths(schema, value, "", rendered, {
     hiddenKeys: new Set(hiddenKeys ?? []),
     hideReadOnlyFields,
+    hideEmpty,
     pre,
     rootValue: value,
     root: true,
@@ -74,6 +78,7 @@ export function unmatchedFormErrors({
 interface CollectOptions {
   hiddenKeys: Set<string>;
   hideReadOnlyFields: boolean;
+  hideEmpty: boolean;
   fieldFilter?: string;
   pre: PreExtension[];
   rootValue: Record<string, unknown>;
@@ -126,6 +131,9 @@ function collectObjectPaths(
       options.pre
     );
     if (!field || (options.hideReadOnlyFields && field.readOnly)) continue;
+    // A field the form drops is not a place an error can be shown, so its error
+    // has to surface as unmatched rather than vanish with the field.
+    if (options.hideEmpty && isEmptyValue(field.value)) continue;
 
     const path = appendInstancePath(basePath, key);
     paths.add(path);

@@ -20,7 +20,11 @@ import {
 import { ItemBadge, RequiredMark } from "./json-schema-form-item-row";
 import { inputSizeClass } from "./json-schema-form-size";
 import { TONE_EDGE_CLASS } from "./json-schema-form-tone";
-import { seedFromSchema } from "./json-schema-form-utils";
+import {
+  canAddItem,
+  canRemoveItem,
+  seedFromSchema,
+} from "./json-schema-form-utils";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
 // CardsArray renders an object-item array as a stack of titled cards: every
@@ -106,7 +110,8 @@ export function CardsArray({
                   {...(itemActionsAllow(spec, "duplicate")
                     ? { onDuplicate: () => commit(duplicateIndex(items, i)) }
                     : {})}
-                  {...(itemActionsAllow(spec, "remove")
+                  {...(itemActionsAllow(spec, "remove") &&
+                  canRemoveItem(field, items.length)
                     ? { onRemove: () => commit(removeIndex(items, i)) }
                     : {})}
                 />
@@ -136,7 +141,7 @@ export function CardsArray({
           {emptyCopy}
         </p>
       )}
-      {!readOnly && (
+      {!readOnly && canAddItem(field, items.length) && (
         <Button
           type="button"
           variant="outline"

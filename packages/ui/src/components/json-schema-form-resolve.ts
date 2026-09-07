@@ -341,6 +341,8 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       ...base,
       kind: "array",
       ...(itemSchema ? { itemSchema } : {}),
+      ...(typeof prop.minItems === "number" ? { minItems: prop.minItems } : {}),
+      ...(typeof prop.maxItems === "number" ? { maxItems: prop.maxItems } : {}),
       ...(display ? { arrayDisplay: display } : {}),
       ...(display === "accordion" ? { itemSpec: resolveItemSpec(prop, itemSchema) } : {}),
       // An accordion reuses the array's description as the zero-item copy in its

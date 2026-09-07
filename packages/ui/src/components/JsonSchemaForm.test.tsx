@@ -1026,6 +1026,78 @@ describe("JsonSchemaForm readOnly schema fields", () => {
     expect(screen.queryByText("abc-123")).not.toBeInTheDocument();
   });
 
+  // A schema wide enough to describe many records leaves most of it blank on any
+  // one of them. Once a record is finished being edited the blanks say only that
+  // a field existed, so an audit view can drop them — but an editable form must
+  // not, because there a blank field is the question.
+  describe("hideEmpty", () => {
+    const record: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        name: { type: "string", title: "Name" },
+        note: { type: "string", title: "Note" },
+        active: { type: "boolean", title: "Active" },
+        count: { type: "integer", title: "Count" },
+        tags: { type: "array", title: "Tags", items: { type: "string" } },
+      },
+    };
+
+    it("drops the fields the value says nothing about", () => {
+      render(
+        <JsonSchemaForm
+          schema={record}
+          value={{ name: "Ada", note: "", tags: [] }}
+          onChange={vi.fn()}
+          hideEmpty
+        />,
+      );
+      expect(screen.getByText("Name")).toBeInTheDocument();
+      expect(screen.queryByText("Note")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tags")).not.toBeInTheDocument();
+      expect(screen.queryByText("Count")).not.toBeInTheDocument();
+    });
+
+    it("keeps false and zero, which are answers", () => {
+      render(
+        <JsonSchemaForm
+          schema={record}
+          value={{ active: false, count: 0 }}
+          onChange={vi.fn()}
+          hideEmpty
+        />,
+      );
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(screen.getByText("Count")).toBeInTheDocument();
+    });
+
+    it("drops a nested section whose every field is blank, and keeps one that is not", () => {
+      const nested: JsonSchemaObject = {
+        type: "object",
+        properties: {
+          blank: { type: "object", title: "Blank", properties: { a: { type: "string", title: "A" } } },
+          filled: { type: "object", title: "Filled", properties: { b: { type: "string", title: "B" } } },
+        },
+      };
+      render(
+        <JsonSchemaForm
+          schema={nested}
+          value={{ blank: { a: "" }, filled: { b: "x" } }}
+          onChange={vi.fn()}
+          hideEmpty
+        />,
+      );
+      expect(screen.queryByText("Blank")).not.toBeInTheDocument();
+      expect(screen.getByText("Filled")).toBeInTheDocument();
+      expect(screen.getByText("B")).toBeInTheDocument();
+    });
+
+    it("leaves every field alone when unset", () => {
+      render(<JsonSchemaForm schema={record} value={{ name: "Ada" }} onChange={vi.fn()} />);
+      expect(screen.getByText("Note")).toBeInTheDocument();
+      expect(screen.getByText("Tags")).toBeInTheDocument();
+    });
+  });
+
   it("lets a pre-extension clear readOnly so the field becomes editable again", () => {
     const makeEditable: PreExtension = (field) =>
       field.key === "ClientGUID" ? { ...field, readOnly: false } : field;

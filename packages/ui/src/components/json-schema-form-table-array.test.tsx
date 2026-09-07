@@ -135,4 +135,80 @@ describe("JsonSchemaForm table arrays", () => {
       "Controls the value shape. It is independent from Role.",
     );
   });
+
+  // An array whose length its producer owns — a proposed journal's two lines,
+  // say — needs its cells editable and its length fixed. readOnly would give
+  // the second by taking the first, so the bounds do it instead.
+  describe("minItems/maxItems", () => {
+    const boundedSchema = (
+      bounds: { minItems?: number; maxItems?: number },
+    ): JsonSchemaObject => ({
+      type: "object",
+      properties: {
+        lines: {
+          type: "array",
+          "x-layout": "table",
+          ...bounds,
+          items: {
+            type: "object",
+            properties: { account: { type: "string", title: "Account" } },
+          },
+        },
+      },
+    });
+
+    const twoLines = { lines: [{ account: "a" }, { account: "b" }] };
+
+    it("offers neither add nor remove on an array pinned to its length", () => {
+      render(
+        <JsonSchemaForm
+          schema={boundedSchema({ minItems: 2, maxItems: 2 })}
+          value={twoLines}
+          onChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Add item" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Remove item/ })).toBeNull();
+      // The point of pinning the length rather than marking it read-only.
+      expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    });
+
+    it("keeps remove while the array is above minItems", () => {
+      render(
+        <JsonSchemaForm
+          schema={boundedSchema({ minItems: 1 })}
+          value={twoLines}
+          onChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getAllByRole("button", { name: /Remove item/ })).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "Add item" })).toBeVisible();
+    });
+
+    it("leaves an unbounded array alone", () => {
+      render(
+        <JsonSchemaForm schema={boundedSchema({})} value={twoLines} onChange={vi.fn()} />,
+      );
+
+      expect(screen.getByRole("button", { name: "Add item" })).toBeVisible();
+      expect(screen.getAllByRole("button", { name: /Remove item/ })).toHaveLength(2);
+    });
+
+    // A value that arrives shorter than minItems must not be a dead end: the
+    // bounds gate the controls, they do not validate what is already there.
+    it("still offers add to an array below minItems", () => {
+      render(
+        <JsonSchemaForm
+          schema={boundedSchema({ minItems: 3, maxItems: 3 })}
+          value={twoLines}
+          onChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Add item" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: /Remove item/ })).toBeNull();
+    });
+  });
 });
