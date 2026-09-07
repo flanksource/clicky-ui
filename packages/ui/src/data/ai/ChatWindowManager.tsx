@@ -81,6 +81,7 @@ export function ChatWindowManagerProvider({
           zIndex: Z_BASE,
           maximized: false,
           initialPrompt: opts?.initialPrompt ?? null,
+          proposedPrompts: opts?.proposedPrompts ?? [],
           contextItems: opts?.contextItems ?? [],
           toolPolicy: opts?.toolPolicy ?? [],
         };
@@ -145,8 +146,10 @@ export function ChatWindowManagerProvider({
       const partial: Partial<ChatWindowState> = {};
       if (opts?.initialPrompt) partial.initialPrompt = opts.initialPrompt;
       // Reusing a window re-targets it at the surface that just asked, so its
-      // tool defaults replace the previous surface's rather than merging.
+      // tool defaults and proposed prompts replace the previous surface's
+      // rather than merging.
       if (opts?.toolPolicy) partial.toolPolicy = opts.toolPolicy;
+      if (opts?.proposedPrompts) partial.proposedPrompts = opts.proposedPrompts;
       if (opts?.contextItems?.length) {
         partial.contextItems = [
           ...existing.contextItems,

@@ -17,6 +17,12 @@ import {
   installMemoryStorage,
 } from "./ChatWindow.test-utils";
 
+// Stable identity: `OpenChatWindowOnMount` opens a panel whenever its props
+// change, so an inline array would open a fresh panel on every render.
+const REVIEW_CELL_PROMPTS = [
+  { label: "Review this cell", prompt: "Help me review this cell." },
+];
+
 function completeTurn(): ReadableStream<UIMessageChunk> {
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
@@ -122,7 +128,7 @@ describe("ChatWindow", () => {
     expect(body).not.toHaveProperty("toolApproval");
   });
 
-  it("passes panel initial prompts into the inner chat", async () => {
+  it("prefills the inner chat from a panel initial prompt without sending it", async () => {
     const sendMessages = vi.fn();
 
     render(
@@ -142,10 +148,42 @@ describe("ChatWindow", () => {
       </ChatWindowManagerProvider>,
     );
 
-    await waitFor(() => expect(sendMessages).toHaveBeenCalledTimes(1));
-    expect(JSON.stringify(sendMessages.mock.calls[0]?.[0])).toContain(
-      "Fix this formula",
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue("Fix this formula"),
     );
+    expect(sendMessages).not.toHaveBeenCalled();
+  });
+
+  it("offers a panel's proposed prompts as chips that fill the composer", async () => {
+    const sendMessages = vi.fn();
+
+    render(
+      <ChatWindowManagerProvider storageId="proposed-prompts">
+        <OpenChatWindowOnMount proposedPrompts={REVIEW_CELL_PROMPTS}>
+          <ChatWindowLayer
+            sessionsApi={null}
+            toolsApi={null}
+            chat={{
+              modelsApi: null,
+              transport: recordingTransport(sendMessages),
+            }}
+          />
+        </OpenChatWindowOnMount>
+      </ChatWindowManagerProvider>,
+    );
+
+    await screen.findByRole("button", { name: "Review this cell" });
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    // Re-queried at click time: the window remounts its chat while the panel
+    // settles, and a node captured earlier would be detached by now.
+    fireEvent.click(screen.getByRole("button", { name: "Review this cell" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue(
+        "Help me review this cell.",
+      ),
+    );
+    expect(sendMessages).not.toHaveBeenCalled();
   });
 
   it("creates a durable thread before sending the first prompt", async () => {
@@ -192,6 +230,12 @@ describe("ChatWindow", () => {
         </OpenChatWindowOnMount>
       </ChatWindowManagerProvider>,
     );
+
+    // The prompt only prefills; the user is the one who starts the turn.
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue("Edit this account"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() =>
       expect(

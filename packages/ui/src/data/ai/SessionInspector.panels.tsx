@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { cn } from "../../lib/utils";
 import { CodeBlock } from "../CodeBlock";
 import { KeyValueList, type KeyValueListItem } from "../KeyValueList";
 import {
@@ -11,9 +10,13 @@ import {
 import { durationLabel, formatDate } from "./SessionInspector.model";
 import { SessionFilesPanel } from "./SessionInspector.files";
 import { SessionPlanPanel } from "./SessionInspector.plan";
+import {
+  SessionApprovalsPanel,
+  type ApprovalResolveHandler,
+} from "./SessionInspector.approvals";
+import { EmptyState, kv, muted } from "./SessionInspector.panel-parts";
 import type { SessionInput } from "./SessionViewer.model";
 import type {
-  SessionApprovalStats,
   SessionCost,
   SessionHealth,
   SessionLiveProcess,
@@ -27,11 +30,13 @@ export function SessionInspectorPanel({
   detail,
   session,
   onPlanChange,
+  onResolveApproval,
 }: {
   tab: SessionInspectorTab;
   detail: UnifiedSessionInput | undefined;
   session: SessionInput;
   onPlanChange?: (content: string) => void;
+  onResolveApproval?: ApprovalResolveHandler;
 }) {
   switch (tab) {
     case "files":
@@ -44,7 +49,13 @@ export function SessionInspectorPanel({
         />
       );
     case "approvals":
-      return <ApprovalsPanel approvals={detail?.approvals} />;
+      return (
+        <SessionApprovalsPanel
+          approvals={detail?.approvals}
+          requests={detail?.requests}
+          {...(onResolveApproval ? { onResolve: onResolveApproval } : {})}
+        />
+      );
     case "costs":
       return (
         <CostsPanel
@@ -60,39 +71,6 @@ export function SessionInspectorPanel({
     default:
       return null;
   }
-}
-
-function ApprovalsPanel({
-  approvals,
-}: {
-  approvals: SessionApprovalStats | undefined;
-}) {
-  if (
-    !approvals ||
-    (!approvals.approved && !approvals.denied && !approvals.denials?.length)
-  ) {
-    return <EmptyState>No approval metadata.</EmptyState>;
-  }
-  return (
-    <div className="space-y-density-4">
-      <KeyValueList
-        items={[
-          kv("Approved", approvals.approved ?? 0),
-          kv("Denied", approvals.denied ?? 0),
-        ]}
-      />
-      {approvals.denials?.length ? (
-        <SimpleList
-          title="Denials"
-          rows={approvals.denials.map((denial, index) => ({
-            key: denial.toolUseId || `${denial.tool}-${index}`,
-            title: [denial.tool, denial.toolUseId].filter(Boolean).join(" "),
-            detail: denial.reason,
-          }))}
-        />
-      ) : null}
-    </div>
-  );
 }
 
 function CostsPanel({
@@ -227,78 +205,12 @@ function JsonSection({ title, value }: { title: string; value: unknown }) {
   );
 }
 
-function SimpleList({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<{ key: string; title?: ReactNode; detail?: ReactNode }>;
-}) {
-  return (
-    <section>
-      <h3 className="mb-density-2 text-xs font-semibold uppercase text-muted-foreground">
-        {title}
-      </h3>
-      <ul className="divide-y divide-border rounded-md border border-border">
-        {rows.map((row) => (
-          <li key={row.key} className="px-density-3 py-density-2">
-            <div className="text-sm font-medium">{row.title || row.key}</div>
-            {row.detail ? (
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {row.detail}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function Th({ children }: { children: ReactNode }) {
   return <th className="px-density-3 py-density-2 font-medium">{children}</th>;
 }
 
 function Td({ children }: { children: ReactNode }) {
   return <td className="px-density-3 py-density-2">{children}</td>;
-}
-
-function EmptyState({
-  children,
-  compact = false,
-}: {
-  children: ReactNode;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-md border border-dashed border-border text-sm text-muted-foreground",
-        compact ? "p-density-3" : "p-density-6 text-center"
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function kv(
-  label: ReactNode,
-  value: ReactNode | undefined | null
-): KeyValueListItem {
-  return {
-    key: String(label),
-    label,
-    value:
-      value === undefined || value === null || value === ""
-        ? muted("-")
-        : value,
-    hidden: value === undefined || value === null || value === "",
-  };
-}
-
-function muted(value: ReactNode) {
-  return <span className="text-muted-foreground">{value}</span>;
 }
 
 function jsonSource(value: unknown) {

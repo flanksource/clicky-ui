@@ -268,10 +268,18 @@ export function ChatWindow({
   });
 
   const initialPrompt = panel.initialPrompt ?? chat?.initialPrompt ?? null;
-  const handleInitialPromptSent = useCallback(() => {
+  const handleInitialPromptConsumed = useCallback(() => {
     if (panel.initialPrompt) updatePanel(panel.id, { initialPrompt: null });
-    chat?.onInitialPromptSent?.();
+    chat?.onInitialPromptConsumed?.();
   }, [chat, panel.id, panel.initialPrompt, updatePanel]);
+  const proposedPrompts = panel.proposedPrompts?.length
+    ? panel.proposedPrompts
+    : (chat?.proposedPrompts ?? null);
+  const handleProposedPromptsConsumed = useCallback(() => {
+    if (panel.proposedPrompts?.length)
+      updatePanel(panel.id, { proposedPrompts: [] });
+    chat?.onProposedPromptsConsumed?.();
+  }, [chat, panel.id, panel.proposedPrompts, updatePanel]);
   const handleUsage = useCallback(
     (snapshot: ChatUsageSummary) => {
       setUsage(snapshot);
@@ -458,7 +466,9 @@ export function ChatWindow({
             {...(toolRenderers ? { toolRenderers } : {})}
             body={mergedBody}
             initialPrompt={initialPrompt}
-            onInitialPromptSent={handleInitialPromptSent}
+            onInitialPromptConsumed={handleInitialPromptConsumed}
+            proposedPrompts={proposedPrompts}
+            onProposedPromptsConsumed={handleProposedPromptsConsumed}
           />
         )}
       </div>

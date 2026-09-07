@@ -25,6 +25,10 @@ import {
 } from "./SessionInspector.collection";
 import { SessionHierarchyPicker } from "./SessionInspector.hierarchy";
 import { useSessionHierarchy } from "./SessionInspector.hierarchy-state";
+import {
+  pendingApprovalRequests,
+  type ApprovalResolveHandler,
+} from "./SessionInspector.approvals";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
 import type { SessionInput } from "./SessionViewer.model";
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
@@ -46,6 +50,9 @@ export interface SessionInspectorProps {
   renderSessionActions?: (item: SessionCollectionItem) => ReactNode;
   /** Receives edits made in the Plan tab. The inspector also keeps the draft visible locally. */
   onPlanChange?: (content: string) => void;
+  /** Resolves one pending tool approval from the Approvals tab. Omitted, the
+   *  tab still lists pending requests but renders no Approve/Deny controls. */
+  onResolveApproval?: ApprovalResolveHandler;
   composer?: ReactNode;
 }
 
@@ -66,6 +73,7 @@ export function SessionInspector({
   transcriptProps,
   renderSessionActions,
   onPlanChange,
+  onResolveApproval,
   composer,
 }: SessionInspectorProps) {
   const detail = useMemo(
@@ -89,6 +97,7 @@ export function SessionInspector({
       ...(transcriptProps ? { transcriptProps } : {}),
       ...(renderSessionActions ? { renderSessionActions } : {}),
       ...(onPlanChange ? { onPlanChange } : {}),
+      ...(onResolveApproval ? { onResolveApproval } : {}),
       ...(composer ? { composer } : {}),
     };
     return (
@@ -118,6 +127,7 @@ function CollectionSessionInspector({
   transcriptProps,
   renderSessionActions,
   onPlanChange,
+  onResolveApproval,
   composer,
 }: Omit<SessionInspectorProps, "session"> & {
   collection: SessionCollectionInput;
@@ -152,7 +162,7 @@ function CollectionSessionInspector({
         className="flex shrink-0 overflow-x-auto border-b border-border px-density-2"
       >
         {TABS.map((item) => {
-          const count = tabCount(item.id, hierarchy.current);
+          const badge = tabBadge(item.id, hierarchy.current);
           return (
             <TabButton
               key={item.id}
@@ -165,7 +175,8 @@ function CollectionSessionInspector({
               )}
               icon={item.icon}
               variant="underline"
-              {...(count === undefined ? {} : { count })}
+              {...(badge.count === undefined ? {} : { count: badge.count })}
+              {...(badge.color ? { countColor: badge.color } : {})}
               className="shrink-0 py-density-2 [&_svg]:text-muted-foreground"
             />
           );
@@ -195,6 +206,7 @@ function CollectionSessionInspector({
                 detail={panelDetail}
                 session={hierarchy.current}
                 {...(onPlanChange ? { onPlanChange } : {})}
+                {...(onResolveApproval ? { onResolveApproval } : {})}
               />
             )}
           </div>
@@ -276,19 +288,31 @@ function LegacySessionInspector({
   );
 }
 
-function tabCount(tab: SessionInspectorTab, session?: UnifiedSessionInput) {
+/** The tab's count badge and, for a pending-approvals badge, an amber
+ *  override so an unresolved approval reads as urgent rather than blending
+ *  into the neutral resolved-count badge every other tab uses. */
+function tabBadge(
+  tab: SessionInspectorTab,
+  session?: UnifiedSessionInput,
+): { count?: number; color?: string } {
   switch (tab) {
     case "files":
-      return (
-        (session?.files?.read?.length ?? 0) +
-        (session?.files?.written?.length ?? 0)
-      );
-    case "approvals":
-      return (
-        (session?.approvals?.approved ?? 0) + (session?.approvals?.denied ?? 0)
-      );
+      return {
+        count:
+          (session?.files?.read?.length ?? 0) +
+          (session?.files?.written?.length ?? 0),
+      };
+    case "approvals": {
+      const pending = pendingApprovalRequests(session?.requests).length;
+      if (pending) return { count: pending, color: "bg-amber-500" };
+      return {
+        count:
+          (session?.approvals?.approved ?? 0) +
+          (session?.approvals?.denied ?? 0),
+      };
+    }
     default:
-      return undefined;
+      return {};
   }
 }
 
