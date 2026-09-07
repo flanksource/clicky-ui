@@ -8,7 +8,17 @@ export interface LogEntry {
   message: string;
 }
 
-export type TaskControlAction = "start" | "stop" | "restart";
+export type TaskControlAction = "start" | "stop" | "restart" | "drain";
+
+export interface TaskWorkProgress {
+  total: number;
+  completed: number;
+  cached: number;
+  failed: number;
+  running: number;
+  canceled: number;
+  unstarted: number;
+}
 
 export interface TaskResourceSnapshot {
   cpuPercent: number;
@@ -77,6 +87,8 @@ export interface TaskSnapshot {
   completed?: number;
   failed?: number;
   running?: number;
+  canceled?: number;
+  work?: TaskWorkProgress;
   /** Per-task (type === "task") live stage label and bounded progress. */
   description?: string;
   progress?: number;
@@ -116,6 +128,8 @@ export interface TaskRunMeta {
   completed: number;
   failed: number;
   running: number;
+  canceled?: number;
+  work?: TaskWorkProgress;
   href?: string;
   controls?: TaskControlAction[];
 }

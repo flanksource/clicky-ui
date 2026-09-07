@@ -1,3 +1,4 @@
+import { taskWorkProgress } from "./task-work-progress";
 import { useState } from "react";
 import { Button } from "../components/button";
 import { CopyButton } from "../components/CopyButton";
@@ -52,6 +53,7 @@ export interface TaskProgressProps {
     group: TaskSnapshot,
   ) => void | Promise<void>;
   metricsBaseUrl?: string;
+  connectionStatus?: string;
 }
 
 export function TaskProgress({
@@ -62,6 +64,7 @@ export function TaskProgress({
   onControl,
   onTaskControl,
   metricsBaseUrl,
+  connectionStatus,
 }: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
@@ -81,11 +84,12 @@ export function TaskProgress({
         <TaskGroupCard
           key={g.groupId || g.id}
           group={g}
-          tasks={tasks.filter((t) => t.groupId === g.groupId || t.group === g.id)}
+          tasks={tasks.filter((t) => g.groupId ? t.groupId === g.groupId : t.group === g.id)}
           compact={compact}
           {...(onControl ? { onControl } : {})}
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+          {...(connectionStatus ? { connectionStatus } : {})}
         />
       ))}
     </div>
@@ -99,6 +103,7 @@ function TaskGroupCard({
   onControl,
   onTaskControl,
   metricsBaseUrl,
+  connectionStatus,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
@@ -110,13 +115,15 @@ function TaskGroupCard({
     group: TaskSnapshot,
   ) => void | Promise<void>;
   metricsBaseUrl?: string;
+  connectionStatus?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const { state: copyState, copy } = useCopyFlash();
-  const total = g.total ?? tasks.length;
-  const counts = bucketTasks(tasks);
+  const work = taskWorkProgress(g);
+  const total = g.work ? work.total : g.total ?? tasks.length;
+  const counts = g.work ? work.counts : bucketTasks(tasks);
   const done = counts.ok + counts.warn + counts.fail;
-  const progress = total > 0 ? `${done}/${total}` : "";
+  const progress = g.work ? work.label : total > 0 ? `${done}/${total}` : "";
 
   const running = tasks.filter((t) => t.status === "running");
   const pending = tasks.filter((t) => t.status === "pending");
@@ -205,6 +212,7 @@ function TaskGroupCard({
         <TaskProcessDetailsView
           details={g.details}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+          {...(connectionStatus ? { connectionStatus } : {})}
         />
       )}
 
@@ -231,6 +239,7 @@ function TaskGroupCard({
           group={g}
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+          {...(connectionStatus ? { connectionStatus } : {})}
         />
       ))}
     </div>
@@ -242,10 +251,12 @@ function TaskRow({
   group,
   onTaskControl,
   metricsBaseUrl,
+  connectionStatus,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
   metricsBaseUrl?: string;
+  connectionStatus?: string;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -342,6 +353,7 @@ function TaskRow({
           <TaskProcessDetailsView
             details={processDetails}
             {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+          {...(connectionStatus ? { connectionStatus } : {})}
           />
         )}
         {expanded && hasLogs && (
@@ -403,7 +415,7 @@ function TaskControls({
 }) {
   const [busy, setBusy] = useState<TaskControlAction | null>(null);
   const [error, setError] = useState("");
-  const icons = { start: UiPlay, stop: UiStop, restart: UiRestart };
+  const icons = { start: UiPlay, stop: UiStop, restart: UiRestart, drain: UiStop };
   const invoke = async (action: TaskControlAction) => {
     setBusy(action);
     setError("");
@@ -419,7 +431,7 @@ function TaskControls({
     <>
       {(target.controls ?? []).map((action) => {
         const ControlIcon = icons[action];
-        const actionLabel = action[0]?.toUpperCase() + action.slice(1);
+        const actionLabel = action === "drain" ? "Stop after current" : action[0]?.toUpperCase() + action.slice(1);
         const label = labelSuffix ? `${actionLabel} ${labelSuffix}` : actionLabel;
         return (
           <Button

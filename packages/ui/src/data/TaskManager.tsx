@@ -7,6 +7,7 @@ import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { Timestamp } from "./cells/Timestamp";
 import { TaskProgress } from "./TaskProgress";
+import { taskWorkProgress } from "./task-work-progress";
 import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
 import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./task-status";
@@ -117,6 +118,7 @@ export function TaskManager({
           <option value="success">Success</option>
           <option value="failed">Failed</option>
           <option value="warning">Warning</option>
+          <option value="canceled">Canceled</option>
         </select>
         <span className="text-xs text-muted-foreground">{status}</span>
       </div>
@@ -198,6 +200,7 @@ function RunRow({
     else setLocalOpen((v) => !v);
   };
   const isTerminal = run.status !== "running" && run.status !== "pending";
+  const progress = taskWorkProgress(run);
 
   return (
     <div className="border-b last:border-0">
@@ -233,8 +236,7 @@ function RunRow({
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
             {run.startedAt && <Timestamp value={run.startedAt} format="relative" />}
             <span>
-              {run.completed + run.failed}/{run.total} done
-              {run.failed > 0 ? `, ${run.failed} failed` : ""}
+              {progress.label}
             </span>
             {Object.entries(run.labels ?? {}).map(([k, v]) => (
               <span key={k} className="font-mono">
@@ -245,14 +247,8 @@ function RunRow({
         </div>
         <div className="w-40 shrink-0">
           <ProgressBar
-            segments={taskSegments({
-              ok: run.completed,
-              warn: 0,
-              fail: run.failed,
-              run: run.running,
-              pending: Math.max(0, run.total - run.completed - run.failed - run.running),
-            })}
-            total={run.total || 1}
+            segments={taskSegments(progress.counts)}
+            total={progress.total || 1}
             height="h-1.5"
           />
         </div>
@@ -280,7 +276,7 @@ function ExpandedRun({
   pollMs: number | undefined;
   runsQueryKey: QueryKey;
 }) {
-  const { snapshots } = useTaskRun({ id: runId, basePath, pollMs });
+  const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
   const queryClient = useQueryClient();
   const pendingControls = useRef(new Map<string, Promise<void>>());
@@ -336,6 +332,7 @@ function ExpandedRun({
     <div className="border-t bg-muted/30 px-4 py-3">
       <TaskProgress
         snapshots={snapshots}
+        connectionStatus={status}
         compact
         onControl={control}
         onTaskControl={controlTask}

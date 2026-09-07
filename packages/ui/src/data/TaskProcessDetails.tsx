@@ -1,7 +1,7 @@
 import { UiActivity, UiDatabase, UiFile } from "../icons";
 import { TimeseriesGauge } from "./TimeseriesGauge";
 import { DiagnosticsTree } from "./diagnostics/DiagnosticsTree";
-import { formatBytes } from "./diagnostics/utils";
+import { TaskResourceReadings } from "./TaskResourceReadings";
 import { buildTaskProcessForest } from "./task-process-details";
 import { TaskCommandLine } from "./TaskExecDetails";
 import type { TaskProcessDetails } from "./TaskSnapshot";
@@ -9,9 +9,11 @@ import type { TaskProcessDetails } from "./TaskSnapshot";
 export function TaskProcessDetailsView({
   details,
   metricsBaseUrl,
+  connectionStatus,
 }: {
   details: TaskProcessDetails;
   metricsBaseUrl?: string;
+  connectionStatus?: string;
 }) {
   const forest = buildTaskProcessForest(details.tree ?? []);
   const metricBase = metricsBaseUrl ?? "/api/v1/tasks/metrics/";
@@ -23,15 +25,9 @@ export function TaskProcessDetailsView({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="font-mono text-foreground">pid {details.pid ?? "—"}</span>
         <span>{details.status}</span>
-        <span>{details.latest.cpuPercent.toFixed(1)}% CPU</span>
-        <span>{formatBytes(details.latest.rssBytes)} RSS</span>
-        <span>{formatBytes(details.latest.vmsBytes)} VMS</span>
-        <span>{details.latest.openFiles >= 0 ? `${details.latest.openFiles} files` : "files unavailable"}</span>
+        <TaskResourceReadings details={details} {...(connectionStatus ? { connectionStatus } : {})} />
         <span>{restartLabel}</span>
         <span>{details.restartPolicy}</span>
-        <span>
-          Peak {details.peak.cpuPercent.toFixed(1)}% CPU · {formatBytes(details.peak.rssBytes)} RSS · {formatBytes(details.peak.vmsBytes)} VMS · {details.peak.openFiles >= 0 ? `${details.peak.openFiles} files` : "files unavailable"}
-        </span>
       </div>
 
       {Object.keys(details.metrics).length > 0 && (
