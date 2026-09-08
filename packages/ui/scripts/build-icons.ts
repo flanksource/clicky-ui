@@ -17,6 +17,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { optimize } from "svgo";
 
+import { createHttpClient, fetchIconifySvgs, planIconifyBatches } from "./icon-fetch";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(here, "..");
 const selectionsPath = join(pkgRoot, "icons", "icon-selections.json");
@@ -279,13 +281,53 @@ function cacheFileName(spec: string): string {
   return spec.replace(/[^a-zA-Z0-9._-]+/g, "__") + ".svg";
 }
 
-async function downloadSvg(url: string, cachePath: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  const svg = await res.text();
+function isIconifySpec(spec: string): boolean {
+  if (spec === "incumbent" || spec.startsWith("incumbent:")) return false;
+  const colon = spec.indexOf(":");
+  return colon > 0 && !spec.slice(0, colon).startsWith("jb-expui-");
+}
+
+/** Shared across every download so one rate-limited host throttles all its traffic. */
+const http = createHttpClient({
+  onRetry: ({ url, attempt, status, delayMs, reason }) =>
+    console.warn(`  retry ${attempt} in ${delayMs}ms (${status ?? "network"}, ${reason}): ${url}`),
+});
+
+/** Iconify specs the API reported as unavailable, so we fail them without re-asking. */
+const iconifyNotFound = new Set<string>();
+
+async function cacheSvg(cachePath: string, svg: string): Promise<string> {
   await mkdir(dirname(cachePath), { recursive: true });
   await writeFile(cachePath, svg);
   return svg;
+}
+
+async function downloadSvg(url: string, cachePath: string): Promise<string> {
+  const res = await http.fetch(url);
+  return cacheSvg(cachePath, await res.text());
+}
+
+/**
+ * Resolves every not-yet-cached Iconify pick up front through the batched
+ * icon-data API — one query per icon set rather than one request per icon.
+ * Each result lands in the same on-disk SVG cache `fetchSvg` reads from.
+ */
+async function prefetchIconifySvgs(specs: string[]): Promise<void> {
+  const missing = [...new Set(specs)].filter(
+    (spec) => isIconifySpec(spec) && !existsSync(join(remoteSvgCacheDir, cacheFileName(spec))),
+  );
+  if (missing.length === 0) return;
+
+  const batches = planIconifyBatches({ specs: missing });
+  console.log(`Fetching ${missing.length} icons from the Iconify API in ${batches.length} queries…`);
+  const { svgs, notFound } = await fetchIconifySvgs({ specs: missing, client: http });
+  for (const [spec, svg] of svgs) {
+    await cacheSvg(join(remoteSvgCacheDir, cacheFileName(spec)), svg);
+  }
+  for (const spec of notFound) iconifyNotFound.add(spec);
+  if (notFound.length) {
+    console.warn(`Iconify has no data for ${notFound.length} icon(s): ${notFound.join(", ")}`);
+  }
 }
 
 async function fetchSvg(spec: string, consumerName: string): Promise<string> {
@@ -321,14 +363,24 @@ async function fetchSvg(spec: string, consumerName: string): Promise<string> {
   const colon = spec.indexOf(":");
   const prefix = spec.slice(0, colon);
   const name = spec.slice(colon + 1);
-  let url: string;
   if (prefix.startsWith("jb-expui-")) {
     const dir = prefix.slice("jb-expui-".length);
-    url = `https://raw.githubusercontent.com/JetBrains/intellij-community/master/platform/icons/src/expui/${dir}/${name}.svg`;
-  } else {
-    url = `https://api.iconify.design/${prefix}/${name}.svg`;
+    return downloadSvg(
+      `https://raw.githubusercontent.com/JetBrains/intellij-community/master/platform/icons/src/expui/${dir}/${name}.svg`,
+      cachePath,
+    );
   }
-  return downloadSvg(url, cachePath);
+
+  // Iconify. The prefetch pass normally filled the cache already; a spec that
+  // reaches here missed it (or the API has no such icon).
+  if (iconifyNotFound.has(spec)) throw new Error(`iconify has no icon named "${spec}"`);
+  const { svgs, notFound } = await fetchIconifySvgs({ specs: [spec], client: http });
+  const svg = svgs.get(spec);
+  if (!svg) {
+    for (const missing of notFound) iconifyNotFound.add(missing);
+    throw new Error(`iconify has no icon named "${spec}"`);
+  }
+  return cacheSvg(cachePath, svg);
 }
 
 /**
@@ -704,6 +756,16 @@ export async function buildIcons({ force = false }: { force?: boolean } = {}): P
   }
 
   const sel: Selections = JSON.parse(await readFile(selectionsPath, "utf8"));
+
+  // Warm the SVG cache for every Iconify pick in one batched pass, before any
+  // file is written. Doing it up front keeps a cold build to a couple of dozen
+  // API queries instead of ~450, which is what keeps us under the rate limit.
+  await prefetchIconifySvgs(
+    sel.rows
+      .filter((r) => r.group !== "change-types")
+      .flatMap((r) => [r.outline, r.filled])
+      .filter((spec): spec is string => !!spec && spec !== "skip" && spec !== "maintain"),
+  );
 
   // Emit into a staging dir first, then atomically swap it in. Generation
   // fetches some SVGs over the network and can fail partway; building beside the
