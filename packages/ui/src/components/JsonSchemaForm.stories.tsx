@@ -156,7 +156,7 @@ const runtimeModeSchema: JsonSchemaObject = {
 /* eslint-enable unicorn/no-thenable */
 
 const meta = {
-  title: "Components/JsonSchemaForm",
+  title: "JsonSchemaForm/Overview",
   component: JsonSchemaForm,
   render: (args) => <FormHarness {...args} />,
   args: {
@@ -172,6 +172,12 @@ const meta = {
     hideReadOnlyFields: {
       control: "boolean",
       description: "Omit schema `readOnly: true` fields entirely instead of showing them as value displays.",
+      table: { category: "Behavior", defaultValue: { summary: "false" } },
+    },
+    hideEmpty: {
+      control: "boolean",
+      description:
+        "Omit fields whose value is empty (`undefined`/`null`/`\"\"`/`[]`/`{}`, and containers whose contents are all empty) at every depth. `false` and `0` are answers and always render.",
       table: { category: "Behavior", defaultValue: { summary: "false" } },
     },
     inline: {
@@ -619,6 +625,55 @@ export const HideReadOnlyFields: Story = {
       description: {
         story:
           "`hideReadOnlyFields` drops every `readOnly: true` field at every depth, leaving only the editable surface.",
+      },
+    },
+  },
+};
+
+const auditSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    reference: { type: "string", title: "Reference" },
+    approved: { type: "boolean", title: "Approved" },
+    attempts: { type: "integer", title: "Attempts" },
+    note: { type: "string", title: "Note" },
+    labels: { type: "array", title: "Labels", items: { type: "string" } },
+    contact: {
+      type: "object",
+      title: "Contact",
+      properties: {
+        email: { type: "string", title: "Email" },
+        phone: { type: "string", title: "Phone" },
+      },
+    },
+    billing: {
+      type: "object",
+      title: "Billing",
+      properties: { vat: { type: "string", title: "VAT number" } },
+    },
+  },
+};
+
+export const HideEmpty: Story = {
+  args: {
+    schema: auditSchema,
+    value: {
+      reference: "INV-2481",
+      approved: false,
+      attempts: 0,
+      note: "",
+      labels: [],
+      contact: { email: "ada@example.com", phone: "" },
+      billing: { vat: "" },
+    },
+    readOnly: true,
+    hideEmpty: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`hideEmpty` omits the fields the value says nothing about, at every depth. Here Note, Labels, Contact → Phone and the whole Billing section disappear, because a section whose every field is blank is itself empty. **Approved (`false`) and Attempts (`0`) stay** — they are answers, not blanks. Pair it with `readOnly` for an audit view of a submitted record: a schema wide enough to describe many records leaves most of it blank on any one of them, and the blanks say only that a field existed. Leave it off for an editable form, where a blank field is the question.",
       },
     },
   },

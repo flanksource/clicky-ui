@@ -359,7 +359,9 @@ export function StringMapControl({
                                     ...childCtx,
                                     size: propertyControlSize[ctx.size],
                                   }}
-                                  preview={<span>{keyLabel}</span>}
+                                  renderPreview={(previewField) => (
+                                    <span>{String(previewField.value)}</span>
+                                  )}
                                   renderEditor={(draft) => (
                                     <div className="flex min-w-0 items-center gap-1">
                                       {keyEditor({

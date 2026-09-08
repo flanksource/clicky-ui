@@ -160,6 +160,9 @@ export interface RenderContext extends FormErrorContext {
   hideReadOnlyFields: boolean;
   // Drop fields whose value is empty; see JsonSchemaFormProps.hideEmpty.
   hideEmpty: boolean;
+  // Commit a properties-layout edit on blur instead of parking it behind a
+  // tick/cross; see JsonSchemaFormProps.autoSave.
+  autoSave: boolean;
   // Resolved form layout (mode + inline width caps); see FormLayout.
   layout: FormLayout;
   // Form-wide size token scaling inputs and labels; see FormSize.
@@ -229,6 +232,8 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    * label column to fit (capped/truncated at 40ch) and caps the value column at
    * 600px. Properties mode renders a table with indented nested labels and
    * click-to-edit values. The inline check saves the edit; cancel discards it.
+   * Leaving the field parks the edit instead — the row shows the pending value
+   * with the check and cancel still offered. See `autoSave` to commit instead.
    */
   layout?: FormLayout;
   /**
@@ -261,6 +266,19 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    * question.
    */
   hideEmpty?: boolean;
+  /**
+   * Drop the properties layout's per-field confirm step: leaving a field or
+   * pressing Enter commits it through `onChange`, and no check/cancel pair is
+   * rendered. Escape still reverts to the saved value.
+   *
+   * Use it when the form already sits behind a save of its own, so confirming
+   * each field twice buys nothing. Left off, an edit that loses focus is parked
+   * on the row — shown, unsaved, and waiting for the check.
+   *
+   * Only the `properties` layout has a draft to commit; `stacked` and `inline`
+   * send every keystroke straight to `onChange`, so this does nothing there.
+   */
+  autoSave?: boolean;
   /** Property keys to omit from rendering. */
   hiddenKeys?: string[];
   /**
