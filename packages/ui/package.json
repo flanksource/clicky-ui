@@ -185,6 +185,7 @@
     "@mdxeditor/editor": "catalog:",
     "@oxlint/plugins": "catalog:",
     "@storybook/react-vite": "catalog:",
+    "storybook": "catalog:",
     "@tailwindcss/cli": "^4.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",

@@ -73,6 +73,18 @@ describe("TaskProgress", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "4");
   });
 
+  it("counts canceled child tasks as completed in group progress", () => {
+    const snapshots: TaskSnapshot[] = [
+      { id: "group", name: "stopped run", type: "group", status: "canceled", groupId: "group", total: 2 },
+      { id: "done", name: "completed step", type: "task", status: "success", groupId: "group" },
+      { id: "stopped", name: "canceled step", type: "task", status: "canceled", groupId: "group" },
+    ];
+
+    render(<TaskProgress snapshots={snapshots} />);
+
+    expect(screen.getByText("2/2")).toBeInTheDocument();
+  });
+
   it("renders an x/y count, percent, description, and a bar for a running task with bounded progress", () => {
     const snapshots: TaskSnapshot[] = [
       { id: "g", name: "ast all", type: "group", status: "running", groupId: "g", total: 2, running: 1 },

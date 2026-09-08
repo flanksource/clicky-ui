@@ -1593,14 +1593,18 @@ export const VirtualizedKeepsRowsWhenDataIsRebuilt: Story = {
     const canvas = within(canvasElement);
     const el = scroller(canvasElement);
 
-    el.scrollTop = 4000;
-    await waitFor(() => expect(el.scrollTop).toBe(4000));
+    const deepScrollOffset = 4000;
+    el.scrollTop = deepScrollOffset;
+    await waitFor(() =>
+      expect(canvasElement.querySelector("tbody")!.textContent).toContain("#100"),
+    );
+    const scrollTopAtDepth = el.scrollTop;
     const textAtDepth = canvasElement.querySelector("tbody")!.textContent;
 
     await userEvent.click(canvas.getByRole("button", { name: "Rebuild rows array" }));
 
-    // Same scroll offset, same rows: a new array identity is inert.
-    await expect(el.scrollTop).toBe(4000);
+    // Same settled scroll offset, same rows: a new array identity is inert.
+    await expect(el.scrollTop).toBe(scrollTopAtDepth);
     await waitFor(() =>
       expect(canvasElement.querySelector("tbody")!.textContent).toBe(
         textAtDepth,
