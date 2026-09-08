@@ -179,6 +179,8 @@
   },
   "devDependencies": {
     "@ai-sdk/react": "catalog:",
+    "@iconify/types": "catalog:",
+    "@iconify/utils": "catalog:",
     "@mdxeditor/editor": "catalog:",
     "@oxlint/plugins": "catalog:",
     "@storybook/react-vite": "catalog:",

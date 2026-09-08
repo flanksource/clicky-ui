@@ -105,7 +105,11 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./src/test/setup.ts"],
-      include: ["src/**/*.test.{ts,tsx}", "oxlint-plugins/**/*.test.{ts,tsx}"],
+      include: [
+        "src/**/*.test.{ts,tsx}",
+        "oxlint-plugins/**/*.test.{ts,tsx}",
+        "scripts/**/*.test.ts",
+      ],
       css: true,
     },
   };
