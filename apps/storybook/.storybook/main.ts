@@ -75,6 +75,7 @@ const config: StorybookConfig = {
       "@flanksource/clicky-ui > @radix-ui/react-slot",
       "@flanksource/clicky-ui > @floating-ui/react",
       "@flanksource/clicky-ui > @tanstack/react-query",
+      "@flanksource/clicky-ui > @tanstack/react-virtual",
       "@flanksource/clicky-ui > jotai",
       "@flanksource/clicky-ui > dompurify",
       // Both entry points CountryPicker/CountryFlag reach for — the bare package

@@ -122,7 +122,7 @@ function TaskGroupCard({
   const work = taskWorkProgress(g);
   const total = g.work ? work.total : g.total ?? tasks.length;
   const counts = g.work ? work.counts : bucketTasks(tasks);
-  const done = counts.ok + counts.warn + counts.fail;
+  const done = counts.ok + counts.warn + counts.fail + counts.canceled;
   const progress = g.work ? work.label : total > 0 ? `${done}/${total}` : "";
 
   const running = tasks.filter((t) => t.status === "running");

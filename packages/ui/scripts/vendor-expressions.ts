@@ -14,7 +14,7 @@
  *   pnpm vendor:expressions                          # from github.com/flanksource/gomplate@main
  *   pnpm vendor:expressions --ref v3.2.0             # from a tag
  *   pnpm vendor:expressions --from ../../../gomplate # from a local checkout
- *   pnpm vendor:expressions:check                    # fail if the tree is out of date
+ *   pnpm vendor:expressions:check                    # compare with the recorded upstream commit
  */
 import { execFileSync } from "node:child_process";
 import {
@@ -29,6 +29,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveVendorRef } from "./vendor-expressions-ref";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -41,20 +42,36 @@ const DEFAULT_REMOTE = "https://github.com/flanksource/gomplate.git";
 const SOURCE_SUBPATH = join("web", "packages", "lang", "src");
 const GENERATED_SUBPATH = join(SOURCE_SUBPATH, "generated");
 
-interface Args {
+interface ParsedArgs {
   from: string;
-  ref: string;
+  ref?: string;
   check: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = { from: DEFAULT_REMOTE, ref: "main", check: false };
+interface Args extends ParsedArgs {
+  ref: string;
+}
+
+interface VendorOptions {
+  args: Args;
+  destination: string;
+  generate: boolean;
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
+  const args: ParsedArgs = { from: DEFAULT_REMOTE, check: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === "--check") args.check = true;
-    else if (flag === "--from") args.from = argv[(i += 1)] ?? args.from;
-    else if (flag === "--ref") args.ref = argv[(i += 1)] ?? args.ref;
-    else throw new Error(`unknown argument ${flag}`);
+    else if (flag === "--from") {
+      const value = argv[(i += 1)];
+      if (!value) throw new Error("--from requires a repository URL or local path");
+      args.from = value;
+    } else if (flag === "--ref") {
+      const value = argv[(i += 1)];
+      if (!value) throw new Error("--ref requires a branch, tag, or commit");
+      args.ref = value;
+    } else throw new Error(`unknown argument ${flag}`);
   }
   return args;
 }
@@ -83,12 +100,11 @@ function checkout(args: Args): { dir: string; cleanup: () => void } {
   }
 
   const dir = scratchDirectory("gomplate-vendor-");
-  console.log(`[vendor] cloning ${args.from}@${args.ref}`);
-  run(
-    "git",
-    ["clone", "--depth", "1", "--branch", args.ref, args.from, dir],
-    packageRoot,
-  );
+  console.log(`[vendor] checking out ${args.from}@${args.ref}`);
+  run("git", ["init", "--quiet", dir], packageRoot);
+  run("git", ["-C", dir, "remote", "add", "origin", args.from], packageRoot);
+  run("git", ["-C", dir, "fetch", "--depth", "1", "origin", args.ref], packageRoot);
+  run("git", ["-C", dir, "checkout", "--quiet", "--detach", "FETCH_HEAD"], packageRoot);
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
@@ -98,15 +114,17 @@ function describe(dir: string): string {
   return dirty ? `${sha} (dirty working tree)` : sha;
 }
 
-function vendor(args: Args, destination: string) {
+function vendor({ args, destination, generate }: VendorOptions) {
   const { dir, cleanup } = checkout(args);
   try {
-    console.log("[vendor] running genmonarch");
-    run(
-      "go",
-      ["run", "./cmd/genmonarch", "-out", join(dir, GENERATED_SUBPATH)],
-      dir,
-    );
+    if (generate) {
+      console.log("[vendor] running genmonarch");
+      run(
+        "go",
+        ["run", "./cmd/genmonarch", "-out", join(dir, GENERATED_SUBPATH)],
+        dir,
+      );
+    }
 
     rmSync(destination, { recursive: true, force: true });
     cpSync(join(dir, SOURCE_SUBPATH), destination, { recursive: true });
@@ -125,19 +143,27 @@ function stampFor(source: string, args: Args) {
   ].join("\n");
 }
 
-const args = parseArgs(process.argv.slice(2));
+const parsedArgs = parseArgs(process.argv.slice(2));
+const args: Args = {
+  ...parsedArgs,
+  ref: resolveVendorRef({
+    check: parsedArgs.check,
+    stamp: parsedArgs.check ? readFileSync(stamp, "utf8") : "",
+    ...(parsedArgs.ref ? { explicitRef: parsedArgs.ref } : {}),
+  }),
+};
 
 if (!args.check) {
-  const source = vendor(args, target);
+  const source = vendor({ args, destination: target, generate: true });
   writeFileSync(stamp, stampFor(source, args));
   console.log(`[vendor] vendored ${source}`);
 } else {
-  // Regenerate into a scratch directory and compare, so a hand-edit under
-  // src/expressions/lang or stale vendoring fails CI rather than shipping.
+  // Compare with the source tree committed at the recorded revision, so a
+  // hand-edit or mismatched VENDOR stamp fails independently of Go versions.
   const scratch = scratchDirectory("gomplate-vendor-check-");
   try {
     const fresh = join(scratch, "lang");
-    vendor(args, fresh);
+    vendor({ args, destination: fresh, generate: false });
 
     const diff = diffTrees(target, fresh);
     if (diff.length > 0) {

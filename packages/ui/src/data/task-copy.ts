@@ -57,7 +57,7 @@ function groupHeader(group: TaskSnapshot, tasks: TaskSnapshot[]): string[] {
   const counts = bucketTasks(tasks);
   const total = group.total ?? tasks.length;
   const summary = [`status: ${group.status}`];
-  if (total > 0) summary.push(`${counts.ok + counts.warn + counts.fail}/${total}`);
+  if (total > 0) summary.push(`${counts.ok + counts.warn + counts.fail + counts.canceled}/${total}`);
   if (group.kind) summary.push(`kind: ${group.kind}`);
 
   const lines = [`# ${group.name}`, summary.join(" · ")];
