@@ -23,6 +23,7 @@ Legend: ✅ present · ❌ missing · ➖ covered by a family/combined demo or n
 | Button | ✅ | ✅ | — |
 | Loading / LoadingDots | ✅ | ✅ | done |
 | IconButton | ✅ | ✅ | done |
+| CopyButton | ✅ | ➖ | — |
 | SplitButton | ✅ | ➖ | — |
 | SegmentedControl | ✅ | ✅ | — |
 | SearchInput | ✅ | ✅ | — |
@@ -143,6 +144,12 @@ Legend: ✅ present · ❌ missing · ➖ covered by a family/combined demo or n
 | TestRunSummary | ✅ | ➖ | done |
 | TestTree | ✅ | ➖ | done |
 | TestTreeNode | ✅ | ➖ | done |
+
+### data/verification/
+
+| Component | Story | Demo | Priority |
+|---|---|---|---|
+| VerificationResults | ✅ | ➖ | — |
 
 ### data/cache-browser/
 
