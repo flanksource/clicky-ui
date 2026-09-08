@@ -145,6 +145,7 @@
     "build": "pnpm run build:icons && vite build && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
+    "download:icons": "tsx scripts/download-icons.ts",
     "build:storybook-schemas": "tsx scripts/build-storybook-schemas.ts",
     "check:declarations": "node scripts/check-declarations.mjs",
     "check:expression-exports": "node scripts/check-expression-exports.mjs",

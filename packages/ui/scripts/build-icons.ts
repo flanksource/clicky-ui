@@ -2,8 +2,8 @@
  * Codegen for @flanksource/clicky-ui/icons.
  *
  * Reads icons/icon-selections.json from the package root, resolves each pick
- * (Phosphor / JetBrains expui / Iconify alternate / incumbent SVG cache),
- * fetches missing source SVGs, normalizes them to 24×24 viewBox with `currentColor`
+ * (Phosphor / JetBrains expui / Iconify alternate / incumbent vendored SVG),
+ * reads source SVGs offline, normalizes them to 24×24 viewBox with `currentColor`
  * fills/strokes for the outline variant (so `text-*` classes propagate),
  * and emits one React component file per icon plus a barrel index.
  *
@@ -13,21 +13,21 @@
  */
 import { mkdir, writeFile, rm, rename, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { optimize } from "svgo";
 
-import { createHttpClient, fetchIconifySvgs, planIconifyBatches } from "./icon-fetch";
+import {
+  packageRoot,
+  readIconSource,
+  resolveAliasTarget,
+  selectionsPath,
+  type SelectionRow,
+  type Selections,
+} from "./icon-sources";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const pkgRoot = join(here, "..");
-const selectionsPath = join(pkgRoot, "icons", "icon-selections.json");
-const svgIncumbentDir = join(pkgRoot, "icons", "svg");
-const iconsRoot = join(pkgRoot, "src", "icons");
-const noticePath = join(pkgRoot, "NOTICE.md");
-const remoteSvgCacheDir = join(svgIncumbentDir, "remote");
-const flanksourceIconsRawBase =
-  "https://raw.githubusercontent.com/flanksource/flanksource-icons/main/svg";
+const iconsRoot = join(packageRoot, "src", "icons");
+const noticePath = join(packageRoot, "NOTICE.md");
 
 /** Whether a prior run already emitted the full generated `src/icons/` tree. */
 function generatedIconsPresent(): boolean {
@@ -39,17 +39,6 @@ function generatedIconsPresent(): boolean {
     existsSync(noticePath)
   );
 }
-
-type SelectionRow = {
-  consumerName: string;
-  group: string;
-  status: "NEW" | "EXISTS" | "ALIAS";
-  outline: string | null;
-  filled: string | null;
-  note: string;
-};
-
-type Selections = { rows: SelectionRow[] };
 
 const SHAPE_TAGS = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline", "line"]);
 
@@ -264,123 +253,6 @@ function stripUirPrefix(name: string): string {
   if (name.startsWith("uir-sql-")) return "sql-" + name.slice("uir-sql-".length);
   if (name.startsWith("uir-")) return name.slice("uir-".length);
   return name;
-}
-
-function resolveAliasTarget(consumerName: string): string | null {
-  // "x -> close" → "close"; "person -> user" → "user"; etc.
-  const arrow = consumerName.indexOf(" -> ");
-  if (arrow < 0) return null;
-  // Strip any trailing parenthetical: "stopwatch -> watch (timer)" → "watch"
-  return consumerName
-    .slice(arrow + 4)
-    .replace(/\s*\(.*\)\s*$/, "")
-    .trim();
-}
-
-function cacheFileName(spec: string): string {
-  return spec.replace(/[^a-zA-Z0-9._-]+/g, "__") + ".svg";
-}
-
-function isIconifySpec(spec: string): boolean {
-  if (spec === "incumbent" || spec.startsWith("incumbent:")) return false;
-  const colon = spec.indexOf(":");
-  return colon > 0 && !spec.slice(0, colon).startsWith("jb-expui-");
-}
-
-/** Shared across every download so one rate-limited host throttles all its traffic. */
-const http = createHttpClient({
-  onRetry: ({ url, attempt, status, delayMs, reason }) =>
-    console.warn(`  retry ${attempt} in ${delayMs}ms (${status ?? "network"}, ${reason}): ${url}`),
-});
-
-/** Iconify specs the API reported as unavailable, so we fail them without re-asking. */
-const iconifyNotFound = new Set<string>();
-
-async function cacheSvg(cachePath: string, svg: string): Promise<string> {
-  await mkdir(dirname(cachePath), { recursive: true });
-  await writeFile(cachePath, svg);
-  return svg;
-}
-
-async function downloadSvg(url: string, cachePath: string): Promise<string> {
-  const res = await http.fetch(url);
-  return cacheSvg(cachePath, await res.text());
-}
-
-/**
- * Resolves every not-yet-cached Iconify pick up front through the batched
- * icon-data API — one query per icon set rather than one request per icon.
- * Each result lands in the same on-disk SVG cache `fetchSvg` reads from.
- */
-async function prefetchIconifySvgs(specs: string[]): Promise<void> {
-  const missing = [...new Set(specs)].filter(
-    (spec) => isIconifySpec(spec) && !existsSync(join(remoteSvgCacheDir, cacheFileName(spec))),
-  );
-  if (missing.length === 0) return;
-
-  const batches = planIconifyBatches({ specs: missing });
-  console.log(`Fetching ${missing.length} icons from the Iconify API in ${batches.length} queries…`);
-  const { svgs, notFound } = await fetchIconifySvgs({ specs: missing, client: http });
-  for (const [spec, svg] of svgs) {
-    await cacheSvg(join(remoteSvgCacheDir, cacheFileName(spec)), svg);
-  }
-  for (const spec of notFound) iconifyNotFound.add(spec);
-  if (notFound.length) {
-    console.warn(`Iconify has no data for ${notFound.length} icon(s): ${notFound.join(", ")}`);
-  }
-}
-
-async function fetchSvg(spec: string, consumerName: string): Promise<string> {
-  // "incumbent" → svg/<consumerName>.svg
-  // "incumbent:<filename>" → svg/<filename>.svg (lets aliases reuse another row's incumbent)
-  if (spec === "incumbent" || spec.startsWith("incumbent:")) {
-    const explicit = spec.startsWith("incumbent:") ? spec.slice("incumbent:".length) : null;
-    // Try the explicit override first; otherwise the consumer name; otherwise
-    // strip a known prefix (e.g. change-diff → diff) and try again.
-    const candidates = explicit
-      ? [explicit]
-      : [consumerName, consumerName.replace(/^change-/, "").replace(/^uir-(sql-)?/, "")];
-    for (const candidate of candidates) {
-      const path = join(svgIncumbentDir, `${candidate}.svg`);
-      if (existsSync(path)) return readFile(path, "utf8");
-    }
-    let lastError: unknown;
-    for (const candidate of candidates) {
-      const cachePath = join(svgIncumbentDir, `${candidate}.svg`);
-      try {
-        return await downloadSvg(`${flanksourceIconsRawBase}/${candidate}.svg`, cachePath);
-      } catch (err) {
-        lastError = err;
-      }
-    }
-    throw new Error(
-      `incumbent svg missing for "${consumerName}" (tried: ${candidates.join(", ")}): ${String(lastError)}`,
-    );
-  }
-  const cachePath = join(remoteSvgCacheDir, cacheFileName(spec));
-  if (existsSync(cachePath)) return readFile(cachePath, "utf8");
-
-  const colon = spec.indexOf(":");
-  const prefix = spec.slice(0, colon);
-  const name = spec.slice(colon + 1);
-  if (prefix.startsWith("jb-expui-")) {
-    const dir = prefix.slice("jb-expui-".length);
-    return downloadSvg(
-      `https://raw.githubusercontent.com/JetBrains/intellij-community/master/platform/icons/src/expui/${dir}/${name}.svg`,
-      cachePath,
-    );
-  }
-
-  // Iconify. The prefetch pass normally filled the cache already; a spec that
-  // reaches here missed it (or the API has no such icon).
-  if (iconifyNotFound.has(spec)) throw new Error(`iconify has no icon named "${spec}"`);
-  const { svgs, notFound } = await fetchIconifySvgs({ specs: [spec], client: http });
-  const svg = svgs.get(spec);
-  if (!svg) {
-    for (const missing of notFound) iconifyNotFound.add(missing);
-    throw new Error(`iconify has no icon named "${spec}"`);
-  }
-  return cacheSvg(cachePath, svg);
 }
 
 /**
@@ -757,19 +629,8 @@ export async function buildIcons({ force = false }: { force?: boolean } = {}): P
 
   const sel: Selections = JSON.parse(await readFile(selectionsPath, "utf8"));
 
-  // Warm the SVG cache for every Iconify pick in one batched pass, before any
-  // file is written. Doing it up front keeps a cold build to a couple of dozen
-  // API queries instead of ~450, which is what keeps us under the rate limit.
-  await prefetchIconifySvgs(
-    sel.rows
-      .filter((r) => r.group !== "change-types")
-      .flatMap((r) => [r.outline, r.filled])
-      .filter((spec): spec is string => !!spec && spec !== "skip" && spec !== "maintain"),
-  );
-
-  // Emit into a staging dir first, then atomically swap it in. Generation
-  // fetches some SVGs over the network and can fail partway; building beside the
-  // live tree means a failure never leaves `src/icons/` half-written or deleted.
+  // Emit into a staging dir first, then atomically swap it in. Building beside
+  // the live tree means a failure never leaves `src/icons/` half-written.
   const stagingRoot = `${iconsRoot}.tmp`;
   const stagingComponents = join(stagingRoot, "components");
   await rm(stagingRoot, { recursive: true, force: true });
@@ -978,8 +839,13 @@ export async function buildIcons({ force = false }: { force?: boolean } = {}): P
     for (const v of variants) {
       const compName = baseName + v.suffix;
       try {
-        const raw = await fetchSvg(v.spec, cleanConsumer);
-        const { inner, viewBox } = normalizeSvg(raw, { recolor: shouldRecolor(v.spec) });
+        const raw = await readIconSource({
+          spec: v.spec,
+          consumerName: cleanConsumer,
+        });
+        const { inner, viewBox } = normalizeSvg(raw, {
+          recolor: shouldRecolor(v.spec),
+        });
         variantPayload[v.slot] = { inner, viewBox, spec: v.spec };
         const defaultColor = DEFAULT_COLORS[baseName];
         // Component body: when this component has a default semantic color,
@@ -1074,6 +940,13 @@ export async function buildIcons({ force = false }: { force?: boolean } = {}): P
     const file = `${baseName}.tsx`;
     await writeFile(join(stagingComponents, file), parts.join("\n"));
     for (const c of componentNames) generated.push({ component: c, file });
+  }
+
+  if (failures.length > 0) {
+    await rm(stagingRoot, { recursive: true, force: true });
+    throw new Error(
+      `Icon generation failed:\n${failures.map((failure) => `  ${failure.row}: ${failure.reason}`).join("\n")}`,
+    );
   }
 
   // types.ts — single shared IconProps definition.
@@ -1243,10 +1116,6 @@ export function getChangeIcon(
   if (skippedCollisions.length) {
     console.log(`\nSkipped due to name collision (${skippedCollisions.length}):`);
     for (const s of skippedCollisions) console.log("  " + s);
-  }
-  if (failures.length) {
-    console.log(`\nFailures (${failures.length}):`);
-    for (const f of failures) console.log(`  ${f.row}: ${f.reason}`);
   }
 }
 
