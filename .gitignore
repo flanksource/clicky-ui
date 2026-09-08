@@ -32,10 +32,9 @@ pnpm-debug.log*
 # Storybook
 storybook-static/
 
-# Generated icon output/cache
+# Generated icon output; source SVGs under packages/ui/icons/svg are vendored.
 packages/ui/NOTICE.md
 packages/ui/src/icons/
-packages/ui/icons/svg/
 
 # Playground feedback (local scratch notes)
 apps/playground/.playground/

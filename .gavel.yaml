@@ -4,6 +4,20 @@ commit:
   compatibilityPrompt: {}
   functionalityRemovedPrompt: {}
   groupingPrompt: {}
+  hooks:
+  - name: vendor-icon-sources
+    run: |
+      set -e
+      pnpm --filter @flanksource/clicky-ui download:icons
+      git add packages/ui/icons/svg
+    files:
+    - .gitignore
+    - packages/ui/icons/icon-selections.json
+    - packages/ui/icons/svg/**/*.svg
+    - packages/ui/package.json
+    - packages/ui/scripts/build-icons.ts
+    - packages/ui/scripts/download-icons.ts
+    - packages/ui/scripts/icon-sources.ts
   linkedDeps: {}
   lint: {}
   messagePrompt: {}
