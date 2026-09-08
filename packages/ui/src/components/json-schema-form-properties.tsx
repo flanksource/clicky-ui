@@ -29,14 +29,17 @@ export function PropertyValueEditor({
   fieldId,
   ctx,
   renderEditor,
-  preview,
+  renderPreview,
   actionsPlacement = "inline",
 }: {
   field: FieldControl;
   fieldId: string;
   ctx: RenderContext;
   renderEditor: (field: FieldControl, ctx: RenderContext) => ReactNode;
-  preview: ReactNode;
+  // Takes the field so a parked edit can be previewed through the same
+  // post-extension pipeline as the saved value, rather than the saved value
+  // being baked into a node the editor cannot re-render.
+  renderPreview: (field: FieldControl) => ReactNode;
   actionsPlacement?: "inline" | "row";
 }) {
   const actionsTarget = useContext(PropertyActionsContext);
@@ -51,6 +54,17 @@ export function PropertyValueEditor({
   const dirty = rootDraft
     ? !propertyValuesEqual(rootDraft, ctx.rootValue)
     : !propertyValuesEqual(draft, field.value);
+  // A draft that outlived its editor. Leaving a field is not a decision to
+  // discard the answer, so the row shows the pending value read-only and keeps
+  // offering the check and cancel. autoSave commits on the way out instead, so
+  // nothing is ever left parked.
+  const pending = !editing && dirty && !readOnly && !ctx.autoSave;
+  // accept() can run from the blur timeout, a tick after the render that
+  // installed it — and NumberControl coerces its text through onChange (which
+  // here is setDraft) during that same blur. Committing the closed-over draft
+  // would save the pre-coercion value, so the commit reads the latest.
+  const latest = useRef({ draft, rootDraft, dirty });
+  latest.current = { draft, rootDraft, dirty };
   useEffect(() => {
     if (!editing && restoringFocus.current) {
       trigger.current?.focus();
@@ -80,18 +94,32 @@ export function PropertyValueEditor({
     observer.observe(container, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [editing]);
-  const finish = () => {
-    restoringFocus.current = true;
-    setEditing(false);
-  };
-  const accept = () => {
-    if (rootDraft) ctx.onRootChange?.(rootDraft);
-    else field.onChange(draft);
-    finish();
-  };
-  const start = () => {
+  // Three ways out of the editor, differing in what happens to the draft:
+  // revert throws it away, park keeps it on the row unsaved, accept commits it.
+  const revert = ({ restoreFocus }: { restoreFocus: boolean }) => {
     setDraft(field.value);
     setRootDraft(undefined);
+    restoringFocus.current = restoreFocus;
+    setEditing(false);
+  };
+  const park = () => {
+    restoringFocus.current = false;
+    setEditing(false);
+  };
+  const accept = ({ restoreFocus }: { restoreFocus: boolean }) => {
+    const { draft: value, rootDraft: root } = latest.current;
+    if (root) ctx.onRootChange?.(root);
+    else field.onChange(value);
+    restoringFocus.current = restoreFocus;
+    setEditing(false);
+  };
+  const start = () => {
+    // Re-opening a parked row must find the draft it parked, not the value the
+    // draft was meant to replace.
+    if (!pending) {
+      setDraft(field.value);
+      setRootDraft(undefined);
+    }
     setEditing(true);
   };
   const acceptAndAdvance = () => {
@@ -105,7 +133,7 @@ export function PropertyValueEditor({
       ).filter((node) => node.closest("[data-json-schema-form]") === form);
     const nextIndex = fields().indexOf(container) + 1;
     const nextField = fields()[nextIndex]?.dataset.propertyEditor;
-    flushSync(accept);
+    flushSync(() => accept({ restoreFocus: true }));
     const updatedFields = fields();
     const next =
       updatedFields.find((node) => node.dataset.propertyEditor === nextField) ??
@@ -128,7 +156,7 @@ export function PropertyValueEditor({
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      finish();
+      revert({ restoreFocus: true });
     } else if (
       event.key === "Enter" &&
       !event.shiftKey &&
@@ -145,8 +173,10 @@ export function PropertyValueEditor({
       acceptAndAdvance();
     }
   };
-  if (editing) {
-    const actions = dirty ? (
+  // Offered while editing a changed value and while that change sits parked, so
+  // the same pair confirms an edit whether or not the field still has focus.
+  const actions =
+    dirty && !readOnly && !ctx.autoSave ? (
       <>
         <IconButton
           icon={UiCheck}
@@ -155,7 +185,7 @@ export function PropertyValueEditor({
             "w-6 text-[var(--fs-success)] hover:text-[var(--fs-success-700)]",
             controlHeightClass[ctx.size],
           )}
-          onClick={accept}
+          onClick={() => accept({ restoreFocus: true })}
         />
         <IconButton
           icon={UiClose}
@@ -164,10 +194,15 @@ export function PropertyValueEditor({
             "w-6 text-destructive hover:text-destructive",
             controlHeightClass[ctx.size],
           )}
-          onClick={finish}
+          onClick={() => revert({ restoreFocus: true })}
         />
       </>
     ) : null;
+  const placedActions =
+    actionsPlacement === "row"
+      ? actionsTarget && createPortal(actions, actionsTarget)
+      : actions;
+  if (editing) {
     return (
       <div
         ref={editor}
@@ -180,8 +215,9 @@ export function PropertyValueEditor({
           focusWithin.current = false;
           setTimeout(() => {
             if (!focusWithin.current && editor.current?.isConnected) {
-              restoringFocus.current = false;
-              setEditing(false);
+              if (ctx.autoSave && latest.current.dirty)
+                accept({ restoreFocus: false });
+              else park();
             }
           }, 0);
         }}
@@ -236,13 +272,11 @@ export function PropertyValueEditor({
             },
           )}
         </div>
-        {actionsPlacement === "row"
-          ? actionsTarget && createPortal(actions, actionsTarget)
-          : actions}
+        {placedActions}
       </div>
     );
   }
-  return (
+  const collapsed = (
     <div
       ref={trigger}
       id={fieldId}
@@ -281,8 +315,17 @@ export function PropertyValueEditor({
       }}
     >
       <div className="pointer-events-none [&_*]:pointer-events-none">
-        {preview}
+        {renderPreview(pending ? { ...field, value: draft } : field)}
       </div>
+    </div>
+  );
+  if (!pending) return collapsed;
+  // The actions sit outside the trigger, or clicking either of them would count
+  // as clicking the row and re-open the editor underneath them.
+  return (
+    <div className="flex min-w-0 items-start gap-1">
+      <div className="min-w-0 flex-1">{collapsed}</div>
+      {placedActions}
     </div>
   );
 }

@@ -220,9 +220,9 @@ function buildField(
   ));
   if (ctx.layout.mode === "properties" && !nestedProperty && field.kind !== "display" && field.kind !== "link") {
     value = <PropertyValueEditor field={field} fieldId={fieldId} ctx={valueCtx}
-      preview={applyPostExtensions(
-        { ...field, readOnly: true },
-        { label, value: <PropertyValuePreview field={field} fieldId={`${fieldId}-preview`} ctx={{ ...valueCtx, idPrefix: `${ctx.idPrefix ?? ""}-preview` }} /> },
+      renderPreview={(previewField) => applyPostExtensions(
+        { ...previewField, readOnly: true },
+        { label, value: <PropertyValuePreview field={previewField} fieldId={`${fieldId}-preview`} ctx={{ ...valueCtx, idPrefix: `${ctx.idPrefix ?? ""}-preview` }} /> },
         ctx.post,
         postCtx,
       ).value}

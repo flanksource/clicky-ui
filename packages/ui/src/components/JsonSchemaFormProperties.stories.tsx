@@ -67,15 +67,23 @@ const schema: JsonSchemaObject = {
 };
 
 const meta = {
-  title: "Forms/JsonSchemaForm/Properties",
+  title: "JsonSchemaForm/Properties",
   component: JsonSchemaForm,
   parameters: {
     layout: "padded",
     docs: {
       description: {
         component:
-          'Use layout={{ mode: "properties" }} for a property table with indented labels and aligned values. Previews render content only: selected tags and labels, rendered Markdown, collection contents, and extensions (post-extensions receive readOnly: true), without input borders, carets, or resize handles. Click a value to open its schema control. The inline check saves changes through onChange; cancel discards the draft. Sizes XS–XL scale cell padding independently; XL matches the original Medium cell height. Read-only values cannot be edited.',
+          'Use layout={{ mode: "properties" }} for a property table with indented labels and aligned values. Previews render content only: selected tags and labels, rendered Markdown, collection contents, and extensions (post-extensions receive readOnly: true), without input borders, carets, or resize handles. Click a value to open its schema control. The inline check saves changes through onChange; cancel discards the draft. Leaving a field parks an unsaved edit on the row rather than discarding it — see the PendingEdit story — unless autoSave is set, which commits on the way out instead. Sizes XS–XL scale cell padding independently; XL matches the original Medium cell height. Read-only values cannot be edited.',
       },
+    },
+  },
+  argTypes: {
+    autoSave: {
+      control: "boolean",
+      description:
+        "Drop the per-field confirm step: blur and Enter commit through `onChange` and no check/cancel is rendered. Escape still reverts. Only meaningful in the properties layout.",
+      table: { category: "Behavior", defaultValue: { summary: "false" } },
     },
   },
   args: { schema, layout: { mode: "properties" }, persistPreferences: false },
@@ -112,8 +120,9 @@ function FieldTypesExample(args: JsonSchemaFormProps) {
       <p className="text-sm text-muted-foreground">
         Click or Tab to an editable value. Enter saves and opens the next field,
         skipping action buttons. The inline check saves in place; Escape or
-        cancel discards the draft. Leaving the editor also discards unsaved
-        changes and restores presentation mode. The inline check and cancel
+        cancel discards the draft. Leaving the editor parks an unsaved change
+        instead: the row returns to presentation showing the pending value, and
+        the check and cancel stay until you decide. The inline check and cancel
         appear only while the draft differs from the saved value. Open pickers
         handle their own keys first; Shift+Enter inserts a newline. The
         committed value below changes only when saved.
@@ -290,6 +299,36 @@ export const FilteringValues: Story = {
       description: {
         story:
           "Search service, internal, localhost, false, or 75. Searches keys, titles, committed scalar values, tags, and nested values without changing the form data. A nested match retains its containing group. Password contents are not searchable; Clear filter restores the complete form.",
+      },
+    },
+  },
+};
+
+export const PendingEdit: Story = {
+  render: FieldTypesExample,
+  args: { schema: allPropertiesSchema, value: allPropertiesValues },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Edit a value and then click or Tab straight to another row without confirming. The edit is **parked**, not lost: the row returns to its presentation rendering but shows the pending value, and the check and cancel stay beside it. Click the value again to reopen the control on the draft, the check to commit it, or the cancel to put the saved value back. The Committed value below moves only when you commit — leaving a field never calls `onChange`.",
+      },
+    },
+  },
+};
+
+export const AutoSave: Story = {
+  render: FieldTypesExample,
+  args: {
+    schema: allPropertiesSchema,
+    value: allPropertiesValues,
+    autoSave: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The same form with `autoSave`. There is no check or cancel at all: leaving a field or pressing Enter commits it, so the Committed value below tracks every edit as you move through the form. Escape still abandons the field you are in. Use this where the form already sits behind a save of its own and confirming each field twice buys nothing.",
       },
     },
   },

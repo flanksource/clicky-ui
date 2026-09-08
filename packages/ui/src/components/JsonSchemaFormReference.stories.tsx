@@ -318,7 +318,7 @@ const discriminatorSchema: JsonSchemaObject = {
 /* eslint-enable unicorn/no-thenable */
 
 const meta = {
-  title: "Components/JsonSchemaForm/Schema Reference",
+  title: "JsonSchemaForm/Schema Reference",
   parameters: {
     layout: "fullscreen",
     docs: {
