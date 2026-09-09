@@ -23,6 +23,37 @@ describe("TaskMetadata", () => {
     expect(screen.queryByRole("link", { name: "idle" })).toBeNull();
   });
 
+  // Metadata is whatever JSON reached the client over the task API or the SSE
+  // stream. A key that means "destination" is not a promise that the value is
+  // one: linked as-is, these navigate nowhere and run something instead.
+  it("refuses to link a value that would run rather than navigate", () => {
+    render(
+      <TaskMetadata
+        metadata={{
+          url: "javascript:alert(document.cookie)",
+          href: "data:text/html,<script>alert(1)</script>",
+          // A browser strips the tab before reading the scheme; so does this.
+          link: "java\tscript:alert(1)",
+          // Protocol-relative — an off-site URL wearing a path's clothes.
+          logs: "//evil.example/steal",
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("javascript:alert(document.cookie)")).toBeInTheDocument();
+  });
+
+  it("still links the destinations that are only destinations", () => {
+    render(<TaskMetadata metadata={{ url: "https://example.com/runs/7", href: "/todos/5d9f1d2a" }} />);
+
+    expect(screen.getByRole("link", { name: "https://example.com/runs/7" })).toHaveAttribute(
+      "href",
+      "https://example.com/runs/7",
+    );
+    expect(screen.getByRole("link", { name: "/todos/5d9f1d2a" })).toBeInTheDocument();
+  });
+
   // The reason metadata is JSON rather than a string map: a nested value has to
   // keep its structure instead of being flattened into something that only looks
   // like a label.

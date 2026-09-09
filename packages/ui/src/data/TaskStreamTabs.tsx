@@ -21,8 +21,45 @@ export interface TaskStreamTab {
  * Contributes host-owned panes for one task. Return [] for tasks it cannot
  * serve. The group is passed alongside because identity — kind, labels, href —
  * lives on the group snapshot, not on the child task row.
+ *
+ * Ids must be unique, and `stdout` and `stderr` belong to the process's own
+ * streams: a pane claiming one of those would take the place of output nothing
+ * else can show.
  */
 export type TaskExtraTabs = (task: TaskSnapshot, group: TaskSnapshot) => TaskStreamTab[];
+
+/** Ids this component renders itself, from the task's own streams. */
+const BUILT_IN_TAB_IDS = ["stdout", "stderr"];
+
+/** Said once per id: a task row re-renders on every frame the run sends. */
+const warnedTabIds = new Set<string>();
+
+function warnTakenTabId(id: string) {
+  if (warnedTabIds.has(id)) return;
+  warnedTabIds.add(id);
+  console.warn(`TaskStreamTabs: dropped an extra tab claiming the id "${id}", which is already taken`);
+}
+
+/**
+ * Host panes that can be told apart. A tab is addressed by its id — it is the
+ * React key, and what a click selects — so a repeat of one, or of a built-in
+ * stream's, does not name a second pane: it hides the first one that answers to
+ * that id. Dropping the later claim keeps every remaining pane reachable, and
+ * says so, rather than rendering a strip whose tabs do not all work.
+ */
+function uniqueHostTabs(extraTabs: TaskStreamTab[]): TaskStreamTab[] {
+  const taken = new Set(BUILT_IN_TAB_IDS);
+  const tabs: TaskStreamTab[] = [];
+  for (const tab of extraTabs) {
+    if (taken.has(tab.id)) {
+      warnTakenTabId(tab.id);
+      continue;
+    }
+    taken.add(tab.id);
+    tabs.push(tab);
+  }
+  return tabs;
+}
 
 function TaskStreamPane({ text, truncated, error }: { text: string; truncated?: boolean; error?: boolean }) {
   return (
@@ -43,7 +80,7 @@ function TaskStreamPane({ text, truncated, error }: { text: string; truncated?: 
  * not grow a tab strip it has no use for.
  */
 export function TaskStreamTabs({ task, extraTabs }: { task: TaskSnapshot; extraTabs?: TaskStreamTab[] }) {
-  const tabs: TaskStreamTab[] = [...(extraTabs ?? [])];
+  const tabs: TaskStreamTab[] = uniqueHostTabs(extraTabs ?? []);
   const stdout = task.stdout;
   const stderr = task.stderr;
   if (stdout) {
