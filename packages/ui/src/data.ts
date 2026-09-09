@@ -360,11 +360,18 @@ export {
   type LogEntry,
   type TaskControlAction,
   type TaskExecDetails,
+  type TaskProcessDetails,
+  type TaskResourceLimits,
   type TaskSnapshot,
   type TaskRunMeta,
   isTerminalStatus,
   allGroupsTerminal,
 } from "./data/TaskSnapshot";
+export {
+  TaskStreamTabs,
+  type TaskExtraTabs,
+  type TaskStreamTab,
+} from "./data/TaskStreamTabs";
 export {
   taskStatusColor,
   taskStatusIcon,

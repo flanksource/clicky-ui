@@ -40,6 +40,15 @@ export interface TaskProcessSample {
   openFiles: number;
 }
 
+/** Runaway bounds a supervised process is killed for exceeding. */
+export interface TaskResourceLimits {
+  maxRssBytes?: number;
+  maxCpuPercent?: number;
+  cpuSampleCount?: number;
+  /** Sampling cadence as a Go duration string, e.g. "2s". */
+  interval?: string;
+}
+
 export interface TaskProcessDetails {
   pid?: number;
   command: string;
@@ -51,10 +60,16 @@ export interface TaskProcessDetails {
   restarts: number;
   restartPolicy: string;
   maxRestarts?: number;
+  limits?: TaskResourceLimits;
   latest: TaskResourceSnapshot;
   peak: TaskResourceSnapshot;
   metrics: Record<string, string>;
   tree?: TaskProcessSample[];
+  /**
+   * Caller-supplied context, re-read on every snapshot. The producer chooses
+   * the keys; this module gives them no meaning beyond "show them".
+   */
+  annotations?: Record<string, string>;
 }
 
 export interface TaskExecDetails {
