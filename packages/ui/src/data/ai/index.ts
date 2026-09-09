@@ -370,12 +370,12 @@ export {
   type SessionInspectorProps,
   type SessionInspectorTab,
 } from "./SessionInspector";
+export { SessionApprovalsPanel } from "./SessionInspector.approvals";
 export {
-  SessionApprovalsPanel,
   pendingApprovalRequests,
   type ApprovalResolveAction,
   type ApprovalResolveHandler,
-} from "./SessionInspector.approvals";
+} from "./SessionInspector.approvals-model";
 export {
   SessionChatComposer,
   type SessionChatCapabilities,

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
-import type { KeyValueListItem } from "../KeyValueList";
 
-/** Small display primitives shared by the SessionInspector detail panels
+/** Small display components shared by the SessionInspector detail panels
  *  (costs, metadata, approvals, …) — kept in their own module so panel files
- *  can depend on them without importing each other. */
+ *  can depend on them without importing each other. The value builders they are
+ *  used with live in SessionInspector.panel-values, which exports no components
+ *  so that neither module loses fast refresh to the other. */
 
 export function EmptyState({
   children,
@@ -53,21 +54,3 @@ export function SimpleList({
   );
 }
 
-export function kv(
-  label: ReactNode,
-  value: ReactNode | undefined | null
-): KeyValueListItem {
-  return {
-    key: String(label),
-    label,
-    value:
-      value === undefined || value === null || value === ""
-        ? muted("-")
-        : value,
-    hidden: value === undefined || value === null || value === "",
-  };
-}
-
-export function muted(value: ReactNode) {
-  return <span className="text-muted-foreground">{value}</span>;
-}

@@ -5,34 +5,21 @@ import { UiClock } from "../../icons";
 import { ToolCall } from "../chat/ToolCall";
 import type { AnyToolPart } from "../chat/types";
 import { durationLabel, formatDate } from "./SessionInspector.model";
-import { EmptyState, SimpleList, kv } from "./SessionInspector.panel-parts";
+import { EmptyState, SimpleList } from "./SessionInspector.panel-parts";
+import { kv } from "./SessionInspector.panel-values";
+import {
+  type ApprovalResolveHandler,
+  pendingApprovalRequests,
+} from "./SessionInspector.approvals-model";
 import type {
   SessionApprovalRequest,
   SessionApprovalStats,
 } from "./SessionViewer.unified";
 
-/** Approve or deny one pending approval. */
-export type ApprovalResolveAction = "approve" | "deny";
-
-/** Resolves one `session.requests[]` row. Rejecting surfaces the server's
- *  refusal text inline on that row (e.g. the prompt run is no longer
- *  `waiting`) instead of leaving the Approve/Deny buttons silently inert. */
-export type ApprovalResolveHandler = (
-  approvalId: string,
-  action: ApprovalResolveAction,
-  message?: string,
-) => void | Promise<void>;
-
-/** The subset of `session.requests[]` this panel surfaces: outstanding tool
- *  approvals, regardless of which surface (in-process chat or an external
- *  broker) created the request. */
-export function pendingApprovalRequests(
-  requests: SessionApprovalRequest[] | undefined,
-): SessionApprovalRequest[] {
-  return (requests ?? []).filter(
-    (request) => request.state === "pending" && request.kind === "tool_approval",
-  );
-}
+export type {
+  ApprovalResolveAction,
+  ApprovalResolveHandler,
+} from "./SessionInspector.approvals-model";
 
 /** Renders every pending tool approval directly from `session.requests[]`
  *  (never from transcript parts — an approval brokered outside this session's
