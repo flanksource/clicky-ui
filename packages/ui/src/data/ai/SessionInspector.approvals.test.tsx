@@ -1,9 +1,7 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  SessionApprovalsPanel,
-  pendingApprovalRequests,
-} from "./SessionInspector.approvals";
+import { SessionApprovalsPanel } from "./SessionInspector.approvals";
+import { pendingApprovalRequests } from "./SessionInspector.approvals-model";
 import type { SessionApprovalRequest } from "./SessionViewer.unified";
 
 afterEach(() => {

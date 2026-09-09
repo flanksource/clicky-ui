@@ -14,7 +14,8 @@ import {
   SessionApprovalsPanel,
   type ApprovalResolveHandler,
 } from "./SessionInspector.approvals";
-import { EmptyState, kv, muted } from "./SessionInspector.panel-parts";
+import { EmptyState } from "./SessionInspector.panel-parts";
+import { kv, muted } from "./SessionInspector.panel-values";
 import type { SessionInput } from "./SessionViewer.model";
 import type {
   SessionCost,

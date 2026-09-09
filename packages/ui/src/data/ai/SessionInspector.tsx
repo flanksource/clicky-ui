@@ -28,7 +28,7 @@ import { useSessionHierarchy } from "./SessionInspector.hierarchy-state";
 import {
   pendingApprovalRequests,
   type ApprovalResolveHandler,
-} from "./SessionInspector.approvals";
+} from "./SessionInspector.approvals-model";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
 import type { SessionInput } from "./SessionViewer.model";
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
