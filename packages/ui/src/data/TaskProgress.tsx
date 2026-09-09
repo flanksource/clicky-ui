@@ -12,6 +12,7 @@ import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
+import { type TaskHeaderExtra, TaskMetadataChips } from "./TaskHeaderExtras";
 import { type TaskExtraTabs, TaskStreamTabs } from "./TaskStreamTabs";
 import {
   isFailedOrWarn,
@@ -59,6 +60,12 @@ export interface TaskProgressProps {
    * an agent's session transcript, say, which this module has no way to fetch.
    */
   extraTabs?: TaskExtraTabs;
+  /**
+   * Replaces the content beside a task's name in its header row. Returning null
+   * for a task falls back to the default, which chips the scalar values of its
+   * process metadata.
+   */
+  headerExtra?: TaskHeaderExtra;
 }
 
 export function TaskProgress({
@@ -71,6 +78,7 @@ export function TaskProgress({
   metricsBaseUrl,
   connectionStatus,
   extraTabs,
+  headerExtra,
 }: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
@@ -97,6 +105,7 @@ export function TaskProgress({
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
           {...(connectionStatus ? { connectionStatus } : {})}
           {...(extraTabs ? { extraTabs } : {})}
+          {...(headerExtra ? { headerExtra } : {})}
         />
       ))}
     </div>
@@ -112,11 +121,13 @@ function TaskGroupCard({
   metricsBaseUrl,
   connectionStatus,
   extraTabs,
+  headerExtra,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
   compact: boolean | undefined;
   extraTabs?: TaskExtraTabs;
+  headerExtra?: TaskHeaderExtra;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
   onTaskControl?: (
     action: TaskControlAction,
@@ -250,6 +261,7 @@ function TaskGroupCard({
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
           {...(connectionStatus ? { connectionStatus } : {})}
           {...(extraTabs ? { extraTabs } : {})}
+          {...(headerExtra ? { headerExtra } : {})}
         />
       ))}
     </div>
@@ -263,12 +275,14 @@ function TaskRow({
   metricsBaseUrl,
   connectionStatus,
   extraTabs: contributeTabs,
+  headerExtra,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
   metricsBaseUrl?: string;
   connectionStatus?: string;
   extraTabs?: TaskExtraTabs;
+  headerExtra?: TaskHeaderExtra;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -279,6 +293,10 @@ function TaskRow({
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
   const extraTabs = contributeTabs?.(t, group) ?? [];
+  // A host that has nothing to add for this task returns null, and the default
+  // metadata chips take over — so enriching one kind of task never costs the
+  // rest their header.
+  const header = headerExtra?.(t, group) ?? <TaskMetadataChips task={t} />;
   const hasOutput = !!t.stdout || !!t.stderr || extraTabs.length > 0;
   const execDetails = isTaskExecDetails(t.details) ? t.details : undefined;
   const processDetails = isTaskProcessDetails(t.details) ? t.details : undefined;
@@ -322,6 +340,7 @@ function TaskRow({
               </span>
             )}
           </span>
+          {header}
           <div className="flex shrink-0 items-center gap-1">
             {t.duration && <span className="text-xs text-muted-foreground">{t.duration}</span>}
             <CopyButton

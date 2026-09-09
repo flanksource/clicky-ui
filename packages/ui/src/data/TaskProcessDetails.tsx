@@ -4,7 +4,7 @@ import { DiagnosticsTree } from "./diagnostics/DiagnosticsTree";
 import { TaskResourceReadings } from "./TaskResourceReadings";
 import { buildTaskProcessForest } from "./task-process-details";
 import { TaskCommandLine } from "./TaskExecDetails";
-import { TaskAnnotations, TaskProcessFacts } from "./TaskProcessAnnotations";
+import { TaskMetadata, TaskProcessFacts } from "./TaskProcessMetadata";
 import type { TaskProcessDetails } from "./TaskSnapshot";
 
 export function TaskProcessDetailsView({
@@ -22,7 +22,7 @@ export function TaskProcessDetailsView({
 
   return (
     <section className="mb-3 space-y-3 rounded-md border bg-muted/20 p-3">
-      <TaskAnnotations {...(details.annotations ? { annotations: details.annotations } : {})} />
+      <TaskMetadata {...(details.metadata !== undefined ? { metadata: details.metadata } : {})} />
       <TaskCommandLine command={details.command} {...(details.args ? { args: details.args } : {})} />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="font-mono text-foreground">pid {details.pid ?? "—"}</span>

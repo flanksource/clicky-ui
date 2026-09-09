@@ -66,10 +66,11 @@ export interface TaskProcessDetails {
   metrics: Record<string, string>;
   tree?: TaskProcessSample[];
   /**
-   * Caller-supplied context, re-read on every snapshot. The producer chooses
-   * the keys; this module gives them no meaning beyond "show them".
+   * Caller-supplied context, re-read on every snapshot. Any JSON the producer
+   * chooses to send — flat values render inline, anything structured renders as
+   * JSON. This module gives the shape no meaning beyond "show it".
    */
-  annotations?: Record<string, string>;
+  metadata?: unknown;
 }
 
 export interface TaskExecDetails {
@@ -122,6 +123,13 @@ export interface TaskSnapshot {
   controls?: TaskControlAction[];
   stdout?: string;
   stderr?: string;
+  /**
+   * Absolute stream offset of the first retained byte — how much the server's
+   * bounded buffer has already discarded ahead of `stdout`/`stderr`. Non-zero
+   * exactly when the matching `*Truncated` flag is set.
+   */
+  stdoutOffset?: number;
+  stderrOffset?: number;
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
   details?: TaskProcessDetails | TaskExecDetails | Record<string, unknown>;

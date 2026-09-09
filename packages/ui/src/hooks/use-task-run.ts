@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   allGroupsTerminal,
   type TaskRunMeta,
   type TaskSnapshot,
 } from "../data/TaskSnapshot";
+import {
+  applyTaskOutputDelta,
+  emptyTaskStreams,
+  type TaskOutputDelta,
+  type TaskStreams,
+  withTaskStreams,
+} from "../data/task-streams";
 import { taskQueryKeys } from "../data/task-query-keys";
 
 // use-task-run / use-task-runs are the generic clicky-ui task clients. They are
@@ -64,6 +71,10 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   const runIdsKey = (ids?.filter(Boolean) ?? (id ? [id] : [])).join(",");
 
   const [byId, setById] = useState<Record<string, TaskSnapshot>>({});
+  // Streams are held beside the snapshots, never inside them: a task frame
+  // replaces its snapshot wholesale and would take the accumulated output with
+  // it. See ../data/task-streams.
+  const [streamsById, setStreamsById] = useState<Record<string, TaskStreams>>({});
   const [status, setStatus] = useState("idle");
   const [isComplete, setIsComplete] = useState(false);
 
@@ -71,11 +82,13 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     const runIds = runIdsKey ? runIdsKey.split(",") : [];
     if (!enabled || (runIds.length === 0 && !kind)) {
       setById({});
+      setStreamsById({});
       setStatus("idle");
       setIsComplete(false);
       return;
     }
     setById({});
+    setStreamsById({});
     setIsComplete(false);
 
     const params = new URLSearchParams();
@@ -91,27 +104,14 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
       });
     };
 
-    const mergeOutput = (delta: {
-      id: string;
-      stream: "stdout" | "stderr";
-      data: string;
-      reset?: boolean;
-      truncated?: boolean;
-    }) => {
-      setById((prev) => {
-        const snapshot = prev[delta.id];
-        if (!snapshot) return prev;
-        const value = delta.reset ? delta.data : `${snapshot[delta.stream] ?? ""}${delta.data}`;
-        const truncatedField = delta.stream === "stdout" ? "stdoutTruncated" : "stderrTruncated";
-        return {
-          ...prev,
-          [delta.id]: {
-            ...snapshot,
-            [delta.stream]: value,
-            [truncatedField]: delta.truncated ?? snapshot[truncatedField],
-          },
-        };
-      });
+    // Deltas are applied whether or not the task frame has landed yet: the
+    // stream is keyed by task id on its own, so output that arrives first is
+    // held rather than dropped.
+    const mergeOutput = (delta: TaskOutputDelta) => {
+      setStreamsById((prev) => ({
+        ...prev,
+        [delta.id]: applyTaskOutputDelta(prev[delta.id] ?? emptyTaskStreams, delta),
+      }));
     };
 
     // Polling fallback transport.
@@ -163,7 +163,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     });
     es.addEventListener("output", (e) => {
       try {
-        mergeOutput(JSON.parse((e as MessageEvent).data) as Parameters<typeof mergeOutput>[0]);
+        mergeOutput(JSON.parse((e as MessageEvent).data) as TaskOutputDelta);
       } catch {
         setStatus("invalid task output data");
       }
@@ -177,7 +177,15 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     return () => es.close();
   }, [runIdsKey, kind, basePath, enabled, pollMs, forcePoll]);
 
-  return { snapshots: Object.values(byId), status, isComplete };
+  // The streams are merged back in only here, at the boundary. The polling
+  // fallback never populates them — its JSON snapshots already carry the full
+  // output — so this is a no-op on that transport.
+  const snapshots = useMemo(
+    () => Object.values(byId).map((snapshot) => withTaskStreams(snapshot, streamsById[snapshot.id])),
+    [byId, streamsById],
+  );
+
+  return { snapshots, status, isComplete };
 }
 
 export interface UseTaskRunsOptions extends TaskTransportOptions {

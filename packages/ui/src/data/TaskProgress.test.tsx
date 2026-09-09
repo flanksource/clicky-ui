@@ -443,18 +443,49 @@ describe("TaskProgress", () => {
     },
   ];
 
-  it("shows the producer's annotations and links the ones that point somewhere", () => {
+  it("chips the producer's metadata in the header and links the ones that point somewhere", () => {
     render(
       <TaskProgress
-        snapshots={agentRun({ annotations: { phase: "run", model: "claude-opus-5", href: "/todos/5d9f1d2a" } })}
+        snapshots={agentRun({ metadata: { phase: "run", model: "claude-opus-5", href: "/todos/5d9f1d2a" } })}
       />,
     );
 
+    // Scalar metadata is readable on the row itself, before anything is expanded.
+    expect(screen.getByTitle("phase: run")).toBeInTheDocument();
+    expect(screen.getByTitle("model: claude-opus-5")).toBeInTheDocument();
+
     fireEvent.click(screen.getByText("run agent"));
 
-    expect(screen.getByText("phase")).toBeInTheDocument();
-    expect(screen.getByText("claude-opus-5")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "/todos/5d9f1d2a" })).toHaveAttribute("href", "/todos/5d9f1d2a");
+  });
+
+  // Structured metadata is the point of it being JSON: the header takes the
+  // scalars it can render as labels and the expanded details keep the rest whole.
+  it("keeps structured metadata out of the header and shows it in the details", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({ metadata: { state: "running", turn: { planMode: true, pending: 2 } } })}
+      />,
+    );
+
+    expect(screen.getByTitle("state: running")).toBeInTheDocument();
+    expect(screen.queryByTitle(/^turn:/)).toBeNull();
+
+    fireEvent.click(screen.getByText("run agent"));
+
+    expect(screen.getByText(/planMode/)).toBeInTheDocument();
+  });
+
+  it("lets a host replace the header content for the tasks it knows", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({ metadata: { state: "running" } })}
+        headerExtra={(task) => (task.name === "run agent" ? <span>turn 3 of 5</span> : null)}
+      />,
+    );
+
+    expect(screen.getByText("turn 3 of 5")).toBeInTheDocument();
+    expect(screen.queryByTitle("state: running")).toBeNull();
   });
 
   it("renders the runaway limits the process would be killed for exceeding", () => {

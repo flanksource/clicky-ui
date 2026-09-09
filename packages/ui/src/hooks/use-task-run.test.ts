@@ -118,6 +118,48 @@ describe("useTaskRun (SSE)", () => {
     });
   });
 
+  // The regression this whole accumulator exists for. clicky strips output from
+  // every task frame and sends it only as deltas, and it never re-sends what a
+  // client has already been given. A supervised task's snapshot changes on almost
+  // every poll (its duration ticks, its resource sample is re-read), so if the
+  // accumulated output lived on the snapshot object it would be destroyed roughly
+  // once a second — the stdout tab appearing, then vanishing, for the whole run.
+  it("keeps accumulated output when a later task frame replaces the snapshot", async () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+
+    act(() => {
+      es.emit("task", taskSnap("running"));
+      es.emit("output", { id: "t1", groupId: "g1", stream: "stdout", data: "building\n", offset: 0 });
+    });
+    await waitFor(() => {
+      expect(result.current.snapshots.find((s) => s.id === "t1")?.stdout).toBe("building\n");
+    });
+
+    // A new task frame for the same task, carrying no stdout key at all.
+    act(() => es.emit("task", { ...taskSnap("running"), duration: "2s", description: "linking" }));
+
+    await waitFor(() => {
+      expect(result.current.snapshots.find((s) => s.id === "t1")).toMatchObject({
+        description: "linking",
+        duration: "2s",
+        stdout: "building\n",
+      });
+    });
+  });
+
+  it("holds output that arrives before its task frame", async () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+
+    act(() => es.emit("output", { id: "t1", groupId: "g1", stream: "stdout", data: "early\n", offset: 0 }));
+    act(() => es.emit("task", taskSnap("running")));
+
+    await waitFor(() => {
+      expect(result.current.snapshots.find((s) => s.id === "t1")?.stdout).toBe("early\n");
+    });
+  });
+
   it("clears snapshots when the subscription is disabled", async () => {
     const { result, rerender } = renderHook(
       ({ enabled }) => useTaskRun({ id: "g1", enabled }),
