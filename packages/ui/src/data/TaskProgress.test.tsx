@@ -522,4 +522,27 @@ describe("TaskProgress", () => {
     fireEvent.click(screen.getByRole("button", { name: "stdout" }));
     expect(screen.getByText('{"jsonrpc":"2.0"}')).toBeInTheDocument();
   });
+
+  // A tab is addressed by its id, so a host pane claiming "stdout" would not add
+  // a pane — it would stand in front of the process's own output, which nothing
+  // else in the UI can show.
+  it("keeps the process's own stream reachable when a host pane claims its id", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({})}
+        extraTabs={() => [
+          { id: "stdout", label: "Transcript", render: () => <span>host pane</span> },
+          { id: "transcript", label: "Transcript", render: () => <span>read FrameSource.tsx</span> },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("run agent"));
+
+    expect(screen.queryByText("host pane")).toBeNull();
+    expect(screen.getByText("read FrameSource.tsx")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "stdout" }));
+    expect(screen.getByText('{"jsonrpc":"2.0"}')).toBeInTheDocument();
+  });
 });

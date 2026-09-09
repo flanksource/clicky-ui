@@ -46,6 +46,20 @@ export interface TaskOutputDelta {
   truncated?: boolean;
 }
 
+const encoder = new TextEncoder();
+
+/**
+ * How far `data` advances the stream. Offsets are byte positions in the
+ * process's own output, and a JS string measures UTF-16 code units — so `"é"`
+ * counts as one there and as the two bytes the server actually wrote. Measuring
+ * the wrong unit puts the client's end short of the next delta's start, and
+ * every following frame is then read as a gap and replaces the text it should
+ * have continued.
+ */
+function utf8Length(data: string): number {
+  return encoder.encode(data).byteLength;
+}
+
 /**
  * Applies one delta to what a task's streams already hold.
  *
@@ -54,14 +68,19 @@ export interface TaskOutputDelta {
  * `reset`, or a gap opened by a retained window that rolled past what this
  * client last saw. Concatenating across such a gap would silently splice
  * together two pieces of output that never ran together.
+ *
+ * Truncation carries across an append: dropping the head of a stream is not
+ * undone by writing more to its tail, so a frame that simply says nothing about
+ * it leaves the flag as it was, and only an explicit value changes it.
  */
 export function applyTaskOutputDelta(current: TaskStreams, delta: TaskOutputDelta): TaskStreams {
   const held = delta.stream === "stdout" ? current.stdout : current.stderr;
   const end = delta.stream === "stdout" ? current.stdoutEnd : current.stderrEnd;
   const continues = delta.reset !== true && held !== undefined && end === delta.offset;
   const text = continues ? `${held}${delta.data}` : delta.data;
-  const truncated = delta.truncated ?? false;
-  const streamEnd = delta.offset + delta.data.length;
+  const wasTruncated = delta.stream === "stdout" ? current.stdoutTruncated : current.stderrTruncated;
+  const truncated = delta.truncated ?? (continues && wasTruncated);
+  const streamEnd = delta.offset + utf8Length(delta.data);
 
   return delta.stream === "stdout"
     ? { ...current, stdout: text, stdoutTruncated: truncated, stdoutEnd: streamEnd }

@@ -6,6 +6,8 @@
  * row of chips without turning into `[object Object]`.
  */
 
+import { isPlainObject } from "../lib/collections";
+
 /** A metadata value that renders as one short piece of text. */
 export type MetadataScalar = string | number | boolean;
 
@@ -18,11 +20,6 @@ export interface MetadataEntry {
 
 function isScalar(value: unknown): value is MetadataScalar {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-}
-
-/** True for a JSON object — not an array, and not null, both of which `typeof` calls "object". */
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -49,9 +46,36 @@ export function isFlatMetadata(value: unknown): boolean {
   return isPlainObject(value) && Object.values(value).every(isScalar);
 }
 
-/** Keys whose value is a destination rather than a label. */
+/** Keys whose value is meant as a destination rather than a label. */
 const LINK_KEYS = new Set(["href", "url", "link"]);
 
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/** The schemes that only ever navigate. `javascript:` and `data:` run instead. */
+const NAVIGABLE_URL = /^https?:\/\//i;
+
+/** A leading `//` or `/\` is somewhere else entirely, wearing a path's clothes. */
+const OFF_SITE_PATH = /^\/[/\\]/;
+
+/** A browser ignores spaces and control characters when reading an href, so a scheme is read from the same stripped form it would see. */
+function withoutBlanks(text: string): string {
+  let stripped = "";
+  for (const character of text) if (character > " ") stripped += character;
+  return stripped;
+}
+
+/**
+ * Whether a metadata value can be put in an `href`.
+ *
+ * The key says what the producer meant by a value; it does not say what the
+ * value is. Metadata is whatever JSON reached this client over the task API or
+ * the SSE stream, so a `url` of `javascript:…` is a script the page would run
+ * on click rather than a place it would go. What may be linked is therefore
+ * named rather than what may not: a relative reference, or an http(s) URL.
+ * Anything else keeps rendering as the plain text it already was.
+ */
 export function isMetadataLink(key: string, text: string): boolean {
-  return LINK_KEYS.has(key) || text.startsWith("/") || text.startsWith("https://");
+  if (!LINK_KEYS.has(key) && !text.startsWith("/") && !text.startsWith("https://")) return false;
+  const destination = withoutBlanks(text);
+  return HAS_SCHEME.test(destination) ? NAVIGABLE_URL.test(destination) : !OFF_SITE_PATH.test(destination);
 }

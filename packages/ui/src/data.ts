@@ -377,7 +377,6 @@ export { TaskMetadata } from "./data/TaskProcessMetadata";
 export {
   isFlatMetadata,
   isMetadataLink,
-  isPlainObject,
   metadataEntries,
   type MetadataEntry,
   type MetadataScalar,

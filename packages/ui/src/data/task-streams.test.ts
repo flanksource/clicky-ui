@@ -57,6 +57,39 @@ describe("applyTaskOutputDelta", () => {
     });
   });
 
+  // Offsets are byte positions in the process's output. Measuring the held text
+  // in UTF-16 code units leaves the client's end short of the server's next
+  // offset, and every following frame is then mistaken for a gap.
+  it("advances the stream end by bytes, not by code units", () => {
+    const held = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "café\n" }));
+    expect(held.stdoutEnd).toBe(6);
+
+    expect(applyTaskOutputDelta(held, stdout({ data: "über\n", offset: 6 }))).toMatchObject({
+      stdout: "café\nüber\n",
+      stdoutEnd: 12,
+    });
+  });
+
+  // Bytes ahead of the retained window stay gone while the process keeps
+  // writing, so a later frame that says nothing about truncation is not
+  // reporting that the head came back.
+  it("keeps a stream marked truncated across a frame that does not mention it", () => {
+    const truncated = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "later\n", offset: 900, truncated: true }));
+
+    expect(applyTaskOutputDelta(truncated, stdout({ data: "more\n", offset: 906 }))).toMatchObject({
+      stdout: "later\nmore\n",
+      stdoutTruncated: true,
+    });
+  });
+
+  it("clears truncation when the server says the retained window holds the whole stream", () => {
+    const truncated = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "later\n", offset: 900, truncated: true }));
+
+    expect(
+      applyTaskOutputDelta(truncated, stdout({ data: "restarted\n", offset: 0, reset: true, truncated: false })),
+    ).toMatchObject({ stdout: "restarted\n", stdoutTruncated: false });
+  });
+
   it("tracks each stream independently", () => {
     const withOut = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "out\n" }));
     const both = applyTaskOutputDelta(withOut, { id: "t1", stream: "stderr", data: "err\n", offset: 0 });
