@@ -372,6 +372,23 @@ export {
   type TaskExtraTabs,
   type TaskStreamTab,
 } from "./data/TaskStreamTabs";
+export { TaskMetadataChips, type TaskHeaderExtra } from "./data/TaskHeaderExtras";
+export { TaskMetadata } from "./data/TaskProcessMetadata";
+export {
+  isFlatMetadata,
+  isMetadataLink,
+  isPlainObject,
+  metadataEntries,
+  type MetadataEntry,
+  type MetadataScalar,
+} from "./data/task-metadata";
+export {
+  applyTaskOutputDelta,
+  emptyTaskStreams,
+  withTaskStreams,
+  type TaskOutputDelta,
+  type TaskStreams,
+} from "./data/task-streams";
 export {
   taskStatusColor,
   taskStatusIcon,
