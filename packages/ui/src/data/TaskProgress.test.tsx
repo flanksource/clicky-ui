@@ -181,7 +181,11 @@ describe("TaskProgress", () => {
     render(<TaskProgress snapshots={snapshots} onControl={onControl} />);
 
     fireEvent.click(screen.getByText("Create commit"));
+    // stdout leads because it is the first stream the task produced; stderr is
+    // one tab away rather than stacked below it.
     expect(screen.getByText("staging files")).toBeInTheDocument();
+    expect(screen.queryByText("hook warning")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "stderr" }));
     expect(screen.getByText("hook warning")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
@@ -365,6 +369,7 @@ describe("TaskProgress", () => {
     expect(screen.getByText("CPU gauge")).toBeInTheDocument();
     expect(screen.getByText("RSS gauge")).toBeInTheDocument();
     expect(screen.getByText("render complete")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "stderr" }));
     expect(screen.getByText("cache warning")).toBeInTheDocument();
   });
 
@@ -413,5 +418,77 @@ describe("TaskProgress", () => {
     expect(screen.getByText('"scan-1"')).toBeInTheDocument();
     expect(screen.getByText("endpointCount")).toBeInTheDocument();
     expect(screen.getByText("stats")).toBeInTheDocument();
+  });
+
+  const agentRun = (details: Record<string, unknown>): TaskSnapshot[] => [
+    { id: "agent", name: "Stack Trace Viewer improvements", type: "group", status: "running", groupId: "a1", total: 1, running: 1 },
+    {
+      id: "agent-task",
+      name: "run agent",
+      type: "task",
+      status: "running",
+      groupId: "a1",
+      stdout: '{"jsonrpc":"2.0"}\n',
+      details: {
+        pid: 19626,
+        command: "tsx",
+        status: "running",
+        restarts: 0,
+        restartPolicy: "no",
+        latest: { cpuPercent: 0.5, rssBytes: 1024, vmsBytes: 2048, openFiles: 8, sampledAt: new Date().toISOString() },
+        peak: { cpuPercent: 18.7, rssBytes: 4096, vmsBytes: 8192, openFiles: 12, sampledAt: new Date().toISOString() },
+        metrics: {},
+        ...details,
+      },
+    },
+  ];
+
+  it("shows the producer's annotations and links the ones that point somewhere", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({ annotations: { phase: "run", model: "claude-opus-5", href: "/todos/5d9f1d2a" } })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("run agent"));
+
+    expect(screen.getByText("phase")).toBeInTheDocument();
+    expect(screen.getByText("claude-opus-5")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "/todos/5d9f1d2a" })).toHaveAttribute("href", "/todos/5d9f1d2a");
+  });
+
+  it("renders the runaway limits the process would be killed for exceeding", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({ limits: { maxRssBytes: 1073741824, maxCpuPercent: 85, interval: "2s" }, ports: [9092] })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("run agent"));
+
+    expect(screen.getByText(/max 1(\.0)? ?GB RSS/)).toBeInTheDocument();
+    expect(screen.getByText(":9092")).toBeInTheDocument();
+  });
+
+  it("puts a host-contributed pane ahead of the process's own streams", () => {
+    render(
+      <TaskProgress
+        snapshots={agentRun({})}
+        extraTabs={(task, group) =>
+          task.type === "task" && group.groupId === "a1"
+            ? [{ id: "transcript", label: "Transcript", render: () => <span>read FrameSource.tsx</span> }]
+            : []
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByText("run agent"));
+
+    // The transcript is what an operator wants; raw JSON-RPC stdout is a tab away.
+    expect(screen.getByText("read FrameSource.tsx")).toBeInTheDocument();
+    expect(screen.queryByText('{"jsonrpc":"2.0"}')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "stdout" }));
+    expect(screen.getByText('{"jsonrpc":"2.0"}')).toBeInTheDocument();
   });
 });

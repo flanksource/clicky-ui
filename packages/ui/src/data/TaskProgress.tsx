@@ -7,12 +7,12 @@ import { useCopyFlash } from "../components/clipboard";
 import { UiCheck, UiCopy, UiJson, UiPlay, UiRestart, UiStop, UiWarningTriangle } from "../icons";
 import { cn } from "../lib/utils";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
-import { AnsiHtml } from "./AnsiHtml";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
+import { type TaskExtraTabs, TaskStreamTabs } from "./TaskStreamTabs";
 import {
   isFailedOrWarn,
   taskGroupErrorCount,
@@ -54,6 +54,11 @@ export interface TaskProgressProps {
   ) => void | Promise<void>;
   metricsBaseUrl?: string;
   connectionStatus?: string;
+  /**
+   * Contributes host-owned output panes alongside a task's own stdout/stderr —
+   * an agent's session transcript, say, which this module has no way to fetch.
+   */
+  extraTabs?: TaskExtraTabs;
 }
 
 export function TaskProgress({
@@ -65,6 +70,7 @@ export function TaskProgress({
   onTaskControl,
   metricsBaseUrl,
   connectionStatus,
+  extraTabs,
 }: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
@@ -90,6 +96,7 @@ export function TaskProgress({
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
           {...(connectionStatus ? { connectionStatus } : {})}
+          {...(extraTabs ? { extraTabs } : {})}
         />
       ))}
     </div>
@@ -104,10 +111,12 @@ function TaskGroupCard({
   onTaskControl,
   metricsBaseUrl,
   connectionStatus,
+  extraTabs,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
   compact: boolean | undefined;
+  extraTabs?: TaskExtraTabs;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
   onTaskControl?: (
     action: TaskControlAction,
@@ -240,6 +249,7 @@ function TaskGroupCard({
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
           {...(connectionStatus ? { connectionStatus } : {})}
+          {...(extraTabs ? { extraTabs } : {})}
         />
       ))}
     </div>
@@ -252,11 +262,13 @@ function TaskRow({
   onTaskControl,
   metricsBaseUrl,
   connectionStatus,
+  extraTabs: contributeTabs,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
   metricsBaseUrl?: string;
   connectionStatus?: string;
+  extraTabs?: TaskExtraTabs;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -266,7 +278,8 @@ function TaskRow({
   const [expanded, setExpanded] = useState(false);
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
-  const hasOutput = !!t.stdout || !!t.stderr;
+  const extraTabs = contributeTabs?.(t, group) ?? [];
+  const hasOutput = !!t.stdout || !!t.stderr || extraTabs.length > 0;
   const execDetails = isTaskExecDetails(t.details) ? t.details : undefined;
   const processDetails = isTaskProcessDetails(t.details) ? t.details : undefined;
   const expandable = hasLogs || hasOutput || execDetails !== undefined || processDetails !== undefined;
@@ -366,38 +379,8 @@ function TaskRow({
             ))}
           </div>
         )}
-        {expanded && hasOutput && (
-          <div className="mt-2 space-y-2">
-            {t.stdout && <TaskStream label="stdout" text={t.stdout} {...(t.stdoutTruncated ? { truncated: true } : {})} />}
-            {t.stderr && <TaskStream label="stderr" text={t.stderr} {...(t.stderrTruncated ? { truncated: true } : {})} error />}
-          </div>
-        )}
+        {expanded && <TaskStreamTabs task={t} {...(extraTabs.length > 0 ? { extraTabs } : {})} />}
       </div>
-    </div>
-  );
-}
-
-function TaskStream({
-  label,
-  text,
-  truncated,
-  error,
-}: {
-  label: string;
-  text: string;
-  truncated?: boolean;
-  error?: boolean;
-}) {
-  return (
-    <div className="overflow-hidden rounded border bg-black">
-      <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 text-[10px] text-gray-400">
-        <span>{label}</span>
-        {truncated && <span>showing latest 1 MiB</span>}
-      </div>
-      <AnsiHtml
-        text={text}
-        className={cn("max-h-64 overflow-auto whitespace-pre-wrap p-2 text-xs text-gray-100", error && "text-red-300")}
-      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Timestamp } from "./cells/Timestamp";
 import { TaskProgress } from "./TaskProgress";
 import { taskWorkProgress } from "./task-work-progress";
 import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
+import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./task-status";
 
@@ -41,6 +42,11 @@ export interface TaskManagerProps {
    * open row is collapsed. Pair with selectedId for URL-driven deep links.
    */
   onSelectRun?: (id: string | null) => void;
+  /**
+   * Contributes host-owned output panes to each task, alongside its own
+   * stdout/stderr — an agent's session transcript, say.
+   */
+  extraTabs?: TaskExtraTabs;
 }
 
 export function TaskManager({
@@ -51,6 +57,7 @@ export function TaskManager({
   className,
   selectedId,
   onSelectRun,
+  extraTabs,
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -144,6 +151,7 @@ export function TaskManager({
                     selectedId={selectedId}
                     onSelectRun={onSelectRun}
                     runsQueryKey={runsQueryKey}
+                    extraTabs={extraTabs}
                   />
                 ))}
               </div>
@@ -182,6 +190,7 @@ function RunRow({
   selectedId,
   onSelectRun,
   runsQueryKey,
+  extraTabs,
 }: {
   run: TaskRunMeta;
   basePath: string | undefined;
@@ -189,6 +198,7 @@ function RunRow({
   selectedId: string | undefined;
   onSelectRun: ((id: string | null) => void) | undefined;
   runsQueryKey: QueryKey;
+  extraTabs: TaskExtraTabs | undefined;
 }) {
   const [localOpen, setLocalOpen] = useState(false);
   // Controlled by selectedId when a selection handler is wired; otherwise the
@@ -259,6 +269,7 @@ function RunRow({
           basePath={basePath}
           pollMs={pollMs}
           runsQueryKey={runsQueryKey}
+          extraTabs={extraTabs}
         />
       )}
     </div>
@@ -270,11 +281,13 @@ function ExpandedRun({
   basePath,
   pollMs,
   runsQueryKey,
+  extraTabs,
 }: {
   runId: string;
   basePath: string | undefined;
   pollMs: number | undefined;
   runsQueryKey: QueryKey;
+  extraTabs: TaskExtraTabs | undefined;
 }) {
   const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
@@ -337,6 +350,7 @@ function ExpandedRun({
         onControl={control}
         onTaskControl={controlTask}
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}
+        {...(extraTabs ? { extraTabs } : {})}
       />
     </div>
   );
