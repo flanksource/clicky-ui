@@ -49,4 +49,24 @@ describe("ExecutionTree", () => {
     );
     expect(screen.getByText("row:m")).toBeTruthy();
   });
+
+  it("renders renderDetail beneath both a leaf and a parent row", () => {
+    const roots: ExecutionNode[] = [
+      { id: "0", label: "outer", children: [{ id: "0.0", label: "inner" }] },
+    ];
+    render(
+      <ExecutionTree
+        roots={roots}
+        defaultOpenDepth={2}
+        renderDetail={(n) => <span>code:{n.id}</span>}
+      />,
+    );
+    expect(screen.getByText("code:0")).toBeTruthy();
+    expect(screen.getByText("code:0.0")).toBeTruthy();
+  });
+
+  it("omits renderDetail entirely, leaving default rendering unaffected", () => {
+    render(<ExecutionTree roots={[{ id: "0", label: "m" }]} />);
+    expect(screen.getByText("m")).toBeTruthy();
+  });
 });

@@ -43,6 +43,13 @@ export type ExecutionTreeProps<T extends ExecutionNode = ExecutionNode> = {
   costThreshold?: number;
   /** Override the entire row rendering. */
   renderRow?: (node: T) => ReactNode;
+  /**
+   * Render extra content beneath a node's row and above its children (e.g. the
+   * decompiled source line a call was made from). Rendered for leaf and parent
+   * nodes alike; a click or keydown inside it never toggles the row. Returning
+   * `null`/`undefined`/`false` renders nothing.
+   */
+  renderDetail?: (node: T) => ReactNode;
   loadChildren?: (node: T) => Promise<T[]>;
 };
 
@@ -54,6 +61,7 @@ export function ExecutionTree<T extends ExecutionNode = ExecutionNode>({
   defaultOpenDepth = 1,
   costThreshold,
   renderRow,
+  renderDetail,
   loadChildren,
 }: ExecutionTreeProps<T>) {
   return (
@@ -65,6 +73,7 @@ export function ExecutionTree<T extends ExecutionNode = ExecutionNode>({
       {...(className !== undefined ? { className } : {})}
       {...(empty !== undefined ? { empty } : {})}
       {...(showControls !== undefined ? { showControls } : {})}
+      {...(renderDetail ? { renderDetail } : {})}
       {...(loadChildren ? { loadChildren, hasMoreChildren: (n: T) => n.expandable === true } : {})}
       renderRow={({ node }) =>
         renderRow ? renderRow(node) : <DefaultExecutionRow node={node} costThreshold={costThreshold} />

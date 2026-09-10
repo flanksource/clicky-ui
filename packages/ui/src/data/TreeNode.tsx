@@ -3,6 +3,12 @@ import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import { UiChevronDown, UiChevronRight } from "../icons";
 
+// A row's content column starts after the chevron (`w-3`, 12px) plus the row's
+// `gap-1.5` (6px) — fixed regardless of indentPx/basePaddingPx, since the
+// chevron/spacer width and gap are not configurable. renderDetail's wrapper
+// adds this on top of the row's own paddingLeft so it lines up under the label.
+const ROW_CONTENT_OFFSET_PX = 18;
+
 export type TreeRowContext<T> = {
   node: T;
   depth: number;
@@ -28,6 +34,16 @@ export type TreeNodeProps<T> = {
   getAriaLabel?: (node: T) => string;
   onSelect?: (node: T) => void;
   renderRow: (ctx: TreeRowContext<T>) => ReactNode;
+  /**
+   * Render extra content beneath a node's row and above its children (e.g. the
+   * decompiled source line a call was made from). Rendered for leaf and parent
+   * nodes alike, regardless of open/collapsed state, and left-aligned with the
+   * row's content column (after the depth indent and chevron). Returning
+   * `null`/`undefined`/`false` renders nothing — no wrapper, no extra spacing.
+   * A click or keydown inside it is stopped from propagating, so it can never
+   * toggle the row's expand/collapse state.
+   */
+  renderDetail?: (node: T) => ReactNode;
   rowClass?: (node: T, selected: boolean) => string;
   indentPx?: number;
   basePaddingPx?: number;
@@ -76,6 +92,7 @@ export function TreeNode<T>({
   getAriaLabel,
   onSelect,
   renderRow,
+  renderDetail,
   rowClass,
   indentPx = 16,
   basePaddingPx = 8,
@@ -192,6 +209,7 @@ export function TreeNode<T>({
 
   const defaultRowBg = isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent";
   const rowClassName = rowClass ? rowClass(node, isSelected) : defaultRowBg;
+  const detail = renderDetail?.(node);
 
   return (
     <div
@@ -238,6 +256,16 @@ export function TreeNode<T>({
           error,
         })}
       </div>
+      {detail != null && detail !== false && (
+        <div
+          className="pb-1 pr-2"
+          style={{ paddingLeft: `${depth * indentPx + basePaddingPx + ROW_CONTENT_OFFSET_PX}px` }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {detail}
+        </div>
+      )}
       {isOpen && hasChildren && (
         <div role="group">
           {children!.map((child) => (
@@ -254,6 +282,7 @@ export function TreeNode<T>({
               indentPx={indentPx}
               basePaddingPx={basePaddingPx}
               {...(defaultOpen ? { defaultOpen } : {})}
+              {...(renderDetail ? { renderDetail } : {})}
               {...(getAriaLabel ? { getAriaLabel } : {})}
               {...(onSelect ? { onSelect } : {})}
               {...(rowClass ? { rowClass } : {})}
