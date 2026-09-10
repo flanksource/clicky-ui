@@ -201,6 +201,20 @@ describe("ObjectGraph", () => {
     });
   });
 
+  it("renders the type via renderType instead of the default @type span, receiving the node", () => {
+    const node: ObjectGraphNode = { id: "r", label: "bean", type: "ActivityDcl", kind: "object" };
+    const renderType = vi.fn((n: ObjectGraphNode) => <a href={`/classes?class=${n.type}`}>{n.type}</a>);
+    render(<ObjectGraph roots={[node]} renderType={renderType} />);
+    expect(screen.queryByText("@ActivityDcl")).toBeNull();
+    expect(screen.getByRole("link", { name: "ActivityDcl" })).toBeTruthy();
+    expect(renderType).toHaveBeenCalledWith(node);
+  });
+
+  it("falls back to the default @type span when renderType is omitted", () => {
+    render(<ObjectGraph roots={[{ id: "r", label: "bean", type: "Foo" }]} />);
+    expect(screen.getByText("@Foo")).toBeTruthy();
+  });
+
   it("opens a fullscreen copy when the fullscreen control is used", () => {
     render(
       <ObjectGraph

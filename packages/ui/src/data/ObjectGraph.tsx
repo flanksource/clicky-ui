@@ -35,6 +35,13 @@ export type ObjectGraphProps<T extends ObjectGraphNode = ObjectGraphNode> = {
    */
   renderValue?: (node: T) => ReactNode;
   /**
+   * Override how a node's `@type` annotation is rendered (e.g. as a link into
+   * a class browser). Called only when `node.type` is set; the caller owns the
+   * whole type rendering, including the leading `@`. Ignored when `renderLabel`
+   * replaces the whole label — `renderType` only applies to the default label.
+   */
+  renderType?: (node: T) => ReactNode;
+  /**
    * Lazily fetch a node's children the first time an `expandable` node opens.
    * When omitted, only inline `children` are shown.
    */
@@ -75,6 +82,7 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
   defaultOpenDepth = 2,
   renderLabel,
   renderValue,
+  renderType,
   loadChildren,
   onNodeSelect,
   selectedId,
@@ -157,6 +165,7 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
                 node={node}
                 selected={selectedId != null && node.id === selectedId}
                 {...(renderValue ? { renderValue } : {})}
+                {...(renderType ? { renderType } : {})}
                 {...(onNodeSelect ? { onSelect: onNodeSelect } : {})}
               />
             )}
@@ -217,11 +226,13 @@ function DefaultObjectLabel<T extends ObjectGraphNode>({
   node,
   onSelect,
   renderValue,
+  renderType,
   selected = false,
 }: {
   node: T;
   onSelect?: (node: T) => void;
   renderValue?: (node: T) => ReactNode;
+  renderType?: (node: T) => ReactNode;
   selected?: boolean;
 }) {
   const label = onSelect ? (
@@ -249,7 +260,12 @@ function DefaultObjectLabel<T extends ObjectGraphNode>({
   return (
     <>
       {label}
-      {node.type && <span className="text-muted-foreground/60">@{node.type}</span>}
+      {node.type &&
+        (renderType ? (
+          renderType(node)
+        ) : (
+          <span className="text-muted-foreground/60">@{node.type}</span>
+        ))}
       {custom != null ? (
         custom
       ) : node.value != null ? (

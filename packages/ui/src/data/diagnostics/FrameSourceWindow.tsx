@@ -18,9 +18,17 @@ import type { FrameSource } from "./FrameSourceWindow.utils";
 export function FrameSourceWindow({
   frame,
   className,
+  focalTone = "error",
 }: {
   frame: FrameSource;
   className?: string;
+  /**
+   * Styling for the focal line. `"error"` (the default, so existing callers
+   * render unchanged) is the red highlight meaning "this line failed".
+   * `"neutral"` marks "the line that made this call" — a subtle theme-token
+   * highlight with no red.
+   */
+  focalTone?: "error" | "neutral";
 }) {
   const lines = useMemo(() => frame.sourceLines ?? [], [frame.sourceLines]);
   const start = frame.sourceStartLine ?? 0;
@@ -50,6 +58,11 @@ export function FrameSourceWindow({
 
   if (lines.length === 0) return null;
 
+  const focalClassName =
+    focalTone === "neutral"
+      ? "bg-primary/10 font-semibold text-foreground"
+      : "bg-red-500/10 font-semibold text-red-800 dark:text-red-300";
+
   return (
     <div
       className={[
@@ -61,18 +74,19 @@ export function FrameSourceWindow({
     >
       {lines.map((source, i) => {
         const lineNumber = numbers?.[i] ?? start + i;
-        const isFocal = lineNumber === focal;
+        const known = numbers === undefined || lineNumber > 0;
+        const isFocal = known && lineNumber === focal;
         return (
           <div
             key={`${lineNumber}-${i}`}
             className={[
               "grid min-w-max grid-cols-[3.5rem_minmax(24rem,1fr)] gap-3 px-2",
-              isFocal ? "bg-red-500/10 font-semibold text-red-800 dark:text-red-300" : "text-foreground",
+              isFocal ? focalClassName : "text-foreground",
             ].join(" ")}
           >
             <span className="select-none text-right text-muted-foreground">
               {isFocal ? ">" : ""}
-              {lineNumber}
+              {known ? lineNumber : ""}
             </span>
             <code className="whitespace-pre">
               {source ? <HighlightedTokens tokens={tokens?.[i]} content={source} /> : " "}
