@@ -9,6 +9,7 @@ import {
   UiFullscreen,
   UiFullscreenFilled,
 } from "../icons";
+import { mediaMatches } from "../hooks/use-media-query";
 import { useEscapeLayer, useModalStack } from "./modalStack";
 import { zIndex } from "./zIndex";
 
@@ -152,9 +153,11 @@ export function Modal({
   useEffect(() => {
     window.clearTimeout(closeTimerRef.current);
     window.cancelAnimationFrame(openFrameRef.current ?? 0);
+    // Both false where the environment cannot be asked, which lands on the
+    // desktop path: mount and unmount immediately, no deferred unmount to wait
+    // on. That is the right answer under SSR and in a consumer's jsdom suite.
     const animateMobile =
-      window.matchMedia(MOBILE_QUERY).matches &&
-      !window.matchMedia(REDUCED_MOTION_QUERY).matches;
+      mediaMatches(MOBILE_QUERY) && !mediaMatches(REDUCED_MOTION_QUERY);
 
     if (open) {
       setPresent(true);

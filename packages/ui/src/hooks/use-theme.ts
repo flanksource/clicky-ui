@@ -1,5 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
+import { mediaMatches, onMediaChange } from "./use-media-query";
+
+export const PREFERS_DARK_QUERY = "(prefers-color-scheme: dark)";
+
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
@@ -15,8 +19,7 @@ const DATA_ATTR = "data-theme";
 export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function prefersDark(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return mediaMatches(PREFERS_DARK_QUERY);
 }
 
 export function readStoredTheme(): Theme {
@@ -51,13 +54,13 @@ export function useResolvedTheme(override?: Theme): ResolvedTheme {
     prefersDark() ? "dark" : "light",
   );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setSystemResolved(mq.matches ? "dark" : "light");
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+  useEffect(
+    () =>
+      onMediaChange(PREFERS_DARK_QUERY, (dark) =>
+        setSystemResolved(dark ? "dark" : "light"),
+      ),
+    [],
+  );
 
   if (override && override !== "system") return override;
   if (override === "system") return systemResolved;
