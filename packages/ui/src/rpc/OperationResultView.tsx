@@ -13,8 +13,11 @@ import {
 import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
+  ClickyRowDetailRenderer,
+  ClickyRowDetailTitle,
   ClickyTableRowSelection,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type {
   CellFilterChange,
   CellFilterMode,
@@ -61,6 +64,14 @@ export type ResultRenderContext = {
    * surface cannot page forward.
    */
   infinite?: DataTableInfinite;
+  /** Host row-detail renderer the default view would have wired to the table. */
+  renderRowDetail?: ClickyRowDetailRenderer;
+  /** How `renderRowDetail` content is surfaced. */
+  detailStyle?: "row" | "dialog";
+  /** Dialog size when `detailStyle` is "dialog". */
+  detailDialogSize?: ModalSize;
+  /** Dialog title when `detailStyle` is "dialog". */
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 // ResultRenderer lets the host app swap the result presentation per surface. It
@@ -105,6 +116,14 @@ export type OperationResultViewProps = {
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   getRowDetailHref?: (id: string) => string | undefined;
+  /** Host row-detail renderer, given raw values keyed by column name. */
+  renderRowDetail?: ClickyRowDetailRenderer;
+  /** How `renderRowDetail` content is surfaced when a row is clicked. */
+  detailStyle?: "row" | "dialog";
+  /** Dialog size when `detailStyle` is "dialog". */
+  detailDialogSize?: ModalSize;
+  /** Dialog title when `detailStyle` is "dialog". */
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 type ErrorResultRow = {
@@ -145,6 +164,10 @@ export function OperationResultView({
   infinite,
   rowSelection,
   getRowDetailHref,
+  renderRowDetail,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
 }: OperationResultViewProps) {
   const rowNav = useRowDetailNavigation(detailOperation, getRowDetailHref);
   const filters = filterConfig?.filters;
@@ -224,6 +247,10 @@ export function OperationResultView({
       {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
       {...(rowSelection ? { rowSelection } : {})}
+      {...(renderRowDetail ? { renderRowDetail } : {})}
+      {...(detailStyle ? { detailStyle } : {})}
+      {...(detailDialogSize ? { detailDialogSize } : {})}
+      {...(detailDialogTitle ? { detailDialogTitle } : {})}
     />
   );
 }

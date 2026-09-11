@@ -16,11 +16,14 @@ import {
   type ClickyDownloadOptions,
   type ClickyDocument,
   type ClickyNode,
+  type ClickyRowDetailRenderer,
+  type ClickyRowDetailTitle,
   type ClickyTableRowClick,
   type ClickyTableRowHref,
   type ClickyTableRowPredicate,
   type ClickyTableRowSelection,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type {
   CellFilterChange,
   CellFilterMode,
@@ -57,6 +60,10 @@ export type CommandOutputProps = {
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
+  renderRowDetail?: ClickyRowDetailRenderer;
+  detailStyle?: "row" | "dialog";
+  detailDialogSize?: ModalSize;
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 type LoadingResultRow = {
@@ -96,6 +103,10 @@ export function CommandOutput({
   infinite,
   rowSelection,
   download,
+  renderRowDetail,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
 }: CommandOutputProps) {
   const text = response?.stdout || response?.output || "";
   const ct = response?.contentType || "application/json";
@@ -151,6 +162,10 @@ export function CommandOutput({
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
+        {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(detailStyle ? { detailStyle } : {})}
+        {...(detailDialogSize ? { detailDialogSize } : {})}
+        {...(detailDialogTitle ? { detailDialogTitle } : {})}
         loading={loading}
       />
     );
@@ -250,6 +265,10 @@ function OutputBody({
   infinite,
   rowSelection,
   download,
+  renderRowDetail,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
   loading,
 }: {
   text: string;
@@ -273,6 +292,10 @@ function OutputBody({
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
   download?: ClickyDownloadOptions;
+  renderRowDetail?: ClickyRowDetailRenderer;
+  detailStyle?: "row" | "dialog";
+  detailDialogSize?: ModalSize;
+  detailDialogTitle?: ClickyRowDetailTitle;
   loading: boolean;
 }) {
   const ct = (contentType.split(";")[0] ?? "").trim();
@@ -320,6 +343,10 @@ function OutputBody({
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
         {...(download ? { download } : {})}
+        {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(detailStyle ? { detailStyle } : {})}
+        {...(detailDialogSize ? { detailDialogSize } : {})}
+        {...(detailDialogTitle ? { detailDialogTitle } : {})}
         loading={loading}
         className="flex min-h-0 flex-1 flex-col"
       />

@@ -66,12 +66,14 @@ export function useBrowserRouter(): RouterAdapter {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, []);
   const renderLink = useCallback<RenderLink>(
-    ({ to, className, children, title, key }) => (
+    ({ to, className, children, title, key, draggable, onDragStart }) => (
       <a
         key={key}
         href={to}
         className={className}
         title={title}
+        draggable={draggable}
+        onDragStart={onDragStart}
         onClick={(event) => {
           if (!isPlainLeftClick(event)) return;
           event.preventDefault();
@@ -96,12 +98,14 @@ export function useMemoryRouter(initialPath: string): RouterAdapter {
   const [pathname, setPathname] = useState(initialPath);
   const navigate = useCallback((to: string) => setPathname(to), []);
   const renderLink = useCallback<RenderLink>(
-    ({ to, className, children, title, key }) => (
+    ({ to, className, children, title, key, draggable, onDragStart }) => (
       <a
         key={key}
         href={to}
         className={className}
         title={title}
+        draggable={draggable}
+        onDragStart={onDragStart}
         onClick={(event) => {
           event.preventDefault();
           setPathname(to);

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { useMemo, useState, type DragEvent, type ReactElement, type ReactNode } from "react";
 import { MethodBadge } from "../data/MethodBadge";
 import type { DomainDefinition, ResolvedOperation } from "./types";
 
@@ -8,6 +8,12 @@ export type RenderLinkArgs = {
   children: ReactNode;
   title?: string;
   key?: string;
+  /**
+   * A stretched row link must not start a native link drag: on touch that
+   * drag swallows the horizontal pan a wide table needs.
+   */
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLAnchorElement>) => void;
 };
 
 // Render-prop form lets callers pass react-router's Link, a plain <a>, or

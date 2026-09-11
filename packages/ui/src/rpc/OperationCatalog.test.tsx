@@ -321,7 +321,9 @@ function makeLookupResponse(): OperationLookupResponse {
         type: "multi-filter",
         options: {
           First: { kind: "text", text: "First", plain: "First" },
+          Second: { kind: "text", text: "Second", plain: "Second" },
         },
+        counts: { First: 128 },
       },
       "include-archived": {
         label: "Include archived",
@@ -993,5 +995,27 @@ describe("OperationCatalog", () => {
         ),
       { timeout: 2_000 }
     );
+  });
+
+  it("shows the lookup response's per-value counts in a rendered multi-filter dropdown", async () => {
+    const client = makeClient();
+    client.lookupMock.mockResolvedValue(makeLookupResponse());
+    renderCatalog(client);
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.lookupMock).toHaveBeenCalledTimes(1));
+
+    // "filter.Name" is type "multi-filter" (kind "multi"), the same shape the
+    // trace-results facet filters (SQL Type/Database/Tables) use.
+    const name = await screen.findByLabelText("Name");
+    fireEvent.focus(name);
+
+    const firstOption = await screen.findByRole("option", { name: /First/ });
+    // "filter.Name.First" carries a count (128) in makeLookupResponse;
+    // "filter.Name.Second" carries none, and must render with no invented count.
+    expect(firstOption).toHaveTextContent("128");
+    const secondOption = screen.getByRole("option", { name: /Second/ });
+    expect(secondOption).toHaveTextContent("Second");
+    expect(secondOption).not.toHaveTextContent(/\d/);
   });
 });

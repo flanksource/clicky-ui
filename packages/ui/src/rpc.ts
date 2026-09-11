@@ -2,6 +2,12 @@ export {
   OperationCatalog,
   type OperationCatalogProps,
 } from "./rpc/OperationCatalog";
+// Re-exported so a host that renders OperationCatalog/EntityExplorerApp
+// needs no `@tanstack/react-query` dependency of its own — every rpc query
+// hook here (useOperations, useOperationPages, ...) already requires one
+// instance to be provided somewhere above it, and this is that instance's
+// single real source in clicky-ui's own dependency graph.
+export { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 export {
   EntityExplorerApp,
   type EntityExplorerAppProps,
