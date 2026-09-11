@@ -21,7 +21,10 @@ import type {
   ClickyDownloadOptions,
   ClickyRemoteFormat,
   ClickyRow,
+  ClickyRowDetailRenderer,
+  ClickyRowDetailTitle,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type { CellFilterChange } from "../data/cells/CellFilterActions";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { OperationCatalogActions } from "./OperationCatalogActions";
@@ -61,10 +64,7 @@ import {
 } from "../data/data-table-filter-values";
 import { Loading } from "../components/loading";
 import { getClickyRowId } from "./rowNavigation";
-import {
-  readOperationFiltersFromUrl,
-  writeOperationFiltersToUrl,
-} from "./operationCatalogUrl";
+import { useOperationCatalogFilterState } from "./operationCatalogFilterState";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -107,9 +107,42 @@ export type OperationCatalogProps = {
   actionInitialValues?: Record<string, Record<string, string>>;
   /** Plural noun used by the cross-page selection notice. */
   selectionNoun?: string;
+  /**
+   * Parameter values pinned by the host — sent on every list request, every
+   * filter lookup (both `client.lookupFilters` and per-filter type-ahead), and
+   * every export/download URL. Never rendered as an editable filter chip or
+   * form field, and never round-tripped through the URL: the host, not the
+   * reader, owns them (e.g. the `stream` a trace-results panel is scoped to).
+   */
+  lockedValues?: Record<string, string>;
+  /**
+   * Controls whether list filters/pagination/sort read and write the URL.
+   * Omit for today's behaviour: unprefixed query params. `false` neither
+   * reads nor writes the URL — for a catalog embedded where the host owns the
+   * whole URL. `{ prefix }` reads and writes only `<prefix>.<name>` keys, so
+   * the catalog can live inside a host route with its own `?step=`/`?tab=`
+   * params without colliding.
+   */
+  urlState?: false | { prefix: string };
+  /**
+   * Host row-detail configuration for the result table. `render` receives raw
+   * row values keyed by column name, including columns hidden from `columns`
+   * — see `ClickyRowDetailRenderer`. Never disturbs server paging, filters,
+   * sort or export.
+   */
+  rowDetail?: {
+    render: ClickyRowDetailRenderer;
+    /** How the detail is surfaced when a row is clicked. Defaults to "row". */
+    style?: "row" | "dialog";
+    /** Dialog size when `style` is "dialog". Defaults to DataTable's "lg". */
+    dialogSize?: ModalSize;
+    /** Dialog title when `style` is "dialog", given the same raw row values as `render`. */
+    title?: ClickyRowDetailTitle;
+  };
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
+const EMPTY_LOCKED_VALUES: Record<string, string> = {};
 
 export function OperationCatalog({
   definition,
@@ -131,7 +164,14 @@ export function OperationCatalog({
   getRowDetailHref,
   actionInitialValues,
   selectionNoun,
+  lockedValues = EMPTY_LOCKED_VALUES,
+  urlState,
+  rowDetail,
 }: OperationCatalogProps) {
+  const renderRowDetail = rowDetail?.render;
+  const rowDetailStyle = rowDetail?.style;
+  const rowDetailDialogSize = rowDetail?.dialogSize;
+  const rowDetailTitle = rowDetail?.title;
   const { operations, spec, isLoading } = useOperations(client);
   const filterShapes = spec?.components?.["x-clicky-filters"];
 
@@ -159,13 +199,12 @@ export function OperationCatalog({
         : undefined,
     [domainOps, surfaceKey, useSurfaceMetadata]
   );
-  const [filters, setFilters] = useState<Record<string, string>>(() =>
-    readOperationFiltersFromUrl()
-  );
+  const listParameters = listEndpoint?.operation.parameters ?? [];
+  const { filters, setFilters, effectiveFilters } =
+    useOperationCatalogFilterState({ listParameters, lockedValues, urlState });
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<ClickyRow[]>([]);
   const [selectedScopeId, setSelectedScopeId] = useState<string>();
-  const listParameters = listEndpoint?.operation.parameters ?? [];
   const membershipFilterParameterNames = useMemo(
     () =>
       listParameters
@@ -198,8 +237,8 @@ export function OperationCatalog({
     }
   }, [membershipFilterKey]);
   const lookupParameters = useMemo(
-    () => packLookupParameterValues(filters, listParameters),
-    [filters, listParameters]
+    () => packLookupParameterValues(effectiveFilters, listParameters),
+    [effectiveFilters, listParameters]
   );
   const download = useMemo<ClickyDownloadOptions | undefined>(() => {
     const meta = listEndpoint?.operation["x-clicky"]?.export;
@@ -221,18 +260,11 @@ export function OperationCatalog({
     };
   }, [definition.title, listEndpoint]);
 
-  useEffect(() => {
-    writeOperationFiltersToUrl(
-      filters,
-      listParameters.map((parameter) => parameter.name)
-    );
-  }, [filters, listParameters]);
-
   const list = useOperationPages({
     client,
     endpoint: listEndpoint,
     parameters: listParameters,
-    filters,
+    filters: effectiveFilters,
   });
 
   useCursorStaleRecovery({
@@ -287,7 +319,7 @@ export function OperationCatalog({
   const lookupSearch = useOperationFilterSearch(
     client,
     listEndpoint,
-    filters,
+    effectiveFilters,
     listParameters
   );
 
@@ -296,12 +328,21 @@ export function OperationCatalog({
       includeLocations: ["query"],
       lookupSearch,
       components: filterShapes,
+      lockedValues,
+      hideLocked: true,
     };
     if (lookupQuery.data != null) {
       options.lookup = lookupQuery.data;
     }
     return parametersToFormConfig(listParameters, filters, setFilters, options);
-  }, [filters, filterShapes, listParameters, lookupQuery.data, lookupSearch]);
+  }, [
+    filters,
+    filterShapes,
+    listParameters,
+    lockedValues,
+    lookupQuery.data,
+    lookupSearch,
+  ]);
   const dataTablePagination = useMemo(
     () =>
       dataTablePaginationFromForm(filterBarConfig.pagination, list.response),
@@ -530,6 +571,12 @@ export function OperationCatalog({
                   ? { sort: filterBarConfig.sort }
                   : {})}
                 {...(download ? { download } : {})}
+                {...(renderRowDetail ? { renderRowDetail } : {})}
+                {...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {})}
+                {...(rowDetailDialogSize
+                  ? { detailDialogSize: rowDetailDialogSize }
+                  : {})}
+                {...(rowDetailTitle ? { detailDialogTitle: rowDetailTitle } : {})}
                 {...walkProps}
               />
             );
@@ -552,6 +599,12 @@ export function OperationCatalog({
                     : {}),
                   ...(download ? { download } : {}),
                   ...(surfaceKey ? { surfaceKey } : {}),
+                  ...(renderRowDetail ? { renderRowDetail } : {}),
+                  ...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {}),
+                  ...(rowDetailDialogSize
+                    ? { detailDialogSize: rowDetailDialogSize }
+                    : {}),
+                  ...(rowDetailTitle ? { detailDialogTitle: rowDetailTitle } : {}),
                   ...walkProps,
                 })
               : defaultView;

@@ -135,7 +135,10 @@ function sampleListResponse(params: Record<string, string>): ExecutionResponse {
   const order = params.order || "desc";
   const limit = Number(params.limit || 2);
   const offset = Number(params.offset || 0);
-  const rows = [...SAMPLE_ROWS]
+  const filtered = SAMPLE_ROWS.filter((row) =>
+    params.kind ? row.kind === params.kind : true,
+  );
+  const rows = [...filtered]
     .sort((left, right) => {
       const comparison = left[sort as "name" | "updated"].localeCompare(
         right[sort as "name" | "updated"],
@@ -170,10 +173,10 @@ function sampleListResponse(params: Record<string, string>): ExecutionResponse {
     parsed: document,
     stdout: JSON.stringify(document),
     pagination: {
-      total: SAMPLE_ROWS.length,
+      total: filtered.length,
       limit,
       offset,
-      hasMore: offset + rows.length < SAMPLE_ROWS.length,
+      hasMore: offset + rows.length < filtered.length,
     },
   };
 }
@@ -262,4 +265,36 @@ export default meta;
 
 export const Default: StoryObj<typeof OperationCatalog> = {
   render: (args) => <CatalogShowcase {...args} />,
+};
+
+// A trace-results-style embedding: `kind` is pinned by the host (so only "big"
+// widgets ever show, and no "Kind" filter chip is rendered), the URL round-trip
+// is namespaced under a "story" prefix so it would not collide with a host
+// route's own query params, and each row expands into host-rendered detail —
+// none of which disturb the native paging/filters/sort/export the table still
+// drives.
+export const LockedValuesAndRowDetail: StoryObj<typeof OperationCatalog> = {
+  args: {
+    lockedValues: { kind: "big" },
+    urlState: { prefix: "story" },
+    rowDetail: {
+      render: (row) => (
+        <div className="space-y-1 p-density-3 text-sm">
+          <div className="font-semibold">{String(row.name)}</div>
+          <div className="text-muted-foreground">
+            Raw id: <code>{String(row.id)}</code>
+          </div>
+        </div>
+      ),
+    },
+  },
+  render: (args) => <CatalogShowcase {...args} />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "lockedValues pins `kind=big` (sent on every request, hidden from the filter bar); urlState namespaces the URL under `story.*`; rowDetail.render expands a clicked row with host-owned content built from raw cell values.",
+      },
+    },
+  },
 };
