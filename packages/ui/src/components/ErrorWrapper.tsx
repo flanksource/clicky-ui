@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
   type ErrorInfo,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import { ErrorDetails } from "../data/diagnostics/ErrorDetails";
@@ -43,7 +44,7 @@ export class ErrorWrapper extends Component<
     this.props.onError?.(error, errorInfo);
   }
 
-  override render() {
+  override render(): ReactElement {
     if (this.state.error) {
       return (
         <ErrorFallback
@@ -52,7 +53,7 @@ export class ErrorWrapper extends Component<
         />
       );
     }
-    return this.props.children;
+    return <>{this.props.children}</>;
   }
 }
 

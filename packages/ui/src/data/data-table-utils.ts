@@ -57,6 +57,19 @@ export function prettifyKey(key: string) {
     .trim();
 }
 
+export function labelText<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+) {
+  if (typeof column.label === "string") return column.label;
+  return prettifyKey(column.key.split(".").at(-1) ?? column.key);
+}
+
+export function isColumnHideable<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+) {
+  return column.hideable !== false;
+}
+
 export function inferColumns<T extends Record<string, unknown>>(
   data: T[],
   opts?: {

@@ -16,6 +16,7 @@ export {
   type ClickyProps,
   type ClickyRemoteFormat,
   type ClickyRow,
+  type ClickyRowDetailRenderer,
   type ClickyStyle,
   type ClickyTableProps,
   type ClickyTableRowHref,

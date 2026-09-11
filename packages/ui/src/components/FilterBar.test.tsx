@@ -31,27 +31,36 @@ function mockFilterBarWidths({
       if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth());
       const itemKey = this.getAttribute("data-filter-bar-item");
       if (itemKey) return rect(itemWidths[itemKey] ?? 120);
-      if (this.getAttribute("aria-label") === "More filters") return rect(triggerWidth);
+      if (/^(More )?filters$/.test(this.getAttribute("aria-label") ?? "")) return rect(triggerWidth);
     }
     return original.call(this);
   });
 }
 
-function mockMatchMedia(matches: boolean) {
-  return vi.spyOn(window, "matchMedia").mockImplementation(
-    (query: string) =>
-      ({
-        matches,
-        media: query,
-        onchange: null,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as MediaQueryList,
-  );
+// Answers each `(max-width: Npx)` query against a viewport width, so a test can
+// sit in the band between the sheet and `md` breakpoints where the two queries
+// disagree; a single boolean for every query cannot express that band. Any
+// other query (reduced motion, colour scheme) answers false, the library's own
+// safe default.
+function mockMatchMedia(viewportWidth: number) {
+  return vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+    const maxWidth = /\(max-width:\s*(\d+)px\)/.exec(query);
+    return {
+      matches: maxWidth ? viewportWidth <= Number(maxWidth[1]) : false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    } as MediaQueryList;
+  });
 }
+
+const PHONE_WIDTH = 390;
+const TABLET_WIDTH = 700;
+const DESKTOP_WIDTH = 1280;
 
 describe("FilterBar", () => {
   it("exposes the shared filter bar styling slot", () => {
@@ -574,13 +583,13 @@ describe("FilterBar", () => {
       />,
     );
 
-    await screen.findByRole("button", { name: /more filters/i });
-    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent(/\d/);
+    await screen.findByRole("button", { name: /^(more )?filters$/i });
+    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent(/\d/);
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^(more )?filters$/i }));
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveClass("rounded-md", "shadow-lg");
@@ -605,7 +614,7 @@ describe("FilterBar", () => {
       window.dispatchEvent(new Event("resize"));
     });
 
-    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
 
@@ -613,7 +622,7 @@ describe("FilterBar", () => {
   });
 
   it("moves all filters into the overflow panel on mobile widths", async () => {
-    const media = mockMatchMedia(true);
+    const media = mockMatchMedia(PHONE_WIDTH);
 
     render(
       <FilterBar
@@ -624,10 +633,10 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /more filters/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^(more )?filters$/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^(more )?filters$/i }));
     const dialog = screen.getByRole("dialog", { name: "Filters" });
     expect(dialog).toHaveClass("max-sm:!h-dvh", "max-sm:!rounded-none", "max-sm:shadow-none");
     expect(within(dialog).getByRole("button", { name: "Back" })).toBeInTheDocument();
@@ -642,6 +651,129 @@ describe("FilterBar", () => {
     expect(label).toHaveClass("col-span-2", "md:col-span-1");
     expect(control).not.toHaveClass("col-span-2");
     expect(clear).toHaveClass("self-center");
+
+    media.mockRestore();
+  });
+
+  it("collapses wrap-mode filters into the overflow panel on mobile widths", async () => {
+    const media = mockMatchMedia(PHONE_WIDTH);
+
+    render(
+      <FilterBar
+        overflowMode="wrap"
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    const trigger = await screen.findByRole("button", { name: "Filters" });
+    // The only way into filtering on a phone, so it says what it is.
+    expect(trigger).toHaveTextContent("Filters");
+    expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Owner")).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Filters" });
+    expect(within(dialog).getByLabelText("Team")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Owner")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Clear Team" })).toHaveClass("h-10", "w-10");
+    expect(within(dialog).getByRole("button", { name: "Apply" })).toHaveClass("h-10");
+
+    media.mockRestore();
+  });
+
+  it("keeps wrap-mode filters inline between the sheet and md breakpoints", () => {
+    const media = mockMatchMedia(TABLET_WIDTH);
+
+    render(
+      <FilterBar
+        overflowMode="wrap"
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+
+    media.mockRestore();
+  });
+
+  it("keeps wrap-mode filters inline above mobile widths", () => {
+    const media = mockMatchMedia(DESKTOP_WIDTH);
+
+    render(
+      <FilterBar
+        overflowMode="wrap"
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+
+    media.mockRestore();
+  });
+
+  it("keeps the bar on one row on phone widths", async () => {
+    const media = mockMatchMedia(PHONE_WIDTH);
+
+    const { container } = render(
+      <FilterBar
+        search={{ value: "", onChange: vi.fn(), placeholder: "Search rows…" }}
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+        dateRange={{ from: "", to: "", onApply: vi.fn() }}
+        trailing={<button type="button">Extra</button>}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Filters" });
+    expect(container.querySelector('[data-slot="filter-bar"]')).toHaveClass("max-sm:flex-nowrap");
+    const searchField = screen.getByRole("searchbox", { name: /search rows/i }).closest("label")!
+      .parentElement!;
+    expect(searchField).toHaveClass("flex-1", "md:flex-[1_1_14rem]");
+    expect(searchField).not.toHaveClass("flex-[1_1_14rem]");
+    const trailingGroup = screen.getByRole("button", { name: "Extra" }).parentElement!;
+    expect(trailingGroup).toHaveClass("max-md:flex-nowrap", "md:shrink-0");
+    expect(trailingGroup).not.toHaveClass("shrink-0");
+
+    media.mockRestore();
+  });
+
+  it("shows the range control as an icon-only button on phone widths", () => {
+    const media = mockMatchMedia(PHONE_WIDTH);
+
+    render(<FilterBar dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }} />);
+
+    const trigger = screen.getByRole("button", { name: /^date range filter: .*now-45d/i });
+    expect(trigger).toHaveTextContent("");
+    expect(trigger).toHaveClass("w-8");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Date range" })).toBeInTheDocument();
+
+    media.mockRestore();
+  });
+
+  it("keeps the range label visible above mobile widths", () => {
+    const media = mockMatchMedia(DESKTOP_WIDTH);
+
+    render(<FilterBar dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }} />);
+
+    const trigger = screen.getByRole("button", { name: "Date range filter" });
+    expect(trigger).toHaveTextContent("now-45d");
+    expect(trigger).toHaveClass("w-fit");
 
     media.mockRestore();
   });
@@ -678,9 +810,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /more filters/i })).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent("1/3");
-    expect(screen.getByRole("button", { name: /more filters/i })).not.toHaveTextContent("3");
+    expect(await screen.findByRole("button", { name: /^(more )?filters$/i })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent("1/3");
+    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent("3");
 
     rerender(
       <FilterBar
@@ -703,7 +835,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /more filters/i })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).toHaveTextContent("3");
 
     measurement.mockRestore();
   });
@@ -730,7 +862,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
@@ -763,7 +895,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
     fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
     expect(onService).not.toHaveBeenCalled();
     fireEvent.click(
@@ -799,7 +931,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
     fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
     fireEvent.click(
       within(screen.getByRole("dialog", { name: /overflow filters/i })).getByRole("button", {
@@ -809,7 +941,7 @@ describe("FilterBar", () => {
 
     expect(onService).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: /more filters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^(more )?filters$/i }));
     expect(screen.getByLabelText("Service")).toHaveValue("");
 
     measurement.mockRestore();
@@ -844,7 +976,7 @@ describe("FilterBar", () => {
         />,
       );
 
-      fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+      fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
       const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
       const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
       expect(toggle().getAttribute("aria-checked")).toBe(String(live));
@@ -886,7 +1018,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
     expect(toggle().id).not.toBe("");
@@ -907,7 +1039,7 @@ describe("FilterBar", () => {
 
     render(<FilterBar overflowMode="wrap" filters={filters} />);
 
-    expect(screen.queryByRole("button", { name: /more filters/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
   });
@@ -1251,7 +1383,7 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /more filters/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     fireEvent.focus(within(dialog).getByRole("combobox", { name: "Status" }));
 

@@ -1125,6 +1125,73 @@ function SelectionActionDescriptorsShowcase() {
   );
 }
 
+type MobileRow = {
+  service: string;
+  status: string;
+  region: string;
+  updated: string;
+  notes: string;
+};
+
+const mobileRows: MobileRow[] = [
+  {
+    service: "api",
+    status: "healthy",
+    region: "us-east",
+    updated: "2026-04-15T12:04:33Z",
+    notes: "Primary public API serving customer traffic.",
+  },
+  {
+    service: "worker",
+    status: "degraded",
+    region: "us-west",
+    updated: "2026-04-15T11:58:10Z",
+    notes: "Queue processor draining a delayed retry batch.",
+  },
+  {
+    service: "billing",
+    status: "healthy",
+    region: "eu-west",
+    updated: "2026-04-15T11:40:02Z",
+    notes: "Ledger sync and invoice reconciliation.",
+  },
+];
+
+const mobileColumns: DataTableColumn<MobileRow>[] = [
+  { key: "service", label: "Service", grow: true },
+  { key: "status", label: "Status", shrink: true },
+  { key: "region", label: "Region", shrink: true },
+  { key: "updated", label: "Updated", kind: "timestamp", shrink: true },
+  { key: "notes", label: "Notes", grow: true },
+];
+
+// A single-scenario showcase for the phone layout: the ⋯ menu opens as a full
+// height Modal sheet, the footer stays on one line with a compact "N/Total"
+// page indicator, and the stretched row link no longer starts a native drag —
+// so the row scrolls horizontally with the reader's finger instead of it.
+function MobilePhoneShowcase() {
+  return (
+    <DataTable
+      data={mobileRows}
+      columns={mobileColumns}
+      autoFilter
+      showGlobalFilter
+      globalFilterPlaceholder="Search services…"
+      hideableColumns
+      menuActions={downloadMenuActions}
+      getRowHref={(row) => `/services/${row.service}`}
+      pagination={{
+        page: 0,
+        pageSize: 50,
+        total: 5324,
+        onPageChange: () => {},
+        onPageSizeChange: () => {},
+      }}
+      columnResizeStorageKey="clicky-ui-story-data-table-mobile-phone"
+    />
+  );
+}
+
 const meta = {
   title: "Data/DataTable",
   component: DataTable,
@@ -1610,5 +1677,18 @@ export const VirtualizedKeepsRowsWhenDataIsRebuilt: Story = {
         textAtDepth,
       ),
     );
+  },
+};
+
+export const MobilePhone: Story = {
+  render: () => <MobilePhoneShowcase />,
+  parameters: {
+    viewport: { defaultViewport: "mobile1" },
+    docs: {
+      description: {
+        story:
+          "Below the `sm` breakpoint the ⋯ menu opens as a full-height sheet, the pagination footer stays on one line with a compact page indicator, and the stretched row link no longer starts a native drag.",
+      },
+    },
   },
 };

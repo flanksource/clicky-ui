@@ -172,6 +172,10 @@ function toComboboxOptions(options: MultiSelectOption[]): ComboboxOption[] {
       ...(option.selectedLabel !== undefined ? { selectedLabel: option.selectedLabel } : {}),
       ...(option.icon !== undefined ? { icon: option.icon } : {}),
       ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+      // MultiFilterField's Combobox always renders tristate, so the option
+      // row is a FilterPill: `count` becomes its leading badge (`trailing` is
+      // ignored in tristate mode).
+      ...(option.count !== undefined ? { count: option.count } : {}),
     };
   });
 }
@@ -204,7 +208,7 @@ export type TriStateMultiSelectProps = {
 export function TriStateMultiSelect({ grow = true, ...rest }: TriStateMultiSelectProps) {
   const filter: FilterBarMultiFilter = { key: rest.label, kind: "multi", ...rest };
   return (
-    <FilterBarContext.Provider value={{ autoSubmit: false }}>
+    <FilterBarContext.Provider value={{ autoSubmit: false, compact: false }}>
       <MultiFilterField filter={filter} grow={grow} />
     </FilterBarContext.Provider>
   );
@@ -312,6 +316,7 @@ export function MultiFilterPanel({
                 mode={mode}
                 title={title}
                 togglePosition="right"
+                {...(option.count !== undefined ? { count: option.count } : {})}
                 onModeChange={(next) => setDraft(updateMultiFilterValue(draft, option.value, next))}
               />
             </div>

@@ -55,6 +55,7 @@ import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { UiChevronDown, UiChevronRight, UiChevronUp, UiClose, UiFilter, UiSearch } from "../icons";
 import { cn } from "../lib/utils";
+import { useMediaQuery } from "../hooks/use-media-query";
 import { Modal } from "../overlay/Modal";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
@@ -115,6 +116,8 @@ export type FilterBarLookupOption = {
   disabled?: boolean;
   /** Optional browser tooltip. */
   title?: string;
+  /** Row count behind this option, rendered as a trailing badge. */
+  count?: number;
 };
 
 export type FilterBarLookupInputType = "text" | "number" | "date";
@@ -414,7 +417,11 @@ export type FilterBarProps = {
   applyLabel?: string;
   /** Shows a pending state on the Apply button. */
   isPending?: boolean;
-  /** `responsive` moves hidden filters into an overflow popover; `wrap` lets them wrap. */
+  /**
+   * `responsive` moves hidden filters into an overflow popover; `wrap` lets
+   * them wrap. Below the `md` breakpoint both modes collapse every filter into
+   * the Filters sheet, so a phone never stacks one filter per row.
+   */
   overflowMode?: "responsive" | "wrap";
   /**
    * Content that takes the bar's place while it is present — a bulk-action bar
@@ -445,11 +452,23 @@ export function FilterBar({
 }: FilterBarProps) {
   const hasRangeControls = Boolean(timeRange || dateRange);
   const showApply = !autoSubmit && !!onApply;
-  const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
   const allFilters = filters ?? [];
-  const responsiveOverflow = overflowMode === "responsive" && allFilters.length > 0;
   const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
   const mobilePageOverflow = useMediaQuery("(max-width: 639px)");
+  const contextValue = useMemo(
+    () => ({ autoSubmit, compact: mobileFilterOverflow }),
+    [autoSubmit, mobileFilterOverflow],
+  );
+  // `wrap` describes how a crowded bar behaves on a desktop: it wraps instead
+  // of hiding filters behind a trigger. At phone widths wrapping stacks every
+  // filter into its own row and pushes the table off the screen, so below the
+  // sheet breakpoint both modes collapse into the Filters sheet. Between the
+  // sheet and `md` breakpoints wrap mode keeps wrapping: collapsing there would
+  // hide filters a tablet has room for behind a popover.
+  const mobileCollapse =
+    overflowMode === "responsive" ? mobileFilterOverflow : mobilePageOverflow;
+  const responsiveOverflow =
+    allFilters.length > 0 && (overflowMode === "responsive" || mobileCollapse);
   const filterListRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
@@ -468,18 +487,18 @@ export function FilterBar({
   // setVisibleFilterCount fired → repeat).
   const allFiltersRef = useRef(allFilters);
   const responsiveOverflowRef = useRef(responsiveOverflow);
-  const mobileFilterOverflowRef = useRef(mobileFilterOverflow);
+  const mobileCollapseRef = useRef(mobileCollapse);
   allFiltersRef.current = allFilters;
   responsiveOverflowRef.current = responsiveOverflow;
-  mobileFilterOverflowRef.current = mobileFilterOverflow;
+  mobileCollapseRef.current = mobileCollapse;
 
   useLayoutEffect(() => {
     setVisibleFilterCount(
-      responsiveOverflowRef.current && mobileFilterOverflowRef.current
+      responsiveOverflowRef.current && mobileCollapseRef.current
         ? 0
         : allFiltersRef.current.length,
     );
-  }, [filterKeys, mobileFilterOverflow]);
+  }, [filterKeys, mobileCollapse]);
 
   const measureOverflow = useCallback(() => {
     const current = allFiltersRef.current;
@@ -487,7 +506,7 @@ export function FilterBar({
       setVisibleFilterCount(current.length);
       return;
     }
-    if (mobileFilterOverflowRef.current) {
+    if (mobileCollapseRef.current) {
       setVisibleFilterCount(0);
       return;
     }
@@ -552,7 +571,7 @@ export function FilterBar({
       observer.disconnect();
       window.removeEventListener("resize", measureOverflow);
     };
-  }, [measureOverflow, responsiveOverflow, mobileFilterOverflow]);
+  }, [measureOverflow, responsiveOverflow, mobileCollapse]);
 
   const inlineFilters = responsiveOverflow
     ? allFilters.slice(0, Math.min(visibleFilterCount, allFilters.length))
@@ -581,7 +600,11 @@ export function FilterBar({
           // so twMerge keeps both and the breakpoint variant still wins above
           // md — which made the documented escape hatch do nothing on exactly
           // the desktop widths where a crowded bar overflows the viewport.
-          overflowMode === "wrap" ? "flex-wrap" : "flex-wrap md:flex-nowrap",
+          // Below `sm` the row only ever holds search, the Filters trigger
+          // and the trailing group, so it never needs a second line.
+          overflowMode === "wrap"
+            ? "flex-wrap max-sm:flex-nowrap"
+            : "flex-wrap max-sm:flex-nowrap md:flex-nowrap",
           className,
           // Hidden rather than unmounted, so a half-typed search survives the
           // takeover. `visibility: hidden` is not focusable per spec, so this
@@ -623,13 +646,14 @@ export function FilterBar({
             triggerRef={overflowTriggerRef}
             filters={overflowFilters}
             activeHidden={activeOverflowCount}
+            allHidden={inlineFilters.length === 0}
             mobilePage={mobilePageOverflow}
             {...(onApply ? { onApply } : {})}
           />
         )}
 
         {(hasRangeControls || trailing || showApply) && (
-          <div className="ml-auto flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="ml-auto flex min-w-0 items-center justify-end gap-2 max-md:flex-nowrap md:shrink-0 md:flex-wrap">
             {dateRange && <RangeControlButton kind="date" label="Date range" {...dateRange} />}
             {timeRange && (
               <RangeControlButton
@@ -686,7 +710,7 @@ export function FilterBarFilterPanel({
   chrome?: FilterBarFilterPanelChrome;
   autoSubmit?: boolean;
 }) {
-  const contextValue = useMemo(() => ({ autoSubmit }), [autoSubmit]);
+  const contextValue = useMemo(() => ({ autoSubmit, compact: false }), [autoSubmit]);
 
   return (
     <FilterBarContext.Provider value={contextValue}>
@@ -784,12 +808,19 @@ function OverflowFiltersMenu({
   triggerRef,
   filters,
   activeHidden,
+  allHidden,
   mobilePage,
   onApply,
 }: {
   triggerRef: RefObject<HTMLButtonElement | null>;
   filters: FilterBarFilter[];
   activeHidden: number;
+  /**
+   * No filter is inline, so this trigger is the only way in. It then carries a
+   * visible "Filters" label: a bare glyph beside a search box gives a phone
+   * user nothing to say that filters exist at all.
+   */
+  allHidden: boolean;
   mobilePage: boolean;
   onApply?: () => void;
 }) {
@@ -851,7 +882,11 @@ function OverflowFiltersMenu({
   const clearAll = (
     <button
       type="button"
-      className="rounded px-1.5 py-0.5 text-xs text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground"
+      className={cn(
+        "rounded text-primary transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:text-muted-foreground",
+        // The sheet is a touch surface: its controls need finger-sized targets.
+        mobilePage ? "h-10 px-3 text-sm" : "px-1.5 py-0.5 text-xs",
+      )}
       onClick={() => stagedFilters.forEach(clearFilterBarFilter)}
       disabled={stagedFilters.every((filter) => !isFilterBarFilterActive(filter))}
     >
@@ -859,8 +894,13 @@ function OverflowFiltersMenu({
     </button>
   );
   const actions = (
-    <OverflowFilterActions onClose={closeOverflowMenu} onApply={applyOverflowFilters} />
+    <OverflowFilterActions
+      onClose={closeOverflowMenu}
+      onApply={applyOverflowFilters}
+      mobilePage={mobilePage}
+    />
   );
+  const triggerLabel = allHidden ? "Filters" : "More filters";
 
   return (
     <div
@@ -872,17 +912,18 @@ function OverflowFiltersMenu({
         type="button"
         variant="outline"
         size="sm"
-        aria-label="More filters"
+        aria-label={triggerLabel}
         tabIndex={hasHidden ? 0 : -1}
-        title={hasHidden ? "More filters" : undefined}
+        title={hasHidden ? triggerLabel : undefined}
         className={cn(
-          "h-8 min-w-0 gap-1.5 px-2 text-xs font-normal",
+          "h-8 min-w-0 gap-1.5 px-2 text-xs font-normal max-md:h-9",
           activeHidden > 0 && "border-primary/40 text-primary",
         )}
         {...getReferenceProps()}
         aria-expanded={open}
       >
         <Icon icon={UiFilter} className="text-[14px]" />
+        {allHidden && <span>Filters</span>}
         {activeHidden > 0 && (
           <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
             {activeHidden}
@@ -973,7 +1014,7 @@ function OverflowFilterRows({
             </label>
             <span className="hidden text-sm text-muted-foreground md:block">=</span>
             <div className="min-w-0 overflow-visible">
-              <FilterBarContext.Provider value={{ autoSubmit: false }}>
+              <FilterBarContext.Provider value={{ autoSubmit: false, compact: false }}>
                 <FilterBarKeyValueControl filter={filter} />
               </FilterBarContext.Provider>
             </div>
@@ -981,7 +1022,10 @@ function OverflowFilterRows({
               type="button"
               aria-label={`Clear ${filter.label}`}
               title={`Clear ${filter.label}`}
-              className="inline-flex h-6 w-6 self-center items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none disabled:text-muted-foreground/40"
+              className={cn(
+                "inline-flex self-center items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none disabled:text-muted-foreground/40",
+                mobilePage ? "h-10 w-10" : "h-6 w-6",
+              )}
               onClick={() => clearFilterBarFilter(filter)}
               disabled={!active}
             >
@@ -997,16 +1041,19 @@ function OverflowFilterRows({
 function OverflowFilterActions({
   onClose,
   onApply,
+  mobilePage = false,
 }: {
   onClose: () => void;
   onApply: () => void;
+  mobilePage?: boolean;
 }) {
+  const size = mobilePage ? "h-10 px-4 text-sm" : "h-8 px-3 text-xs";
   return (
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={onClose}>
+      <Button type="button" variant="ghost" size="sm" className={size} onClick={onClose}>
         Close
       </Button>
-      <Button type="button" variant="default" size="sm" className="h-8 px-3 text-xs" onClick={onApply}>
+      <Button type="button" variant="default" size="sm" className={size} onClick={onApply}>
         Apply
       </Button>
     </div>
@@ -1065,6 +1112,11 @@ function lookupOptionsToCombobox(options: FilterBarLookupOption[]): ComboboxOpti
     value: option.value,
     label: option.label ?? option.value,
     ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+    // Neither "lookup" nor "lookup-multi" renders tristate, so the count
+    // reaches the row through `trailing`, not the tristate pill's badge.
+    ...(option.count !== undefined
+      ? { trailing: <span>{option.count.toLocaleString()}</span> }
+      : {}),
   }));
 }
 
@@ -1360,7 +1412,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
   const [draft, setDraft] = useDebouncedTextDraft(search.value, search.onChange);
 
   return (
-    <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-2 md:min-w-[14rem] md:max-w-[24rem]">
+    <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-[1_1_14rem] md:min-w-[14rem] md:max-w-[24rem]">
       <label
         className={cn(
           "flex h-8 min-w-0 flex-1 items-center rounded-md border border-input bg-background px-3 text-sm",
@@ -1377,7 +1429,7 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
         <input
           type="search"
           aria-label={search.ariaLabel ?? search.placeholder ?? "Search"}
-          className="w-full bg-transparent outline-none placeholder:text-placeholder"
+          className="w-full min-w-0 bg-transparent outline-none placeholder:text-placeholder"
           placeholder={search.placeholder ?? "Search…"}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -2251,6 +2303,7 @@ function RangeControlButton({
   className,
   disabled,
 }: FilterBarRangeProps & { kind: "date" | "time"; label: string }) {
+  const { compact } = useContext(FilterBarContext);
   return (
     <TimeRange
       kind={kind}
@@ -2258,6 +2311,7 @@ function RangeControlButton({
       from={from}
       to={to}
       onApply={onApply}
+      compact={compact}
       {...(disabled !== undefined ? { disabled } : {})}
       {...(presets ? { presets } : {})}
       {...(timeEnabled !== undefined ? { timeEnabled } : {})}
@@ -2297,24 +2351,6 @@ function useAnchoredPopup(
     if (refs.domReference.current instanceof HTMLElement) refs.domReference.current.focus();
   });
   return { refs, floatingStyles, context, floatingZ, getReferenceProps, getFloatingProps };
-}
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener?.("change", onChange);
-    return () => media.removeEventListener?.("change", onChange);
-  }, [query]);
-
-  return matches;
 }
 
 function useDebouncedTextDraft(value: string, onChange: (value: string) => void) {

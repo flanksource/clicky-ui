@@ -127,6 +127,28 @@ function mockFilterBarWidths(listWidth: number, itemWidth = 112) {
     });
 }
 
+// Answers each `(max-width: Npx)` query against a viewport width — the same
+// helper FilterBar.test.tsx uses for its own mobile-sheet coverage. Any other
+// query (reduced motion, colour scheme) answers false, the library's own safe
+// default.
+function mockMatchMedia(viewportWidth: number) {
+  return vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+    const maxWidth = /\(max-width:\s*(\d+)px\)/.exec(query);
+    return {
+      matches: maxWidth ? viewportWidth <= Number(maxWidth[1]) : false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    } as MediaQueryList;
+  });
+}
+
+const PHONE_WIDTH = 390;
+
 describe("DataTable", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -1866,6 +1888,40 @@ describe("DataTable", () => {
     // A plain left-click routes client-side (no hard navigation).
     fireEvent.click(link);
     expect(navigate).toHaveBeenCalledWith("/services/api");
+  });
+
+  it("marks the stretched row anchor non-draggable so it can't swallow a horizontal touch pan", () => {
+    const adapter: RouterAdapter = {
+      pathname: "/",
+      navigate: vi.fn(),
+      renderLink: ({ to, className, children, draggable, onDragStart }) => (
+        <a
+          href={to}
+          className={className}
+          draggable={draggable}
+          onDragStart={onDragStart}
+        >
+          {children}
+        </a>
+      ),
+    };
+
+    render(
+      <RouterProvider adapter={adapter}>
+        <DataTable
+          data={rows}
+          columns={columns}
+          getRowHref={(row) => `/services/${row.service}`}
+        />
+      </RouterProvider>,
+    );
+
+    const link = screen.getByRole("link", { name: "api" });
+    expect(link).toHaveAttribute("draggable", "false");
+    expect(link.className).toContain("[-webkit-user-drag:none]");
+
+    const notCanceled = fireEvent.dragStart(link);
+    expect(notCanceled).toBe(false);
   });
 
   it("keeps cell-filter buttons outside the row link so both stay activatable", () => {
@@ -3615,5 +3671,125 @@ describe("DataTable caller-owned FilterBar inputs", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(ref.current).toBe(inline));
+  });
+
+  describe("table preferences sheet at phone widths", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("renders the ⋯ menu as a full-height mobile sheet below the sm breakpoint", () => {
+      mockMatchMedia(PHONE_WIDTH);
+      render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          showThemeControl
+          onThemeChange={vi.fn()}
+          menuActions={[
+            { id: "export-json", label: "Export JSON", onSelect: vi.fn() },
+          ]}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+
+      const dialog = screen.getByRole("dialog", { name: "Table options" });
+      expect(dialog).toHaveClass("max-sm:!h-dvh");
+      const sheet = within(dialog);
+      expect(sheet.getByText("Columns")).toBeInTheDocument();
+      expect(sheet.getByText("Show all")).toBeInTheDocument();
+      for (const label of ["Service", "Status", "Restarts", "Notes", "Tags"]) {
+        expect(
+          sheet.getByRole("checkbox", { name: label }),
+        ).toBeInTheDocument();
+      }
+      expect(sheet.getByText("Density")).toBeInTheDocument();
+      expect(sheet.getByText("Export JSON")).toBeInTheDocument();
+      expect(sheet.getByText("Theme")).toBeInTheDocument();
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("hides a column when its checkbox is toggled inside the sheet", () => {
+      mockMatchMedia(PHONE_WIDTH);
+      render(<DataTable data={rows} columns={columns} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+      const dialog = screen.getByRole("dialog", { name: "Table options" });
+      fireEvent.click(within(dialog).getByRole("checkbox", { name: "Service" }));
+
+      expect(
+        within(screen.getByRole("table")).queryByText("Service"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("closes the sheet on Escape", () => {
+      mockMatchMedia(PHONE_WIDTH);
+      render(<DataTable data={rows} columns={columns} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+      expect(
+        screen.getByRole("dialog", { name: "Table options" }),
+      ).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      expect(
+        screen.queryByRole("dialog", { name: "Table options" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the floating column menu at desktop widths", () => {
+      render(<DataTable data={rows} columns={columns} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Open column menu" }));
+
+      expect(
+        screen.getByRole("menu", { name: "Column menu" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: "Table options" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("pagination footer at phone widths", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("collapses onto one line with a compact page indicator", () => {
+      mockMatchMedia(PHONE_WIDTH);
+      const fullPage: ServiceRow[] = Array.from({ length: 50 }, (_, index) => ({
+        service: `service-${index}`,
+        status: "healthy",
+        restarts: 0,
+        notes: "",
+        tags: [],
+      }));
+      render(
+        <DataTable
+          data={fullPage}
+          columns={columns}
+          pagination={{
+            page: 0,
+            pageSize: 50,
+            total: 5324,
+            onPageChange: vi.fn(),
+            onPageSizeChange: vi.fn(),
+          }}
+        />,
+      );
+
+      const rangeLabel = screen.getByText("1-50 of 5324");
+      expect(rangeLabel.parentElement).toHaveClass("max-sm:flex-nowrap");
+
+      const rowsPerPage = screen.getByLabelText("Rows per page");
+      expect(rowsPerPage.tagName).toBe("SELECT");
+      expect(screen.getByText("Rows per page")).toHaveClass("max-sm:sr-only");
+
+      expect(screen.getByText("1/107")).toBeInTheDocument();
+      expect(screen.queryByText(/Page 1 of/)).not.toBeInTheDocument();
+    });
   });
 });
