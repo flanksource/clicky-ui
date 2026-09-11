@@ -22,6 +22,8 @@ export type WorkspacePaneSpec = {
   minHeight?: number;
   maxHeight?: number;
   collapsible?: boolean;
+  /** Omits the pane chrome when the content already owns its heading. */
+  showHeader?: boolean;
   resizable?: boolean;
   defaultCollapsed?: boolean;
   className?: string;
@@ -53,6 +55,11 @@ export function validateWorkspacePanes(panes: WorkspacePaneSpec[]) {
     if (ids.has(pane.id))
       throw new Error(`Workspace pane id ${pane.id} is duplicated`);
     ids.add(pane.id);
+    if (pane.showHeader === false && pane.collapsible !== false) {
+      throw new Error(
+        `Workspace pane ${pane.id} headerless panes must not be collapsible`,
+      );
+    }
     validatePaneDimensions(pane);
   }
 

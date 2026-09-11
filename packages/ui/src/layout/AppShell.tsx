@@ -455,6 +455,12 @@ export function AppShell(props: AppShellProps) {
                   data-slot="app-shell-actions"
                   className={cn(
                     "flex shrink-0 items-center gap-density-2",
+                    // Below md the cluster must never be wider than the
+                    // phone: a shrink-0 row that overflows widens the layout
+                    // viewport, and then every fixed overlay on the page
+                    // loses its right edge. Let it shrink and scroll its own
+                    // contents instead, the same guard the nav slot has.
+                    "max-md:min-w-0 max-md:max-w-full max-md:shrink max-md:overflow-x-auto",
                     hasSidebar && "order-1 ml-auto md:order-none md:ml-0",
                   )}
                 >
