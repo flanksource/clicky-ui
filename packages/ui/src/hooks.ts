@@ -6,6 +6,11 @@ export {
   type ResolvedTheme,
 } from "./hooks/use-theme";
 export { ThemeProvider, type ThemeProviderProps } from "./hooks/theme-provider";
+export {
+  mediaMatches,
+  onMediaChange,
+  useMediaQuery,
+} from "./hooks/use-media-query";
 export { useDensity, useDensityValue, type Density } from "./hooks/use-density";
 export {
   DensityProvider,

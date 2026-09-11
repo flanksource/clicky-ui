@@ -809,11 +809,16 @@ export function lookupOptionsToFieldOptions(filter: OperationLookupFilter) {
     }
   }
 
-  return Array.from(merged.entries()).map(([value, meta]) => ({
-    value,
-    label: meta.label ?? value,
-    title: meta.title ?? value,
-  }));
+  const counts = filter.counts;
+  return Array.from(merged.entries()).map(([value, meta]) => {
+    const count = counts?.[value];
+    return {
+      value,
+      label: meta.label ?? value,
+      title: meta.title ?? value,
+      ...(count !== undefined ? { count } : {}),
+    };
+  });
 }
 
 function workloadsFromLookup(

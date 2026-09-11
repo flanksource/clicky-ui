@@ -143,17 +143,25 @@ describe("the column inspector", () => {
     expect(markup).toContain("prod, dev");
   });
 
-  // A name, a type and a backend field are all short; stretching them to half
-  // a wide editor puts the label and the value it names at opposite ends of
-  // the screen. The two expression editors are the exception — they need the
-  // room, so they opt out.
-  it("caps the labelled controls but not the expression editors", () => {
-    const markup = render({ name: "tenant", type: "string" });
+  // A name, a type and a backend field are all short, so each fills its own
+  // half of the paired grid and the two halves stay equal as the pane grows.
+  // The two expression editors are the exception — they need the room, so they
+  // take the whole row instead of sharing one.
+  it("pairs the labelled controls but gives the expression editors the full row", () => {
+    const host = document.createElement("div");
+    host.innerHTML = render({ name: "tenant", type: "string" });
+    const spanning = '[class~="sm:col-span-2"]';
 
-    expect(markup).toContain("max-w-md");
+    const name = host
+      .querySelector('[aria-label="Output name"]')
+      ?.closest("label");
+    expect(name).toHaveClass("w-full");
+    expect(name?.closest(spanning)).toBeNull();
+
     for (const editor of ["JSONPath", "CEL expression"]) {
-      const label = markup.slice(markup.indexOf(`>${editor}<`) - 400, markup.indexOf(`>${editor}<`));
-      expect(label).not.toContain("max-w-md");
+      expect(
+        host.querySelector(`[aria-label="${editor}"]`)?.closest(spanning),
+      ).not.toBeNull();
     }
   });
 });

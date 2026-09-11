@@ -68,6 +68,22 @@ describe("ProfileFieldEditorForm CEL examples", () => {
 });
 
 describe("ProfileFieldEditorForm enum controls", () => {
+  it("fills both editor columns instead of capping controls inside their tracks", () => {
+    render(
+      <ProfileFieldEditorForm
+        field={{ name: "duration_ms", type: "number" }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "Output name" }).closest("label"),
+    ).toHaveClass("w-full");
+    expect(
+      screen.getByRole("combobox", { name: "Data type" }).closest("label"),
+    ).toHaveClass("w-full");
+  });
+
   it("offers each enum as a combobox that clears back to the inferred value", () => {
     const onChange = vi.fn();
     render(

@@ -89,6 +89,23 @@ describe("Workspace", () => {
     expect(screen.getByTestId("workspace-pane-editor")).toHaveClass("flex-1");
   });
 
+  it("renders a non-collapsible pane without a duplicate header when requested", () => {
+    render(
+      <Workspace
+        panes={panes.map((pane) =>
+          pane.id === "editor"
+            ? { ...pane, collapsible: false, showHeader: false }
+            : pane,
+        )}
+      />,
+    );
+
+    const editor = screen.getByTestId("workspace-pane-editor");
+    expect(editor).toHaveTextContent("Source");
+    expect(editor).not.toHaveTextContent("Editor");
+    expect(editor.querySelector("header")).not.toBeInTheDocument();
+  });
+
   const STACK_HEIGHT = 200;
   const stackPanes: WorkspacePaneSpec[] = [
     {
@@ -139,7 +156,9 @@ describe("Workspace", () => {
     expect(section).toHaveClass("shrink-0");
     expect(section).not.toHaveClass("flex-1");
     expect(screen.queryByText("Sized body")).not.toBeInTheDocument();
-    expect(screen.getByTestId("workspace-stack-sized").style.flexBasis).toBe("");
+    expect(screen.getByTestId("workspace-stack-sized").style.flexBasis).toBe(
+      "",
+    );
   });
 
   it("enables collapse and resize by default and restores remembered size", () => {
@@ -352,6 +371,15 @@ describe("Workspace", () => {
           />,
         ),
       ).toThrow("share one width");
+      expect(() =>
+        render(
+          <Workspace
+            panes={panes.map((pane) =>
+              pane.id === "editor" ? { ...pane, showHeader: false } : pane,
+            )}
+          />,
+        ),
+      ).toThrow("headerless panes must not be collapsible");
     } finally {
       consoleError.mockRestore();
     }

@@ -79,7 +79,7 @@ import { StackTrace } from "./diagnostics/RenderedStackTrace";
 import type { ParsedStackFrame } from "./diagnostics/stacktrace-parse";
 import { Badge, type BadgeShape } from "./Badge";
 import { HoverCard } from "../overlay/HoverCard";
-import { Modal } from "../overlay/Modal";
+import { Modal, type ModalSize } from "../overlay/Modal";
 import { useEscapeLayer } from "../overlay/modalStack";
 import { TagList } from "./cells/TagList";
 import {
@@ -134,6 +134,10 @@ export type ClickyColumn = {
   filterKey?: string;
   grow?: boolean;
   shrink?: boolean;
+  /** Minimum column width in pixels — e.g. a statement column that should not collapse below a readable width. */
+  minWidth?: number;
+  /** Maximum column width in pixels — bounds a `grow` column's share of the leftover space. */
+  maxWidth?: number;
   kind?: "timestamp" | "tags" | "status";
 };
 
@@ -321,6 +325,17 @@ export type ClickyDownloadOptions = {
 
 export type ClickyDownloadScope = "page" | "all";
 
+/**
+ * Renders host-owned detail content for an expanded/dialog row. Receives raw
+ * row values keyed by column name — see {@link clickyRowRawValues} — not the
+ * formatted ClickyNode cells, and including columns hidden from `columns`
+ * (e.g. a hidden JSON column carrying a call tree for an ExecutionTree).
+ */
+export type ClickyRowDetailRenderer = (row: Record<string, unknown>) => ReactNode;
+
+/** Dialog title for a `renderRowDetail` dialog, fed the same raw row values. */
+export type ClickyRowDetailTitle = (row: Record<string, unknown>) => ReactNode;
+
 export type ClickyProps = {
   /** Clicky document, node, or JSON string to render. */
   data?: ClickyDocument | ClickyNode | string;
@@ -372,6 +387,14 @@ export type ClickyProps = {
   rowSelection?: ClickyTableRowSelection;
   /** Shows the first embedded table's loading bar without replacing its rows. */
   loading?: boolean;
+  /** Host row-detail renderer for the first embedded table. */
+  renderRowDetail?: ClickyRowDetailRenderer;
+  /** How `renderRowDetail` content is surfaced for the first embedded table. */
+  detailStyle?: "row" | "dialog";
+  /** Dialog size when `detailStyle` is "dialog" for the first embedded table. */
+  detailDialogSize?: ModalSize;
+  /** Dialog title when `detailStyle` is "dialog" for the first embedded table. */
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 export type ClickyNodeViewProps = {
@@ -412,6 +435,14 @@ export type ClickyTableProps = {
   menuActions?: DataTableMenuAction[] | undefined;
   /** Shows the table loading bar without replacing existing rows. */
   loading?: boolean | undefined;
+  /** Host row-detail renderer, given raw values keyed by column name. */
+  renderRowDetail?: ClickyRowDetailRenderer | undefined;
+  /** How `renderRowDetail` content is surfaced when a row is clicked. */
+  detailStyle?: "row" | "dialog" | undefined;
+  /** Dialog size when `detailStyle` is "dialog". */
+  detailDialogSize?: ModalSize | undefined;
+  /** Dialog title when `detailStyle` is "dialog". */
+  detailDialogTitle?: ClickyRowDetailTitle | undefined;
 };
 
 export type ClickyTableRowSelection = DataTableRowSelection<ClickyRow> & {
@@ -453,6 +484,10 @@ type ClickyRuntimeContextValue = {
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
+  tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableDetailStyle?: "row" | "dialog" | undefined;
+  tableDetailDialogSize?: ModalSize | undefined;
+  tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
   operations: ResolvedOperation[];
   operationsLoading: boolean;
 };
@@ -553,6 +588,16 @@ export function Clicky(props: ClickyProps) {
         {...(props.loading !== undefined
           ? { tableLoading: props.loading }
           : {})}
+        {...(props.renderRowDetail
+          ? { tableRenderRowDetail: props.renderRowDetail }
+          : {})}
+        {...(props.detailStyle ? { tableDetailStyle: props.detailStyle } : {})}
+        {...(props.detailDialogSize
+          ? { tableDetailDialogSize: props.detailDialogSize }
+          : {})}
+        {...(props.detailDialogTitle
+          ? { tableDetailDialogTitle: props.detailDialogTitle }
+          : {})}
         {...(tableMenuActions.length > 0 ? { tableMenuActions } : {})}
       >
         {props.url ? (
@@ -595,6 +640,10 @@ function ClickyRuntimeProvider({
   tableRowSelection,
   tableMenuActions,
   tableLoading,
+  tableRenderRowDetail,
+  tableDetailStyle,
+  tableDetailDialogSize,
+  tableDetailDialogTitle,
   children,
 }: {
   commandRuntime?: ClickyCommandRuntime | undefined;
@@ -613,6 +662,10 @@ function ClickyRuntimeProvider({
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
+  tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableDetailStyle?: "row" | "dialog" | undefined;
+  tableDetailDialogSize?: ModalSize | undefined;
+  tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
   children: ReactNode;
 }) {
   if (!commandRuntime) {
@@ -631,7 +684,11 @@ function ClickyRuntimeProvider({
       tableInfinite ||
       tableRowSelection ||
       tableMenuActions ||
-      tableLoading;
+      tableLoading ||
+      tableRenderRowDetail ||
+      tableDetailStyle ||
+      tableDetailDialogSize ||
+      tableDetailDialogTitle;
     return (
       <ClickyRuntimeContext.Provider
         value={
@@ -653,6 +710,10 @@ function ClickyRuntimeProvider({
                 tableRowSelection,
                 tableMenuActions,
                 tableLoading,
+                tableRenderRowDetail,
+                tableDetailStyle,
+                tableDetailDialogSize,
+                tableDetailDialogTitle,
               }
             : clickyRuntimeContextDefault
         }
@@ -680,6 +741,10 @@ function ClickyRuntimeProvider({
       {...(tableRowSelection ? { tableRowSelection } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
       {...(tableLoading !== undefined ? { tableLoading } : {})}
+      {...(tableRenderRowDetail ? { tableRenderRowDetail } : {})}
+      {...(tableDetailStyle ? { tableDetailStyle } : {})}
+      {...(tableDetailDialogSize ? { tableDetailDialogSize } : {})}
+      {...(tableDetailDialogTitle ? { tableDetailDialogTitle } : {})}
     >
       {children}
     </ClickyCommandRuntimeProvider>
@@ -703,6 +768,10 @@ function ClickyCommandRuntimeProvider({
   tableRowSelection,
   tableMenuActions,
   tableLoading,
+  tableRenderRowDetail,
+  tableDetailStyle,
+  tableDetailDialogSize,
+  tableDetailDialogTitle,
   children,
 }: {
   commandRuntime: ClickyCommandRuntime;
@@ -721,6 +790,10 @@ function ClickyCommandRuntimeProvider({
   tableRowSelection?: ClickyTableRowSelection | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
+  tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableDetailStyle?: "row" | "dialog" | undefined;
+  tableDetailDialogSize?: ModalSize | undefined;
+  tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
   children: ReactNode;
 }) {
   const { operations, isLoading } = useOperations(commandRuntime.client);
@@ -742,6 +815,10 @@ function ClickyCommandRuntimeProvider({
       tableRowSelection,
       tableMenuActions,
       tableLoading,
+      tableRenderRowDetail,
+      tableDetailStyle,
+      tableDetailDialogSize,
+      tableDetailDialogTitle,
       operations,
       operationsLoading: isLoading,
     }),
@@ -764,6 +841,10 @@ function ClickyCommandRuntimeProvider({
       tableRowSelection,
       tableMenuActions,
       tableLoading,
+      tableRenderRowDetail,
+      tableDetailStyle,
+      tableDetailDialogSize,
+      tableDetailDialogTitle,
     ],
   );
 
@@ -2102,8 +2183,49 @@ function isAbsoluteUrl(url: string) {
   return /^[a-z][a-z\d+\-.]*:/i.test(url) || url.startsWith("//");
 }
 
-function ClickyNodeRenderer({ node }: ClickyNodeViewProps) {
-  if (!node) return null;
+/**
+ * clicky's Go text styling (e.g. xetrace/pretty.go, clicky/api/text.go) uses
+ * "text-muted" as the terminal's "dim" style, the same way it uses
+ * "text-red-500" or "font-bold" — a bare utility class, not a semantic
+ * DEFAULT/foreground pair. But shadcn's `muted` color (the palette
+ * clicky-ui's tokens.css defines, and the one clicky's own standalone HTML
+ * formatter's tailwind config declares — formatters/html_react_formatter.go)
+ * splits DEFAULT ("--muted", a pale background fill) from foreground
+ * ("--muted-foreground", the readable dim text color). `text-muted` in
+ * Tailwind resolves to the DEFAULT — the background token — so Go's "dim"
+ * cells render nearly invisible instead of legible-but-quiet.
+ *
+ * Every other bare style token clicky's Go side emits (grep of
+ * clicky/api and oipa-cli's xetrace package) is either a Tailwind size
+ * utility (text-xs/sm/lg/xl) or a color already outside this DEFAULT/
+ * foreground split (text-red-500 etc.), so only this one token needs
+ * remapping today.
+ */
+const CLICKY_STYLE_TOKEN_MAP: Record<string, string> = {
+  "text-muted": "text-muted-foreground",
+};
+
+function normalizeClickyClassName(className: string): string {
+  return className
+    .split(/\s+/)
+    .map((token) => CLICKY_STYLE_TOKEN_MAP[token] ?? token)
+    .join(" ");
+}
+
+function normalizeClickyNodeStyle(node: ClickyNode): ClickyNode {
+  const className = node.style?.className;
+  if (!className) return node;
+  const normalized = normalizeClickyClassName(className);
+  if (normalized === className) return node;
+  return { ...node, style: { ...node.style, className: normalized } };
+}
+
+function ClickyNodeRenderer({ node: rawNode }: ClickyNodeViewProps) {
+  if (!rawNode) return null;
+  // Every node passes through here (children/items/fields recurse back into
+  // this same component), so normalizing once at the entry point covers the
+  // whole tree without a separate deep-clone pass.
+  const node = normalizeClickyNodeStyle(rawNode);
 
   switch (node.kind) {
     case "text":
@@ -3090,6 +3212,10 @@ export function ClickyTable({
   rowSelection,
   menuActions,
   loading,
+  renderRowDetail,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
 }: ClickyTableProps) {
   const runtime = useContext(ClickyRuntimeContext);
   const rowClick = onTableRowClick ?? runtime.onTableRowClick;
@@ -3109,6 +3235,13 @@ export function ClickyTable({
   const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
   const effectiveLoading = loading ?? runtime.tableLoading;
+  const effectiveRenderRowDetail =
+    renderRowDetail ?? runtime.tableRenderRowDetail;
+  const effectiveDetailStyle = detailStyle ?? runtime.tableDetailStyle;
+  const effectiveDetailDialogSize =
+    detailDialogSize ?? runtime.tableDetailDialogSize;
+  const effectiveDetailDialogTitle =
+    detailDialogTitle ?? runtime.tableDetailDialogTitle;
 
   if (columns.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
@@ -3147,7 +3280,36 @@ export function ClickyTable({
       serverFilterLabel: (value) => clickyNodeText(value as ClickyNode),
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
       ...(column.shrink !== undefined ? { shrink: column.shrink } : {}),
+      ...(column.minWidth !== undefined ? { minWidth: column.minWidth } : {}),
+      ...(column.maxWidth !== undefined ? { maxWidth: column.maxWidth } : {}),
     };
+    const timestampColumn =
+      column.kind === "timestamp" &&
+      !tagColumn &&
+      !keyValueColumn &&
+      !jsonColumn;
+    if (timestampColumn) {
+      // DataTable's own "timestamp" kind supplies the adaptive-format render,
+      // sortValue and filterValue (applyKindDefaults in DataTable.tsx) — but
+      // only when the column carries no `render` of its own. Every other
+      // branch below hands the full ClickyNode to a custom render, which
+      // would permanently shadow that default, so this column's accessor
+      // resolves straight to the raw scalar DataTable's Timestamp component
+      // expects instead.
+      return {
+        ...base,
+        kind: "timestamp",
+        accessor: (row) => clickyCellRawValue(row.cells[column.name]),
+        serverFilterValue: (value) =>
+          typeof value === "string" || typeof value === "number"
+            ? String(value)
+            : undefined,
+        serverFilterLabel: (value, row) =>
+          typeof value === "string" || typeof value === "number"
+            ? String(value)
+            : clickyNodeText(row.cells[column.name]),
+      };
+    }
     if (keyValueColumn) {
       return {
         ...base,
@@ -3185,7 +3347,15 @@ export function ClickyTable({
     return {
       ...base,
       ...(column.kind ? { kind: column.kind } : {}),
-      render: (value) => <ClickyNodeRenderer node={value as ClickyNode} />,
+      // A "code" cell (a SQL/JSON/etc. statement) renders full-block —
+      // bordered, headered, wrapping — everywhere else ClickyNodeRenderer
+      // draws one, but a table row is one line tall: render it truncated and
+      // inline instead, with the full source on the row-detail path.
+      render: (value) => {
+        const node = value as ClickyNode;
+        if (node.kind === "code") return <ClickyInlineCodeCell node={node} />;
+        return <ClickyNodeRenderer node={node} />;
+      },
       sortValue: (value) => clickyNodeSortValue(value as ClickyNode),
       filterValue: (value) => clickyNodeText(value as ClickyNode),
     };
@@ -3284,6 +3454,22 @@ export function ClickyTable({
       {...(effectiveInfinite ? { infinite: effectiveInfinite } : {})}
       {...(effectiveMenuActions ? { menuActions: effectiveMenuActions } : {})}
       {...(effectiveLoading !== undefined ? { loading: effectiveLoading } : {})}
+      {...(effectiveRenderRowDetail
+        ? {
+            renderExpandedRow: (row: ClickyRow) =>
+              effectiveRenderRowDetail(clickyRowRawValues(row)),
+          }
+        : {})}
+      {...(effectiveDetailStyle ? { detailStyle: effectiveDetailStyle } : {})}
+      {...(effectiveDetailDialogSize
+        ? { detailDialogSize: effectiveDetailDialogSize }
+        : {})}
+      {...(effectiveDetailDialogTitle
+        ? {
+            detailDialogTitle: (row: ClickyRow) =>
+              effectiveDetailDialogTitle(clickyRowRawValues(row)),
+          }
+        : {})}
     />
   );
 }
@@ -3316,6 +3502,20 @@ function ClickyCollapsedStructRows({
         );
       })}
     </div>
+  );
+}
+
+// ClickyInlineCodeCell renders a "code" node as a single truncated,
+// syntax-colored line for a table cell. The full bordered/headered block
+// (CodeBlock's default) belongs to the row-detail dialog, not the grid.
+function ClickyInlineCodeCell({ node }: { node: ClickyNode }) {
+  return (
+    <CodeBlock
+      language={node.language}
+      source={node.source ?? node.plain ?? ""}
+      highlightedHtml={node.highlightedHtml}
+      inline
+    />
   );
 }
 
@@ -4055,6 +4255,37 @@ function clickyNodeSortValue(
   node: ClickyNode | null | undefined,
 ): string | number | boolean {
   return node?.filterValue ?? clickyNodeText(node);
+}
+
+/**
+ * clickyCellRawValue is the raw value a host row-detail renderer sees for one
+ * cell — the server's scalar over its rendered text, and the structured
+ * payload itself for the two tree/graph node kinds, so a renderer can hand
+ * `executionRoots` straight to `<ExecutionTree>` / `objects` to `<ObjectGraph>`
+ * without re-parsing text the server already gave it structured.
+ */
+function clickyCellRawValue(node: ClickyNode | null | undefined): unknown {
+  if (node == null) return undefined;
+  if (node.kind === "execution-tree") return node.executionRoots ?? [];
+  if (node.kind === "object-graph") return node.objects ?? [];
+  if (node.filterValue !== undefined) return node.filterValue;
+  return clickyNodeText(node);
+}
+
+/**
+ * clickyRowRawValues converts a ClickyRow into the `Record<string, unknown>`
+ * a host `renderRowDetail` receives: every cell the server sent, keyed by
+ * column name, including columns the server omitted from `columns` (and so
+ * never render as a visible header/cell) — a hidden JSON column carrying a
+ * call tree is exactly this case.
+ */
+function clickyRowRawValues(row: ClickyRow): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row.cells).map(([name, node]) => [
+      name,
+      clickyCellRawValue(node),
+    ]),
+  );
 }
 
 function clickyNodeText(node: ClickyNode | null | undefined): string {

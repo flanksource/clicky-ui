@@ -3,6 +3,18 @@ import { vi } from "vitest";
 import { TimeRange } from "./TimeRange";
 
 describe("TimeRange", () => {
+  it("renders an icon-only trigger that names the current range when compact", () => {
+    render(<TimeRange compact from="now-25h" to="now" onApply={vi.fn()} />);
+
+    const trigger = screen.getByRole("button", { name: /^time range filter: .*now-25h/i });
+    expect(trigger).toHaveTextContent("");
+    expect(trigger).toHaveAttribute("title", expect.stringMatching(/now-25h/));
+    expect(trigger).toHaveClass("w-8");
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Time range" })).toBeInTheDocument();
+  });
+
   it("applies typed time range values from the custom inputs", () => {
     const onApply = vi.fn();
 

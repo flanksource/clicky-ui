@@ -1,7 +1,9 @@
 export interface FrameSource {
   /** Source lines around the focal line. */
   sourceLines?: string[];
-  /** Absolute line number for each entry in sourceLines (preferred gutter). */
+  /** Absolute line number for each entry in sourceLines (preferred gutter). An
+   *  entry of 0 marks a line whose number is unknown — e.g. a decompiled row
+   *  the line table does not map — and leaves its gutter blank. */
   sourceLineNumbers?: number[];
   /** Line number of sourceLines[0] when sourceLineNumbers is absent. */
   sourceStartLine?: number;

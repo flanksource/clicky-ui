@@ -63,20 +63,23 @@ export const Bar: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.hover(canvas.getByLabelText("Context 74% used"));
-    const body = within(document.body);
-    await waitFor(() =>
-      expect(body.getByText("claude-opus-4-8")).toBeInTheDocument(),
+    // Scoped to the card rather than the body: the bar trigger already names
+    // the model, so waiting on body text would resolve while the card is still
+    // inside its open delay — and would then match the trigger twice over.
+    const card = within(
+      await within(document.body).findByRole("tooltip"),
     );
-    await expect(body.getByText("High effort")).toBeInTheDocument();
-    await expect(body.getByText("cmux")).toBeInTheDocument();
+    await expect(card.getByText("claude-opus-4-8")).toBeInTheDocument();
+    await expect(card.getByText("High effort")).toBeInTheDocument();
+    await expect(card.getByText("cmux")).toBeInTheDocument();
     await expect(
-      body.getByRole("button", { name: "Copy session ID" }),
+      card.getByRole("button", { name: "Copy session ID" }),
     ).toBeInTheDocument();
     // Tokens + Cost merged into one table: the Output bucket shows both cells.
-    await expect(body.getByText("Output")).toBeInTheDocument();
-    await expect(body.getByText("18k")).toBeInTheDocument();
-    await expect(body.getByText("$0.54")).toBeInTheDocument();
-    await expect(body.getByText("$1.24 / $5.00")).toBeInTheDocument();
+    await expect(card.getByText("Output")).toBeInTheDocument();
+    await expect(card.getByText("18k")).toBeInTheDocument();
+    await expect(card.getByText("$0.54")).toBeInTheDocument();
+    await expect(card.getByText("$1.24 / $5.00")).toBeInTheDocument();
   },
 };
 

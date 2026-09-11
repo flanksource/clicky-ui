@@ -283,7 +283,6 @@ export function ProfileFieldEditorForm({
         <EditorField
           label="JSONPath"
           icon={<UiBraces />}
-          fullWidth
           help="Optional path computing the value, rooted at the row or at Source; an alternative to CEL."
         >
           <JSONPathField

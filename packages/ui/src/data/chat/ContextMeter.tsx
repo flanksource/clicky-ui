@@ -368,7 +368,21 @@ export function ContextMeter({
         )}
         aria-label={`Context ${pct}% used`}
       >
-        <span className="shrink-0">ctx</span>
+        {model ? (
+          <span className="flex min-w-0 max-w-40 items-center gap-1">
+            {EffortGlyph ? (
+              <EffortGlyph className={cn("size-3.5 shrink-0", effortColor)} />
+            ) : null}
+            <span
+              className="truncate font-medium text-foreground"
+              title={model}
+            >
+              {model}
+            </span>
+          </span>
+        ) : (
+          <span className="shrink-0">ctx</span>
+        )}
         <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
           <span
             className={cn(

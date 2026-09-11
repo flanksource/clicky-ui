@@ -28,6 +28,35 @@ afterEach(() => {
 });
 
 describe("ProcessorPipeline", () => {
+  it("renders sidebar steps as tree items", () => {
+    renderPipeline({
+      steps: [{ use: "logs.json" }],
+      tree: true,
+    });
+
+    expect(
+      screen
+        .getByRole("button", { name: "Edit Parse JSON logs" })
+        .closest("[data-profile-tree-item]"),
+    ).not.toBeNull();
+  });
+
+  it("renders only the externally selected editor when the step list lives elsewhere", () => {
+    renderPipeline({
+      steps: [{ use: "logs.json" }, { type: "cel.dedupe" }],
+      selectedIndex: 1,
+      showSteps: false,
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Add processor" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit cel.dedupe" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Dedupe requires partition/)).toBeInTheDocument();
+  });
+
   it("ports the ordered rail, helpers and resolved config without a paging warning", () => {
     renderPipeline({ steps: [{ use: "java.stacktrace" }] });
 
@@ -166,6 +195,9 @@ function renderPipeline({
   previewer,
   profile,
   onChange = vi.fn(),
+  selectedIndex,
+  showSteps,
+  tree,
 }: {
   steps: Array<{
     use?: string;
@@ -175,6 +207,9 @@ function renderPipeline({
   previewer?: Parameters<typeof ProcessorPipeline>[0]["previewer"];
   profile?: Record<string, unknown>;
   onChange?: Parameters<typeof ProcessorPipeline>[0]["onChange"];
+  selectedIndex?: number;
+  showSteps?: boolean;
+  tree?: boolean;
 }) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
@@ -190,6 +225,9 @@ function renderPipeline({
         }
         onChange={onChange}
         {...(previewer ? { previewer } : {})}
+        {...(selectedIndex === undefined ? {} : { selectedIndex })}
+        {...(showSteps === undefined ? {} : { showSteps })}
+        {...(tree === undefined ? {} : { tree })}
       />
     </QueryClientProvider>,
   );

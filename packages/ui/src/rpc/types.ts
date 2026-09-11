@@ -284,6 +284,12 @@ export interface OperationLookupFilter {
   truncated?: boolean;
   /** True distinct count behind a truncated option set; drives "… and N more". */
   total?: number;
+  /**
+   * Per-value row counts, keyed the same as `options`. A value absent from
+   * this map is a value the source did not count — never rendered as zero —
+   * and the whole field is omitted when the source doesn't count at all.
+   */
+  counts?: Record<string, number>;
   presets?: Array<
     { label: string; from: string; to: string } | TimeRangePresetGroup
   >;
