@@ -23,9 +23,9 @@ export type MatrixTableProps = {
   columnClassName?: string;
   rowLabelClassName?: string;
   cellClassName?: string;
-  // headerClassName is appended to the header row and every header cell (corner
-  // + columns). The header has no background by default; use this to add one,
-  // e.g. "bg-muted", since tailwind-merge lets the later class win.
+  // headerClassName backgrounds the header plane and corner. Non-angled column
+  // cells also receive it; angled cells stay transparent so their labels can
+  // extend across neighbouring columns without being covered.
   headerClassName?: string;
 };
 
@@ -73,7 +73,7 @@ export function MatrixTable({
             ))}
           </colgroup>
         )}
-        <thead>
+        <thead className={cn(angledHeaders && "sticky top-0 z-20")}>
           <tr className={cn(!angledHeaders && "border-b border-border", headerClassName)}>
             <th
               scope="col"
@@ -93,9 +93,10 @@ export function MatrixTable({
                   scope="col"
                   title={columnTitle(column)}
                   className={cn(
-                    "sticky top-0 z-20 overflow-visible border-b border-border p-0 align-bottom",
+                    "relative overflow-visible border-b border-border p-0 align-bottom",
                     columnClassName,
                     headerClassName,
+                    "bg-transparent",
                   )}
                   style={{
                     width: columnWidth,
@@ -125,7 +126,7 @@ export function MatrixTable({
                     />
                   )}
                   <div
-                    className="absolute bottom-2 overflow-hidden text-ellipsis whitespace-nowrap pl-1 text-left text-xs font-medium leading-none text-muted-foreground"
+                    className="absolute bottom-0 overflow-hidden text-ellipsis whitespace-nowrap pl-1 text-left text-xs font-medium leading-none text-muted-foreground"
                     style={{
                       left: columnWidth / 2,
                       width: textWidth,
