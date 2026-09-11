@@ -52,6 +52,8 @@ export function unmatchedFormErrors({
   hideEmpty,
   fieldFilter,
   pre,
+  rootValue = value,
+  instancePath = "",
 }: {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
@@ -61,14 +63,16 @@ export function unmatchedFormErrors({
   hideEmpty: boolean;
   fieldFilter?: string;
   pre: PreExtension[];
+  rootValue?: Record<string, unknown>;
+  instancePath?: string;
 }): JsonSchemaFormError[] {
   const rendered = new Set<string>();
-  collectObjectPaths(schema, value, "", rendered, {
+  collectObjectPaths(schema, value, instancePath, rendered, {
     hiddenKeys: new Set(hiddenKeys ?? []),
     hideReadOnlyFields,
     hideEmpty,
     pre,
-    rootValue: value,
+    rootValue,
     root: true,
     ...(fieldFilter ? { fieldFilter } : {}),
   });

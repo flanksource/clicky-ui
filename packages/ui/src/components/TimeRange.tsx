@@ -89,6 +89,11 @@ export type TimeRangeProps = {
   triggerClassName?: string;
   /** Classes applied to the popup panel. */
   panelClassName?: string;
+  /**
+   * Icon-only trigger for narrow bars: the current range moves into the
+   * accessible name and the tooltip instead of visible text.
+   */
+  compact?: boolean;
 };
 
 const defaultTimeChipRows: TimeRangeChipRow[] = [
@@ -239,6 +244,7 @@ export function TimeRange({
   className,
   triggerClassName,
   panelClassName,
+  compact = false,
 }: TimeRangeProps) {
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
@@ -318,10 +324,12 @@ export function TimeRange({
         type="button"
         variant="outline"
         size="sm"
-        aria-label={`${label} filter`}
+        aria-label={compact ? `${label} filter: ${buttonLabel}` : `${label} filter`}
+        title={compact ? buttonLabel : undefined}
         disabled={disabled}
         className={cn(
-          "h-7 w-fit max-w-[12rem] min-w-0 gap-2 px-2 text-xs font-normal",
+          "h-7 min-w-0 text-xs font-normal",
+          compact ? "w-8 justify-center px-0 max-md:h-8" : "w-fit max-w-[12rem] gap-2 px-2",
           triggerClassName,
         )}
         {...getReferenceProps()}
@@ -330,7 +338,7 @@ export function TimeRange({
           icon={kind === "time" ? UiWatch : UiCalendar}
           className="text-muted-foreground text-[14px]"
         />
-        <span className="truncate font-normal tabular-nums">{buttonLabel}</span>
+        {!compact && <span className="truncate font-normal tabular-nums">{buttonLabel}</span>}
       </Button>
 
       {open && (
