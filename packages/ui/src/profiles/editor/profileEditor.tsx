@@ -5,8 +5,15 @@ import { Modal } from "../../overlay/Modal";
 import { useOperationLookupFetcher } from "../../rpc/operationLookupFetcher";
 import type { ResolvedOperation } from "../../rpc/types";
 import type { OperationsApiClient } from "../../rpc/useOperations";
-import { UiColumns, UiListTree, UiTable } from "../../icons";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { UiListTree, UiTable } from "../../icons";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   cloneProfileDraft,
   mergeSampledProfileColumns,
@@ -14,7 +21,6 @@ import {
   profileEditorSectionStatus,
   profileEditorSections,
   profileGeneralOptionKeys,
-  profileProcessorKeys,
   profileSampleSignature,
   profileUpdateConflictTarget,
   resetProfileColumns,
@@ -28,10 +34,11 @@ import {
   ProfileSchemaSection,
   ProfileSourceSection,
 } from "./profileEditorSections";
+import { ProfileFieldSidebarList } from "../fields/profileFieldList";
 import {
-  ProfileFieldFilters,
-  ProfileFieldList,
-} from "../fields/profileFieldList";
+  ProfileFieldEditorForm,
+  profileFieldEditorEmptyMessage,
+} from "../fields/profileFieldEditor";
 import { useProfileFieldState } from "../fields/profileFieldState";
 import type { ProfileSample } from "../wizard/profileWizardQueryStep";
 import { JsonPathProfileProvider } from "../query/jsonPathSampleRow";
@@ -40,6 +47,16 @@ import type {
   ProfileWizardDraft,
 } from "../wizard/profileWizardModel";
 import { resolveProfileUpdatePath } from "./profileEditorRoutes";
+import {
+  ProfileParameterDetail,
+  ProfileParameterSidebar,
+} from "./profileParameterEditor";
+import { ProcessorPipeline } from "../processor/processorPipeline";
+import type {
+  ProcessorPreset,
+  ProcessorSpec,
+} from "../processor/processorConfig";
+import { profileSchema } from "../profileApi";
 
 const ProfileEditorRaw = lazy(() =>
   import("./profileEditorRaw").then((module) => ({
@@ -53,8 +70,8 @@ const ProfileEditorRaw = lazy(() =>
  * Six sections, ~130 discoverable fields and a CEL editor per column outgrew a
  * modal: the layout is a clicky-ui Workspace, so the section rail, the column
  * grid and the sampled preview are panes the user can resize, collapse and keep
- * across visits. A column's own properties open inside its grid row rather than
- * as a fourth pane, so editing one never moves the eye off the list.
+ * across visits. Collection fields stay in the rail while the selected item is
+ * edited in the center, keeping names and icons visible throughout the edit.
  */
 export function ProfileEditor({
   client,
@@ -90,6 +107,8 @@ export function ProfileEditor({
   const [activeField, setActiveField] = useState(
     initialDraft.columns?.[0]?.name ?? "",
   );
+  const [activeParameter, setActiveParameter] = useState(0);
+  const [activeProcessor, setActiveProcessor] = useState(0);
   const [lastSampleSignature, setLastSampleSignature] = useState(() =>
     profileSampleSignature(initialDraft),
   );
@@ -116,6 +135,22 @@ export function ProfileEditor({
       setDraft((current) => ({ ...current, columns })),
     onActiveNameChange: setActiveField,
   });
+  const processors = Array.isArray(draft.processors)
+    ? (draft.processors as ProcessorSpec[])
+    : [];
+  const processorPresets = useMemo(() => {
+    const processorSchema = profileSchema().properties?.processors;
+    return (
+      (processorSchema?.["x-clicky-presets"] as
+        | Record<string, ProcessorPreset>
+        | undefined) ?? {}
+    );
+  }, []);
+  const setProcessors = useCallback(
+    (next: ProcessorSpec[]) =>
+      setDraft((current) => ({ ...current, processors: next })),
+    [],
+  );
 
   // A route can be refreshed or navigated away from; the dialog used to guard
   // unsaved edits with confirmClose, so the route has to guard them too.
@@ -216,31 +251,41 @@ export function ProfileEditor({
           onSample={acceptSample}
         />
       ) : null}
+      {section === "columns" ? (
+        fields.activeField ? (
+          <section className="rounded-xl border bg-card p-5">
+            <div className="max-w-6xl">
+              <ProfileFieldEditorForm
+                field={fields.activeField}
+                onChange={fields.updateActiveField}
+              />
+            </div>
+          </section>
+        ) : (
+          <div className="grid h-full place-items-center text-sm text-muted-foreground">
+            {profileFieldEditorEmptyMessage}
+          </div>
+        )
+      ) : null}
       {section === "parameters" ? (
-        <ProfileSchemaSection
+        <ProfileParameterDetail
           draft={draft}
-          keys={["params"]}
-          title="Parameters"
-          // The zero-item explanation lives on the schema now (it is the add
-          // row's own copy), so this stays a one-liner rather than repeating it.
-          description="Named values the profile query and filters accept at run time."
-          idPrefix="profile-parameters"
-          // The accordion needs the full pane for its auto-fill grid — the
-          // default 600px stack would cap it at two columns — and its help
-          // belongs on the label, not stacked under every control.
-          layout={{ mode: "stacked", valueMaxWidth: "none", help: "hover" }}
+          activeIndex={activeParameter}
           onChange={setDraft}
         />
       ) : null}
       {section === "processors" ? (
-        <ProfileSchemaSection
-          draft={draft}
-          keys={profileProcessorKeys}
-          title="Processors"
-          description="Add and configure ordered post-query transformations, then preview the selected stage."
-          idPrefix="profile-processors"
-          onChange={setDraft}
-        />
+        <div className="max-w-5xl">
+          <ProcessorPipeline
+            steps={processors}
+            presets={processorPresets}
+            profile={draft}
+            selectedIndex={activeProcessor}
+            showSteps={false}
+            onSelectedIndexChange={setActiveProcessor}
+            onChange={setProcessors}
+          />
+        </div>
       ) : null}
       {section === "raw" ? (
         <Suspense
@@ -266,9 +311,9 @@ export function ProfileEditor({
       label: "Profile",
       icon: <UiListTree />,
       location: "left",
-      width: 240,
-      minWidth: 180,
-      maxWidth: 340,
+      width: 340,
+      minWidth: 280,
+      maxWidth: 480,
       content: (
         <ProfileEditorRail
           value={section}
@@ -277,73 +322,72 @@ export function ProfileEditor({
             availableColumns: fields.available.length,
             sampleStale,
           })}
+          collections={{
+            columns: (
+              <ProfileFieldSidebarList
+                state={fields}
+                onFieldSelect={(name) => {
+                  fields.setActiveName(name);
+                  setSection("columns");
+                }}
+                onAdd={() => setSection("columns")}
+                {...(resetState.visible
+                  ? {
+                      reset: {
+                        disabled: resetState.disabled,
+                        title: resetState.title,
+                        onReset: () => setConfirmResetColumns(true),
+                      },
+                    }
+                  : {})}
+              />
+            ),
+            parameters: (
+              <ProfileParameterSidebar
+                draft={draft}
+                activeIndex={activeParameter}
+                onActiveIndexChange={(index) => {
+                  setActiveParameter(index);
+                  setSection("parameters");
+                }}
+                onChange={setDraft}
+              />
+            ),
+            processors: (
+              <ProcessorPipeline
+                steps={processors}
+                presets={processorPresets}
+                profile={draft}
+                selectedIndex={activeProcessor}
+                showEditor={false}
+                tree
+                onSelectedIndexChange={(index) => {
+                  setActiveProcessor(index);
+                  setSection("processors");
+                }}
+                onChange={setProcessors}
+              />
+            ),
+          }}
           onChange={setSection}
         />
       ),
     };
 
-    if (section !== "columns") {
-      return [
-        rail,
-        {
-          id: "section",
-          label: sectionLabel(section),
-          location: "center",
-          collapsible: false,
-          contentClassName: "p-0",
-          content: sectionContent,
-        },
-      ];
-    }
-
-    return [
+    const result: WorkspacePaneSpec[] = [
       rail,
       {
-        id: "columns",
-        label: "Columns",
-        icon: <UiColumns />,
+        id: "section",
+        label: sectionLabel(section),
         location: "center",
         collapsible: false,
-        contentClassName: "flex flex-col overflow-hidden",
-        slots: {
-          headerTrailing: (
-            <>
-              <span className="text-[11px] text-muted-foreground">
-                {fields.configuredCount} of {fields.available.length} included
-              </span>
-              {resetState.visible ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={resetState.disabled}
-                  title={resetState.title}
-                  onClick={() => setConfirmResetColumns(true)}
-                >
-                  Reset columns
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={fields.addField}
-              >
-                Add column
-              </Button>
-            </>
-          ),
-        },
-        content: (
-          <>
-            <div className="shrink-0 border-b border-border p-2">
-              <ProfileFieldFilters state={fields} compact />
-            </div>
-            <ProfileFieldList state={fields} />
-          </>
-        ),
+        showHeader: false,
+        contentClassName: "p-0",
+        content: sectionContent,
       },
-      {
+    ];
+    if (section === "columns") {
+      result.push({
         id: "preview",
         label: "Preview",
         icon: <UiTable />,
@@ -366,9 +410,12 @@ export function ProfileEditor({
             rows={sampleRows}
           />
         ),
-      },
-    ];
+      });
+    }
+    return result;
   }, [
+    activeParameter,
+    activeProcessor,
     draft,
     fields,
     resetState,
@@ -376,6 +423,9 @@ export function ProfileEditor({
     sampleStale,
     section,
     sectionContent,
+    processorPresets,
+    processors,
+    setProcessors,
   ]);
 
   const leave = () => (dirty ? setConfirmDiscard(true) : onClose());
@@ -427,7 +477,7 @@ export function ProfileEditor({
           </Button>
         </header>
 
-        <Workspace panes={panes} storageKey="profile-editor" />
+        <Workspace panes={panes} storageKey="profile-editor-v2" />
       </div>
 
       {confirmDiscard ? (

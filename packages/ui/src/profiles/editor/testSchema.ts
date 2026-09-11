@@ -19,7 +19,29 @@ export const testProfileSchema: ProfileSchema = {
     profile: { type: "string" },
     namespace: { type: "string" },
     query: { type: "string" },
-    params: { type: "array", items: { type: "object" } },
+    params: {
+      type: "array",
+      "x-clicky-component": "test-params",
+      "x-item": {
+        title: ["label", "name"],
+        glyph: "type",
+        noun: "parameter",
+        nounPlural: "parameters",
+      },
+      items: {
+        type: "object",
+        "x-clicky-component": "test-param",
+        properties: {
+          name: { type: "string", title: "Name" },
+          label: { type: "string", title: "Label" },
+          type: {
+            type: "string",
+            title: "Type",
+            enum: ["string", "list"],
+          },
+        },
+      },
+    },
     processors: {
       type: "array",
       items: {

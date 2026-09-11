@@ -82,6 +82,22 @@ describe("ContextMeter", () => {
     );
   });
 
+  it("uses the model and effort icon as the compact bar identity", () => {
+    render(
+      <ContextMeter
+        mode="bar"
+        usedPercent={63}
+        model="claude-opus-5"
+        effort="high"
+      />,
+    );
+
+    const trigger = screen.getByLabelText("Context 63% used");
+    expect(trigger).toHaveTextContent("claude-opus-5");
+    expect(trigger).not.toHaveTextContent("ctx");
+    expect(trigger.querySelector("svg")).toHaveClass("text-orange-700");
+  });
+
   it("shows colored provider and effort metadata in the hover card", async () => {
     render(
       <ContextMeter

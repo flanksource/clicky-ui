@@ -21,28 +21,27 @@ export const inputClassName =
  * a button inside the <label>, and an embedded control leaves the implicit
  * label unable to name anything.
  *
- * Capped rather than filling its grid track: a name, a type and a backend field
- * are all short, and stretching them to half a wide editor puts the label and
- * the value it names at opposite ends of the screen. `fullWidth` opts out for
- * the editors that genuinely need the room — a JSONPath, a CEL expression.
+ * The labelled control fills its grid track, so paired fields keep equal widths
+ * as the editor pane grows and do not leave a dead strip inside either column.
  */
 export function EditorField({
   label,
   icon,
   help,
-  fullWidth,
   children,
 }: {
   label: string;
   icon?: LabelIconSpec;
   help?: string;
-  fullWidth?: boolean;
   children: ReactNode;
 }) {
   return (
-    <label className={`grid gap-1.5 text-sm font-medium ${fullWidth ? "" : "max-w-md"}`}>
+    <label className="grid w-full gap-1.5 text-sm font-medium">
       <span className="flex min-w-0 items-center gap-2">
-        <LabelIcon icon={icon} className="shrink-0 text-[15px] text-muted-foreground" />
+        <LabelIcon
+          icon={icon}
+          className="shrink-0 text-[15px] text-muted-foreground"
+        />
         <span className="truncate">{label}</span>
         {help ? <HelpHint label={label} helper={help} /> : null}
       </span>
@@ -76,7 +75,11 @@ export function EnumField({
   onChange: (value: string | undefined) => void;
 }) {
   return (
-    <EditorField label={label} {...(icon ? { icon } : {})} {...(help ? { help } : {})}>
+    <EditorField
+      label={label}
+      {...(icon ? { icon } : {})}
+      {...(help ? { help } : {})}
+    >
       <Combobox
         ariaLabel={label}
         value={value}

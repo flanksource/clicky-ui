@@ -18,6 +18,17 @@ describe("celPathFor", () => {
     expect(celPathFor(input)).toBe(expected);
   });
 
+  // An environment whose row keys are themselves the variables — an
+  // authorization rule's `user`, `groups` — has no `row` to start from, so a
+  // top-level key is named bare rather than as `.groups`.
+  it.each([
+    ["a top-level key", node({ path: "$.groups" }), "groups"],
+    ["a nested key", node({ path: "$.oidc.groups" }), "oidc.groups"],
+    ["an element of a top-level list", node({ path: "$.groups[1]" }), "groups[1]"],
+  ])("names %s bare when rows bind their keys directly", (_label, input, expected) => {
+    expect(celPathFor(input, "")).toBe(expected);
+  });
+
   // Inside a decoded column the inner path restarts at `$`, so the accessor is
   // rebuilt from the origin chain + a decoder + that inner path.
   it.each([

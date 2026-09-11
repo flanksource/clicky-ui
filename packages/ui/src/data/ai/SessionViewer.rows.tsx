@@ -54,7 +54,7 @@ export function SessionRow({
   return (
     <li
       data-event-kind={event.kind}
-      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+      className="relative flex gap-density-2 pb-density-3 last:pb-0 @min-[48rem]/session-viewer:gap-density-3 @min-[48rem]/session-viewer:pb-density-4"
     >
       {!last && (
         <span
@@ -124,7 +124,7 @@ export function WaitGroupRow({
     <li
       data-event-kind="tool"
       data-event-group="wait"
-      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+      className="relative flex gap-density-2 pb-density-3 last:pb-0 @min-[48rem]/session-viewer:gap-density-3 @min-[48rem]/session-viewer:pb-density-4"
     >
       {!last && (
         <span
@@ -198,7 +198,7 @@ function UserRow({
       data-event-kind="user"
       className="relative flex justify-end pb-density-4 last:pb-0"
     >
-      <div className="flex max-w-[85%] items-start gap-density-3">
+      <div className="flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:max-w-[85%] @min-[48rem]/session-viewer:gap-density-3">
         <div className="min-w-0">
           <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
             You

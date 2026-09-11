@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { celExamplesFor, explainCelError } from "./celExpression";
+import { celExamplesFor } from "./celExamples";
+import { explainCelError } from "./celExpression";
 
 const OTEL_TAGS = JSON.stringify([
   { key: "host.arch", type: "string", value: "amd64" },
@@ -73,6 +74,103 @@ describe("celExamplesFor", () => {
       "Convert to text",
     ]);
     expect(celExamplesFor("row.duration", 397).map((e) => e.label)).toContain("Scale by 1,000");
+  });
+
+  // Object.keys of a string is its character indices, which offered
+  // `.map(e, e.0)` — an expression that does not compile.
+  it("indexes a map key CEL cannot name, rather than dotting it", () => {
+    expect(celExamplesFor("row.meta", { "@id": "x" }).slice(0, 2)).toEqual([
+      { label: "Read @id", expression: 'row.meta["@id"]' },
+      { label: "Default @id when missing", expression: '"@id" in row.meta ? row.meta["@id"] : ""' },
+    ]);
+  });
+
+  it("offers no field to pull from a list of scalars", () => {
+    expect(celExamplesFor("row.groups", ["OM Super", "Web Service"]).map((e) => e.label)).toEqual([
+      "Take the first entry",
+      "Count the entries",
+      "Keep the whole list",
+    ]);
+  });
+});
+
+// A filter or an authorization matcher selects rows, so the engine refuses an
+// expression that returns anything but a bool: every example has to be a test.
+describe("celExamplesFor a predicate", () => {
+  const predicate = { predicate: true };
+
+  it.each([
+    [
+      "a list of scalars, by membership and emptiness",
+      "groups",
+      ["OM Super", "Web Service"],
+      [
+        { label: "Contains OM Super", expression: '"OM Super" in groups' },
+        { label: "Is not empty", expression: "size(groups) > 0" },
+        { label: "Is empty", expression: "size(groups) == 0" },
+      ],
+    ],
+    [
+      "a string, by equality",
+      "user",
+      "admin",
+      [
+        { label: "Is admin", expression: 'user == "admin"' },
+        { label: "Is not admin", expression: 'user != "admin"' },
+      ],
+    ],
+    [
+      "a number, by equality",
+      "row.duration",
+      397,
+      [
+        { label: "Is 397", expression: "row.duration == 397" },
+        { label: "Is not 397", expression: "row.duration != 397" },
+      ],
+    ],
+    [
+      "a bool, as itself",
+      "row.enabled",
+      true,
+      [
+        { label: "Is true", expression: "row.enabled" },
+        { label: "Is false", expression: "!row.enabled" },
+      ],
+    ],
+    [
+      "a map, by the presence of a key",
+      "row.meta",
+      { status: "OPEN" },
+      [
+        { label: "Has status", expression: "has(row.meta.status)" },
+        { label: "Is not empty", expression: "size(row.meta) > 0" },
+      ],
+    ],
+    [
+      "a map, by the presence of a key it has to quote",
+      "row.meta",
+      { "@id": "x" },
+      [
+        { label: "Has @id", expression: '"@id" in row.meta' },
+        { label: "Is not empty", expression: "size(row.meta) > 0" },
+      ],
+    ],
+  ])("tests %s", (_label, accessor, value, expected) => {
+    expect(celExamplesFor(accessor, value, predicate)).toEqual(expected);
+  });
+
+  it("tests a list of objects by a field of any entry, ranging over dyn()", () => {
+    expect(celExamplesFor("row.refs", [{ name: "a" }], predicate)[0]).toEqual({
+      label: "Any entry with name a",
+      expression: 'dyn(row.refs).exists(e, e.name == "a")',
+    });
+  });
+
+  it("tests a key/value list by the value of a key in the sample", () => {
+    expect(celExamplesFor('row["process.tags"].JSONArray()', OTEL_TAGS, predicate)[0]).toEqual({
+      label: "host.arch is amd64",
+      expression: `dyn(row["process.tags"].JSONArray()).fold(e, acc, merge(acc, {e.key: e.value}))["host.arch"] == "amd64"`,
+    });
   });
 });
 

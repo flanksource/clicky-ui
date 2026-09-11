@@ -44,6 +44,7 @@ const THEME_OPTIONS: Array<SegmentedOption<SessionThemeOverride>> = [
 ];
 
 export interface SessionViewerMenuProps {
+  menuHeader?: ReactNode;
   density: Density | undefined;
   onDensityChange: (density: Density | undefined) => void;
   theme: SessionThemeOverride | undefined;
@@ -64,6 +65,7 @@ export interface SessionViewerMenuProps {
  *  segmented icon rows, plus visibility toggles for the captain category /
  *  tool / source facets present in the session. */
 export function SessionViewerMenu({
+  menuHeader,
   density,
   onDensityChange,
   theme,
@@ -89,6 +91,7 @@ export function SessionViewerMenu({
       title="Session options"
       menuLabel="Session options"
       menuClassName="min-w-[12rem] max-h-[70vh] overflow-auto px-1"
+      header={menuHeader}
     >
       {() => (
         <div className="text-popover-foreground">
