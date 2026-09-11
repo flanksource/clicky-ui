@@ -182,6 +182,59 @@ export function unreachableKeys(row: Record<string, unknown> | undefined): strin
 }
 
 /**
+ * Where an expression runs: what it may name, what evaluates it, and how its
+ * rows are addressed.
+ *
+ * A profile's scopes are the built-in environments (see
+ * {@link profileCelEnvironment}). A host whose CEL is not a profile's — an
+ * authorization rule, say — passes its own, so the editor previews that
+ * expression against the host's rows on the host's engine instead of posing as
+ * a profile expression with bindings the host does not have.
+ */
+export type CelEnvironment = {
+  /** Stable id; part of the evaluation cache key. */
+  id: string;
+  /** Names the environment in the editor's header. */
+  label: string;
+  /** The variable a whole row is bound to, or "" when a row's keys are the variables. */
+  rowName: string;
+  /** What an expression may name, given the focused row. */
+  bindings: (row: Record<string, unknown> | undefined) => Binding[];
+  /** Evaluates the expression once per row, on the engine that will run it for real. */
+  evaluate: (cel: string, rows: unknown[]) => Promise<CelResponse>;
+  /** Row keys that exist but cannot be named bare, listed under the bindings. */
+  unreachable?: (row: Record<string, unknown> | undefined) => string[];
+  /** Names a row; defaults to its position. */
+  rowLabel?: (row: Record<string, unknown>, index: number) => string;
+  /** What one row is, for the count in the header; defaults to a sampled row. */
+  rowNoun?: string;
+  /**
+   * The expression selects rows rather than computing a value — a filter, an
+   * authorization matcher — so true and false are tallied and drawn apart
+   * instead of both reading as "evaluated".
+   */
+  predicate?: boolean;
+};
+
+const SCOPE_LABEL: Record<CelScope, string> = {
+  row: "Row",
+  batch: "Batch",
+  boundary: "Boundary",
+};
+
+/** The built-in environment of a profile scope, evaluated by the profile service. */
+export function profileCelEnvironment(scope: CelScope): CelEnvironment {
+  return {
+    id: scope,
+    label: `${SCOPE_LABEL[scope]} scope`,
+    rowName: "row",
+    bindings: (row) => bindingsFor(scope, row),
+    evaluate: (cel, rows) => evaluateCel({ cel, scope, rows }),
+    ...(scope === "row" ? {} : { unreachable: unreachableKeys }),
+  };
+}
+
+/**
  * A failure the author can act on, read out of the engine's own words.
  *
  * The engine reports in the vocabulary of the Go library underneath it, so
@@ -248,105 +301,4 @@ export function explainCelError(error: string, draft: string): CelFailure {
   }
 
   return { message: raw, raw };
-}
-
-/** An example expression the author can drop into the draft. */
-export type CelExample = { label: string; expression: string };
-
-/** Whether a list looks like OpenTelemetry's `[{key, type, value}]` tag shape. */
-function isKeyValueList(value: unknown): value is Array<Record<string, unknown>> {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every(
-      (entry) =>
-        entry !== null && typeof entry === "object" && "key" in entry && "value" in entry,
-    )
-  );
-}
-
-/** The value behind an accessor, decoded when the column holds JSON as text. */
-function decoded(value: unknown): unknown {
-  if (typeof value !== "string") return value;
-  const text = value.trim();
-  if (!text.startsWith("{") && !text.startsWith("[")) return value;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return value;
-  }
-}
-
-/**
- * Examples that fit the value in front of the author.
- *
- * A fixed list is wrong wherever it matters most: on a JSON column every
- * suggestion built from the field name alone reads the encoded string rather
- * than what is in it. These are derived from the sampled value, so the decoder
- * they carry is the one that value actually needs — which is the same mistake
- * this whole panel exists to stop the author making.
- *
- * The syntax is gomplate's own, verified against its CEL reference: the
- * comprehension macros (map/filter), and `fold` with the `merge` helper for
- * folding a key/value list into a map. Ranges are wrapped in `dyn(...)` because
- * the engine declares every binding as `any` and a comprehension needs a
- * concrete list to walk.
- */
-export function celExamplesFor(accessor: string, value: unknown): CelExample[] {
-  const inner = decoded(value);
-  const range = `dyn(${accessor})`;
-
-  if (isKeyValueList(inner)) {
-    const sample = String(inner[0]?.["key"] ?? "key");
-    // A fold into a map rather than filter-then-index: a missing key reads as
-    // absent, where indexing an empty filter result is a hard error.
-    const asMap = `${range}.fold(e, acc, merge(acc, {e.key: e.value}))`;
-    return [
-      { label: `Read ${sample}`, expression: `${asMap}[${JSON.stringify(sample)}]` },
-      // The map itself has to be encoded to leave the engine: a CEL map is a
-      // map[ref.Val]ref.Val, which the response cannot serialize. Indexing one
-      // yields a scalar and needs no such call, which is why only this example
-      // carries it.
-      { label: "Fold every entry into a map", expression: `${asMap}.toJSON()` },
-      { label: "List the keys", expression: `${range}.map(e, e.key)` },
-      { label: "Keep the whole list", expression: accessor },
-    ];
-  }
-
-  if (Array.isArray(inner)) {
-    const field = Object.keys((inner[0] ?? {}) as Record<string, unknown>)[0];
-    return [
-      { label: "Take the first entry", expression: `${accessor}[0]` },
-      { label: "Count the entries", expression: `size(${accessor})` },
-      ...(field
-        ? [{ label: `Pull ${field} from each`, expression: `${range}.map(e, e.${field})` }]
-        : []),
-      { label: "Keep the whole list", expression: accessor },
-    ];
-  }
-
-  if (inner !== null && typeof inner === "object") {
-    const field = Object.keys(inner as Record<string, unknown>)[0];
-    return [
-      ...(field
-        ? [
-            { label: `Read ${field}`, expression: `${accessor}.${field}` },
-            {
-              label: `Default ${field} when missing`,
-              expression: `has(${accessor}.${field}) ? ${accessor}.${field} : ""`,
-            },
-          ]
-        : []),
-      { label: "List the keys", expression: `${accessor}.keys()` },
-      { label: "Keep the whole object", expression: accessor },
-    ];
-  }
-
-  return [
-    { label: "Read it", expression: accessor },
-    { label: "Convert to text", expression: `string(${accessor})` },
-    ...(typeof inner === "number"
-      ? [{ label: "Scale by 1,000", expression: `${accessor} / 1000.0` }]
-      : []),
-  ];
 }

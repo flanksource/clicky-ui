@@ -32,9 +32,10 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
  */
 function appendSegment(accessor: string, segment: string | number): string {
   if (typeof segment === "number") return `${accessor}[${segment}]`;
-  return IDENTIFIER.test(segment)
-    ? `${accessor}.${segment}`
-    : `${accessor}[${JSON.stringify(segment)}]`;
+  if (!IDENTIFIER.test(segment)) return `${accessor}[${JSON.stringify(segment)}]`;
+  // With no base the row's keys are themselves the variables, so the first
+  // segment is a bare name rather than a field of something.
+  return accessor === "" ? segment : `${accessor}.${segment}`;
 }
 
 /** Builds an accessor from `base` by walking a literal JSONPath. */
@@ -94,6 +95,9 @@ function originPrefix(origin: JSONPathOrigin | undefined, base: string): string 
  * Selecting a boundary node itself yields the decoded form rather than the raw
  * string: picking a column that holds a document is a request for the document,
  * and naming the decoder here is the whole point of the panel.
+ *
+ * `base` is the name the row is bound to; "" for an environment whose row keys
+ * are bound as variables of their own.
  */
 export function celPathFor(node: JSONPathNode, base = "row"): string {
   const reached = walk(originPrefix(node.origin, base), node.path);

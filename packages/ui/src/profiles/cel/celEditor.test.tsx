@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import { CelEditorPanel } from "./celEditor";
-import type { CelResponse, CelScope } from "./celExpression";
+import type { CelEnvironment, CelResponse, CelScope } from "./celExpression";
 
 const ROWS = [
   { message: "Timeout after 5006ms", level: "ERROR" },
@@ -132,5 +133,130 @@ describe("CelEditorDialog", () => {
 
   it("says plainly when there is nothing to evaluate against", () => {
     expect(renderDialog({ results: [] }, { rows: [] })).toContain("nothing sampled yet");
+  });
+});
+
+/**
+ * An authorization rule: its rows are identities whose keys are the variables,
+ * it is run by the host's own engine, and it selects rows rather than computing
+ * a value.
+ */
+const IDENTITIES = [
+  { user: "alice", groups: ["OM Super"] },
+  { user: "bob", groups: [] },
+  { user: "carol", groups: ["OM Super"] },
+];
+const MATCHER = '"OM Super" in groups';
+
+function ruleEnvironment(evaluate: CelEnvironment["evaluate"] = vi.fn()): CelEnvironment {
+  return {
+    id: "access-rule",
+    label: "Access rule",
+    rowName: "",
+    rowNoun: "user",
+    predicate: true,
+    bindings: () => [
+      { name: "user", detail: "string · the signed-in login" },
+      { name: "groups", detail: "list · the user's groups" },
+    ],
+    evaluate,
+    rowLabel: (row) => String(row.user),
+  };
+}
+
+const MATCHES: CelResponse = {
+  results: [
+    { index: 0, value: true, type: "bool" },
+    { index: 1, value: false, type: "bool" },
+    { index: 2, value: true, type: "bool" },
+  ],
+};
+
+function renderRule(response: CelResponse, environment = ruleEnvironment()) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(["cel-expression", environment.id, MATCHER, IDENTITIES.length], response);
+  return renderToStaticMarkup(
+    <QueryClientProvider client={client}>
+      <CelEditorPanel
+        value={MATCHER}
+        scope={environment}
+        rows={IDENTITIES}
+        title="matcher"
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+describe("CelEditorPanel in a host environment", () => {
+  it("names the host's environment and offers its variables, not a profile's", () => {
+    const html = renderRule(MATCHES);
+
+    expect(html).toContain("Access rule");
+    expect(html).toContain("the user&#x27;s groups");
+    expect(html).not.toContain("Row scope");
+    expect(html).not.toContain(">span<");
+  });
+
+  // Both true and false are values, so a coverage tally would call every row
+  // "evaluated" — which says nothing about whom the rule selects.
+  it("tallies a predicate's matches apart from its misses", () => {
+    const html = renderRule(MATCHES);
+
+    expect(html).toContain("2 true");
+    expect(html).toContain("1 false");
+    expect(html).not.toContain("3 evaluated");
+  });
+
+  it("names each row the way the host does rather than by position", () => {
+    const html = renderRule(MATCHES);
+
+    expect(html).toContain('aria-label="bob"');
+    expect(html).toContain("3 users");
+    expect(html).not.toContain("sampled rows");
+  });
+
+  it("runs the expression on the host's engine, against the rows it was given", async () => {
+    const evaluate = vi.fn<CelEnvironment["evaluate"]>().mockResolvedValue(MATCHES);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <CelEditorPanel
+          value={MATCHER}
+          scope={ruleEnvironment(evaluate)}
+          rows={IDENTITIES}
+          title="matcher"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("2 true")).toBeInTheDocument());
+    expect(evaluate).toHaveBeenCalledWith(MATCHER, IDENTITIES);
+  });
+
+  // A matcher must return a bool, so an example that reads a value is one the
+  // engine refuses; and the rows' keys are the variables, so the accessor is
+  // the bare name.
+  it("offers tests on the bare variable for a node picked from an identity", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <CelEditorPanel
+          value={MATCHER}
+          scope={ruleEnvironment(vi.fn<CelEnvironment["evaluate"]>().mockResolvedValue(MATCHES))}
+          rows={IDENTITIES}
+          title="matcher"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await within(screen.getByLabelText("user values")).findByText("groups"));
+    expect(screen.queryByText("Count the entries")).toBeNull();
+    fireEvent.click(await screen.findByText("Is empty"));
+
+    expect(screen.getByLabelText<HTMLTextAreaElement>("CEL expression").value).toBe("size(groups) == 0");
   });
 });

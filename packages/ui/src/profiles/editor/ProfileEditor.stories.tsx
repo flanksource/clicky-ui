@@ -51,6 +51,7 @@ const initialValue = {
       role: "filter",
     },
   ],
+  processors: [{ type: "logs.parse", config: { format: "json" } }],
   columns: [
     {
       name: "observed_at",
@@ -98,7 +99,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The route-sized editor for a commons-db query profile. Its section rail, field grid, inspector and preview use the shared Workspace layout. Hosts inject the generated profile schema with `configureProfiles` and provide an `OperationsApiClient` for save and lookup operations; this example supplies both in memory.",
+          "The route-sized editor for a commons-db query profile. Collection names and icons expand in the section rail while the selected column, parameter or processor is edited in the headerless center pane. Hosts inject the generated profile schema with `configureProfiles` and provide an `OperationsApiClient` for save and lookup operations; this example supplies both in memory.",
       },
     },
   },
@@ -135,19 +136,52 @@ export const Columns: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole("button", { name: /^Columns Fields, labels, expressions/ }),
+      canvas.getByRole("button", {
+        name: /^Columns Fields, labels, expressions/,
+      }),
     );
     await expect(canvas.findByText("3 of 3 included")).resolves.toBeVisible();
-    const observedAt = within(
-      await canvas.findByRole("region", { name: /^observed_at / }),
-    );
-    await expect(observedAt.getByRole("textbox", { name: "Display label" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "observed_at" }));
+    await expect(
+      canvas.getByRole("textbox", { name: "Display label" }),
+    ).toBeVisible();
     await userEvent.selectOptions(
       canvas.getByRole("combobox", { name: "CEL examples" }),
       "row.observed_at / 1000.0",
     );
-    await expect(canvas.getByRole("textbox", { name: "CEL expression" })).toHaveValue(
-      "row.observed_at / 1000.0",
+    await expect(
+      canvas.getByRole("textbox", { name: "CEL expression" }),
+    ).toHaveValue("row.observed_at / 1000.0");
+  },
+};
+
+export const Collections: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const columns = canvas.getByRole("button", {
+      name: /^Columns Fields, labels, expressions/,
+    });
+    const parameters = canvas.getByRole("button", {
+      name: /^Parameters Named query inputs/,
+    });
+    await userEvent.click(columns);
+    await expect(
+      canvas.getByRole("button", { name: "observed_at" }),
+    ).toBeVisible();
+    await userEvent.click(parameters);
+    await expect(canvas.getByRole("button", { name: "Service" })).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "observed_at" }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Service" }));
+    await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveValue(
+      "service",
     );
+    await userEvent.click(
+      canvas.getByRole("button", { name: "observed_at" }),
+    );
+    await expect(
+      canvas.getByRole("textbox", { name: "Output name" }),
+    ).toHaveValue("observed_at");
   },
 };

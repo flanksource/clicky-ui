@@ -272,7 +272,7 @@ export function TagList({
 export function TagPropertiesList({
   tags,
   rowClassName,
-  gridTemplateColumns = "minmax(4rem, 8rem) minmax(0, 1fr)",
+  gridTemplateColumns,
 }: {
   tags: NormalizedTag[];
   rowClassName?: string;
@@ -283,6 +283,14 @@ export function TagPropertiesList({
     () => tags.map((tag, index) => ({ key: `${tag.token}-${index}`, value: tag })),
     [tags],
   );
+  // A plain string list (e.g. sqlxevent.go's Tables []string) normalizes to
+  // tags with no `key` at all — there is nothing to label. Previously every
+  // keyless tag fell back to a literal italic "tag" placeholder, so a plain
+  // value list rendered as a misleading two-column "tag | AsActivity" grid.
+  // When nothing in the list has a key, collapse the label column instead
+  // of filling it with a fake one.
+  const hasKeys = tags.some((tag) => Boolean(tag.key));
+  const columns = gridTemplateColumns ?? (hasKeys ? "minmax(4rem, 8rem) minmax(0, 1fr)" : "0 minmax(0, 1fr)");
 
   return (
     <Properties<NormalizedTag>
@@ -290,14 +298,8 @@ export function TagPropertiesList({
       density="compact"
       className="border-0 bg-transparent"
       {...(rowClassName ? { rowClassName } : {})}
-      gridTemplateColumns={gridTemplateColumns}
-      renderLabel={(_key, tag) =>
-        tag.key ? (
-          <span className="font-mono">{tag.key}</span>
-        ) : (
-          <span className="italic text-muted-foreground">tag</span>
-        )
-      }
+      gridTemplateColumns={columns}
+      renderLabel={(_key, tag) => (tag.key ? <span className="font-mono">{tag.key}</span> : null)}
       renderValue={(_key, tag) => (
         <span className="block truncate font-mono" title={tag.value}>
           {tag.value}

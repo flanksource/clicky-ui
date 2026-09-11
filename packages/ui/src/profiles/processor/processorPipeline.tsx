@@ -45,14 +45,29 @@ export function ProcessorPipeline({
   onChange,
   profile,
   previewer = previewProfileProcessors,
+  selectedIndex,
+  onSelectedIndexChange,
+  showSteps = true,
+  showEditor = true,
+  tree = false,
 }: {
   steps: ProcessorSpec[];
   presets: Record<string, ProcessorPreset>;
   onChange: (next: ProcessorSpec[]) => void;
   profile: unknown;
   previewer?: ProcessorPreviewer;
+  selectedIndex?: number;
+  onSelectedIndexChange?: (index: number) => void;
+  showSteps?: boolean;
+  showEditor?: boolean;
+  tree?: boolean;
 }) {
-  const [selected, setSelected] = useState(0);
+  const [innerSelected, setInnerSelected] = useState(0);
+  const requestedSelected = selectedIndex ?? innerSelected;
+  const selected =
+    steps.length === 0
+      ? 0
+      : Math.max(0, Math.min(requestedSelected, steps.length - 1));
   const [preview, setPreview] = useState<ProcessorPreview>();
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -81,7 +96,7 @@ export function ProcessorPipeline({
         ...(preset.description ? { title: preset.description } : {}),
         onSelect: () => {
           onChange([...steps, { use: name }]);
-          setSelected(steps.length);
+          select(steps.length);
         },
       })),
     ...Object.keys(PROCESSOR_CONFIG_KEYS)
@@ -91,10 +106,15 @@ export function ProcessorPipeline({
         group: "Processor types",
         onSelect: () => {
           onChange([...steps, { type }]);
-          setSelected(steps.length);
+          select(steps.length);
         },
       })),
   ];
+
+  function select(index: number) {
+    if (selectedIndex === undefined) setInnerSelected(index);
+    onSelectedIndexChange?.(index);
+  }
 
   useEffect(() => {
     setPreview(undefined);
@@ -136,93 +156,118 @@ export function ProcessorPipeline({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <section className="space-y-1">
-          <div className="flex items-center gap-1.5 pb-1 text-[11px] text-muted-foreground">
-            <Icon icon={UiFunnelData} className="text-[13px]" />
-            Runs in order after aliases, filters and columns
-            {preview ? (
-              <Badge tone="neutral" variant="soft" size="md">
-                {preview.input.length} rows in
-              </Badge>
+      <div
+        className={cn(
+          "grid gap-3",
+          showSteps && showEditor
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+            : "grid-cols-1",
+        )}
+      >
+        {showSteps ? (
+          <section className="space-y-1">
+            <div className="flex items-center gap-1.5 pb-1 text-[11px] text-muted-foreground">
+              <Icon icon={UiFunnelData} className="text-[13px]" />
+              Runs in order after aliases, filters and columns
+              {preview ? (
+                <Badge tone="neutral" variant="soft" size="md">
+                  {preview.input.length} rows in
+                </Badge>
+              ) : null}
+            </div>
+
+            {steps.length === 0 ? (
+              <p
+                data-profile-tree-item={tree ? "" : undefined}
+                className={cn(
+                  "text-xs text-muted-foreground",
+                  tree
+                    ? "relative rounded-md px-2 py-2"
+                    : "rounded border border-dashed border-border px-2 py-3 text-center",
+                )}
+              >
+                No post-query steps.
+              </p>
             ) : null}
-          </div>
 
-          {steps.length === 0 ? (
-            <p className="rounded border border-dashed border-border px-2 py-3 text-center text-xs text-muted-foreground">
-              No post-query steps.
-            </p>
-          ) : null}
+            {steps.map((entry, index) => (
+              <StepCard
+                key={index}
+                step={entry}
+                preset={entry.use ? presets[entry.use] : undefined}
+                preview={preview?.stages[index]}
+                selected={index === selected}
+                first={index === 0}
+                last={index === steps.length - 1}
+                tree={tree}
+                onSelect={() => select(index)}
+                onMove={(direction) => {
+                  onChange(reorder(steps, index, index + direction));
+                  select(index + direction);
+                }}
+                onRemove={() => {
+                  onChange(steps.filter((_, position) => position !== index));
+                  select(Math.max(0, Math.min(index, steps.length - 2)));
+                }}
+              />
+            ))}
 
-          {steps.map((entry, index) => (
-            <StepCard
-              key={index}
-              step={entry}
-              preset={entry.use ? presets[entry.use] : undefined}
-              preview={preview?.stages[index]}
-              selected={index === selected}
-              first={index === 0}
-              last={index === steps.length - 1}
-              onSelect={() => setSelected(index)}
-              onMove={(direction) => {
-                onChange(reorder(steps, index, index + direction));
-                setSelected(index + direction);
-              }}
-              onRemove={() => {
-                onChange(steps.filter((_, position) => position !== index));
-                setSelected(Math.max(0, Math.min(index, steps.length - 2)));
-              }}
-            />
-          ))}
+            <div
+              data-profile-tree-item={tree ? "" : undefined}
+              className={tree ? "relative" : undefined}
+            >
+              <DropdownMenu
+                label="Add processor"
+                icon={UiAdd}
+                variant={tree ? "ghost" : "outline"}
+                size="sm"
+                className="w-full [&>button]:w-full [&>button]:justify-start"
+                menuClassName="min-w-64"
+                menuLabel="Add processor"
+                items={addItems}
+              />
+            </div>
 
-          <DropdownMenu
-            label="Add processor"
-            icon={UiAdd}
-            variant="outline"
-            size="sm"
-            className="w-full [&>button]:w-full"
-            menuClassName="min-w-64"
-            menuLabel="Add processor"
-            items={addItems}
-          />
+            {blocks.length > 0 ? <PagingNotice blocks={blocks} /> : null}
+          </section>
+        ) : null}
 
-          {blocks.length > 0 ? <PagingNotice blocks={blocks} /> : null}
-        </section>
-
-        <section className="rounded-lg border border-border p-3">
-          {step ? (
-            <ProcessorPipelineEditor
-              step={step}
-              preset={step.use ? presets[step.use] : undefined}
-              profile={withCurrentProcessors(profile, steps)}
-              previewing={previewing}
-              previewError={previewError}
-              params={params}
-              paramValues={sampleParams}
-              missingParams={missingProcessorPreviewParams(
-                params,
-                sampleParams,
-              )}
-              onParamChange={(name, value) =>
-                setSampleParams((current) => {
-                  const next = { ...current };
-                  if (value === undefined) delete next[name];
-                  else next[name] = value;
-                  return next;
-                })
-              }
-              onPreview={() => void runPreview()}
-              onChange={(next) => update(selected, next)}
-            />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Add a processor to configure and preview it.
-            </p>
-          )}
-        </section>
+        {showEditor ? (
+          <section className="rounded-lg border border-border p-3">
+            {step ? (
+              <ProcessorPipelineEditor
+                step={step}
+                preset={step.use ? presets[step.use] : undefined}
+                profile={withCurrentProcessors(profile, steps)}
+                previewing={previewing}
+                previewError={previewError}
+                params={params}
+                paramValues={sampleParams}
+                missingParams={missingProcessorPreviewParams(
+                  params,
+                  sampleParams,
+                )}
+                onParamChange={(name, value) =>
+                  setSampleParams((current) => {
+                    const next = { ...current };
+                    if (value === undefined) delete next[name];
+                    else next[name] = value;
+                    return next;
+                  })
+                }
+                onPreview={() => void runPreview()}
+                onChange={(next) => update(selected, next)}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Add a processor to configure and preview it.
+              </p>
+            )}
+          </section>
+        ) : null}
       </div>
 
-      {preview ? (
+      {showEditor && preview ? (
         <ProcessorPreviewTable preview={preview} selected={selected} />
       ) : null}
     </div>
@@ -236,6 +281,7 @@ function StepCard({
   selected,
   first,
   last,
+  tree,
   onSelect,
   onMove,
   onRemove,
@@ -246,6 +292,7 @@ function StepCard({
   selected: boolean;
   first: boolean;
   last: boolean;
+  tree: boolean;
   onSelect: () => void;
   onMove: (direction: number) => void;
   onRemove: () => void;
@@ -259,13 +306,23 @@ function StepCard({
 
   return (
     <div
+      data-profile-tree-item={tree ? "" : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg border px-2 py-2",
+        "relative flex items-center gap-2 px-2 py-2",
+        tree ? "rounded-md" : "rounded-lg border",
         selected
-          ? "border-primary/50 bg-primary/[0.05] ring-1 ring-primary/20"
-          : "border-border hover:bg-muted/50",
+          ? tree
+            ? "bg-primary/[0.08]"
+            : "border-primary/50 bg-primary/[0.05] ring-1 ring-primary/20"
+          : tree
+            ? "hover:bg-muted/50"
+            : "border-border hover:bg-muted/50",
       )}
     >
+      <Icon
+        icon={UiFunnelData}
+        className="shrink-0 text-[14px] text-muted-foreground"
+      />
       <button
         type="button"
         aria-label={`Edit ${title}`}

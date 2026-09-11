@@ -63,4 +63,31 @@ describe("TagList", () => {
     const buttonAncestor = overflow.closest("button");
     expect(buttonAncestor).toBeNull();
   });
+
+  // A "tables" column (a list of plain strings — no key=value structure, see
+  // sqlxevent.go's Tables []string) normalizes to tags with no `key` at all.
+  // TagPropertiesList's overflow popover used to fall back to a literal
+  // italic "tag" placeholder label for every keyless tag, so a plain string
+  // list rendered as a two-column "tag | AsActivity" grid instead of just
+  // the values.
+  it("lists plain (keyless) overflow values with no 'tag' placeholder label", () => {
+    vi.useFakeTimers();
+    const tags = normalizeTags(["AsActivity", "AsActivitySequence", "AsHistory", "AsChangeRequest"]);
+
+    render(<TagList tags={tags} maxVisible={2} />);
+    const overflowBadge = screen.getByText("+2");
+    const hoverWrapper = overflowBadge.closest("span.relative");
+    expect(hoverWrapper).not.toBeNull();
+
+    fireEvent.mouseEnter(hoverWrapper!);
+
+    expect(screen.getByText("AsHistory")).toBeInTheDocument();
+    expect(screen.getByText("AsChangeRequest")).toBeInTheDocument();
+    expect(screen.queryByText("tag")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    vi.useRealTimers();
+  });
 });
