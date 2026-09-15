@@ -35,8 +35,9 @@ const RICH = {
   windowTokens: 200_000,
   messageCount: 32,
   sessionId: "session-01JZQX7TXAXQM0RHD7XCGBF8F0",
+  provider: "anthropic",
   executionMode: "cmux",
-  model: "claude-opus-4-8",
+  model: "anthropic/claude-opus-4-8",
   modelIcon: providerIcon("anthropic"),
   effort: "high",
   tokens: {
@@ -69,7 +70,12 @@ export const Bar: Story = {
     const card = within(
       await within(document.body).findByRole("tooltip"),
     );
-    await expect(card.getByText("claude-opus-4-8")).toBeInTheDocument();
+    await expect(
+      canvas.getByTitle("anthropic/claude-opus-4-8"),
+    ).toHaveTextContent("opus-4.8");
+    await expect(
+      card.getByText("anthropic/claude-opus-4-8"),
+    ).toBeInTheDocument();
     await expect(card.getByText("High effort")).toBeInTheDocument();
     await expect(card.getByText("cmux")).toBeInTheDocument();
     await expect(
@@ -92,6 +98,15 @@ export const Gauge: Story = {
     await waitFor(() => expect(body.getByText("Tokens")).toBeInTheDocument());
     await expect(body.getByText("Messages")).toBeInTheDocument();
   },
+};
+
+export const NarrowBar: Story = {
+  args: { mode: "bar", ...RICH },
+  render: (args) => (
+    <div className="@container flex w-80 justify-end p-4">
+      <ContextMeter {...args} />
+    </div>
+  ),
 };
 
 /** Chat only knows a single total cost — the popover shows just the total. */

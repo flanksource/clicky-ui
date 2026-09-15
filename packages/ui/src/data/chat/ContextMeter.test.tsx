@@ -7,10 +7,22 @@ import {
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ContextMeter } from "./ContextMeter";
+import { shortContextModelName } from "./ContextMeter.model";
 import { effortLevelColor } from "./effort-icons";
 import { providerIcon, providerIconColor } from "./provider-icons";
 
 describe("ContextMeter", () => {
+  it.each([
+    ["anthropic/claude-opus-4-8", "opus-4.8"],
+    ["Claude Opus 4.8", "opus-4.8"],
+    ["claude-agent-sonnet-5", "sonnet-5"],
+    ["claude-code-haiku-4-5", "haiku-4.5"],
+    ["gpt-5.5", "gpt-5.5"],
+    ["acme/model-next", "model-next"],
+  ])("shortens the model label %s to %s", (model, expected) => {
+    expect(shortContextModelName(model)).toBe(expected);
+  });
+
   it("maps provider marks to their brand colors", () => {
     expect(providerIconColor("openai")).toContain("text-black");
     expect(providerIconColor("anthropic")).toBe(
@@ -82,20 +94,114 @@ describe("ContextMeter", () => {
     );
   });
 
-  it("uses the model and effort icon as the compact bar identity", () => {
+  it("shows provider, shortened model, mode, effort, progress, and percentage in order", () => {
     render(
       <ContextMeter
         mode="bar"
         usedPercent={63}
+        provider="anthropic"
+        executionMode="cmux"
+        model="anthropic/claude-opus-4-8"
+        effort="high"
+      />,
+    );
+
+    const trigger = screen.getByLabelText("Context 63% used");
+    expect(trigger).toHaveTextContent("opus-4.8");
+    expect(trigger).not.toHaveTextContent("anthropic/claude-opus-4-8");
+    expect(trigger).not.toHaveTextContent("ctx");
+    expect(trigger.querySelector("[data-context-provider] svg")).toHaveClass(
+      "text-[#C15F3C]",
+    );
+    expect(
+      trigger.querySelector('[data-context-mode="cmux"] svg'),
+    ).not.toBeNull();
+    expect(trigger.querySelector("[data-context-effort] svg")).toHaveClass(
+      "text-orange-700",
+    );
+    expect(
+      [...trigger.children].map((child) =>
+        child.getAttribute("data-context-identity"),
+      ),
+    ).toEqual([
+      "provider",
+      "model",
+      "mode",
+      "effort",
+      "progress",
+      "percentage",
+    ]);
+    expect(screen.getByTitle("anthropic/claude-opus-4-8")).toHaveTextContent(
+      "opus-4.8",
+    );
+  });
+
+  it.each(["agent", "api", "cli", "cmux"])(
+    "renders the chosen %s mode icon",
+    (executionMode) => {
+      render(
+        <ContextMeter
+          mode="bar"
+          usedPercent={42}
+          provider="anthropic"
+          executionMode={executionMode}
+          model="claude-opus-5"
+          effort="high"
+        />,
+      );
+
+      expect(
+        screen
+          .getByLabelText("Context 42% used")
+          .querySelector(`[data-context-mode="${executionMode}"] svg`),
+      ).not.toBeNull();
+    },
+  );
+
+  it("keeps a provider icon for an unknown provider", () => {
+    render(
+      <ContextMeter
+        mode="bar"
+        usedPercent={42}
+        provider="acme"
+        executionMode="api"
+        model="acme/model-next"
+        effort="low"
+      />,
+    );
+
+    expect(
+      screen
+        .getByLabelText("Context 42% used")
+        .querySelector('[data-context-provider="acme"] svg'),
+    ).not.toBeNull();
+  });
+
+  it("provides horizontal and bottom-up vertical progress tracks", () => {
+    render(
+      <ContextMeter
+        mode="bar"
+        usedPercent={63}
+        provider="anthropic"
+        executionMode="agent"
         model="claude-opus-5"
         effort="high"
       />,
     );
 
     const trigger = screen.getByLabelText("Context 63% used");
-    expect(trigger).toHaveTextContent("claude-opus-5");
-    expect(trigger).not.toHaveTextContent("ctx");
-    expect(trigger.querySelector("svg")).toHaveClass("text-orange-700");
+    expect(
+      trigger.querySelector('[data-context-progress="horizontal"]'),
+    ).toHaveClass("max-md:hidden", "@max-[48rem]:hidden");
+    expect(
+      trigger.querySelector('[data-context-progress="vertical"]'),
+    ).toHaveClass("hidden", "max-md:inline-flex", "@max-[48rem]:inline-flex");
+    expect(
+      trigger.querySelector('[data-context-progress="vertical"] > span'),
+    ).toHaveClass("bottom-0");
+    expect(
+      trigger.querySelector('[data-context-progress="vertical"] > span'),
+    ).toHaveStyle({ height: "63%" });
   });
 
   it("shows colored provider and effort metadata in the hover card", async () => {
