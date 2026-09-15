@@ -214,7 +214,7 @@ async function expectRuntimeModel(label: string): Promise<void> {
   await waitFor(() =>
     expect(
       screen.getByRole("button", {
-        name: new RegExp(`^Runtime: Claude, API, ${label}, effort None$`),
+        name: new RegExp(`^Runtime: Claude, API, ${label}, effort Unspecified$`),
       }),
     ).toBeInTheDocument(),
   );

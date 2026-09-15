@@ -141,4 +141,32 @@ describe("presets", () => {
       applySpecPreset({}, "bogus" as never, entries({})),
     ).toThrowError(/unknown spec runtime preset/);
   });
+
+  it("keeps permissions.mode when a tool preset is applied", () => {
+    const value: AISpecRuntimeValue = { permissions: { mode: "plan" } };
+    const next = applySpecPreset(value, "edit", entries(value));
+    expect(next.permissions?.mode).toBe("plan");
+    expect(next.permissions?.tools).toMatchObject({ Read: "allow" });
+  });
+
+  it("keeps permissions.mode when a saved snapshot is reapplied", () => {
+    const value: AISpecRuntimeValue = {
+      permissions: { mode: "plan", tools: { Read: "allow" } },
+    };
+    const snapshot = buildPermissionPresetSnapshot(value, entries(value));
+    expect(snapshot.permissions.mode).toBeUndefined();
+
+    const target: AISpecRuntimeValue = { permissions: { mode: "acceptEdits" } };
+    const applied = applyPermissionPresetSnapshot(target, snapshot);
+    expect(applied.permissions?.mode).toBe("acceptEdits");
+    expect(applied.permissions?.tools).toMatchObject({ Read: "allow" });
+  });
+
+  it("lets an explicit snapshot mode override the current one", () => {
+    const applied = applyPermissionPresetSnapshot(
+      { permissions: { mode: "plan" } },
+      { permissions: { mode: "bypassPermissions" } },
+    );
+    expect(applied.permissions?.mode).toBe("bypassPermissions");
+  });
 });

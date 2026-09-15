@@ -14,13 +14,20 @@ export function effortOptionsForModel(
   return [...(model.supportedEfforts ?? [])];
 }
 
-/** Applies catalog identity and capabilities under the caller's execution policy. */
+/**
+ * Applies catalog identity and capabilities under the caller's execution
+ * policy. A model or mode change never invents a reasoning effort the user
+ * did not choose — it only drops one the new model can't run. Pass
+ * `defaultEffort: true` for a seeding path (chat's initial/default runtime)
+ * that must land on a usable tier when nothing is set.
+ */
 export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
   value: T,
   model: ChatModel | undefined,
   fallbackEfforts: readonly string[],
   execution?: {
-    mode: string | undefined;
+    mode?: string | undefined;
+    defaultEffort?: boolean;
   },
 ): T {
   const next = { ...value } as ModelRuntimeSelection;
@@ -33,18 +40,16 @@ export function reconcileModelCapabilities<T extends ModelRuntimeSelection>(
     next.model = model.id;
   }
 
-  if (execution) {
-    if (execution.mode) next.mode = execution.mode;
-    else delete next.mode;
+  if (execution?.mode !== undefined) {
+    next.mode = execution.mode;
   }
 
   const efforts = effortOptionsForModel(model, fallbackEfforts);
-  if (model?.capabilitiesKnown && efforts.length === 0) {
+  const unsupported = Boolean(next.effort) && !efforts.includes(next.effort!);
+  if ((model?.capabilitiesKnown && efforts.length === 0) || unsupported) {
     delete next.effort;
-  } else if (
-    efforts.length > 0 &&
-    (!next.effort || !efforts.includes(next.effort))
-  ) {
+  }
+  if (execution?.defaultEffort && efforts.length > 0 && !next.effort) {
     const preferred = model?.defaultEffort;
     next.effort =
       preferred && efforts.includes(preferred)

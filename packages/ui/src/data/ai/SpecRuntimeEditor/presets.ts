@@ -117,10 +117,13 @@ export function applyPermissionPresetSnapshot(
   snapshot: SpecRuntimePermissionSnapshot,
 ): AISpecRuntimeValue {
   const { permissions: _permissions, memory: _memory, ...rest } = value;
-  const next: AISpecRuntimeValue = {
-    ...rest,
-    permissions: clonePermissions(snapshot.permissions),
-  };
+  // A preset governs tools/mcp/plugins/skills, not the base posture: an
+  // explicit mode on the snapshot wins, otherwise the current mode survives.
+  const mode = snapshot.permissions.mode ?? value.permissions?.mode;
+  const permissions = clonePermissions(snapshot.permissions);
+  if (mode) permissions.mode = mode;
+  else delete permissions.mode;
+  const next: AISpecRuntimeValue = { ...rest, permissions };
   const memory = cloneMemory(snapshot.memory);
   return memory ? { ...next, memory } : next;
 }
@@ -252,6 +255,7 @@ function clonePermissions(
   value: AISpecRuntimePermissions,
 ): AISpecRuntimePermissions {
   const permissions: AISpecRuntimePermissions = {};
+  if (value.mode) permissions.mode = value.mode;
   if (value.tools)
     permissions.tools = { ...(value.tools as AISpecRuntimeToolPolicies) };
   if (value.mcp) {

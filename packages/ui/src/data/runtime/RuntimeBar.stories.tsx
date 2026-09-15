@@ -204,7 +204,7 @@ export const Combo: Story = {
     await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     await expect(
       canvas.getByRole("button", {
-        name: "Runtime: Claude, CLI, Prompt default, effort High",
+        name: "Runtime: Claude, CLI, Unspecified, effort High",
       }),
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
@@ -231,7 +231,7 @@ export const NoModelsForFamily: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTitle("Model — prompt default"));
+    await userEvent.click(canvas.getByTitle("Model — unspecified"));
     await userEvent.type(
       await within(document.body).findByLabelText("Model id"),
       "gemini-3-pro",
@@ -263,7 +263,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
     // CLI survives the family switch; the Claude-only model does not.
     await expect(canvas.getByTitle("Codex CLI")).toHaveTextContent("CLI");
     await expect(
-      canvas.getByTitle("Model — prompt default"),
+      canvas.getByTitle("Model — unspecified"),
     ).toBeInTheDocument();
   },
 };

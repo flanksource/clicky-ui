@@ -55,7 +55,7 @@ describe("ModelSection", () => {
       />,
     );
 
-    expect(screen.getByTitle("Model — prompt default")).toBeInTheDocument();
+    expect(screen.getByTitle("Model — unspecified")).toBeInTheDocument();
     expect(screen.getByText("Max turns")).toBeInTheDocument();
     expect(screen.queryByText("Max cost (USD)")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Reasoning effort")).not.toBeInTheDocument();

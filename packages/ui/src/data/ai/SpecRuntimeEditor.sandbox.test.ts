@@ -99,7 +99,7 @@ describe("sandbox mutators", () => {
     expect(sandboxRef({})).toEqual({});
   });
 
-  it("clears incompatible settings when the public mode changes", () => {
+  it("clears every prior setting, including approval, when the public mode changes", () => {
     const native = withSandbox(
       {},
       {
@@ -110,7 +110,6 @@ describe("sandbox mutators", () => {
     );
     expect(sandboxRef(withSandboxMode(native, "docker"))).toEqual({
       mode: "docker",
-      approval: "plan",
     });
 
     const remote = withSandbox(
@@ -125,7 +124,6 @@ describe("sandbox mutators", () => {
     );
     expect(sandboxRef(withSandboxMode(remote, "native"))).toEqual({
       mode: "native",
-      approval: "dontAsk",
     });
     expect(sandboxRef(withSandboxMode(remote, "off"))).toEqual({ mode: "off" });
   });

@@ -7,6 +7,8 @@ import {
   withBudgetValue,
   withCheckoutMode,
   withOptionalRoot,
+  withPermissionMode,
+  withSandboxMode,
   withStashMode,
   withWorktreeMode,
   worktreeMode,
@@ -126,5 +128,33 @@ describe("update helpers", () => {
     expect(parseOptionalNumber("0.7")).toBe(0.7);
     expect(parseOptionalNumber("2.9", true)).toBe(2);
     expect(parseOptionalNumber("-3", true)).toBe(0);
+  });
+
+  it("sets and deletes permissions.mode without disturbing other permission fields", () => {
+    const withTools: AISpecRuntimeValue = {
+      permissions: { tools: { Read: "auto" } },
+    };
+    expect(withPermissionMode(withTools, "plan").permissions).toEqual({
+      tools: { Read: "auto" },
+      mode: "plan",
+    });
+    expect(
+      withPermissionMode({ permissions: { mode: "plan" } }, undefined),
+    ).not.toHaveProperty("permissions");
+    expect(
+      withPermissionMode(
+        { permissions: { mode: "plan", tools: { Read: "auto" } } },
+        undefined,
+      ).permissions,
+    ).toEqual({ tools: { Read: "auto" } });
+  });
+
+  it("drops the whole sandbox ref down to mode on a mode switch, never carrying approval", () => {
+    const value: AISpecRuntimeValue = {
+      sandbox: { mode: "native", approval: "plan" },
+    };
+    expect(withSandboxMode(value, "docker").sandbox).toEqual({
+      mode: "docker",
+    });
   });
 });

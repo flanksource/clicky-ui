@@ -442,7 +442,7 @@ describe("SpecRuntimeEditor", () => {
     const bar = within(picker).getByRole("group", { name: "Fallback runtime" });
     expect(within(bar).getByTitle("Anthropic API")).toHaveTextContent("API");
     expect(
-      within(bar).getByTitle("Model — prompt default"),
+      within(bar).getByTitle("Model — unspecified"),
     ).toBeInTheDocument();
     // The bar is the whole editor — temperature is no longer part of it.
     expect(
@@ -459,7 +459,7 @@ describe("SpecRuntimeEditor", () => {
 
     fireEvent.click(within(bar).getByTitle("Family — Claude"));
     fireEvent.click(await screen.findByRole("menuitem", { name: /^Codex/ }));
-    fireEvent.click(within(bar).getByTitle("Model — prompt default"));
+    fireEvent.click(within(bar).getByTitle("Model — unspecified"));
     fireEvent.click(await screen.findByRole("menuitem", { name: /o4-mini/ }));
     expect(
       await within(modelSection).findByTitle("Model — openai/o4-mini"),
@@ -589,12 +589,27 @@ describe("SpecRuntimeEditor", () => {
 
     render(<Host />);
 
+    // The permission mode posture and the tool preset both publish a "Plan"
+    // option, so each is queried from its own control rather than the shared
+    // "Permissions" region.
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Permission posture" }),
+      ).getByRole("radio", { name: "Unspecified" }),
+    ).toHaveAttribute("aria-checked", "true");
+
     const planPreset = within(
-      screen.getByRole("region", { name: "Permissions" }),
+      screen.getByRole("radiogroup", { name: "Permission preset" }),
     ).getByRole("radio", { name: /Plan/ });
     fireEvent.click(planPreset);
 
     expect(planPreset).toHaveAttribute("aria-checked", "true");
+    // Applying a tool preset is independent of the posture: Unspecified survives.
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Permission posture" }),
+      ).getByRole("radio", { name: "Unspecified" }),
+    ).toHaveAttribute("aria-checked", "true");
     openPermissionsAdvanced();
     expect(
       within(screen.getByLabelText("Permissions")).queryByRole("combobox", {
@@ -910,5 +925,32 @@ describe("SpecRuntimeEditor", () => {
         name: "Claude, needs attention",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("preset variant shows Unspecified for model, effort, and permission mode", () => {
+    render(
+      <SpecRuntimeEditor
+        value={{}}
+        onChange={vi.fn()}
+        models={SAMPLE_MODELS}
+        families={PERMISSION_FAMILIES}
+        tools={SAMPLE_TOOLS}
+        variant="preset"
+        showHeader={false}
+      />,
+    );
+
+    const modelSection = screen.getByRole("region", { name: "Model" });
+    expect(
+      within(modelSection).getByTitle("Model — unspecified"),
+    ).toBeInTheDocument();
+    // The model and reasoning-effort segments both read Unspecified.
+    expect(within(modelSection).getAllByText("Unspecified")).toHaveLength(2);
+
+    expect(
+      within(
+        screen.getByRole("radiogroup", { name: "Permission posture" }),
+      ).getByRole("radio", { name: "Unspecified" }),
+    ).toHaveAttribute("aria-checked", "true");
   });
 });

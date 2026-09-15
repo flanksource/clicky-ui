@@ -380,7 +380,7 @@ function EffortSlider({
     currentIndex >= 0
       ? current
         ? effortLevelLabel(current)
-        : "None"
+        : UNSPECIFIED_LABEL
       : `${effortLevelLabel(current)} unsupported`;
   const percent = (sliderIndex / (options.length - 1)) * 100;
   const firstIcon = effortLevelIcon(supported[0]!);

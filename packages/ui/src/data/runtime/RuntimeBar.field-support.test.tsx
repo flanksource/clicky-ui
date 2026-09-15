@@ -40,7 +40,7 @@ describe("RuntimeBar field support", () => {
       screen.queryByRole("slider", { name: "Reasoning effort" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Prompt default" }),
+      screen.queryByRole("button", { name: "Unspecified" }),
     ).not.toBeInTheDocument();
   });
 });
