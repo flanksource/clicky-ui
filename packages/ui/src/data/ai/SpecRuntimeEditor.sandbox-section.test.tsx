@@ -226,9 +226,6 @@ describe("SpecRuntimeEditor sandbox section", () => {
     render(<Harness />);
     chooseMode("Native");
     expect(
-      screen.getByRole("radiogroup", { name: "Permission posture" }),
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole("checkbox", { name: "Require native sandbox" }),
     ).toBeInTheDocument();
     expect(
@@ -253,22 +250,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     ).toBeNull();
   });
 
-  it("moves posture into sandbox and collapses equivalent provider aliases", () => {
-    render(<Harness initial={{ mode: "agent" }} />);
-    chooseMode("Native");
-    expect(
-      screen.getAllByRole("radio", { name: "Ask for approval" }),
-    ).toHaveLength(1);
-    fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
-    expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
-      JSON.stringify({
-        mode: "agent",
-        sandbox: { mode: "native", approval: "plan" },
-      }),
-    );
-  });
-
-  it("clears native policy when switching to docker but preserves posture", () => {
+  it("clears native policy and any legacy sandbox.approval when switching to docker", () => {
     render(
       <Harness
         initial={{
@@ -286,7 +268,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
       JSON.stringify({
         mode: "cli",
-        sandbox: { mode: "docker", approval: "plan" },
+        sandbox: { mode: "docker" },
       }),
     );
   });

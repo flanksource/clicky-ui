@@ -131,7 +131,7 @@ describe("RuntimeBar", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Runtime: Codex, CLI, Prompt default, effort High",
+        name: "Runtime: Codex, CLI, Unspecified, effort High",
       }),
     );
     expect(screen.getByRole("radio", { name: "Codex" })).toBeChecked();
@@ -290,7 +290,6 @@ describe("RuntimeBar", () => {
     expect(onChange).toHaveBeenCalledWith({
       mode: "cmux",
       model: "gpt-5",
-      effort: "medium",
     });
   });
 
@@ -343,7 +342,7 @@ describe("RuntimeBar", () => {
     openSegment("Model — gemini-3-pro");
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Prompt defaultno override"]);
+    ).toEqual(["Unspecifiednot sent — configuration decides"]);
 
     fireEvent.change(screen.getByLabelText("Model id"), {
       target: { value: "gemini-3-pro-preview" },
@@ -365,20 +364,19 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Model — prompt default");
+    openSegment("Model — unspecified");
     const items = screen.getAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "Prompt defaultno override",
+      "Unspecifiednot sent — inherits GPT-5",
       "GPT-5openai/gpt-5",
     ]);
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
 
     fireEvent.click(items[1]!);
-    // A reasoning model with unknown capabilities defaults to medium effort.
+    // Picking a model never invents a reasoning effort the user didn't choose.
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
       model: "gpt-5",
-      effort: "medium",
     });
   });
 
@@ -495,7 +493,7 @@ describe("RuntimeBar", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Runtime: Codex, CLI, Prompt default, effort None",
+        name: "Runtime: Codex, CLI, Unspecified, effort Unspecified",
       }),
     );
 
@@ -528,14 +526,13 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Model — prompt default");
+    openSegment("Model — unspecified");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Sonnet 4.6/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-sonnet-4-6",
       id: "anthropic/claude-sonnet-4-6",
       mode: "api",
-      effort: "medium",
     });
   });
 
@@ -579,17 +576,16 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Model — prompt default");
+    openSegment("Model — unspecified");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Opus 5/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-opus-5",
       mode: "cli",
-      effort: "medium",
     });
   });
 
-  it("clears the model through the prompt-default entry", () => {
+  it("clears the model through the Unspecified entry", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
@@ -600,12 +596,12 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — gpt-5");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Prompt default/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Unspecified/ }));
 
     expect(onChange).toHaveBeenCalledWith({ mode: "cli" });
   });
 
-  it("clears the effort through the None entry", () => {
+  it("clears the effort through the Unspecified entry", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
@@ -616,7 +612,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Reasoning effort");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^None/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Unspecified/ }));
 
     expect(onChange).toHaveBeenCalledWith({ mode: "cli", model: "gpt-5" });
   });
@@ -634,6 +630,11 @@ describe("RuntimeBar", () => {
     openSegment("Reasoning effort");
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Nonesingle pass", "Low", "High", "Minimalunsupported"]);
+    ).toEqual([
+      "Unspecifiednot sent — configuration decides",
+      "Low",
+      "High",
+      "Minimalunsupported",
+    ]);
   });
 });

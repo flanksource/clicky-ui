@@ -4,18 +4,12 @@ import { JsonSchemaForm, SegmentedControl } from "../../../components";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
 import { UiAdd, UiRepeat, UiRobotAi, UiWarningTriangle } from "../../../icons";
 import { Icon } from "../../Icon";
-import {
-  SPEC_RUNTIME_FAMILIES,
-  type RuntimeSpecSchema,
-  type SpecRuntimeFamily,
-} from "../../runtime/runtime-mode";
+import type { RuntimeSpecSchema } from "../../runtime/runtime-mode";
 import { runtimeSchemaPropertyAtPath } from "../../runtime/runtime-field-support";
 import {
-  SPEC_PERMISSION_MODES,
   SPEC_SANDBOX_MODES,
   type AISpecRuntimeSandboxPolicy,
   type AISpecRuntimeValue,
-  type SpecPermissionMode,
   type SpecSandboxMode,
 } from "../SpecRuntimeEditor.model";
 import { SandboxCreateWizard } from "../SandboxCreateWizard";
@@ -28,7 +22,6 @@ import {
   SpecField,
   SpecSelect,
 } from "./fields";
-import { PermissionModeField } from "./PermissionModeField";
 import type {
   SpecRuntimeSandboxBackend,
   SpecRuntimeSandboxCatalog,
@@ -60,14 +53,12 @@ export function SandboxSection({
   schema,
   catalog,
   createConfig,
-  families = SPEC_RUNTIME_FAMILIES,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   schema: RuntimeSpecSchema;
   catalog?: SpecRuntimeSandboxCatalog | undefined;
   createConfig?: SpecRuntimeSandboxCreateConfig | undefined;
-  families?: SpecRuntimeFamily[] | undefined;
 }) {
   const [creating, setCreating] = useState(false);
   const [createdBackends, setCreatedBackends] = useState<
@@ -77,7 +68,6 @@ export function SandboxSection({
   const modes = sandboxModes(schema);
   const mode = ref.mode ?? modes[0];
   if (!mode) throw new Error("the selected backend published no sandbox modes");
-  const approvalModes = sandboxApprovalModes(schema);
   const backends = sandboxBackends(catalog, createdBackends, mode);
   const selectedBackend = backends.find(
     (backend) => backend.name === ref.backend,
@@ -115,15 +105,6 @@ export function SandboxSection({
           className="w-full"
         />
       </SpecField>
-
-      {mode !== "off" && approvalModes.length > 0 && (
-        <PermissionModeField
-          value={value}
-          onChange={onChange}
-          families={families}
-          availableModes={approvalModes}
-        />
-      )}
 
       {mode === "native" && (
         <NativeSandboxSettings
@@ -331,24 +312,6 @@ function sandboxModes(schema: RuntimeSpecSchema): SpecSandboxMode[] {
       );
     }
     return value as SpecSandboxMode;
-  });
-}
-
-function sandboxApprovalModes(schema: RuntimeSpecSchema): SpecPermissionMode[] {
-  const values = runtimeSchemaPropertyAtPath(schema, "sandbox.approval")?.enum;
-  if (values == null) return [];
-  if (!Array.isArray(values))
-    throw new Error("sandbox.approval must publish an enum");
-  return values.map((value) => {
-    if (
-      typeof value !== "string" ||
-      !SPEC_PERMISSION_MODES.includes(value as SpecPermissionMode)
-    ) {
-      throw new Error(
-        `sandbox.approval published unsupported value ${JSON.stringify(value)}`,
-      );
-    }
-    return value as SpecPermissionMode;
   });
 }
 

@@ -118,7 +118,7 @@ describe("Chat runtime controls", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Runtime: Codex, Agent, GPT-5.6 Luna, effort None",
+        name: "Runtime: Codex, Agent, GPT-5.6 Luna, effort Unspecified",
       }),
     );
     fireEvent.click(screen.getByRole("radio", { name: "CLI" }));
@@ -178,7 +178,7 @@ describe("Chat runtime controls", () => {
     });
     expect(
       screen.getByRole("button", {
-        name: "Runtime: Codex, API, Prompt default, effort Medium",
+        name: "Runtime: Codex, API, Unspecified, effort Medium",
       }),
     ).toBeInTheDocument();
   });

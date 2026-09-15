@@ -36,12 +36,10 @@ export function resolveChatRuntime({
       selected.runtime?.mode !== undefined &&
       selected.runtime.mode !== current.mode,
     );
-    next = reconcileModelCapabilities(
-      current,
-      selected,
-      reasoningEfforts,
-      preservesExecutionSelection ? { mode: current.mode } : undefined,
-    );
+    next = reconcileModelCapabilities(current, selected, reasoningEfforts, {
+      defaultEffort: true,
+      ...(preservesExecutionSelection ? { mode: current.mode } : {}),
+    });
     if (!next.id && !next.model) next.id = selected.id;
   } else if (preferredModel) {
     next = { ...current, model: preferredModel };

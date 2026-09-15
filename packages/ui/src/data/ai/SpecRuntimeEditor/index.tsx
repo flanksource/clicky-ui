@@ -232,6 +232,7 @@ export function SpecRuntimeEditor({
       supports(`permissions.${entry.domain}`),
   );
   const hasPermissionSection =
+    supports("permissions.mode") ||
     (skillsSection === "permissions" && supports("permissions.skills")) ||
     (["tools", "mcp", "plugins"] as const).some((domain) =>
       supports(`permissions.${domain}`),
@@ -321,7 +322,6 @@ export function SpecRuntimeEditor({
             onChange={commitChange}
             schema={runtimeSchema}
             {...(sandboxCatalog ? { catalog: sandboxCatalog } : {})}
-            families={runtimeFamilies}
             {...(sandboxCreate ? { createConfig: sandboxCreate } : {})}
           />
         ) : null;
@@ -331,6 +331,9 @@ export function SpecRuntimeEditor({
             value={value}
             onChange={commitChange}
             entries={permissionEntries}
+            families={runtimeFamilies}
+            {...(runtimeSchema ? { schema: runtimeSchema } : {})}
+            effectiveMode={effectiveMode}
           />
         ) : null;
       case "environment":

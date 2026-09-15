@@ -325,11 +325,11 @@ describe("ChatWindow tool approval default", () => {
       name: "Advanced Chat Settings",
     });
 
-    fireEvent.click(within(dialog).getByTitle("Model — prompt default"));
+    fireEvent.click(within(dialog).getByTitle("Model — unspecified"));
     expect(
       screen.queryByRole("menuitem", { name: /Claude Opus/ })
     ).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByTitle("Model — prompt default"));
+    fireEvent.click(within(dialog).getByTitle("Model — unspecified"));
 
     fireEvent.click(within(dialog).getByTitle("Claude Agent"));
     expect(

@@ -2,7 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { SegmentedControl, type SegmentedOption } from "../../../components";
 import { Icon, type StaticIconComponent } from "../../Icon";
 import { UiAdd, UiEdit, UiListDashes, UiLock, UiShield } from "../../../icons";
-import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
+import {
+  SPEC_PERMISSION_MODES,
+  type AISpecRuntimeValue,
+  type SpecPermissionMode,
+} from "../SpecRuntimeEditor.model";
+import {
+  SPEC_RUNTIME_FAMILIES,
+  type RuntimeSpecSchema,
+  type SpecRuntimeFamily,
+} from "../../runtime/runtime-mode";
+import { runtimeSchemaPropertyAtPath } from "../../runtime/runtime-field-support";
+import { PermissionModeField } from "./PermissionModeField";
 import { SpecInput } from "./fields";
 import {
   type PermissionDomain,
@@ -42,18 +53,61 @@ export function PermissionsSection({
   value,
   onChange,
   entries,
+  families = SPEC_RUNTIME_FAMILIES,
+  schema,
+  effectiveMode,
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   entries: PermissionListEntry[];
+  families?: SpecRuntimeFamily[] | undefined;
+  /** Runtime schema used to narrow the published `permissions.mode` enum. */
+  schema?: RuntimeSpecSchema | undefined;
+  effectiveMode?: string | undefined;
 }) {
   return (
-    <PermissionPresetSelector
-      value={value}
-      entries={entries}
-      onChange={onChange}
-    />
+    <div className="grid gap-density-3">
+      <PermissionModeField
+        value={value}
+        onChange={onChange}
+        families={families}
+        availableModes={permissionModeModes(schema)}
+        effectiveMode={effectiveMode}
+      />
+      <PermissionPresetSelector
+        value={value}
+        entries={entries}
+        onChange={onChange}
+      />
+    </div>
   );
+}
+
+// Mirrors the schema-driven validation `sandbox.approval` used to publish:
+// an unsupported value is a schema authoring bug, not a user input to shrug
+// off. With no runtime resolved yet there is no schema to consult, so every
+// mode is offered; once a runtime is known, a schema that simply doesn't
+// publish `permissions.mode` means that runtime has no postures to offer.
+function permissionModeModes(
+  schema: RuntimeSpecSchema | undefined,
+): SpecPermissionMode[] {
+  if (!schema) return [...SPEC_PERMISSION_MODES];
+  const values = runtimeSchemaPropertyAtPath(schema, "permissions.mode")?.enum;
+  if (values == null) return [];
+  if (!Array.isArray(values)) {
+    throw new Error("permissions.mode must publish an enum");
+  }
+  return values.map((value) => {
+    if (
+      typeof value !== "string" ||
+      !SPEC_PERMISSION_MODES.includes(value as SpecPermissionMode)
+    ) {
+      throw new Error(
+        `permissions.mode published unsupported value ${JSON.stringify(value)}`,
+      );
+    }
+    return value as SpecPermissionMode;
+  });
 }
 
 export function PermissionsAdvanced({

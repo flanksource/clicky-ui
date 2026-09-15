@@ -115,8 +115,11 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   const inheritedModelLabel =
     value.model || value.id
       ? undefined
-      : (runtimeModelForValue(models, { model: effectiveModel }, isSelectableModel)
-          ?.label ?? effectiveModel);
+      : (runtimeModelForValue(
+          models,
+          effectiveModel !== undefined ? { model: effectiveModel } : {},
+          isSelectableModel,
+        )?.label ?? effectiveModel);
 
   const applyMode = (familyId: string, modeId: string) => {
     setPreference({ model: effectiveModel, family: familyId });
