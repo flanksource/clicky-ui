@@ -27,6 +27,7 @@ const GROUP_LABELS: Record<string, string> = {
   "configs-metadata": "Configs & metadata",
   "uir-ast-code": "UIR / AST code",
   "uir-sql": "UIR / SQL",
+  "tracing-observability": "Tracing & observability",
   "files-code": "Files & code",
   "git-source-control": "Git & source control",
   "dev-tools": "Dev tools",
@@ -290,4 +291,93 @@ export const ChangeAliases: Story = {
     showAliases: true,
     showStats: false,
   },
+};
+
+const OBSERVABILITY_ICONS = [
+  {
+    component: GeneratedIcons.UiStackTrace,
+    name: "Stack trace",
+    description: "Connected runtime call frames.",
+  },
+  {
+    component: GeneratedIcons.UiProfiler,
+    name: "CPU profile",
+    description: "Sampled execution tiers and a narrow hotspot.",
+  },
+  {
+    component: GeneratedIcons.UiMemoryProfile,
+    name: "Memory profile",
+    description: "Heap allocations and an available slot.",
+  },
+  {
+    component: GeneratedIcons.UiAuditLog,
+    name: "Audit log",
+    description: "Chronological entries ending in verification.",
+  },
+  {
+    component: GeneratedIcons.UiDatabaseEventStream,
+    name: "Database event stream",
+    description: "Stored records emitting engine events / SQL XEvents.",
+  },
+];
+
+export const Observability: Story = {
+  parameters: {
+    controls: { disable: true },
+    docs: {
+      description: {
+        story: [
+          "Five original icons using the blue and gray stroke/fill palette of UiClass and UiNamespace, with a 24×24 viewBox and a 1.5-unit stroke. Each row compares actual 16, 20, and 24px sizes; use the theme toolbar to compare light and dark backgrounds.",
+          "",
+          "Import from `@flanksource/clicky-ui/icons`: `UiStackTrace`, `UiProfiler` (CPU), `UiMemoryProfile`, `UiAuditLog`, and `UiDatabaseEventStream`.",
+          "",
+          "```tsx",
+          'import { UiMemoryProfile } from "@flanksource/clicky-ui/icons";',
+          '<UiMemoryProfile size={16} title="Memory profile" />',
+          "```",
+          "`size` sets both dimensions and defaults to 1em. `title` supplies the accessible name; omit it when adjacent text already labels the icon. The SVGs carry their blue and gray palette, like the reference icons. The standalone SVGs live in `packages/ui/icons/svg/`.",
+        ].join("\n"),
+      },
+    },
+  },
+  render: () => (
+    <div className="max-w-2xl space-y-4" data-testid="observability-icons">
+      <h2 className="text-lg font-semibold">Tracing & observability</h2>
+      <p className="text-sm text-muted-foreground">
+        Original icons at 16, 20, and 24px, using the UIR / AST palette.
+      </p>
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span>References:</span>
+        <GeneratedIcons.UiClass size={24} title="UiClass reference" />
+        <span>UiClass</span>
+        <GeneratedIcons.UiNamespace size={24} title="UiNamespace reference" />
+        <span>UiNamespace</span>
+      </div>
+      <div className="divide-y divide-border rounded border border-border">
+        {OBSERVABILITY_ICONS.map(({ component: Icon, name, description }) => (
+          <div key={name} className="flex items-center gap-6 px-4 py-3">
+            <div className="flex shrink-0 items-center gap-5">
+              {[16, 20, 24].map((size) => (
+                <div
+                  key={size}
+                  className="flex w-8 flex-col items-center gap-2"
+                >
+                  <div className="flex h-8 items-center justify-center">
+                    <Icon size={size} title={`${name} at ${size}px`} />
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {size}px
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-sm font-medium">{name}</div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
 };

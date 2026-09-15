@@ -621,6 +621,43 @@ describe("FilterBar", () => {
     measurement.mockRestore();
   });
 
+  it("keeps explicitly secondary filters in the overflow menu when space is available", async () => {
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 1_000,
+      itemWidths: { team: 100, owner: 100, service: 100 },
+    });
+
+    render(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: vi.fn(),
+            placement: "overflow",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+    expect(
+      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByLabelText(
+        "Service",
+      ),
+    ).toBeInTheDocument();
+
+    measurement.mockRestore();
+  });
+
   it("moves all filters into the overflow panel on mobile widths", async () => {
     const media = mockMatchMedia(PHONE_WIDTH);
 
