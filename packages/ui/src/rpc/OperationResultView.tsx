@@ -115,6 +115,7 @@ export type OperationResultViewProps = {
   /** Load-more handle for that walk, forwarded to the table's sentinel. */
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   getRowDetailHref?: (id: string) => string | undefined;
   /** Host row-detail renderer, given raw values keyed by column name. */
   renderRowDetail?: ClickyRowDetailRenderer;
@@ -163,6 +164,7 @@ export function OperationResultView({
   pages,
   infinite,
   rowSelection,
+  hiddenColumns,
   getRowDetailHref,
   renderRowDetail,
   detailStyle,
@@ -247,6 +249,7 @@ export function OperationResultView({
       {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
       {...(rowSelection ? { rowSelection } : {})}
+      {...(hiddenColumns ? { hiddenColumns } : {})}
       {...(renderRowDetail ? { renderRowDetail } : {})}
       {...(detailStyle ? { detailStyle } : {})}
       {...(detailDialogSize ? { detailDialogSize } : {})}

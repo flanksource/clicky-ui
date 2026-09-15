@@ -46,6 +46,20 @@ export {
   type OperationActionDialogProps,
 } from "./rpc/OperationActionDialog";
 export {
+  OperationPicker,
+  type OperationPickerProps,
+} from "./rpc/OperationPicker";
+export {
+  OperationScheduleDialog,
+  type OperationScheduleDialogProps,
+} from "./rpc/OperationScheduleDialog";
+export { OperationSchedules } from "./rpc/OperationSchedules";
+export type {
+  OperationSchedule,
+  OperationScheduleInput,
+  OperationSchedulesProps,
+} from "./rpc/operation-schedule-types";
+export {
   OperationActionBar,
   type OperationActionBarProps,
 } from "./rpc/OperationActionBar";

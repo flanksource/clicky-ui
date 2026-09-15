@@ -1,5 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ClickyRow } from "../data/Clicky";
 import {
   appendTailEvent,
   emptyLogTailBuffer,
@@ -152,6 +153,45 @@ describe("appendTailEvent", () => {
   it("returns the same buffer when a duplicate carries nothing new", () => {
     const first = appendTailEvent(emptyLogTailBuffer, frame(5, "hello"), 10);
     expect(appendTailEvent(first, frame(5, "hello"), 10)).toBe(first);
+  });
+
+  it("keeps clickyRow index-aligned with the raw row it presents", () => {
+    // A trace/follow session's per-row event carries the exact ClickyRow the
+    // list document's own node.rows[n] uses — a plain log tail never sets
+    // this, so it must default to undefined without disturbing `rows` itself.
+    const presented: ClickyRow = { cells: { message: { kind: "text", plain: "ready" } } };
+    const withRow: LogTailEvent = { ...frame(1, "starting") };
+    const withClickyRow: LogTailEvent = { ...frame(2, "ready"), clickyRow: presented };
+
+    const applied = [withRow, withClickyRow].reduce(
+      (buffer, event) => appendTailEvent(buffer, event, 10),
+      emptyLogTailBuffer,
+    );
+
+    expect(applied.rows.map((row) => row.message)).toEqual(["starting", "ready"]);
+    expect(applied.clickyRows).toEqual([undefined, presented]);
+  });
+
+  it("pads a batched rows frame with undefined clickyRows, one per row", () => {
+    const batch: LogTailEvent = {
+      sessionId: SESSION_ID,
+      sequence: 3,
+      rows: [podRow("one"), podRow("two")],
+    };
+    const applied = appendTailEvent(emptyLogTailBuffer, batch, 10);
+    expect(applied.clickyRows).toEqual([undefined, undefined]);
+  });
+
+  it("evicts clickyRows in step with the rows the cap drops", () => {
+    const presented: ClickyRow = { cells: { message: { kind: "text", plain: "three" } } };
+    const applied = [
+      frame(41, "one"),
+      frame(42, "two"),
+      { ...frame(43, "three"), clickyRow: presented },
+    ].reduce((buffer, event) => appendTailEvent(buffer, event, 2), emptyLogTailBuffer);
+
+    expect(applied.rows.map((row) => row.message)).toEqual(["two", "three"]);
+    expect(applied.clickyRows).toEqual([undefined, presented]);
   });
 });
 

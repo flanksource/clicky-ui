@@ -106,4 +106,39 @@ describe("useOperationCatalogFilterState", () => {
       false,
     );
   });
+
+  it("seeds a filter from initialValues when the URL has no value for it", () => {
+    const { result } = renderState({ initialValues: { q: "seeded" } });
+
+    expect(result.current.filters).toEqual({ q: "seeded" });
+  });
+
+  it("lets the URL value win over initialValues for the same key", () => {
+    window.history.replaceState(null, "", "/?q=preset");
+    const { result } = renderState({ initialValues: { q: "seeded" } });
+
+    expect(result.current.filters).toEqual({ q: "preset" });
+  });
+
+  it("still applies initialValues when urlState is false", () => {
+    const { result } = renderState({
+      urlState: false,
+      initialValues: { q: "seeded" },
+    });
+
+    expect(result.current.filters).toEqual({ q: "seeded" });
+  });
+
+  it("keeps an initialValues seed editable, unlike a locked value", () => {
+    const { result } = renderState({ initialValues: { q: "seeded" } });
+
+    act(() => {
+      result.current.setFilters((current) => ({ ...current, q: "edited" }));
+    });
+
+    expect(result.current.filters).toEqual({ q: "edited" });
+    expect(new URLSearchParams(window.location.search).get("q")).toBe(
+      "edited",
+    );
+  });
 });

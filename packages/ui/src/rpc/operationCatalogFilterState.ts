@@ -38,10 +38,19 @@ export function useOperationCatalogFilterState({
   listParameters,
   lockedValues,
   urlState,
+  initialValues,
 }: {
   listParameters: OpenAPIParameter[];
   lockedValues: ParameterValues;
   urlState: OperationCatalogUrlState | undefined;
+  /**
+   * Editable seed values applied only to a key the URL has no value for —
+   * unlike `lockedValues`, these are ordinary starting `filters`: the reader
+   * can change them, and a change round-trips through the URL like any other
+   * edit. Never merged into `lockedValues` and never itself written to the
+   * URL as a distinct concept (only the resulting `filters` value is).
+   */
+  initialValues?: ParameterValues;
 }): OperationCatalogFilterState {
   // Read as primitives rather than the `urlState` object itself so an inline
   // object literal from the host does not retrigger the URL-write effect on
@@ -49,9 +58,10 @@ export function useOperationCatalogFilterState({
   const urlStateDisabled = urlState === false;
   const urlStatePrefix = urlState ? urlState.prefix : undefined;
 
-  const [filters, setFilters] = useState<ParameterValues>(() =>
-    urlStateDisabled ? {} : readOperationFiltersFromUrl(urlStatePrefix)
-  );
+  const [filters, setFilters] = useState<ParameterValues>(() => ({
+    ...initialValues,
+    ...(urlStateDisabled ? {} : readOperationFiltersFromUrl(urlStatePrefix)),
+  }));
 
   const effectiveFilters = useMemo(
     () => ({ ...filters, ...lockedValues }),

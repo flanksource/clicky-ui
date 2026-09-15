@@ -1,7 +1,5 @@
 import { isPlainObject, moveItem } from "./collections";
-import {
-  type SpecRuntimeFamily,
-} from "../data/runtime/runtime-mode";
+import { type SpecRuntimeFamily } from "../data/runtime/runtime-mode";
 import {
   familyForModel,
   modeOptionFor,
@@ -133,7 +131,7 @@ export function newPresetRecord(
     "New preset",
     presets.map((item) => item.name),
   );
-  return { id, name, scope: "surface", spec: {} };
+  return { id, name, scope: "surface", spec: {}, presets: [] };
 }
 
 export function duplicateRecord<T extends { id: string; name: string }>(

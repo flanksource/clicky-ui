@@ -66,14 +66,20 @@ export function mergeExecutionPages(
 // The executor puts the decoded document on `parsed` and its bytes on
 // `stdout`; CommandOutput reads them in that order, so this does too or a
 // merged page could disagree with the one the renderer would have shown.
-function documentOf(response: ExecutionResponse): ClickyDocument | undefined {
+// Exported for operationCatalogFollow.ts, which reads the same response shape
+// to find the table it merges live rows into.
+export function documentOf(response: ExecutionResponse): ClickyDocument | undefined {
   const payload = response.parsed ?? response.stdout ?? response.output ?? "";
   if (typeof payload !== "string" && typeof payload !== "object") return undefined;
   const parsed = parseClickyData(payload as Parameters<typeof parseClickyData>[0]);
   return parsed.ok ? parsed.document : undefined;
 }
 
-function findFirstTable(node: ClickyNode): ClickyNode | undefined {
+// Exported for operationCatalogFollow.ts, which merges live-streamed rows into
+// the same first table a cursor walk accumulates into — one traversal, reused
+// rather than re-implemented, so the two never disagree on which node is "the
+// table" a document's rows live in.
+export function findFirstTable(node: ClickyNode): ClickyNode | undefined {
   let found: ClickyNode | undefined;
   mapFirstTable(node, (table) => {
     found = table;
@@ -88,7 +94,7 @@ function findFirstTable(node: ClickyNode): ClickyNode | undefined {
  * rewriting it, so the page a walk reads rows out of is by construction the
  * page it writes them back into.
  */
-function mapFirstTable(
+export function mapFirstTable(
   node: ClickyNode,
   fn: (table: ClickyNode) => ClickyNode,
 ): { node: ClickyNode; found: boolean } {

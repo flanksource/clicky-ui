@@ -59,6 +59,7 @@ export type CommandOutputProps = {
   // only carries the question of whether to ask for another.
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
   renderRowDetail?: ClickyRowDetailRenderer;
   detailStyle?: "row" | "dialog";
@@ -102,6 +103,7 @@ export function CommandOutput({
   onSortChange,
   infinite,
   rowSelection,
+  hiddenColumns,
   download,
   renderRowDetail,
   detailStyle,
@@ -161,6 +163,7 @@ export function CommandOutput({
         {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
+        {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
         {...(renderRowDetail ? { renderRowDetail } : {})}
         {...(detailStyle ? { detailStyle } : {})}
@@ -264,6 +267,7 @@ function OutputBody({
   onSortChange,
   infinite,
   rowSelection,
+  hiddenColumns,
   download,
   renderRowDetail,
   detailStyle,
@@ -291,6 +295,7 @@ function OutputBody({
   onSortChange?: (sort: SortState | null) => void;
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
   renderRowDetail?: ClickyRowDetailRenderer;
   detailStyle?: "row" | "dialog";
@@ -342,6 +347,7 @@ function OutputBody({
         {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
+        {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
         {...(renderRowDetail ? { renderRowDetail } : {})}
         {...(detailStyle ? { detailStyle } : {})}
