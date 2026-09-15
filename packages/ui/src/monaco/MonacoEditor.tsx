@@ -1,5 +1,6 @@
 import Editor, { loader, type Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import { useRef } from "react";
 import { useResolvedTheme } from "../hooks/use-theme";
 import { useMonacoWorkerFactory } from "./use-monaco-worker";
 import type { MonacoEditorProps } from "./types";
@@ -18,6 +19,10 @@ export function MonacoEditor({
 }: MonacoEditorProps) {
   const workers = useMonacoWorkerFactory();
   const theme = useResolvedTheme() === "dark" ? "vs-dark" : "light";
+  // @monaco-editor/react keeps the first onMount it sees, so read the value at
+  // mount time through a ref rather than that render's closure.
+  const latestValue = useRef(value);
+  latestValue.current = value;
 
   if (!workers) {
     return <div role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">Monaco workers are not configured.</div>;
@@ -34,9 +39,12 @@ export function MonacoEditor({
         theme={theme}
         keepCurrentModel
         {...(beforeMount ? { beforeMount } : {})}
-        {...(onMount
-          ? { onMount: (instance, monacoInstance) => onMount(instance, monacoInstance) }
-          : {})}
+        onMount={(instance, monacoInstance) => {
+          // keepCurrentModel remounts onto the model already at `path`, which
+          // still holds the text from when the previous editor unmounted.
+          if (instance.getValue() !== latestValue.current) instance.setValue(latestValue.current);
+          onMount?.(instance, monacoInstance);
+        }}
         {...(onValidate ? { onValidate } : {})}
         options={{
           automaticLayout: true,

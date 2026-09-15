@@ -323,18 +323,23 @@ export type FilterBarTriStateFilter = {
 };
 
 export type FilterBarFilter =
-  | FilterBarTextFilter
-  | FilterBarLookupFilter
-  | FilterBarLookupMultiFilter
-  | FilterBarMultiFilter
-  | FilterBarNestedMultiFilter
-  | FilterBarWorkloadFilter
-  | FilterBarSelectMultiFilter
-  | FilterBarNumberFilter
-  | FilterBarEnumFilter
-  | FilterBarBooleanFilter
-  | FilterBarTriStateFilter
-  | FilterBarDateRangeFilter;
+  (
+    | FilterBarTextFilter
+    | FilterBarLookupFilter
+    | FilterBarLookupMultiFilter
+    | FilterBarMultiFilter
+    | FilterBarNestedMultiFilter
+    | FilterBarWorkloadFilter
+    | FilterBarSelectMultiFilter
+    | FilterBarNumberFilter
+    | FilterBarEnumFilter
+    | FilterBarBooleanFilter
+    | FilterBarTriStateFilter
+    | FilterBarDateRangeFilter
+  ) & {
+    /** Keeps a secondary filter in the overflow menu without removing it. */
+    placement?: "auto" | "overflow";
+  };
 
 export type FilterBarRangePreset = {
   /** Visible preset label. */
@@ -452,7 +457,19 @@ export function FilterBar({
 }: FilterBarProps) {
   const hasRangeControls = Boolean(timeRange || dateRange);
   const showApply = !autoSubmit && !!onApply;
-  const allFilters = filters ?? [];
+  const allFilters = useMemo(() => {
+    const configured = filters ?? [];
+    return [
+      ...configured.filter((filter) => filter.placement !== "overflow"),
+      ...configured.filter((filter) => filter.placement === "overflow"),
+    ];
+  }, [filters]);
+  const inlineFilterLimit = allFilters.findIndex(
+    (filter) => filter.placement === "overflow",
+  );
+  const maximumInlineFilters =
+    inlineFilterLimit === -1 ? allFilters.length : inlineFilterLimit;
+  const hasForcedOverflow = maximumInlineFilters < allFilters.length;
   const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
   const mobilePageOverflow = useMediaQuery("(max-width: 639px)");
   const contextValue = useMemo(
@@ -468,16 +485,20 @@ export function FilterBar({
   const mobileCollapse =
     overflowMode === "responsive" ? mobileFilterOverflow : mobilePageOverflow;
   const responsiveOverflow =
-    allFilters.length > 0 && (overflowMode === "responsive" || mobileCollapse);
+    allFilters.length > 0 &&
+    (overflowMode === "responsive" || mobileCollapse || hasForcedOverflow);
   const filterListRef = useRef<HTMLDivElement>(null);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const filterNodeRefs = useRef(new Map<string, HTMLDivElement>());
   const filterWidthCache = useRef(new Map<string, number>());
   const filterKeys = useMemo(
-    () => allFilters.map((filter) => filter.key).join("\u0000"),
+    () =>
+      allFilters
+        .map((filter) => `${filter.key}:${filter.placement ?? "auto"}`)
+        .join("\u0000"),
     [allFilters],
   );
-  const [visibleFilterCount, setVisibleFilterCount] = useState(allFilters.length);
+  const [visibleFilterCount, setVisibleFilterCount] = useState(maximumInlineFilters);
 
   // Latest-value refs so measureOverflow can be a stable useCallback. Reading
   // the current values through refs sidesteps the closure-staleness problem
@@ -488,20 +509,23 @@ export function FilterBar({
   const allFiltersRef = useRef(allFilters);
   const responsiveOverflowRef = useRef(responsiveOverflow);
   const mobileCollapseRef = useRef(mobileCollapse);
+  const maximumInlineFiltersRef = useRef(maximumInlineFilters);
   allFiltersRef.current = allFilters;
   responsiveOverflowRef.current = responsiveOverflow;
   mobileCollapseRef.current = mobileCollapse;
+  maximumInlineFiltersRef.current = maximumInlineFilters;
 
   useLayoutEffect(() => {
     setVisibleFilterCount(
       responsiveOverflowRef.current && mobileCollapseRef.current
         ? 0
-        : allFiltersRef.current.length,
+        : maximumInlineFiltersRef.current,
     );
   }, [filterKeys, mobileCollapse]);
 
   const measureOverflow = useCallback(() => {
     const current = allFiltersRef.current;
+    const maximumInline = maximumInlineFiltersRef.current;
     if (!responsiveOverflowRef.current) {
       setVisibleFilterCount(current.length);
       return;
@@ -517,7 +541,7 @@ export function FilterBar({
     const availableWidth = Math.floor(filterList.getBoundingClientRect().width);
     if (availableWidth <= 0) return;
 
-    const widths = current.map((filter) => {
+    const widths = current.slice(0, maximumInline).map((filter) => {
       const node = filterNodeRefs.current.get(filter.key);
       const measured = node?.getBoundingClientRect().width ?? 0;
       if (measured > 0) {
@@ -533,10 +557,11 @@ export function FilterBar({
         FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX,
     );
     const triggerGap = triggerWidth > 0 ? FILTER_BAR_GAP_PX : 0;
-    const allFiltersWidth = sumFilterWidths(widths);
+    const allInlineWidth = sumFilterWidths(widths);
+    const forcedOverflow = maximumInline < current.length;
     const nextVisible =
-      allFiltersWidth <= availableWidth
-        ? current.length
+      !forcedOverflow && allInlineWidth <= availableWidth
+        ? maximumInline
         : calculateVisibleFilterCount(
             widths,
             Math.max(0, availableWidth - triggerWidth - triggerGap),
@@ -573,11 +598,12 @@ export function FilterBar({
     };
   }, [measureOverflow, responsiveOverflow, mobileCollapse]);
 
+  const inlineEnd = Math.min(visibleFilterCount, maximumInlineFilters);
   const inlineFilters = responsiveOverflow
-    ? allFilters.slice(0, Math.min(visibleFilterCount, allFilters.length))
+    ? allFilters.slice(0, inlineEnd)
     : allFilters;
   const overflowFilters = responsiveOverflow
-    ? allFilters.slice(Math.min(visibleFilterCount, allFilters.length))
+    ? allFilters.slice(inlineEnd)
     : [];
   const activeOverflowCount = overflowFilters.filter(isFilterBarFilterActive).length;
 
