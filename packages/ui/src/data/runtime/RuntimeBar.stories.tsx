@@ -150,6 +150,12 @@ export const NarrowContainer: Story = {
     );
     await expect(bar.scrollWidth).toBe(bar.clientWidth);
     await expect(settings!.scrollWidth).toBe(settings!.clientWidth);
+    // A narrow bar must keep its limit values legible: the run settings give up
+    // the static "Effort" key label rather than ellipsing "30m" or "$2.00".
+    for (const caption of ["Medium", "30m", "$2.00"]) {
+      const span = within(settings!).getByText(caption);
+      await expect(span.scrollWidth).toBeLessThanOrEqual(span.clientWidth);
+    }
   },
 };
 
