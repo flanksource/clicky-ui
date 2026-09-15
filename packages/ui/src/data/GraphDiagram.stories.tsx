@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { GraphDiagram, type GraphDiagramEdge, type GraphDiagramNode } from "./GraphDiagram";
 
 const meta = {
@@ -68,8 +68,14 @@ export const Selectable: Story = {
     });
     await step("clicking another node moves the selection", async () => {
       const survivor = canvas.getByRole("button", { name: /survivor/ });
-      survivor.click();
-      await expect(survivor).toHaveAttribute("aria-pressed", "true");
+      await userEvent.click(survivor);
+      await waitFor(() =>
+        expect(survivor).toHaveAttribute("aria-pressed", "true"),
+      );
+      await expect(canvas.getByRole("button", { name: /victim/ })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
     });
   },
 };

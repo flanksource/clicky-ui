@@ -12,7 +12,10 @@ export const SEGMENT_KEY_CLASS =
   "text-[11px] font-semibold uppercase leading-none tracking-wide text-muted-foreground";
 
 // One trigger in the segmented runtime bar: a dropdown whose button carries the
-// segment's current value.
+// segment's current value. `min-w-0` on the root lets a segment shrink past its
+// content — without it the flex item's automatic minimum size is its max-content
+// width, so a row of segments overflows a narrow container instead of ellipsing
+// its captions.
 export function RuntimeSegment({
   items,
   menuLabel,
@@ -37,7 +40,10 @@ export function RuntimeSegment({
       items={items}
       {...(header ? { header } : {})}
       menuClassName="min-w-56 max-w-80"
-      className={cn("border-l border-border first:border-l-0 [&>span]:min-w-0 [&>span]:w-full", className)}
+      className={cn(
+        "min-w-0 border-l border-border first:border-l-0 [&>span]:min-w-0 [&>span]:w-full",
+        className,
+      )}
       trigger={
         <button
           type="button"
