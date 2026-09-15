@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   parseJavaStackTrace,
   type ParsedStackFrame,
@@ -6,7 +6,13 @@ import {
 } from "./stacktrace-parse";
 import { Icon } from "../Icon";
 import { UiStackFrameDot, UiError } from "../../icons";
-import { StackFrameRow, type StackFrameActions } from "./StackFrameRow";
+import {
+  StackFrameRow,
+  type StackFrameActions,
+  type StackFrameActionsVisibility,
+  type StackFrameDetailRenderer,
+  type StackFramePartRenderer,
+} from "./StackFrameRow";
 import type { FrameSource } from "./FrameSourceWindow.utils";
 
 // SourceResolver matches the Go clicky.SourceResolver interface: given a
@@ -42,6 +48,16 @@ export interface StackTraceProps {
   exclude?: string[];
   /** Trailing per-frame actions, revealed on hover/focus. */
   frameActions?: StackFrameActions;
+  /** Replace method, class, and location labels with application-owned renderers. */
+  renderFramePart?: StackFramePartRenderer;
+  /** Render application-owned detail below each visible frame. */
+  renderFrameDetail?: StackFrameDetailRenderer;
+  /** Control whether per-frame actions are hover-only or always visible. */
+  frameActionsVisibility?: StackFrameActionsVisibility;
+  /** Additional application-owned frame predicate. */
+  frameFilter?: (frame: ParsedStackFrame) => boolean;
+  /** Render application-owned detail below a parsed cause. */
+  renderCauseDetail?: (cause: string, index: number) => ReactNode;
   /** Classes applied to the stack-trace shell. */
   className?: string;
 }
@@ -59,6 +75,11 @@ export function StackTrace({
   include,
   exclude,
   frameActions,
+  renderFramePart,
+  renderFrameDetail,
+  frameActionsVisibility = "hover",
+  frameFilter,
+  renderCauseDetail,
   className,
 }: StackTraceProps) {
   const parsed = useMemo<ParsedStackTrace>(() => {
@@ -84,13 +105,14 @@ export function StackTrace({
   const visibleFrames = useMemo(() => {
     return enrichedFrames.filter((frame) => {
       if (hideRuntimeOnly && frame.runtime) return false;
+      if (frameFilter && !frameFilter(frame)) return false;
       if (exclude && exclude.some((p) => frame.class?.startsWith(p))) return false;
       if (include && include.length > 0) {
         return include.some((p) => frame.class?.startsWith(p));
       }
       return true;
     });
-  }, [enrichedFrames, hideRuntimeOnly, include, exclude]);
+  }, [enrichedFrames, hideRuntimeOnly, include, exclude, frameFilter]);
 
   if (visibleFrames.length === 0 && !parsed.exceptionClass) return null;
 
@@ -129,16 +151,19 @@ export function StackTrace({
       )}
       {parsed.causedBy.length > 0 && (
         <div className="space-y-1 border-b border-border bg-orange-500/5 px-3 py-2">
-          {parsed.causedBy.map((cause, i) => (
-            <div
-              key={i}
-              className="flex min-w-0 items-start gap-2 font-mono text-[11px] text-orange-700 dark:text-orange-300"
-            >
-              <Icon icon={UiStackFrameDot} className="mt-0.5 shrink-0 text-xs" />
-              <span className="shrink-0 opacity-75">Caused by</span>
-              <span className="min-w-0 break-all">{cause}</span>
-            </div>
-          ))}
+          {parsed.causedBy.map((cause, i) => {
+            const detail = renderCauseDetail?.(cause, i);
+            return (
+              <div key={i} data-cause-index={i} className="min-w-0">
+                <div className="flex min-w-0 items-start gap-2 font-mono text-[11px] text-orange-700 dark:text-orange-300">
+                  <Icon icon={UiStackFrameDot} className="mt-0.5 shrink-0 text-xs" />
+                  <span className="shrink-0 opacity-75">Caused by</span>
+                  <span className="min-w-0 break-all">{cause}</span>
+                </div>
+                {detail ? <div className="mt-1 pl-5">{detail}</div> : null}
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="divide-y divide-border/60">
@@ -149,6 +174,9 @@ export function StackTrace({
             index={idx}
             showIndex
             {...(frameActions ? { frameActions } : {})}
+            {...(renderFramePart ? { renderFramePart } : {})}
+            {...(renderFrameDetail ? { renderFrameDetail } : {})}
+            frameActionsVisibility={frameActionsVisibility}
           />
         ))}
       </div>

@@ -91,4 +91,76 @@ describe("frameActions slot", () => {
     render(<JvmStackTrace frames={[frame()]} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("renders application-owned frame parts and details", () => {
+    render(
+      <StackTrace
+        input={{ causedBy: [], language: "java", frames: [frame()] }}
+        renderFramePart={(part, value) => <a href={`/${part}`}>{value[part]}</a>}
+        renderFrameDetail={() => <div>decompiled source</div>}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "run" })).toHaveAttribute("href", "/method");
+    expect(screen.getByRole("link", { name: "com.example.App" })).toHaveAttribute(
+      "href",
+      "/class",
+    );
+    expect(screen.getByRole("link", { name: "App.java:42" })).toHaveAttribute(
+      "href",
+      "/location",
+    );
+    expect(screen.getByText("decompiled source")).toBeInTheDocument();
+  });
+
+  it("keeps actions visible when requested", () => {
+    const { container } = render(
+      <StackTrace
+        input={{ causedBy: [], language: "java", frames: [frame()] }}
+        frameActions={() => <button type="button">trace</button>}
+        frameActionsVisibility="always"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "trace" }).parentElement).toHaveClass("opacity-100");
+    expect(container.querySelector(".group-hover\\:opacity-100")).toBeNull();
+  });
+
+  it("filters frames with the application predicate before invoking slots", () => {
+    const actions = vi.fn(() => <button type="button">trace</button>);
+    render(
+      <StackTrace
+        input={{
+          causedBy: [],
+          language: "java",
+          frames: [frame({ method: "keep" }), frame({ method: "aspectOf" })],
+        }}
+        frameFilter={(value) => value.method !== "aspectOf"}
+        frameActions={actions}
+      />,
+    );
+    expect(actions).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Showing 1 of 2 frames")).toBeInTheDocument();
+  });
+
+  it("renders application-owned detail below the cause it belongs to", () => {
+    const causes = ["java.lang.RuntimeException: boom", "RuleElementLocation: 17"];
+    render(
+      <StackTrace
+        input={{
+          exceptionClass: "java.lang.RuntimeException",
+          causedBy: causes,
+          language: "java",
+          frames: [],
+        }}
+        renderCauseDetail={(cause, index) =>
+          cause.startsWith("RuleElementLocation") ? <pre>{`#${index} <MathVariable/>`}</pre> : null
+        }
+      />,
+    );
+    const detail = screen.getByText("#1 <MathVariable/>");
+    const causeRow = screen.getByText(causes[1]!).closest("[data-cause-index]");
+    expect(causeRow).toHaveAttribute("data-cause-index", "1");
+    expect(causeRow).toContainElement(detail);
+    expect(causeRow?.firstElementChild).not.toContainElement(detail);
+    expect(screen.getByText(causes[0]!).closest("[data-cause-index]")?.querySelector("pre")).toBeNull();
+  });
 });
