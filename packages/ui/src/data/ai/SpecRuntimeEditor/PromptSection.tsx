@@ -32,11 +32,22 @@ export function PromptSection({
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   supports?: RuntimeFieldSupport | undefined;
-  variant?: "runtime" | "document" | undefined;
+  variant?: "runtime" | "document" | "system" | undefined;
 }) {
+  if (
+    variant === "system" &&
+    !supports("prompt.system") &&
+    !supports("prompt.appendSystem")
+  ) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        This runtime does not accept system prompt overrides.
+      </p>
+    );
+  }
   return (
     <div className="grid gap-density-2">
-      {variant === "document" ? (
+      {variant === "document" && (
         <TextareaField
           label="Prompt document body"
           value={value.prompt?.user}
@@ -45,7 +56,8 @@ export function PromptSection({
           minHeight={220}
           icon={UiUser}
         />
-      ) : (
+      )}
+      {variant === "runtime" && (
         <ExpandField
           label="User override"
           value={value.prompt?.user}

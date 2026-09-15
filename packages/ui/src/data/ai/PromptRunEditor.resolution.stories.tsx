@@ -3,9 +3,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PromptRunEditor } from "./PromptRunEditor";
 import type { AIPromptRunValue } from "./PromptRunEditor/model";
 
-function ResolvedProfileStory() {
+function ResolvedPresetsStory() {
   const [value, setValue] = useState<AIPromptRunValue>({
-    runtimeProfile: "review-profile",
+    presets: ["review-preset"],
     spec: {},
   });
   return (
@@ -21,7 +21,6 @@ function ResolvedProfileStory() {
           { id: "operator", label: "Operator family", provider: "openai", modes: [{ id: "cmux", label: "cmux" }] },
           { id: "review", label: "Review family", provider: "anthropic", modes: [{ id: "cmux", label: "cmux" }] },
         ]}
-        profiles={[{ id: "review-profile", name: "Review profile", presets: ["review-preset"], spec: {} }]}
         presets={[{ id: "review-preset", name: "Review preset", spec: { model: "review-model", mode: "cmux" } }]}
         resolution={{ spec: { model: "review-model", mode: "cmux" }, constraints: {}, trace: [] }}
       />
@@ -33,7 +32,7 @@ function ResolvedProfileStory() {
 }
 
 const meta = {
-  title: "AI/PromptRunEditor/Resolved profile",
+  title: "AI/PromptRunEditor/Resolved presets",
   component: PromptRunEditor,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof PromptRunEditor>;
@@ -42,5 +41,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const InheritedRuntime: Story = {
-  render: () => <ResolvedProfileStory />,
+  render: () => <ResolvedPresetsStory />,
 };

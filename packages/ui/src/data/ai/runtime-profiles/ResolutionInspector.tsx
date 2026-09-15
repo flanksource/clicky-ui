@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Tabs } from "../../../layout/Tabs";
 import { CodeBlock } from "../../CodeBlock";
-import type { RuntimeProfileResolveRequest } from "../runtime-profile";
+import type {
+  RuntimePresetResolveRequest,
+  RuntimeProfileResolveRequest,
+} from "../runtime-profile";
 import { ToolSchemaBrowser } from "../ToolSchemaBrowser";
 import { ResolutionTrace } from "./ResolutionTrace";
 import type { RuntimeProfileResolutionState } from "./types";
@@ -18,7 +21,7 @@ export function ResolutionInspector({
   request,
   state,
 }: {
-  request: RuntimeProfileResolveRequest;
+  request: RuntimeProfileResolveRequest | RuntimePresetResolveRequest;
   state: RuntimeProfileResolutionState;
 }) {
   const [tab, setTab] = useState<InspectorTab>("settings");
@@ -99,6 +102,8 @@ function StatusLabel({
     return <span className="text-xs font-medium text-destructive">Failed</span>;
   }
   return (
-    <span className="text-xs font-medium text-muted-foreground">Resolving…</span>
+    <span className="text-xs font-medium text-muted-foreground">
+      Resolving…
+    </span>
   );
 }
