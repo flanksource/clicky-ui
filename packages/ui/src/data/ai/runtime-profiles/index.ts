@@ -29,7 +29,10 @@ export {
 } from "./RuntimeProfilePicker.model";
 export { useRuntimeFamilies } from "./use-runtime-families";
 export { useRuntimePermissionCatalog } from "./use-permission-catalog";
-export { useRuntimeProfileResolution } from "./use-resolution";
+export {
+  useRuntimePresetResolution,
+  useRuntimeProfileResolution,
+} from "./use-resolution";
 export {
   authoredRuntimeSpec,
   duplicateName,

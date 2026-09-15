@@ -19,7 +19,6 @@ import type {
   RuntimeProfilesClient,
   RuntimeProfilesPersistence,
   RuntimeProfilesStore,
-  RuntimeProfilesView,
   RuntimeRecordMeta,
 } from "./types";
 
@@ -30,7 +29,12 @@ const PRESETS: RuntimePreset[] = [
     scope: "global",
     spec: { model: "anthropic/claude-sonnet-5", mode: "cli" },
   },
-  { id: "plan-mode", name: "Plan mode", scope: "surface", spec: { mode: "cli" } },
+  {
+    id: "plan-mode",
+    name: "Plan mode",
+    scope: "surface",
+    spec: { mode: "cli" },
+  },
 ];
 
 const PROFILES: RuntimeProfile[] = [
@@ -73,7 +77,7 @@ const RESOLUTION: ResolvedRuntimeProfile = {
 
 function fakeClient(): RuntimeProfilesClient {
   return {
-    resolve: vi.fn(async () => RESOLUTION),
+    resolvePresets: vi.fn(async () => RESOLUTION),
     loadPermissionCatalog: vi.fn(async () => ({
       tools: [{ id: "Read", label: "Read", group: "Agent tools" }],
     })),
@@ -91,24 +95,29 @@ function Harness({
   recordMeta?: ((id: string) => RuntimeRecordMeta) | undefined;
   onStore?: ((store: RuntimeProfilesStore) => void) | undefined;
 }) {
-  const [view, setView] = useState<RuntimeProfilesView>("profiles");
   const [presets, setPresets] = useState(PRESETS);
   const [profiles, setProfiles] = useState(PROFILES);
   const [selectedPresetId, setSelectedPresetId] = useState<string | undefined>(
     PRESETS[0]?.id,
   );
-  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>(
-    PROFILES[0]?.id,
-  );
+  const [selectedProfileId, setSelectedProfileId] = useState<
+    string | undefined
+  >(PROFILES[0]?.id);
   const store: RuntimeProfilesStore = {
     createPreset: (preset) => setPresets((current) => [...current, preset]),
     updatePreset: (next) =>
-      setPresets((current) => current.map((p) => (p.id === next.id ? next : p))),
-    deletePreset: (id) => setPresets((current) => current.filter((p) => p.id !== id)),
+      setPresets((current) =>
+        current.map((p) => (p.id === next.id ? next : p)),
+      ),
+    deletePreset: (id) =>
+      setPresets((current) => current.filter((p) => p.id !== id)),
     createProfile: (profile) => setProfiles((current) => [...current, profile]),
     updateProfile: (next) =>
-      setProfiles((current) => current.map((p) => (p.id === next.id ? next : p))),
-    deleteProfile: (id) => setProfiles((current) => current.filter((p) => p.id !== id)),
+      setProfiles((current) =>
+        current.map((p) => (p.id === next.id ? next : p)),
+      ),
+    deleteProfile: (id) =>
+      setProfiles((current) => current.filter((p) => p.id !== id)),
   };
   onStore?.(store);
   return (
@@ -116,8 +125,8 @@ function Harness({
       <RuntimeProfilesWorkspace
         presets={presets}
         profiles={profiles}
-        view={view}
-        onViewChange={setView}
+        view="presets"
+        onViewChange={() => undefined}
         selectedPresetId={selectedPresetId}
         selectedProfileId={selectedProfileId}
         onSelectPreset={setSelectedPresetId}
@@ -129,8 +138,8 @@ function Harness({
         recordMeta={recordMeta}
         newId={() => "new-record"}
       />
-      <output data-testid="profiles-json">{JSON.stringify(profiles)}</output>
-      <output data-testid="selection">{selectedProfileId ?? ""}</output>
+      <output data-testid="presets-json">{JSON.stringify(presets)}</output>
+      <output data-testid="selection">{selectedPresetId ?? ""}</output>
     </>
   );
 }
@@ -138,7 +147,7 @@ function Harness({
 describe("RuntimeProfilesWorkspace", () => {
   afterEach(cleanup);
 
-  it("resolves the selected profile and renders the trace, without a persistence bar", async () => {
+  it("resolves the selected preset and renders the trace, without a persistence bar", async () => {
     const client = fakeClient();
     render(<Harness client={client} />);
 
@@ -146,15 +155,17 @@ describe("RuntimeProfilesWorkspace", () => {
     await waitFor(() => expect(screen.queryByText("Resolved")).not.toBeNull());
     expect(
       Array.from(
-        screen.getByRole("list", { name: "Resolution order" }).querySelectorAll("li"),
+        screen
+          .getByRole("list", { name: "Resolution order" })
+          .querySelectorAll("li"),
         (item) => item.textContent,
       ),
     ).toEqual([
       expect.stringContaining("Organization defaults"),
       expect.stringContaining("request"),
     ]);
-    expect(client.resolve).toHaveBeenCalledWith(
-      expect.objectContaining({ profile: PROFILES[0], presets: PRESETS }),
+    expect(client.resolvePresets).toHaveBeenCalledWith(
+      { selected: [PRESETS[0]!.id], presets: PRESETS },
       expect.any(AbortSignal),
     );
     await waitFor(() =>
@@ -169,7 +180,7 @@ describe("RuntimeProfilesWorkspace", () => {
     const persistence: RuntimeProfilesPersistence = {
       dirty: true,
       saving: false,
-      error: "conflict on Plan and review",
+      error: "conflict on Organization defaults",
       onSave: vi.fn(),
       onDiscard: vi.fn(),
     };
@@ -178,7 +189,7 @@ describe("RuntimeProfilesWorkspace", () => {
     const bar = screen.getByRole("group", { name: "Persistence" });
     expect(within(bar).getByText("Unsaved changes")).not.toBeNull();
     expect(within(bar).getByRole("alert").textContent).toBe(
-      "conflict on Plan and review",
+      "conflict on Organization defaults",
     );
     fireEvent.click(within(bar).getByRole("button", { name: "Save" }));
     fireEvent.click(within(bar).getByRole("button", { name: "Discard" }));
@@ -191,41 +202,51 @@ describe("RuntimeProfilesWorkspace", () => {
       <Harness
         client={fakeClient()}
         recordMeta={(id) =>
-          id === "review-profile"
+          id === "organization-defaults"
             ? { sourceLabel: "file", writable: false }
             : { sourceLabel: "db", writable: true }
         }
       />,
     );
 
-    const readOnly = screen.getByRole("button", { name: "Delete Plan and review" });
+    const readOnly = screen.getByRole("button", {
+      name: "Delete Organization defaults",
+    });
     expect(readOnly).toBeDisabled();
     expect(readOnly).toHaveAttribute("title", "file is read-only");
-    expect(screen.getByRole("button", { name: "Delete Autonomous coding" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Delete Plan mode" }),
+    ).toBeEnabled();
     expect(screen.getByText("file")).not.toBeNull();
   });
 
-  it("renders a missing preset reference as a removable row", () => {
+  it("keeps a preset referenced by a hidden legacy profile read-only", () => {
     render(<Harness client={fakeClient()} />);
 
-    const order = screen.getByRole("list", { name: "Preset order" });
-    expect(within(order).getByText("ghost-preset")).not.toBeNull();
-    expect(within(order).getByText("missing")).not.toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Remove missing preset ghost-preset" }),
-    );
-    expect(
-      JSON.parse(screen.getByTestId("profiles-json").textContent ?? "[]")[0].presets,
-    ).toEqual(["organization-defaults"]);
+    const button = screen.getByRole("button", {
+      name: "Delete Organization defaults",
+    });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", "Used by Plan and review");
+    expect(screen.queryByText("Profiles")).not.toBeInTheDocument();
   });
 
-  it("creates and selects a new profile through the store", () => {
+  it("creates and selects a new preset through the store", () => {
     render(<Harness client={fakeClient()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Profiles" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Presets" }));
     expect(screen.getByTestId("selection").textContent).toBe("new-record");
-    expect((screen.getByLabelText("Profile name") as HTMLInputElement).value).toBe(
-      "New profile",
-    );
+    expect(
+      (screen.getByLabelText("Preset name") as HTMLInputElement).value,
+    ).toBe("New preset");
+    expect(
+      JSON.parse(screen.getByTestId("presets-json").textContent ?? "[]").at(-1),
+    ).toEqual({
+      id: "new-record",
+      name: "New preset",
+      scope: "surface",
+      spec: {},
+      presets: [],
+    });
   });
 });

@@ -7,7 +7,8 @@ import type { SpecSectionMeta } from "./types";
 
 // Numbered scroll-target section (design .sec): a collapsible header with icon,
 // title and hint, body, then an optional Advanced disclosure. The heading itself
-// is the toggle (WAI-ARIA accordion pattern: heading > button).
+// is the toggle (WAI-ARIA accordion pattern: heading > button). The bare variant
+// drops the header for a tab panel that already names the section.
 export function SectionCard({
   meta,
   number,
@@ -16,21 +17,32 @@ export function SectionCard({
   advanced,
   advancedHint,
   defaultCollapsed = false,
+  bare = false,
   children,
   className,
 }: {
   meta: SpecSectionMeta;
-  number: string;
+  number?: string | undefined;
   domId: string;
   sectionRef: (element: HTMLElement | null) => void;
   advanced?: ReactNode | undefined;
   advancedHint?: string | undefined;
   defaultCollapsed?: boolean | undefined;
+  bare?: boolean | undefined;
   children: ReactNode;
   className?: string | undefined;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const bodyId = `${domId}-body`;
+  if (bare) {
+    return (
+      <section id={domId} ref={sectionRef} aria-label={meta.label} className={className}>
+        <p className="mb-density-3 text-xs text-muted-foreground">{meta.hint}</p>
+        {children}
+        {advanced && <Disclosure hint={advancedHint}>{advanced}</Disclosure>}
+      </section>
+    );
+  }
   return (
     <section
       id={domId}
@@ -59,9 +71,11 @@ export function SectionCard({
                 )}
               />
               <span>{meta.label}</span>
-              <span className="text-[10px] font-bold tabular-nums text-muted-foreground/70">
-                {number}
-              </span>
+              {number && (
+                <span className="text-[10px] font-bold tabular-nums text-muted-foreground/70">
+                  {number}
+                </span>
+              )}
               <Icon
                 icon={collapsed ? UiChevronRight : UiChevronDown}
                 className="ml-auto size-4 shrink-0 text-muted-foreground/70 group-hover:text-foreground"

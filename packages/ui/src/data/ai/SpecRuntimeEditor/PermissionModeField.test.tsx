@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
+import type {
+  RuntimePermissionSupport,
+  SpecRuntimeFamily,
+} from "../../runtime/runtime-mode";
 import { SPEC_PERMISSION_MODES } from "../SpecRuntimeEditor.model";
 import { PermissionModeField } from "./PermissionModeField";
 
@@ -38,10 +41,11 @@ const FAMILIES: SpecRuntimeFamily[] = [
               },
             },
             auto: {
-              kind: "approximated",
+              kind: "native",
               effects: {
                 sandbox: "workspace-write",
                 approval: "on-request",
+                reviewer: "auto_review",
               },
             },
             bypassPermissions: {
@@ -57,6 +61,35 @@ const FAMILIES: SpecRuntimeFamily[] = [
     ],
   },
 ];
+
+const IDENTICAL_AUTOMATIC_EFFECTS = {
+  sandbox: "workspace-write",
+  approval: "on-request",
+};
+
+function codexFamilyWith(
+  acceptEdits: RuntimePermissionSupport,
+  auto: RuntimePermissionSupport,
+): SpecRuntimeFamily[] {
+  return [
+    {
+      id: "codex",
+      label: "Codex",
+      provider: "codex-agent",
+      modes: [
+        {
+          id: "agent",
+          label: "Agent",
+          permissions: {
+            modes: { default: { kind: "approximated" }, acceptEdits, auto },
+            toolPolicies: {},
+            resources: {},
+          },
+        },
+      ],
+    },
+  ];
+}
 
 describe("PermissionModeField", () => {
   it("offers only permission postures implemented by the selected runtime", () => {
@@ -89,6 +122,9 @@ describe("PermissionModeField", () => {
       screen.getAllByRole("radio", { name: "Ask for approval" }),
     ).toHaveLength(1);
     expect(
+      screen.getByRole("radio", { name: "Auto review" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("radio", { name: "Full access" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Don't ask" })).toBeNull();
@@ -100,7 +136,7 @@ describe("PermissionModeField", () => {
     });
   });
 
-  it("shows one automatic posture when accept-edits and auto have identical approximated effects", () => {
+  it("offers codex auto review apart from ask-for-approval when only the reviewer differs", () => {
     const onChange = vi.fn();
     render(
       <PermissionModeField
@@ -110,56 +146,33 @@ describe("PermissionModeField", () => {
         }}
         onChange={onChange}
         availableModes={["default", "acceptEdits", "auto"]}
-        families={[
+        families={codexFamilyWith(
           {
-            id: "codex",
-            label: "Codex",
-            provider: "codex-agent",
-            modes: [
-              {
-                id: "agent",
-                label: "Agent",
-                permissions: {
-                  modes: {
-                    default: { kind: "approximated" },
-                    acceptEdits: {
-                      kind: "approximated",
-                      effects: {
-                        sandbox: "workspace-write",
-                        approval: "on-request",
-                        note: "workspace writes are granted as one tier",
-                      },
-                    },
-                    auto: {
-                      kind: "approximated",
-                      effects: {
-                        sandbox: "workspace-write",
-                        approval: "on-request",
-                        note: "auto and accept-edits resolve identically",
-                      },
-                    },
-                  },
-                  toolPolicies: {},
-                  resources: {},
-                },
-              },
-            ],
+            kind: "approximated",
+            effects: { ...IDENTICAL_AUTOMATIC_EFFECTS, reviewer: "user" },
           },
-        ]}
+          {
+            kind: "native",
+            effects: {
+              ...IDENTICAL_AUTOMATIC_EFFECTS,
+              reviewer: "auto_review",
+            },
+          },
+        )}
       />,
     );
 
-    expect(screen.queryByRole("radio", { name: "Accept edits" })).toBeNull();
-    expect(screen.queryByRole("radio", { name: "Auto" })).toBeNull();
-    const automatic = screen.getByRole("radio", { name: "Ask for approval" });
-    fireEvent.click(automatic);
+    expect(
+      screen.getByRole("radio", { name: "Ask for approval" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Auto review" }));
     expect(onChange).toHaveBeenCalledWith({
       mode: "agent",
-      sandbox: { mode: "native", approval: "acceptEdits" },
+      sandbox: { mode: "native", approval: "auto" },
     });
   });
 
-  it("preserves a selected codex alias while presenting one native posture", () => {
+  it("selects codex auto review for a persisted auto posture", () => {
     render(
       <PermissionModeField
         value={{
@@ -172,9 +185,13 @@ describe("PermissionModeField", () => {
       />,
     );
 
+    expect(screen.getByRole("radio", { name: "Auto review" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(
       screen.getByRole("radio", { name: "Ask for approval" }),
-    ).toHaveAttribute("aria-checked", "true");
+    ).toHaveAttribute("aria-checked", "false");
   });
 
   it("keeps claude native postures distinct and uses its mode tones", () => {

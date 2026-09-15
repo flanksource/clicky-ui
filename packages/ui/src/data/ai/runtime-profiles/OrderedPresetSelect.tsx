@@ -25,8 +25,8 @@ export function OrderedPresetSelect({
       <div>
         <div className="text-sm font-semibold">Included presets</div>
         <p className="text-xs text-muted-foreground">
-          Select reusable behavior, then order presets within their resolution
-          scope. The profile spec below is the final profile-owned override.
+          Select reusable task behavior, then order presets within their
+          resolution scope. The prompt request remains the final override.
         </p>
       </div>
       <MultiSelect
@@ -37,7 +37,7 @@ export function OrderedPresetSelect({
         }))}
         value={selectedIds}
         onChange={onChange}
-        ariaLabel="Profile presets"
+        ariaLabel="Runtime presets"
         placeholder="Select presets"
         className="w-full"
         triggerClassName="w-full max-w-none"
