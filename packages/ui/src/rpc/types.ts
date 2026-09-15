@@ -229,6 +229,7 @@ export interface ClickyOperationMeta {
 
 export interface ClickyScheduleMeta {
   suggestions?: CronSuggestion[];
+  timeout?: number;
 }
 
 export interface ClickyExportMeta {

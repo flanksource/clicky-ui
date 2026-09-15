@@ -26,12 +26,17 @@ const operations: ResolvedOperation[] = [
         },
       },
       "x-clicky": {
+        command: "cycle/truncate",
         verb: "action",
         scope: "collection",
         toolHints: { destructiveHint: true },
         schedule: {
           suggestions: [
-            { label: "Recommended", cron: "0 2 * * 0", description: "Weekly Sunday maintenance" },
+            {
+              label: "Recommended",
+              cron: "0 2 * * 0",
+              description: "Weekly Sunday maintenance",
+            },
           ],
         },
       },
@@ -82,13 +87,21 @@ describe("OperationSchedules", () => {
 
     expect(screen.getByText("Weekly cleanup")).toBeInTheDocument();
     expect(screen.getByText("Truncate cycle history")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Run Weekly cleanup now" }));
-    const confirmation = screen.getByRole("dialog", { name: "Run Weekly cleanup now?" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Run Weekly cleanup now" }),
+    );
+    const confirmation = screen.getByRole("dialog", {
+      name: "Run Weekly cleanup now?",
+    });
     await act(async () => {
-      fireEvent.click(within(confirmation).getByRole("button", { name: "Run now" }));
+      fireEvent.click(
+        within(confirmation).getByRole("button", { name: "Run now" }),
+      );
     });
 
-    await vi.waitFor(() => expect(callbacks.onRunSaved).toHaveBeenCalledWith("schedule-1"));
+    await vi.waitFor(() =>
+      expect(callbacks.onRunSaved).toHaveBeenCalledWith("schedule-1"),
+    );
   });
 
   it("creates a schedule from a schedulable operation and its JSON schema", async () => {
@@ -97,18 +110,29 @@ describe("OperationSchedules", () => {
       <OperationSchedules
         operations={operations}
         schedules={[]}
+        cli={{ executable: "oipa-cli", globalFlags: { context: "dev" } }}
         {...callbacks}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Add schedule" }));
     const dialog = screen.getByRole("dialog", { name: "Add schedule" });
-    const scheduleName = within(dialog).getByRole("textbox", { name: "Schedule name" });
-    const operationPicker = within(dialog).getByRole("combobox", { name: "Operation" });
+    const scheduleName = within(dialog).getByRole("textbox", {
+      name: "Schedule name",
+    });
+    const operationPicker = within(dialog).getByRole("combobox", {
+      name: "Operation",
+    });
     fireEvent.click(operationPicker);
-    expect(screen.queryByRole("option", { name: /Maintenance status/ })).not.toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("option", { name: /Truncate cycle history/ }));
-    await vi.waitFor(() => expect(operationPicker).toHaveValue("Truncate cycle history"));
+    expect(
+      screen.queryByRole("option", { name: /Maintenance status/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.mouseDown(
+      screen.getByRole("option", { name: /Truncate cycle history/ }),
+    );
+    await vi.waitFor(() =>
+      expect(operationPicker).toHaveValue("Truncate cycle history"),
+    );
 
     fireEvent.change(scheduleName, {
       target: { value: "Sunday cleanup" },
@@ -117,7 +141,15 @@ describe("OperationSchedules", () => {
     fireEvent.change(batchSize, {
       target: { value: "750" },
     });
-    const cron = within(dialog).getByRole("combobox", { name: "Cron expression" });
+    expect(
+      screen.getByText("oipa-cli --context=dev cycle truncate --batchSize=750"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy CLI command" }),
+    ).toBeInTheDocument();
+    const cron = within(dialog).getByRole("combobox", {
+      name: "Cron expression",
+    });
     fireEvent.click(cron);
     fireEvent.mouseDown(screen.getByRole("option", { name: /Recommended/ }));
     await act(async () => {
@@ -148,21 +180,33 @@ describe("OperationSchedules", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add schedule" }));
     const dialog = screen.getByRole("dialog", { name: "Add schedule" });
-    const operationPicker = within(dialog).getByRole("combobox", { name: "Operation" });
+    const operationPicker = within(dialog).getByRole("combobox", {
+      name: "Operation",
+    });
     fireEvent.click(operationPicker);
-    fireEvent.mouseDown(screen.getByRole("option", { name: /Truncate cycle history/ }));
-    await vi.waitFor(() => expect(operationPicker).toHaveValue("Truncate cycle history"));
+    fireEvent.mouseDown(
+      screen.getByRole("option", { name: /Truncate cycle history/ }),
+    );
+    await vi.waitFor(() =>
+      expect(operationPicker).toHaveValue("Truncate cycle history"),
+    );
     const batchSize = await screen.findByRole("textbox", { name: /batch/i });
     fireEvent.change(batchSize, {
       target: { value: "250" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Run now" }));
-    const confirmation = screen.getByRole("dialog", { name: "Run Truncate cycle history now?" });
+    const confirmation = screen.getByRole("dialog", {
+      name: "Run Truncate cycle history now?",
+    });
     await act(async () => {
-      fireEvent.click(within(confirmation).getByRole("button", { name: "Run now" }));
+      fireEvent.click(
+        within(confirmation).getByRole("button", { name: "Run now" }),
+      );
     });
 
-    await vi.waitFor(() => expect(callbacks.onRunDraft).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(callbacks.onRunDraft).toHaveBeenCalledTimes(1),
+    );
     expect(callbacks.onCreate).not.toHaveBeenCalled();
   });
 });

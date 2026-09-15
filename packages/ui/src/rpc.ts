@@ -54,9 +54,12 @@ export {
   type OperationScheduleDialogProps,
 } from "./rpc/OperationScheduleDialog";
 export { OperationSchedules } from "./rpc/OperationSchedules";
+export { schedulableOperations } from "./rpc/operation-schedule-model";
 export type {
   OperationSchedule,
+  OperationScheduleCLI,
   OperationScheduleInput,
+  OperationScheduleRunInput,
   OperationSchedulesProps,
 } from "./rpc/operation-schedule-types";
 export {
