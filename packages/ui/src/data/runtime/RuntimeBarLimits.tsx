@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { InputField } from "../../components/InputField";
 import { UiCurrencyDollar, UiTimer } from "../../icons";
+import { cn } from "../../lib/utils";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
@@ -105,6 +106,9 @@ function LimitSegment<V extends string | number>({
     <RuntimeSegment
       menuLabel={label}
       title={`${label} — ${current ?? "no limit"}`}
+      // A limit is only worth showing at its full value, so it never absorbs the
+      // settings row's shrink; the effort segment's "Effort" key label does.
+      className="shrink-0"
       items={items}
       header={
         <div className="grid gap-1">
@@ -133,7 +137,10 @@ function LimitSegment<V extends string | number>({
     >
       <Icon icon={icon} className="size-4 shrink-0 text-muted-foreground" />
       <span
-        className={current ? SEGMENT_CAPTION_CLASS : "truncate text-xs text-muted-foreground"}
+        className={cn(
+          "shrink-0",
+          current ? SEGMENT_CAPTION_CLASS : "truncate text-xs text-muted-foreground",
+        )}
       >
         {current ?? "None"}
       </span>

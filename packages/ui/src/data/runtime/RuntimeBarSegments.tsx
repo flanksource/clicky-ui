@@ -208,9 +208,11 @@ export function RuntimeBarSegments({
                 onSelect: onEffortChange,
               })}
             >
-              <span className={SEGMENT_KEY_CLASS}>Effort</span>
+              <span className={cn(SEGMENT_KEY_CLASS, "min-w-0 truncate")}>
+                Effort
+              </span>
               <EffortGlyph effort={value.effort} />
-              <span className={SEGMENT_CAPTION_CLASS}>
+              <span className={cn(SEGMENT_CAPTION_CLASS, "shrink-0")}>
                 {value.effort ? effortLevelLabel(value.effort) : "None"}
               </span>
             </RuntimeSegment>
