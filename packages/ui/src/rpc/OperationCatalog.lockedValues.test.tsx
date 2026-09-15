@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationCatalog } from "./OperationCatalog";
@@ -21,6 +21,18 @@ function makeSpec(): OpenAPISpec {
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
             { name: "stream", in: "query", schema: { type: "string" } },
+            {
+              name: "from",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
+              "x-clicky": { role: "time-from" },
+            },
+            {
+              name: "to",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
+              "x-clicky": { role: "time-to" },
+            },
             {
               name: "limit",
               in: "query",
@@ -54,6 +66,52 @@ function tableResponse(rowName: string): ExecutionResponse {
           {
             cells: {
               name: { kind: "text", text: rowName, plain: rowName },
+            },
+          },
+        ],
+      },
+    }),
+  };
+}
+
+function tableResponseWithDetail(): ExecutionResponse {
+  return {
+    success: true,
+    exit_code: 0,
+    stdout: JSON.stringify({
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [
+          { name: "name", label: "Name" },
+          { name: "detail", label: "Detail payload" },
+        ],
+        rows: [
+          {
+            cells: {
+              name: { kind: "text", text: "Row one", plain: "Row one" },
+              detail: {
+                kind: "map",
+                fields: [
+                  {
+                    name: "execution",
+                    value: {
+                      kind: "list",
+                      items: [
+                        {
+                          kind: "map",
+                          fields: [
+                            {
+                              name: "label",
+                              value: { kind: "text", text: "process" },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
             },
           },
         ],
@@ -245,6 +303,96 @@ describe("OperationCatalog urlState", () => {
   });
 });
 
+describe("OperationCatalog initialValues", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("seeds an editable filter field and sends it on the first request", async () => {
+    const client = makeClient();
+    renderCatalog(client, { initialValues: { q: "seeded" } });
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenLastCalledWith(
+        "/api/v1/records",
+        "get",
+        { q: "seeded" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+    // Unlike a locked value, it renders as an ordinary editable field.
+    expect(screen.getByLabelText("Q")).toHaveValue("seeded");
+  });
+
+  it("lets a URL value win over the initial seed for the same key", async () => {
+    window.history.replaceState(null, "", "/?q=fromUrl");
+    const client = makeClient();
+    renderCatalog(client, { initialValues: { q: "seeded" } });
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenLastCalledWith(
+        "/api/v1/records",
+        "get",
+        { q: "fromUrl" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+  });
+
+  it("stays editable after being seeded", async () => {
+    const client = makeClient();
+    renderCatalog(client, { initialValues: { q: "seeded" } });
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText("Q"), {
+      target: { value: "changed" },
+    });
+
+    await waitFor(() =>
+      expect(client.executeMock).toHaveBeenLastCalledWith(
+        "/api/v1/records",
+        "get",
+        { q: "changed", offset: "0" },
+        { Accept: "application/json+clicky" },
+      ),
+    );
+    expect(new URLSearchParams(window.location.search).get("q")).toBe(
+      "changed",
+    );
+  });
+});
+
+describe("OperationCatalog filter placement", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("moves a decorated time range into the overflow menu without removing it", async () => {
+    const client = makeClient();
+    renderCatalog(client, {
+      filterPre: [
+        (filter) =>
+          filter.key === "timeRange"
+            ? { ...filter, placement: "overflow" }
+            : filter,
+      ],
+    });
+
+    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Q")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /time range filter/i })).toBeNull();
+
+    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+    const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /time range filter/i }),
+    );
+    expect(screen.getByLabelText("Time range from")).toBeInTheDocument();
+    expect(screen.getByLabelText("Time range to")).toBeInTheDocument();
+    expect(dialog.querySelector('[data-overflow-filter-row="timeRange"]')).not.toBeNull();
+  });
+});
+
 describe("OperationCatalog rowDetail", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
@@ -286,5 +434,28 @@ describe("OperationCatalog rowDetail", () => {
     expect(dialog).toHaveTextContent("Detail: Row one");
     // Modal.tsx maps ModalSize "xl" to the "max-w-4xl" panel width class.
     expect(dialog).toHaveClass("max-w-4xl");
+  });
+
+  it("hides host-selected table columns while preserving their raw detail values", async () => {
+    const client = makeClient();
+    client.executeMock.mockResolvedValue(tableResponseWithDetail());
+    const renderDetail = vi.fn((row: Record<string, unknown>) => (
+      <div>Detail: {JSON.stringify(row.detail)}</div>
+    ));
+    renderCatalog(client, {
+      hiddenColumns: ["detail"],
+      rowDetail: { render: renderDetail },
+    });
+
+    const cell = await screen.findByText("Row one");
+    expect(screen.queryByText("Detail payload")).toBeNull();
+
+    fireEvent.click(cell);
+
+    expect(await screen.findByText(/process/)).toBeInTheDocument();
+    expect(renderDetail).toHaveBeenCalledWith({
+      name: "Row one",
+      detail: { execution: [{ label: "process" }] },
+    });
   });
 });

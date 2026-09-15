@@ -1,5 +1,6 @@
 import type { ClickyNode } from "../data/Clicky";
 import type { TimeRangePresetGroup } from "../components/TimeRange";
+import type { CronSuggestion } from "../components/schedule-types";
 
 export type OperationRequestValues = Record<string, string | string[]>;
 
@@ -223,6 +224,11 @@ export interface ClickyOperationMeta {
   group?: string;
   toolHints?: ClickyToolHints;
   export?: ClickyExportMeta;
+  schedule?: ClickyScheduleMeta;
+}
+
+export interface ClickyScheduleMeta {
+  suggestions?: CronSuggestion[];
 }
 
 export interface ClickyExportMeta {

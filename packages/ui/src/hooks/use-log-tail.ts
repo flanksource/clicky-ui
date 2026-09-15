@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ClickyRow } from "../data/Clicky";
 
 // use-log-tail is the clicky-ui client for a *follow* session: the server opens
 // a live source for a query profile and streams rows out of it until someone
@@ -42,6 +43,13 @@ export interface LogSessionInfo {
  * One `event:` frame. It carries either a single `row` or a batch under `rows`
  * — never both — plus an `error` when the source failed mid-stream without the
  * session itself ending.
+ *
+ * `clickyRow` is the presented row — `{cells, detail?}`, built by the exact
+ * function that fills in `node.rows[n]` of the list's own
+ * `application/json+clicky` document — riding next to the raw `row` on a
+ * trace/follow session's per-row events. A plain log tail (or a top-session
+ * snapshot event) never sets it; only a reader that reconciles rows against a
+ * presented table, i.e. OperationCatalog's follow mode, depends on it.
  */
 export interface LogTailEvent {
   sessionId: string;
@@ -49,6 +57,8 @@ export interface LogTailEvent {
   time?: string;
   row?: Record<string, unknown>;
   rows?: Record<string, unknown>[];
+  /** The presented ClickyRow for `row`, when the profile sends one. */
+  clickyRow?: ClickyRow;
   error?: string;
 }
 
@@ -86,13 +96,25 @@ export function isTerminalSessionState(state: LogSessionState | undefined): bool
 export interface LogTailBuffer {
   /** Rows in arrival order, oldest first — the order this surface tails in. */
   rows: Record<string, unknown>[];
+  /**
+   * Each entry's presented ClickyRow, index-aligned with `rows` (same length,
+   * same order) — `undefined` where the event carried none. Additive: a plain
+   * log tail never reads this and `rows` itself is unchanged, so existing
+   * `useLogTail` consumers keep working exactly as before.
+   */
+  clickyRows: (ClickyRow | undefined)[];
   /** Highest sequence applied, or null before the first frame. Never assumed to start at 1. */
   lastSequence: number | null;
   /** Rows evicted by the cap. Kept so the UI can say so instead of quietly shortening history. */
   dropped: number;
 }
 
-export const emptyLogTailBuffer: LogTailBuffer = { rows: [], lastSequence: null, dropped: 0 };
+export const emptyLogTailBuffer: LogTailBuffer = {
+  rows: [],
+  clickyRows: [],
+  lastSequence: null,
+  dropped: 0,
+};
 
 /**
  * Renders profile parameters as the tail of a session request's query string,
@@ -139,10 +161,19 @@ export function appendTailEvent(
   const incoming = event.rows ?? (event.row ? [event.row] : []);
   if (incoming.length === 0) return { ...buffer, lastSequence: event.sequence };
 
+  // A batched `rows` frame has no per-item clickyRow equivalent — only the
+  // single-`row` shape trace/follow sessions use ever carries one — so a
+  // batch pads with `undefined` to stay index-aligned with `rows`.
+  const incomingClickyRows: (ClickyRow | undefined)[] = event.rows
+    ? event.rows.map(() => undefined)
+    : [event.clickyRow];
+
   const merged = buffer.rows.concat(incoming);
+  const mergedClickyRows = buffer.clickyRows.concat(incomingClickyRows);
   const overflow = Math.max(0, merged.length - Math.max(1, maxRows));
   return {
     rows: overflow > 0 ? merged.slice(overflow) : merged,
+    clickyRows: overflow > 0 ? mergedClickyRows.slice(overflow) : mergedClickyRows,
     lastSequence: event.sequence,
     dropped: buffer.dropped + overflow,
   };
@@ -168,6 +199,10 @@ export interface UseLogTailOptions {
 export interface UseLogTailResult {
   /** Accumulated rows, oldest first. */
   rows: Record<string, unknown>[];
+  /** Each row's presented ClickyRow, index-aligned with `rows`; `undefined`
+   *  where the event carried none (a plain log tail, or a top-session
+   *  snapshot event). */
+  clickyRows: (ClickyRow | undefined)[];
   status: LogTailStatus;
   error: LogTailError | null;
   sessionId: string | null;
@@ -411,6 +446,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
 
   return {
     rows: buffer.rows,
+    clickyRows: buffer.clickyRows,
     status,
     error,
     sessionId: session?.id ?? null,

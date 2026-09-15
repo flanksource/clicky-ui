@@ -61,6 +61,16 @@ export { nextTriState, type TriState } from "./components/tri-state";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
 export {
+  ScheduleEditor,
+  type ScheduleEditorProps,
+  type ScheduleValue,
+} from "./components/ScheduleEditor";
+export {
+  COMMON_CRON_SUGGESTIONS,
+  DEFAULT_CRON,
+  type CronSuggestion,
+} from "./components/schedule-types";
+export {
   FormatOptionsDropdown,
   type FormatOptionsDropdownProps,
 } from "./components/FormatOptionsDropdown";
