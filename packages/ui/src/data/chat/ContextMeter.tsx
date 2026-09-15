@@ -9,6 +9,15 @@ import {
   effortLevelIcon,
   effortLevelLabel,
 } from "./effort-icons";
+import { ContextMeterBar } from "./ContextMeter.bar";
+import {
+  contextBarTone,
+  contextRingTone,
+  contextTextTone,
+  COPY_STATUS_RESET_MS,
+  GAUGE_CIRCUMFERENCE,
+  GAUGE_RADIUS,
+} from "./ContextMeter.styles";
 
 export type ContextMeterMode = "bar" | "gauge";
 
@@ -72,34 +81,6 @@ export type ContextMeterProps = {
   className?: string | undefined;
 };
 
-const COPY_STATUS_RESET_MS = 2000;
-const GAUGE_RADIUS = 15;
-const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
-
-function barTone(pct: number): string {
-  return pct > 80
-    ? "bg-red-600 [[data-theme=dark]_&]:bg-red-400"
-    : pct > 50
-      ? "bg-amber-700 [[data-theme=dark]_&]:bg-amber-400"
-      : "bg-emerald-600 [[data-theme=dark]_&]:bg-emerald-400";
-}
-
-function ringTone(pct: number): string {
-  return pct > 80
-    ? "text-red-600 [[data-theme=dark]_&]:text-red-400"
-    : pct > 50
-      ? "text-amber-700 [[data-theme=dark]_&]:text-amber-400"
-      : "text-emerald-600 [[data-theme=dark]_&]:text-emerald-400";
-}
-
-function textTone(pct: number): string {
-  return pct > 80
-    ? "text-red-700 [[data-theme=dark]_&]:text-red-400"
-    : pct > 50
-      ? "text-amber-700 [[data-theme=dark]_&]:text-amber-400"
-      : "text-emerald-700 [[data-theme=dark]_&]:text-emerald-400";
-}
-
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
@@ -107,10 +88,6 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="font-medium tabular-nums">{value}</span>
     </div>
   );
-}
-
-function anyPositive(...values: (number | undefined)[]): boolean {
-  return values.some((v) => v != null && v > 0);
 }
 
 type BucketRow = {
@@ -319,7 +296,7 @@ export function ContextMeter({
             width="36"
             height="36"
             viewBox="0 0 36 36"
-            className={cn("absolute inset-0", ringTone(pct))}
+            className={cn("absolute inset-0", contextRingTone(pct))}
           >
             <circle
               cx="18"
@@ -352,7 +329,7 @@ export function ContextMeter({
             <span
               className={cn(
                 "relative text-[9px] font-semibold tabular-nums",
-                textTone(pct),
+                contextTextTone(pct),
               )}
             >
               {pct}
@@ -361,43 +338,18 @@ export function ContextMeter({
         </span>
       </span>
     ) : (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground",
-          className,
-        )}
-        aria-label={`Context ${pct}% used`}
-      >
-        {model ? (
-          <span className="flex min-w-0 max-w-40 items-center gap-1">
-            {EffortGlyph ? (
-              <EffortGlyph className={cn("size-3.5 shrink-0", effortColor)} />
-            ) : null}
-            <span
-              className="truncate font-medium text-foreground"
-              title={model}
-            >
-              {model}
-            </span>
-          </span>
-        ) : (
-          <span className="shrink-0">ctx</span>
-        )}
-        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-          <span
-            className={cn(
-              "block h-full rounded-full transition-all",
-              barTone(pct),
-            )}
-            style={{ width: `${pct}%` }}
-          />
-        </span>
-        <span
-          className={cn("shrink-0 font-medium tabular-nums", textTone(pct))}
-        >
-          {pct}%
-        </span>
-      </span>
+      <ContextMeterBar
+        pct={pct}
+        barClassName={contextBarTone(pct)}
+        textClassName={contextTextTone(pct)}
+        {...(provider ? { provider } : {})}
+        {...(executionMode ? { executionMode } : {})}
+        {...(model ? { model } : {})}
+        {...(Glyph ? { modelIcon: Glyph } : {})}
+        {...(modelIconClassName ? { modelIconClassName } : {})}
+        {...(effort ? { effort } : {})}
+        {...(className ? { className } : {})}
+      />
     );
 
   return (
@@ -410,7 +362,9 @@ export function ContextMeter({
       <div className="space-y-2.5 text-xs">
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">Context usage</span>
-          <span className={cn("font-semibold tabular-nums", textTone(pct))}>
+          <span
+            className={cn("font-semibold tabular-nums", contextTextTone(pct))}
+          >
             {pct}%
           </span>
         </div>
@@ -495,7 +449,7 @@ export function ContextMeter({
         <div className="space-y-1.5">
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className={cn("h-full rounded-full", barTone(pct))}
+              className={cn("h-full rounded-full", contextBarTone(pct))}
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -533,7 +487,7 @@ export function ContextMeter({
               />
             ) : budget?.remaining != null ? (
               <Row label="Budget left" value={formatCost(budget.remaining)} />
-            ) : anyPositive(budget?.used) ? (
+            ) : budget?.used != null && budget.used > 0 ? (
               <Row label="Budget" value={formatCost(budget?.used ?? 0)} />
             ) : null}
           </div>
