@@ -55,10 +55,12 @@ export {
   assertRuntimePresetSpec,
   projectRuntimePresetSpec,
   type ResolvedRuntimeProfile,
+  type ResolvedRuntimePreset,
   type ResolvedRuntimeSpec,
   type RuntimePreset,
   type RuntimePresetSetup,
   type RuntimePresetSpec,
+  type RuntimePresetResolveRequest,
   type RuntimeProfile,
   type RuntimeProfileConstraints,
   type RuntimeProfileResolveRequest,
@@ -93,6 +95,7 @@ export {
   useRuntimePermissionCatalog,
   useRuntimeProfilePicker,
   useRuntimeProfileResolution,
+  useRuntimePresetResolution,
   type RuntimeFamiliesState,
   type RuntimeLibraryItem,
   type RuntimePermissionCatalogState,
@@ -158,8 +161,10 @@ export type {
   SpecRuntimeSandboxBackend,
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSandboxKind,
+  SpecRuntimeTab,
   SpecSectionId,
 } from "./SpecRuntimeEditor/types";
+export { SPEC_RUNTIME_TABS } from "./SpecRuntimeEditor/types";
 export {
   buildAISpecRuntimePayload,
   compactAISpecRuntime,
@@ -278,11 +283,15 @@ export {
   type SourceTone,
 } from "./PromptCatalog";
 export { PromptRunEditor, type PromptRunEditorProps } from "./PromptRunEditor";
-export type {
-  AIPromptRunSpec,
-  AIPromptRunValue,
-  AISpecRuntimeModel,
+export {
+  RECENT_RUNTIME_LIMIT,
+  recordRecentRuntimes,
+  runtimeRows,
+  type AIPromptRunSpec,
+  type AIPromptRunValue,
+  type AISpecRuntimeModel,
 } from "./PromptRunEditor/model";
+export { parsePromptRunYaml, promptRunYaml } from "./PromptRunEditor/yaml";
 export {
   effortOptionsForModel,
   reconcileModelCapabilities,

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SessionRow } from "./SessionViewer.rows";
 import { normalizeSession, type SessionEvent } from "./SessionViewer.model";
@@ -55,6 +55,35 @@ describe("eventVisual for system-kind session rows", () => {
     expect(container.querySelector(".bg-muted")).not.toBeNull();
     expect(container.querySelector("path")?.getAttribute("d")).toBe(
       renderedIconPath(UiSparkles),
+    );
+  });
+});
+
+describe("file session rows", () => {
+  it("renders an attached user image with its filename", () => {
+    const event = normalizeSession({
+      messages: [
+        {
+          id: "image",
+          role: "user",
+          parts: [
+            {
+              type: "file",
+              mediaType: "image/png",
+              url: "/api/attachments/sha256:image",
+              filename: "scorecard.png",
+            },
+          ],
+        },
+      ],
+    })[0];
+    if (!event) throw new Error("expected a file event");
+
+    renderRow(event);
+
+    expect(screen.getByRole("img", { name: "scorecard.png" })).toHaveAttribute(
+      "src",
+      "/api/attachments/sha256:image",
     );
   });
 });

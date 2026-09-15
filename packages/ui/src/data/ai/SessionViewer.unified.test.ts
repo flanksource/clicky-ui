@@ -95,4 +95,22 @@ describe("normalizeSession (unified messages)", () => {
       events: [{ type: "last-prompt" }],
     });
   });
+
+  it("projects the session's top-level permissionMode into the metadata summary", () => {
+    const session: UnifiedSessionInput = {
+      id: "s1",
+      messages,
+      permissionMode: "acceptEdits",
+    };
+
+    expect(getSessionMetadata(session)).toMatchObject({
+      permissionMode: "acceptEdits",
+    });
+  });
+
+  it("omits permissionMode from the metadata summary when the session carries none", () => {
+    const session: UnifiedSessionInput = { id: "s1", messages };
+
+    expect(getSessionMetadata(session)?.permissionMode).toBeUndefined();
+  });
 });

@@ -113,6 +113,45 @@ export const WithModelAndEffort: Story = {
   ),
 };
 
+function NarrowRuntimeBarStory() {
+  const [value, setValue] = useState<AISpecRuntimeValue>({
+    mode: "cli",
+    model: "anthropic/claude-sonnet-4-6",
+    effort: "medium",
+    budget: { timeout: "30m", cost: 2 },
+  });
+  return (
+    <div className="w-80 max-w-full p-4">
+      <RuntimeBar
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        showTimeout
+        showCost
+        ariaLabel="Narrow runtime"
+      />
+    </div>
+  );
+}
+
+// Too narrow for one strip: the run settings (effort, timeout, max cost) wrap
+// onto their own row instead of being clipped. On a phone viewport the bar
+// also spans the full width and the family collapses to its brand icon.
+export const NarrowContainer: Story = {
+  args: { variant: "segmented" },
+  render: () => <NarrowRuntimeBarStory />,
+  play: async ({ canvasElement }) => {
+    const bar = within(canvasElement).getByRole("group", { name: "Narrow runtime" });
+    const identity = bar.querySelector("[data-runtime-bar-section=identity]");
+    const settings = bar.querySelector("[data-runtime-bar-section=settings]");
+
+    await expect(settings!.getBoundingClientRect().top).toBeGreaterThan(
+      identity!.getBoundingClientRect().top,
+    );
+    await expect(bar.scrollWidth).toBe(bar.clientWidth);
+  },
+};
+
 export const Combo: Story = {
   args: {
     variant: "combo",

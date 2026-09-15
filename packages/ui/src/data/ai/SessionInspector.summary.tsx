@@ -5,6 +5,7 @@ import {
   UiFingerprint,
   UiRobotAi,
   UiServerProcess,
+  UiShield,
   UiTimer,
 } from "../../icons";
 import { Icon, type StaticIconComponent } from "../Icon";
@@ -25,6 +26,8 @@ import {
 import { SessionContextMeter } from "./SessionViewer.header";
 import { getSessionMetadata } from "./SessionViewer.model";
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
+import { permissionModeVisual } from "./SpecRuntimeEditor/permission-mode-visuals";
+import { SPEC_PERMISSION_MODES } from "./SpecRuntimeEditor.model";
 
 export function SessionInspectorHeader({
   session,
@@ -125,6 +128,14 @@ export function SessionInspectorSidebar({
               {...(runtime?.title ? { title: runtime.title } : {})}
             />
           </div>
+          {session.permissionMode ? (
+            <div data-testid="session-permission-mode">
+              <PermissionModeRow
+                family={session.source}
+                mode={session.permissionMode}
+              />
+            </div>
+          ) : null}
           <DetailRow
             icon={UiServerProcess}
             label="PID"
@@ -163,6 +174,24 @@ export function SessionInspectorSidebar({
         </div>
       </section>
     </aside>
+  );
+}
+
+function PermissionModeRow({
+  family,
+  mode,
+}: {
+  family: string | undefined;
+  mode: string;
+}) {
+  const known = SPEC_PERMISSION_MODES.find((candidate) => candidate === mode);
+  const visual = known ? permissionModeVisual(family, known) : undefined;
+  return (
+    <DetailRow
+      icon={visual?.icon ?? UiShield}
+      label="Permission mode"
+      value={visual?.label ?? mode}
+    />
   );
 }
 
