@@ -298,6 +298,12 @@ export {
   type ModelRuntimeSelection,
 } from "../runtime/model-capabilities";
 export {
+  UNSPECIFIED_HINT,
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  unspecifiedHint,
+} from "../runtime/unspecified";
+export {
   RuntimeBar,
   type RuntimeBarProps,
   type RuntimeBarValue,

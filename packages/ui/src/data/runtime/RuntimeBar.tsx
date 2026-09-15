@@ -110,6 +110,13 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     resolvedModel,
     reasoningEfforts,
   );
+  // The name an Unspecified model would resolve to, so the picker can say what
+  // it inherits instead of leaving the operator guessing.
+  const inheritedModelLabel =
+    value.model || value.id
+      ? undefined
+      : (runtimeModelForValue(models, { model: effectiveModel }, isSelectableModel)
+          ?.label ?? effectiveModel);
 
   const applyMode = (familyId: string, modeId: string) => {
     setPreference({ model: effectiveModel, family: familyId });
@@ -157,6 +164,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
         models={modelOptions}
         selectedModel={resolvedModel}
         selectedModelUnavailable={selectedModelUnavailable}
+        inheritedModelLabel={inheritedModelLabel}
         supportedEfforts={supportedEfforts}
         locked={locked}
         showModel={showModel}
@@ -179,6 +187,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       modelOptions={modelOptions}
       resolvedModel={resolvedModel}
       selectedModelUnavailable={selectedModelUnavailable}
+      inheritedModelLabel={inheritedModelLabel}
       families={families}
       family={family}
       mode={mode}
