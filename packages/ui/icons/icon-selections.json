@@ -3011,6 +3011,54 @@
       "outline": "ph:steps-light",
       "filled": "ph:steps-fill",
       "note": "An ordered stage within a pipeline that must run in sequence."
+    },
+    {
+      "consumerName": "cache",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "iconmind:kv-cache-outline-thin",
+      "filled": "skip",
+      "note": "An ephemeral key-value cache used by a trace span."
+    },
+    {
+      "consumerName": "stack-trace",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent:stack-trace",
+      "filled": "skip",
+      "note": "A nested runtime call stack captured as diagnostic evidence."
+    },
+    {
+      "consumerName": "profiler",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent:cpu-profile",
+      "filled": "skip",
+      "note": "A sampled CPU profile with nested execution tiers and a narrow compute hotspot."
+    },
+    {
+      "consumerName": "audit-log",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent:audit-log",
+      "filled": "skip",
+      "note": "An append-only chronological record ending in a verified entry."
+    },
+    {
+      "consumerName": "memory-profile",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent:memory-profile",
+      "filled": "skip",
+      "note": "Unequal heap allocations with an open slot for available memory."
+    },
+    {
+      "consumerName": "database-event-stream",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent:database-event-stream",
+      "filled": "skip",
+      "note": "Stored database records emitting engine events, including SQL XEvents."
     }
   ]
 }
