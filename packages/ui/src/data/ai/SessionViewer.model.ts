@@ -124,6 +124,8 @@ export interface SessionMetadataSummary {
   provider?: string;
   /** Session reasoning effort, for the context meter's hover popover. */
   reasoningEffort?: string;
+  /** Last permission mode recorded in the transcript, for the header badge. */
+  permissionMode?: string;
   /** Aggregate token usage, for the context meter's hover popover. */
   usage?: SessionUsage;
   /** Aggregate cost breakdown, for the context meter's hover popover. */
@@ -152,6 +154,8 @@ export interface SessionEvent {
   toolResponse?: string;
   /** Prose for user/assistant/thinking, or the error message for errors. */
   text?: string;
+  /** Canonical file part rendered as an attachment thumbnail or chip. */
+  file?: SessionUIPart;
   /** Working directory the tool ran in — used to relativize file paths. */
   cwd?: string;
   timestamp?: string;
@@ -409,6 +413,9 @@ export function getSessionMetadata(
     ...(input.reasoningEffort
       ? { reasoningEffort: input.reasoningEffort }
       : {}),
+    ...(input.permissionMode
+      ? { permissionMode: input.permissionMode }
+      : {}),
     ...(input.usage ? { usage: input.usage } : {}),
     ...(input.cost ? { cost: input.cost } : {}),
   };
@@ -529,6 +536,17 @@ function partEvent(
         }
       : null;
   }
+  if (part.type === "file") {
+    return {
+      id,
+      kind: role,
+      file: part,
+      ...(meta.timestamp ? { timestamp: meta.timestamp } : {}),
+      ...(meta.turnId ? { turnId: meta.turnId } : {}),
+      ...(meta.agentId ? { agentId: meta.agentId } : {}),
+      ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
+    };
+  }
   if (part.type === "text") {
     return part.text
       ? {
@@ -549,7 +567,7 @@ function partEvent(
         }
       : null;
   }
-  return null; // file / unknown parts have no row representation
+  return null;
 }
 
 function pendingFromPart(part: SessionUIPart): boolean {

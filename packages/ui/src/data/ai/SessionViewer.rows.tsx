@@ -20,6 +20,7 @@ import { formatEventRange } from "./SessionViewer.row-time";
 import { ToolBody } from "./SessionViewer.tool-row";
 import type { SessionToolDecision } from "./SessionViewer";
 import { Markdown } from "../Markdown";
+import { MessageFilePart } from "../chat/MessageFilePart";
 
 export function SessionRow({
   event,
@@ -204,7 +205,7 @@ function UserRow({
             You
           </div>
           <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right text-base font-medium leading-relaxed text-accent-foreground">
-            {event.text}
+            {event.file ? <MessageFilePart part={event.file} /> : event.text}
           </div>
           {showRowMetadata && <EventMetadata event={event} align="right" />}
           {showRaw && event.raw !== undefined && (
@@ -334,6 +335,7 @@ function MessageBody({
     <div className="flex items-start gap-1.5">
       {badge}
       <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
+        {event.file && <MessageFilePart part={event.file} />}
         {event.text && <Markdown text={event.text} />}
       </div>
     </div>

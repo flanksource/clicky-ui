@@ -30,6 +30,7 @@ export interface SessionUIPart {
   mediaType?: string;
   url?: string;
   filename?: string;
+  attachmentId?: string;
   toolName?: string;
   toolCallId?: string;
   state?: string;
@@ -228,6 +229,8 @@ export interface UnifiedSessionInput {
   modelMode?: string;
   model?: string;
   reasoningEffort?: string;
+  /** Last permission mode recorded in the transcript (absent for e.g. codex sessions). */
+  permissionMode?: string;
   historyFile?: string;
   git?: SessionGitState;
   startedAt?: string;
@@ -250,4 +253,5 @@ export interface UnifiedSessionInput {
   health?: SessionHealth[];
   live?: SessionLiveProcess;
   prompt?: unknown;
+  structuredOutput?: unknown;
 }

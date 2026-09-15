@@ -1,11 +1,6 @@
-import type { ReactNode } from "react";
 import { InputField } from "../../components/InputField";
-import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
-import {
-  DropdownMenu,
-  type DropdownMenuItem,
-} from "../../overlay/DropdownMenu";
+import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
   effortLevelColor,
@@ -16,6 +11,13 @@ import { providerIcon } from "../chat/provider-icons";
 import type { ChatModel } from "../chat/types";
 import { runtimeFamilyBrand } from "./RuntimeBar.model";
 import type { RuntimeBarValue } from "./RuntimeBar";
+import { CostSegment, TimeoutSegment } from "./RuntimeBarLimits";
+import {
+  RuntimeSegment,
+  SEGMENT_CAPTION_CLASS,
+  SEGMENT_KEY_CLASS,
+  SegmentItemLabel,
+} from "./RuntimeBarSegment";
 import { isUnavailable } from "./availability";
 import {
   modelsForFamily,
@@ -38,6 +40,8 @@ export type RuntimeBarSegmentsProps = {
   locked: boolean;
   showModel: boolean;
   showEffort: boolean;
+  showTimeout: boolean;
+  showCost: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onModeChange: (familyId: string, modeId: string) => void;
@@ -45,6 +49,8 @@ export type RuntimeBarSegmentsProps = {
   onModelSelect: (model: ChatModel) => void;
   onModelClear: () => void;
   onEffortChange: (effort: string) => void;
+  onTimeoutChange: (timeout: string | undefined) => void;
+  onCostChange: (cost: number | undefined) => void;
 };
 
 export function RuntimeBarSegments({
@@ -62,6 +68,8 @@ export function RuntimeBarSegments({
   locked,
   showModel,
   showEffort,
+  showTimeout,
+  showCost,
   ariaLabel,
   className,
   onModeChange,
@@ -69,171 +77,156 @@ export function RuntimeBarSegments({
   onModelSelect,
   onModelClear,
   onEffortChange,
+  onTimeoutChange,
+  onCostChange,
 }: RuntimeBarSegmentsProps) {
   const brand = runtimeFamilyBrand(family);
   const modelLabel = selectedModelUnavailable
     ? "Unavailable selection"
     : (resolvedModel?.label ?? value.model ?? "Default");
+  const showEffortSegment = showEffort && supportedEfforts.length > 0;
 
+  // Identity and settings wrap as two units, so a narrow bar drops its settings
+  // onto a second row instead of clipping them. The settings row carries both a
+  // left and a top divider, pulled 1px outside the bar's padding box; the bar's
+  // overflow clipping hides whichever one does not apply to the current wrap.
   return (
     <div
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex h-control-h w-fit max-w-full items-stretch overflow-hidden rounded-md border border-input bg-background",
+        "inline-flex w-fit max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background max-sm:w-full",
         className,
       )}
     >
-      <RuntimeSegment
-        menuLabel="Family"
-        title={`Family — ${family.label}`}
-        disabled={locked}
-        items={familyItems({
-          families,
-          models,
-          selectedId: family.id,
-          onSelect: (familyId) => onModeChange(familyId, selectedMode),
-        })}
+      <div
+        data-runtime-bar-section="identity"
+        className="flex h-control-h min-w-0 max-w-full items-stretch max-sm:grow"
       >
-        {brand.icon && (
-          <Icon
-            icon={brand.icon}
-            className={cn("size-4 shrink-0", brand.color)}
-          />
-        )}
-        <span className={CAPTION_CLASS}>{family.label}</span>
-      </RuntimeSegment>
-      <RuntimeSegment
-        menuLabel="Runtime mode"
-        title={mode.title ?? "Runtime mode"}
-        disabled={locked}
-        items={modeItems({
-          family,
-          selectedId: selectedMode,
-          onSelect: (modeId) => onModeChange(family.id, modeId),
-        })}
-      >
-        {mode.icon && (
-          <Icon
-            icon={mode.icon}
-            className="size-4 shrink-0 text-muted-foreground"
-          />
-        )}
-        <span className={CAPTION_CLASS}>{mode.label}</span>
-      </RuntimeSegment>
-      {showModel && (
         <RuntimeSegment
-          menuLabel="Model"
-          title={
-            selectedModelUnavailable
-              ? "Model — unavailable selection"
-              : value.model
-                ? `Model — ${value.model}`
-                : "Model — prompt default"
-          }
+          menuLabel="Family"
+          title={`Family — ${family.label}`}
           disabled={locked}
-          className="min-w-0 max-w-56 flex-1 [&>span]:min-w-0 [&>span]:w-full [&>span>button]:w-full"
-          header={
-            <div className="grid gap-1">
-              <span className={KEY_CLASS}>Model id</span>
-              <InputField
-                value={selectedModelUnavailable ? "" : (value.model ?? "")}
-                onChange={onCustomModel}
-                {...(selectedModelUnavailable
-                  ? { placeholder: "Unavailable selection" }
-                  : {})}
-                aria-label="Model id"
-                disabled={locked}
-                inputClassName="font-mono text-xs"
-                className="bg-background"
-              />
-            </div>
-          }
-          items={modelItems({
-            models: modelOptions,
-            group: `${family.label} models`,
-            selectedId: selectedModelUnavailable
-              ? undefined
-              : (resolvedModel?.id ?? value.model),
-            onSelect: onModelSelect,
-            onClear: onModelClear,
+          items={familyItems({
+            families,
+            models,
+            selectedId: family.id,
+            onSelect: (familyId) => onModeChange(familyId, selectedMode),
           })}
         >
-          <span className="min-w-0 truncate font-mono text-xs text-foreground">
-            {modelLabel}
+          {brand.icon && (
+            <Icon
+              icon={brand.icon}
+              className={cn("size-4 shrink-0", brand.color)}
+            />
+          )}
+          <span
+            className={cn(SEGMENT_CAPTION_CLASS, brand.icon && "max-sm:sr-only")}
+          >
+            {family.label}
           </span>
         </RuntimeSegment>
-      )}
-      {showEffort && supportedEfforts.length > 0 && (
         <RuntimeSegment
-          menuLabel="Reasoning effort"
-          title="Reasoning effort"
-          items={effortItems({
-            offered: effortUniverse(
-              reasoningEfforts,
-              supportedEfforts,
-              value.effort,
-            ),
-            supported: supportedEfforts,
-            selected: value.effort,
-            onSelect: onEffortChange,
+          menuLabel="Runtime mode"
+          title={mode.title ?? "Runtime mode"}
+          disabled={locked}
+          items={modeItems({
+            family,
+            selectedId: selectedMode,
+            onSelect: (modeId) => onModeChange(family.id, modeId),
           })}
         >
-          <span className={KEY_CLASS}>Effort</span>
-          <EffortGlyph effort={value.effort} />
-          <span className={CAPTION_CLASS}>
-            {value.effort ? effortLevelLabel(value.effort) : "None"}
-          </span>
+          {mode.icon && (
+            <Icon
+              icon={mode.icon}
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+          )}
+          <span className={SEGMENT_CAPTION_CLASS}>{mode.label}</span>
         </RuntimeSegment>
+        {showModel && (
+          <RuntimeSegment
+            menuLabel="Model"
+            title={
+              selectedModelUnavailable
+                ? "Model — unavailable selection"
+                : value.model
+                  ? `Model — ${value.model}`
+                  : "Model — prompt default"
+            }
+            disabled={locked}
+            className="min-w-0 max-w-56 flex-1 max-sm:max-w-none"
+            header={
+              <div className="grid gap-1">
+                <span className={SEGMENT_KEY_CLASS}>Model id</span>
+                <InputField
+                  value={selectedModelUnavailable ? "" : (value.model ?? "")}
+                  onChange={onCustomModel}
+                  {...(selectedModelUnavailable
+                    ? { placeholder: "Unavailable selection" }
+                    : {})}
+                  aria-label="Model id"
+                  disabled={locked}
+                  inputClassName="font-mono text-xs"
+                  className="bg-background"
+                />
+              </div>
+            }
+            items={modelItems({
+              models: modelOptions,
+              group: `${family.label} models`,
+              selectedId: selectedModelUnavailable
+                ? undefined
+                : (resolvedModel?.id ?? value.model),
+              onSelect: onModelSelect,
+              onClear: onModelClear,
+            })}
+          >
+            <span className="min-w-0 truncate font-mono text-xs text-foreground">
+              {modelLabel}
+            </span>
+          </RuntimeSegment>
+        )}
+      </div>
+      {(showEffortSegment || showTimeout || showCost) && (
+        <div
+          data-runtime-bar-section="settings"
+          className="-ml-px -mt-px flex h-control-h min-w-0 items-stretch border-l border-t border-border max-sm:w-full max-sm:[&>div]:flex-1"
+        >
+          {showEffortSegment && (
+            <RuntimeSegment
+              menuLabel="Reasoning effort"
+              title="Reasoning effort"
+              items={effortItems({
+                offered: effortUniverse(
+                  reasoningEfforts,
+                  supportedEfforts,
+                  value.effort,
+                ),
+                supported: supportedEfforts,
+                selected: value.effort,
+                onSelect: onEffortChange,
+              })}
+            >
+              <span className={SEGMENT_KEY_CLASS}>Effort</span>
+              <EffortGlyph effort={value.effort} />
+              <span className={SEGMENT_CAPTION_CLASS}>
+                {value.effort ? effortLevelLabel(value.effort) : "None"}
+              </span>
+            </RuntimeSegment>
+          )}
+          {showTimeout && (
+            <TimeoutSegment
+              value={value.budget?.timeout}
+              onChange={onTimeoutChange}
+            />
+          )}
+          {showCost && (
+            <CostSegment value={value.budget?.cost} onChange={onCostChange} />
+          )}
+        </div>
       )}
     </div>
-  );
-}
-
-const CAPTION_CLASS = "truncate text-xs font-semibold text-foreground";
-const KEY_CLASS =
-  "text-[11px] font-semibold uppercase leading-none tracking-wide text-muted-foreground";
-
-function RuntimeSegment({
-  items,
-  menuLabel,
-  title,
-  header,
-  disabled = false,
-  className,
-  children,
-}: {
-  items: DropdownMenuItem[];
-  menuLabel: string;
-  title: string;
-  header?: ReactNode;
-  disabled?: boolean;
-  className?: string | undefined;
-  children: ReactNode;
-}) {
-  return (
-    <DropdownMenu
-      align="left"
-      menuLabel={menuLabel}
-      items={items}
-      {...(header ? { header } : {})}
-      menuClassName="min-w-56 max-w-80"
-      className={cn("border-l border-border first:border-l-0", className)}
-      trigger={
-        <button
-          type="button"
-          disabled={disabled}
-          title={title}
-          className="inline-flex h-full min-w-0 items-center gap-1.5 px-density-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [[aria-expanded=true]_&]:bg-muted"
-        >
-          {children}
-          <Icon
-            icon={UiChevronDown}
-            className="size-3 shrink-0 text-muted-foreground/70"
-          />
-        </button>
-      }
-    />
   );
 }
 
@@ -248,45 +241,6 @@ function EffortGlyph({ effort }: { effort?: string | undefined }) {
         effort ? effortLevelColor(effort) : undefined,
       )}
     />
-  );
-}
-
-function itemLabel({
-  text,
-  hint,
-  selected,
-  stacked = false,
-}: {
-  text: string;
-  hint?: string | undefined;
-  selected: boolean;
-  stacked?: boolean | undefined;
-}): ReactNode {
-  return (
-    <>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block truncate", selected && "font-semibold")}>
-          {text}
-        </span>
-        {hint && stacked && (
-          <span className="block whitespace-normal text-[11px] leading-4 text-muted-foreground">
-            {hint}
-          </span>
-        )}
-      </span>
-      {hint && !stacked && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          {hint}
-        </span>
-      )}
-      <Icon
-        icon={UiCheck}
-        className={cn(
-          "size-3.5 shrink-0 text-primary",
-          !selected && "invisible",
-        )}
-      />
-    </>
   );
 }
 
@@ -310,11 +264,13 @@ function familyItems({
       const count = modelsForFamily(models, family).length;
       return {
         group: "Family",
-        label: itemLabel({
-          text: family.label,
-          ...(count > 0 ? { hint: `${count} models` } : {}),
-          selected: family.id === selectedId,
-        }),
+        label: (
+          <SegmentItemLabel
+            text={family.label}
+            {...(count > 0 ? { hint: `${count} models` } : {})}
+            selected={family.id === selectedId}
+          />
+        ),
         ...(brand.icon ? { icon: brand.icon } : {}),
         onSelect: () => onSelect(family.id),
       };
@@ -334,11 +290,13 @@ function modeItems({
     .filter((mode) => !isUnavailable(mode.availability))
     .map((mode) => ({
       group: "Mode · runtime",
-      label: itemLabel({
-        text: mode.label,
-        ...(mode.title ? { hint: mode.title } : {}),
-        selected: mode.id === selectedId,
-      }),
+      label: (
+        <SegmentItemLabel
+          text={mode.label}
+          {...(mode.title ? { hint: mode.title } : {})}
+          selected={mode.id === selectedId}
+        />
+      ),
       ...(mode.icon ? { icon: mode.icon } : {}),
       ...(mode.title ? { title: mode.title } : {}),
       onSelect: () => onSelect(mode.id),
@@ -360,11 +318,13 @@ function modelItems({
 }): DropdownMenuItem[] {
   const clear: DropdownMenuItem = {
     group: "Model",
-    label: itemLabel({
-      text: "Prompt default",
-      hint: "no override",
-      selected: !selectedId,
-    }),
+    label: (
+      <SegmentItemLabel
+        text="Prompt default"
+        hint="no override"
+        selected={!selectedId}
+      />
+    ),
     onSelect: onClear,
   };
   return [
@@ -375,12 +335,14 @@ function modelItems({
       );
       return {
         group,
-        label: itemLabel({
-          text: model.label,
-          ...(model.id === model.label ? {} : { hint: model.id }),
-          selected: model.id === selectedId,
-          stacked: true,
-        }),
+        label: (
+          <SegmentItemLabel
+            text={model.label}
+            {...(model.id === model.label ? {} : { hint: model.id })}
+            selected={model.id === selectedId}
+            stacked
+          />
+        ),
         ...(glyph ? { icon: glyph } : {}),
         onSelect: () => onSelect(model),
       };
@@ -402,11 +364,13 @@ function effortItems({
   const current = selected?.trim() ?? "";
   const none: DropdownMenuItem = {
     group: "Reasoning effort",
-    label: itemLabel({
-      text: "None",
-      hint: "single pass",
-      selected: current === "",
-    }),
+    label: (
+      <SegmentItemLabel
+        text="None"
+        hint="single pass"
+        selected={current === ""}
+      />
+    ),
     onSelect: () => onSelect(""),
   };
   return [
@@ -416,11 +380,13 @@ function effortItems({
       const usable = supported.includes(effort);
       return {
         group: "Reasoning effort",
-        label: itemLabel({
-          text: effortLevelLabel(effort),
-          ...(usable ? {} : { hint: "unsupported" }),
-          selected: effort === current,
-        }),
+        label: (
+          <SegmentItemLabel
+            text={effortLevelLabel(effort)}
+            {...(usable ? {} : { hint: "unsupported" })}
+            selected={effort === current}
+          />
+        ),
         ...(glyph ? { icon: glyph } : {}),
         disabled: !usable,
         onSelect: () => onSelect(effort),

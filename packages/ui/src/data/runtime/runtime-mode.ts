@@ -112,6 +112,7 @@ export type RuntimePermissionSupport = {
         flag?: string | undefined;
         sandbox?: string | undefined;
         approval?: string | undefined;
+        reviewer?: string | undefined;
         note?: string | undefined;
       }
     | undefined;
@@ -265,6 +266,12 @@ const MODE_ICONS: Record<string, StaticIconComponent> = {
   cli: UiTerminal,
   cmux: UiColumns,
 };
+
+export function runtimeModeIcon(
+  mode?: string | undefined,
+): StaticIconComponent | undefined {
+  return mode ? MODE_ICONS[mode.toLowerCase()] : undefined;
+}
 
 // Mode ids are lowercase tokens; only the acronyms and the lowercase brand
 // "cmux" need spelling out. `agent` falls through to plain title case.
