@@ -13,6 +13,8 @@ export type CodeBlockActionsProps = {
   copyable?: boolean | undefined;
   /** Show a download button. */
   downloadable?: boolean | undefined;
+  /** Name of the downloaded file. Defaults to `snippet.<extension of language>`. */
+  downloadFilename?: string | undefined;
   /** This block's effective theme, shown by the toggle. */
   theme?: ResolvedTheme | undefined;
   /** Called when the per-block theme toggle is clicked. Omit to hide it. */
@@ -39,13 +41,13 @@ const LANG_EXTENSIONS: Record<string, string> = {
   css: "css",
 };
 
-function downloadSource(source: string, language: string | undefined) {
+function downloadSource(source: string, language: string | undefined, filename: string | undefined) {
   const ext = (language && LANG_EXTENSIONS[language.toLowerCase()]) || "txt";
   const blob = new Blob([source], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `snippet.${ext}`;
+  anchor.download = filename || `snippet.${ext}`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -58,6 +60,7 @@ export function CodeBlockActions({
   language,
   copyable = false,
   downloadable = false,
+  downloadFilename,
   theme,
   onToggleTheme,
 }: CodeBlockActionsProps) {
@@ -93,7 +96,7 @@ export function CodeBlockActions({
           type="button"
           aria-label="Download code"
           title="Download file"
-          onClick={() => downloadSource(source, language)}
+          onClick={() => downloadSource(source, language, downloadFilename)}
           className="rounded p-1 hover:bg-accent hover:text-accent-foreground"
         >
           <Icon icon={UiDownload} className="size-3.5" />

@@ -24,6 +24,8 @@ export type CodeBlockProps = {
   copyable?: boolean | undefined;
   /** Show a download button in the header (ignored when `bare`). */
   downloadable?: boolean | undefined;
+  /** Name of the downloaded file. Defaults to `snippet.<extension of language>`. */
+  downloadFilename?: string | undefined;
   /** Show a per-block light/dark theme toggle in the header (ignored when `bare`). */
   themeToggle?: boolean | undefined;
   /** Render a language-aware diff instead of highlighting `source`. */
@@ -55,6 +57,7 @@ export function CodeBlock({
   bare = false,
   copyable = false,
   downloadable = false,
+  downloadFilename,
   themeToggle = false,
   diff,
   diffView,
@@ -103,6 +106,7 @@ export function CodeBlock({
       language={languageProp}
       copyable={copyable}
       downloadable={downloadable}
+      downloadFilename={downloadFilename}
       theme={effectiveTheme}
       {...(themeToggle
         ? { onToggleTheme: () => setThemeOverride(effectiveTheme === "dark" ? "light" : "dark") }
