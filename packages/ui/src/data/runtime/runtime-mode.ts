@@ -13,6 +13,7 @@ import {
   isSpecRuntimeMode,
   type SpecRuntimeMode,
 } from "../../lib/runtime-family";
+import { UNSPECIFIED_LABEL } from "./unspecified";
 export {
   familyForModel,
   isSpecRuntimeMode,
@@ -21,6 +22,12 @@ export {
   SPEC_RUNTIME_MODES,
   type SpecRuntimeMode,
 } from "../../lib/runtime-family";
+export {
+  UNSPECIFIED_HINT,
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  unspecifiedHint,
+} from "./unspecified";
 
 // A runtime has two independent axes: the model selects a provider family and
 // `spec.mode` selects api | agent | cli | cmux. The mode never contains a
@@ -500,7 +507,7 @@ export function labelForMode(
       }
     }
   }
-  return "Prompt default";
+  return UNSPECIFIED_LABEL;
 }
 
 /** Lists selectable models for one provider family. */

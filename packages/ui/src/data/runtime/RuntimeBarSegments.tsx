@@ -24,6 +24,11 @@ import {
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
+import {
+  UNSPECIFIED_HINT,
+  UNSPECIFIED_LABEL,
+  unspecifiedHint,
+} from "./unspecified";
 
 export type RuntimeBarSegmentsProps = {
   value: RuntimeBarValue;
@@ -31,6 +36,8 @@ export type RuntimeBarSegmentsProps = {
   modelOptions: ChatModel[];
   resolvedModel: ChatModel | undefined;
   selectedModelUnavailable: boolean;
+  /** Display name of the model this layer would inherit when unspecified. */
+  inheritedModelLabel?: string | undefined;
   families: SpecRuntimeFamily[];
   family: SpecRuntimeFamily;
   mode: SpecRuntimeModeOption;
@@ -59,6 +66,7 @@ export function RuntimeBarSegments({
   modelOptions,
   resolvedModel,
   selectedModelUnavailable,
+  inheritedModelLabel,
   families,
   family,
   mode,
@@ -83,7 +91,7 @@ export function RuntimeBarSegments({
   const brand = runtimeFamilyBrand(family);
   const modelLabel = selectedModelUnavailable
     ? "Unavailable selection"
-    : (resolvedModel?.label ?? value.model ?? "Default");
+    : (resolvedModel?.label ?? value.model ?? UNSPECIFIED_LABEL);
   const showEffortSegment = showEffort && supportedEfforts.length > 0;
 
   // Identity and settings wrap as two units, so a narrow bar drops its settings
@@ -152,7 +160,7 @@ export function RuntimeBarSegments({
                 ? "Model — unavailable selection"
                 : value.model
                   ? `Model — ${value.model}`
-                  : "Model — prompt default"
+                  : "Model — unspecified"
             }
             disabled={locked}
             className="min-w-0 max-w-56 flex-1 max-sm:max-w-none"
@@ -178,6 +186,7 @@ export function RuntimeBarSegments({
               selectedId: selectedModelUnavailable
                 ? undefined
                 : (resolvedModel?.id ?? value.model),
+              inheritedLabel: inheritedModelLabel,
               onSelect: onModelSelect,
               onClear: onModelClear,
             })}
@@ -213,7 +222,7 @@ export function RuntimeBarSegments({
               </span>
               <EffortGlyph effort={value.effort} />
               <span className={cn(SEGMENT_CAPTION_CLASS, "shrink-0")}>
-                {value.effort ? effortLevelLabel(value.effort) : "None"}
+                {value.effort ? effortLevelLabel(value.effort) : UNSPECIFIED_LABEL}
               </span>
             </RuntimeSegment>
           )}
@@ -309,12 +318,14 @@ function modelItems({
   models,
   group,
   selectedId,
+  inheritedLabel,
   onSelect,
   onClear,
 }: {
   models: ChatModel[];
   group: string;
   selectedId?: string | undefined;
+  inheritedLabel?: string | undefined;
   onSelect: (model: ChatModel) => void;
   onClear: () => void;
 }): DropdownMenuItem[] {
@@ -322,8 +333,8 @@ function modelItems({
     group: "Model",
     label: (
       <SegmentItemLabel
-        text="Prompt default"
-        hint="no override"
+        text={UNSPECIFIED_LABEL}
+        hint={unspecifiedHint(inheritedLabel)}
         selected={!selectedId}
       />
     ),
@@ -368,8 +379,8 @@ function effortItems({
     group: "Reasoning effort",
     label: (
       <SegmentItemLabel
-        text="None"
-        hint="single pass"
+        text={UNSPECIFIED_LABEL}
+        hint={UNSPECIFIED_HINT}
         selected={current === ""}
       />
     ),
