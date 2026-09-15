@@ -23,7 +23,10 @@ function InteractivePickerStory() {
   return (
     <div className="max-w-xl space-y-2">
       <p className="text-xs text-muted-foreground">
-        Current mode: <span className="font-mono">{permissionMode}</span>
+        Current mode:{" "}
+        <span className="font-mono" data-testid="current-mode">
+          {permissionMode}
+        </span>
       </p>
       <SessionChatComposer
         status="idle"
@@ -68,7 +71,8 @@ export const WithPermissionModePicker: Story = {
     const picker = canvas.getByRole("combobox", { name: "Permission mode" });
     await expect(picker).toHaveValue("default");
     await userEvent.selectOptions(picker, "auto");
-    await expect(canvas.getByText("Current mode: auto")).toBeInTheDocument();
+    await expect(picker).toHaveValue("auto");
+    await expect(canvas.getByTestId("current-mode")).toHaveTextContent("auto");
   },
 };
 

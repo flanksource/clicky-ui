@@ -149,6 +149,7 @@ export const NarrowContainer: Story = {
       identity!.getBoundingClientRect().top,
     );
     await expect(bar.scrollWidth).toBe(bar.clientWidth);
+    await expect(settings!.scrollWidth).toBe(settings!.clientWidth);
   },
 };
 
