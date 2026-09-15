@@ -385,6 +385,8 @@ export type ClickyProps = {
   infinite?: DataTableInfinite;
   /** Controlled multi-row selection for the first embedded table. */
   rowSelection?: ClickyTableRowSelection;
+  /** Column names retained in raw rows but omitted from the first table. */
+  hiddenColumns?: string[];
   /** Shows the first embedded table's loading bar without replacing its rows. */
   loading?: boolean;
   /** Host row-detail renderer for the first embedded table. */
@@ -431,6 +433,8 @@ export type ClickyTableProps = {
   infinite?: DataTableInfinite | undefined;
   /** Controlled multi-row selection. */
   rowSelection?: ClickyTableRowSelection | undefined;
+  /** Column names retained in raw rows but omitted from the table. */
+  hiddenColumns?: string[] | undefined;
   /** Extra actions rendered in the table menu. */
   menuActions?: DataTableMenuAction[] | undefined;
   /** Shows the table loading bar without replacing existing rows. */
@@ -482,6 +486,7 @@ type ClickyRuntimeContextValue = {
   onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
+  tableHiddenColumns?: string[] | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
@@ -585,6 +590,9 @@ export function Clicky(props: ClickyProps) {
         {...(props.rowSelection
           ? { tableRowSelection: props.rowSelection }
           : {})}
+        {...(props.hiddenColumns
+          ? { tableHiddenColumns: props.hiddenColumns }
+          : {})}
         {...(props.loading !== undefined
           ? { tableLoading: props.loading }
           : {})}
@@ -638,6 +646,7 @@ function ClickyRuntimeProvider({
   onTableSortChange,
   tableInfinite,
   tableRowSelection,
+  tableHiddenColumns,
   tableMenuActions,
   tableLoading,
   tableRenderRowDetail,
@@ -660,6 +669,7 @@ function ClickyRuntimeProvider({
   onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
+  tableHiddenColumns?: string[] | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
@@ -683,6 +693,7 @@ function ClickyRuntimeProvider({
       onTableSortChange ||
       tableInfinite ||
       tableRowSelection ||
+      tableHiddenColumns ||
       tableMenuActions ||
       tableLoading ||
       tableRenderRowDetail ||
@@ -708,6 +719,7 @@ function ClickyRuntimeProvider({
                 onTableSortChange,
                 tableInfinite,
                 tableRowSelection,
+                tableHiddenColumns,
                 tableMenuActions,
                 tableLoading,
                 tableRenderRowDetail,
@@ -739,6 +751,7 @@ function ClickyRuntimeProvider({
       {...(onTableSortChange ? { onTableSortChange } : {})}
       {...(tableInfinite ? { tableInfinite } : {})}
       {...(tableRowSelection ? { tableRowSelection } : {})}
+      {...(tableHiddenColumns ? { tableHiddenColumns } : {})}
       {...(tableMenuActions ? { tableMenuActions } : {})}
       {...(tableLoading !== undefined ? { tableLoading } : {})}
       {...(tableRenderRowDetail ? { tableRenderRowDetail } : {})}
@@ -766,6 +779,7 @@ function ClickyCommandRuntimeProvider({
   onTableSortChange,
   tableInfinite,
   tableRowSelection,
+  tableHiddenColumns,
   tableMenuActions,
   tableLoading,
   tableRenderRowDetail,
@@ -788,6 +802,7 @@ function ClickyCommandRuntimeProvider({
   onTableSortChange?: ((sort: SortState | null) => void) | undefined;
   tableInfinite?: DataTableInfinite | undefined;
   tableRowSelection?: ClickyTableRowSelection | undefined;
+  tableHiddenColumns?: string[] | undefined;
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
@@ -813,6 +828,7 @@ function ClickyCommandRuntimeProvider({
       onTableSortChange,
       tableInfinite,
       tableRowSelection,
+      tableHiddenColumns,
       tableMenuActions,
       tableLoading,
       tableRenderRowDetail,
@@ -839,6 +855,7 @@ function ClickyCommandRuntimeProvider({
       onTableSortChange,
       tableInfinite,
       tableRowSelection,
+      tableHiddenColumns,
       tableMenuActions,
       tableLoading,
       tableRenderRowDetail,
@@ -3210,6 +3227,7 @@ export function ClickyTable({
   onSortChange,
   infinite,
   rowSelection,
+  hiddenColumns,
   menuActions,
   loading,
   renderRowDetail,
@@ -3233,6 +3251,7 @@ export function ClickyTable({
   const effectiveSortChange = onSortChange ?? runtime.onTableSortChange;
   const effectiveInfinite = infinite ?? runtime.tableInfinite;
   const effectiveRowSelection = rowSelection ?? runtime.tableRowSelection;
+  const effectiveHiddenColumns = hiddenColumns ?? runtime.tableHiddenColumns;
   const effectiveMenuActions = menuActions ?? runtime.tableMenuActions;
   const effectiveLoading = loading ?? runtime.tableLoading;
   const effectiveRenderRowDetail =
@@ -3243,15 +3262,20 @@ export function ClickyTable({
   const effectiveDetailDialogTitle =
     detailDialogTitle ?? runtime.tableDetailDialogTitle;
 
-  if (columns.length === 0) {
+  const hiddenColumnNames = new Set(effectiveHiddenColumns);
+  const visibleColumns = columns.filter(
+    (column) => !hiddenColumnNames.has(column.name),
+  );
+
+  if (visibleColumns.length === 0) {
     return <div className="text-sm text-muted-foreground">No data</div>;
   }
 
-  if (shouldRenderRowsAsCollapsedStructs(columns, rows)) {
-    return <ClickyCollapsedStructRows columns={columns} rows={rows} />;
+  if (shouldRenderRowsAsCollapsedStructs(visibleColumns, rows)) {
+    return <ClickyCollapsedStructRows columns={visibleColumns} rows={rows} />;
   }
 
-  const tableColumns: DataTableColumn<ClickyRow>[] = columns.map((column) => {
+  const tableColumns: DataTableColumn<ClickyRow>[] = visibleColumns.map((column) => {
     const tagColumn = isClickyTagColumn(column);
     const keyValueColumn = isClickyKeyValueColumn(column);
     const jsonColumn = column.type === "json";
@@ -3364,10 +3388,11 @@ export function ClickyTable({
   const defaultSortColumn =
     effectivePagination || effectiveSortChange
       ? undefined
-      : (columns.find((column) => column.sortable !== false) ?? columns[0]);
+      : (visibleColumns.find((column) => column.sortable !== false) ??
+        visibleColumns[0]);
   const controlledTableSort = effectiveSort
     ? (() => {
-        const column = columns.find(
+        const column = visibleColumns.find(
           (candidate) => candidate.sortKey === effectiveSort.key,
         );
         if (!column) {
@@ -3389,7 +3414,7 @@ export function ClickyTable({
         const columnName = next.key.startsWith("cells.")
           ? next.key.slice("cells.".length)
           : next.key;
-        const column = columns.find(
+        const column = visibleColumns.find(
           (candidate) => candidate.name === columnName,
         );
         if (!column?.sortKey) {
@@ -3426,7 +3451,7 @@ export function ClickyTable({
         : {})}
       getRowId={(row, index) =>
         effectiveRowSelection?.getRowId(row, index) ??
-        `${index}-${columns
+        `${index}-${visibleColumns
           .map((column) => clickyNodeText(row.cells[column.name]))
           .filter(Boolean)
           .join("|")}`
@@ -4268,6 +4293,9 @@ function clickyCellRawValue(node: ClickyNode | null | undefined): unknown {
   if (node == null) return undefined;
   if (node.kind === "execution-tree") return node.executionRoots ?? [];
   if (node.kind === "object-graph") return node.objects ?? [];
+  if (node.kind === "map" || node.kind === "list") {
+    return clickyNodeJSONValue(node);
+  }
   if (node.filterValue !== undefined) return node.filterValue;
   return clickyNodeText(node);
 }
