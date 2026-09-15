@@ -1,13 +1,15 @@
 import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
+import { Button } from "./button";
 import { Combobox, type ComboboxOption } from "./Combobox";
 import { Field } from "./Field";
 import { InputField } from "./InputField";
-import { Switch } from "./Switch";
 import {
-  COMMON_CRON_SUGGESTIONS,
-  type CronSuggestion,
-} from "./schedule-types";
+  formatStructuredCron,
+  parseStructuredCron,
+} from "./schedule-cron-model";
+import { Switch } from "./Switch";
+import { COMMON_CRON_SUGGESTIONS, type CronSuggestion } from "./schedule-types";
 
 export interface ScheduleValue {
   cron: string;
@@ -28,6 +30,16 @@ export interface ScheduleEditorProps {
   timezoneSuggestions?: readonly string[];
   className?: string;
 }
+
+const WEEKDAYS = [
+  { value: 0, short: "Sun", label: "Sunday" },
+  { value: 1, short: "Mon", label: "Monday" },
+  { value: 2, short: "Tue", label: "Tuesday" },
+  { value: 3, short: "Wed", label: "Wednesday" },
+  { value: 4, short: "Thu", label: "Thursday" },
+  { value: 5, short: "Fri", label: "Friday" },
+  { value: 6, short: "Sat", label: "Saturday" },
+] as const;
 
 /**
  * Controlled recurring-schedule fields shared by operation and activity forms.
@@ -56,9 +68,7 @@ export function ScheduleEditor({
   ]).map<ComboboxOption>((suggestion) => ({
     value: suggestion.cron,
     label: suggestion.label,
-    ...(suggestion.description
-      ? { description: suggestion.description }
-      : {}),
+    ...(suggestion.description ? { description: suggestion.description } : {}),
     selectedLabel: suggestion.cron,
     trailing: (
       <code className="text-[11px] text-muted-foreground">
@@ -67,6 +77,29 @@ export function ScheduleEditor({
     ),
   }));
   const timezoneOptions = [...new Set(timezoneSuggestions ?? [])];
+  const structured = parseStructuredCron(value.cron);
+  const structuredDisabled = Boolean(disabled || !structured);
+
+  const changeTime = (time: string) => {
+    if (!structured || !/^\d{2}:\d{2}$/.test(time)) return;
+    onChange({
+      ...value,
+      cron: formatStructuredCron(time, structured.weekdays),
+    });
+  };
+
+  const toggleWeekday = (weekday: number) => {
+    if (!structured) return;
+    const selected = structured.weekdays.includes(weekday);
+    if (selected && structured.weekdays.length === 1) return;
+    const weekdays = selected
+      ? structured.weekdays.filter((day) => day !== weekday)
+      : [...structured.weekdays, weekday];
+    onChange({
+      ...value,
+      cron: formatStructuredCron(structured.time, weekdays),
+    });
+  };
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -122,6 +155,50 @@ export function ScheduleEditor({
             onChange={(enabled) => onChange({ ...value, enabled })}
           />
         </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[minmax(10rem,0.35fr)_minmax(0,1fr)]">
+        <Field label="Time" htmlFor={`${id}-time`}>
+          <InputField
+            id={`${id}-time`}
+            type="time"
+            value={structured?.time ?? ""}
+            disabled={structuredDisabled}
+            onChange={changeTime}
+          />
+        </Field>
+        <Field
+          label="Days of week"
+          helper={
+            structured
+              ? "Select one or more days."
+              : "This custom cron expression is preserved; edit it above to enable time and weekday controls."
+          }
+        >
+          <div
+            className="flex flex-wrap gap-1"
+            role="group"
+            aria-label="Days of week"
+          >
+            {WEEKDAYS.map((weekday) => {
+              const selected =
+                structured?.weekdays.includes(weekday.value) ?? false;
+              return (
+                <Button
+                  key={weekday.value}
+                  type="button"
+                  size="sm"
+                  variant={selected ? "secondary" : "outline"}
+                  aria-label={weekday.label}
+                  aria-pressed={selected}
+                  disabled={structuredDisabled}
+                  onClick={() => toggleWeekday(weekday.value)}
+                >
+                  {weekday.short}
+                </Button>
+              );
+            })}
+          </div>
+        </Field>
       </div>
     </div>
   );

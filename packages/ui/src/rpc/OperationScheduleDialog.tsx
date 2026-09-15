@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../components/button";
+import { CopyButton } from "../components/CopyButton";
 import { Field } from "../components/Field";
 import { InputField } from "../components/InputField";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
@@ -12,7 +13,13 @@ import {
   operationLabel,
   scheduleToInput,
 } from "./operation-schedule-model";
-import type { OperationSchedule, OperationScheduleInput } from "./operation-schedule-types";
+import { operationCLICommand } from "./operation-cli-command";
+import type {
+  OperationSchedule,
+  OperationScheduleCLI,
+  OperationScheduleInput,
+  OperationScheduleRunInput,
+} from "./operation-schedule-types";
 import type { ResolvedOperation } from "./types";
 import { InlineError } from "./InlineError";
 import { OperationPicker } from "./OperationPicker";
@@ -21,29 +28,37 @@ export interface OperationScheduleDialogProps {
   open: boolean;
   operations: readonly ResolvedOperation[];
   schedule?: OperationSchedule;
+  cli?: OperationScheduleCLI;
   onClose: () => void;
   onSave: (input: OperationScheduleInput) => Promise<unknown>;
-  onRunNow: (input: OperationScheduleInput) => Promise<unknown>;
+  onRunNow: (input: OperationScheduleRunInput) => Promise<unknown>;
 }
 
 export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
-  const { open, operations, schedule, onClose, onSave, onRunNow } = _props;
-  const [input, setInput] = useState<OperationScheduleInput>(newOperationScheduleInput);
+  const { open, operations, schedule, cli, onClose, onSave, onRunNow } = _props;
+  const [input, setInput] = useState<OperationScheduleInput>(
+    newOperationScheduleInput,
+  );
   const [pending, setPending] = useState<"save" | "run">();
   const [error, setError] = useState<unknown>();
   const [confirmingRun, setConfirmingRun] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setInput(schedule ? scheduleToInput(schedule) : newOperationScheduleInput());
+    setInput(
+      schedule ? scheduleToInput(schedule) : newOperationScheduleInput(),
+    );
     setError(undefined);
     setConfirmingRun(false);
   }, [open, schedule]);
 
   const operation = operationByID(operations, input.operationId);
   const schema = operationInputSchema(operation);
-  const suggestions = operation?.operation["x-clicky"]?.schedule?.suggestions ?? [];
-  const destructive = operation?.operation["x-clicky"]?.toolHints?.destructiveHint === true;
+  const suggestions =
+    operation?.operation["x-clicky"]?.schedule?.suggestions ?? [];
+  const destructive =
+    operation?.operation["x-clicky"]?.toolHints?.destructiveHint === true;
+  const cliCommand = operationCLICommand(operation, input.args, cli);
 
   const selectOperation = (operationId: string) => {
     const selected = operationByID(operations, operationId);
@@ -52,7 +67,9 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
       operationId,
       args: {},
       name: current.name || operationLabel(selected),
-      cron: selected?.operation["x-clicky"]?.schedule?.suggestions?.[0]?.cron ?? current.cron,
+      cron:
+        selected?.operation["x-clicky"]?.schedule?.suggestions?.[0]?.cron ??
+        current.cron,
     }));
   };
 
@@ -73,7 +90,7 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     setPending("run");
     setError(undefined);
     try {
-      await onRunNow(input);
+      await onRunNow({ operationId: input.operationId, args: input.args });
       setConfirmingRun(false);
       onClose();
     } catch (nextError) {
@@ -84,7 +101,9 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     }
   };
 
-  const canSave = Boolean(input.name.trim() && input.operationId && input.cron.trim());
+  const canSave = Boolean(
+    input.name.trim() && input.operationId && input.cron.trim(),
+  );
   const canRun = Boolean(input.operationId);
 
   return (
@@ -96,7 +115,9 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         size="xl"
         footer={
           <div className="flex w-full flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             <Button
               type="button"
               variant={destructive ? "destructive" : "secondary"}
@@ -118,7 +139,11 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         }
       >
         <div className="space-y-5">
-          <Field label="Schedule name" htmlFor="operation-schedule-name" required>
+          <Field
+            label="Schedule name"
+            htmlFor="operation-schedule-name"
+            required
+          >
             <InputField
               id="operation-schedule-name"
               value={input.name}
@@ -144,8 +169,21 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
                 />
               </section>
             ) : (
-              <p className="text-sm text-muted-foreground">This operation has no arguments.</p>
+              <p className="text-sm text-muted-foreground">
+                This operation has no arguments.
+              </p>
             )
+          ) : null}
+          {cliCommand ? (
+            <section className="space-y-1">
+              <h3 className="text-sm font-semibold">Equivalent CLI command</h3>
+              <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-xs">
+                  {cliCommand}
+                </code>
+                <CopyButton value={cliCommand} label="Copy CLI command" />
+              </div>
+            </section>
           ) : null}
           <ScheduleEditor
             id="operation-schedule"
@@ -154,7 +192,9 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
             cronSuggestions={suggestions}
             timezoneSuggestions={[input.timezone, "UTC"]}
           />
-          {error ? <InlineError title="Schedule action failed" error={error} /> : null}
+          {error ? (
+            <InlineError title="Schedule action failed" error={error} />
+          ) : null}
         </div>
       </Modal>
       <Modal
@@ -164,7 +204,13 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         size="sm"
         footer={
           <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setConfirmingRun(false)}>Cancel</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmingRun(false)}
+            >
+              Cancel
+            </Button>
             <Button
               type="button"
               variant={destructive ? "destructive" : "default"}
@@ -177,7 +223,8 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         }
       >
         <p className="text-sm text-muted-foreground">
-          This runs the configured operation once without creating or changing a recurring schedule.
+          This runs the configured operation once without creating or changing a
+          recurring schedule.
         </p>
       </Modal>
     </>
