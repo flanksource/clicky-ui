@@ -44,6 +44,8 @@ export type TreeNodeProps<T> = {
    * toggle the row's expand/collapse state.
    */
   renderDetail?: (node: T) => ReactNode;
+  /** Render a node's result after its children, including when the children are collapsed. */
+  renderAfterChildren?: (node: T) => ReactNode;
   rowClass?: (node: T, selected: boolean) => string;
   indentPx?: number;
   basePaddingPx?: number;
@@ -93,6 +95,7 @@ export function TreeNode<T>({
   onSelect,
   renderRow,
   renderDetail,
+  renderAfterChildren,
   rowClass,
   indentPx = 16,
   basePaddingPx = 8,
@@ -210,6 +213,7 @@ export function TreeNode<T>({
   const defaultRowBg = isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent";
   const rowClassName = rowClass ? rowClass(node, isSelected) : defaultRowBg;
   const detail = renderDetail?.(node);
+  const afterChildren = renderAfterChildren?.(node);
 
   return (
     <div
@@ -283,6 +287,7 @@ export function TreeNode<T>({
               basePaddingPx={basePaddingPx}
               {...(defaultOpen ? { defaultOpen } : {})}
               {...(renderDetail ? { renderDetail } : {})}
+              {...(renderAfterChildren ? { renderAfterChildren } : {})}
               {...(getAriaLabel ? { getAriaLabel } : {})}
               {...(onSelect ? { onSelect } : {})}
               {...(rowClass ? { rowClass } : {})}
@@ -291,6 +296,16 @@ export function TreeNode<T>({
               {...(loadChildren ? { loadChildren } : {})}
             />
           ))}
+        </div>
+      )}
+      {afterChildren != null && afterChildren !== false && (
+        <div
+          className="pb-1 pr-2"
+          style={{ paddingLeft: `${depth * indentPx + basePaddingPx + ROW_CONTENT_OFFSET_PX}px` }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {afterChildren}
         </div>
       )}
     </div>

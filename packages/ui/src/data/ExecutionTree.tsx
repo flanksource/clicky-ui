@@ -50,6 +50,8 @@ export type ExecutionTreeProps<T extends ExecutionNode = ExecutionNode> = {
    * `null`/`undefined`/`false` renders nothing.
    */
   renderDetail?: (node: T) => ReactNode;
+  /** Render a call's return or error after its nested calls. */
+  renderAfterChildren?: (node: T) => ReactNode;
   loadChildren?: (node: T) => Promise<T[]>;
 };
 
@@ -62,6 +64,7 @@ export function ExecutionTree<T extends ExecutionNode = ExecutionNode>({
   costThreshold,
   renderRow,
   renderDetail,
+  renderAfterChildren,
   loadChildren,
 }: ExecutionTreeProps<T>) {
   return (
@@ -74,6 +77,7 @@ export function ExecutionTree<T extends ExecutionNode = ExecutionNode>({
       {...(empty !== undefined ? { empty } : {})}
       {...(showControls !== undefined ? { showControls } : {})}
       {...(renderDetail ? { renderDetail } : {})}
+      {...(renderAfterChildren ? { renderAfterChildren } : {})}
       {...(loadChildren ? { loadChildren, hasMoreChildren: (n: T) => n.expandable === true } : {})}
       renderRow={({ node }) =>
         renderRow ? renderRow(node) : <DefaultExecutionRow node={node} costThreshold={costThreshold} />

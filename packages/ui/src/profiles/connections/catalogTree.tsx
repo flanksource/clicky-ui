@@ -4,12 +4,12 @@ import {
   UiActivity,
   UiDatabase,
   UiLink,
-  UiNamespace,
   UiSqlColumn,
   UiSqlDatabase,
   UiSqlIndex,
+  UiSqlSchema,
+  UiSqlTable,
   UiSqlView,
-  UiTable,
 } from "../../icons";
 import type { CatalogNode } from "./connectionBrowserModel";
 
@@ -134,9 +134,9 @@ function CatalogNodes({
 function catalogIcon(kind: string) {
   switch (kind) {
     case "schema":
-      return UiNamespace;
+      return UiSqlSchema;
     case "table":
-      return UiTable;
+      return UiSqlTable;
     case "view":
       return UiSqlView;
     case "column":
