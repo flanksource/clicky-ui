@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import {
   DEFAULT_COMMENT_STATUSES,
   DOCUMENT_ANCHOR,
@@ -12,6 +12,7 @@ import {
 import type {
   CommentElementCaptureContext,
   CommentElementContext,
+  CommentScreenshotCapture,
 } from "../../plugins/comments-model";
 import { resolveAnchor } from "./dom-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
@@ -45,8 +46,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     !(response.headers.get("content-type") ?? "").includes("application/json")
   ) {
     throw new Error(
-      "Comment persistence only exists under `vite dev` — the playground-comments middleware " +
-        "is not part of the production build.",
+      "The playground comments API returned a non-JSON response. Run the playground with vite dev or vite preview.",
     );
   }
   const payload = (await response.json()) as T & { error?: string };
@@ -83,7 +83,12 @@ export type PlaygroundComments = {
   allComments: PageComment[];
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
-  create: (input: CommentCreateInput) => Promise<void>;
+  create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
+  prepareSelection: (
+    anchor: string,
+    target: Element,
+    screenshot?: Promise<CommentScreenshotCapture>,
+  ) => void;
   reply: (input: CommentReplyInput) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   close: (id: string) => Promise<void>;
@@ -99,6 +104,34 @@ export function useComments(
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const preparedSelection = useRef<{
+    page: string;
+    anchor: string;
+    context: Promise<PromiseSettledResult<CommentElementContext>>;
+    screenshot?: Promise<CommentScreenshotCapture>;
+  } | null>(null);
+
+  const prepareSelection = useCallback(
+    (
+      anchor: string,
+      target: Element,
+      screenshot?: Promise<CommentScreenshotCapture>,
+    ) => {
+      preparedSelection.current = {
+        page,
+        anchor,
+        context: captureElementContext(
+          target,
+          `apps/playground/src/pages/${page}.tsx`,
+        ).then(
+          (value) => ({ status: "fulfilled" as const, value }),
+          (reason: unknown) => ({ status: "rejected" as const, reason }),
+        ),
+        ...(screenshot ? { screenshot } : {}),
+      };
+    },
+    [page],
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -116,6 +149,7 @@ export function useComments(
 
   useEffect(() => {
     setComments([]);
+    preparedSelection.current = null;
     void refresh();
   }, [refresh]);
 
@@ -147,9 +181,14 @@ export function useComments(
   );
 
   const create = useCallback(
-    (input: CommentCreateInput) =>
+    (input: CommentCreateInput, actionId = "plain") =>
       mutate(
         async () => {
+          if (actionId !== "plain" && actionId !== "screenshot") {
+            throw new Error(
+              `Unknown comment create action ${JSON.stringify(actionId)}`,
+            );
+          }
           const anchor = input.anchor ?? null;
           const content = contentRef.current;
           if (!content) {
@@ -167,22 +206,34 @@ export function useComments(
             );
           }
 
-          // Start capture while the submit click still supplies browser activation.
-          const screenshot = captureScreenshot(target);
-          const context =
-            anchor === null || anchor === DOCUMENT_ANCHOR
+          const prepared =
+            preparedSelection.current?.page === page &&
+            preparedSelection.current.anchor === anchor
+              ? preparedSelection.current
+              : null;
+          const screenshot =
+            actionId === "screenshot"
+              ? (prepared?.screenshot ?? captureScreenshot(target))
+              : null;
+          const context = prepared
+            ? prepared.context.then((result) => {
+                if (result.status === "rejected") throw result.reason;
+                return result.value;
+              })
+            : anchor === null || anchor === DOCUMENT_ANCHOR
               ? Promise.resolve({
                   source: `apps/playground/src/pages/${page}.tsx`,
                   html: captureElementHtml(target),
                 })
-              : captureElementContext(target);
-          const [capturedContext, capturedScreenshot] = await Promise.all([
-            context,
-            screenshot,
-          ]);
+              : captureElementContext(
+                  target,
+                  `apps/playground/src/pages/${page}.tsx`,
+                );
+          const capturedContext = await context;
+          const capturedScreenshot = await screenshot;
           const element: CommentElementCaptureContext = {
             ...capturedContext,
-            screenshot: capturedScreenshot,
+            ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
           await post(COMMENTS_ROUTE, {
@@ -193,6 +244,9 @@ export function useComments(
             ...(input.rating ? { rating: input.rating } : {}),
             element,
           });
+          if (preparedSelection.current === prepared) {
+            preparedSelection.current = null;
+          }
         },
         { rethrow: true },
       ),
@@ -291,6 +345,7 @@ export function useComments(
     allComments,
     error,
     create,
+    prepareSelection,
     reply,
     updateStatus,
     close,
