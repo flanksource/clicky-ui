@@ -193,6 +193,92 @@ describe("page management", () => {
     );
   });
 
+  it("updates JavaScript-style imports that resolve to a moved TSX page", () => {
+    createSource(pagesDir, "review", SOURCE);
+    const consumer = join(pagesDir, "consumer.tsx");
+    writeFileSync(consumer, 'import OldPage from "./review.js";\n');
+
+    movePage({
+      sourceRoot: pagesDir,
+      pagesDir,
+      commentsDir,
+      slug: "review",
+      nextSlug: "approved/review",
+    });
+
+    expect(readFileSync(consumer, "utf8")).toBe(
+      'import OldPage from "./approved/review.js";\n',
+    );
+  });
+
+  it("leaves an import of a separate JavaScript file intact", () => {
+    createSource(pagesDir, "review", SOURCE);
+    writeFileSync(join(pagesDir, "review.js"), "export default 'separate';\n");
+    const consumer = join(pagesDir, "consumer.tsx");
+    const source = 'import value from "./review.js";\n';
+    writeFileSync(consumer, source);
+
+    movePage({
+      sourceRoot: pagesDir,
+      pagesDir,
+      commentsDir,
+      slug: "review",
+      nextSlug: "approved/review",
+    });
+
+    expect(readFileSync(consumer, "utf8")).toBe(source);
+  });
+
+  it("updates module and page references while preserving unrelated strings and asset paths", () => {
+    createSource(
+      pagesDir,
+      "review",
+      [
+        'import "./review.css";',
+        'const icon = new URL("./review.svg", import.meta.url);',
+        'export const meta = { title: "Review" };',
+      ].join("\n"),
+    );
+    writeFileSync(join(pagesDir, "review.css"), "body {}\n");
+    writeFileSync(join(pagesDir, "review.svg"), "<svg />\n");
+    const consumer = join(pagesDir, "consumer.tsx");
+    writeFileSync(
+      consumer,
+      [
+        'export { meta } from "./review";',
+        'export const load = () => import("./review");',
+        'export const route = { page: "review" };',
+        'export const unrelated = "review";',
+        "export const href = `?page=review`;",
+      ].join("\n"),
+    );
+
+    movePage({
+      sourceRoot: pagesDir,
+      pagesDir,
+      commentsDir,
+      slug: "review",
+      nextSlug: "approved/review",
+    });
+
+    expect(readSource(pagesDir, "approved/review")).toBe(
+      [
+        'import "../review.css";',
+        'const icon = new URL("../review.svg", import.meta.url);',
+        'export const meta = { title: "Review" };',
+      ].join("\n"),
+    );
+    expect(readFileSync(consumer, "utf8")).toBe(
+      [
+        'export { meta } from "./approved/review";',
+        'export const load = () => import("./approved/review");',
+        'export const route = { page: "approved/review" };',
+        'export const unrelated = "review";',
+        "export const href = `?page=approved/review`;",
+      ].join("\n"),
+    );
+  });
+
   it("rolls back the page and rewritten references when a write fails", () => {
     createSource(pagesDir, "review", SOURCE);
     const consumer = join(pagesDir, "consumer.ts");
@@ -210,7 +296,8 @@ describe("page management", () => {
         slug: "review",
         nextSlug: "approved/review",
         writeReference: (file, source) => {
-          if (source.includes("approved/review")) throw new Error("simulated write failure");
+          if (source.includes("approved/review"))
+            throw new Error("simulated write failure");
           writeFileSync(file, source);
         },
       }),

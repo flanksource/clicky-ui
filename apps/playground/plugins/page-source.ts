@@ -19,9 +19,13 @@ export function rewritePageTitle(source: string, title: string): string {
 
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name) || declaration.name.text !== "meta") continue;
-      if (!declaration.initializer || !ts.isObjectLiteralExpression(declaration.initializer)) break;
+      const initializer =
+        declaration.initializer && ts.isSatisfiesExpression(declaration.initializer)
+          ? declaration.initializer.expression
+          : declaration.initializer;
+      if (!initializer || !ts.isObjectLiteralExpression(initializer)) break;
 
-      const titleProperty = declaration.initializer.properties.find(
+      const titleProperty = initializer.properties.find(
         (property): property is ts.PropertyAssignment =>
           ts.isPropertyAssignment(property) &&
           ((ts.isIdentifier(property.name) && property.name.text === "title") ||

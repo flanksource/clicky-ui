@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Plugin } from "vite";
+import type { Connect, Logger, Plugin } from "vite";
 
 import { COMMENT_TOOLS } from "./comments-schema";
 import {
@@ -199,18 +199,21 @@ function persistElementContext(
     throw new Error("every root comment requires element context");
   }
   const candidate = input as Record<string, unknown>;
-  if (candidate["screenshot"] === undefined) {
-    throw new Error("every root comment requires a screenshot capture result");
-  }
-  const screenshot = persistScreenshot(
-    dir,
-    id,
-    assertScreenshotCapture(candidate["screenshot"]),
-  );
+  const screenshot =
+    candidate["screenshot"] === undefined
+      ? undefined
+      : persistScreenshot(
+          dir,
+          id,
+          assertScreenshotCapture(candidate["screenshot"]),
+        );
   try {
-    return assertElementContext({ ...candidate, screenshot });
+    return assertElementContext({
+      ...candidate,
+      ...(screenshot ? { screenshot } : {}),
+    });
   } catch (cause) {
-    discardScreenshot(dir, id, screenshot);
+    if (screenshot) discardScreenshot(dir, id, screenshot);
     throw cause;
   }
 }
@@ -354,36 +357,50 @@ function handle(
  * reload and stay readable in-repo by a coding agent, and exposes the same data
  * as an API a model can call — `GET <route>/schema` describes every endpoint
  * available to agents. Human-only lifecycle routes remain UI-owned.
- * Dev-server only: the production `vite build` output has no comment backend by
- * design.
+ * The middleware runs in both Vite development and local build preview.
  */
 export function playgroundComments(options: { dir: string }): Plugin {
   return {
     name: "playground-comments",
-    apply: "serve",
     configureServer(server) {
-      server.middlewares.use(COMMENTS_ROUTE, (req, res, next) => {
-        void (async () => {
-          try {
-            await handle(options.dir, req, res);
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            server.config.logger.error(
-              `[playground-comments] ${req.method} failed: ${message}`,
-            );
-            if (res.headersSent) {
-              next(error);
-              return;
-            }
-            sendJson(
-              res,
-              error instanceof CommentHttpError ? error.statusCode : 400,
-              { error: message },
-            );
-          }
-        })();
-      });
+      registerCommentsMiddleware(
+        server.middlewares,
+        server.config.logger,
+        options.dir,
+      );
+    },
+    configurePreviewServer(server) {
+      registerCommentsMiddleware(
+        server.middlewares,
+        server.config.logger,
+        options.dir,
+      );
     },
   };
+}
+
+function registerCommentsMiddleware(
+  middlewares: Connect.Server,
+  logger: Logger,
+  dir: string,
+) {
+  middlewares.use(COMMENTS_ROUTE, (req, res, next) => {
+    void (async () => {
+      try {
+        await handle(dir, req, res);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`[playground-comments] ${req.method} failed: ${message}`);
+        if (res.headersSent) {
+          next(error);
+          return;
+        }
+        sendJson(
+          res,
+          error instanceof CommentHttpError ? error.statusCode : 400,
+          { error: message },
+        );
+      }
+    })();
+  });
 }

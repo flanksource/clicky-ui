@@ -28,7 +28,7 @@ export type CommentElementContext = {
   componentName?: string;
   source: string;
   html: string;
-  /** Optional only so comments created before screenshot capture remain readable. */
+  /** Present when screenshot capture was requested. */
   screenshot?: CommentScreenshot;
 };
 
@@ -36,5 +36,5 @@ export type CommentElementCaptureContext = Omit<
   CommentElementContext,
   "screenshot"
 > & {
-  screenshot: CommentScreenshotCapture;
+  screenshot?: CommentScreenshotCapture;
 };

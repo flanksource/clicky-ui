@@ -13,6 +13,7 @@ type CropTargetFactory = {
 
 let retainedDisplayStream: MediaStream | undefined;
 let pendingDisplayStream: Promise<MediaStream> | undefined;
+const CAPTURE_TIMEOUT_MS = 10_000;
 
 function stopStream(stream: MediaStream): void {
   stream.getTracks().forEach((track) => track.stop());
@@ -142,8 +143,30 @@ export async function captureScreenshot(
 
   try {
     const stream = await requestDisplayStream();
-    await cropToElement(stream.getVideoTracks()[0] as CroppableTrack, element);
-    return { status: "captured", dataUrl: await frameToDataUrl(stream) };
+    const source = stream.getVideoTracks()[0];
+    if (!source) throw new Error("selected display stream has no video track");
+
+    // Keep the shared source uncropped so each comment starts with a fresh frame.
+    const track = source.clone() as CroppableTrack;
+    const captureStream = new MediaStream([track]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const frame = (async () => {
+        await cropToElement(track, element);
+        return frameToDataUrl(captureStream);
+      })();
+      const stalled = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          if (retainedDisplayStream === stream) retainedDisplayStream = undefined;
+          stopStream(stream);
+          reject(new Error("screenshot capture timed out"));
+        }, CAPTURE_TIMEOUT_MS);
+      });
+      return { status: "captured", dataUrl: await Promise.race([frame, stalled]) };
+    } finally {
+      clearTimeout(timeout);
+      track.stop();
+    }
   } catch (error) {
     return { status: "unavailable", reason: unavailableReason(error) };
   }
