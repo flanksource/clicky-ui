@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { StaticIconComponent } from "@flanksource/clicky-ui";
 import type { ExtractedGuidance } from "../plugins/markdown-model";
 
@@ -10,6 +10,8 @@ export type PageMeta = {
   icon?: StaticIconComponent;
   navOrder?: number;
   groupOrder?: number;
+  appShellBreadcrumbs?: readonly string[];
+  appShellActions?: ReactNode;
 };
 
 export type PageModule = {
@@ -51,7 +53,9 @@ export function humanizeSlug(slug: string): string {
 
 export function groupFromSlug(slug: string): string {
   const parts = slug.split("/");
-  return parts.length > 1 ? humanizeSlug(parts.slice(0, -1).join("/")) : ROOT_GROUP;
+  return parts.length > 1
+    ? humanizeSlug(parts.slice(0, -1).join("/"))
+    : ROOT_GROUP;
 }
 
 export function folderForPage(
@@ -78,7 +82,8 @@ export function buildRegistry(
         title: humanizeSlug(slug),
         group: groupFromSlug(slug),
         load,
-        loadGuidance: guidanceModules[key] ?? (() => Promise.resolve({ blocks: [] })),
+        loadGuidance:
+          guidanceModules[key] ?? (() => Promise.resolve({ blocks: [] })),
       };
     })
     .sort(compareEntries);
@@ -127,11 +132,15 @@ export function fallbackPageSlug(
   excludedSlug?: string,
 ): string | undefined {
   const available = entries.filter((entry) => entry.slug !== excludedSlug);
-  return available.find((entry) => entry.slug === DEFAULT_PAGE_SLUG)?.slug ??
-    available[0]?.slug;
+  return (
+    available.find((entry) => entry.slug === DEFAULT_PAGE_SLUG)?.slug ??
+    available[0]?.slug
+  );
 }
 
-export function findPage(slug: string | null | undefined): PageEntry | undefined {
+export function findPage(
+  slug: string | null | undefined,
+): PageEntry | undefined {
   if (!slug) return undefined;
   return pages().find((entry) => entry.slug === slug);
 }
@@ -249,7 +258,9 @@ export function getMetaVersion(): number {
 
 export function pageTitle(entry: PageEntry): string {
   return (
-    movedTitles.get(entry.slug) ?? metaCache.get(entry.slug)?.title ?? entry.title
+    movedTitles.get(entry.slug) ??
+    metaCache.get(entry.slug)?.title ??
+    entry.title
   );
 }
 
@@ -282,7 +293,10 @@ export function preloadMeta(entries: PageEntry[]): void {
           (error: unknown) => {
             // The page still renders its own loud error when navigated to; this
             // only degrades the nav label, so report it and keep the rest.
-            console.error(`[playground] could not preload ${entry.slug}`, error);
+            console.error(
+              `[playground] could not preload ${entry.slug}`,
+              error,
+            );
             cacheMeta(entry.slug, undefined);
           },
         ),
@@ -290,8 +304,9 @@ export function preloadMeta(entries: PageEntry[]): void {
     ).then(emit);
   };
 
-  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number })
-    .requestIdleCallback;
+  const idle = (
+    window as Window & { requestIdleCallback?: (cb: () => void) => number }
+  ).requestIdleCallback;
   if (idle) idle(run);
   else window.setTimeout(run, 200);
 }

@@ -2,7 +2,6 @@ import {
   Suspense,
   lazy,
   useCallback,
-  useEffect,
   useState,
   type ComponentType,
   type LazyExoticComponent,
@@ -12,11 +11,11 @@ import {
   AppShell,
   CommentSidePanel,
   DOCUMENT_ANCHOR,
-  cn,
   useCommentContext,
 } from "@flanksource/clicky-ui";
 
 import { CommentOverlay } from "./comments/CommentOverlay";
+import { useReactGrabComments } from "./comments/useReactGrabComments";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
@@ -30,6 +29,7 @@ import {
   EmptyPlayground,
   PlaygroundBanner as Banner,
 } from "./PlaygroundShellParts";
+import { PlaygroundBodyHeader } from "./PlaygroundBodyHeader";
 import { PlaygroundShellActions } from "./PlaygroundShellActions";
 
 // Monaco is several megabytes and only ever needed once someone opens the
@@ -39,15 +39,13 @@ const SourceEditor = lazy(() =>
     default: module.SourceEditor,
   })),
 );
-import { resolveAnchor } from "./comments/dom-anchor";
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
-import { type PageComment } from "./comments/useComments";
+import { type PageComment, type PlaygroundComments } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
   fallbackPageSlug,
   loadPage,
-  pageDescription,
-  pageGroup,
+  pageMeta,
   pageTitle,
   pages,
   type PageEntry,
@@ -87,6 +85,7 @@ export type PlaygroundShellProps = {
   onReviewNavigate: (page: string, comment?: string) => void;
   onReviewExit: () => void;
   onCommentAndReopen: (id: string, body: string) => Promise<void>;
+  onPrepareCommentSelection: PlaygroundComments["prepareSelection"];
 };
 
 function shortAnchorLabel(anchor: string): string {
@@ -112,9 +111,9 @@ export function PlaygroundShell({
   onReviewNavigate,
   onReviewExit,
   onCommentAndReopen,
+  onPrepareCommentSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
-  const [commentMode, setCommentMode] = useState(false);
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const source = useSource(active?.slug, editing);
@@ -159,45 +158,19 @@ export function PlaygroundShell({
     [ctx.contentRef],
   );
 
-  const handlePick = useCallback(
-    (anchor: string) => {
-      const content = contentRef.current;
-      if (!content) return;
-      const element = resolveAnchor(content, anchor);
-      if (element instanceof HTMLElement) {
-        // Registering up front lets the rail align to a brand-new anchor that
-        // has no comments yet. Clear first: re-registering a different element
-        // under the same key is an error in the provider.
-        ctx.registerAnchor(anchor, null);
-        ctx.registerAnchor(anchor, element);
+  useReactGrabComments({
+    contentRef,
+    enabled: view === "preview" && Boolean(active),
+    onSelect: ({ anchor, element, screenshot }) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error("React Grab comment selection requires an HTML element");
       }
-      setCommentMode(false);
+      onPrepareCommentSelection(anchor, element, screenshot);
+      ctx.registerAnchor(anchor, null);
+      ctx.registerAnchor(anchor, element);
       ctx.focusAnchor(anchor);
     },
-    [ctx],
-  );
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey)
-        return;
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-      ) {
-        return;
-      }
-      event.preventDefault();
-      setCommentMode((on) => !on);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // Leaving a page must not leave the picker armed on the next one.
-  useEffect(() => setCommentMode(false), [active?.slug, view]);
+  });
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
   const { queue: reviewQueue, selectItem: selectReviewItem } =
@@ -225,6 +198,7 @@ export function PlaygroundShell({
 
   const PageComponent = active ? lazyPage(active) : null;
   const activeTitle = active ? pageTitle(active) : "";
+  const activeMeta = active ? pageMeta(active) : undefined;
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
     view === "preview" &&
@@ -258,45 +232,45 @@ export function PlaygroundShell({
         />
       }
       actions={
-        <PlaygroundShellActions
-          view={view}
-          annotations={annotations}
-          copyDisabled={pageGuidance.markdown === null}
-          pageMarkdownCopied={pageGuidance.copied}
-          onViewChange={onViewChange}
-          onAnnotationsChange={onAnnotationsChange}
-          onCopyPage={() => void pageGuidance.copyPage()}
-          filesystemActionsDisabled={filesystemActionsDisabled}
-          {...(filesystemActionsDisabledReason
-            ? { filesystemActionsDisabledReason }
-            : {})}
-          onNewPage={(action) => setPageAction({ action })}
-          active={Boolean(active)}
-          editing={editing}
-          sourceDirty={source.dirty}
-          onToggleEditing={() => setEditing((on) => !on)}
-          reviewActive={review === "resolved"}
-          reviewCount={reviewQueue.length}
-          onToggleReview={() =>
-            review === "resolved"
-              ? onReviewExit()
-              : selectReviewItem(
-                  reviewQueue.find(
-                    (comment) => comment.page === active?.slug,
-                  ) ?? reviewQueue[0],
-                )
-          }
-          commentMode={commentMode}
-          onToggleCommentMode={() => setCommentMode((on) => !on)}
-          onCommentWholePage={() => {
-            setCommentMode(false);
-            ctx.focusAnchor(DOCUMENT_ANCHOR);
-          }}
-          feedbackCopied={feedback.copied}
-          onCopyFeedback={feedback.copyFeedback}
-          feedbackCopyActions={feedback.copyActions}
-          pageCommentCount={ctx.comments.length}
-        />
+        <>
+          {activeMeta?.appShellActions}
+          <PlaygroundShellActions
+            view={view}
+            annotations={annotations}
+            copyDisabled={pageGuidance.markdown === null}
+            pageMarkdownCopied={pageGuidance.copied}
+            onViewChange={onViewChange}
+            onAnnotationsChange={onAnnotationsChange}
+            onCopyPage={() => void pageGuidance.copyPage()}
+            filesystemActionsDisabled={filesystemActionsDisabled}
+            {...(filesystemActionsDisabledReason
+              ? { filesystemActionsDisabledReason }
+              : {})}
+            onNewPage={(action) => setPageAction({ action })}
+            active={Boolean(active)}
+            editing={editing}
+            sourceDirty={source.dirty}
+            onToggleEditing={() => setEditing((on) => !on)}
+            reviewActive={review === "resolved"}
+            reviewCount={reviewQueue.length}
+            onToggleReview={() =>
+              review === "resolved"
+                ? onReviewExit()
+                : selectReviewItem(
+                    reviewQueue.find(
+                      (comment) => comment.page === active?.slug,
+                    ) ?? reviewQueue[0],
+                  )
+            }
+            onCommentWholePage={() => {
+              ctx.focusAnchor(DOCUMENT_ANCHOR);
+            }}
+            feedbackCopied={feedback.copied}
+            onCopyFeedback={feedback.copyFeedback}
+            feedbackCopyActions={feedback.copyActions}
+            pageCommentCount={ctx.comments.length}
+          />
+        </>
       }
       navSections={navSections}
       collapsedStorageKey="playground:sidebar:collapsed"
@@ -320,22 +294,7 @@ export function PlaygroundShell({
           </Suspense>
         ) : undefined
       }
-      bodyHeader={
-        active ? (
-          <div className="flex items-baseline gap-2 text-sm">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {pageGroup(active)}
-            </span>
-            <span className="text-muted-foreground">›</span>
-            <span className="font-medium">{pageTitle(active)}</span>
-            {pageDescription(active) && (
-              <span className="truncate text-xs text-muted-foreground">
-                {pageDescription(active)}
-              </span>
-            )}
-          </div>
-        ) : undefined
-      }
+      bodyHeader={active ? <PlaygroundBodyHeader active={active} /> : undefined}
       bodyActions={
         active ? (
           <PageActions
@@ -349,10 +308,7 @@ export function PlaygroundShell({
       <div className="flex h-full min-h-0">
         <div
           ref={attachScrollRef}
-          className={cn(
-            "relative min-w-0 flex-1 overflow-auto",
-            commentMode && "cursor-crosshair",
-          )}
+          className="relative min-w-0 flex-1 overflow-auto"
         >
           <div ref={contentRef} className="min-w-0 p-density-4">
             {pageFolders.error && (
@@ -406,14 +362,10 @@ export function PlaygroundShell({
 
           {view === "preview" && (
             <CommentOverlay
-              active={commentMode}
-              scrollRef={ctx.contentRef}
-              contentRef={contentRef}
               pins={pins}
               focusedAnchor={
                 ctx.railMode === "focused" ? ctx.focusedAnchor : null
               }
-              onPick={handlePick}
               onFocus={ctx.focusAnchor}
             />
           )}
@@ -457,6 +409,10 @@ export function PlaygroundShell({
                 anchorLabels={labels}
                 formatAnchorLabel={shortAnchorLabel}
                 compact
+                createActions={[
+                  { id: "plain", label: "Post comment" },
+                  { id: "screenshot", label: "Post with screenshot" },
+                ]}
                 threadToMarkdown={feedback.threadToMarkdown}
               />
             )}
