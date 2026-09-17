@@ -69,6 +69,11 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     forcePoll = false,
   } = options;
   const runIdsKey = (ids?.filter(Boolean) ?? (id ? [id] : [])).join(",");
+  // State is reset in an effect, so the first render after the subscription
+  // changes still holds the previous run's snapshots and completion; stateKey
+  // hides them until the reset lands.
+  const subscriptionKey = JSON.stringify([runIdsKey, kind ?? "", basePath, enabled]);
+  const [stateKey, setStateKey] = useState(subscriptionKey);
 
   const [byId, setById] = useState<Record<string, TaskSnapshot>>({});
   // Streams are held beside the snapshots, never inside them: a task frame
@@ -80,6 +85,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
 
   useEffect(() => {
     const runIds = runIdsKey ? runIdsKey.split(",") : [];
+    setStateKey(subscriptionKey);
     if (!enabled || (runIds.length === 0 && !kind)) {
       setById({});
       setStreamsById({});
@@ -175,17 +181,20 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [runIdsKey, kind, basePath, enabled, pollMs, forcePoll]);
+  }, [subscriptionKey, runIdsKey, kind, basePath, enabled, pollMs, forcePoll]);
 
+  const current = stateKey === subscriptionKey;
   // The streams are merged back in only here, at the boundary. The polling
   // fallback never populates them — its JSON snapshots already carry the full
   // output — so this is a no-op on that transport.
   const snapshots = useMemo(
-    () => Object.values(byId).map((snapshot) => withTaskStreams(snapshot, streamsById[snapshot.id])),
-    [byId, streamsById],
+    () => current
+      ? Object.values(byId).map((snapshot) => withTaskStreams(snapshot, streamsById[snapshot.id]))
+      : [],
+    [current, byId, streamsById],
   );
 
-  return { snapshots, status, isComplete };
+  return { snapshots, status: current ? status : "idle", isComplete: current && isComplete };
 }
 
 export interface UseTaskRunsOptions extends TaskTransportOptions {

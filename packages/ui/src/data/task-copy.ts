@@ -1,3 +1,6 @@
+import { shellCommandLine } from "../lib/shell-command";
+import { isTaskExecDetails } from "./task-exec-details";
+import { isTaskProcessDetails } from "./task-process-details";
 import type { TaskSnapshot } from "./TaskSnapshot";
 import { bucketTasks } from "./task-status";
 
@@ -32,6 +35,24 @@ function streamBlock(label: string, text: string, truncated: boolean | undefined
   return fence(truncated ? `${label} (showing latest 1 MiB)` : label, text);
 }
 
+// The command gets a pasteable `sh` fence; remaining domain keys still fence as JSON.
+function execCommandSection({ command, args, cwd, ...rest }: {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  [key: string]: unknown;
+}): string[] {
+  const lines = fence(
+    "command",
+    shellCommandLine({ command, ...(args ? { args } : {}), ...(cwd ? { cwd } : {}) }),
+    "sh",
+  );
+  if (Object.keys(rest).length > 0) {
+    lines.push(...fence("details", JSON.stringify(rest, null, 2), "json"));
+  }
+  return lines;
+}
+
 function taskSection(t: TaskSnapshot): string[] {
   const lines = [`## ${t.name} — ${t.status}${t.duration ? ` (${t.duration})` : ""}`];
   if (t.description) lines.push(t.description);
@@ -45,9 +66,11 @@ function taskSection(t: TaskSnapshot): string[] {
   }
   if (t.stdout) lines.push(...streamBlock("stdout", t.stdout, t.stdoutTruncated));
   if (t.stderr) lines.push(...streamBlock("stderr", t.stderr, t.stderrTruncated));
-  // `details` is an open shape (TaskExecDetails carries arbitrary domain keys),
-  // so serialize it whole rather than narrowing to a known variant.
-  if (t.details !== undefined) {
+  if (isTaskExecDetails(t.details) || isTaskProcessDetails(t.details)) {
+    lines.push(...execCommandSection({ ...t.details }));
+  } else if (t.details !== undefined) {
+    // `details` is otherwise an open shape (arbitrary domain keys), so
+    // serialize it whole rather than narrowing to a known variant.
     lines.push(...fence("details", JSON.stringify(t.details, null, 2), "json"));
   }
   return lines;

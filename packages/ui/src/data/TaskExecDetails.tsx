@@ -1,7 +1,18 @@
+import { CopyButton } from "../components/CopyButton";
+import { shellCommandLine } from "../lib/shell-command";
 import { JsonView } from "./JsonView";
 import type { TaskExecDetails } from "./TaskSnapshot";
 
-const EXEC_KEYS = new Set(["command", "args", "pid", "status", "exitCode", "started", "duration"]);
+const EXEC_KEYS = new Set([
+  "command",
+  "args",
+  "cwd",
+  "pid",
+  "status",
+  "exitCode",
+  "started",
+  "duration",
+]);
 
 function formatExecDuration(nanoseconds: number): string {
   const milliseconds = nanoseconds / 1_000_000;
@@ -12,14 +23,26 @@ function formatExecDuration(nanoseconds: number): string {
   return `${minutes}m ${Number((seconds % 60).toFixed(1))}s`;
 }
 
-export function TaskCommandLine({ command, args }: { command: string; args?: string[] }) {
+export function TaskCommandLine({
+  command,
+  args,
+  cwd,
+}: {
+  command: string;
+  args?: string[];
+  cwd?: string;
+}) {
+  const line = shellCommandLine({ command, ...(args ? { args } : {}), ...(cwd ? { cwd } : {}) });
   return (
     <>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Command and arguments
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Command
+        </div>
+        <CopyButton value={line} label="Copy command" />
       </div>
-      <code className="block overflow-x-auto whitespace-pre rounded border bg-background p-2 text-xs">
-        {JSON.stringify([command, ...(args ?? [])])}
+      <code className="block whitespace-pre-wrap break-all rounded border bg-background p-2 text-xs font-mono">
+        {line}
       </code>
     </>
   );
@@ -30,7 +53,11 @@ export function TaskExecDetailsView({ details }: { details: TaskExecDetails }) {
 
   return (
     <section aria-label="Execution details" className="mb-3 space-y-2 rounded-md border bg-muted/20 p-3">
-      <TaskCommandLine command={details.command} {...(details.args ? { args: details.args } : {})} />
+      <TaskCommandLine
+        command={details.command}
+        {...(details.args ? { args: details.args } : {})}
+        {...(details.cwd ? { cwd: details.cwd } : {})}
+      />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>{details.status}</span>
         {details.pid !== undefined && <span className="font-mono text-foreground">pid {details.pid}</span>}

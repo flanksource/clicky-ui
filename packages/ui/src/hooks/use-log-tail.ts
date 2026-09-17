@@ -195,6 +195,14 @@ export interface UseLogTailOptions {
   following?: boolean | undefined;
   /** Rows kept in memory; older ones are evicted and counted in `droppedRows`. */
   maxRows?: number | undefined;
+  /**
+   * Called once per applied `event` frame, in sequence order, before the frame
+   * reaches the buffer — so a reducer sees every row even after `maxRows` starts
+   * evicting. A replayed sequence is not delivered again, and `done` frames are
+   * never delivered. The latest callback is always used; changing its identity
+   * does not restart the session. A throw is reported as a `stream` error.
+   */
+  onEvent?: ((event: LogTailEvent) => void) | undefined;
 }
 
 export interface UseLogTailResult {
@@ -231,6 +239,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     basePath = DEFAULT_BASE,
     following: wantFollow = false,
     maxRows = DEFAULT_MAX_ROWS,
+    onEvent,
   } = options;
 
   const [buffer, setBuffer] = useState<LogTailBuffer>(emptyLogTailBuffer);
@@ -242,6 +251,8 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
   // much history to keep never tears down a live session to do it.
   const maxRowsRef = useRef(maxRows);
   maxRowsRef.current = maxRows;
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   // Profile parameters travel in the query string because that is where the
   // session endpoint reads them from: it builds its params by walking
@@ -279,12 +290,28 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     const aborter = new AbortController();
     let source: EventSource | undefined;
     let ended = false;
+    // onEvent's own watermark, tracked here rather than read from the buffer:
+    // the buffer only dedupes inside a state updater, which React may run twice,
+    // so a callback there would double-count. Same rule as appendTailEvent.
+    let delivered: number | null = null;
+
+    const deliver = (event: LogTailEvent) => {
+      if (delivered !== null && event.sequence <= delivered) return;
+      delivered = event.sequence;
+      try {
+        onEventRef.current?.(event);
+      } catch (cause) {
+        setError({ scope: "stream", message: `onEvent threw on sequence ${event.sequence}: ${String(cause)}` });
+      }
+    };
 
     const apply = (event: LogTailEvent) => {
-      setBuffer((prev) => appendTailEvent(prev, event, maxRowsRef.current));
       // An event-level error does not end the session, so it is reported beside
-      // the rows rather than in place of them.
+      // the rows rather than in place of them. Set before delivery so a reducer
+      // that throws on the same frame is the error left standing.
       if (event.error) setError({ scope: "stream", message: event.error });
+      deliver(event);
+      setBuffer((prev) => appendTailEvent(prev, event, maxRowsRef.current));
     };
 
     // Unlike the task stream this does not skip what it cannot parse: a tail
