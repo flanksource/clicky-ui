@@ -23,11 +23,16 @@ export {
 } from "./data/code-diff";
 export { inferColumns } from "./data/data-table-utils";
 export {
+  parseBoundsValue,
+  parseDurationBoundsValue,
   parseMultiFilterValue,
+  serializeBoundsValue,
+  serializeDurationBoundsValue,
   serializeMultiFilterValue,
   splitCommaValues,
   updateFilterSelection,
   type DataTableFilterSelection,
+  type FilterDefaultOperator,
 } from "./data/data-table-filter-values";
 export {
   DATA_TABLE_FILTER_LOOKUP_LIMIT,

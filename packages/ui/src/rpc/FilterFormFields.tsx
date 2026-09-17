@@ -1,6 +1,7 @@
 import { Button } from "../components/button";
 import { Combobox } from "../components/Combobox";
 import {
+  FilterBarFilterPanel,
   type FilterBarFilter,
   type FilterBarMultiFilter,
   type FilterBarRangeProps,
@@ -33,7 +34,11 @@ export function ParameterGrid({
     <div className={cn("space-y-3", className)}>
       <div className="divide-y divide-border border-y border-border">
         {filters.map((filter) => (
-          <ParameterRow key={filter.key} filter={filter} />
+          <ParameterRow
+            key={filter.key}
+            filter={filter}
+            autoSubmit={autoSubmit}
+          />
         ))}
         {timeRange && <TimeRangeRow timeRange={timeRange} />}
       </div>
@@ -49,7 +54,13 @@ export function ParameterGrid({
   );
 }
 
-function ParameterRow({ filter }: { filter: FilterBarFilter }) {
+function ParameterRow({
+  filter,
+  autoSubmit,
+}: {
+  filter: FilterBarFilter;
+  autoSubmit: boolean;
+}) {
   const id = `clicky-param-${filter.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   return (
@@ -57,18 +68,24 @@ function ParameterRow({ filter }: { filter: FilterBarFilter }) {
       title={filter.description}
       className={cn(
         "grid grid-cols-1 gap-2 py-2 sm:grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] sm:items-center",
-        filter.disabled && "opacity-60"
+        filter.disabled && "opacity-60",
       )}
     >
       <label htmlFor={id} className="text-sm font-medium text-muted-foreground">
         {filter.label}
       </label>
-      <div className="min-w-0">{renderParameterInput(filter, id)}</div>
+      <div className="min-w-0">
+        {renderParameterInput(filter, id, autoSubmit)}
+      </div>
     </div>
   );
 }
 
-function renderParameterInput(filter: FilterBarFilter, id: string) {
+function renderParameterInput(
+  filter: FilterBarFilter,
+  id: string,
+  autoSubmit: boolean,
+) {
   if (filter.kind === "date-range") {
     return (
       <TimeRange
@@ -201,6 +218,16 @@ function renderParameterInput(filter: FilterBarFilter, id: string) {
     return <MultiParameterInput filter={filter} id={id} />;
   }
 
+  if (filter.kind === "number" || filter.kind === "duration") {
+    return (
+      <FilterBarFilterPanel
+        filter={filter}
+        chrome="embedded"
+        autoSubmit={autoSubmit}
+      />
+    );
+  }
+
   if (filter.kind === "text") {
     return (
       <input
@@ -253,7 +280,7 @@ function MultiParameterInput({
         label:
           typeof option.label === "string"
             ? option.label
-            : option.title ?? option.value,
+            : (option.title ?? option.value),
         ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
         ...(option.title !== undefined ? { title: option.title } : {}),
       }))}

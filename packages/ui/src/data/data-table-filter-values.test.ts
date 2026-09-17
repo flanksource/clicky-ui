@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { FilterBarMultiFilterMode } from "../components/filter-bar-field-utils";
 import {
+  parseBoundsValue,
+  parseDurationBoundsValue,
   parseMultiFilterValue,
+  serializeBoundsValue,
+  serializeDurationBoundsValue,
   serializeMultiFilterValue,
   splitCommaValues,
   updateFilterSelection,
@@ -85,6 +89,56 @@ describe("multi-filter round trip", () => {
 describe("splitCommaValues", () => {
   it("trims items and drops the empties a trailing comma leaves behind", () => {
     expect(splitCommaValues(" a , b ,, c,")).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("bounded filter wire format", () => {
+  it("uses the declared operator for bare values without changing explicit comparisons", () => {
+    expect(parseBoundsValue("100", ">")).toEqual({ min: "100", minOperator: ">" });
+    expect(parseBoundsValue("<=100", ">")).toEqual({ max: "100", maxOperator: "<=" });
+    expect(parseBoundsValue("", ">")).toEqual({ minOperator: ">" });
+    expect(parseDurationBoundsValue("1.5s", "ms", ">")).toEqual({ min: "1500", minOperator: ">", minUnit: "ms" });
+  });
+  it("preserves strict and inclusive operators independently", () => {
+    const value = parseBoundsValue(">100,<=500");
+
+    expect(value).toEqual({
+      min: "100",
+      minOperator: ">",
+      max: "500",
+      maxOperator: "<=",
+    });
+    expect(serializeBoundsValue(value)).toBe(">100,<=500");
+  });
+
+  it("defaults omitted operators to inclusive bounds", () => {
+    expect(serializeBoundsValue({ min: "100", max: "500" })).toBe(
+      ">=100,<=500",
+    );
+  });
+
+  it("normalizes compound Go durations into the declared storage unit", () => {
+    expect(parseDurationBoundsValue(">2m30s,<=3h", "s")).toEqual({
+      min: "150",
+      minOperator: ">",
+      minUnit: "s",
+      max: "10800",
+      maxOperator: "<=",
+      maxUnit: "s",
+    });
+  });
+
+  it("serializes each duration edge with its selected unit", () => {
+    expect(
+      serializeDurationBoundsValue({
+        min: "500",
+        minOperator: ">",
+        minUnit: "ms",
+        max: "2",
+        maxOperator: "<=",
+        maxUnit: "m",
+      }),
+    ).toBe(">500ms,<=2m");
   });
 });
 

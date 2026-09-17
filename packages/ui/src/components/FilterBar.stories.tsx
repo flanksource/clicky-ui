@@ -4,11 +4,15 @@ import { Icon } from "../data/Icon";
 import { UiCloud, UiDatabase, UiNamespace, UiServer, UiTag } from "../icons";
 import {
   FilterBar,
+  type FilterBarDurationValue,
   type FilterBarFilter,
   type FilterBarNumberValue,
   type FilterBarProps,
 } from "./FilterBar";
-import { applyFilterExtensions, type FilterExtension } from "./filter-bar-utils";
+import {
+  applyFilterExtensions,
+  type FilterExtension,
+} from "./filter-bar-utils";
 
 type FilterBarShowcaseProps = Pick<
   FilterBarProps,
@@ -27,6 +31,14 @@ function FilterBarShowcase(overrides: FilterBarShowcaseProps = {}) {
   const [restarts, setRestarts] = useState<FilterBarNumberValue>({
     min: "1",
     max: "5",
+  });
+  const [latency, setLatency] = useState<FilterBarDurationValue>({
+    min: "500",
+    minOperator: ">",
+    minUnit: "ms",
+    max: "2",
+    maxOperator: "<=",
+    maxUnit: "s",
   });
   const [timeFrom, setTimeFrom] = useState("now-24h");
   const [timeTo, setTimeTo] = useState("now");
@@ -87,6 +99,14 @@ function FilterBarShowcase(overrides: FilterBarShowcaseProps = {}) {
       step: 1,
       onChange: (next) => setRestarts(next),
     },
+    {
+      key: "latency",
+      kind: "duration",
+      label: "Latency",
+      value: latency,
+      unit: "ms",
+      onChange: setLatency,
+    },
   ];
 
   return (
@@ -114,7 +134,11 @@ function FilterBarShowcase(overrides: FilterBarShowcaseProps = {}) {
         },
       }}
       onApply={() => undefined}
-      trailing={<span className="text-xs text-muted-foreground">{search || "Idle"}</span>}
+      trailing={
+        <span className="text-xs text-muted-foreground">
+          {search || "Idle"}
+        </span>
+      }
       {...overrides}
     />
   );
@@ -156,7 +180,8 @@ const meta = {
     },
     applyLabel: {
       control: "text",
-      description: "Label for the Apply button (only shown when `autoSubmit` is false).",
+      description:
+        "Label for the Apply button (only shown when `autoSubmit` is false).",
       table: { category: "Behavior", defaultValue: { summary: "Apply" } },
     },
     isPending: {
@@ -178,7 +203,7 @@ const meta = {
           "",
           "**Composition**",
           "- `search` renders the leading search input.",
-          "- `filters` is an array of typed descriptors — `text`, `number`, `multi` (a tristate combobox whose options cycle include/exclude), `lookup`, and `lookup-multi` — each fully controlled via its own `value`/`onChange`.",
+          "- `filters` is an array of typed descriptors — including `text`, bounded `number`, unit-aware `duration`, `multi` (a tristate combobox whose options cycle include/exclude), and lookup controls — each fully controlled via its own `value`/`onChange`.",
           "- `timeRange`/`dateRange` add range pickers; `leading`/`trailing`/`children` inject custom content.",
           "",
           "**Submit modes**",
@@ -262,7 +287,8 @@ function LookupExtensionShowcase({
   const [database, setDatabase] = useState("");
   const [service, setService] = useState("");
 
-  const placeholder = (label: string) => (withPlaceholder ? { placeholder: label } : {});
+  const placeholder = (label: string) =>
+    withPlaceholder ? { placeholder: label } : {};
 
   const baseFilters: FilterBarFilter[] = [
     {

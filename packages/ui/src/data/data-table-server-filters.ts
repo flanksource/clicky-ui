@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type {
+  FilterBarDurationUnit,
+  FilterBarDurationValue,
   FilterBarFilter,
   FilterBarNumberValue,
   FilterBarRangePreset,
@@ -9,12 +11,13 @@ import type { FilterExtension } from "../components/filter-bar-utils";
 import { applyFilterExtensions } from "../components/filter-bar-utils";
 import type { MultiSelectOption } from "../components/MultiSelect";
 import type { TriState } from "../components/TriStateToggle";
-import { formatUnit } from "../lib/format";
 import type { DataTableColumn, DataTableColumnKind } from "./DataTable";
 import {
   parseBoundsValue,
+  parseDurationBoundsValue,
   parseMultiFilterValue,
   serializeBoundsValue,
+  serializeDurationBoundsValue,
   serializeMultiFilterValue,
   updateFilterSelection,
   type DataTableFilterSelection,
@@ -146,9 +149,9 @@ export type ServerFilterConfig = {
  * `filterable: false`, because a described result is filtered by the source and
  * never by cardinality guessed from one page.
  */
-export function serverColumnsToDataTableColumns<T extends Record<string, unknown>>(
-  columns: DataTableServerColumn[],
-): DataTableColumn<T>[] {
+export function serverColumnsToDataTableColumns<
+  T extends Record<string, unknown>,
+>(columns: DataTableServerColumn[]): DataTableColumn<T>[] {
   return columns.map((column, index) => ({
     key: column.name === "" ? `column-${index}` : column.name,
     label: column.label ?? prettifyKey(column.name),
@@ -186,7 +189,9 @@ export function serverFiltersToFilterBar(
     if (!filter) continue;
     const filterKey = column.filterKey;
     if (!filterKey) {
-      throw new Error(`Column ${column.name} declares a filter but no filterKey to send it under`);
+      throw new Error(
+        `Column ${column.name} declares a filter but no filterKey to send it under`,
+      );
     }
     const owner = claimed.get(filterKey);
     if (owner !== undefined) {
@@ -208,7 +213,15 @@ export function serverFiltersToFilterBar(
     }
     config.filters.push(
       applyFilterExtensions(
-        buildFilter({ column, filterKey, label, filter, values, setValues, options }),
+        buildFilter({
+          column,
+          filterKey,
+          label,
+          filter,
+          values,
+          setValues,
+          options,
+        }),
         options.extensions,
       ),
     );
@@ -230,11 +243,15 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
   const { filterKey, label, filter, values, setValues } = args;
   const raw = values[filterKey] ?? "";
   const write = (serialized: string) =>
-    setValues((current) => updateFilterSelection(current, filterKey, serialized));
+    setValues((current) =>
+      updateFilterSelection(current, filterKey, serialized),
+    );
   const shared = {
     key: filterKey,
     label,
-    ...(filter.description !== undefined ? { description: filter.description } : {}),
+    ...(filter.description !== undefined
+      ? { description: filter.description }
+      : {}),
     ...(filter.disabled !== undefined ? { disabled: filter.disabled } : {}),
   };
 
@@ -253,32 +270,48 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
         timeEnabled: filter.kind === "time",
       };
     case "range":
-    // A duration is a range that knows what its numbers mean, so it differs
-    // only in how the slider labels them.
-    case "duration":
       return {
         ...shared,
         kind: "number",
         value: parseBoundsValue(raw),
-        onChange: (next: FilterBarNumberValue) => write(serializeBoundsValue(next)),
+        onChange: (next: FilterBarNumberValue) =>
+          write(serializeBoundsValue(next)),
         ...(filter.min !== undefined ? { domainMin: filter.min } : {}),
         ...(filter.max !== undefined ? { domainMax: filter.max } : {}),
         ...(filter.step !== undefined ? { step: filter.step } : {}),
-        ...(filter.kind === "duration"
-          ? { formatValue: (value: number) => formatUnit(value, filter.unit || "ms") }
-          : {}),
+        ...(filter.unit ? { unit: filter.unit } : {}),
       };
+    case "duration": {
+      const unit = durationStorageUnit(filter.unit);
+      return {
+        ...shared,
+        kind: "duration",
+        unit,
+        value: parseDurationBoundsValue(raw, unit),
+        onChange: (next: FilterBarDurationValue) =>
+          write(serializeDurationBoundsValue(next, unit)),
+        ...(filter.min !== undefined ? { domainMin: filter.min } : {}),
+        ...(filter.max !== undefined ? { domainMax: filter.max } : {}),
+        ...(filter.step !== undefined ? { step: filter.step } : {}),
+      };
+    }
     // An exact match has nothing to enumerate, which is what buildTermsFilter
     // already falls back to for a selection that turned out to have no values.
     // Declaring it says so up front rather than arriving there by exhaustion.
     case "exact":
-      return { ...shared, kind: "text", value: raw, onChange: (next: string) => write(next) };
+      return {
+        ...shared,
+        kind: "text",
+        value: raw,
+        onChange: (next: string) => write(next),
+      };
     case "boolean":
       return {
         ...shared,
         kind: "tristate",
         value: raw === "" ? undefined : raw === "true",
-        onChange: (next: TriState) => write(next === undefined ? "" : String(next)),
+        onChange: (next: TriState) =>
+          write(next === undefined ? "" : String(next)),
       };
     case "text":
       return {
@@ -292,9 +325,22 @@ function buildFilter(args: BuildArgs): FilterBarFilter {
   }
 }
 
+function durationStorageUnit(unit: string | undefined): FilterBarDurationUnit {
+  const resolved = unit || "ms";
+  if (resolved !== "ms" && resolved !== "s") {
+    throw new Error(`Unsupported duration storage unit ${resolved}`);
+  }
+  return resolved;
+}
+
 function buildTermsFilter(
   { filter, options }: BuildArgs,
-  shared: { key: string; label: string; description?: string; disabled?: boolean },
+  shared: {
+    key: string;
+    label: string;
+    description?: string;
+    disabled?: boolean;
+  },
   raw: string,
   write: (serialized: string) => void,
 ): FilterBarFilter {
@@ -304,7 +350,12 @@ function buildTermsFilter(
   // grammar is the wire format either way, so typing "a,b" or "!a" into the
   // input still means what selecting them would have.
   if (!filter.lookup && (filter.options?.length ?? 0) === 0) {
-    return { ...shared, kind: "text", value: raw, onChange: (next: string) => write(next) };
+    return {
+      ...shared,
+      kind: "text",
+      value: raw,
+      onChange: (next: string) => write(next),
+    };
   }
   return {
     ...shared,
@@ -341,7 +392,11 @@ function buildTimeRange(
     ...boundsToRange(parseBoundsValue(values[filterKey] ?? "")),
     onApply: (from, to) =>
       setValues((current) =>
-        updateFilterSelection(current, filterKey, serializeBoundsValue({ min: from, max: to })),
+        updateFilterSelection(
+          current,
+          filterKey,
+          serializeBoundsValue({ min: from, max: to }),
+        ),
       ),
     ...(filter.presets !== undefined ? { presets: filter.presets } : {}),
     timeEnabled: true,
@@ -349,7 +404,10 @@ function buildTimeRange(
 }
 
 /** Names a bounded selection's edges the way a range control reads them. */
-function boundsToRange(bounds: FilterBoundsValue): { from?: string; to?: string } {
+function boundsToRange(bounds: FilterBoundsValue): {
+  from?: string;
+  to?: string;
+} {
   return {
     ...(bounds.min !== undefined ? { from: bounds.min } : {}),
     ...(bounds.max !== undefined ? { to: bounds.max } : {}),
@@ -361,7 +419,9 @@ function toMultiSelectOption(option: DataTableFilterOption): MultiSelectOption {
   return {
     value: option.value,
     label,
-    ...(option.count !== undefined ? { title: `${label} · ${option.count.toLocaleString()}` } : {}),
+    ...(option.count !== undefined
+      ? { title: `${label} · ${option.count.toLocaleString()}` }
+      : {}),
   };
 }
 
