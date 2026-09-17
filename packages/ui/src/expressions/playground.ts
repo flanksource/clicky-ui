@@ -28,9 +28,15 @@ export type {
   EvalRequest,
   EvalResponse,
   Example,
+  PlaygroundSample,
+  ResultExpectation,
 } from "./playground/api.ts";
 
 export { useEvaluator } from "./playground/useEvaluator.ts";
-export type { Evaluator } from "./playground/useEvaluator.ts";
+export type { Evaluator, EvaluatorOptions } from "./playground/useEvaluator.ts";
+export { useSampleRuns } from "./playground/useSampleRuns.ts";
+export type { SampleResult, SampleRuns, SampleRunsPayload } from "./playground/useSampleRuns.ts";
+export { classifySample, nextFailure, tallySamples } from "./playground/sampleOutcome.ts";
+export type { SampleOutcome } from "./playground/sampleOutcome.ts";
 export { useParsedInput } from "./playground/useParsedInput.ts";
 export type { ParsedInput } from "./playground/useParsedInput.ts";

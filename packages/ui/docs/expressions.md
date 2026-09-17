@@ -54,6 +54,12 @@ import { ExpressionPlayground } from "@flanksource/clicky-ui/expressions/playgro
 
 Renders the expression editor, the input document, and the Result / Object graph / Tokens / Functions panels. Deliberately shell-less — a host frames it with its own navigation.
 
+A host whose evaluation has side effects or a typed destination can also pass:
+
+- `beforeRun(requests)`: receives every evaluation a run is about to make, one per sample for **All samples**, so a single `useConfirm` prompt covers the batch. Return `false` to cancel.
+- `expectation`: `{ options, rules, validate }`. The Result tab shows the allowed values and rules above the result, highlights the option the result names, and reports `validate`'s issues or **Valid**.
+- `samples`: with two or more, the Result tab offers **All samples**. It evaluates the expression against each sample one after another, lists the outcome of each (valid / empty / invalid / failed), and **Next failure** steps through the broken ones.
+
 It talks to the Go handler in [`gomplate/playground`](https://github.com/flanksource/gomplate/tree/main/playground), which a host mounts with its own CEL options, template functions and sample documents. **That handler carries no authorization**: mount it behind the same authorization as any other query endpoint.
 
 ## `src/expressions/lang` is generated — do not edit it

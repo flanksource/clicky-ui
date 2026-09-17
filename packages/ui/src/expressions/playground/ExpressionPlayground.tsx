@@ -12,18 +12,19 @@ import {
 } from "../lang/index.ts";
 import type { GomplateSpec, RegisteredLanguages } from "../lang/index.ts";
 import { DEFAULT_API_BASE, fetchExamples, fetchSpec } from "./api.ts";
-import type { EvalResponse, Example } from "./api.ts";
+import type { EvalRequest, EvalResponse, Example, PlaygroundSample, ResultExpectation } from "./api.ts";
 import { LANGUAGES, languageById } from "./languages.ts";
 import type { PlaygroundLanguage } from "./languages.ts";
 import { GraphPanel } from "./panels/GraphPanel.tsx";
-import { ResultPanel } from "./panels/ResultPanel.tsx";
+import { ResultView, type ResultViewId } from "./panels/ResultView.tsx";
 import { SpecPanel } from "./panels/SpecPanel.tsx";
 import { TokensPanel } from "./panels/TokensPanel.tsx";
 import { RunControls } from "./RunControls.tsx";
 import { registerRunAction } from "./runAction.ts";
 import { useEditorTheme } from "./useEditorTheme.ts";
-import { useEvaluator } from "./useEvaluator.ts";
+import { useEvaluator, type Evaluator } from "./useEvaluator.ts";
 import { useParsedInput } from "./useParsedInput.ts";
+import { useSampleRuns } from "./useSampleRuns.ts";
 import { VerticalSplit } from "./VerticalSplit.tsx";
 import { rowsToPaneHeight } from "./verticalSplitModel";
 
@@ -47,6 +48,26 @@ export interface ExpressionPlaygroundProps {
    * configured `Options.Examples` needs no prop at all.
    */
   examples?: Example[];
+  /** Host catalogue. When supplied, the playground does not fetch /spec. */
+  spec?: GomplateSpec;
+  /** Host evaluator for runtimes beyond the packaged playground API. */
+  evaluate?: (request: EvalRequest, signal: AbortSignal) => Promise<EvalResponse>;
+  /**
+   * Runs before every run with the evaluations it is about to make -- one for
+   * the current input, one per sample for "All samples". Return false to cancel.
+   */
+  beforeRun?: (requests: EvalRequest[]) => boolean | Promise<boolean>;
+  /**
+   * Inputs the expression should hold for. With two or more, the Result tab
+   * offers "All samples", which evaluates the expression against each in turn.
+   */
+  samples?: PlaygroundSample[];
+  /** What the result is going into: allowed values, rules and a validator. */
+  expectation?: ResultExpectation;
+  /** Explicit mode disables evaluation on mount and edits. */
+  executionMode?: "automatic" | "explicit";
+  /** Host syntax for paths inserted from the object graph. */
+  formatPath?: (segments: Array<string | number>) => string | null;
   /** Controlled state. Pair with `onChange`. */
   value?: PlaygroundState;
   onChange?: (state: PlaygroundState) => void;
@@ -76,6 +97,13 @@ export function ExpressionPlayground({
   apiBase = DEFAULT_API_BASE,
   languages: offered = LANGUAGES,
   examples,
+  spec,
+  evaluate,
+  beforeRun,
+  samples = [],
+  expectation,
+  executionMode,
+  formatPath,
   value,
   onChange,
   defaultValue,
@@ -105,7 +133,27 @@ export function ExpressionPlayground({
     language: language.evalLanguage,
     source: state.source,
     input: state.input,
+  }, {
+    ...(executionMode ? { mode: executionMode } : {}),
+    ...(evaluate ? { evaluate } : {}),
+    ...(beforeRun ? { beforeRun } : {}),
   });
+
+  const [resultView, setResultView] = useState<ResultViewId>("input");
+  const sampleRuns = useSampleRuns(apiBase, {
+    language: language.evalLanguage,
+    source: state.source,
+    samples,
+  }, {
+    ...(evaluate ? { evaluate } : {}),
+    ...(beforeRun ? { beforeRun } : {}),
+  });
+  // Run, its shortcut and the Monaco action all drive whichever result view is
+  // showing, so "run" never means evaluating something the author cannot see.
+  const showingSamples = samples.length > 1 && outputTab === "result" && resultView === "samples";
+  const runner: Evaluator = showingSamples
+    ? { ...evaluator, explicit: true, autoRun: false, run: sampleRuns.run, pending: sampleRuns.pending, stale: sampleRuns.stale }
+    : evaluator;
 
   // Completion reads the document through a ref: languages are registered once,
   // before the first editor mounts, while the input keeps being edited after.
@@ -116,7 +164,7 @@ export function ExpressionPlayground({
   const [served, setServed] = useState<GomplateSpec>();
   const servedRef = useRef<GomplateSpec>(undefined);
   servedRef.current = served;
-  const activeSpec = useMemo(() => mergeSpec(packagedSpec, served), [served]);
+  const activeSpec = useMemo(() => mergeSpec(packagedSpec, spec ?? served), [spec, served]);
 
   const [fetched, setFetched] = useState<Example[]>();
   const available = examples ?? fetched ?? [];
@@ -130,24 +178,25 @@ export function ExpressionPlayground({
   // so both paths apply the catalogue.
   const registered = useRef<RegisteredLanguages | null>(null);
   const registerLanguages = useCallback((monaco: Monaco) => {
-    const current = servedRef.current;
+    const current = spec ?? servedRef.current;
     registered.current = registerGomplateLanguages(monaco, {
       environment: () => environmentRef.current,
       ...(current ? { spec: current } : {}),
     });
-  }, []);
+  }, [spec]);
 
   useEffect(() => {
+    if (spec) return;
     const controller = new AbortController();
     void fetchSpec(apiBase, controller.signal).then((next) => {
       if (!controller.signal.aborted) setServed(next);
     });
     return () => controller.abort();
-  }, [apiBase]);
+  }, [apiBase, spec]);
 
   useEffect(() => {
-    if (served) registered.current?.setSpec(served);
-  }, [served]);
+    if (spec ?? served) registered.current?.setSpec(spec ?? served);
+  }, [spec, served]);
 
   useEffect(() => {
     if (examples) return;
@@ -167,8 +216,8 @@ export function ExpressionPlayground({
 
   // The Monaco action is registered once per editor, so it has to reach the
   // current `run` through a ref rather than capturing it.
-  const runRef = useRef(evaluator.run);
-  runRef.current = evaluator.run;
+  const runRef = useRef(runner.run);
+  runRef.current = runner.run;
   const sourceEditor = useRef<Parameters<typeof registerRunAction>[0] | null>(
     null,
   );
@@ -206,7 +255,7 @@ export function ExpressionPlayground({
           top={
             <EditorPane
               label="Expression"
-              actions={<RunControls evaluator={evaluator} />}
+              actions={<RunControls evaluator={runner} label={showingSamples ? "Run all" : "Run"} />}
               hint={
                 forLanguage.length > 0 ? (
                   <Combobox
@@ -291,11 +340,14 @@ export function ExpressionPlayground({
 
         <div className="min-h-0 flex-1">
           {outputTab === "result" ? (
-            <ResultPanel
-              response={evaluator.response}
-              pending={evaluator.pending}
-              stale={evaluator.stale}
-              onRun={evaluator.run}
+            <ResultView
+              view={resultView}
+              onViewChange={setResultView}
+              evaluator={evaluator}
+              sampleRuns={sampleRuns}
+              samples={samples}
+              expectation={expectation}
+              onUseInput={(input) => update({ input })}
             />
           ) : null}
           {outputTab === "graph" ? (
@@ -303,6 +355,7 @@ export function ExpressionPlayground({
               document={parsedInput.value}
               languageId={language.editorLanguage}
               onInsert={insertExpression}
+              {...(formatPath ? { formatPath } : {})}
             />
           ) : null}
           {outputTab === "tokens" ? (

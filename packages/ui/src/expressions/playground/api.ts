@@ -23,6 +23,29 @@ export interface EvalResponse {
   durationMs: number;
 }
 
+/**
+ * One input the expression should hold for. With more than one, the Result
+ * tab can evaluate the current expression against every sample at once.
+ */
+export interface PlaygroundSample {
+  id: string;
+  label: string;
+  input: string;
+}
+
+/**
+ * What the result is going into. The playground shows it beside the result and
+ * judges each result by `validate`; it knows nothing about schemas itself.
+ */
+export interface ResultExpectation {
+  /** Allowed values. The one equal to the result is highlighted. */
+  options?: Array<{ value: string; label?: string }>;
+  /** Other constraints, one phrase each ("Integer", "Min: 0", "Required"). */
+  rules?: string[];
+  /** Problems with a successful result; empty when it is acceptable. */
+  validate?: (response: EvalResponse) => string[];
+}
+
 /** One sample an author can load, as `GET /api/examples` returns it. */
 export interface Example {
   name: string;
