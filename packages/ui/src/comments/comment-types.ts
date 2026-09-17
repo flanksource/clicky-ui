@@ -146,6 +146,8 @@ export type CommentCreateInput = {
   mentions?: CommentMention[];
 };
 
+export type CommentCreateAction = { id: string; label: string };
+
 /** Payload for replying to a comment. */
 export type CommentReplyInput = {
   parentId: string;
@@ -159,7 +161,7 @@ export type CommentReplyInput = {
  * performs the mutation and feeds the updated `comments` back in.
  */
 export type CommentCallbacks = {
-  onCreate?: (input: CommentCreateInput) => void | Promise<void>;
+  onCreate?: (input: CommentCreateInput, actionId?: string) => void | Promise<void>;
   onReply?: (input: CommentReplyInput) => void | Promise<void>;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   /** Human-only transition from resolved to closed. */

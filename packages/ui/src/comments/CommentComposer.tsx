@@ -9,6 +9,7 @@ import { toneToBadgeTone } from "./comment-utils";
 import type {
   CommentAnchor,
   CommentConfig,
+  CommentCreateAction,
   CommentCreateInput,
   CommentFacet,
   CommentMention,
@@ -30,10 +31,12 @@ export type CommentComposerProps = {
   anchor?: CommentAnchor | null;
   /** Start collapsed as an "Add a comment…" pill until clicked. */
   collapsible?: boolean;
+  /** Focus the input on mount. A collapsible composer also focuses when the user expands it. */
   autoFocus?: boolean;
   placeholder?: string;
   /** Create a new root comment. */
-  onCreate?: (input: CommentCreateInput) => void | Promise<void>;
+  onCreate?: (input: CommentCreateInput, actionId?: string) => void | Promise<void>;
+  createActions?: readonly CommentCreateAction[];
   /** Fired once per mention referenced by a posted comment. */
   onMention?: (mention: CommentMention, context: { body: string }) => void;
 };
@@ -121,6 +124,7 @@ export function CommentComposer({
   autoFocus = false,
   placeholder = "Add a comment…",
   onCreate,
+  createActions,
   onMention,
 }: CommentComposerProps) {
   const [open, setOpen] = useState(!collapsible || autoFocus);
@@ -149,7 +153,7 @@ export function CommentComposer({
     });
   }
 
-  async function submit() {
+  async function submit(actionId?: string) {
     const text = body.trim();
     if ((!text && !rating) || submittingRef.current) return;
     submittingRef.current = true;
@@ -158,13 +162,15 @@ export function CommentComposer({
       body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
     );
     try {
-      await onCreate?.({
+      const input: CommentCreateInput = {
         body: text,
         anchor: anchor ?? null,
         ...(rating ? { rating } : {}),
         ...(Object.keys(facets).length > 0 ? { facets } : {}),
         ...(mentions.length > 0 ? { mentions } : {}),
-      });
+      };
+      if (actionId === undefined) await onCreate?.(input);
+      else await onCreate?.(input, actionId);
       for (const mention of mentions) onMention?.(mention, { body: text });
       reset();
       if (collapsible) setOpen(false);
@@ -204,7 +210,9 @@ export function CommentComposer({
           if (collapsible) setOpen(false);
         }}
         placeholder={placeholder}
-        autoFocus={autoFocus || open}
+        // An always-open composer is page chrome: focusing it on mount would
+        // scroll its host to it and steal the keyboard from the page.
+        autoFocus={autoFocus || (collapsible && open)}
         data-testid="comment-compose-input"
         className="min-h-[48px] pr-10"
       />
@@ -255,16 +263,32 @@ export function CommentComposer({
             onChange={(value) => setFacet(facet.key, value)}
           />
         ))}
-        <button
-          type="button"
-          data-testid="comment-compose-send"
-          aria-label="Post comment"
-          onClick={() => void submit()}
-          disabled={submitting || (!body.trim() && !rating)}
-          className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-        >
-          <Icon icon={UiArrowUp} className="text-xs" />
-        </button>
+        {createActions?.length ? (
+          <div className="ml-auto flex gap-1">
+            {createActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => void submit(action.id)}
+                disabled={submitting || (!body.trim() && !rating)}
+                className="whitespace-nowrap rounded-md bg-primary px-1.5 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="comment-compose-send"
+            aria-label="Post comment"
+            onClick={() => void submit()}
+            disabled={submitting || (!body.trim() && !rating)}
+            className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+          >
+            <Icon icon={UiArrowUp} className="text-xs" />
+          </button>
+        )}
       </div>
     </div>
   );
