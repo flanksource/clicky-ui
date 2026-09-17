@@ -21,7 +21,13 @@ describe("JsonView", () => {
 
   it("shows collapsed summary at depths beyond defaultOpenDepth", () => {
     render(<JsonView data={{ a: { b: { c: 1 } } }} defaultOpenDepth={1} />);
-    expect(screen.getByText(/1 keys/)).toBeInTheDocument();
+    expect(screen.getByText(/1 key/)).toBeInTheDocument();
+  });
+
+  it("uses singular grammar for a collapsed one-item array", () => {
+    render(<JsonView data={{ values: ["only"] }} defaultOpenDepth={1} />);
+    expect(screen.getByText(/1 item/)).toBeInTheDocument();
+    expect(screen.queryByText(/1 items/)).not.toBeInTheDocument();
   });
 
   it("renders numeric and boolean values", () => {

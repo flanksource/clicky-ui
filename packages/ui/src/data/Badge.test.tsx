@@ -57,6 +57,22 @@ describe("Badge", () => {
     expect(screen.getByText("production").parentElement?.className).toMatch(/font-mono/);
   });
 
+  it("applies custom colors to a value-only label badge", () => {
+    const { container } = render(
+      <Badge
+        variant="label"
+        value="completed"
+        color="bg-emerald-500/10"
+        textColor="text-emerald-700"
+        shape="pill"
+      />,
+    );
+
+    const badge = container.firstElementChild as HTMLElement | null;
+    expect(badge).toHaveClass("bg-emerald-500/10", "text-emerald-700");
+    expect(badge).toHaveClass("rounded-full");
+  });
+
   it("renders links with a safe default rel for new tabs", () => {
     render(
       <Badge

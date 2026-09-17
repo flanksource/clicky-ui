@@ -756,6 +756,7 @@ export function Badge({
   ) : null;
 
   if (resolvedVariant === "label") {
+    const hasLabelSegment = richLabel != null || iconEl != null;
     const labelClasses = [
       "inline-flex items-center self-stretch",
       richValue != null ? "shrink-0" : "min-w-0",
@@ -764,16 +765,20 @@ export function Badge({
       richValue != null ? "border-r border-border/70" : "",
     ];
     const valueClasses = [
-      "inline-flex min-w-0 items-center self-stretch text-foreground",
-      richLabel != null || iconEl != null ? "flex-1" : "",
+      "inline-flex min-w-0 items-center self-stretch",
+      textColor == null || hasLabelSegment ? "text-foreground" : "",
+      hasLabelSegment ? "flex-1" : "",
       sizeClasses.segment,
     ];
     const labelStyle: CSSProperties = {};
 
-    if (richLabel != null || iconEl != null) {
+    if (hasLabelSegment) {
       labelClasses.push("bg-secondary text-secondary-foreground");
       applyColorValue(color, "backgroundColor", labelStyle, labelClasses);
       applyColorValue(textColor, "color", labelStyle, labelClasses);
+    } else {
+      applyColorValue(color, "backgroundColor", wrapperStyle, wrapperClasses);
+      applyColorValue(textColor, "color", wrapperStyle, wrapperClasses);
     }
 
     applyColorValue(borderColor, "borderColor", wrapperStyle, wrapperClasses);
@@ -788,7 +793,7 @@ export function Badge({
       style: wrapperStyle,
       content: (
         <>
-          {(richLabel != null || iconEl != null) && (
+          {hasLabelSegment && (
             <span className={cn(labelClasses, labelClassName)} style={labelStyle}>
               {iconEl}
               {richLabel != null && (

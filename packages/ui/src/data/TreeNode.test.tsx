@@ -155,6 +155,19 @@ describe("TreeNode", () => {
     expect(screen.queryByText("detail:b")).toBeNull();
   });
 
+  it("renders a call's footer after its nested calls and keeps it visible when collapsed", () => {
+    const { container } = renderTree({
+      renderDetail: (node) => node.id === "a" ? <span>arguments</span> : null,
+      renderAfterChildren: (node) => node.id === "a" ? <span>return value</span> : null,
+    });
+    const call = screen.getByText("a").closest("[role='treeitem']")!;
+    fireEvent.click(screen.getByText("a"));
+    expect(call.textContent).toContain("aargumentsa1return value");
+    fireEvent.click(screen.getByText("a"));
+    expect(call.textContent).toContain("aargumentsreturn value");
+    expect(container.querySelectorAll("[role='treeitem']")).toHaveLength(3);
+  });
+
   it("does not toggle the node when a click lands inside renderDetail", () => {
     renderTree({
       renderDetail: (node) => (node.id === "a" ? <button type="button">detail-btn</button> : null),
