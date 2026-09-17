@@ -13,12 +13,20 @@ export interface Evaluator {
   /** The source or input has changed since the shown result was produced. */
   stale: boolean;
   autoRun: boolean;
+  explicit: boolean;
   setAutoRun: (next: boolean) => void;
   /** Evaluates now, skipping the debounce. */
-  run: () => void;
+  run: () => Promise<void>;
 }
 
 type Payload = Pick<EvalRequest, "language" | "source" | "input">;
+
+export interface EvaluatorOptions {
+  mode?: "automatic" | "explicit";
+  evaluate?: (request: EvalRequest, signal: AbortSignal) => Promise<EvalResponse>;
+  /** Every evaluation a run is about to make; one call covers a whole batch. */
+  beforeRun?: (requests: EvalRequest[]) => boolean | Promise<boolean>;
+}
 
 /**
  * Runs an expression against the Go evaluator.
@@ -29,50 +37,66 @@ type Payload = Pick<EvalRequest, "language" | "source" | "input">;
  * available -- which is also the only way to re-run an expression whose value
  * changes on its own (`time.Now()`, `uuid.V4()`, `random.*`).
  */
-export function useEvaluator(apiBase: string, payload: Payload): Evaluator {
+export function useEvaluator(apiBase: string, payload: Payload, options: EvaluatorOptions = {}): Evaluator {
+  const explicit = options.mode === "explicit";
   const [response, setResponse] = useState<EvalResponse | null>(null);
   const [pending, setPending] = useState(false);
   const [autoRun, setAutoRunState] = useState(readAutoRun);
   const [evaluated, setEvaluated] = useState<Payload | null>(null);
 
   const abortRef = useRef<AbortController | undefined>(undefined);
+  const runningRef = useRef(false);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   // The current payload, so `run` stays referentially stable: it is wired into
   // a Monaco action registered once at mount, which would otherwise capture the
   // payload from the first render forever.
   const payloadRef = useRef(payload);
   payloadRef.current = payload;
 
-  const evaluateNow = useCallback(() => {
+  const evaluateNow = useCallback(async () => {
     const current = payloadRef.current;
+    if (explicit && runningRef.current) return;
     if (!current.source.trim()) {
-      abortRef.current?.abort();
+      if (!explicit) abortRef.current?.abort();
       setResponse(null);
       setEvaluated(current);
       setPending(false);
       return;
     }
 
-    abortRef.current?.abort();
+    if (!explicit) abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-
-    setPending(true);
-    evaluate(apiBase, current, controller.signal)
-      .then((next) => {
+    if (explicit) runningRef.current = true;
+    try {
+      // Pending starts once the run is confirmed: while a confirmation is on
+      // screen nothing is evaluating, and the result panel must not say so.
+      if (optionsRef.current.beforeRun && !(await optionsRef.current.beforeRun([current]))) return;
+      setPending(true);
+      const next = await (optionsRef.current.evaluate ?? ((request, signal) => evaluate(apiBase, request, signal)))(current, controller.signal);
+      if (!controller.signal.aborted) {
         setResponse(next);
         setEvaluated(current);
+      }
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setResponse({ result: "", durationMs: 0, error: { message: String(cause) } });
+        setEvaluated(current);
+      }
+    } finally {
+      if (abortRef.current === controller) {
+        runningRef.current = false;
         setPending(false);
-      })
-      .catch(() => {
-        // Superseded by a newer run; that one owns the state.
-      });
-  }, [apiBase]);
+      }
+    }
+  }, [apiBase, explicit]);
 
   useEffect(() => {
-    if (!autoRun) return;
-    const timer = setTimeout(evaluateNow, DEBOUNCE_MS);
+    if (explicit || !autoRun) return;
+    const timer = setTimeout(() => { void evaluateNow(); }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [payload.language, payload.source, payload.input, autoRun, evaluateNow]);
+  }, [payload.language, payload.source, payload.input, autoRun, explicit, evaluateNow]);
 
   // Switching language changes what the source even means, so show nothing
   // rather than the previous language's result.
@@ -85,16 +109,17 @@ export function useEvaluator(apiBase: string, payload: Payload): Evaluator {
     (next: boolean) => {
       setAutoRunState(next);
       window.localStorage.setItem(AUTO_RUN_STORAGE_KEY, String(next));
-      if (next) evaluateNow();
+      if (next && !explicit) void evaluateNow();
     },
-    [evaluateNow],
+    [evaluateNow, explicit],
   );
 
   return {
     response,
     pending,
     stale: isStale(evaluated, payload),
-    autoRun,
+    autoRun: explicit ? false : autoRun,
+    explicit,
     setAutoRun,
     run: evaluateNow,
   };

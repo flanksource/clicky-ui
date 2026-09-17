@@ -2,8 +2,9 @@ import { Button } from "../../../components/button";
 import { Badge } from "../../../data/Badge";
 import { CodeBlock } from "../../../data/CodeBlock";
 import { JsonView } from "../../../data/JsonView";
-import type { EvalResponse } from "../api.ts";
+import type { EvalError, EvalResponse, ResultExpectation } from "../api.ts";
 import { RUN_SHORTCUT_LABEL } from "../runShortcut";
+import { ExpectationStrip } from "./ExpectationStrip.tsx";
 
 interface ResultPanelProps {
   response: EvalResponse | null;
@@ -11,6 +12,7 @@ interface ResultPanelProps {
   /** The shown result predates the current source or input. */
   stale: boolean;
   onRun: () => void;
+  expectation?: ResultExpectation | undefined;
 }
 
 export function ResultPanel({
@@ -18,32 +20,36 @@ export function ResultPanel({
   pending,
   stale,
   onRun,
+  expectation,
 }: ResultPanelProps) {
+  const expected = expectation ? (
+    <ExpectationStrip expectation={expectation} response={response} stale={stale} />
+  ) : null;
+
   if (!response) {
     return (
-      <div className="p-4">
-        <p className="text-sm text-muted-foreground">
-          {pending ? "Evaluating…" : "Type an expression, then run it."}
-        </p>
-        {stale && !pending ? (
-          <Button onClick={onRun} size="sm" className="mt-3">
-            Run ({RUN_SHORTCUT_LABEL})
-          </Button>
-        ) : null}
+      <div className="flex h-full flex-col">
+        {expected}
+        <div className="p-4">
+          <p className="text-sm text-muted-foreground">
+            {pending ? "Evaluating…" : "Type an expression, then run it."}
+          </p>
+          {stale && !pending ? (
+            <Button onClick={onRun} size="sm" className="mt-3">
+              Run ({RUN_SHORTCUT_LABEL})
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }
 
   if (response.error) {
     return (
-      <div className="p-4">
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-destructive">
-            {response.error.line
-              ? `Error at line ${response.error.line}, column ${response.error.column}`
-              : "Error"}
-          </p>
-          <CodeBlock source={response.error.message} bare />
+      <div className="flex h-full flex-col">
+        {expected}
+        <div className="p-4">
+          <ResultError error={response.error} />
         </div>
       </div>
     );
@@ -58,45 +64,72 @@ export function ResultPanel({
         ) : null}
         {/* Without this, a result that no longer matches what is on screen is
             indistinguishable from one that does. */}
-        {stale ? (
-          <button
-            type="button"
-            onClick={onRun}
-            className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
-            title={`Run (${RUN_SHORTCUT_LABEL})`}
-          >
-            Out of date — run again
-          </button>
-        ) : null}
+        {stale ? <StaleButton onRun={onRun} /> : null}
       </div>
+      {expected}
 
       <div
         className={`min-h-0 flex-1 overflow-auto p-4 ${stale ? "opacity-50" : ""}`}
       >
-        {/* The rendered string is what a gomplate caller receives. A structured
-            result is more readable as a tree, so hand those to JsonView and
-            keep the raw rendering below it. */}
-        {isStructured(response.value) ? (
-          <>
-            <JsonView data={response.value} defaultOpenDepth={3} />
-            <details className="mt-4">
-              <summary className="cursor-pointer text-xs text-muted-foreground">
-                Rendered string
-              </summary>
-              <div className="mt-2">
-                <CodeBlock source={response.result} bare copyable={false} />
-              </div>
-            </details>
-          </>
-        ) : (
-          <CodeBlock
-            source={response.result || "(empty)"}
-            language={languageOf(response.result)}
-            copyable
-          />
-        )}
+        <ResultValue response={response} />
       </div>
     </div>
+  );
+}
+
+export function StaleButton({ onRun, label = "Out of date — run again" }: { onRun: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onRun}
+      className="ml-auto rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
+      title={`Run (${RUN_SHORTCUT_LABEL})`}
+    >
+      {label}
+    </button>
+  );
+}
+
+export function ResultError({ error }: { error: EvalError }) {
+  return (
+    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-destructive">
+        {error.line
+          ? `Error at line ${error.line}, column ${error.column}`
+          : "Error"}
+      </p>
+      <CodeBlock source={error.message} bare />
+    </div>
+  );
+}
+
+/**
+ * The rendered string is what a gomplate caller receives. A structured result
+ * is more readable as a tree, so hand those to JsonView and keep the raw
+ * rendering below it.
+ */
+export function ResultValue({ response }: { response: EvalResponse }) {
+  if (isStructured(response.value)) {
+    return (
+      <>
+        <JsonView data={response.value} defaultOpenDepth={3} />
+        <details className="mt-4">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
+            Rendered string
+          </summary>
+          <div className="mt-2">
+            <CodeBlock source={response.result} bare copyable={false} />
+          </div>
+        </details>
+      </>
+    );
+  }
+  return (
+    <CodeBlock
+      source={response.result || "(empty)"}
+      language={languageOf(response.result)}
+      copyable
+    />
   );
 }
 
