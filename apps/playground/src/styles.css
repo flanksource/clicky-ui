@@ -9,6 +9,7 @@
  * column with no error anywhere. An explicit `@source` is scanned regardless.
  */
 @source "./pages";
+@source inline("{rounded-xl,overflow-hidden,shadow-lg,border-2,border-solid,p-2,px-3,py-2,p-3,text-center,text-white,text-xs,font-bold}");
 
 /* The AppShell-based playground chrome is full-height; let it fill the viewport. */
 html,
@@ -19,4 +20,13 @@ body,
 
 [data-playground-annotations="hidden"] section:has(> [data-playground-annotation-only]) {
   display: none;
+}
+
+/*
+ * Monaco line decorations are addressed by a plain class name, so the band that
+ * marks the method being patched cannot live in a component's scoped styles.
+ * Used by `pages/oipa/_jvm/source-pane.tsx`.
+ */
+.jvm-focus-band {
+  background-color: color-mix(in oklab, var(--color-primary, #3b82f6) 12%, transparent);
 }

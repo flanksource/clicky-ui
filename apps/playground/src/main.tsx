@@ -4,6 +4,7 @@ import { clickyIconProvider } from "@flanksource/clicky-ui/icons";
 import { App } from "./App";
 import "@flanksource/clicky-ui/styles.css";
 import "./styles.css";
+import "react-grab";
 
 // Schema-driven surfaces carry icons as runtime strings (x-enum-icons, x-icon,
 // <Icon name="...">), which no import can resolve. Registering this package's
@@ -15,13 +16,6 @@ setFallbackIconProvider(clickyIconProvider());
 (globalThis as { process?: { env: Record<string, string> } }).process ??= {
   env: {},
 };
-
-// Hover any element and press ⌘C to copy it — plus its React component stack and
-// source location — as context for a coding agent. Dev only; do not remove the
-// guard, it is what keeps react-grab out of the production bundle.
-if (import.meta.env.DEV) {
-  void import("react-grab");
-}
 
 const root = document.getElementById("app");
 if (!root) throw new Error("#app root not found");

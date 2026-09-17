@@ -8,26 +8,33 @@
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "lint": "oxlint src plugins vite.config.ts --deny-warnings",
-    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint"
+    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
+    "@flanksource/facet": "catalog:",
     "@flanksource/icons": "catalog:",
     "@iconify/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "monaco-editor": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-grab": "catalog:"
   },
   "devDependencies": {
     "@iconify-icons/ph": "1.2.5",
     "@tailwindcss/vite": "catalog:",
+    "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
-    "react-grab": "catalog:",
+    "jsdom": "catalog:",
     "tailwindcss": "catalog:",
+    "ts-morph": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }
