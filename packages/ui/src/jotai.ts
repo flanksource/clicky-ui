@@ -8,6 +8,7 @@ export {
 } from "./components/jotai-bindings-core";
 export type {
   JotaiFilterBarBooleanFilter,
+  JotaiFilterBarDurationFilter,
   JotaiFilterBarEnumFilter,
   JotaiFilterBarFilter,
   JotaiFilterBarLookupFilter,

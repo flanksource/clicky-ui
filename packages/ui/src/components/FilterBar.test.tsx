@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { vi } from "vitest";
-import { FilterBar, type FilterBarFilter } from "./FilterBar";
+import {
+  FilterBar,
+  FilterBarFilterPanel,
+  type FilterBarFilter,
+} from "./FilterBar";
 
 function rect(width: number): DOMRect {
   return {
@@ -26,15 +31,18 @@ function mockFilterBarWidths({
   triggerWidth?: number;
 }) {
   const original = HTMLElement.prototype.getBoundingClientRect;
-  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-    if (this instanceof HTMLElement) {
-      if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth());
-      const itemKey = this.getAttribute("data-filter-bar-item");
-      if (itemKey) return rect(itemWidths[itemKey] ?? 120);
-      if (/^(More )?filters$/.test(this.getAttribute("aria-label") ?? "")) return rect(triggerWidth);
-    }
-    return original.call(this);
-  });
+  return vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function () {
+      if (this instanceof HTMLElement) {
+        if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth());
+        const itemKey = this.getAttribute("data-filter-bar-item");
+        if (itemKey) return rect(itemWidths[itemKey] ?? 120);
+        if (/^(More )?filters$/.test(this.getAttribute("aria-label") ?? ""))
+          return rect(triggerWidth);
+      }
+      return original.call(this);
+    });
 }
 
 // Answers each `(max-width: Npx)` query against a viewport width, so a test can
@@ -63,10 +71,77 @@ const TABLET_WIDTH = 700;
 const DESKTOP_WIDTH = 1280;
 
 describe("FilterBar", () => {
+  it("edits duration operators and units without inventing a slider domain", () => {
+    const onChange = vi.fn();
+    render(
+      <FilterBarFilterPanel
+        autoSubmit={false}
+        filter={{
+          key: "latency",
+          kind: "duration",
+          label: "Latency",
+          unit: "ms",
+          value: { min: "500", minOperator: ">", minUnit: "ms" },
+          onChange,
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByLabelText("Latency minimum slider"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Latency minimum operator")).toHaveValue(">");
+    expect(screen.getByLabelText("Latency minimum unit")).toHaveValue("ms");
+
+    fireEvent.change(screen.getByLabelText("Latency minimum operator"), {
+      target: { value: ">=" },
+    });
+    fireEvent.change(screen.getByLabelText("Latency minimum unit"), {
+      target: { value: "s" },
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ min: "500", minOperator: ">=", minUnit: "s" }),
+    );
+  });
+
+  it("commits a cleared search immediately and cancels the pending query", () => {
+    vi.useFakeTimers();
+    const onSearch = vi.fn();
+
+    function ControlledSearch() {
+      const [value, setValue] = useState("SELEC");
+      return (
+        <FilterBar
+          search={{
+            value,
+            onChange: (next) => {
+              onSearch(next);
+              setValue(next);
+            },
+          }}
+        />
+      );
+    }
+
+    render(<ControlledSearch />);
+    const search = screen.getByRole("searchbox");
+    fireEvent.change(search, { target: { value: "SELECT" } });
+    fireEvent.change(search, { target: { value: "" } });
+
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(onSearch).toHaveBeenLastCalledWith("");
+    act(() => vi.advanceTimersByTime(500));
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it("exposes the shared filter bar styling slot", () => {
     const { container } = render(<FilterBar />);
 
-    expect(container.querySelector('[data-slot="filter-bar"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="filter-bar"]'),
+    ).toBeInTheDocument();
   });
 
   it("renders native search, filters, and range controls", () => {
@@ -131,9 +206,12 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("searchbox", { name: /search traces/i }), {
-      target: { value: "api" },
-    });
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: /search traces/i }),
+      {
+        target: { value: "api" },
+      },
+    );
     expect(onSearch).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(500);
@@ -142,7 +220,9 @@ describe("FilterBar", () => {
 
     expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("+1");
 
-    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "platform" } });
+    fireEvent.change(screen.getByLabelText("Owner"), {
+      target: { value: "platform" },
+    });
     expect(screen.getByLabelText("Owner").closest("label")).toHaveAttribute(
       "title",
       "Filter by owner team",
@@ -154,7 +234,9 @@ describe("FilterBar", () => {
     expect(onOwner).toHaveBeenCalledWith("platform");
 
     fireEvent.click(screen.getByRole("button", { name: /restarts filter/i }));
-    fireEvent.change(screen.getByLabelText("Restarts minimum"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Restarts minimum"), {
+      target: { value: "2" },
+    });
     expect(onRestarts).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(500);
@@ -163,8 +245,12 @@ describe("FilterBar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
     expect(screen.queryByText("Quick ranges")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Time range from"), { target: { value: "now-1h" } });
-    fireEvent.change(screen.getByLabelText("Time range to"), { target: { value: "now" } });
+    fireEvent.change(screen.getByLabelText("Time range from"), {
+      target: { value: "now-1h" },
+    });
+    fireEvent.change(screen.getByLabelText("Time range to"), {
+      target: { value: "now" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /apply/i }));
     expect(onTimeRange).toHaveBeenCalledWith("now-1h", "now");
 
@@ -215,16 +301,18 @@ describe("FilterBar", () => {
 
     expect(screen.getByText("Search")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("+1");
-    expect(screen.getByRole("button", { name: /time range filter/i })).toHaveTextContent("now-24h");
-    expect(screen.getByRole("button", { name: /time range filter/i })).not.toHaveTextContent(
-      "Time range",
-    );
-    expect(screen.getByRole("button", { name: /date range filter/i })).toHaveTextContent(
-      "2026-04-21",
-    );
-    expect(screen.getByRole("button", { name: /date range filter/i })).not.toHaveTextContent(
-      "Date range:",
-    );
+    expect(
+      screen.getByRole("button", { name: /time range filter/i }),
+    ).toHaveTextContent("now-24h");
+    expect(
+      screen.getByRole("button", { name: /time range filter/i }),
+    ).not.toHaveTextContent("Time range");
+    expect(
+      screen.getByRole("button", { name: /date range filter/i }),
+    ).toHaveTextContent("2026-04-21");
+    expect(
+      screen.getByRole("button", { name: /date range filter/i }),
+    ).not.toHaveTextContent("Date range:");
   });
 
   it("autoSubmit=false forwards text edits immediately and renders an Apply button", () => {
@@ -247,7 +335,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "platform" } });
+    fireEvent.change(screen.getByLabelText("Owner"), {
+      target: { value: "platform" },
+    });
     expect(onOwner).toHaveBeenCalledWith("platform");
 
     fireEvent.click(screen.getByRole("button", { name: /apply/i }));
@@ -260,7 +350,9 @@ describe("FilterBar", () => {
         autoSubmit={false}
         onApply={vi.fn()}
         isPending
-        filters={[{ key: "q", kind: "text", label: "Q", value: "", onChange: vi.fn() }]}
+        filters={[
+          { key: "q", kind: "text", label: "Q", value: "", onChange: vi.fn() },
+        ]}
       />,
     );
 
@@ -398,7 +490,11 @@ describe("FilterBar", () => {
             value: {},
             placeholder: "Any cost center",
             options: [
-              { value: "ops", label: <span>Operations</span>, title: "Operations" },
+              {
+                value: "ops",
+                label: <span>Operations</span>,
+                title: "Operations",
+              },
               { value: "admin", label: <span>Admin</span>, title: "Admin" },
             ],
             onChange: vi.fn(),
@@ -412,9 +508,13 @@ describe("FilterBar", () => {
 
     // The dropdown lists the human-readable labels, not the underlying codes.
     fireEvent.focus(input);
-    expect(screen.getByRole("option", { name: "Operations" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Operations" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "ops" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "ops" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders lookup-backed single and multi filters as option-restricted comboboxes", () => {
@@ -483,7 +583,9 @@ describe("FilterBar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /time range filter/i }));
     expect(screen.getAllByLabelText(/pick time range/i)).toHaveLength(2);
-    expect(screen.queryByLabelText(/time range from time/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/time range from time/i),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /date range filter/i }));
     expect(screen.getAllByLabelText(/pick date range/i)).toHaveLength(2);
@@ -534,7 +636,9 @@ describe("FilterBar", () => {
     // Hovering a key reveals its values in the second panel.
     fireEvent.mouseEnter(envGroup);
     expect(screen.getByRole("button", { name: /^prod$/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^staging$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^staging$/ }),
+    ).toBeInTheDocument();
 
     // Toggle the value's pill into include — this mirrors the flat multi
     // pathway exactly (same wire shape, same handler).
@@ -564,9 +668,27 @@ describe("FilterBar", () => {
       <FilterBar
         autoSubmit={false}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: vi.fn(),
+          },
           {
             key: "status",
             kind: "multi",
@@ -578,13 +700,21 @@ describe("FilterBar", () => {
               { value: "degraded", label: "Degraded" },
             ],
           },
-          { key: "region", kind: "text", label: "Region", value: "", onChange: vi.fn() },
+          {
+            key: "region",
+            kind: "text",
+            label: "Region",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
 
     await screen.findByRole("button", { name: /^(more )?filters$/i });
-    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent(/\d/);
+    expect(
+      screen.getByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toHaveTextContent(/\d/);
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
@@ -593,14 +723,24 @@ describe("FilterBar", () => {
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveClass("rounded-md", "shadow-lg");
-    expect(within(dialog).queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Back" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
     expect(screen.queryByLabelText("Overflow filter")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^apply$/i })).toBeInTheDocument();
-    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(3);
-    for (const row of Array.from(dialog.querySelectorAll("[data-overflow-filter-row]"))) {
+    expect(
+      screen.getByRole("button", { name: /^close$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^apply$/i }),
+    ).toBeInTheDocument();
+    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(
+      3,
+    );
+    for (const row of Array.from(
+      dialog.querySelectorAll("[data-overflow-filter-row]"),
+    )) {
       expect(row).toHaveClass("md:h-12");
     }
 
@@ -614,7 +754,9 @@ describe("FilterBar", () => {
       window.dispatchEvent(new Event("resize"));
     });
 
-    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
 
@@ -630,8 +772,20 @@ describe("FilterBar", () => {
     render(
       <FilterBar
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
           {
             key: "service",
             kind: "text",
@@ -648,11 +802,13 @@ describe("FilterBar", () => {
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    );
     expect(
-      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByLabelText(
-        "Service",
-      ),
+      within(
+        screen.getByRole("dialog", { name: /overflow filters/i }),
+      ).getByLabelText("Service"),
     ).toBeInTheDocument();
 
     measurement.mockRestore();
@@ -664,22 +820,48 @@ describe("FilterBar", () => {
     render(
       <FilterBar
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /^(more )?filters$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^(more )?filters$/i }));
     const dialog = screen.getByRole("dialog", { name: "Filters" });
-    expect(dialog).toHaveClass("max-sm:!h-dvh", "max-sm:!rounded-none", "max-sm:shadow-none");
-    expect(within(dialog).getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(dialog.querySelector('[data-slot="modal-body"]')).toBeInTheDocument();
-    expect(dialog.querySelector('[data-slot="modal-footer"]')).toBeInTheDocument();
-    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(2);
+    expect(dialog).toHaveClass(
+      "max-sm:!h-dvh",
+      "max-sm:!rounded-none",
+      "max-sm:shadow-none",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Back" }),
+    ).toBeInTheDocument();
+    expect(
+      dialog.querySelector('[data-slot="modal-body"]'),
+    ).toBeInTheDocument();
+    expect(
+      dialog.querySelector('[data-slot="modal-footer"]'),
+    ).toBeInTheDocument();
+    expect(dialog.querySelectorAll("[data-overflow-filter-row]")).toHaveLength(
+      2,
+    );
     expect(within(dialog).getByLabelText("Team")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Owner")).toBeInTheDocument();
     const teamRow = dialog.querySelector('[data-overflow-filter-row="team"]');
@@ -699,8 +881,20 @@ describe("FilterBar", () => {
       <FilterBar
         overflowMode="wrap"
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
@@ -715,8 +909,12 @@ describe("FilterBar", () => {
     const dialog = screen.getByRole("dialog", { name: "Filters" });
     expect(within(dialog).getByLabelText("Team")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Owner")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Clear Team" })).toHaveClass("h-10", "w-10");
-    expect(within(dialog).getByRole("button", { name: "Apply" })).toHaveClass("h-10");
+    expect(
+      within(dialog).getByRole("button", { name: "Clear Team" }),
+    ).toHaveClass("h-10", "w-10");
+    expect(within(dialog).getByRole("button", { name: "Apply" })).toHaveClass(
+      "h-10",
+    );
 
     media.mockRestore();
   });
@@ -728,13 +926,27 @@ describe("FilterBar", () => {
       <FilterBar
         overflowMode="wrap"
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
 
@@ -748,13 +960,27 @@ describe("FilterBar", () => {
       <FilterBar
         overflowMode="wrap"
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
 
@@ -768,8 +994,20 @@ describe("FilterBar", () => {
       <FilterBar
         search={{ value: "", onChange: vi.fn(), placeholder: "Search rows…" }}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
         dateRange={{ from: "", to: "", onApply: vi.fn() }}
         trailing={<button type="button">Extra</button>}
@@ -777,12 +1015,17 @@ describe("FilterBar", () => {
     );
 
     await screen.findByRole("button", { name: "Filters" });
-    expect(container.querySelector('[data-slot="filter-bar"]')).toHaveClass("max-sm:flex-nowrap");
-    const searchField = screen.getByRole("searchbox", { name: /search rows/i }).closest("label")!
-      .parentElement!;
+    expect(container.querySelector('[data-slot="filter-bar"]')).toHaveClass(
+      "max-sm:flex-nowrap",
+    );
+    const searchField = screen
+      .getByRole("searchbox", { name: /search rows/i })
+      .closest("label")!.parentElement!;
     expect(searchField).toHaveClass("flex-1", "md:flex-[1_1_14rem]");
     expect(searchField).not.toHaveClass("flex-[1_1_14rem]");
-    const trailingGroup = screen.getByRole("button", { name: "Extra" }).parentElement!;
+    const trailingGroup = screen.getByRole("button", {
+      name: "Extra",
+    }).parentElement!;
     expect(trailingGroup).toHaveClass("max-md:flex-nowrap", "md:shrink-0");
     expect(trailingGroup).not.toHaveClass("shrink-0");
 
@@ -792,13 +1035,21 @@ describe("FilterBar", () => {
   it("shows the range control as an icon-only button on phone widths", () => {
     const media = mockMatchMedia(PHONE_WIDTH);
 
-    render(<FilterBar dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }} />);
+    render(
+      <FilterBar
+        dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }}
+      />,
+    );
 
-    const trigger = screen.getByRole("button", { name: /^date range filter: .*now-45d/i });
+    const trigger = screen.getByRole("button", {
+      name: /^date range filter: .*now-45d/i,
+    });
     expect(trigger).toHaveTextContent("");
     expect(trigger).toHaveClass("w-8");
     fireEvent.click(trigger);
-    expect(screen.getByRole("dialog", { name: "Date range" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Date range" }),
+    ).toBeInTheDocument();
 
     media.mockRestore();
   });
@@ -806,7 +1057,11 @@ describe("FilterBar", () => {
   it("keeps the range label visible above mobile widths", () => {
     const media = mockMatchMedia(DESKTOP_WIDTH);
 
-    render(<FilterBar dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }} />);
+    render(
+      <FilterBar
+        dateRange={{ from: "now-45d", to: "now", onApply: vi.fn() }}
+      />,
+    );
 
     const trigger = screen.getByRole("button", { name: "Date range filter" });
     expect(trigger).toHaveTextContent("now-45d");
@@ -829,9 +1084,27 @@ describe("FilterBar", () => {
     const { rerender } = render(
       <FilterBar
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "platform", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "data", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "platform",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "data",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: vi.fn(),
+          },
           {
             key: "status",
             kind: "multi",
@@ -847,16 +1120,40 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /^(more )?filters$/i })).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent("1/3");
-    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).not.toHaveTextContent("3");
+    expect(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    ).toHaveTextContent("1");
+    expect(
+      screen.getByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toHaveTextContent("1/3");
+    expect(
+      screen.getByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toHaveTextContent("3");
 
     rerender(
       <FilterBar
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "platform", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "data", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "api", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "platform",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "data",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "api",
+            onChange: vi.fn(),
+          },
           {
             key: "status",
             kind: "multi",
@@ -872,7 +1169,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /^(more )?filters$/i })).toHaveTextContent("3");
+    expect(
+      screen.getByRole("button", { name: /^(more )?filters$/i }),
+    ).toHaveTextContent("3");
 
     measurement.mockRestore();
   });
@@ -891,15 +1190,41 @@ describe("FilterBar", () => {
     render(
       <FilterBar
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "", onChange: vi.fn() },
-          { key: "region", kind: "text", label: "Region", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "region",
+            kind: "text",
+            label: "Region",
+            value: "",
+            onChange: vi.fn(),
+          },
         ]}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
@@ -925,18 +1250,42 @@ describe("FilterBar", () => {
         autoSubmit={false}
         onApply={onApply}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "", onChange: onService },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: onService,
+          },
         ]}
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
-    fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Service"), {
+      target: { value: "api" },
+    });
     expect(onService).not.toHaveBeenCalled();
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByRole("button", {
+      within(
+        screen.getByRole("dialog", { name: /overflow filters/i }),
+      ).getByRole("button", {
         name: /^apply$/i,
       }),
     );
@@ -961,17 +1310,41 @@ describe("FilterBar", () => {
       <FilterBar
         autoSubmit={false}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
-          { key: "service", kind: "text", label: "Service", value: "", onChange: onService },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "service",
+            kind: "text",
+            label: "Service",
+            value: "",
+            onChange: onService,
+          },
         ]}
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
-    fireEvent.change(screen.getByLabelText("Service"), { target: { value: "api" } });
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /overflow filters/i })).getByRole("button", {
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    );
+    fireEvent.change(screen.getByLabelText("Service"), {
+      target: { value: "api" },
+    });
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: /overflow filters/i }),
+      ).getByRole("button", {
         name: /^close$/i,
       }),
     );
@@ -1000,8 +1373,20 @@ describe("FilterBar", () => {
         <FilterBar
           autoSubmit={false}
           filters={[
-            { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-            { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+            {
+              key: "team",
+              kind: "text",
+              label: "Team",
+              value: "",
+              onChange: vi.fn(),
+            },
+            {
+              key: "owner",
+              kind: "text",
+              label: "Owner",
+              value: "",
+              onChange: vi.fn(),
+            },
             {
               key: "intercompany",
               kind: "tristate",
@@ -1013,12 +1398,16 @@ describe("FilterBar", () => {
         />,
       );
 
-      fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: /^(more )?filters$/i }),
+      );
       const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
-      const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
+      const toggle = () =>
+        within(dialog).getByRole("checkbox", { name: "Intercompany" });
       expect(toggle().getAttribute("aria-checked")).toBe(String(live));
 
-      for (let click = 0; click < clicksToUnset; click += 1) fireEvent.click(toggle());
+      for (let click = 0; click < clicksToUnset; click += 1)
+        fireEvent.click(toggle());
 
       // The staged `undefined` must survive the staged-value lookup rather than
       // falling back to the still-live true/false.
@@ -1042,8 +1431,20 @@ describe("FilterBar", () => {
       <FilterBar
         autoSubmit={false}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
           {
             key: "intercompany",
             kind: "tristate",
@@ -1055,9 +1456,12 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    );
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
-    const toggle = () => within(dialog).getByRole("checkbox", { name: "Intercompany" });
+    const toggle = () =>
+      within(dialog).getByRole("checkbox", { name: "Intercompany" });
     expect(toggle().id).not.toBe("");
 
     const labelText = within(dialog).getByText("Intercompany");
@@ -1070,13 +1474,27 @@ describe("FilterBar", () => {
 
   it("keeps wrap mode available for legacy multi-row layouts", () => {
     const filters: FilterBarFilter[] = [
-      { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-      { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+      {
+        key: "team",
+        kind: "text",
+        label: "Team",
+        value: "",
+        onChange: vi.fn(),
+      },
+      {
+        key: "owner",
+        kind: "text",
+        label: "Owner",
+        value: "",
+        onChange: vi.fn(),
+      },
     ];
 
     render(<FilterBar overflowMode="wrap" filters={filters} />);
 
-    expect(screen.queryByRole("button", { name: /^(more )?filters$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(more )?filters$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Team")).toBeInTheDocument();
     expect(screen.getByLabelText("Owner")).toBeInTheDocument();
   });
@@ -1088,7 +1506,13 @@ describe("FilterBar", () => {
   // desktop widths the caller opted out for.
   it("drops the no-wrap breakpoint in wrap mode", () => {
     const filters: FilterBarFilter[] = [
-      { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+      {
+        key: "team",
+        kind: "text",
+        label: "Team",
+        value: "",
+        onChange: vi.fn(),
+      },
     ];
 
     const { container, rerender } = render(<FilterBar filters={filters} />);
@@ -1149,13 +1573,17 @@ describe("FilterBar", () => {
     );
 
     fireEvent.focus(screen.getByRole("combobox", { name: "Rule" }));
-    expect(screen.getByText(/and 72 more — type to search all/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/and 72 more — type to search all/i),
+    ).toBeInTheDocument();
   });
 
   it("replaces the head with onSearch matches and hides non-selected head items", async () => {
     vi.useFakeTimers();
     // onSearch returns a value (plan-0225) that is NOT in the head set.
-    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+    const onSearch = vi
+      .fn()
+      .mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
 
     render(
       <FilterBar
@@ -1192,7 +1620,9 @@ describe("FilterBar", () => {
 
   it("keeps an already-toggled head item visible during an onSearch query", async () => {
     vi.useFakeTimers();
-    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+    const onSearch = vi
+      .fn()
+      .mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
 
     render(
       <FilterBar
@@ -1234,7 +1664,9 @@ describe("FilterBar", () => {
 
   it("commits a selected onSearch match while the option query remains active", async () => {
     vi.useFakeTimers();
-    const onSearch = vi.fn().mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
+    const onSearch = vi
+      .fn()
+      .mockResolvedValue([{ value: "plan-0225", label: "Plan 0225" }]);
     const onChange = vi.fn();
 
     render(
@@ -1266,7 +1698,9 @@ describe("FilterBar", () => {
     const match = screen.getByRole("option", { name: "Plan 0225" });
     fireEvent.mouseDown(match);
     fireEvent.click(match);
-    expect(screen.getByRole("option", { name: "Plan 0225, included" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Plan 0225, included" }),
+    ).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(500);
@@ -1367,7 +1801,9 @@ describe("FilterBar", () => {
     expect(includeRegion).toBeInstanceOf(HTMLElement);
     fireEvent.click(includeRegion as HTMLElement);
 
-    expect(screen.getByRole("option", { name: "Plan 0000, included" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Plan 0000, included" }),
+    ).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(250);
@@ -1375,7 +1811,9 @@ describe("FilterBar", () => {
 
     rerender(<Fixture nonce={1} />);
 
-    expect(screen.getByRole("option", { name: "Plan 0000, included" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Plan 0000, included" }),
+    ).toBeInTheDocument();
     expect(onPlan).not.toHaveBeenCalled();
 
     act(() => {
@@ -1403,8 +1841,20 @@ describe("FilterBar", () => {
         autoSubmit={false}
         onApply={onApply}
         filters={[
-          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
-          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+          {
+            key: "team",
+            kind: "text",
+            label: "Team",
+            value: "",
+            onChange: vi.fn(),
+          },
+          {
+            key: "owner",
+            kind: "text",
+            label: "Owner",
+            value: "",
+            onChange: vi.fn(),
+          },
           {
             key: "status",
             kind: "multi",
@@ -1420,7 +1870,9 @@ describe("FilterBar", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /^(more )?filters$/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^(more )?filters$/i }),
+    );
     const dialog = screen.getByRole("dialog", { name: /overflow filters/i });
     fireEvent.focus(within(dialog).getByRole("combobox", { name: "Status" }));
 
@@ -1429,7 +1881,9 @@ describe("FilterBar", () => {
     const option = screen.getByRole("option", { name: "Healthy" });
     fireEvent.mouseDown(option);
     fireEvent.click(option);
-    expect(screen.getByRole("dialog", { name: /overflow filters/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /overflow filters/i }),
+    ).toBeInTheDocument();
     expect(onStatus).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: /^apply$/i }));
@@ -1568,7 +2022,10 @@ describe("FilterBar date lookup rendering", () => {
         ]}
       />,
     );
-    const title = screen.getByLabelText("Since").closest("label")?.getAttribute("title");
+    const title = screen
+      .getByLabelText("Since")
+      .closest("label")
+      ?.getAttribute("title");
     expect(title).toMatch(/2026/);
     expect(title).toMatch(/\(.+\)$/);
   });

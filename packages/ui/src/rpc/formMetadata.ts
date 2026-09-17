@@ -1,6 +1,9 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type {
+  FilterBarDurationUnit,
+  FilterBarDurationValue,
   FilterBarFilter,
+  FilterBarNumberValue,
   FilterBarRangeProps,
   FilterBarSearchProps,
 } from "../components/FilterBar";
@@ -12,8 +15,10 @@ import type { DataTablePagination } from "../data/DataTable";
 import type { SortState } from "../hooks/use-sort";
 import {
   parseBoundsValue,
+  parseDurationBoundsValue,
   parseMultiFilterValue,
   serializeBoundsValue,
+  serializeDurationBoundsValue,
   serializeMultiFilterValue,
   splitCommaValues,
 } from "../data/data-table-filter-values";
@@ -433,6 +438,47 @@ export function parametersToFormConfig(
     // The spec's answer wins: it is the one that is still there mid-refetch.
     const filterType = shape?.type ?? lookupFilter?.type;
 
+    if (filterType === "number" && param.in === "query") {
+      const unit = shape?.unit ?? lookupFilter?.unit;
+      emitFilters.push({
+        key: param.name,
+        kind: "number",
+        label,
+        disabled,
+        value: parseBoundsValue(value, shape?.defaultOperator ?? lookupFilter?.defaultOperator),
+        ...(unit ? { unit } : {}),
+        onChange: (next: FilterBarNumberValue) => {
+          if (disabled) return;
+          setValues((current) =>
+            rewind({ ...current, [param.name]: serializeBoundsValue(next) }),
+          );
+        },
+      });
+      continue;
+    }
+
+    if (filterType === "duration" && param.in === "query") {
+      const unit = durationStorageUnit(shape?.unit ?? lookupFilter?.unit);
+      emitFilters.push({
+        key: param.name,
+        kind: "duration",
+        label,
+        disabled,
+        unit,
+        value: parseDurationBoundsValue(value, unit, shape?.defaultOperator ?? lookupFilter?.defaultOperator),
+        onChange: (next: FilterBarDurationValue) => {
+          if (disabled) return;
+          setValues((current) =>
+            rewind({
+              ...current,
+              [param.name]: serializeDurationBoundsValue(next, unit),
+            }),
+          );
+        },
+      });
+      continue;
+    }
+
     if (filterType === "workload" && param.in === "query") {
       emitFilters.push({
         key: param.name,
@@ -523,7 +569,9 @@ export function parametersToFormConfig(
         ...(bounds.max !== undefined ? { to: bounds.max } : {}),
         ...(lookupFilter?.presets ? { presets: lookupFilter.presets } : {}),
         timeEnabled:
-          filterType === "day-range" ? false : (lookupFilter?.timeEnabled ?? true),
+          filterType === "day-range"
+            ? false
+            : (lookupFilter?.timeEnabled ?? true),
         ...(lookupFilter?.timeZone ? { timeZone: lookupFilter.timeZone } : {}),
         ...(lookupFilter?.timeZones
           ? { timeZones: lookupFilter.timeZones }
@@ -615,7 +663,9 @@ export function parametersToFormConfig(
           label,
           value: splitCommaValues(value),
           disabled,
-          options: lookupFilter ? lookupOptionsToFieldOptions(lookupFilter) : [],
+          options: lookupFilter
+            ? lookupOptionsToFieldOptions(lookupFilter)
+            : [],
           // Reported, not searched: this control's onSearch hands the query back
           // to the consumer to refetch and re-feed `options`, which is a
           // different contract from the one searchProps satisfies.
@@ -778,6 +828,14 @@ export function useDebouncedRecord<T>(value: T, delayMs: number) {
   }, [delayMs, value]);
 
   return debounced;
+}
+
+function durationStorageUnit(unit: string | undefined): FilterBarDurationUnit {
+  const resolved = unit || "ms";
+  if (resolved !== "ms" && resolved !== "s" && resolved !== "m" && resolved !== "h") {
+    throw new Error(`Unsupported duration storage unit ${resolved}`);
+  }
+  return resolved;
 }
 
 function positiveInt(value: string | undefined): number | undefined {

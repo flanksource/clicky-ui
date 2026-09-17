@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { useStore, type WritableAtom } from "jotai";
 import type {
   FilterBarBooleanFilter,
+  FilterBarDurationFilter,
   FilterBarEnumFilter,
   FilterBarFilter,
   FilterBarLookupFilter,
@@ -19,14 +20,22 @@ import type {
 import type { JsonSchemaFormProps } from "./json-schema-form-types";
 
 export type JotaiWritableAtom<Value> = WritableAtom<Value, [Value], unknown>;
-export type JotaiJsonSchemaFormAtom = JotaiWritableAtom<Record<string, unknown>>;
+export type JotaiJsonSchemaFormAtom = JotaiWritableAtom<
+  Record<string, unknown>
+>;
 
-export type JotaiJsonSchemaFormProps = Omit<JsonSchemaFormProps, "value" | "onChange"> & {
+export type JotaiJsonSchemaFormProps = Omit<
+  JsonSchemaFormProps,
+  "value" | "onChange"
+> & {
   atom: JotaiJsonSchemaFormAtom;
   onChange?: JsonSchemaFormProps["onChange"];
 };
 
-export type JotaiFilterBarSearchProps = Omit<FilterBarSearchProps, "value" | "onChange"> & {
+export type JotaiFilterBarSearchProps = Omit<
+  FilterBarSearchProps,
+  "value" | "onChange"
+> & {
   atom: JotaiWritableAtom<string>;
   onChange?: FilterBarSearchProps["onChange"];
 };
@@ -36,7 +45,10 @@ export type JotaiFilterBarRangeValue = {
   to?: string;
 };
 
-export type JotaiFilterBarRangeProps = Omit<FilterBarRangeProps, "from" | "to" | "onApply"> & {
+export type JotaiFilterBarRangeProps = Omit<
+  FilterBarRangeProps,
+  "from" | "to" | "onApply"
+> & {
   atom: JotaiWritableAtom<JotaiFilterBarRangeValue>;
   onApply?: FilterBarRangeProps["onApply"];
 };
@@ -46,21 +58,31 @@ export type JotaiFilterBarRangeProps = Omit<FilterBarRangeProps, "from" | "to" |
 // JotaiFilterBarRangeProps instead.
 type ValuedFilterBarFilter = Extract<FilterBarFilter, { value: unknown }>;
 
-type AtomizedFilter<TFilter extends ValuedFilterBarFilter> = Omit<TFilter, "value" | "onChange"> & {
+type AtomizedFilter<TFilter extends ValuedFilterBarFilter> = Omit<
+  TFilter,
+  "value" | "onChange"
+> & {
   atom: JotaiWritableAtom<TFilter["value"]>;
   onChange?: TFilter["onChange"];
 };
 
 export type JotaiFilterBarTextFilter = AtomizedFilter<FilterBarTextFilter>;
-export type JotaiFilterBarWorkloadFilter = AtomizedFilter<FilterBarWorkloadFilter>;
+export type JotaiFilterBarWorkloadFilter =
+  AtomizedFilter<FilterBarWorkloadFilter>;
 export type JotaiFilterBarLookupFilter = AtomizedFilter<FilterBarLookupFilter>;
-export type JotaiFilterBarLookupMultiFilter = AtomizedFilter<FilterBarLookupMultiFilter>;
+export type JotaiFilterBarLookupMultiFilter =
+  AtomizedFilter<FilterBarLookupMultiFilter>;
 export type JotaiFilterBarMultiFilter = AtomizedFilter<FilterBarMultiFilter>;
-export type JotaiFilterBarNestedMultiFilter = AtomizedFilter<FilterBarNestedMultiFilter>;
-export type JotaiFilterBarSelectMultiFilter = AtomizedFilter<FilterBarSelectMultiFilter>;
+export type JotaiFilterBarNestedMultiFilter =
+  AtomizedFilter<FilterBarNestedMultiFilter>;
+export type JotaiFilterBarSelectMultiFilter =
+  AtomizedFilter<FilterBarSelectMultiFilter>;
 export type JotaiFilterBarNumberFilter = AtomizedFilter<FilterBarNumberFilter>;
+export type JotaiFilterBarDurationFilter =
+  AtomizedFilter<FilterBarDurationFilter>;
 export type JotaiFilterBarEnumFilter = AtomizedFilter<FilterBarEnumFilter>;
-export type JotaiFilterBarBooleanFilter = AtomizedFilter<FilterBarBooleanFilter>;
+export type JotaiFilterBarBooleanFilter =
+  AtomizedFilter<FilterBarBooleanFilter>;
 
 export type JotaiFilterBarFilter =
   | JotaiFilterBarTextFilter
@@ -71,6 +93,7 @@ export type JotaiFilterBarFilter =
   | JotaiFilterBarNestedMultiFilter
   | JotaiFilterBarSelectMultiFilter
   | JotaiFilterBarNumberFilter
+  | JotaiFilterBarDurationFilter
   | JotaiFilterBarEnumFilter
   | JotaiFilterBarBooleanFilter;
 
@@ -93,7 +116,9 @@ function useAtomSubscriptions(atoms: AnyJotaiAtom[]) {
 
   useEffect(() => {
     if (uniqueAtoms.length === 0) return undefined;
-    const unsubscribers = uniqueAtoms.map((atom) => store.sub(atom, forceRender));
+    const unsubscribers = uniqueAtoms.map((atom) =>
+      store.sub(atom, forceRender),
+    );
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
@@ -154,7 +179,9 @@ function useJotaiFilterBarAtoms({
   useAtomSubscriptions(atoms);
 }
 
-function useJotaiSearch(search: JotaiFilterBarSearchProps | undefined): FilterBarSearchProps | undefined {
+function useJotaiSearch(
+  search: JotaiFilterBarSearchProps | undefined,
+): FilterBarSearchProps | undefined {
   const store = useStore();
   if (!search) return undefined;
   const { atom, onChange, ...rest } = search;
@@ -168,7 +195,9 @@ function useJotaiSearch(search: JotaiFilterBarSearchProps | undefined): FilterBa
   };
 }
 
-function useJotaiRange(range: JotaiFilterBarRangeProps | undefined): FilterBarRangeProps | undefined {
+function useJotaiRange(
+  range: JotaiFilterBarRangeProps | undefined,
+): FilterBarRangeProps | undefined {
   const store = useStore();
   if (!range) return undefined;
   const { atom, onApply, ...rest } = range;
@@ -184,13 +213,18 @@ function useJotaiRange(range: JotaiFilterBarRangeProps | undefined): FilterBarRa
   };
 }
 
-function useJotaiFilters(filters: JotaiFilterBarFilter[] | undefined): FilterBarFilter[] | undefined {
+function useJotaiFilters(
+  filters: JotaiFilterBarFilter[] | undefined,
+): FilterBarFilter[] | undefined {
   const store = useStore();
   if (!filters) return undefined;
   return filters.map((filter) => bindJotaiFilter(store, filter));
 }
 
-function bindJotaiFilter(store: ReturnType<typeof useStore>, filter: JotaiFilterBarFilter): FilterBarFilter {
+function bindJotaiFilter(
+  store: ReturnType<typeof useStore>,
+  filter: JotaiFilterBarFilter,
+): FilterBarFilter {
   switch (filter.kind) {
     case "text": {
       const { atom, onChange, ...rest } = filter;
@@ -255,6 +289,17 @@ function bindJotaiFilter(store: ReturnType<typeof useStore>, filter: JotaiFilter
         ...rest,
         value: store.get(atom),
         onChange: (next: FilterBarNumberFilter["value"]) => {
+          store.set(atom, next);
+          onChange?.(next);
+        },
+      };
+    }
+    case "duration": {
+      const { atom, onChange, ...rest } = filter;
+      return {
+        ...rest,
+        value: store.get(atom),
+        onChange: (next: FilterBarDurationFilter["value"]) => {
           store.set(atom, next);
           onChange?.(next);
         },

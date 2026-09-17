@@ -27,6 +27,7 @@ import {
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberValue,
+  type FilterBarDurationValue,
   type FilterBarProps,
   type FilterBarRangePreset,
   type FilterBarRangeProps,
@@ -111,6 +112,7 @@ import {
 } from "./DataTable.grouping";
 import { DataTableGroupingControls } from "./DataTableGroupingControls";
 import { SelectionActionBar } from "./SelectionActionBar";
+import { DataTableOverflowCue } from "./DataTableOverflowCue";
 
 export type { TimestampOptions, TagsOptions };
 
@@ -165,7 +167,7 @@ type RowStreamItem<T> =
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
-  kind: "text" | "multi" | "nested-multi" | "number";
+  kind: "text" | "multi" | "nested-multi" | "number" | "duration";
   options: MultiSelectOption[];
   groups?: Array<{
     groupKey: string;
@@ -240,6 +242,12 @@ export type DataTableColumn<
   sortable?: boolean;
   /** Enables a generated column filter when `autoFilter` is true. */
   filterable?: boolean;
+  /** Declares a stable bounded control even when the result set is empty. */
+  filterKind?: "number" | "duration";
+  /** Unit of duration values returned by filterValue. */
+  filterUnit?: "ms" | "s" | "m" | "h";
+  /** Unit suffix shown by a numeric bounded control. */
+  numberUnit?: string;
   /** Native server-filter parameter associated with this rendered column. */
   filterKey?: string;
   /** Converts the raw cell value to the exact scalar sent to the native server filter. */
@@ -662,6 +670,9 @@ type DataTableInnerProps<
   scrollContainerClassName?: string;
   /** Generate filters from filterable columns. */
   autoFilter?: boolean;
+  /** Controlled bounded filter selections, e.g. when persisted in the route URL. */
+  boundedFilters?: Record<string, FilterBarDurationValue>;
+  onBoundedFiltersChange?: (filters: Record<string, FilterBarDurationValue>) => void;
   /**
    * Show the built-in global search input. Defaults to `autoFilter` — the box
    * narrows rows client-side, so it only mounts by default where DataTable
@@ -807,6 +818,8 @@ type DataTableInnerProps<
     row: T,
     context: DataTableRowDetailContext<T>,
   ) => ReactNode;
+  /** Render each result as a full-width card while retaining filters and paging. */
+  renderCard?: (row: T) => ReactNode;
   /**
    * How `renderExpandedRow` detail is surfaced when a row is clicked.
    * - "row" (default): expands an inline detail row beneath the clicked row.
@@ -944,6 +957,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   className,
   scrollContainerClassName,
   autoFilter = false,
+  boundedFilters,
+  onBoundedFiltersChange,
   showGlobalFilter,
   manualFilter = false,
   globalFilter,
@@ -977,6 +992,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   isRowClickable,
   getRowHref,
   renderExpandedRow,
+  renderCard,
   detailStyle = "row",
   detailDialogTitle,
   detailDialogSize = "lg",
@@ -1055,9 +1071,13 @@ function DataTableInner<T extends Record<string, unknown>>({
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
   >({});
-  const [numberFilters, setNumberFilters] = useState<
-    Record<string, FilterBarNumberValue>
-  >({});
+  const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarDurationValue>>({});
+  const effectiveNumberFilters = boundedFilters ?? numberFilters;
+  const changeNumberFilter = (key: string, next: FilterBarDurationValue) => {
+    const updated = updateNumberFilterValue(effectiveNumberFilters, key, next);
+    if (boundedFilters) onBoundedFiltersChange?.(updated);
+    else setNumberFilters(updated);
+  };
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [detailRow, setDetailRow] = useState<InternalRow<T> | null>(null);
   const [localGroupingMode, setLocalGroupingMode] = useState<
@@ -1259,7 +1279,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
 
   const showColumnVisibilityControl =
-    hideableColumns && hideableColumnCount > 1;
+    !renderCard && hideableColumns && hideableColumnCount > 1;
   const resolvedShowDensityControl =
     showDensityControl ?? showColumnVisibilityControl;
   const hasMenuActions = Boolean(menuActions && menuActions.length > 0);
@@ -1318,16 +1338,16 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
 
   const generatedFilters = useMemo<GeneratedFilter<T>[]>(() => {
-    if (!autoFilter || loading) return [];
+    if (!autoFilter) return [];
 
     return filterableColumns.map((column) => {
       const numberBounds = getNumericFilterBounds(rows, column);
-      if (numberBounds) {
+      if (column.filterKind || numberBounds) {
         return {
           column,
-          kind: "number" as const,
+          kind: column.filterKind ?? ("number" as const),
           options: [],
-          numberBounds,
+          ...(numberBounds ? { numberBounds } : {}),
         };
       }
 
@@ -1374,7 +1394,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         options,
       };
     });
-  }, [autoFilter, filterableColumns, loading, rows]);
+  }, [autoFilter, filterableColumns, rows]);
 
   // For every multi / nested-multi column (which includes kind:"tags"), expose a
   // TagActions value backed by this table's multiFilters slot. The + / − icons in
@@ -1447,16 +1467,24 @@ function DataTableInner<T extends Record<string, unknown>>({
             groups: filter.groups ?? [],
           };
         }
-        if (filter.kind === "number") {
+        if (filter.kind === "number" || filter.kind === "duration") {
+          if (filter.kind === "duration") {
+            return {
+              key: columnKey,
+              kind: "duration",
+              label: labelText(filter.column),
+              unit: filter.column.filterUnit ?? "ms",
+              value: effectiveNumberFilters[columnKey] ?? {},
+              onChange: (next: FilterBarDurationValue) => changeNumberFilter(columnKey, next),
+            };
+          }
           const numberFilter: Extract<FilterBarFilter, { kind: "number" }> = {
             key: columnKey,
             kind: "number",
             label: labelText(filter.column),
-            value: numberFilters[columnKey] ?? {},
-            onChange: (next: FilterBarNumberValue) =>
-              setNumberFilters((current) =>
-                updateNumberFilterValue(current, columnKey, next),
-              ),
+            value: effectiveNumberFilters[columnKey] ?? {},
+            onChange: (next: FilterBarNumberValue) => changeNumberFilter(columnKey, next),
+            ...(filter.column.numberUnit ? { unit: filter.column.numberUnit } : {}),
           };
           if (filter.numberBounds?.min !== undefined) {
             numberFilter.domainMin = filter.numberBounds.min;
@@ -1480,7 +1508,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             ),
         };
       }),
-    [generatedFilters, multiFilters, numberFilters, textFilters],
+    [generatedFilters, multiFilters, effectiveNumberFilters, textFilters],
   );
   const serverFilterByKey = useMemo(
     () =>
@@ -1667,10 +1695,10 @@ function DataTableInner<T extends Record<string, unknown>>({
           ) {
             return false;
           }
-        } else if (filter.kind === "number") {
-          const range = numberFilters[filter.column.key] ?? {};
-          const min = parseNumberInput(range.min);
-          const max = parseNumberInput(range.max);
+        } else if (filter.kind === "number" || filter.kind === "duration") {
+          const range = effectiveNumberFilters[filter.column.key] ?? {};
+          const min = boundedOperand(range.min, filter.kind === "duration" ? range.minUnit : undefined, filter.column.filterUnit);
+          const max = boundedOperand(range.max, filter.kind === "duration" ? range.maxUnit : undefined, filter.column.filterUnit);
           const hasMin = String(range.min ?? "").trim() !== "";
           const hasMax = String(range.max ?? "").trim() !== "";
 
@@ -1678,7 +1706,8 @@ function DataTableInner<T extends Record<string, unknown>>({
             const values = getFilterNumbers(row, filter.column);
             const matches = values.some(
               (value) =>
-                (min == null || value >= min) && (max == null || value <= max),
+                (min == null || (range.minOperator === ">" ? value > min : value >= min)) &&
+                (max == null || (range.maxOperator === "<" ? value < max : value <= max)),
             );
 
             if (!matches) {
@@ -1718,7 +1747,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     generatedFilters,
     manualFilter,
     multiFilters,
-    numberFilters,
+    effectiveNumberFilters,
     rows,
     textFilters,
     timeRangeColumn,
@@ -2190,6 +2219,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     Record<string, number>
   >({});
   const headRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const tableColumnCount = renderCard ? 1 : visibleColumns.length + (rowSelection ? 1 : 0);
   // Hiding or showing a column changes what width the rest should get, so
   // the pins are keyed on the visible set rather than the declared one.
   const visibleColumnKeysSignature = visibleColumns
@@ -2197,7 +2228,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     .join(" ");
 
   useEffect(() => {
-    if (!virtualOptions) {
+    if (!virtualOptions || renderCard) {
       setPinnedColumnWidths({});
       return;
     }
@@ -2229,7 +2260,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       observer.disconnect();
     };
     // Density changes cell padding, so it changes the natural widths too.
-  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density]);
+  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density, renderCard]);
 
   // The virtualizer needs the scroll element during render, before a ref would
   // be attached — hence the state-backed setter — while callers may also have
@@ -2237,6 +2268,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   const composeScrollRef = useCallback(
     (node: HTMLDivElement | null) => {
       virtual.setScrollEl(node);
+      setScrollElement(node);
       if (scrollContainerRef) {
         (scrollContainerRef as { current: HTMLDivElement | null }).current =
           node;
@@ -2296,6 +2328,10 @@ function DataTableInner<T extends Record<string, unknown>>({
     },
     [requestMoreRows, sentinelActive],
   );
+
+  if (renderCard && (renderExpandedRow || rowSelection)) {
+    throw new Error("DataTable card rendering cannot be combined with row detail or row selection");
+  }
 
   const startColumnResize = (
     event: ReactMouseEvent<HTMLElement>,
@@ -2422,6 +2458,38 @@ function DataTableInner<T extends Record<string, unknown>>({
           />
         )}
 
+        {renderCard && !pageLocalSort && effectiveColumns.some((column) => column.sortable !== false) && (
+          <div className="flex shrink-0 items-center gap-2 px-1 text-xs text-muted-foreground">
+            <label className="flex items-center gap-1.5">
+              Sort by
+              <select
+                aria-label="Sort cards by"
+                className="h-7 rounded-md border border-input bg-background px-2 text-foreground"
+                value={sort?.key ?? ""}
+                onChange={(event) => {
+                  const key = event.target.value;
+                  if (!key) onSortChange?.(null);
+                  else if (onSortChange) onSortChange({ key, dir: "asc" });
+                  else toggle(key);
+                }}
+              >
+                <option value="">Default order</option>
+                {effectiveColumns.filter((column) => column.sortable !== false).map((column) => (
+                  <option key={column.key} value={column.key}>{labelText(column)}</option>
+                ))}
+              </select>
+            </label>
+            {sort && (
+              <button type="button" className="h-7 rounded-md border border-input px-2 text-foreground hover:bg-accent"
+                onClick={() => {
+                  if (onSortChange) onSortChange({ key: sort.key, dir: sort.dir === "asc" ? "desc" : "asc" });
+                  else toggle(sort.key);
+                }}
+              >{sort.dir === "asc" ? "Ascending" : "Descending"}</button>
+            )}
+          </div>
+        )}
+
         <div className="relative flex min-h-0 max-w-full flex-1 flex-col">
           {loading && error == null ? (
             <LoadingBar
@@ -2436,6 +2504,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             // parameter is compared by variance rather than structurally. The
             // two shapes are the same object; the cast is what says so.
             ref={composeScrollRef}
+            data-testid="data-table-scroll"
             className={cn(
               "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border bg-background",
               scrollContainerClassName,
@@ -2444,7 +2513,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           >
             <table
               className={cn(
-                "w-max min-w-full text-left text-sm",
+                renderCard ? "w-full text-left text-sm" : "w-max min-w-full text-left text-sm",
                 // Only once the widths are pinned: switching to fixed layout
                 // before there is anything to fix them to would collapse every
                 // column to an equal share.
@@ -2453,7 +2522,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   : "table-auto",
               )}
             >
-              <colgroup>
+              {renderCard ? <colgroup><col /></colgroup> : <colgroup>
                 {rowSelection && error == null ? (
                   <col className="w-10" />
                 ) : null}
@@ -2477,7 +2546,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                     }
                   />
                 ))}
-              </colgroup>
+              </colgroup>}
+              {renderCard ? (
+                <thead className="sr-only"><tr><th scope="col">Results</th></tr></thead>
+              ) : (
               <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
                 <tr
                   ref={headRowRef}
@@ -2601,10 +2673,11 @@ function DataTableInner<T extends Record<string, unknown>>({
                   ))}
                 </tr>
               </thead>
+              )}
               <tbody ref={virtual.setTbodyEl}>
                 {error != null ? (
                   <DataTableErrorRow
-                    colSpan={visibleColumns.length}
+                    colSpan={tableColumnCount}
                     error={error}
                   />
                 ) : loading && visibleSorted.length === 0 ? (
@@ -2617,7 +2690,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                 ) : filteredRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      colSpan={tableColumnCount}
                       className="px-4 py-10 text-center text-sm text-muted-foreground"
                     >
                       {emptyMessage}
@@ -2633,7 +2706,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   {virtual.enabled && virtual.spacers.top > 0 && (
                     <tr aria-hidden data-virtual-spacer="top">
                       <td
-                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        colSpan={tableColumnCount}
                         style={{
                           height: virtual.spacers.top,
                           padding: 0,
@@ -2658,9 +2731,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                           {...rowHooks}
                         >
                           <td
-                            colSpan={
-                              visibleColumns.length + (rowSelection ? 1 : 0)
-                            }
+                            colSpan={tableColumnCount}
                             className="bg-muted/40 p-density-3"
                           >
                             <div className="w-0 min-w-full overflow-x-auto rounded-md border border-border bg-background p-density-3">
@@ -2687,9 +2758,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                             ? { metaClassName: effectiveGrouping.metaClassName }
                             : {})}
                           count={item.group.records.length}
-                          colSpan={
-                            visibleColumns.length + (rowSelection ? 1 : 0)
-                          }
+                          colSpan={tableColumnCount}
                           collapsed={item.group.collapsed}
                           onToggleCollapsed={() =>
                             setCollapseStateByMode((current) => ({
@@ -2737,6 +2806,13 @@ function DataTableInner<T extends Record<string, unknown>>({
                       );
                     }
                     const record = item.record;
+                    if (renderCard) {
+                      return (
+                        <tr key={record.id} {...rowHooks} className="align-top">
+                          <td className="border-b border-border/60 p-density-2">{renderCard(record.row)}</td>
+                        </tr>
+                      );
+                    }
                     const href = getRowHref?.(record.row);
                     const expanded = expandedRows[record.id] ?? false;
                     const expandedContent =
@@ -2951,7 +3027,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   {virtual.enabled && virtual.spacers.bottom > 0 && (
                     <tr aria-hidden data-virtual-spacer="bottom">
                       <td
-                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        colSpan={tableColumnCount}
                         style={{
                           height: virtual.spacers.bottom,
                           padding: 0,
@@ -2965,7 +3041,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                 {error == null && sentinelActive && (
                   <tr ref={infiniteSentinelRef} aria-hidden>
                     <td
-                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      colSpan={tableColumnCount}
                       className="p-density-2 text-center text-xs text-muted-foreground"
                     >
                       {sentinelLabel}
@@ -2975,6 +3051,7 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tbody>
             </table>
           </div>
+          {!renderCard && <DataTableOverflowCue scroll={scrollElement} />}
         </div>
 
         {renderedFooter !== null && (
@@ -3935,13 +4012,18 @@ function pruneNumberFilterState(
   state: Record<string, FilterBarNumberValue>,
   filters: GeneratedFilter<any>[],
 ) {
-  return pruneFilterState(
-    state,
-    filters,
-    "number",
-    (value) =>
-      !String(value.min ?? "").trim() && !String(value.max ?? "").trim(),
+  const allowed = new Set(filters.filter((filter) => filter.kind === "number" || filter.kind === "duration").map((filter) => filter.column.key));
+  return Object.fromEntries(
+    Object.entries(state).filter(([key, value]) => allowed.has(key) && (String(value.min ?? "").trim() || String(value.max ?? "").trim())),
   );
+}
+
+const durationUnitMs = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000 };
+
+function boundedOperand(value: unknown, selectedUnit?: "ms" | "s" | "m" | "h", storageUnit?: "ms" | "s" | "m" | "h"): number | null {
+  const parsed = parseNumberInput(value);
+  if (parsed == null) return null;
+  return parsed * durationUnitMs[selectedUnit ?? storageUnit ?? "ms"] / durationUnitMs[storageUnit ?? "ms"];
 }
 
 function pruneFilterState<T>(
@@ -4564,7 +4646,7 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       data-theme={resolvedTheme}
-      className={cn("flex min-h-0 flex-col text-foreground", className)}
+      className={cn("flex min-h-0 flex-1 flex-col text-foreground", className)}
     >
       {renderTable({ inFullscreen: false })}
       {showFullscreenControl && (

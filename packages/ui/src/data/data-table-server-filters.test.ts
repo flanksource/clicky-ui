@@ -25,7 +25,11 @@ function capture(initial: DataTableFilterSelection = {}) {
   const setValues = (update: unknown) => {
     state.current =
       typeof update === "function"
-        ? (update as (prev: DataTableFilterSelection) => DataTableFilterSelection)(state.current)
+        ? (
+            update as (
+              prev: DataTableFilterSelection,
+            ) => DataTableFilterSelection
+          )(state.current)
         : (update as DataTableFilterSelection);
   };
   return { state, setValues };
@@ -38,7 +42,11 @@ describe("serverColumnsToDataTableColumns", () => {
       { name: "alpha" },
       { name: "mike" },
     ]);
-    expect(columns.map((column) => column.key)).toEqual(["zulu", "alpha", "mike"]);
+    expect(columns.map((column) => column.key)).toEqual([
+      "zulu",
+      "alpha",
+      "mike",
+    ]);
   });
 
   // A raw result set has names no path resolver can read, so every column is
@@ -47,7 +55,9 @@ describe("serverColumnsToDataTableColumns", () => {
     const [column] = serverColumnsToDataTableColumns<Record<string, unknown>>([
       { name: "payload.user" },
     ]);
-    expect(column!.accessor!({ "payload.user": "ada", payload: { user: "nope" } })).toBe("ada");
+    expect(
+      column!.accessor!({ "payload.user": "ada", payload: { user: "nope" } }),
+    ).toBe("ada");
   });
 
   it("gives an unnamed column a key of its own", () => {
@@ -70,7 +80,11 @@ describe("serverFiltersToFilterBar", () => {
     const config = serverFiltersToFilterBar(
       [
         terms("region"),
-        { name: "latency", filterKey: "latency", filter: { kind: "range", min: 0, max: 900 } },
+        {
+          name: "latency",
+          filterKey: "latency",
+          filter: { kind: "range", min: 0, max: 900 },
+        },
         { name: "deleted", filterKey: "deleted", filter: { kind: "boolean" } },
         { name: "message", filterKey: "message", filter: { kind: "text" } },
       ],
@@ -90,7 +104,10 @@ describe("serverFiltersToFilterBar", () => {
   it("hoists a time column into the range slot", () => {
     const { setValues } = capture();
     const config = serverFiltersToFilterBar(
-      [terms("region"), { name: "created", filterKey: "created", filter: { kind: "time" } }],
+      [
+        terms("region"),
+        { name: "created", filterKey: "created", filter: { kind: "time" } },
+      ],
       { created: ">=now-1h" },
       setValues,
     );
@@ -115,7 +132,10 @@ describe("serverFiltersToFilterBar", () => {
       {},
       setValues,
     );
-    (config.filters[0] as FilterBarNumberFilter).onChange({ min: "100", max: "500" });
+    (config.filters[0] as FilterBarNumberFilter).onChange({
+      min: "100",
+      max: "500",
+    });
     expect(state.current).toEqual({ latency: ">=100,<=500" });
   });
 
@@ -128,25 +148,76 @@ describe("serverFiltersToFilterBar", () => {
     );
     expect((config.filters[0] as FilterBarNumberFilter).value).toEqual({
       min: "100",
+      minOperator: ">",
       max: "500",
+      maxOperator: "<",
     });
+  });
+
+  it("maps durations to a unit-aware control and preserves mixed operators", () => {
+    const { state, setValues } = capture();
+    const config = serverFiltersToFilterBar(
+      [
+        {
+          name: "latency",
+          filterKey: "latency",
+          filter: { kind: "duration", unit: "s" },
+        },
+      ],
+      { latency: ">2m30s,<=3h" },
+      setValues,
+    );
+
+    const filter = config.filters[0];
+    expect(filter).toMatchObject({
+      kind: "duration",
+      unit: "s",
+      value: {
+        min: "150",
+        minOperator: ">",
+        minUnit: "s",
+        max: "10800",
+        maxOperator: "<=",
+        maxUnit: "s",
+      },
+    });
+    if (filter.kind !== "duration") throw new Error("expected duration filter");
+    filter.onChange({
+      min: "500",
+      minOperator: ">",
+      minUnit: "ms",
+      max: "2",
+      maxOperator: "<=",
+      maxUnit: "m",
+    });
+    expect(state.current).toEqual({ latency: ">500ms,<=2m" });
   });
 
   // An absent key and a key holding "" would send different query strings for
   // the same "nothing selected".
   it("drops a filter's key once it is cleared", () => {
     const { state, setValues } = capture({ region: "eu" });
-    const config = serverFiltersToFilterBar([terms("region")], state.current, setValues);
+    const config = serverFiltersToFilterBar(
+      [terms("region")],
+      state.current,
+      setValues,
+    );
     (config.filters[0] as FilterBarMultiFilter).onChange({});
     expect(state.current).toEqual({});
   });
 
   it("asks the loader for a bounded head of the set", async () => {
-    const lookupValues = vi.fn().mockResolvedValue({ options: [{ value: "eu", count: 3 }] });
+    const lookupValues = vi
+      .fn()
+      .mockResolvedValue({ options: [{ value: "eu", count: 3 }] });
     const { setValues } = capture();
-    const config = serverFiltersToFilterBar([terms("region")], {}, setValues, { lookupValues });
+    const config = serverFiltersToFilterBar([terms("region")], {}, setValues, {
+      lookupValues,
+    });
 
-    const options = await (config.filters[0] as FilterBarMultiFilter).onSearch!("e");
+    const options = await (config.filters[0] as FilterBarMultiFilter).onSearch!(
+      "e",
+    );
     expect(lookupValues).toHaveBeenCalledWith({
       filterKey: "region",
       search: "e",
@@ -164,13 +235,17 @@ describe("serverFiltersToFilterBar", () => {
       setValues,
       { lookupValues },
     );
-    expect((config.filters[0] as FilterBarMultiFilter).onSearch).toBeUndefined();
+    expect(
+      (config.filters[0] as FilterBarMultiFilter).onSearch,
+    ).toBeUndefined();
   });
 
   it("applies the caller's decorators", () => {
     const { setValues } = capture();
     const config = serverFiltersToFilterBar([terms("region")], {}, setValues, {
-      extensions: [(filter) => ({ ...filter, label: `${filter.label} (scoped)` })],
+      extensions: [
+        (filter) => ({ ...filter, label: `${filter.label} (scoped)` }),
+      ],
     });
     expect(config.filters[0]!.label).toBe("Region (scoped)");
   });
@@ -179,7 +254,11 @@ describe("serverFiltersToFilterBar", () => {
     it("when the column names no filter key", () => {
       const { setValues } = capture();
       expect(() =>
-        serverFiltersToFilterBar([{ name: "region", filter: { kind: "terms" } }], {}, setValues),
+        serverFiltersToFilterBar(
+          [{ name: "region", filter: { kind: "terms" } }],
+          {},
+          setValues,
+        ),
       ).toThrow(/no filterKey/);
     });
 
@@ -193,17 +272,31 @@ describe("serverFiltersToFilterBar", () => {
         ),
       ).toThrow(/both filter through region/);
     });
-
   });
 
   describe("time columns", () => {
-    const created = { name: "created", filterKey: "created", filter: { kind: "time" as const } };
-    const updated = { name: "updated", filterKey: "updated", filter: { kind: "time" as const } };
+    const created = {
+      name: "created",
+      filterKey: "created",
+      filter: { kind: "time" as const },
+    };
+    const updated = {
+      name: "updated",
+      filterKey: "updated",
+      filter: { kind: "time" as const },
+    };
 
     it("gives the bar's range control to the first time column", () => {
       const { setValues } = capture();
-      const config = serverFiltersToFilterBar([created], { created: ">=now-24h" }, setValues);
-      expect(config.timeRange).toMatchObject({ from: "now-24h", timeEnabled: true });
+      const config = serverFiltersToFilterBar(
+        [created],
+        { created: ">=now-24h" },
+        setValues,
+      );
+      expect(config.timeRange).toMatchObject({
+        from: "now-24h",
+        timeEnabled: true,
+      });
       expect(config.filters).toHaveLength(0);
     });
 
@@ -229,7 +322,11 @@ describe("serverFiltersToFilterBar", () => {
 
     it("writes a second time column's range back under its own key", () => {
       const { setValues, state } = capture();
-      const config = serverFiltersToFilterBar([created, updated], {}, setValues);
+      const config = serverFiltersToFilterBar(
+        [created, updated],
+        {},
+        setValues,
+      );
       (config.filters[0] as FilterBarDateRangeFilter).onApply("now-7d", "now");
       expect(state.current).toEqual({ updated: ">=now-7d,<=now" });
     });
@@ -240,12 +337,26 @@ describe("serverFiltersToFilterBar", () => {
   it("renders a terms filter with nothing to enumerate as a typed input", () => {
     const { setValues, state } = capture();
     const config = serverFiltersToFilterBar(
-      [{ name: "id", filterKey: "id", filter: { kind: "terms", lookup: false } }],
+      [
+        {
+          name: "id",
+          filterKey: "id",
+          filter: { kind: "terms", lookup: false },
+        },
+      ],
       {},
       setValues,
     );
-    expect(config.filters[0]).toMatchObject({ key: "id", kind: "text", value: "" });
-    (config.filters[0] as FilterBarTextFilter).onChange("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
-    expect(state.current).toEqual({ id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8" });
+    expect(config.filters[0]).toMatchObject({
+      key: "id",
+      kind: "text",
+      value: "",
+    });
+    (config.filters[0] as FilterBarTextFilter).onChange(
+      "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    );
+    expect(state.current).toEqual({
+      id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    });
   });
 });

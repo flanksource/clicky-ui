@@ -332,6 +332,8 @@ export type ClickyDownloadScope = "page" | "all";
  * (e.g. a hidden JSON column carrying a call tree for an ExecutionTree).
  */
 export type ClickyRowDetailRenderer = (row: Record<string, unknown>) => ReactNode;
+export type ClickyRowCardRenderer = (row: Record<string, unknown>) => ReactNode;
+export type ClickyCellRenderers = Record<string, (value: unknown, row: Record<string, unknown>) => ReactNode>;
 
 /** Dialog title for a `renderRowDetail` dialog, fed the same raw row values. */
 export type ClickyRowDetailTitle = (row: Record<string, unknown>) => ReactNode;
@@ -391,6 +393,8 @@ export type ClickyProps = {
   loading?: boolean;
   /** Host row-detail renderer for the first embedded table. */
   renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
   /** How `renderRowDetail` content is surfaced for the first embedded table. */
   detailStyle?: "row" | "dialog";
   /** Dialog size when `detailStyle` is "dialog" for the first embedded table. */
@@ -441,6 +445,8 @@ export type ClickyTableProps = {
   loading?: boolean | undefined;
   /** Host row-detail renderer, given raw values keyed by column name. */
   renderRowDetail?: ClickyRowDetailRenderer | undefined;
+  cellRenderers?: ClickyCellRenderers | undefined;
+  renderRowCard?: ClickyRowCardRenderer | undefined;
   /** How `renderRowDetail` content is surfaced when a row is clicked. */
   detailStyle?: "row" | "dialog" | undefined;
   /** Dialog size when `detailStyle` is "dialog". */
@@ -490,6 +496,8 @@ type ClickyRuntimeContextValue = {
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableCellRenderers?: ClickyCellRenderers | undefined;
+  tableRenderRowCard?: ClickyRowCardRenderer | undefined;
   tableDetailStyle?: "row" | "dialog" | undefined;
   tableDetailDialogSize?: ModalSize | undefined;
   tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
@@ -599,6 +607,12 @@ export function Clicky(props: ClickyProps) {
         {...(props.renderRowDetail
           ? { tableRenderRowDetail: props.renderRowDetail }
           : {})}
+        {...(props.cellRenderers
+          ? { tableCellRenderers: props.cellRenderers }
+          : {})}
+        {...(props.renderRowCard
+          ? { tableRenderRowCard: props.renderRowCard }
+          : {})}
         {...(props.detailStyle ? { tableDetailStyle: props.detailStyle } : {})}
         {...(props.detailDialogSize
           ? { tableDetailDialogSize: props.detailDialogSize }
@@ -650,6 +664,8 @@ function ClickyRuntimeProvider({
   tableMenuActions,
   tableLoading,
   tableRenderRowDetail,
+  tableCellRenderers,
+  tableRenderRowCard,
   tableDetailStyle,
   tableDetailDialogSize,
   tableDetailDialogTitle,
@@ -673,6 +689,8 @@ function ClickyRuntimeProvider({
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableCellRenderers?: ClickyCellRenderers | undefined;
+  tableRenderRowCard?: ClickyRowCardRenderer | undefined;
   tableDetailStyle?: "row" | "dialog" | undefined;
   tableDetailDialogSize?: ModalSize | undefined;
   tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
@@ -697,6 +715,8 @@ function ClickyRuntimeProvider({
       tableMenuActions ||
       tableLoading ||
       tableRenderRowDetail ||
+      tableCellRenderers ||
+      tableRenderRowCard ||
       tableDetailStyle ||
       tableDetailDialogSize ||
       tableDetailDialogTitle;
@@ -723,6 +743,8 @@ function ClickyRuntimeProvider({
                 tableMenuActions,
                 tableLoading,
                 tableRenderRowDetail,
+                tableCellRenderers,
+                tableRenderRowCard,
                 tableDetailStyle,
                 tableDetailDialogSize,
                 tableDetailDialogTitle,
@@ -755,6 +777,8 @@ function ClickyRuntimeProvider({
       {...(tableMenuActions ? { tableMenuActions } : {})}
       {...(tableLoading !== undefined ? { tableLoading } : {})}
       {...(tableRenderRowDetail ? { tableRenderRowDetail } : {})}
+      {...(tableCellRenderers ? { tableCellRenderers } : {})}
+      {...(tableRenderRowCard ? { tableRenderRowCard } : {})}
       {...(tableDetailStyle ? { tableDetailStyle } : {})}
       {...(tableDetailDialogSize ? { tableDetailDialogSize } : {})}
       {...(tableDetailDialogTitle ? { tableDetailDialogTitle } : {})}
@@ -783,6 +807,8 @@ function ClickyCommandRuntimeProvider({
   tableMenuActions,
   tableLoading,
   tableRenderRowDetail,
+  tableCellRenderers,
+  tableRenderRowCard,
   tableDetailStyle,
   tableDetailDialogSize,
   tableDetailDialogTitle,
@@ -806,6 +832,8 @@ function ClickyCommandRuntimeProvider({
   tableMenuActions?: DataTableMenuAction[] | undefined;
   tableLoading?: boolean | undefined;
   tableRenderRowDetail?: ClickyRowDetailRenderer | undefined;
+  tableCellRenderers?: ClickyCellRenderers | undefined;
+  tableRenderRowCard?: ClickyRowCardRenderer | undefined;
   tableDetailStyle?: "row" | "dialog" | undefined;
   tableDetailDialogSize?: ModalSize | undefined;
   tableDetailDialogTitle?: ClickyRowDetailTitle | undefined;
@@ -832,6 +860,8 @@ function ClickyCommandRuntimeProvider({
       tableMenuActions,
       tableLoading,
       tableRenderRowDetail,
+      tableCellRenderers,
+      tableRenderRowCard,
       tableDetailStyle,
       tableDetailDialogSize,
       tableDetailDialogTitle,
@@ -859,6 +889,8 @@ function ClickyCommandRuntimeProvider({
       tableMenuActions,
       tableLoading,
       tableRenderRowDetail,
+      tableCellRenderers,
+      tableRenderRowCard,
       tableDetailStyle,
       tableDetailDialogSize,
       tableDetailDialogTitle,
@@ -3231,6 +3263,8 @@ export function ClickyTable({
   menuActions,
   loading,
   renderRowDetail,
+  cellRenderers,
+  renderRowCard,
   detailStyle,
   detailDialogSize,
   detailDialogTitle,
@@ -3256,6 +3290,8 @@ export function ClickyTable({
   const effectiveLoading = loading ?? runtime.tableLoading;
   const effectiveRenderRowDetail =
     renderRowDetail ?? runtime.tableRenderRowDetail;
+  const effectiveCellRenderers = cellRenderers ?? runtime.tableCellRenderers;
+  const effectiveRenderRowCard = renderRowCard ?? runtime.tableRenderRowCard;
   const effectiveDetailStyle = detailStyle ?? runtime.tableDetailStyle;
   const effectiveDetailDialogSize =
     detailDialogSize ?? runtime.tableDetailDialogSize;
@@ -3275,7 +3311,7 @@ export function ClickyTable({
     return <ClickyCollapsedStructRows columns={visibleColumns} rows={rows} />;
   }
 
-  const tableColumns: DataTableColumn<ClickyRow>[] = visibleColumns.map((column) => {
+  const tableColumns: DataTableColumn<ClickyRow>[] = visibleColumns.map<DataTableColumn<ClickyRow>>((column) => {
     const tagColumn = isClickyTagColumn(column);
     const keyValueColumn = isClickyKeyValueColumn(column);
     const jsonColumn = column.type === "json";
@@ -3383,6 +3419,11 @@ export function ClickyTable({
       sortValue: (value) => clickyNodeSortValue(value as ClickyNode),
       filterValue: (value) => clickyNodeText(value as ClickyNode),
     };
+  }).map((tableColumn, index) => {
+    const render = effectiveCellRenderers?.[visibleColumns[index]!.name];
+    return render
+      ? { ...tableColumn, render: (value: unknown, row: ClickyRow) => render(clickyCellRawValue(value as ClickyNode), clickyRowRawValues(row)) }
+      : tableColumn;
   });
 
   const defaultSortColumn =
@@ -3451,6 +3492,9 @@ export function ClickyTable({
         : {})}
       getRowId={(row, index) =>
         effectiveRowSelection?.getRowId(row, index) ??
+        (effectiveRenderRowCard && typeof clickyRowRawValues(row).id === "string"
+          ? String(clickyRowRawValues(row).id)
+          : undefined) ??
         `${index}-${visibleColumns
           .map((column) => clickyNodeText(row.cells[column.name]))
           .filter(Boolean)
@@ -3484,6 +3528,9 @@ export function ClickyTable({
             renderExpandedRow: (row: ClickyRow) =>
               effectiveRenderRowDetail(clickyRowRawValues(row)),
           }
+        : {})}
+      {...(effectiveRenderRowCard
+        ? { renderCard: (row: ClickyRow) => effectiveRenderRowCard(clickyRowRawValues(row)) }
         : {})}
       {...(effectiveDetailStyle ? { detailStyle: effectiveDetailStyle } : {})}
       {...(effectiveDetailDialogSize

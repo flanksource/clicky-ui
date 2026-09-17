@@ -2041,6 +2041,24 @@ describe("DataTable", () => {
     vi.useRealTimers();
   });
 
+  it("honors strict controlled bounds and keeps an explicit numeric filter on empty results", () => {
+    const { rerender } = render(<DataTable data={rows} columns={columns} autoFilter boundedFilters={{ restarts: { min: "1", minOperator: ">" } }} onBoundedFiltersChange={() => undefined} />);
+    expect(screen.getByText("worker")).toBeInTheDocument();
+    expect(screen.queryByText("api")).not.toBeInTheDocument();
+    expect(screen.queryByText("cron")).not.toBeInTheDocument();
+    rerender(<DataTable data={[] as ServiceRow[]} columns={[{ key: "restarts", label: "Restarts", filterKind: "number" }]} autoFilter />);
+    expect(screen.getAllByRole("button", { name: /restarts filter/i }).length).toBeGreaterThan(0);
+    rerender(<DataTable data={[] as ServiceRow[]} columns={[{ key: "restarts", label: "Restarts", filterKind: "number" }]} autoFilter loading />);
+    expect(screen.getAllByRole("button", { name: /restarts filter/i }).length).toBeGreaterThan(0);
+  });
+
+  it("compares duration bounds in the declared storage unit", () => {
+    const durationRows = [{ id: "edge", duration: 1_000_000_000 }, { id: "above", duration: 1_500_000_000 }];
+    render(<DataTable data={durationRows} columns={[{ key: "id", label: "ID" }, { key: "duration", label: "Duration", filterKind: "duration", filterUnit: "ms", filterValue: (value) => Number(value) / 1_000_000 }]} autoFilter boundedFilters={{ duration: { min: "1", minOperator: ">", minUnit: "s" } }} onBoundedFiltersChange={() => undefined} />);
+    expect(screen.getByText("above")).toBeInTheDocument();
+    expect(screen.queryByText("edge")).not.toBeInTheDocument();
+  });
+
   it("uses responsive overflow for generated filter-bar filters", async () => {
     const measurement = mockFilterBarWidths(260);
     render(<DataTable data={rows} columns={columns} autoFilter />);
@@ -2235,6 +2253,7 @@ describe("DataTable", () => {
     );
 
     const table = screen.getByRole("table");
+    const themeRoot = table.closest("[data-theme]");
     const scrollBody = table.parentElement;
     const shell = scrollBody?.parentElement;
     const header = screen
@@ -2242,6 +2261,7 @@ describe("DataTable", () => {
       .closest("thead");
     const footer = screen.getByText("1-3 of 3").parentElement;
 
+    expect(themeRoot).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(shell).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(scrollBody).toHaveClass("min-h-0", "flex-1", "overflow-auto");
     expect(header).toHaveClass("sticky", "top-0");
@@ -3238,6 +3258,36 @@ describe("DataTable", () => {
       const detail = within(dialog).getByText("Detail for worker");
       expect(detail.closest("table")).toBeNull();
     });
+  });
+
+  it("renders full-width cards while retaining the table's paging controls", () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        getRowId={(row) => row.service}
+        renderCard={(row) => <article>Invocation {row.service}</article>}
+        pagination={{ page: 0, pageSize: 2, total: 3, onPageChange: vi.fn() }}
+      />,
+    );
+
+    expect(screen.getAllByRole("article")).toHaveLength(rows.length);
+    expect(screen.getByText("Invocation api")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Service" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open column menu" })).not.toBeInTheDocument();
+    expect(screen.getByText(/page 1 of/i)).toBeInTheDocument();
+  });
+
+  it("keeps server-backed sort choices available when card headers replace column headers", () => {
+    const onSortChange = vi.fn();
+    render(<DataTable data={rows} columns={columns}
+      renderCard={(row) => <article>{row.service}</article>}
+      sort={{ key: "service", dir: "asc" }} onSortChange={onSortChange} manualSort />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort cards by" }), { target: { value: "status" } });
+    expect(onSortChange).toHaveBeenCalledWith({ key: "status", dir: "asc" });
+    fireEvent.click(screen.getByRole("button", { name: "Ascending" }));
+    expect(onSortChange).toHaveBeenLastCalledWith({ key: "service", dir: "desc" });
   });
 });
 
