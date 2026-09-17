@@ -25,6 +25,10 @@ function normalizeToken(token: TemplateToken): { value: string; label: ReactNode
 // text state and expose no input[data-jsf-input], so there the value replaces the
 // field value instead of inserting at a caret.
 function insertTemplateValue(field: FieldControl, trigger: HTMLElement | null, value: string) {
+  if (field.kind !== "string" && field.kind !== "textarea") {
+    field.onChange(value);
+    return;
+  }
   const input = trigger
     ?.closest("[data-jsf-control]")
     ?.querySelector<HTMLInputElement>("input[data-jsf-input]");

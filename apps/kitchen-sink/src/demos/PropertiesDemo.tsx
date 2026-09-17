@@ -4,6 +4,7 @@ import {
   UiZoomIn as ZoomInIcon,
   UiZoomOut as ZoomOutIcon,
   Properties,
+  JsonSchemaForm,
   type PropertiesItem,
 } from "@flanksource/clicky-ui";
 import { DemoSection } from "./Section";
@@ -41,12 +42,18 @@ const iconForKey = (key: string): string => {
 
 function copy(value: unknown) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    void navigator.clipboard.writeText(typeof value === "string" ? value : JSON.stringify(value));
+    void navigator.clipboard.writeText(
+      typeof value === "string" ? value : JSON.stringify(value),
+    );
   }
 }
 
 export function PropertiesDemo() {
   const [open, setOpen] = useState<Record<string, boolean>>({ tags: true });
+  const [settings, setSettings] = useState<Record<string, unknown>>({
+    name: "Example service",
+    connection: { host: "localhost", retries: 3 },
+  });
 
   const expandableItems: PropertiesItem<unknown>[] = [
     { key: "namespace", value: "claims-demo" },
@@ -70,7 +77,12 @@ export function PropertiesDemo() {
         <Properties
           density="compact"
           className="mt-density-1"
-          items={["env=prod", "team=platform", "tier=api", "region=eu-west-1"].map((t, i) => ({
+          items={[
+            "env=prod",
+            "team=platform",
+            "tier=api",
+            "region=eu-west-1",
+          ].map((t, i) => ({
             key: `tags.${i}`,
             value: t,
           }))}
@@ -108,12 +120,44 @@ export function PropertiesDemo() {
     >
       <div className="space-y-density-4">
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">Default</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Click-to-edit form
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Click a value to edit it. Use the inline check to save or cancel to discard changes.
+          </p>
+          <JsonSchemaForm
+            layout={{ mode: "properties" }}
+            value={settings}
+            onChange={setSettings}
+            persistPreferences={false}
+            schema={{
+              type: "object",
+              properties: {
+                name: { type: "string", title: "Name" },
+                connection: {
+                  type: "object",
+                  title: "Connection",
+                  properties: {
+                    host: { type: "string", title: "Host" },
+                    retries: { type: "integer", title: "Retries" },
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+        <div className="space-y-density-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Default
+          </h3>
           <Properties items={baseItems} />
         </div>
 
         <div className="space-y-density-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">Label icons + subtitles</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Label icons + subtitles
+          </h3>
           <Properties
             items={[
               {

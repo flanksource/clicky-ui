@@ -129,7 +129,7 @@ export function TableArray({
               )}
             >
               {columns.map(([col, prop]) => (
-                <td key={col} className="px-2 py-1">
+                <td key={col} className={cn("px-2 py-1", !ctx.presentation && !readOnly && "min-w-40")}>
                   {cell(item, i, col, prop)}
                 </td>
               ))}
