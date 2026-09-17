@@ -85,6 +85,22 @@ Import gomplate-compatible Monaco language support from `@flanksource/clicky-ui/
 
 UI subpaths that render icons are intended for browser bundlers such as Vite, Rollup, Webpack, Rspack, and Bun's bundler. The Iconify React packages expose `.jsx` modules and CSS imports, so plain Node `import`/`require` of icon-heavy subpaths is not a supported verification target.
 
+### IntelliJ icon catalog
+
+Import the offline components from `@flanksource/clicky-ui/icons`:
+
+```tsx
+import {
+  UiBreakpoint,
+  UiMessageQueue,
+  UiSqlPrimaryKey,
+} from "@flanksource/clicky-ui/icons";
+```
+
+The `jb-site:` entries in `icons/icon-selections.json` resolve against the [IntelliJ icon catalog](https://intellij-icons.jetbrains.design/data.json). Run `pnpm --filter @flanksource/clicky-ui download:icons` after changing selections, then `pnpm --filter @flanksource/clicky-ui build:icons:force`. The downloader checks each catalog path and requires an Apache 2.0 header in every downloaded SVG. It stores URL-fetched sources from JetBrains, Iconify, and other providers under `icons/svg/remote`; generated React components are built from those local files. The per-component source list is in `NOTICE.md`.
+
+Downloaded IntelliJ icon ZIPs can be imported with `pnpm --filter @flanksource/clicky-ui exec tsx scripts/import-jetbrains-zips.ts <download-dir> <since-ISO> --licensed-only`. The command extracts each light/dark pair into `icons/svg/downloaded`, adds `programming` selections, and writes `icons/jetbrains-download-audit.json` for the processed archives. Use `--include-without-header` instead to explicitly include pairs without an embedded Apache header. Those pairs use `jb-download-unverified:` source IDs and appear in the audit's `withoutHeader` list; their license is not verified by the import. Both SVG directories are offline build inputs; `remote` distinguishes URL-fetched artwork from ZIP-extracted artwork. Rebuild with `build:icons:force` after importing. Each concept has a preferred `Ui<Concept>` icon and numbered alternatives such as `UiFunction1` and `UiFunction2`. Imported icons have matching `Dark` variants, while existing preferred components keep their artwork. `programmingIconCatalog` supplies typed concept, variation, color-role, and header-status metadata for palette pages.
+
 Markdown and code highlighting use optional peer dependencies (`marked`, `shiki`, and `@shikijs/*`). Install them in applications that render those components.
 
 ## Tailwind preset

@@ -12,8 +12,11 @@ import {
   iconSourceRequests,
   incumbentSvgPaths,
   isIconifySpec,
+  jetbrainsIconUrl,
   remoteSvgPath,
   selectionsPath,
+  validateJetbrainsCatalog,
+  validateJetbrainsSvg,
   type IconSourceRequest,
   type Selections,
 } from "./icon-sources";
@@ -88,6 +91,21 @@ async function downloadNonIconifySource(
     );
   }
 
+  if (spec.startsWith("jb-site:")) {
+    const path = remoteSvgPath(spec);
+    if (existsSync(path)) return false;
+    const response = await http.fetch(jetbrainsIconUrl(spec));
+    await writeSvg(path, validateJetbrainsSvg(spec, await response.text()));
+    return true;
+  }
+
+  if (
+    spec.startsWith("jb-download:") ||
+    spec.startsWith("jb-download-unverified:")
+  ) {
+    return false;
+  }
+
   const colon = spec.indexOf(":");
   const prefix = spec.slice(0, colon);
   if (colon < 1 || !prefix.startsWith("jb-expui-")) {
@@ -109,6 +127,19 @@ export async function downloadIcons(): Promise<void> {
     await readFile(selectionsPath, "utf8"),
   ) as Selections;
   const requests = iconSourceRequests(selections);
+  const siteSpecs = [
+    ...new Set(
+      requests
+        .map(({ spec }) => spec)
+        .filter((spec) => spec.startsWith("jb-site:")),
+    ),
+  ];
+  if (siteSpecs.length > 0) {
+    const response = await http.fetch(
+      "https://intellij-icons.jetbrains.design/data.json",
+    );
+    validateJetbrainsCatalog(siteSpecs, await response.json());
+  }
   let downloaded = await downloadIconifySources(requests);
   for (const request of requests) {
     if (
