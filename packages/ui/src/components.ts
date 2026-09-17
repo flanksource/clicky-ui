@@ -20,7 +20,11 @@ export {
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { CopyButton, type CopyButtonProps } from "./components/CopyButton";
-export { copyText, useCopyFlash, type CopyFlashState } from "./components/clipboard";
+export {
+  copyText,
+  useCopyFlash,
+  type CopyFlashState,
+} from "./components/clipboard";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
 export {
@@ -102,7 +106,11 @@ export {
 } from "./components/RangeSlider";
 export {
   FilterBar,
+  FilterBarFilterPanel,
   type FilterBarBooleanFilter,
+  type FilterBarDurationFilter,
+  type FilterBarDurationUnit,
+  type FilterBarDurationValue,
   type FilterBarEnumFilter,
   type FilterBarFilter,
   type FilterBarLookupFilter,
@@ -419,6 +427,12 @@ export {
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export {
+  ConfirmDialog,
+  type ConfirmDialogProps,
+  type ConfirmOptions,
+} from "./overlay/ConfirmDialog";
+export { useConfirm, useConfirmMemory } from "./overlay/useConfirm";
 export {
   useModalStack,
   useEscapeLayer,
