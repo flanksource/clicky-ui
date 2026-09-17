@@ -406,9 +406,6 @@ function FollowShowcase(args: ComponentProps<typeof OperationCatalog>) {
           { status: 201 },
         );
       }
-      if (method === "DELETE" && url.includes("/sessions/")) {
-        return new Response("", { status: 204 });
-      }
       return originalFetch(input, init);
     }) as typeof fetch;
     window.EventSource = FollowFakeEventSource as unknown as typeof EventSource;

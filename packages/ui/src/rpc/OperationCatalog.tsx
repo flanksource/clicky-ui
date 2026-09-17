@@ -22,6 +22,8 @@ import type {
   ClickyRemoteFormat,
   ClickyRow,
   ClickyRowDetailRenderer,
+  ClickyCellRenderers,
+  ClickyRowCardRenderer,
   ClickyRowDetailTitle,
 } from "../data/Clicky";
 import type { ModalSize } from "../overlay/Modal";
@@ -71,7 +73,7 @@ import {
   partitionFollowRows,
 } from "./operationCatalogFollow";
 import { OperationCatalogFollowStatus } from "./OperationCatalogFollowStatus";
-import { useOperationCatalogFollow } from "./useOperationCatalogFollow";
+import { useOperationCatalogFollow, type OperationCatalogFollowOption } from "./useOperationCatalogFollow";
 import type { LogTailError } from "../hooks/use-log-tail";
 
 export type OperationCatalogProps = {
@@ -142,6 +144,8 @@ export type OperationCatalogProps = {
    * params without colliding.
    */
   urlState?: false | { prefix: string };
+  /** Omit to infer cursor walking automatically; set when a host requires a specific paging presentation. */
+  paginationMode?: "paged" | "infinite";
   /** Column names retained in raw rows for detail rendering but omitted from the table. */
   hiddenColumns?: string[];
   /**
@@ -159,6 +163,10 @@ export type OperationCatalogProps = {
     /** Dialog title when `style` is "dialog", given the same raw row values as `render`. */
     title?: ClickyRowDetailTitle;
   };
+  /** Override selected result table cells using raw server values. */
+  cellRenderers?: ClickyCellRenderers;
+  /** Render each list result as a card from its raw row values. */
+  rowCard?: ClickyRowCardRenderer;
   /**
    * Follows the surface's list results live over the commons-db sessions SSE
    * API instead of polling: rows the server has appended since the last
@@ -173,7 +181,7 @@ export type OperationCatalogProps = {
    * Pass `{ maxRows }` to size the in-memory live buffer (default 5,000 —
    * see `useLogTail`); older rows are evicted and counted as `dropped`.
    */
-  follow?: boolean | { maxRows?: number };
+  follow?: OperationCatalogFollowOption;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -203,8 +211,11 @@ export function OperationCatalog({
   lockedValues = EMPTY_LOCKED_VALUES,
   initialValues = EMPTY_INITIAL_VALUES,
   urlState,
+  paginationMode,
   hiddenColumns,
   rowDetail,
+  cellRenderers,
+  rowCard,
   follow,
 }: OperationCatalogProps) {
   const renderRowDetail = rowDetail?.render;
@@ -309,6 +320,7 @@ export function OperationCatalog({
     endpoint: listEndpoint,
     parameters: listParameters,
     filters: effectiveFilters,
+    ...(paginationMode ? { paginationMode } : {}),
   });
 
   const { followEnabled, sessionOperation, followMissing, tail } =
@@ -320,6 +332,20 @@ export function OperationCatalog({
       effectiveFilters,
       showTable: !!listEndpoint,
     });
+  const reconcileFollow = typeof follow === "object" && follow?.mode === "reconcile";
+  const refetchList = useRef(list.refetch);
+  refetchList.current = list.refetch;
+  const onReconcile = useRef(reconcileFollow ? follow.onReconcile : undefined);
+  onReconcile.current = reconcileFollow ? follow.onReconcile : undefined;
+  useEffect(() => {
+    if (!reconcileFollow || tail.lastSequence === null) return;
+    const sequence = tail.lastSequence;
+    const timer = setTimeout(() => {
+      refetchList.current();
+      onReconcile.current?.(sequence);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [reconcileFollow, tail.lastSequence]);
 
   useCursorStaleRecovery({
     error: list.error,
@@ -536,7 +562,7 @@ export function OperationCatalog({
   const followPartition = partitionFollowRows(tail.rows, tail.clickyRows);
   const followStreamError: LogTailError | null =
     tail.error ??
-    (followPartition.missingClickyRow
+    (!reconcileFollow && followPartition.missingClickyRow
       ? {
           scope: "stream",
           message:
@@ -544,7 +570,7 @@ export function OperationCatalog({
         }
       : null);
   const followMerge =
-    followEnabled && sessionOperation
+    followEnabled && sessionOperation && !reconcileFollow
       ? mergeFollowRowsIntoResponse(
           tableResponse,
           followPartition.rows,
@@ -631,7 +657,7 @@ export function OperationCatalog({
                 <OperationCatalogFollowStatus
                   status={tail.status}
                   error={followStreamError}
-                  droppedRows={tail.droppedRows}
+                  droppedRows={reconcileFollow ? 0 : tail.droppedRows}
                   addedCount={followMerge?.addedCount ?? 0}
                   className="mb-2"
                 />
@@ -706,6 +732,8 @@ export function OperationCatalog({
                       : {})}
                     {...(download ? { download } : {})}
                     {...(renderRowDetail ? { renderRowDetail } : {})}
+                    {...(cellRenderers ? { cellRenderers } : {})}
+                    {...(rowCard ? { renderRowCard: rowCard } : {})}
                     {...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {})}
                     {...(rowDetailDialogSize
                       ? { detailDialogSize: rowDetailDialogSize }
@@ -736,6 +764,7 @@ export function OperationCatalog({
                       ...(download ? { download } : {}),
                       ...(surfaceKey ? { surfaceKey } : {}),
                       ...(renderRowDetail ? { renderRowDetail } : {}),
+                      ...(rowCard ? { renderRowCard: rowCard } : {}),
                       ...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {}),
                       ...(rowDetailDialogSize
                         ? { detailDialogSize: rowDetailDialogSize }

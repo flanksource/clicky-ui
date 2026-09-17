@@ -7,7 +7,10 @@ import {
 } from "./operationCatalogFollow";
 import type { OpenAPIParameter, ResolvedOperation } from "./types";
 
-export type OperationCatalogFollowOption = boolean | { maxRows?: number } | undefined;
+export type OperationCatalogFollowOption = boolean
+  | { mode?: "append"; maxRows?: number }
+  | { mode: "reconcile"; params: Record<string, string>; maxRows?: number; onReconcile?: (sequence: number) => void }
+  | undefined;
 
 export type UseOperationCatalogFollowResult = {
   /** True when the host asked to follow (`follow` was truthy). */
@@ -24,10 +27,8 @@ export type UseOperationCatalogFollowResult = {
 /**
  * Bundles OperationCatalog's `follow` wiring behind one hook call: resolving
  * whether the list operation advertises a session to follow, deriving the
- * `useLogTail` target from its path, and opening the tail with the same
- * scoping params (locked values + active filters) the list request itself
- * sends. Kept separate from OperationCatalog.tsx so that file's already
- * large render body does not also carry this hook bookkeeping.
+ * `useLogTail` target from its path, and opening the tail with either the
+ * list's filters or the stream scope supplied by a reconciling caller.
  */
 export function useOperationCatalogFollow(options: {
   follow: OperationCatalogFollowOption;
@@ -54,8 +55,10 @@ export function useOperationCatalogFollow(options: {
     [listEndpoint],
   );
   const followParams = useMemo(
-    () => followSessionParams(listParameters, effectiveFilters),
-    [listParameters, effectiveFilters],
+    () => typeof follow === "object" && follow?.mode === "reconcile"
+      ? follow.params
+      : followSessionParams(listParameters, effectiveFilters),
+    [follow, listParameters, effectiveFilters],
   );
 
   const tail = useLogTail({

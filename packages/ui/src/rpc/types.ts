@@ -120,6 +120,8 @@ export interface ClickyParameterLookup {
 export interface ClickyFilterShape {
   label?: string;
   type?: OperationLookupFilterType;
+  unit?: string;
+  defaultOperator?: ">" | ">=" | "<" | "<=";
   multi?: boolean;
 }
 
@@ -303,10 +305,10 @@ export interface OperationLookupFilter {
   timeEnabled?: boolean;
   timeZone?: string;
   timeZones?: string[];
-  /** The unit a "duration" filter's operands are written in ("ms" or "s"), so
-   *  the control labels itself in the numbers the column is stored in. Absent
-   *  means milliseconds. */
+  /** Unit used by numeric values. For durations this is the storage unit
+   *  ("ms", "s", "m", or "h"); absent duration units mean milliseconds. */
   unit?: string;
+  defaultOperator?: ">" | ">=" | "<" | "<=";
 }
 
 export interface OperationLookupResponse {

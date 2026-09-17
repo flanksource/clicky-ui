@@ -302,6 +302,12 @@ const EVENTS_SPEC: OpenAPISpec = {
             schema: { type: "string" },
             "x-clicky": { role: "cursor" },
           },
+          {
+            name: "offset",
+            in: "query",
+            schema: { type: "integer" },
+            "x-clicky": { role: "offset" },
+          },
         ],
         responses: {},
       },
@@ -336,6 +342,7 @@ function eventPage(offset: number, limit: number): ExecutionResponse {
     pagination: {
       total: EVENT_COUNT,
       limit,
+      offset,
       hasMore: next < EVENT_COUNT,
       ...(next < EVENT_COUNT ? { nextCursor: `after-${next}` } : {}),
     },
@@ -357,7 +364,9 @@ function makeEventsClient(): OperationsApiClient & {
   const executeMock = vi.fn(
     async (_path: string, _method: string, params: Record<string, string>) => {
       const cursor = params.cursor ?? "";
-      const offset = cursor ? Number(cursor.replace("after-", "")) : 0;
+      const offset = cursor
+        ? Number(cursor.replace("after-", ""))
+        : Number(params.offset ?? 0);
       return eventPage(offset, Number(params.limit || EVENT_PAGE_SIZE));
     },
   );
@@ -374,7 +383,10 @@ function makeEventsClient(): OperationsApiClient & {
  * the scroll sentinel, which needs an IntersectionObserver jsdom does not have —
  * it drives exactly the handle the table would.
  */
-function renderEvents(client: OperationsApiClient) {
+function renderEvents(
+  client: OperationsApiClient,
+  paginationMode?: "paged" | "infinite",
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -392,6 +404,7 @@ function renderEvents(client: OperationsApiClient) {
         surfaceKey="events"
         client={client}
         renderLink={anchorLink}
+        {...(paginationMode ? { paginationMode } : {})}
         resultRenderer={(context) => {
           seen.context = context;
           return (
@@ -422,6 +435,24 @@ function cursorOf(
 }
 
 describe("OperationCatalog — cursor walk", () => {
+  it("lets a caller explicitly page a cursor-capable operation", async () => {
+    const pagedClient = makeEventsClient();
+    const paged = renderEvents(pagedClient, "paged");
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Next page" })).toBeInTheDocument(),
+    );
+    expect(paged.context?.infinite).toBeUndefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() =>
+      expect(pagedClient.executeMock.mock.calls.at(-1)?.[2]).toMatchObject({
+        offset: "2",
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("3-4 of 6")).toBeInTheDocument());
+  });
+
   it("opens the walk with no cursor and resumes it with the one the server minted", async () => {
     const client = makeEventsClient();
     renderEvents(client);
