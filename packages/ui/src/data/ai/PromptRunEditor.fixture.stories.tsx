@@ -49,7 +49,7 @@ const meta = {
     layout: "fullscreen",
     docs: {
       description: {
-        component: "Pass runner-owned fixtureSchemas to the prompt run editor. Open Edit spec, then expand the contract fence to edit its schema fields. The schema map also populates Add fence and remains outside the serialized runtime spec.",
+        component: "Pass runner-owned fixtureSchemas to the prompt run editor. Open the runtime bar's ⋮ → Advanced, then expand the contract fence to edit its schema fields. The schema map also populates Add fence and remains outside the serialized runtime spec.",
       },
     },
   },

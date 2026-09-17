@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { InputField } from "../../components/InputField";
 import { cn } from "../../lib/utils";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
@@ -26,6 +27,7 @@ import {
 } from "./runtime-mode";
 import {
   UNSPECIFIED_HINT,
+  UNSPECIFIED_ID,
   UNSPECIFIED_LABEL,
   unspecifiedHint,
 } from "./unspecified";
@@ -49,6 +51,8 @@ export type RuntimeBarSegmentsProps = {
   showEffort: boolean;
   showTimeout: boolean;
   showCost: boolean;
+  /** Trailing spec-level section fused onto the bar (see `RuntimeBarActions`). */
+  actions?: ReactNode | undefined;
   ariaLabel: string;
   className?: string | undefined;
   onModeChange: (familyId: string, modeId: string) => void;
@@ -78,6 +82,7 @@ export function RuntimeBarSegments({
   showEffort,
   showTimeout,
   showCost,
+  actions,
   ariaLabel,
   className,
   onModeChange,
@@ -237,6 +242,7 @@ export function RuntimeBarSegments({
           )}
         </div>
       )}
+      {actions}
     </div>
   );
 }
@@ -374,17 +380,17 @@ function effortItems({
   selected?: string | undefined;
   onSelect: (effort: string) => void;
 }): DropdownMenuItem[] {
-  const current = selected?.trim() ?? "";
+  const current = selected?.trim() ?? UNSPECIFIED_ID;
   const none: DropdownMenuItem = {
     group: "Reasoning effort",
     label: (
       <SegmentItemLabel
         text={UNSPECIFIED_LABEL}
         hint={UNSPECIFIED_HINT}
-        selected={current === ""}
+        selected={current === UNSPECIFIED_ID}
       />
     ),
-    onSelect: () => onSelect(""),
+    onSelect: () => onSelect(UNSPECIFIED_ID),
   };
   return [
     none,

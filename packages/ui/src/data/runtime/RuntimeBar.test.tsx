@@ -342,7 +342,7 @@ describe("RuntimeBar", () => {
     openSegment("Model — gemini-3-pro");
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Unspecifiednot sent — configuration decides"]);
+    ).toEqual(["-not sent — configuration decides"]);
 
     fireEvent.change(screen.getByLabelText("Model id"), {
       target: { value: "gemini-3-pro-preview" },
@@ -367,7 +367,7 @@ describe("RuntimeBar", () => {
     openSegment("Model — unspecified");
     const items = screen.getAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "Unspecifiednot sent — inherits GPT-5",
+      "-not sent — inherits GPT-5",
       "GPT-5openai/gpt-5",
     ]);
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
@@ -596,7 +596,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — gpt-5");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Unspecified/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^-\s*not sent/ }));
 
     expect(onChange).toHaveBeenCalledWith({ mode: "cli" });
   });
@@ -612,7 +612,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Reasoning effort");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Unspecified/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^-\s*not sent/ }));
 
     expect(onChange).toHaveBeenCalledWith({ mode: "cli", model: "gpt-5" });
   });
@@ -631,7 +631,7 @@ describe("RuntimeBar", () => {
     expect(
       screen.getAllByRole("menuitem").map((item) => item.textContent),
     ).toEqual([
-      "Unspecifiednot sent — configuration decides",
+      "-not sent — configuration decides",
       "Low",
       "High",
       "Minimalunsupported",

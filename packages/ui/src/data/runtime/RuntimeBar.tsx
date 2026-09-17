@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 import { withBudgetLimit, type RuntimeBarBudget } from "./RuntimeBar.limits";
@@ -51,6 +51,12 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   showTimeout?: boolean | undefined;
   /** Opt-in `budget.cost` segment; segmented variant only. */
   showCost?: boolean | undefined;
+  /**
+   * Trailing section fused onto the bar's border, for settings that belong to
+   * the surrounding spec rather than this runtime row (see `RuntimeBarActions`).
+   * Segmented variant only — the combo variant has no segment chrome to fuse to.
+   */
+  actions?: ReactNode | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
 };
@@ -70,11 +76,15 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   showEffort = true,
   showTimeout = false,
   showCost = false,
+  actions,
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
   if (variant === "combo" && (showTimeout || showCost)) {
     throw new Error("RuntimeBar: showTimeout and showCost require the segmented variant");
+  }
+  if (variant === "combo" && actions) {
+    throw new Error("RuntimeBar: actions require the segmented variant");
   }
   const [preference, setPreference] = useState<{
     model: string | undefined;
@@ -202,6 +212,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       showEffort={showEffort}
       showTimeout={showTimeout}
       showCost={showCost}
+      actions={actions}
       ariaLabel={ariaLabel}
       className={className}
       onModeChange={applyMode}

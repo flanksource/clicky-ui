@@ -141,8 +141,8 @@ const PROMPT_VARIANT_HINTS = {
 } as const;
 
 // Full-page runtime spec editor (design "Runtime Spec Editor v2"): a live
-// summary rail with scrollspy nav, preset quick-starts, and stacked numbered
-// sections. Container-responsive so it works embedded in a modal or standalone.
+// summary rail with scrollspy nav and stacked numbered sections.
+// Container-responsive so it works embedded in a modal or standalone.
 export function SpecRuntimeEditor({
   value,
   onChange,
@@ -330,7 +330,6 @@ export function SpecRuntimeEditor({
           <PermissionsSection
             value={value}
             onChange={commitChange}
-            entries={permissionEntries}
             families={runtimeFamilies}
             {...(runtimeSchema ? { schema: runtimeSchema } : {})}
             effectiveMode={effectiveMode}

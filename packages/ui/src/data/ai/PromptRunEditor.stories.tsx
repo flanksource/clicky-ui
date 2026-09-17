@@ -111,6 +111,10 @@ export const CanonicalRequest: Story = {
       canvas.queryByRole("group", { name: "Runtime 3" }),
     ).not.toBeInTheDocument();
 
+    // Permissions and Advanced belong to the spec, so comparison rows share one
+    // actions section rather than repeating it per row.
+    await expect(canvas.getAllByTitle("Runtime options")).toHaveLength(1);
+
     await userEvent.click(canvas.getByRole("radio", { name: "Single model" }));
     await expect(
       canvas.queryByRole("group", { name: "Runtime 2" }),
@@ -118,15 +122,15 @@ export const CanonicalRequest: Story = {
   },
 };
 
-// Spec sections render inline behind tabs instead of the "Edit spec" modal,
-// with recently used runtimes one click from reuse under the runtime bar.
+// Spec sections render inline behind tabs instead of the bar's "Advanced"
+// modal, with recently used runtimes one click from reuse under the bar.
 export const TabbedSpec: Story = {
   render: () => <TabbedSpecStory />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await expect(
-      canvas.queryByRole("button", { name: "Edit spec" }),
+      canvas.queryByTitle("Runtime options"),
     ).not.toBeInTheDocument();
     await userEvent.click(
       within(canvas.getByRole("list", { name: "Recently used runtimes" })).getByRole("button"),

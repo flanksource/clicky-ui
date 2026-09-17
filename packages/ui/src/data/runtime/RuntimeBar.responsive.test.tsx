@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RuntimeBar, type RuntimeBarValue } from "./RuntimeBar";
+import { RuntimeBarActions } from "./RuntimeBarActions";
 
 const VALUE: RuntimeBarValue = {
   mode: "agent",
@@ -12,7 +13,10 @@ const VALUE: RuntimeBarValue = {
 const titles = (element: HTMLElement) =>
   [...element.querySelectorAll("button[title]")].map((button) => button.getAttribute("title"));
 
-function section(bar: HTMLElement, name: "identity" | "settings"): HTMLElement {
+function section(
+  bar: HTMLElement,
+  name: "identity" | "settings" | "actions",
+): HTMLElement {
   const element = bar.querySelector<HTMLElement>(`[data-runtime-bar-section=${name}]`);
   if (!element) throw new Error(`runtime bar has no ${name} section`);
   return element;
@@ -39,6 +43,36 @@ describe("RuntimeBar responsive layout", () => {
     const family = screen.getByRole("button", { name: "Claude" });
 
     expect(within(family).getByText("Claude")).toHaveClass("max-sm:sr-only");
+  });
+
+  it("fuses host actions onto the bar as a third section without touching the runtime's own sections", () => {
+    render(
+      <RuntimeBar
+        value={VALUE}
+        onChange={vi.fn()}
+        showTimeout
+        showCost
+        actions={
+          <RuntimeBarActions
+            menu={[{ label: "Advanced", onSelect: vi.fn() }]}
+          />
+        }
+      />,
+    );
+
+    const bar = screen.getByRole("group", { name: "Runtime" });
+
+    expect(titles(section(bar, "identity"))).toEqual(["Family — Claude", "Claude Agent SDK", "Model — anthropic/claude-sonnet-5"]);
+    expect(titles(section(bar, "settings"))).toEqual(["Reasoning effort", "Timeout — 30m", "Max cost — $2.00"]);
+    expect(titles(section(bar, "actions"))).toEqual(["Runtime options"]);
+  });
+
+  it("renders no actions section unless the host passes one", () => {
+    render(<RuntimeBar value={VALUE} onChange={vi.fn()} showTimeout showCost />);
+
+    expect(
+      screen.getByRole("group", { name: "Runtime" }).querySelector("[data-runtime-bar-section=actions]"),
+    ).toBeNull();
   });
 
   it("renders no settings group when the runtime exposes no effort or limits", () => {

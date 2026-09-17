@@ -71,7 +71,6 @@ export type AISpecRuntimeSandboxDispatch = {
 
 export type AISpecRuntimeSandbox = {
   mode?: SpecSandboxMode;
-  approval?: SpecPermissionMode;
   backend?: string;
   agent?: string;
   policy?: AISpecRuntimeSandboxPolicy;
@@ -86,9 +85,17 @@ export function compactRuntimeSandbox(
     const raw = value.trim();
     return raw ? sandboxMode(raw) : undefined;
   }
+  // Captain's SandboxRef has no Approval field and decodes with
+  // DisallowUnknownFields: a persisted `sandbox.approval` must fail loudly
+  // here rather than load silently and blow up as "unknown field" at run
+  // time. The base posture now lives at `permissions.mode`, independent of
+  // the sandbox (see AISpecRuntimePermissions).
+  if ("approval" in value) {
+    throw new Error("sandbox.approval was removed; use permissions.mode");
+  }
   assertKnownKeys(
     value,
-    ["mode", "approval", "backend", "agent", "policy", "dispatch"],
+    ["mode", "backend", "agent", "policy", "dispatch"],
     "sandbox",
   );
   const configured = Object.values(value).some(
@@ -102,21 +109,19 @@ export function compactRuntimeSandbox(
     return undefined;
   }
   const mode = sandboxMode(value.mode);
-  const approval = permissionMode(value.approval);
   const backend = cleanString(value.backend);
   const agent = cleanString(value.agent);
   const policy = compactNativePolicy(value.policy);
   const dispatch = compactDispatch(value.dispatch);
 
   if (mode === "off") {
-    rejectSandboxFields(mode, { approval, backend, agent, policy, dispatch });
+    rejectSandboxFields(mode, { backend, agent, policy, dispatch });
     return mode;
   }
   if (mode === "native") {
     rejectSandboxFields(mode, { backend, agent, dispatch });
     return compactSandboxObject({
       mode,
-      ...(approval ? { approval } : {}),
       ...(policy ? { policy } : {}),
     });
   }
@@ -124,14 +129,12 @@ export function compactRuntimeSandbox(
     rejectSandboxFields(mode, { agent, policy, dispatch });
     return compactSandboxObject({
       mode,
-      ...(approval ? { approval } : {}),
       ...(backend ? { backend } : {}),
     });
   }
   rejectSandboxFields(mode, { policy });
   return compactSandboxObject({
     mode,
-    ...(approval ? { approval } : {}),
     ...(backend ? { backend } : {}),
     ...(agent ? { agent } : {}),
     ...(dispatch ? { dispatch } : {}),
@@ -340,16 +343,6 @@ function sandboxMode(value: string): SpecSandboxMode {
   const mode = SPEC_SANDBOX_MODES.find((item) => item === value);
   if (!mode)
     throw new Error(`sandbox.mode ${JSON.stringify(value)} is invalid`);
-  return mode;
-}
-
-function permissionMode(
-  value: string | undefined,
-): SpecPermissionMode | undefined {
-  if (!value) return undefined;
-  const mode = SPEC_PERMISSION_MODES.find((item) => item === value);
-  if (!mode)
-    throw new Error(`sandbox.approval ${JSON.stringify(value)} is invalid`);
   return mode;
 }
 

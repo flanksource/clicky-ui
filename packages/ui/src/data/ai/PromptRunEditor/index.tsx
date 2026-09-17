@@ -1,18 +1,20 @@
 import { useState, type ReactNode } from "react";
-import { Button } from "../../../components/button";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
 import { SegmentedControl } from "../../../components/SegmentedControl";
 import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
 import { UiGearSix } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
-import { Icon } from "../../Icon";
 import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
 import type {
   AttachmentLimits,
   AttachmentUploadAdapter,
 } from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
+import type {
+  RuntimeBarAction,
+  RuntimeBarActionsProps,
+} from "../../runtime/RuntimeBarActions";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
@@ -51,6 +53,7 @@ import {
 } from "./model";
 import { Block, PromptBlocks } from "./PromptBlocks";
 import { RecentRuntimes } from "./RecentRuntimes";
+import { permissionField, presetsField } from "./runtimeActions";
 import { RuntimeRows } from "./RuntimeRows";
 
 export type PromptRunEditorProps = {
@@ -95,12 +98,13 @@ export type PromptRunEditorProps = {
   footer?: ReactNode | undefined;
   className?: string | undefined;
 
-  editSpecLabel?: string | undefined;
+  /** Label of the runtime bar's ⋮ entry that opens the full spec modal. */
+  advancedLabel?: string | undefined;
   specModalTitle?: string | undefined;
-  /** Restrict which SpecRuntimeEditor sections the "Edit spec" modal shows. */
+  /** Restrict which SpecRuntimeEditor sections the "Advanced" modal shows. */
   specSections?: readonly SpecSectionId[] | undefined;
   /**
-   * Replaces the "Edit spec" modal with inline tabs of spec sections (see
+   * Replaces the "Advanced" modal with inline tabs of spec sections (see
    * `SPEC_RUNTIME_TABS`), led by a tab holding Variables and the prompt.
    */
   specTabs?: readonly SpecRuntimeTab[] | undefined;
@@ -167,7 +171,7 @@ export function PromptRunEditor({
   header,
   footer,
   className,
-  editSpecLabel = "Edit spec",
+  advancedLabel = "Advanced",
   specModalTitle = "Runtime spec",
   specSections,
   specTabs,
@@ -180,6 +184,7 @@ export function PromptRunEditor({
     );
   }
   const [specOpen, setSpecOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const spec = value.spec ?? {};
   const modelMode = modelModeOf(value);
   const presetCatalog = presets ?? [];
@@ -194,6 +199,43 @@ export function PromptRunEditor({
       },
       presetCatalog,
     );
+
+  // Spec-level run settings shown on the runtime bar. The permission field is
+  // dropped under `specTabs` because the inline Permissions tab already owns it,
+  // and a value with two editors in one layout is a value that drifts.
+  const barActions: RuntimeBarActionsProps = {
+    fields: [
+      ...(specTabs
+        ? []
+        : [
+            permissionField({
+              spec,
+              families,
+              effectiveMode: runRuntime.mode,
+              onChange: (next) => onChange({ ...value, spec: next }),
+            }),
+          ]),
+      ...(presets === undefined
+        ? []
+        : [
+            presetsField({
+              presets: presetCatalog,
+              value: value.presets ?? [],
+              onChange: (next) => onChange({ ...value, presets: next }),
+              onReorder: () => setPresetsOpen(true),
+            }),
+          ]),
+    ].filter((field): field is RuntimeBarAction => field !== undefined),
+    menu: specTabs
+      ? []
+      : [
+          {
+            label: advancedLabel,
+            icon: UiGearSix,
+            onSelect: () => setSpecOpen(true),
+          },
+        ],
+  };
 
   const specEditorProps: SpecRuntimeEditorProps = {
     value: spec,
@@ -246,6 +288,7 @@ export function PromptRunEditor({
           families={families}
           reasoningEfforts={reasoningEfforts}
           effectiveRuntime={runRuntime}
+          actions={barActions}
         />
         <RecentRuntimes
           runtimes={recentRuntimes}
@@ -253,24 +296,6 @@ export function PromptRunEditor({
           families={families}
           onSelect={(runtime) => onChange(withRecentRuntime(value, runtime))}
         />
-        {presets !== undefined && (
-          <OrderedPresetSelect
-            presets={presetCatalog}
-            value={value.presets ?? []}
-            onChange={(next) => onChange({ ...value, presets: next })}
-          />
-        )}
-        {!specTabs && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-fit"
-            onClick={() => setSpecOpen(true)}
-          >
-            <Icon icon={UiGearSix} className="size-4" />
-            {editSpecLabel}
-          </Button>
-        )}
         {children}
       </Block>
 
@@ -298,6 +323,22 @@ export function PromptRunEditor({
       )}
 
       {footer}
+
+      {presets !== undefined && (
+        <Modal
+          open={presetsOpen}
+          onClose={() => setPresetsOpen(false)}
+          title="Presets"
+          size="lg"
+          closeOnEsc
+        >
+          <OrderedPresetSelect
+            presets={presetCatalog}
+            value={value.presets ?? []}
+            onChange={(next) => onChange({ ...value, presets: next })}
+          />
+        </Modal>
+      )}
 
       {!specTabs && (
         <Modal

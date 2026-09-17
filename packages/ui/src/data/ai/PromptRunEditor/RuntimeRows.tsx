@@ -1,8 +1,13 @@
 import { Button } from "../../../components/button";
+import { useContainerWiderThan } from "../../../hooks/use-container-width";
 import { UiAdd, UiTrash } from "../../../icons";
 import { Icon } from "../../Icon";
 import type { ChatModel } from "../../chat/types";
 import { RuntimeBar } from "../../runtime/RuntimeBar";
+import {
+  RuntimeBarActions,
+  type RuntimeBarActionsProps,
+} from "../../runtime/RuntimeBarActions";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
 import {
@@ -14,6 +19,12 @@ import {
   type AIPromptRunValue,
 } from "./model";
 
+// Below this the bar's identity and settings sections already fill a row, so
+// inline action fields would force a third. Measured on the row wrapper, which
+// fills the column independently of what the bar renders. Tune in the browser
+// at captain's narrow left column and gavel's 2xl dialog.
+const RUNTIME_ACTIONS_INLINE_MIN_PX = 560;
+
 // Single model: one bar that also owns the run's timeout and max cost.
 // Multi-model: one bar per comparison runtime; limits stay shared in the spec.
 export function RuntimeRows({
@@ -23,6 +34,7 @@ export function RuntimeRows({
   families,
   reasoningEfforts,
   effectiveRuntime,
+  actions,
 }: {
   value: AIPromptRunValue;
   onChange: (value: AIPromptRunValue) => void;
@@ -30,7 +42,10 @@ export function RuntimeRows({
   families: SpecRuntimeFamily[];
   reasoningEfforts: string[];
   effectiveRuntime: Pick<AISpecRuntimeSpec, "model" | "mode">;
+  /** Spec-level run settings; rendered once regardless of the row count. */
+  actions?: RuntimeBarActionsProps | undefined;
 }) {
+  const { ref, wider } = useContainerWiderThan(RUNTIME_ACTIONS_INLINE_MIN_PX);
   const shared = {
     models,
     families,
@@ -41,7 +56,12 @@ export function RuntimeRows({
 
   if (modelModeOf(value) === "single") {
     return (
-      <div role="group" aria-label="Runtime 1" className="flex min-w-0 items-center">
+      <div
+        ref={ref}
+        role="group"
+        aria-label="Runtime 1"
+        className="flex min-w-0 items-center"
+      >
         <RuntimeBar
           {...shared}
           value={singleRuntimeOf(value)}
@@ -49,6 +69,9 @@ export function RuntimeRows({
           showTimeout
           showCost
           ariaLabel="Runtime 1 controls"
+          {...(actions
+            ? { actions: <RuntimeBarActions {...actions} inline={wider} /> }
+            : {})}
         />
       </div>
     );
@@ -56,7 +79,7 @@ export function RuntimeRows({
 
   const rows = runtimeRows(value);
   return (
-    <div className="grid grid-cols-1 gap-density-2">
+    <div ref={ref} className="grid grid-cols-1 gap-density-2">
       {rows.map((runtime, index) => (
         <div
           key={index}
@@ -96,6 +119,8 @@ export function RuntimeRows({
           )}
         </div>
       ))}
+      {/* Spec-level, so it sits beside the rows rather than repeating in each. */}
+      {actions && <RuntimeBarActions {...actions} inline={wider} standalone />}
       <Button
         size="sm"
         variant="outline"
