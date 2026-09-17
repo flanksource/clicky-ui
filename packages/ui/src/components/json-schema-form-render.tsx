@@ -47,6 +47,7 @@ import {
   orderByPriority,
   orderByXOrder,
   orderRequiredFirst,
+  seedFromSchema,
   softError,
 } from "./json-schema-form-utils";
 import { labelSizeClass } from "./json-schema-form-size";
@@ -54,6 +55,7 @@ import { PropertiesFieldRow, PropertyValueEditor } from "./json-schema-form-prop
 import { PropertyValuePreview } from "./json-schema-form-property-preview";
 import { propertyControlSize } from "./json-schema-form-properties-size";
 import { matchesFieldFilter } from "./json-schema-form-filter";
+import { Combobox } from "./Combobox";
 
 // This module is the top of the json-schema-form graph: it imports the control
 // components and dispatches into them, while container controls recurse back in
@@ -383,8 +385,11 @@ export function renderObjectFields(
   // each field spans `x-col-span` columns (object sections/table arrays span the
   // full row). Only takes effect in stacked mode — inline owns its 2-track grid.
   const columns = ctx.layout.mode !== "stacked" ? 1 : normalizeColumns(schema["x-columns"]);
-  return entries.flatMap(([key, prop]) => {
+  const arrayEntries = entries.filter(([, prop]) => prop.type === "array");
+  const compactArrays = ctx.layout.mode !== "properties" && arrayEntries.length > 3;
+  const rows = entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
+    if (compactArrays && prop.type === "array" && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
     const row = renderFieldRow(
       {
         key,
@@ -419,6 +424,32 @@ export function renderObjectFields(
     // child of the FieldsGrid and snaps to its label/value tracks.
     return [<div key={key} className="contents">{row}</div>];
   });
+  if (compactArrays && !ctx.readOnly && !ctx.presentation) {
+    const available = arrayEntries.filter(([key, prop]) =>
+      !hidden.has(key) && (!Array.isArray(value[key]) || prop.maxItems === undefined || value[key].length < prop.maxItems),
+    );
+    if (available.length > 0) {
+      rows.push(
+        <div key="keyed-array-add" className="col-span-full w-full max-w-72">
+          <Combobox
+            ariaLabel="Add item"
+            placeholder="Add item…"
+            options={available.map(([key, prop]) => ({ value: key, label: prop.title || key }))}
+            value=""
+            allowCustomValue={false}
+            onChange={(key) => {
+              const prop = properties[key];
+              if (!prop || prop.type !== "array") throw new Error(`cannot add item to ${key}`);
+              const items = value[key];
+              if (items !== undefined && !Array.isArray(items)) throw new Error(`${key} is not an array`);
+              onChange({ ...value, [key]: [...(items ?? []), seedFromSchema(prop.items ?? { type: "string" })] });
+            }}
+          />
+        </div>,
+      );
+    }
+  }
+  return rows;
 }
 
 // rendersFullWidth reports whether a property renders as a full-width block

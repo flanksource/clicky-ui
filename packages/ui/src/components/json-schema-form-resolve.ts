@@ -302,6 +302,15 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   if (branch) {
     return { ...base, kind: "enum", options: enumOptions(branch) };
   }
+  const templateBranch = prop.anyOf?.find((part) => part.type === "string" && typeof part.pattern === "string");
+  if (prop.anyOf?.length === 2 && templateBranch) {
+    const nativeBranch = prop.anyOf.find((part) => part !== templateBranch);
+    if (nativeBranch && (nativeBranch.type === "number" || nativeBranch.type === "integer" || nativeBranch.type === "boolean" || nativeBranch.format === "date" || nativeBranch.format === "date-time")) {
+      const nativeSchema = { ...prop, ...nativeBranch };
+      delete nativeSchema.anyOf;
+      return resolveControl({ ...args, prop: nativeSchema });
+    }
+  }
   // A schema-declared date/date-time string renders as a date control.
   if (prop.format === "date" || prop.format === "date-time") {
     return { ...base, kind: "date", dateFormat: prop.format };

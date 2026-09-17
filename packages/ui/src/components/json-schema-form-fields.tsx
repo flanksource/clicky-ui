@@ -125,7 +125,7 @@ export function NumberControl({
   // spin buttons, min/max), matching a hand-built numeric field.
   const coerce = field.coerceNumber !== false;
   const step = typeof field.schema.multipleOf === "number" ? field.schema.multipleOf : undefined;
-  const native = step !== undefined;
+  const native = step !== undefined && !(field.allowCustomValue && typeof field.value === "string" && field.value.includes("{{"));
   // A static unit (e.g. "%") rides the right edge of the input as a display-only
   // suffix; a consumer-set `suffix` (e.g. an insert-snippet button) wins if both
   // are present (number insert triggers mount on the left as `prefix`).
@@ -248,6 +248,9 @@ export function DateControl({
   size: FormSize;
 }) {
   const text = toText(field.value);
+  if (!readOnly && field.allowCustomValue && text.includes("{{")) {
+    return <StringControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+  }
   if (readOnly) {
     return (
       <div
@@ -293,7 +296,8 @@ export function BooleanControl({
   // so it is preserved and editable.
   if (typeof field.value === "boolean" || field.value === undefined || field.value === null) {
     return (
-      <div className={cn("flex items-center", controlHeightClass[size])}>
+      <div className={cn("flex items-center gap-1", controlHeightClass[size])}>
+        {field.prefix}
         <input
           id={fieldId}
           type="checkbox"
