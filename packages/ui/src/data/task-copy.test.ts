@@ -71,6 +71,30 @@ const APPLY: TaskSnapshot = {
   details: { command: "oipa-cli", status: "exited", exitCode: 0, scanId: "abc" },
 };
 
+const RETRY: TaskSnapshot = {
+  id: "t5",
+  name: "Create commit",
+  type: "task",
+  groupId: "g1",
+  status: "failed",
+  details: {
+    command: "git",
+    args: ["commit", "-m", "fix bug"],
+    cwd: "/repo path",
+    status: "exited",
+    exitCode: 1,
+  },
+};
+
+const NON_EXEC: TaskSnapshot = {
+  id: "t6",
+  name: "Diff summary",
+  type: "task",
+  groupId: "g1",
+  status: "success",
+  details: { changedFiles: 3, insertions: 12, deletions: 4 },
+};
+
 const TASKS = [MEASURE, EXPORT, VERIFY, APPLY];
 
 describe("taskGroupMarkdown", () => {
@@ -103,10 +127,25 @@ describe("taskGroupMarkdown", () => {
     expect(md).toContain("stderr (showing latest 1 MiB):\n```\nwarn: retrying once\n```");
   });
 
-  it("fences the open-shaped details object as JSON, keeping unknown keys", () => {
+  it("fences exec-shaped details as a pasteable shell command, with the remainder as JSON", () => {
     const md = taskGroupMarkdown(GROUP, [APPLY]);
+    expect(md).toContain("command:\n```sh\noipa-cli\n```");
     expect(md).toContain("details:\n```json");
     expect(md).toContain('"scanId": "abc"');
+    // command/args/cwd never repeat in the JSON remainder.
+    expect(md).not.toContain('"command"');
+  });
+
+  it("prefixes the shell command with `cd` when the exec details carry a cwd", () => {
+    const md = taskGroupMarkdown(GROUP, [RETRY]);
+    expect(md).toContain("command:\n```sh\ncd '/repo path' && git commit -m 'fix bug'\n```");
+  });
+
+  it("fences a non-exec-shaped details object whole, as JSON", () => {
+    const md = taskGroupMarkdown(GROUP, [NON_EXEC]);
+    expect(md).not.toContain("command:\n```sh");
+    expect(md).toContain("details:\n```json");
+    expect(md).toContain('"changedFiles": 3');
   });
 
   it("includes every task, successes included", () => {

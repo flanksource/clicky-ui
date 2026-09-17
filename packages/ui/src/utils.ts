@@ -96,3 +96,4 @@ export {
   type ClickyColumnUnit,
   type FormatBytesOptions,
 } from "./lib/format";
+export { shellCommandLine, shellQuote } from "./lib/shell-command";

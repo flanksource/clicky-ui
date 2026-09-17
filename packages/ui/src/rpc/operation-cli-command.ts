@@ -1,3 +1,4 @@
+import { shellQuote } from "../lib/shell-command";
 import type { OperationScheduleCLI } from "./operation-schedule-types";
 import type { ResolvedOperation } from "./types";
 
@@ -49,9 +50,4 @@ function flagValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(",");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
-}
-
-function shellQuote(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }

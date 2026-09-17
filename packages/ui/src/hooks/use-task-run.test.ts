@@ -160,6 +160,29 @@ describe("useTaskRun (SSE)", () => {
     });
   });
 
+  it("never renders a finished run's state as the state of the run it switches to", async () => {
+    const renders: Array<{ id: string; isComplete: boolean; snapshotIds: string[] }> = [];
+    const { result, rerender } = renderHook(
+      ({ id }) => {
+        const state = useTaskRun({ id });
+        renders.push({ id, isComplete: state.isComplete, snapshotIds: state.snapshots.map((s) => s.id) });
+        return state;
+      },
+      { initialProps: { id: "finished-run" } },
+    );
+    act(() => {
+      MockEventSource.last!.emit("task", groupSnap("success"));
+      MockEventSource.last!.emit("done", { status: "completed" });
+    });
+    await waitFor(() => expect(result.current.isComplete).toBe(true));
+
+    rerender({ id: "retried-run" });
+
+    const switched = renders.filter((render) => render.id === "retried-run");
+    expect(switched.length).toBeGreaterThan(0);
+    expect(switched).toEqual(switched.map(() => ({ id: "retried-run", isComplete: false, snapshotIds: [] })));
+  });
+
   it("clears snapshots when the subscription is disabled", async () => {
     const { result, rerender } = renderHook(
       ({ enabled }) => useTaskRun({ id: "g1", enabled }),

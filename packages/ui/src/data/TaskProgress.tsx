@@ -4,7 +4,7 @@ import { Button } from "../components/button";
 import { CopyButton } from "../components/CopyButton";
 import { SplitButton } from "../components/SplitButton";
 import { useCopyFlash } from "../components/clipboard";
-import { UiCheck, UiCopy, UiJson, UiPlay, UiRestart, UiStop, UiWarningTriangle } from "../icons";
+import { UiCheck, UiCopy, UiJson, UiPlay, UiRefresh, UiRestart, UiStop, UiWarningTriangle } from "../icons";
 import { cn } from "../lib/utils";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Icon } from "./Icon";
@@ -417,7 +417,13 @@ function TaskControls({
 }) {
   const [busy, setBusy] = useState<TaskControlAction | null>(null);
   const [error, setError] = useState("");
-  const icons = { start: UiPlay, stop: UiStop, restart: UiRestart, drain: UiStop };
+  const icons: Record<TaskControlAction, typeof UiPlay> = {
+    start: UiPlay,
+    stop: UiStop,
+    restart: UiRestart,
+    drain: UiStop,
+    retry: UiRefresh,
+  };
   const invoke = async (action: TaskControlAction) => {
     setBusy(action);
     setError("");

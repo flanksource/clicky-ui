@@ -118,6 +118,44 @@ export const CopyRunDetails: Story = {
   },
 };
 
+// A failed run whose group advertises `retry` — the operator re-runs just the
+// failed work without starting the whole thing over. The exec task's details
+// render a pasteable `cd ... && ...` command line rather than JSON.stringify.
+export const FailedWithRetry: Story = {
+  args: {
+    snapshots: [
+      {
+        id: "commit-run",
+        name: "Commit gavel",
+        type: "group",
+        status: "failed",
+        groupId: "commit-1",
+        kind: "gavel-commit",
+        total: 1,
+        failed: 1,
+        controls: ["retry"],
+      },
+      {
+        id: "commit-task",
+        name: "Create commit",
+        type: "task",
+        groupId: "commit-1",
+        status: "failed",
+        error: "exit status 1",
+        stderr: "error: nothing added to commit but untracked files present\n",
+        details: {
+          command: "git",
+          args: ["commit", "-m", "fix bug", "src/report generator.ts"],
+          cwd: "/repo path",
+          status: "exited",
+          exitCode: 1,
+        },
+      },
+    ],
+    onControl: fn(),
+  },
+};
+
 export const Complete: Story = {
   args: {
     snapshots: run("success", [

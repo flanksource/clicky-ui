@@ -8,7 +8,7 @@ export interface LogEntry {
   message: string;
 }
 
-export type TaskControlAction = "start" | "stop" | "restart" | "drain";
+export type TaskControlAction = "start" | "stop" | "restart" | "drain" | "retry";
 
 export interface TaskWorkProgress {
   total: number;
@@ -76,6 +76,7 @@ export interface TaskProcessDetails {
 export interface TaskExecDetails {
   command: string;
   args?: string[];
+  cwd?: string;
   pid?: number;
   status: string;
   exitCode: number;
