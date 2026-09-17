@@ -8,6 +8,7 @@ import type {
   CommentAnchor,
   CommentCallbacks,
   CommentConfig,
+  CommentCreateAction,
 } from "./comment-types";
 
 export type CommentThreadProps = CommentCallbacks & {
@@ -25,6 +26,7 @@ export type CommentThreadProps = CommentCallbacks & {
   composerPlaceholder?: string;
   /** Hide the composer (read-only thread). */
   hideComposer?: boolean;
+  createActions?: readonly CommentCreateAction[];
   renderRootMeta?: (comment: Comment) => ReactNode;
   renderBody?: (body: string) => ReactNode;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
@@ -45,6 +47,7 @@ export function CommentThread({
   defaultExpanded = false,
   composerPlaceholder,
   hideComposer = false,
+  createActions,
   renderRootMeta,
   renderBody,
   threadToMarkdown,
@@ -85,6 +88,7 @@ export function CommentThread({
               ? { placeholder: composerPlaceholder }
               : {})}
             onCreate={onCreate}
+            {...(createActions ? { createActions } : {})}
             {...(onMention ? { onMention } : {})}
           />
         </div>
