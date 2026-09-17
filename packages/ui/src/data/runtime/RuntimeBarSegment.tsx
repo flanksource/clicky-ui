@@ -22,6 +22,7 @@ export function RuntimeSegment({
   title,
   header,
   disabled = false,
+  hideChevron = false,
   className,
   children,
 }: {
@@ -30,6 +31,8 @@ export function RuntimeSegment({
   title: string;
   header?: ReactNode;
   disabled?: boolean;
+  /** Drops the trailing chevron, for a segment whose caption is a bare glyph. */
+  hideChevron?: boolean;
   className?: string | undefined;
   children: ReactNode;
 }) {
@@ -52,10 +55,12 @@ export function RuntimeSegment({
           className="inline-flex h-full w-full min-w-0 items-center gap-1.5 px-density-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [[aria-expanded=true]_&]:bg-muted"
         >
           {children}
-          <Icon
-            icon={UiChevronDown}
-            className="size-3 shrink-0 text-muted-foreground/70"
-          />
+          {!hideChevron && (
+            <Icon
+              icon={UiChevronDown}
+              className="size-3 shrink-0 text-muted-foreground/70"
+            />
+          )}
         </button>
       }
     />

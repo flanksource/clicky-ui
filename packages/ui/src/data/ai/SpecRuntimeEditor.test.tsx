@@ -10,7 +10,6 @@ import type { ChatModel } from "../chat/types";
 import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
 import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
-import { SPEC_PERMISSION_PRESET_STORAGE_KEY } from "./SpecRuntimeEditor/presets";
 
 const RESOURCES: Record<SecretKind, SecretResource[]> = {
   secret: [{ name: "captain-api", keys: ["token"] }],
@@ -572,92 +571,45 @@ describe("SpecRuntimeEditor", () => {
     ).toBeInTheDocument();
   });
 
-  it("applies permission presets and marks custom trees after manual tweaks", () => {
+  it("changes the permission posture and clears it via Unspecified", () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
         mode: "agent",
+        permissions: { mode: "plan" },
       });
       return (
-        <SpecRuntimeEditor
-          value={value}
-          onChange={setValue}
-          tools={SAMPLE_TOOLS}
-          families={PERMISSION_FAMILIES}
-        />
+        <>
+          <SpecRuntimeEditor
+            value={value}
+            onChange={setValue}
+            tools={SAMPLE_TOOLS}
+            families={PERMISSION_FAMILIES}
+          />
+          <output aria-label="Permissions value">
+            {JSON.stringify(value.permissions ?? {})}
+          </output>
+        </>
       );
     }
 
     render(<Host />);
 
-    // The permission mode posture and the tool preset both publish a "Plan"
-    // option, so each is queried from its own control rather than the shared
-    // "Permissions" region.
+    const posture = () =>
+      screen.getByRole("radiogroup", { name: "Permission posture" });
     expect(
-      within(
-        screen.getByRole("radiogroup", { name: "Permission posture" }),
-      ).getByRole("radio", { name: "Unspecified" }),
+      within(posture()).getByRole("radio", { name: "Plan" }),
     ).toHaveAttribute("aria-checked", "true");
 
-    const planPreset = within(
-      screen.getByRole("radiogroup", { name: "Permission preset" }),
-    ).getByRole("radio", { name: /Plan/ });
-    fireEvent.click(planPreset);
-
-    expect(planPreset).toHaveAttribute("aria-checked", "true");
-    // Applying a tool preset is independent of the posture: Unspecified survives.
-    expect(
-      within(
-        screen.getByRole("radiogroup", { name: "Permission posture" }),
-      ).getByRole("radio", { name: "Unspecified" }),
-    ).toHaveAttribute("aria-checked", "true");
-    openPermissionsAdvanced();
-    expect(
-      within(screen.getByLabelText("Permissions")).queryByRole("combobox", {
-        name: "Permission mode",
-      }),
-    ).not.toBeInTheDocument();
-    expect(policyRadio("Read", "Allow")).toBeChecked();
-    expect(policyRadio("Bash", "Deny")).toBeChecked();
-
-    fireEvent.click(policyRadio("Bash", "Allow"));
-    expect(screen.getByRole("radio", { name: /Custom/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
+    // Choosing Unspecified deletes permissions.mode outright.
+    fireEvent.click(
+      within(posture()).getByRole("radio", { name: "-" }),
     );
-  });
-
-  it("saves and reapplies local permission presets", () => {
-    window.localStorage.removeItem(SPEC_PERMISSION_PRESET_STORAGE_KEY);
-
-    function Host() {
-      const [value, setValue] = useState<AISpecRuntimeValue>({});
-      return (
-        <SpecRuntimeEditor
-          value={value}
-          onChange={setValue}
-          tools={SAMPLE_TOOLS}
-        />
-      );
-    }
-
-    render(<Host />);
-
-    fireEvent.click(screen.getByRole("radio", { name: /Read-only/ }));
-    fireEvent.change(screen.getByLabelText("Permission preset name"), {
-      target: { value: "Locked down" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
     expect(
-      window.localStorage.getItem(SPEC_PERMISSION_PRESET_STORAGE_KEY),
-    ).toContain("Locked down");
-
-    openPermissionsAdvanced();
-    expect(policyRadio("Bash", "Deny")).toBeChecked();
-    fireEvent.click(policyRadio("Bash", "Allow"));
-    expect(policyRadio("Bash", "Allow")).toBeChecked();
-
-    fireEvent.click(screen.getByRole("radio", { name: /Locked down/ }));
-    expect(policyRadio("Bash", "Deny")).toBeChecked();
+      within(posture()).getByRole("radio", { name: "-" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      JSON.parse(screen.getByLabelText("Permissions value").textContent ?? "{}"),
+    ).not.toHaveProperty("mode");
   });
 
   it("shows the target chip in the header", () => {
@@ -944,13 +896,13 @@ describe("SpecRuntimeEditor", () => {
     expect(
       within(modelSection).getByTitle("Model — unspecified"),
     ).toBeInTheDocument();
-    // The model and reasoning-effort segments both read Unspecified.
-    expect(within(modelSection).getAllByText("Unspecified")).toHaveLength(2);
+    // The model and reasoning-effort segments both read "-" (Unspecified).
+    expect(within(modelSection).getAllByText("-")).toHaveLength(2);
 
     expect(
       within(
         screen.getByRole("radiogroup", { name: "Permission posture" }),
-      ).getByRole("radio", { name: "Unspecified" }),
+      ).getByRole("radio", { name: "-" }),
     ).toHaveAttribute("aria-checked", "true");
   });
 });

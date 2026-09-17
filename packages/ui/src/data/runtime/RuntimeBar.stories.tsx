@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
+import { UiGearSix } from "../../icons";
+import { cn } from "../../lib/utils";
 import type { ChatModel } from "../chat/types";
 import type { AISpecRuntimeValue } from "../ai/SpecRuntimeEditor.model";
 import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
+import { RuntimeBarActions } from "./RuntimeBarActions";
 
 // A catalog wide enough for every segment to have somewhere to go: agent/CLI
 // families that carry their own models, plus a hosted-API family that does not.
@@ -156,6 +159,66 @@ export const NarrowContainer: Story = {
       const span = within(settings!).getByText(caption);
       await expect(span.scrollWidth).toBeLessThanOrEqual(span.clientWidth);
     }
+  },
+};
+
+function HostActionsStory({ inline }: { inline: boolean }) {
+  const [value, setValue] = useState<AISpecRuntimeValue>({
+    mode: "cli",
+    model: "anthropic/claude-sonnet-4-6",
+    effort: "medium",
+  });
+  return (
+    <div className={cn("p-4", inline ? "max-w-3xl" : "w-80 max-w-full")}>
+      <RuntimeBar
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        ariaLabel={inline ? "Wide runtime" : "Narrow runtime"}
+        actions={
+          <RuntimeBarActions
+            inline={inline}
+            fields={[
+              {
+                id: "presets",
+                label: "Presets",
+                title: "Presets — Guardrails",
+                caption: <span className="text-xs">Presets 1</span>,
+                items: [{ label: "Guardrails", onSelect: () => {} }],
+              },
+            ]}
+            menu={[{ label: "Advanced", icon: UiGearSix, onSelect: () => {} }]}
+          />
+        }
+      />
+    </div>
+  );
+}
+
+// Spec-level settings the host fuses onto the bar. Wide enough, they are their
+// own segments; in a narrow column the host flips `inline` off and the same
+// items become submenus of the ⋮ segment that always carries Advanced.
+export const HostActions: Story = {
+  args: { variant: "segmented" },
+  render: () => (
+    <div className="grid gap-4">
+      <HostActionsStory inline />
+      <HostActionsStory inline={false} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const wide = canvas.getByRole("group", { name: "Wide runtime" });
+    const narrow = canvas.getByRole("group", { name: "Narrow runtime" });
+
+    await expect(within(wide).getByTitle("Presets — Guardrails")).toBeInTheDocument();
+    await expect(within(narrow).queryByTitle("Presets — Guardrails")).not.toBeInTheDocument();
+
+    await userEvent.click(within(narrow).getByTitle("Runtime options"));
+    const menu = within(document.body).getAllByRole("menu")[0]!;
+    await expect(
+      within(menu).getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Presets", "Advanced"]);
   },
 };
 

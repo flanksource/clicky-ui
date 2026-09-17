@@ -250,14 +250,13 @@ describe("SpecRuntimeEditor sandbox section", () => {
     ).toBeNull();
   });
 
-  it("clears native policy and any legacy sandbox.approval when switching to docker", () => {
+  it("clears native policy when switching to docker", () => {
     render(
       <Harness
         initial={{
           mode: "cli",
           sandbox: {
             mode: "native",
-            approval: "plan",
             policy: { filesystem: { access: "read-only" } },
           },
         }}

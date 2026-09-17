@@ -60,7 +60,7 @@ describe("buildAISpecRuntimePayload", () => {
         memory: {
           bare: true,
         },
-        sandbox: { mode: "native", approval: "acceptEdits" },
+        sandbox: { mode: "native" },
         setup: {
           cwd: ".",
           baseDir: " .captain/workspaces ",
@@ -156,7 +156,7 @@ describe("buildAISpecRuntimePayload", () => {
         memory: {
           bare: true,
         },
-        sandbox: { mode: "native", approval: "acceptEdits" },
+        sandbox: "native",
         setup: {
           cwd: ".",
           baseDir: ".captain/workspaces",
@@ -293,13 +293,32 @@ describe("buildAISpecRuntimePayload", () => {
     expect(buildAISpecRuntimePayload({ cliArgs: {} })).toEqual({});
   });
 
-  it("emits the dontAsk approval posture under sandbox", () => {
+  it("emits the dontAsk permission mode under permissions", () => {
     expect(SPEC_PERMISSION_MODES).toContain("dontAsk");
     expect(
       buildAISpecRuntimePayload({
-        sandbox: { mode: "native", approval: "dontAsk" },
+        permissions: { mode: "dontAsk" },
       }),
-    ).toEqual({ spec: { sandbox: { mode: "native", approval: "dontAsk" } } });
+    ).toEqual({ spec: { permissions: { mode: "dontAsk" } } });
+  });
+
+  it("rejects a legacy sandbox.approval instead of loading it silently", () => {
+    // Captain's SandboxRef has no Approval field and decodes with
+    // DisallowUnknownFields, so a saved value here must fail loudly at
+    // compaction rather than round-trip and blow up as "unknown field" later.
+    expect(() =>
+      buildAISpecRuntimePayload({
+        sandbox: { mode: "native", approval: "dontAsk" } as never,
+      }),
+    ).toThrow("sandbox.approval was removed; use permissions.mode");
+  });
+
+  it("rejects an unknown permissions.mode instead of passing it through", () => {
+    expect(() =>
+      buildAISpecRuntimePayload({
+        permissions: { mode: "bogus" as never },
+      }),
+    ).toThrow('permissions.mode "bogus" is invalid');
   });
 
   it("omits empty setup and local workflow sections", () => {

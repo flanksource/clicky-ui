@@ -16,12 +16,11 @@ describe("compactAISpecRuntime sandbox", () => {
     ).toBe("git-agent");
   });
 
-  it("preserves unified approval, backend, agent, and dispatch settings", () => {
+  it("preserves backend, agent, and dispatch settings", () => {
     expect(
       compactAISpecRuntime({
         sandbox: {
           mode: "git-agent",
-          approval: "plan",
           backend: "prod-pool",
           agent: "worker-01",
           dispatch: { paths: ["pkg/**", "!**/*.pem"], maxAttempts: 3 },
@@ -29,11 +28,27 @@ describe("compactAISpecRuntime sandbox", () => {
       }).sandbox,
     ).toEqual({
       mode: "git-agent",
-      approval: "plan",
       backend: "prod-pool",
       agent: "worker-01",
       dispatch: { paths: ["pkg/**", "!**/*.pem"], maxAttempts: 3 },
     });
+  });
+
+  it("rejects a legacy sandbox.approval instead of loading it silently", () => {
+    // Captain's SandboxRef has no Approval field and decodes with
+    // DisallowUnknownFields: a preset/profile saved before the move to
+    // permissions.mode must fail loudly here, not round-trip and blow up as
+    // "unknown field approval" when the run actually dispatches.
+    expect(() =>
+      compactAISpecRuntime({
+        sandbox: { mode: "native", approval: "plan" } as never,
+      }),
+    ).toThrow("sandbox.approval was removed; use permissions.mode");
+    expect(() =>
+      compactAISpecRuntime({
+        sandbox: { mode: "off", approval: "plan" } as never,
+      }),
+    ).toThrow("sandbox.approval was removed; use permissions.mode");
   });
 
   it("preserves provider-neutral native filesystem and network policy", () => {
@@ -79,14 +94,14 @@ describe("compactAISpecRuntime sandbox", () => {
     expect(compactAISpecRuntime({ sandbox: {} }).sandbox).toBeUndefined();
     expect(() =>
       compactAISpecRuntime({
-        sandbox: { backend: "prod-pool", approval: "plan" },
+        sandbox: { backend: "prod-pool" },
       }),
     ).toThrow("sandbox.mode is required");
     expect(() =>
       compactAISpecRuntime({
-        sandbox: { mode: "off", approval: "plan", backend: "prod-pool" },
+        sandbox: { mode: "off", backend: "prod-pool" },
       }),
-    ).toThrow("sandbox mode off does not accept approval");
+    ).toThrow("sandbox mode off does not accept backend");
   });
 });
 
@@ -99,12 +114,11 @@ describe("sandbox mutators", () => {
     expect(sandboxRef({})).toEqual({});
   });
 
-  it("clears every prior setting, including approval, when the public mode changes", () => {
+  it("clears every prior setting when the public mode changes", () => {
     const native = withSandbox(
       {},
       {
         mode: "native",
-        approval: "plan",
         policy: { filesystem: { access: "read-only" } },
       },
     );
@@ -116,7 +130,6 @@ describe("sandbox mutators", () => {
       {},
       {
         mode: "git-agent",
-        approval: "dontAsk",
         backend: "prod-pool",
         agent: "worker-01",
         dispatch: { maxAttempts: 3 },
@@ -128,14 +141,13 @@ describe("sandbox mutators", () => {
     expect(sandboxRef(withSandboxMode(remote, "off"))).toEqual({ mode: "off" });
   });
 
-  it("patches native policy without disturbing posture", () => {
+  it("patches native policy through the mutator", () => {
     const value = withSandboxPolicy(
-      { sandbox: { mode: "native", approval: "plan" } },
+      { sandbox: { mode: "native" } },
       { filesystem: { access: "workspace-write" } },
     );
     expect(sandboxRef(value)).toEqual({
       mode: "native",
-      approval: "plan",
       policy: { filesystem: { access: "workspace-write" } },
     });
   });

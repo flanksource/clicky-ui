@@ -19,7 +19,9 @@ import {
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
 import {
+  UNSPECIFIED_ID,
   UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
   unspecifiedHint,
 } from "./unspecified";
 
@@ -80,8 +82,8 @@ export function RuntimeBarCombo({
     : UNSPECIFIED_LABEL;
   const effortIcon = value.effort ? effortLevelIcon(value.effort) : undefined;
   const summaryParts = [family.label, mode.label];
-  if (showModel) summaryParts.push(modelLabel);
-  if (showEffort) summaryParts.push(`effort ${effortLabel}`);
+  if (showModel) summaryParts.push(modelLabel === UNSPECIFIED_LABEL ? UNSPECIFIED_NAME : modelLabel);
+  if (showEffort) summaryParts.push(`effort ${value.effort ? effortLabel : UNSPECIFIED_NAME}`);
   const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and mode are locked for this conversation; fork it to change them" : ""}`;
 
   return (
@@ -372,8 +374,8 @@ function EffortSlider({
     );
   }
 
-  const options = ["", ...supported];
-  const current = value?.trim() ?? "";
+  const options = [UNSPECIFIED_ID, ...supported];
+  const current = value?.trim() ?? UNSPECIFIED_ID;
   const currentIndex = options.indexOf(current);
   const sliderIndex = currentIndex >= 0 ? currentIndex : 0;
   const label =

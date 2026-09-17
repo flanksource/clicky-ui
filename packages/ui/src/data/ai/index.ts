@@ -301,6 +301,7 @@ export {
   UNSPECIFIED_HINT,
   UNSPECIFIED_ID,
   UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
   unspecifiedHint,
 } from "../runtime/unspecified";
 export {
@@ -308,6 +309,11 @@ export {
   type RuntimeBarProps,
   type RuntimeBarValue,
 } from "../runtime/RuntimeBar";
+export {
+  RuntimeBarActions,
+  type RuntimeBarAction,
+  type RuntimeBarActionsProps,
+} from "../runtime/RuntimeBarActions";
 export {
   ProviderStatusPanel,
   type ProviderStatusPanelProps,

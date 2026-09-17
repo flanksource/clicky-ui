@@ -27,7 +27,7 @@ const fixtureSchemas: FixtureFenceSchemas = {
 
 Omitting the prop keeps the existing generic fixture editor behavior. The shared library does not fetch schemas or define runner-specific contracts.
 
-Run the example with `pnpm --filter storybook dev`, then open [the verification fixture story](http://localhost:5270/?path=/story/ai-promptruneditor-verification-fixture--host-schemas). Open **Edit spec**, expand the **contract** fence, and edit **Policy**. Close the modal to inspect the resulting fixture markdown.
+Run the example with `pnpm --filter storybook dev`, then open [the verification fixture story](http://localhost:5270/?path=/story/ai-promptruneditor-verification-fixture--host-schemas). Open the runtime bar's **⋮ → Advanced**, expand the **contract** fence, and edit **Policy**. Close the modal to inspect the resulting fixture markdown.
 
 ## Resolved runtime display
 

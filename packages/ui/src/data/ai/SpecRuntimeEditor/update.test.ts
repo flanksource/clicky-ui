@@ -149,9 +149,12 @@ describe("update helpers", () => {
     ).toEqual({ tools: { Read: "auto" } });
   });
 
-  it("drops the whole sandbox ref down to mode on a mode switch, never carrying approval", () => {
+  it("drops the whole sandbox ref down to mode on a mode switch", () => {
     const value: AISpecRuntimeValue = {
-      sandbox: { mode: "native", approval: "plan" },
+      sandbox: {
+        mode: "native",
+        policy: { filesystem: { access: "read-only" } },
+      },
     };
     expect(withSandboxMode(value, "docker").sandbox).toEqual({
       mode: "docker",

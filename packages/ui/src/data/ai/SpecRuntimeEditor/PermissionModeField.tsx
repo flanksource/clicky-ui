@@ -8,7 +8,12 @@ import {
   modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
-import { UNSPECIFIED_LABEL, unspecifiedHint } from "../../runtime/unspecified";
+import {
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
+  unspecifiedHint,
+} from "../../runtime/unspecified";
 import { SegmentedControl } from "../../../components/SegmentedControl";
 import { sessionTone } from "../session-tones";
 import { SpecField } from "./fields";
@@ -18,7 +23,7 @@ import {
 } from "./permission-mode-visuals";
 import { withPermissionMode } from "./update";
 
-type SelectableMode = SpecPermissionMode | "";
+type SelectableMode = SpecPermissionMode | typeof UNSPECIFIED_ID;
 
 /**
  * Edits `permissions.mode` — the base posture, independent of the sandbox
@@ -62,7 +67,7 @@ export function PermissionModeField({
   );
   const invalid = current && !publishedModes.includes(current);
   if (visibleModes.length === 0 && !invalid) return null;
-  const selected: SelectableMode = current ?? "";
+  const selected: SelectableMode = current ?? UNSPECIFIED_ID;
   const selectedSupport = current ? support[current] : undefined;
   const runtimeLabel = runtime
     ? `${family?.label ?? specMode} ${runtime.label}`
@@ -79,7 +84,7 @@ export function PermissionModeField({
         <SpecField
           label="Permission posture"
           hint={
-            selected === ""
+            selected === UNSPECIFIED_ID
               ? unspecifiedHint()
               : selectedSupport?.effects?.note || selectedSupport?.kind
           }
@@ -89,16 +94,21 @@ export function PermissionModeField({
             aria-label="Permission posture"
             value={selected}
             onChange={(mode) =>
-              onChange(withPermissionMode(value, mode || undefined))
+              onChange(
+                withPermissionMode(
+                  value,
+                  mode === UNSPECIFIED_ID ? undefined : mode,
+                ),
+              )
             }
             size="sm"
             wrap
             className="w-full"
             options={[
               {
-                id: "" as const,
+                id: UNSPECIFIED_ID,
                 label: UNSPECIFIED_LABEL,
-                title: unspecifiedHint(),
+                title: `${UNSPECIFIED_NAME}: ${unspecifiedHint()}`,
               },
               ...visibleModes.map((mode) => {
                 const cell = support[mode];

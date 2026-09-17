@@ -110,7 +110,7 @@ describe("PermissionModeField", () => {
       screen.getByRole("radiogroup", { name: "Permission posture" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Unspecified" }),
+      screen.getByRole("radio", { name: "-" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: "Read only" }),
@@ -147,7 +147,7 @@ describe("PermissionModeField", () => {
     );
 
     expect(
-      screen.getByRole("radio", { name: "Unspecified" }),
+      screen.getByRole("radio", { name: "-" }),
     ).toHaveAttribute("aria-checked", "true");
     expect(
       screen.getByRole("radio", { name: "Read only" }),
@@ -165,7 +165,7 @@ describe("PermissionModeField", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("radio", { name: "Unspecified" }));
+    fireEvent.click(screen.getByRole("radio", { name: "-" }));
     expect(onChange).toHaveBeenCalledWith({ mode: "agent" });
   });
 
@@ -183,7 +183,7 @@ describe("PermissionModeField", () => {
       screen.getByRole("radiogroup", { name: "Permission posture" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Unspecified" }),
+      screen.getByRole("radio", { name: "-" }),
     ).toHaveAttribute("aria-checked", "true");
     // No runtime is known yet, so the modes fall back to their generic
     // (non-provider-specific) labels rather than Codex's "Read only" etc.
