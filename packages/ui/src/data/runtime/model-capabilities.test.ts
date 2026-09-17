@@ -15,7 +15,7 @@ const known = (patch: Partial<ChatModel>): ChatModel => ({
 });
 
 describe("model capability reconciliation", () => {
-  it("uses exact tiers and the model default", () => {
+  it("drops an unsupported effort without inventing a replacement by default", () => {
     const model = known({
       supportedEfforts: ["low", "high", "ultra"],
       defaultEffort: "high",
@@ -29,6 +29,21 @@ describe("model capability reconciliation", () => {
       reconcileModelCapabilities({ model: "old", effort: "xhigh" }, model, [
         "medium",
       ]),
+    ).toEqual({ model: "model" });
+  });
+
+  it("uses exact tiers and the model default when a default effort is requested", () => {
+    const model = known({
+      supportedEfforts: ["low", "high", "ultra"],
+      defaultEffort: "high",
+    });
+    expect(
+      reconcileModelCapabilities(
+        { model: "old", effort: "xhigh" },
+        model,
+        ["medium"],
+        { defaultEffort: true },
+      ),
     ).toEqual({ model: "model", effort: "high" });
   });
 
@@ -45,13 +60,35 @@ describe("model capability reconciliation", () => {
     ).toEqual({ model: "model" });
   });
 
-  it("keeps the compatibility fallback for unknown models", () => {
+  it("drops an unsupported custom effort for unknown models by default", () => {
     const model = known({ capabilitiesKnown: false });
     expect(
       reconcileModelCapabilities({ effort: "future" }, model, [
         "low",
         "medium",
       ]),
+    ).toEqual({ model: "model" });
+  });
+
+  it("keeps the compatibility fallback for unknown models when a default effort is requested", () => {
+    const model = known({ capabilitiesKnown: false });
+    expect(
+      reconcileModelCapabilities(
+        { effort: "future" },
+        model,
+        ["low", "medium"],
+        { defaultEffort: true },
+      ),
     ).toEqual({ model: "model", effort: "medium" });
+  });
+
+  it("applies an explicit mode alongside a requested default effort", () => {
+    const model = known({ supportedEfforts: ["low", "medium"] });
+    expect(
+      reconcileModelCapabilities({}, model, ["low", "medium"], {
+        mode: "cli",
+        defaultEffort: true,
+      }),
+    ).toEqual({ model: "model", mode: "cli", effort: "medium" });
   });
 });

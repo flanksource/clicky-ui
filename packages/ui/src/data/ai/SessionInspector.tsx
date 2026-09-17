@@ -1,21 +1,17 @@
-import { useMemo, useState, type ReactNode } from "react";
-import {
-  UiBraces,
-  UiChatDots,
-  UiCoins,
-  UiFileText,
-  UiListDashes,
-  UiSealCheck,
-  UiStrategy,
-} from "../../icons";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
-import { TabButton } from "../TabButton";
-import { formatCost, costTotal } from "./session-cost";
 import { SessionInspectorPanel } from "./SessionInspector.panels";
 import {
   SessionInspectorHeader,
   SessionInspectorSidebar,
 } from "./SessionInspector.summary";
+import { CompactSessionInspectorToolbar } from "./SessionInspector.compact";
+import { InspectorTabs } from "./SessionInspector.tabs";
+import {
+  hasStructuredOutput,
+  inspectorTabs,
+  type SessionInspectorTab,
+} from "./SessionInspector.tabs.model";
 import { SessionTranscript } from "./SessionInspector.transcript";
 import {
   isSessionCollectionInput,
@@ -23,28 +19,31 @@ import {
   type SessionCollectionItem,
   type SessionInspectorInput,
 } from "./SessionInspector.collection";
-import { SessionHierarchyPicker } from "./SessionInspector.hierarchy";
-import { useSessionHierarchy } from "./SessionInspector.hierarchy-state";
 import {
-  pendingApprovalRequests,
-  type ApprovalResolveHandler,
-} from "./SessionInspector.approvals-model";
+  SessionHierarchyPicker,
+  SessionHierarchyTree,
+} from "./SessionInspector.hierarchy";
+import { useSessionHierarchy } from "./SessionInspector.hierarchy-state";
+import { type ApprovalResolveHandler } from "./SessionInspector.approvals-model";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
-import type { SessionInput } from "./SessionViewer.model";
+import {
+  getSessionMetadata,
+  type SessionInput,
+  type SessionMetadataSummary,
+} from "./SessionViewer.model";
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
 
-export type SessionInspectorTab =
-  | "transcript"
-  | "files"
-  | "plan"
-  | "approvals"
-  | "costs"
-  | "metadata"
-  | "raw";
+export type { SessionInspectorTab } from "./SessionInspector.tabs.model";
 
 export interface SessionInspectorProps {
   session: SessionInspectorInput;
   className?: string;
+  /** Compact keeps tabs, runtime context, host actions, and session options on one line. */
+  layout?: "default" | "compact";
+  /** Runtime metadata to display in the compact context bar. Defaults to session metadata. */
+  metadata?: SessionMetadataSummary;
+  /** Host controls rendered before Session options in the compact toolbar. */
+  toolbarActions?: ReactNode;
   defaultTab?: SessionInspectorTab;
   transcriptProps?: Omit<SessionViewerProps, "session">;
   renderSessionActions?: (item: SessionCollectionItem) => ReactNode;
@@ -56,16 +55,6 @@ export interface SessionInspectorProps {
   composer?: ReactNode;
 }
 
-const TABS = [
-  { id: "transcript", label: "Transcript", icon: UiChatDots },
-  { id: "files", label: "Files", icon: UiFileText },
-  { id: "plan", label: "Plan", icon: UiStrategy },
-  { id: "approvals", label: "Approvals", icon: UiSealCheck },
-  { id: "costs", label: "Costs", icon: UiCoins },
-  { id: "metadata", label: "Metadata", icon: UiListDashes },
-  { id: "raw", label: "Raw", icon: UiBraces },
-] as const;
-
 export function SessionInspector({
   session,
   className,
@@ -75,6 +64,9 @@ export function SessionInspector({
   onPlanChange,
   onResolveApproval,
   composer,
+  layout = "default",
+  metadata,
+  toolbarActions,
 }: SessionInspectorProps) {
   const detail = useMemo(
     () =>
@@ -99,6 +91,9 @@ export function SessionInspector({
       ...(onPlanChange ? { onPlanChange } : {}),
       ...(onResolveApproval ? { onResolveApproval } : {}),
       ...(composer ? { composer } : {}),
+      ...(layout === "compact" ? { layout } : {}),
+      ...(metadata ? { metadata } : {}),
+      ...(toolbarActions ? { toolbarActions } : {}),
     };
     return (
       <CollectionSessionInspector
@@ -116,6 +111,9 @@ export function SessionInspector({
       {...(className ? { className } : {})}
       {...(transcriptProps ? { transcriptProps } : {})}
       {...(composer ? { composer } : {})}
+      {...(layout === "compact" ? { layout } : {})}
+      {...(metadata ? { metadata } : {})}
+      {...(toolbarActions ? { toolbarActions } : {})}
     />
   );
 }
@@ -129,94 +127,172 @@ function CollectionSessionInspector({
   onPlanChange,
   onResolveApproval,
   composer,
+  layout = "default",
+  metadata,
+  toolbarActions,
 }: Omit<SessionInspectorProps, "session"> & {
   collection: SessionCollectionInput;
 }) {
   const hierarchy = useSessionHierarchy(collection);
-  const [tab, setTab] = useState<SessionInspectorTab>(defaultTab);
+  const compact = layout === "compact";
+  const [menuHost, setMenuHost] = useState<HTMLSpanElement | null>(null);
+  const outputVisible = hasStructuredOutput(hierarchy.current);
+  const [tab, setTab] = useState<SessionInspectorTab>(
+    defaultTab === "output" && !outputVisible ? "transcript" : defaultTab,
+  );
   const transcriptClassName = cn("h-full", transcriptProps?.className);
   const panelDetail = tab === "costs" ? hierarchy.filtered : hierarchy.current;
+  const compactMetadata = metadata ?? getSessionMetadata(hierarchy.current);
+  const compactTabs = inspectorTabs(
+    outputVisible,
+    hierarchy.current,
+    hierarchy.filtered,
+  );
+  const compactMenuHeader = (
+    <div className="w-[min(38rem,calc(100vw-4rem))]">
+      <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Session content
+      </p>
+      <SessionHierarchyTree
+        collection={collection}
+        state={hierarchy}
+        {...(renderSessionActions ? { renderSessionActions } : {})}
+        className="h-[min(32rem,52vh)]"
+      />
+      {transcriptProps?.menuHeader ? (
+        <div className="mt-1 border-t border-border pt-1">
+          {transcriptProps.menuHeader}
+        </div>
+      ) : null}
+    </div>
+  );
+  const compactTranscriptProps = compact
+    ? {
+        ...transcriptProps,
+        menuContainer: menuHost,
+        menuHeader: compactMenuHeader,
+        showMenu: menuHost !== null && transcriptProps?.showMenu !== false,
+      }
+    : transcriptProps;
+
+  useEffect(() => {
+    if (tab === "output" && !outputVisible) setTab("transcript");
+  }, [outputVisible, tab]);
 
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden rounded-xl border border-border bg-background text-sm shadow-sm",
+        "flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-background text-sm",
+        compact
+          ? "@container rounded-none border-0 shadow-none"
+          : "rounded-xl border border-border shadow-sm",
         className,
       )}
     >
-      <SessionInspectorHeader session={hierarchy.current} />
-      <div
-        role="toolbar"
-        aria-label="Session content controls"
-        className="flex shrink-0 justify-start border-b border-border px-density-2 py-density-2"
-      >
-        <SessionHierarchyPicker
-          collection={collection}
-          state={hierarchy}
-          {...(renderSessionActions ? { renderSessionActions } : {})}
+      {compact ? (
+        <CompactSessionInspectorToolbar
+          tabs={compactTabs}
+          activeTab={tab}
+          onSelect={(next) => setTab(next as SessionInspectorTab)}
+          onMenuHost={setMenuHost}
+          {...(compactMetadata ? { metadata: compactMetadata } : {})}
+          {...(toolbarActions ? { toolbarActions } : {})}
         />
-      </div>
-      <div
-        role="tablist"
-        aria-label="Session detail view"
-        className="flex shrink-0 overflow-x-auto border-b border-border px-density-2"
-      >
-        {TABS.map((item) => {
-          const badge = tabBadge(item.id, hierarchy.current);
-          return (
-            <TabButton
-              key={item.id}
-              active={tab === item.id}
-              onClick={() => setTab(item.id)}
-              label={tabLabel(
-                item.id,
-                item.label,
-                item.id === "costs" ? hierarchy.filtered : hierarchy.current,
-              )}
-              icon={item.icon}
-              variant="underline"
-              {...(badge.count === undefined ? {} : { count: badge.count })}
-              {...(badge.color ? { countColor: badge.color } : {})}
-              className="shrink-0 py-density-2 [&_svg]:text-muted-foreground"
-            />
-          );
-        })}
-      </div>
-      <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_18rem] lg:overflow-hidden">
-        <main className="flex min-h-[28rem] min-w-0 flex-col lg:min-h-0">
+      ) : (
+        <>
+          <SessionInspectorHeader session={hierarchy.current} />
           <div
-            className={cn(
-              "min-h-0 flex-1",
-              tab === "transcript"
-                ? "overflow-hidden"
-                : "overflow-auto p-density-4",
-            )}
+            role="toolbar"
+            aria-label="Session content controls"
+            className="flex shrink-0 justify-start border-b border-border px-density-2 py-density-2"
           >
-            {tab === "transcript" ? (
-              <SessionTranscript
-                session={hierarchy.filtered}
-                viewerProps={{
-                  ...transcriptProps,
-                  className: transcriptClassName,
-                }}
-              />
-            ) : (
-              <SessionInspectorPanel
-                tab={tab}
-                detail={panelDetail}
-                session={hierarchy.current}
-                {...(onPlanChange ? { onPlanChange } : {})}
-                {...(onResolveApproval ? { onResolveApproval } : {})}
-              />
-            )}
+            <SessionHierarchyPicker
+              collection={collection}
+              state={hierarchy}
+              {...(renderSessionActions ? { renderSessionActions } : {})}
+            />
           </div>
+          <InspectorTabs tab={tab} tabs={compactTabs} onSelect={setTab} />
+        </>
+      )}
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto",
+          !compact &&
+            "grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:overflow-hidden",
+        )}
+      >
+        <main
+          className={cn(
+            "flex min-w-0 flex-col",
+            compact ? "min-h-0" : "min-h-[28rem] lg:min-h-0",
+          )}
+        >
+          {compact ? (
+            <>
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-hidden",
+                  tab !== "transcript" && "hidden",
+                )}
+              >
+                <SessionTranscript
+                  session={hierarchy.filtered}
+                  viewerProps={{
+                    ...compactTranscriptProps,
+                    className: transcriptClassName,
+                  }}
+                />
+              </div>
+              {tab !== "transcript" ? (
+                <div className="min-h-0 flex-1 overflow-auto p-density-4">
+                  <SessionInspectorPanel
+                    tab={tab}
+                    detail={panelDetail}
+                    session={hierarchy.current}
+                    {...(onPlanChange ? { onPlanChange } : {})}
+                    {...(onResolveApproval ? { onResolveApproval } : {})}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div
+              className={cn(
+                "min-h-0 flex-1",
+                tab === "transcript"
+                  ? "overflow-hidden"
+                  : "overflow-auto p-density-4",
+              )}
+            >
+              {tab === "transcript" ? (
+                <SessionTranscript
+                  session={hierarchy.filtered}
+                  viewerProps={{
+                    ...transcriptProps,
+                    className: transcriptClassName,
+                  }}
+                />
+              ) : (
+                <SessionInspectorPanel
+                  tab={tab}
+                  detail={panelDetail}
+                  session={hierarchy.current}
+                  {...(onPlanChange ? { onPlanChange } : {})}
+                  {...(onResolveApproval ? { onResolveApproval } : {})}
+                />
+              )}
+            </div>
+          )}
           {composer ? (
             <div className="shrink-0 border-t border-border p-density-3">
               {composer}
             </div>
           ) : null}
         </main>
-        <SessionInspectorSidebar session={hierarchy.current} />
+        {!compact ? (
+          <SessionInspectorSidebar session={hierarchy.current} />
+        ) : null}
       </div>
     </div>
   );
@@ -228,56 +304,106 @@ function LegacySessionInspector({
   defaultTab = "transcript",
   transcriptProps,
   composer,
+  layout = "default",
+  metadata,
+  toolbarActions,
 }: Pick<
   SessionInspectorProps,
-  "className" | "defaultTab" | "transcriptProps" | "composer"
+  | "className"
+  | "defaultTab"
+  | "transcriptProps"
+  | "composer"
+  | "layout"
+  | "metadata"
+  | "toolbarActions"
 > & {
   session: SessionInput;
 }) {
-  const [tab, setTab] = useState<SessionInspectorTab>(defaultTab);
+  const compact = layout === "compact";
+  const [menuHost, setMenuHost] = useState<HTMLSpanElement | null>(null);
+  const [tab, setTab] = useState<SessionInspectorTab>(
+    defaultTab === "output" ? "transcript" : defaultTab,
+  );
   const transcriptClassName = cn("h-full", transcriptProps?.className);
+  const compactTabs = inspectorTabs(false);
+  const compactMetadata = metadata ?? getSessionMetadata(session);
+  const viewerProps = compact
+    ? {
+        ...transcriptProps,
+        menuContainer: menuHost,
+        showMenu: menuHost !== null && transcriptProps?.showMenu !== false,
+      }
+    : transcriptProps;
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden rounded-xl border border-border bg-background text-sm shadow-sm",
+        "flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-background text-sm",
+        compact
+          ? "@container rounded-none border-0 shadow-none"
+          : "rounded-xl border border-border shadow-sm",
         className,
       )}
     >
-      <div
-        role="tablist"
-        aria-label="Session detail view"
-        className="flex shrink-0 overflow-x-auto border-b border-border px-density-2"
-      >
-        {TABS.map((item) => (
-          <TabButton
-            key={item.id}
-            active={tab === item.id}
-            onClick={() => setTab(item.id)}
-            label={item.label}
-            icon={item.icon}
-            variant="underline"
-            className="shrink-0 py-density-2 [&_svg]:text-muted-foreground"
-          />
-        ))}
-      </div>
+      {compact ? (
+        <CompactSessionInspectorToolbar
+          tabs={compactTabs}
+          activeTab={tab}
+          onSelect={(next) => setTab(next as SessionInspectorTab)}
+          onMenuHost={setMenuHost}
+          {...(compactMetadata ? { metadata: compactMetadata } : {})}
+          {...(toolbarActions ? { toolbarActions } : {})}
+        />
+      ) : (
+        <InspectorTabs tab={tab} tabs={compactTabs} onSelect={setTab} />
+      )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {tab === "transcript" ? (
-            <SessionViewer
-              session={session}
-              scrollable
-              showRowMetadata
-              {...transcriptProps}
-              className={transcriptClassName}
-            />
-          ) : (
-            <SessionInspectorPanel
-              tab={tab}
-              detail={undefined}
-              session={session}
-            />
-          )}
-        </div>
+        {compact ? (
+          <>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden",
+                tab !== "transcript" && "hidden",
+              )}
+            >
+              <SessionViewer
+                session={session}
+                scrollable
+                showRowMetadata
+                {...viewerProps}
+                className={transcriptClassName}
+                showHeader={false}
+                showContextMeter={false}
+              />
+            </div>
+            {tab !== "transcript" ? (
+              <div className="min-h-0 flex-1 overflow-auto p-density-4">
+                <SessionInspectorPanel
+                  tab={tab}
+                  detail={undefined}
+                  session={session}
+                />
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {tab === "transcript" ? (
+              <SessionViewer
+                session={session}
+                scrollable
+                showRowMetadata
+                {...transcriptProps}
+                className={transcriptClassName}
+              />
+            ) : (
+              <SessionInspectorPanel
+                tab={tab}
+                detail={undefined}
+                session={session}
+              />
+            )}
+          </div>
+        )}
         {composer ? (
           <div className="shrink-0 border-t border-border p-density-3">
             {composer}
@@ -286,34 +412,6 @@ function LegacySessionInspector({
       </div>
     </div>
   );
-}
-
-/** The tab's count badge and, for a pending-approvals badge, an amber
- *  override so an unresolved approval reads as urgent rather than blending
- *  into the neutral resolved-count badge every other tab uses. */
-function tabBadge(
-  tab: SessionInspectorTab,
-  session?: UnifiedSessionInput,
-): { count?: number; color?: string } {
-  switch (tab) {
-    case "files":
-      return {
-        count:
-          (session?.files?.read?.length ?? 0) +
-          (session?.files?.written?.length ?? 0),
-      };
-    case "approvals": {
-      const pending = pendingApprovalRequests(session?.requests).length;
-      if (pending) return { count: pending, color: "bg-amber-500" };
-      return {
-        count:
-          (session?.approvals?.approved ?? 0) +
-          (session?.approvals?.denied ?? 0),
-      };
-    }
-    default:
-      return {};
-  }
 }
 
 function singleSessionCollection(
@@ -326,16 +424,6 @@ function singleSessionCollection(
     currentSessionId: id,
     sessions: [{ id, session }],
   };
-}
-
-function tabLabel(
-  tab: SessionInspectorTab,
-  label: string,
-  session?: UnifiedSessionInput,
-) {
-  if (tab !== "costs") return label;
-  const total = costTotal(session?.cost);
-  return total ? `${label} ${formatCost(total)}` : label;
 }
 
 function asUnifiedSession(

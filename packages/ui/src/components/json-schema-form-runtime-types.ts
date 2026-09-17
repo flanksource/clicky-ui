@@ -221,6 +221,12 @@ export interface JsonSchemaFormProps extends FormErrorProps {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  /** Full document exposed to extensions when this form edits a projection. */
+  rootValue?: Record<string, unknown>;
+  /** Atomically replaces the full extension root. Required by sibling edits. */
+  onRootChange?: (next: Record<string, unknown>) => void;
+  /** RFC 6901 path where this projected form is mounted in its full document. */
+  instancePath?: string;
   readOnly?: boolean;
   /**
    * Shorthand for `layout: { mode: "inline" }` (2-column label/value); stacked

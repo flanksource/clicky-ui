@@ -16,6 +16,14 @@ import type { ParsedThreadFrame } from "./jvm-stacktrace";
 // StackFrameActions renders trailing per-frame affordances. It is a slot: the
 // shared library never knows what the actions do, only where they go.
 export type StackFrameActions = (frame: ParsedThreadFrame, index: number) => ReactNode;
+export type StackFramePart = "method" | "class" | "location";
+export type StackFramePartRenderer = (
+  part: StackFramePart,
+  frame: ParsedThreadFrame,
+  index: number,
+) => ReactNode;
+export type StackFrameDetailRenderer = (frame: ParsedThreadFrame, index: number) => ReactNode;
+export type StackFrameActionsVisibility = "hover" | "always";
 
 export interface StackFrameRowProps {
   frame: ParsedThreadFrame;
@@ -24,6 +32,12 @@ export interface StackFrameRowProps {
   showIndex?: boolean;
   /** Trailing actions for this frame, revealed on hover/focus. */
   frameActions?: StackFrameActions;
+  /** Replace the method, class, or location label while preserving row layout. */
+  renderFramePart?: StackFramePartRenderer;
+  /** Additional detail rendered below an ordinary frame. */
+  renderFrameDetail?: StackFrameDetailRenderer;
+  /** Whether actions are hover-only or permanently visible. */
+  frameActionsVisibility?: StackFrameActionsVisibility;
 }
 
 // StackFrameRow is THE stack-frame renderer. Both an exception dump (via
@@ -39,10 +53,14 @@ export function StackFrameRow({
   index,
   showIndex = false,
   frameActions,
+  renderFramePart,
+  renderFrameDetail,
+  frameActionsVisibility = "hover",
 }: StackFrameRowProps) {
   const isAnnotation = frame.kind !== "frame";
   const methodName = frame.displayName || frame.method || frame.functionName;
   const actions = frameActions?.(frame, index);
+  const detail = !isAnnotation ? renderFrameDetail?.(frame, index) : null;
 
   return (
     <div
@@ -72,18 +90,30 @@ export function StackFrameRow({
             </>
           ) : (
             <>
-              <span className="min-w-0 break-all font-mono font-semibold leading-4">
-                {methodName}
-              </span>
-              {frame.class && (
-                <span className="min-w-0 break-all font-mono text-[11px] text-muted-foreground">
-                  {frame.class}
+              {renderFramePart ? (
+                renderFramePart("method", frame, index)
+              ) : (
+                <span className="min-w-0 break-all font-mono font-semibold leading-4">
+                  {methodName}
                 </span>
               )}
+              {frame.class && (
+                renderFramePart ? (
+                  renderFramePart("class", frame, index)
+                ) : (
+                  <span className="min-w-0 break-all font-mono text-[11px] text-muted-foreground">
+                    {frame.class}
+                  </span>
+                )
+              )}
               {frame.location && (
-                <span className="rounded border border-border bg-muted/40 px-1.5 py-px font-mono text-[10px] text-muted-foreground">
-                  {frame.location}
-                </span>
+                renderFramePart ? (
+                  renderFramePart("location", frame, index)
+                ) : (
+                  <span className="rounded border border-border bg-muted/40 px-1.5 py-px font-mono text-[10px] text-muted-foreground">
+                    {frame.location}
+                  </span>
+                )
               )}
             </>
           )}
@@ -91,7 +121,14 @@ export function StackFrameRow({
       </div>
 
       {actions ? (
-        <div className="flex shrink-0 items-start gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <div
+          className={[
+            "flex shrink-0 items-start gap-1",
+            frameActionsVisibility === "hover"
+              ? "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+              : "opacity-100",
+          ].join(" ")}
+        >
           {actions}
         </div>
       ) : (
@@ -103,6 +140,7 @@ export function StackFrameRow({
           <FrameSourceWindow frame={frame} />
         </div>
       ) : null}
+      {detail ? <div className="col-span-3">{detail}</div> : null}
     </div>
   );
 }

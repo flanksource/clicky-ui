@@ -20,6 +20,7 @@ import { formatEventRange } from "./SessionViewer.row-time";
 import { ToolBody } from "./SessionViewer.tool-row";
 import type { SessionToolDecision } from "./SessionViewer";
 import { Markdown } from "../Markdown";
+import { MessageFilePart } from "../chat/MessageFilePart";
 
 export function SessionRow({
   event,
@@ -54,7 +55,7 @@ export function SessionRow({
   return (
     <li
       data-event-kind={event.kind}
-      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+      className="relative flex gap-density-2 pb-density-3 last:pb-0 @min-[48rem]/session-viewer:gap-density-3 @min-[48rem]/session-viewer:pb-density-4"
     >
       {!last && (
         <span
@@ -124,7 +125,7 @@ export function WaitGroupRow({
     <li
       data-event-kind="tool"
       data-event-group="wait"
-      className="relative flex gap-density-3 pb-density-4 last:pb-0"
+      className="relative flex gap-density-2 pb-density-3 last:pb-0 @min-[48rem]/session-viewer:gap-density-3 @min-[48rem]/session-viewer:pb-density-4"
     >
       {!last && (
         <span
@@ -198,13 +199,13 @@ function UserRow({
       data-event-kind="user"
       className="relative flex justify-end pb-density-4 last:pb-0"
     >
-      <div className="flex max-w-[85%] items-start gap-density-3">
+      <div className="flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:max-w-[85%] @min-[48rem]/session-viewer:gap-density-3">
         <div className="min-w-0">
           <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
             You
           </div>
           <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right text-base font-medium leading-relaxed text-accent-foreground">
-            {event.text}
+            {event.file ? <MessageFilePart part={event.file} /> : event.text}
           </div>
           {showRowMetadata && <EventMetadata event={event} align="right" />}
           {showRaw && event.raw !== undefined && (
@@ -334,6 +335,7 @@ function MessageBody({
     <div className="flex items-start gap-1.5">
       {badge}
       <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
+        {event.file && <MessageFilePart part={event.file} />}
         {event.text && <Markdown text={event.text} />}
       </div>
     </div>

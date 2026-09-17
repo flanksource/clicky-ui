@@ -5,7 +5,7 @@ import {
 } from "./runtime-profile";
 
 describe("runtime preset specs", () => {
-  it("projects only reusable behavior and permission fields", () => {
+  it("preserves the complete task spec", () => {
     expect(
       projectRuntimePresetSpec({
         mode: "agent",
@@ -33,12 +33,21 @@ describe("runtime preset specs", () => {
       }),
     ).toEqual({
       mode: "agent",
+      prompt: { user: "task prompt" },
+      workflow: { verify: { fixture: "task fixture" } },
+      sessionId: "thread-id",
       setup: {
+        cwd: "/workspace/repo",
+        connections: { fromConfigItem: "captain-owned" },
         checkout: {
           mode: "remote",
+          url: "https://example.com/repo.git",
+          path: "/workspace/repo",
+          ref: "main",
           depth: 1,
           worktree: {
             mode: "new",
+            path: "/workspace/worktree",
             keep: true,
             uncommitted: "clone",
             ignored: "skip",
@@ -48,12 +57,12 @@ describe("runtime preset specs", () => {
     });
   });
 
-  it("rejects task-owned fields decoded into a preset payload", () => {
+  it("accepts task-owned fields decoded into a preset payload", () => {
     expect(() =>
       assertRuntimePresetSpec(
-        { prompt: { user: "task prompt" } } as never,
+        { prompt: { user: "task prompt" } },
         "preset.spec",
       ),
-    ).toThrow('runtime preset field "preset.spec.prompt" is not allowed');
+    ).not.toThrow();
   });
 });

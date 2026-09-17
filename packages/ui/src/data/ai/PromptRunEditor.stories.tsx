@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import type { ChatModel } from "../chat/types";
 import { PromptRunEditor } from "./PromptRunEditor";
 import type { AIPromptRunValue } from "./PromptRunEditor/model";
+import { SPEC_RUNTIME_TABS } from "./SpecRuntimeEditor/types";
 
 const MODELS: ChatModel[] = [
   {
@@ -50,6 +51,29 @@ function CanonicalRequestStory() {
   );
 }
 
+function TabbedSpecStory() {
+  const [value, setValue] = useState<AIPromptRunValue>({
+    variables: { company: "Acme" },
+    spec: {
+      model: "claude-sonnet-4-6",
+      id: "anthropic/claude-sonnet-4-6",
+      prompt: { user: "Review {{company}}", system: "Be precise" },
+      budget: { maxTokens: 8000 },
+    },
+  });
+  return (
+    <div className="max-w-3xl p-density-4">
+      <PromptRunEditor
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        specTabs={SPEC_RUNTIME_TABS}
+        recentRuntimes={[{ model: "gpt-5.5", id: "openai/gpt-5.5", mode: "agent", effort: "high" }]}
+      />
+    </div>
+  );
+}
+
 const meta = {
   title: "AI/PromptRunEditor",
   component: PromptRunEditor,
@@ -71,23 +95,57 @@ export const CanonicalRequest: Story = {
       canvas.queryByRole("group", { name: "Runtime 2" }),
     ).not.toBeInTheDocument();
 
-    // A comparison row seeds from the first row's backend and becomes
-    // removable, so both rows carry their own controls.
-    await userEvent.click(canvas.getByRole("button", { name: "Add runtime" }));
+    // Multi-model seeds a comparison row from the first row's mode; rows only
+    // become removable past the two a comparison needs.
+    await userEvent.click(canvas.getByRole("radio", { name: "Multi-model" }));
 
     const second = await canvas.findByRole("group", { name: "Runtime 2" });
     await expect(
       within(second).getByRole("group", { name: "Runtime 2 controls" }),
     ).toBeInTheDocument();
-    await expect(
-      canvas.getByRole("button", { name: "Remove runtime 2" }),
-    ).toBeInTheDocument();
-
+    await userEvent.click(canvas.getByRole("button", { name: "Add runtime" }));
     await userEvent.click(
-      canvas.getByRole("button", { name: "Remove runtime 2" }),
+      await canvas.findByRole("button", { name: "Remove runtime 3" }),
     );
+    await expect(
+      canvas.queryByRole("group", { name: "Runtime 3" }),
+    ).not.toBeInTheDocument();
+
+    // Permissions and Advanced belong to the spec, so comparison rows share one
+    // actions section rather than repeating it per row.
+    await expect(canvas.getAllByTitle("Runtime options")).toHaveLength(1);
+
+    await userEvent.click(canvas.getByRole("radio", { name: "Single model" }));
     await expect(
       canvas.queryByRole("group", { name: "Runtime 2" }),
     ).not.toBeInTheDocument();
+  },
+};
+
+// Spec sections render inline behind tabs instead of the bar's "Advanced"
+// modal, with recently used runtimes one click from reuse under the bar.
+export const TabbedSpec: Story = {
+  render: () => <TabbedSpecStory />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByTitle("Runtime options"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(canvas.getByRole("list", { name: "Recently used runtimes" })).getByRole("button"),
+    );
+    await expect(
+      within(canvas.getByRole("group", { name: "Runtime 1 controls" })).getByTitle(
+        "Model — gpt-5.5",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("tab", { name: "System Prompt" }));
+    await expect(canvas.getByLabelText("System")).toHaveValue("Be precise");
+
+    await userEvent.click(canvas.getByRole("tab", { name: "Model" }));
+    await expect(
+      canvas.getByRole("region", { name: "Model" }),
+    ).toHaveTextContent("Max tokens");
   },
 };

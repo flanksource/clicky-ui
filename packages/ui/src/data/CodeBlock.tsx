@@ -24,13 +24,29 @@ export type CodeBlockProps = {
   copyable?: boolean | undefined;
   /** Show a download button in the header (ignored when `bare`). */
   downloadable?: boolean | undefined;
+  /** Name of the downloaded file. Defaults to `snippet.<extension of language>`. */
+  downloadFilename?: string | undefined;
   /** Show a per-block light/dark theme toggle in the header (ignored when `bare`). */
   themeToggle?: boolean | undefined;
   /** Render a language-aware diff instead of highlighting `source`. */
   diff?: { original: string; modified: string } | { unified: string } | undefined;
   /** Diff layout when `diff` is set. Defaults to `unified`. */
   diffView?: "unified" | "split" | undefined;
+  /**
+   * Render as a single truncated line for a table cell: no border, header, or
+   * wrap, whitespace collapsed to one line, syntax-colored when highlighting
+   * is available, with the collapsed source (up to 2,000 chars) in a title
+   * tooltip. Only the leading 500 chars are rendered and highlighted — the
+   * cell clips long before that. The full block is what a row-detail dialog
+   * should show instead.
+   */
+  inline?: boolean | undefined;
 };
+
+// A captured SQL statement can run to tens of thousands of characters on one
+// line; highlighting all of it for a one-line cell cost ~220 ms a statement.
+const INLINE_RENDER_CHARS = 500;
+const INLINE_TITLE_CHARS = 2000;
 
 export function CodeBlock({
   language: languageProp,
@@ -41,9 +57,11 @@ export function CodeBlock({
   bare = false,
   copyable = false,
   downloadable = false,
+  downloadFilename,
   themeToggle = false,
   diff,
   diffView,
+  inline = false,
 }: CodeBlockProps) {
   const language = (languageProp ?? "").toLowerCase().replace(/^\.+/, "");
   const chromaHtml = highlightedHtml ? sanitizeHtml(highlightedHtml) : "";
@@ -59,6 +77,11 @@ export function CodeBlock({
   const [shikiHtml, setShikiHtml] = useState<string | null>(null);
   const wantsClientHighlight =
     parsedJson === JSON_PARSE_FAILED && !chromaHtml && !!language && !!source;
+  const singleLine = useMemo(
+    () => (inline ? source.replace(/\s+/g, " ").trim() : ""),
+    [inline, source],
+  );
+  const highlightSource = inline ? singleLine.slice(0, INLINE_RENDER_CHARS) : source;
 
   useEffect(() => {
     if (!wantsClientHighlight) {
@@ -68,14 +91,14 @@ export function CodeBlock({
 
     let cancelled = false;
     const theme = effectiveTheme === "dark" ? "github-dark" : "github-light";
-    highlightCode(source, { lang: language, theme }).then((out) => {
+    highlightCode(highlightSource, { lang: language, theme }).then((out) => {
       if (!cancelled) setShikiHtml(out);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [wantsClientHighlight, language, source, effectiveTheme]);
+  }, [wantsClientHighlight, language, highlightSource, effectiveTheme]);
 
   const headerActions = (
     <CodeBlockActions
@@ -83,6 +106,7 @@ export function CodeBlock({
       language={languageProp}
       copyable={copyable}
       downloadable={downloadable}
+      downloadFilename={downloadFilename}
       theme={effectiveTheme}
       {...(themeToggle
         ? { onToggleTheme: () => setThemeOverride(effectiveTheme === "dark" ? "light" : "dark") }
@@ -92,6 +116,26 @@ export function CodeBlock({
   // Re-scope theme tokens (shell background/border/label) to the override so an
   // overridden block stays visually coherent with its re-highlighted code.
   const overrideAttrs = themeOverride ? { "data-theme": themeOverride } : {};
+
+  if (inline) {
+    const html = chromaHtml || shikiHtml;
+    const title =
+      singleLine.length > INLINE_TITLE_CHARS
+        ? `${singleLine.slice(0, INLINE_TITLE_CHARS)}…`
+        : singleLine;
+    return (
+      <code
+        className={cn(
+          "block max-w-full truncate font-mono text-xs text-foreground",
+          className,
+          html && "[&_pre]:inline [&_pre]:whitespace-pre [&_.chroma]:bg-transparent",
+        )}
+        title={title}
+      >
+        {html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : highlightSource}
+      </code>
+    );
+  }
 
   if (diff) {
     return (

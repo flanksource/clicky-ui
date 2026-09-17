@@ -1,11 +1,14 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ClickyRow } from "../data/Clicky";
 import {
   appendTailEvent,
   emptyLogTailBuffer,
   encodeTailParams,
+  isTerminalSessionState,
   useLogTail,
   type LogSessionInfo,
+  type LogSessionState,
   type LogTailEvent,
 } from "./use-log-tail";
 
@@ -75,23 +78,23 @@ const response = (status: number, body: unknown) => ({
   text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
 });
 
-/** A fetch double that answers the three calls the hook makes: create, poll, delete. */
+/**
+ * A fetch double for the one request the hook makes: creating the session.
+ * Events only ever arrive over EventSource, so any other request is a defect
+ * and answers 405 where the spec can see it.
+ */
 function stubFetch(
   handlers: {
-    create?: () => { status: number; body: unknown };
-    poll?: (url: string) => LogTailEvent[] | { status: number; body: unknown };
+    create?: (init: RequestInit | undefined) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
   } = {},
 ) {
   const mock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "POST") {
-      const { status, body } = handlers.create?.() ?? { status: 201, body: sessionInfo() };
+      const { status, body } = (await handlers.create?.(init)) ?? { status: 201, body: sessionInfo() };
       return response(status, body);
     }
-    if (method === "DELETE") return response(204, "");
-    const polled = handlers.poll?.(url) ?? [];
-    if (Array.isArray(polled)) return response(200, polled);
-    return response(polled.status, polled.body);
+    return response(405, `${method} ${url} is not served`);
   });
   vi.stubGlobal("fetch", mock);
   return mock;
@@ -125,6 +128,22 @@ describe("encodeTailParams", () => {
   });
 });
 
+describe("isTerminalSessionState", () => {
+  it.each<[LogSessionState, boolean]>([
+    ["starting", false],
+    ["running", false],
+    ["stopping", false],
+    ["completed", true],
+    ["failed", true],
+    ["stopped", true],
+    ["interrupted", true],
+  ])("treats %s as terminal=%s", (state, terminal) => {
+    // `stopping` is a stop in flight: the session still owns its source and
+    // may still emit rows, so a tail must keep reading until the done frame.
+    expect(isTerminalSessionState(state)).toBe(terminal);
+  });
+});
+
 describe("appendTailEvent", () => {
   it("orders rows oldest-first and ignores a replayed sequence", () => {
     // A reconnecting EventSource sends Last-Event-ID and the server replays from
@@ -153,6 +172,45 @@ describe("appendTailEvent", () => {
     const first = appendTailEvent(emptyLogTailBuffer, frame(5, "hello"), 10);
     expect(appendTailEvent(first, frame(5, "hello"), 10)).toBe(first);
   });
+
+  it("keeps clickyRow index-aligned with the raw row it presents", () => {
+    // A trace/follow session's per-row event carries the exact ClickyRow the
+    // list document's own node.rows[n] uses — a plain log tail never sets
+    // this, so it must default to undefined without disturbing `rows` itself.
+    const presented: ClickyRow = { cells: { message: { kind: "text", plain: "ready" } } };
+    const withRow: LogTailEvent = { ...frame(1, "starting") };
+    const withClickyRow: LogTailEvent = { ...frame(2, "ready"), clickyRow: presented };
+
+    const applied = [withRow, withClickyRow].reduce(
+      (buffer, event) => appendTailEvent(buffer, event, 10),
+      emptyLogTailBuffer,
+    );
+
+    expect(applied.rows.map((row) => row.message)).toEqual(["starting", "ready"]);
+    expect(applied.clickyRows).toEqual([undefined, presented]);
+  });
+
+  it("pads a batched rows frame with undefined clickyRows, one per row", () => {
+    const batch: LogTailEvent = {
+      sessionId: SESSION_ID,
+      sequence: 3,
+      rows: [podRow("one"), podRow("two")],
+    };
+    const applied = appendTailEvent(emptyLogTailBuffer, batch, 10);
+    expect(applied.clickyRows).toEqual([undefined, undefined]);
+  });
+
+  it("evicts clickyRows in step with the rows the cap drops", () => {
+    const presented: ClickyRow = { cells: { message: { kind: "text", plain: "three" } } };
+    const applied = [
+      frame(41, "one"),
+      frame(42, "two"),
+      { ...frame(43, "three"), clickyRow: presented },
+    ].reduce((buffer, event) => appendTailEvent(buffer, event, 2), emptyLogTailBuffer);
+
+    expect(applied.rows.map((row) => row.message)).toEqual(["two", "three"]);
+    expect(applied.clickyRows).toEqual([undefined, presented]);
+  });
 });
 
 describe("useLogTail (SSE)", () => {
@@ -160,15 +218,15 @@ describe("useLogTail (SSE)", () => {
     vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
   });
   afterEach(() => {
-    // Unmount before the globals go back, so the DELETE the hook issues on the
-    // way out still lands on the fetch double rather than on a real socket.
+    // Unmount before the globals go back, so any request the hook made on the
+    // way out would still land on the fetch double rather than a real socket.
     cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     MockEventSource.last = null;
   });
 
-  it("opens a follow session, streams rows ascending, and releases it on unmount", async () => {
+  it("opens a follow session, streams rows ascending, and only closes the stream on unmount", async () => {
     const fetchMock = stubFetch();
     const { result, unmount } = renderHook(() =>
       useLogTail({ profile: PROFILE, params: { namespace: "storefront" }, following: true }),
@@ -204,12 +262,13 @@ describe("useLogTail (SSE)", () => {
 
     unmount();
     expect(es.closed).toBe(true);
-    await waitFor(() =>
-      expect(deleteCalls(fetchMock)[0]?.[0]).toContain(`/sessions/${SESSION_ID}`),
-    );
+    // The server reaps a view session once it has no subscriber; there is no
+    // DELETE route to call.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deleteCalls(fetchMock)).toHaveLength(0);
   });
 
-  it("stops the session when the caller stops following, keeping the rows already tailed", async () => {
+  it("closes the stream when the caller stops following, keeping the rows already tailed", async () => {
     const fetchMock = stubFetch();
     const { result, rerender } = renderHook(({ following }) => useLogTail({ profile: PROFILE, following }), {
       initialProps: { following: true },
@@ -222,8 +281,8 @@ describe("useLogTail (SSE)", () => {
 
     rerender({ following: false });
 
-    await waitFor(() => expect(deleteCalls(fetchMock)).toHaveLength(1));
-    expect(es.closed).toBe(true);
+    await waitFor(() => expect(es.closed).toBe(true));
+    expect(deleteCalls(fetchMock)).toHaveLength(0);
     expect(result.current.following).toBe(false);
     expect(result.current.status).toBe("idle");
     expect(result.current.rows).toHaveLength(1);
@@ -243,8 +302,20 @@ describe("useLogTail (SSE)", () => {
     expect(result.current.following).toBe(false);
     expect(result.current.sessionId).toBeNull();
     expect(MockEventSource.last).toBeNull();
-    // Nothing was created, so nothing may be deleted.
     expect(deleteCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("keeps following a session that reports stopping until its done frame", async () => {
+    stubFetch({ create: () => ({ status: 201, body: sessionInfo({ state: "stopping" }) }) });
+    const { result } = renderHook(() => useLogTail({ profile: PROFILE, following: true }));
+
+    await waitFor(() => expect(result.current.session?.state).toBe("stopping"));
+    const es = MockEventSource.last!;
+    act(() => es.emit("event", frame(4, "flushed after stop")));
+
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    expect(result.current.following).toBe(true);
+    expect(es.closed).toBe(false);
   });
 
   it("surfaces an event-level error without abandoning the stream", async () => {
@@ -321,58 +392,100 @@ describe("useLogTail (SSE)", () => {
   });
 });
 
-describe("useLogTail (polling fallback)", () => {
+describe("useLogTail (release)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+  });
   afterEach(() => {
-    // Unmount before the globals go back, so the DELETE the hook issues on the
-    // way out still lands on the fetch double rather than on a real socket.
     cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     MockEventSource.last = null;
   });
 
-  it("polls the events endpoint from the last sequence it applied", async () => {
-    vi.stubGlobal("EventSource", undefined);
-    let served = false;
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+  it("aborts a start still in flight on unmount and never subscribes or fetches afterwards", async () => {
+    let answer: ((value: { status: number; body: unknown }) => void) | undefined;
+    let signal: AbortSignal | undefined;
     const fetchMock = stubFetch({
-      poll: () => {
-        if (served) return [];
-        served = true;
-        return [frame(31, "poller saw this"), frame(32, "and this")];
+      create: (init) => {
+        signal = init?.signal ?? undefined;
+        return new Promise((resolve) => {
+          answer = resolve;
+        });
       },
     });
+    const { result, unmount } = renderHook(() => useLogTail({ profile: PROFILE, following: true }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    const { result } = renderHook(() => useLogTail({ profile: PROFILE, following: true, pollMs: 5 }));
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    answer?.({ status: 201, body: sessionInfo() });
+    await flush();
 
-    await waitFor(() => expect(result.current.rows).toHaveLength(2));
-    expect(result.current.status).toBe("polling");
-    // The next poll resumes after the highest sequence applied, the same way a
-    // reconnecting EventSource resumes from Last-Event-ID.
-    await waitFor(() =>
-      expect(fetchMock.mock.calls.some(([url]) => String(url).includes("after=32"))).toBe(true),
-    );
+    expect({ fetches: fetchMock.mock.calls.length, subscribed: MockEventSource.last, error: result.current.error }).toEqual({
+      fetches: 1,
+      subscribed: null,
+      error: null,
+    });
   });
 
-  it("polls when forcePoll is set even though EventSource exists", async () => {
-    vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
-    stubFetch({ poll: () => [frame(1, "forced poll")] });
+  it("makes no request after unmounting a live stream", async () => {
+    const fetchMock = stubFetch();
+    const { unmount } = renderHook(() => useLogTail({ profile: PROFILE, following: true }));
+    await waitFor(() => expect(MockEventSource.last).not.toBeNull());
+    const es = MockEventSource.last!;
 
-    const { result } = renderHook(() =>
-      useLogTail({ profile: PROFILE, following: true, pollMs: 5, forcePoll: true }),
-    );
+    unmount();
+    act(() => es.onerror?.(new Event("error")));
+    await flush();
 
-    await waitFor(() => expect(result.current.rows).toHaveLength(1));
-    expect(MockEventSource.last).toBeNull();
+    expect({ closed: es.closed, fetches: fetchMock.mock.calls.length }).toEqual({ closed: true, fetches: 1 });
   });
 
-  it("treats a rejected poll as a session error rather than an empty tail", async () => {
+  it("closes the old stream and opens a new session when the parameters change", async () => {
+    let nextId = 1;
+    const fetchMock = stubFetch({
+      create: () => ({ status: 201, body: sessionInfo({ id: `sess-${nextId++}` }) }),
+    });
+    const { result, rerender } = renderHook(
+      ({ namespace }) => useLogTail({ profile: PROFILE, params: { namespace }, following: true }),
+      { initialProps: { namespace: "storefront" } },
+    );
+    await waitFor(() => expect(MockEventSource.last?.url).toContain("/sessions/sess-1/events"));
+    const first = MockEventSource.last!;
+
+    rerender({ namespace: "tenant-x" });
+
+    await waitFor(() => expect(MockEventSource.last?.url).toContain("/sessions/sess-2/events"));
+    expect(first.closed).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `/api/v1/profile/${PROFILE}/sessions?follow=true&namespace=storefront`,
+      `/api/v1/profile/${PROFILE}/sessions?follow=true&namespace=tenant-x`,
+    ]);
+    expect(result.current.sessionId).toBe("sess-2");
+  });
+});
+
+describe("useLogTail without EventSource", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    MockEventSource.last = null;
+  });
+
+  it("fails with an explicit start error and never creates a session nobody would read", async () => {
     vi.stubGlobal("EventSource", undefined);
-    stubFetch({ poll: () => ({ status: 404, body: "no such session" }) });
+    const fetchMock = stubFetch();
 
-    const { result } = renderHook(() => useLogTail({ profile: PROFILE, following: true, pollMs: 5 }));
+    const { result } = renderHook(() => useLogTail({ profile: PROFILE, following: true }));
 
-    await waitFor(() => expect(result.current.error?.scope).toBe("session"));
-    expect(result.current.error?.message).toContain("404");
-    expect(result.current.status).toBe("failed");
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+    expect(result.current.error).toMatchObject({ scope: "start" });
+    expect(result.current.error?.message).toContain("EventSource");
+    expect(result.current.following).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -16,11 +16,16 @@ import {
   type ClickyDownloadOptions,
   type ClickyDocument,
   type ClickyNode,
+  type ClickyRowDetailRenderer,
+  type ClickyCellRenderers,
+  type ClickyRowCardRenderer,
+  type ClickyRowDetailTitle,
   type ClickyTableRowClick,
   type ClickyTableRowHref,
   type ClickyTableRowPredicate,
   type ClickyTableRowSelection,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type {
   CellFilterChange,
   CellFilterMode,
@@ -56,7 +61,14 @@ export type CommandOutputProps = {
   // only carries the question of whether to ask for another.
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
+  renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
+  detailStyle?: "row" | "dialog";
+  detailDialogSize?: ModalSize;
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 type LoadingResultRow = {
@@ -95,7 +107,14 @@ export function CommandOutput({
   onSortChange,
   infinite,
   rowSelection,
+  hiddenColumns,
   download,
+  renderRowDetail,
+  cellRenderers,
+  renderRowCard,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
 }: CommandOutputProps) {
   const text = response?.stdout || response?.output || "";
   const ct = response?.contentType || "application/json";
@@ -150,7 +169,14 @@ export function CommandOutput({
         {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
+        {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
+        {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(cellRenderers ? { cellRenderers } : {})}
+        {...(renderRowCard ? { renderRowCard } : {})}
+        {...(detailStyle ? { detailStyle } : {})}
+        {...(detailDialogSize ? { detailDialogSize } : {})}
+        {...(detailDialogTitle ? { detailDialogTitle } : {})}
         loading={loading}
       />
     );
@@ -249,7 +275,14 @@ function OutputBody({
   onSortChange,
   infinite,
   rowSelection,
+  hiddenColumns,
   download,
+  renderRowDetail,
+  cellRenderers,
+  renderRowCard,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
   loading,
 }: {
   text: string;
@@ -272,7 +305,14 @@ function OutputBody({
   onSortChange?: (sort: SortState | null) => void;
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
+  renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
+  detailStyle?: "row" | "dialog";
+  detailDialogSize?: ModalSize;
+  detailDialogTitle?: ClickyRowDetailTitle;
   loading: boolean;
 }) {
   const ct = (contentType.split(";")[0] ?? "").trim();
@@ -319,7 +359,14 @@ function OutputBody({
         {...(onSortChange ? { onSortChange } : {})}
         {...(infinite ? { infinite } : {})}
         {...(rowSelection ? { rowSelection } : {})}
+        {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
+        {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(cellRenderers ? { cellRenderers } : {})}
+        {...(renderRowCard ? { renderRowCard } : {})}
+        {...(detailStyle ? { detailStyle } : {})}
+        {...(detailDialogSize ? { detailDialogSize } : {})}
+        {...(detailDialogTitle ? { detailDialogTitle } : {})}
         loading={loading}
         className="flex min-h-0 flex-1 flex-col"
       />

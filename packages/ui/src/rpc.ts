@@ -3,6 +3,51 @@ export {
   type OperationCatalogProps,
 } from "./rpc/OperationCatalog";
 export {
+  SESSIONS_SURFACE_KEY,
+  SessionsCatalog,
+  type SessionsCatalogProps,
+} from "./rpc/SessionsCatalog";
+export {
+  SessionHeader,
+  type SessionConfirmRenderArgs,
+  type SessionHeaderProps,
+} from "./rpc/SessionHeader";
+export {
+  SESSION_POLL_MS,
+  useSession,
+  type SessionAction,
+  type UseSessionOptions,
+  type UseSessionResult,
+} from "./rpc/useSession";
+export {
+  SESSION_STATES,
+  isSessionTerminal,
+  parseSessionInfo,
+  sessionDurationParam,
+  sessionParamsDurationMs,
+  type SessionInfo,
+  type SessionOwner,
+  type SessionProfileKind,
+  type SessionRole,
+  type SessionState,
+  type SessionStoreLocation,
+  type SessionStreamRef,
+} from "./rpc/sessionTypes";
+export {
+  DEFAULT_SESSION_DURATION_PRESETS_MS,
+  formatSessionCountdown,
+  formatSessionDuration,
+  formatSessionStoreLocation,
+  sessionControls,
+  type SessionControls,
+} from "./rpc/sessionHeaderModel";
+// Re-exported so a host that renders OperationCatalog/EntityExplorerApp
+// needs no `@tanstack/react-query` dependency of its own — every rpc query
+// hook here (useOperations, useOperationPages, ...) already requires one
+// instance to be provided somewhere above it, and this is that instance's
+// single real source in clicky-ui's own dependency graph.
+export { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+export {
   EntityExplorerApp,
   type EntityExplorerAppProps,
   type SurfaceActionLabels,
@@ -39,6 +84,23 @@ export {
   OperationActionDialog,
   type OperationActionDialogProps,
 } from "./rpc/OperationActionDialog";
+export {
+  OperationPicker,
+  type OperationPickerProps,
+} from "./rpc/OperationPicker";
+export {
+  OperationScheduleDialog,
+  type OperationScheduleDialogProps,
+} from "./rpc/OperationScheduleDialog";
+export { OperationSchedules } from "./rpc/OperationSchedules";
+export { schedulableOperations } from "./rpc/operation-schedule-model";
+export type {
+  OperationSchedule,
+  OperationScheduleCLI,
+  OperationScheduleInput,
+  OperationScheduleRunInput,
+  OperationSchedulesProps,
+} from "./rpc/operation-schedule-types";
 export {
   OperationActionBar,
   type OperationActionBarProps,

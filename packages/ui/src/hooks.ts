@@ -6,6 +6,12 @@ export {
   type ResolvedTheme,
 } from "./hooks/use-theme";
 export { ThemeProvider, type ThemeProviderProps } from "./hooks/theme-provider";
+export {
+  mediaMatches,
+  onMediaChange,
+  useMediaQuery,
+} from "./hooks/use-media-query";
+export { useContainerWiderThan } from "./hooks/use-container-width";
 export { useDensity, useDensityValue, type Density } from "./hooks/use-density";
 export {
   DensityProvider,
@@ -46,7 +52,6 @@ export {
 } from "./hooks/use-hotkey";
 export {
   useLogTail,
-  stopLogSession,
   appendTailEvent,
   emptyLogTailBuffer,
   encodeTailParams,

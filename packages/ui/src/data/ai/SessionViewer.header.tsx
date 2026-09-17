@@ -1,7 +1,11 @@
 import { ContextMeter, type ContextMeterMode } from "../chat/ContextMeter";
 import { providerIcon, providerIconColor } from "../chat/provider-icons";
+import { Icon } from "../Icon";
+import { PERMISSION_MODE_ICONS } from "./agent-action-icons";
 import { costTotal, tokenTotal } from "./session-cost";
+import { sessionTone } from "./session-tones";
 import type { SessionMetadataSummary } from "./SessionViewer.model";
+import { SPEC_PERMISSION_MODES } from "./SpecRuntimeEditor.model";
 
 function hasContextMeterMetadata(metadata: SessionMetadataSummary) {
   return Boolean(metadata.context || metadata.sessionId || metadata.model);
@@ -41,6 +45,7 @@ export function SessionContextMeter({
       {...(modelIcon ? { modelIcon } : {})}
       {...(metadata.provider
         ? {
+            provider: metadata.provider,
             modelIconClassName: providerIconColor(metadata.provider),
           }
         : {})}
@@ -98,9 +103,12 @@ export function SessionMetadataBadges({
       ? [{ key: "events", label: countLabel(metadata.events.length, "event") }]
       : []),
   ];
+  const permissionMode = permissionModeBadge(metadata.permissionMode);
   const renderContextMeter =
     showContextMeter && hasContextMeterMetadata(metadata);
-  if (badges.length === 0 && !renderContextMeter) return null;
+  if (badges.length === 0 && !permissionMode && !renderContextMeter) {
+    return null;
+  }
 
   return (
     <>
@@ -113,11 +121,36 @@ export function SessionMetadataBadges({
           <span className="truncate">{badge.label}</span>
         </span>
       ))}
+      {permissionMode && (
+        <span
+          title={`Permission mode: ${permissionMode.label}`}
+          className="inline-flex max-w-40 items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+        >
+          {permissionMode.icon && (
+            <Icon
+              icon={permissionMode.icon}
+              className={`size-3 shrink-0 ${sessionTone(permissionMode.tone).text}`}
+            />
+          )}
+          <span className="truncate">{permissionMode.label}</span>
+        </span>
+      )}
       {renderContextMeter ? (
         <SessionContextMeter metadata={metadata} mode="bar" />
       ) : null}
     </>
   );
+}
+
+function permissionModeBadge(mode: string | undefined) {
+  if (!mode) return undefined;
+  const posture = SPEC_PERMISSION_MODES.find((candidate) => candidate === mode);
+  const known = posture ? PERMISSION_MODE_ICONS[posture] : undefined;
+  return {
+    label: known?.label ?? mode,
+    icon: known?.icon,
+    tone: known?.tone ?? ("slate" as const),
+  };
 }
 
 function countBadge(label: string, values: string[] | undefined) {

@@ -1,5 +1,9 @@
 import type { ToolMeta } from "../../chat/types";
+import { runtimeSchemaPropertyAtPath } from "../../runtime/runtime-field-support";
+import type { RuntimeSpecSchema } from "../../runtime/runtime-mode";
 import {
+  SPEC_PERMISSION_MODES,
+  type SpecPermissionMode,
   normalizeMCPPermissions,
   normalizeResourcePolicies,
   normalizeToolPolicies,
@@ -12,6 +16,33 @@ import {
   type SpecResourceMode,
   type SpecToolPolicy,
 } from "../SpecRuntimeEditor.model";
+
+// Mirrors the schema-driven validation `sandbox.approval` used to publish:
+// an unsupported value is a schema authoring bug, not a user input to shrug
+// off. With no runtime resolved yet there is no schema to consult, so every
+// mode is offered; once a runtime is known, a schema that simply doesn't
+// publish `permissions.mode` means that runtime has no postures to offer.
+export function publishedPermissionModes(
+  schema: RuntimeSpecSchema | undefined,
+): SpecPermissionMode[] {
+  if (!schema) return [...SPEC_PERMISSION_MODES];
+  const values = runtimeSchemaPropertyAtPath(schema, "permissions.mode")?.enum;
+  if (values == null) return [];
+  if (!Array.isArray(values)) {
+    throw new Error("permissions.mode must publish an enum");
+  }
+  return values.map((value) => {
+    if (
+      typeof value !== "string" ||
+      !SPEC_PERMISSION_MODES.includes(value as SpecPermissionMode)
+    ) {
+      throw new Error(
+        `permissions.mode published unsupported value ${JSON.stringify(value)}`,
+      );
+    }
+    return value as SpecPermissionMode;
+  });
+}
 
 export type PermissionDomain = "tools" | "mcp" | "plugins" | "skills";
 export type PermissionListMode = SpecToolPolicy | SpecResourceMode;

@@ -9,10 +9,29 @@ function MemoryHarness() {
     <div>
       <span data-testid="path">{router.pathname}</span>
       {router.renderLink({ to: "/b", children: "Go B", key: "b" })}
+      {router.renderLink({ to: "/d", children: "Pinned", key: "d", draggable: false })}
       <button onClick={() => router.navigate("/c")}>nav C</button>
     </div>
   );
 }
+
+function BrowserLinkHarness() {
+  const router = useBrowserRouter();
+  return router.renderLink({ to: "/d", children: "Pinned", key: "d", draggable: false });
+}
+
+describe("renderLink draggable", () => {
+  it("forwards draggable=false to the anchor in both adapters", () => {
+    render(<MemoryHarness />);
+    expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("draggable", "false");
+    expect(screen.getByRole("link", { name: "Go B" })).not.toHaveAttribute("draggable");
+  });
+
+  it("forwards draggable=false in the browser adapter", () => {
+    render(<BrowserLinkHarness />);
+    expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("draggable", "false");
+  });
+});
 
 function RouterConsumer() {
   const { pathname, renderLink } = useRouter();

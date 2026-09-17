@@ -73,6 +73,36 @@ describe("templateValuePre prefix wiring", () => {
     );
     expect(screen.queryByRole("button", { name: TRIGGER })).not.toBeInTheDocument();
   });
+
+  it("keeps schema-derived enum, number, date and boolean controls for selected template fields", () => {
+    const onChange = vi.fn();
+    render(
+      <JsonSchemaForm
+        schema={{ type: "object", properties: {
+          role: { anyOf: [{ type: "string", enum: ["insured", "owner"] }, { type: "string", pattern: ".*\\{\\{.*" }], "x-source": true },
+          percent: { anyOf: [{ type: "number", multipleOf: 0.1 }, { type: "string", pattern: ".*\\{\\{.*" }], "x-source": true },
+          start: { anyOf: [{ type: "string", format: "date" }, { type: "string", pattern: ".*\\{\\{.*" }], "x-source": true },
+          active: { anyOf: [{ type: "boolean" }, { type: "string", pattern: ".*\\{\\{.*" }], "x-source": true },
+          unrelated: { type: "string" },
+        } }}
+        value={{ role: "insured", percent: 0.5, start: "2026-09-16", active: true }}
+        onChange={onChange}
+        pre={[templateValuePre({
+          tokens: ["{{source.Value}}"],
+          kinds: ["string", "enum", "number", "date", "boolean"],
+          when: (_field, { prop }) => prop["x-source"] === true,
+        })]}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: TRIGGER })).toHaveLength(4);
+    expect(screen.getByRole("combobox", { name: "role" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "percent" })).toBeInTheDocument();
+    expect(screen.getByLabelText("start")).toHaveAttribute("type", "date");
+    expect(screen.getByRole("checkbox", { name: "active" })).toBeChecked();
+    openTemplateMenu(3);
+    fireEvent.click(screen.getByRole("menuitem", { name: "{{source.Value}}" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ active: "{{source.Value}}" }));
+  });
 });
 
 describe("templateValuePre insertion", () => {

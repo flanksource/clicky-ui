@@ -68,6 +68,8 @@ export interface SessionViewerProps {
   showMenu?: boolean;
   /** Controls rendered beside the 3-dot menu in the summary header. */
   headerActions?: ReactNode;
+  /** Host controls rendered at the top of the 3-dot menu. */
+  menuHeader?: ReactNode;
   /** Portal the 3-dot menu into this element instead of rendering it inline in
    *  the summary header — lets a host place the menu in its own toolbar while the
    *  filter/density state stays owned by the viewer. Ignored when `showMenu` is
@@ -126,6 +128,7 @@ export function SessionViewer({
   showContextMeter = true,
   showMenu = true,
   headerActions,
+  menuHeader,
   menuContainer,
   defaultDensity,
   defaultTheme,
@@ -219,6 +222,7 @@ export function SessionViewer({
 
   const menu = showMenu ? (
     <SessionViewerMenu
+      menuHeader={menuHeader}
       density={densityOverride}
       onDensityChange={setDensityOverride}
       theme={themeOverride}
@@ -284,7 +288,7 @@ export function SessionViewer({
   return (
     <div
       className={cn(
-        "bg-background text-sm text-foreground data-[theme=dark]:bg-[var(--fs-bg-subtle)] [[data-theme=dark]_&]:bg-[var(--fs-bg-subtle)]",
+        "@container/session-viewer min-w-0 bg-background text-sm text-foreground data-[theme=dark]:bg-[var(--fs-bg-subtle)] [[data-theme=dark]_&]:bg-[var(--fs-bg-subtle)]",
         scrollable && "flex h-full min-h-0 flex-col",
         className,
       )}
@@ -294,15 +298,16 @@ export function SessionViewer({
         {menu && menuContainer && createPortal(menu, menuContainer)}
         {(showHeader || headerActions || inlineMenu) && (
           <div
+            data-session-viewer-header
             className={cn(
-              "flex items-center justify-between gap-density-3",
+              "flex min-w-0 flex-wrap items-center justify-between gap-x-density-3 gap-y-density-2",
               scrollable
-                ? "shrink-0 border-b border-border px-density-4 py-density-2 md:px-density-6"
+                ? "shrink-0 border-b border-border px-density-3 py-density-2 @min-[48rem]/session-viewer:px-density-4"
                 : "mb-density-3",
             )}
           >
             {showHeader && (
-              <div className="flex flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
                 {summary.model && (
                   <span className="inline-flex items-center gap-1 font-medium text-foreground">
                     <Icon icon={UiRobotAi} className="size-3.5" />
@@ -334,7 +339,11 @@ export function SessionViewer({
 
         {scrollable ? (
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-            <div ref={contentRef} className="p-density-4 md:p-density-6">
+            <div
+              ref={contentRef}
+              data-session-viewer-content
+              className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
+            >
               {list}
             </div>
           </div>

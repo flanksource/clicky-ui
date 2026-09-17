@@ -29,6 +29,8 @@ export type OperationPagesOptions = {
   parameters: OpenAPIParameter[];
   /** Current filter/pagination state, as the catalog holds and URL-mirrors it. */
   filters: ParameterValues;
+  /** Omit to infer a cursor walk from the operation; hosts may force either presentation. */
+  paginationMode?: "paged" | "infinite";
 };
 
 export type OperationPages = {
@@ -49,12 +51,14 @@ export type OperationPages = {
 
 /**
  * useOperationPages runs a surface's list operation, walking it forward when it
- * declares a cursor and fetching a single page when it does not.
+ * declares a cursor and fetching a single page when it does not. A host can
+ * explicitly keep a cursor-capable operation paged when readers need offset
+ * controls; omission retains automatic selection.
  *
- * The mode is the operation's to decide, not the caller's: a cursor role is the
- * server saying "you may resume this query", and everything else — the majority
- * of surfaces — keeps the single-page query it has always had, replacing its
- * rows when the offset moves.
+ * Automatic mode follows the operation: a cursor role is the server saying
+ * "you may resume this query", and everything else keeps the single-page query
+ * it has always had. An explicit host override changes only the presentation;
+ * the operation still owns the available cursor and offset capabilities.
  *
  * In walk mode the cursor is deliberately absent from the query key. The key is
  * the identity of the query being walked, and the cursor is a position inside
@@ -68,11 +72,18 @@ export function useOperationPages({
   endpoint,
   parameters,
   filters,
+  paginationMode,
 }: OperationPagesOptions): OperationPages {
   const queryClient = useQueryClient();
   const cursorParam = cursorParameterName(parameters);
   const path = endpoint?.path;
   const method = endpoint?.method;
+  if (endpoint && paginationMode === "infinite" && !cursorParam) {
+    throw new Error(
+      `Operation ${method?.toUpperCase()} ${path} cannot use infinite pagination without a cursor parameter`,
+    );
+  }
+  const walkMode = paginationMode === "infinite" || (paginationMode === undefined && !!cursorParam);
 
   // The walk's own view of the filters: everything that identifies the query,
   // with the position taken out. A cursor left over in the URL from a shared
@@ -102,7 +113,7 @@ export function useOperationPages({
   const single = useQuery<ExecutionResponse>({
     queryKey: [LIST_KEY, method, path, filters],
     queryFn: () => execute(filters),
-    enabled: !!endpoint && !cursorParam,
+    enabled: !!endpoint && !walkMode,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
@@ -132,7 +143,7 @@ export function useOperationPages({
     // and guessing one is how a client forges a position it was never given.
     getNextPageParam: (lastPage) =>
       lastPage.pagination?.hasMore ? lastPage.pagination.nextCursor : undefined,
-    enabled: !!endpoint && !!cursorParam,
+    enabled: !!endpoint && walkMode,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     retry: 0,
@@ -159,20 +170,20 @@ export function useOperationPages({
 
   const fetchNextPage = walk.fetchNextPage;
   const infinite = useMemo<DataTableInfinite | undefined>(() => {
-    if (!cursorParam) return undefined;
+    if (!walkMode || !cursorParam) return undefined;
     return {
       hasMore: walk.hasNextPage,
       loading: walk.isFetchingNextPage,
       onLoadMore: () => void fetchNextPage(),
     };
-  }, [cursorParam, fetchNextPage, walk.hasNextPage, walk.isFetchingNextPage]);
+  }, [cursorParam, fetchNextPage, walk.hasNextPage, walk.isFetchingNextPage, walkMode]);
 
   const resetWalk = useCallback(() => {
     void queryClient.resetQueries({ queryKey: walkKey });
   }, [queryClient, walkKey]);
   const refetchSingle = single.refetch;
 
-  if (!cursorParam) {
+  if (!walkMode) {
     return {
       pages: single.data ? [single.data] : [],
       response: single.data ?? null,

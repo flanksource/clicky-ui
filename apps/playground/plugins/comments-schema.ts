@@ -94,7 +94,7 @@ const RATING: JsonProperty = {
 const ELEMENT: JsonProperty = {
   type: "object",
   description:
-    "Captured component path, HTML, and screenshot result. Required for every new root, including page-level comments.",
+    "Captured component path and HTML. Required for every new root, including page-level comments. Screenshot capture is optional.",
   properties: {
     componentName: {
       type: "string",
@@ -132,7 +132,7 @@ const ELEMENT: JsonProperty = {
       additionalProperties: false,
     },
   },
-  required: ["source", "html", "screenshot"],
+  required: ["source", "html"],
   additionalProperties: false,
 };
 
@@ -141,7 +141,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "list_comments",
     label: "List comments",
     description:
-      "List playground feedback across every artifact page. New roots carry captured component/source, HTML, and screenshot context. Replies carry parentId and no status.",
+      "List playground feedback across every artifact page. New roots carry captured component/source and HTML, with optional screenshot context. Replies carry parentId and no status.",
     method: "GET",
     path: BASE,
     annotations: { readOnlyHint: true, idempotentHint: true },

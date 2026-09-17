@@ -23,6 +23,7 @@ import {
   DOCUMENT_ANCHOR,
   type Comment,
   type CommentAnchor,
+  type CommentCreateAction,
   type CommentStatusStage,
 } from "./comment-types";
 
@@ -37,6 +38,7 @@ export type CommentSidePanelProps = {
   className?: string;
   /** Serialize one whole thread for Copy and its maximized Markdown tab. */
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  createActions?: readonly CommentCreateAction[];
 };
 
 function defaultAnchorLabel(anchor: CommentAnchor): string {
@@ -223,6 +225,7 @@ function FocusedComments({
   label,
   compact,
   threadToMarkdown,
+  createActions,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -230,6 +233,7 @@ function FocusedComments({
   label: string;
   compact?: boolean;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  createActions?: readonly CommentCreateAction[];
 }) {
   const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
@@ -253,6 +257,7 @@ function FocusedComments({
           hasComments ? "Add another top-level comment…" : "Add a comment…"
         }
         {...ctx.callbacks}
+        {...(createActions ? { createActions } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -422,6 +427,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             ctx={ctx}
             comments={ctx.comments}
             anchor={ctx.focusedAnchor}
+            {...(props.createActions ? { createActions: props.createActions } : {})}
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}
             {...(props.threadToMarkdown

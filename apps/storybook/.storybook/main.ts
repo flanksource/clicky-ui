@@ -30,6 +30,9 @@ const config: StorybookConfig = {
     if (process.env.STORYBOOK_BASE_PATH) {
       viteConfig.base = process.env.STORYBOOK_BASE_PATH;
     }
+    // Keep Vite's source watcher active while requiring a browser refresh to see edits.
+    viteConfig.server ??= {};
+    viteConfig.server.hmr = false;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss()];
     // Force a single React instance across the storybook app and the linked
     // packages/ui source it renders (their react resolves via different

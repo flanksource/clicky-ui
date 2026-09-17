@@ -1,29 +1,30 @@
 import { useEffect, useRef, useState } from "react";
+import type { ClickyRow } from "../data/Clicky";
+import { isSessionState, isSessionTerminal, type SessionState } from "../rpc/sessionTypes";
 
 // use-log-tail is the clicky-ui client for a *follow* session: the server opens
 // a live source for a query profile and streams rows out of it until someone
-// closes it. It is shaped like use-task-run — SSE-first, polling only when
-// EventSource is missing — but the resource underneath is far less forgiving. A
-// follow session holds a websocket to Loki, or a log stream to a kubelet, for as
-// long as it exists, and the server caps how many may run at once
-// (ErrMaxSessions, surfaced as HTTP 409). A session that is left behind is
-// therefore not untidy, it is a slot the next reader cannot have, which is why
-// stopping is a DELETE the hook issues on every exit path including unmount.
+// closes it. The resource underneath is unforgiving. A follow session holds a
+// websocket to Loki, or a log stream to a kubelet, for as long as it exists,
+// and the server caps how many may run at once (ErrMaxSessions, surfaced as
+// HTTP 409). The server owns that slot's release: a view session ends shortly
+// after its last subscriber disconnects, so every exit path — unmount and a
+// parameter change included — only has to abort the start request and close
+// the EventSource.
 //
-// The second thing this stream does differently is replay. Each SSE frame
-// carries an `id:`, so a reconnecting EventSource sends Last-Event-ID and the
-// server resumes from that sequence — re-delivering frames the client may
-// already hold. Sequences are the server's, not a client index: they do not
-// start at 1 and they do not reset, so the accumulator dedupes against the
-// highest sequence it has applied rather than against a position in an array.
+// Events travel over SSE only. The events route serves SSE (or ndjson on
+// request) and resumes through Last-Event-ID; there is no JSON-array polling
+// shape to fall back to, so a browser without EventSource fails loudly.
+//
+// Each SSE frame carries an `id:`, so a reconnecting EventSource sends
+// Last-Event-ID and the server resumes from that sequence — re-delivering
+// frames the client may already hold. Sequences are the server's, not a client
+// index: they do not start at 1 and they do not reset, so the accumulator
+// dedupes against the highest sequence it has applied rather than against a
+// position in an array.
 
-export type LogSessionState =
-  | "starting"
-  | "running"
-  | "completed"
-  | "failed"
-  | "stopped"
-  | "interrupted";
+/** The sessions API's state, under the name this hook has always exported. */
+export type LogSessionState = SessionState;
 
 /** SessionInfo as returned by POST /profile/{name}/sessions and the `done` frame. */
 export interface LogSessionInfo {
@@ -42,6 +43,13 @@ export interface LogSessionInfo {
  * One `event:` frame. It carries either a single `row` or a batch under `rows`
  * — never both — plus an `error` when the source failed mid-stream without the
  * session itself ending.
+ *
+ * `clickyRow` is the presented row — `{cells, detail?}`, built by the exact
+ * function that fills in `node.rows[n]` of the list's own
+ * `application/json+clicky` document — riding next to the raw `row` on a
+ * trace/follow session's per-row events. A plain log tail (or a top-session
+ * snapshot event) never sets it; only a reader that reconciles rows against a
+ * presented table, i.e. OperationCatalog's follow mode, depends on it.
  */
 export interface LogTailEvent {
   sessionId: string;
@@ -49,6 +57,8 @@ export interface LogTailEvent {
   time?: string;
   row?: Record<string, unknown>;
   rows?: Record<string, unknown>[];
+  /** The presented ClickyRow for `row`, when the profile sends one. */
+  clickyRow?: ClickyRow;
   error?: string;
 }
 
@@ -70,29 +80,46 @@ export type LogTailStatus =
   | "idle"
   | "starting"
   | "streaming"
-  | "polling"
   | "connection lost — retrying"
   | "completed"
   | "failed"
   | "stopped"
   | "interrupted";
 
-const TERMINAL: ReadonlySet<string> = new Set(["completed", "failed", "stopped", "interrupted"]);
-
+/**
+ * `stopping` is a stop in flight: the source may still flush rows, so the tail
+ * keeps reading until the done frame.
+ */
 export function isTerminalSessionState(state: LogSessionState | undefined): boolean {
-  return state !== undefined && TERMINAL.has(state);
+  return state !== undefined && isSessionTerminal(state);
+}
+
+function isTerminalTailStatus(status: LogTailStatus): boolean {
+  return isSessionState(status) && isSessionTerminal(status);
 }
 
 export interface LogTailBuffer {
   /** Rows in arrival order, oldest first — the order this surface tails in. */
   rows: Record<string, unknown>[];
+  /**
+   * Each entry's presented ClickyRow, index-aligned with `rows` (same length,
+   * same order) — `undefined` where the event carried none. Additive: a plain
+   * log tail never reads this and `rows` itself is unchanged, so existing
+   * `useLogTail` consumers keep working exactly as before.
+   */
+  clickyRows: (ClickyRow | undefined)[];
   /** Highest sequence applied, or null before the first frame. Never assumed to start at 1. */
   lastSequence: number | null;
   /** Rows evicted by the cap. Kept so the UI can say so instead of quietly shortening history. */
   dropped: number;
 }
 
-export const emptyLogTailBuffer: LogTailBuffer = { rows: [], lastSequence: null, dropped: 0 };
+export const emptyLogTailBuffer: LogTailBuffer = {
+  rows: [],
+  clickyRows: [],
+  lastSequence: null,
+  dropped: 0,
+};
 
 /**
  * Renders profile parameters as the tail of a session request's query string,
@@ -139,10 +166,19 @@ export function appendTailEvent(
   const incoming = event.rows ?? (event.row ? [event.row] : []);
   if (incoming.length === 0) return { ...buffer, lastSequence: event.sequence };
 
+  // A batched `rows` frame has no per-item clickyRow equivalent — only the
+  // single-`row` shape trace/follow sessions use ever carries one — so a
+  // batch pads with `undefined` to stay index-aligned with `rows`.
+  const incomingClickyRows: (ClickyRow | undefined)[] = event.rows
+    ? event.rows.map(() => undefined)
+    : [event.clickyRow];
+
   const merged = buffer.rows.concat(incoming);
+  const mergedClickyRows = buffer.clickyRows.concat(incomingClickyRows);
   const overflow = Math.max(0, merged.length - Math.max(1, maxRows));
   return {
     rows: overflow > 0 ? merged.slice(overflow) : merged,
+    clickyRows: overflow > 0 ? mergedClickyRows.slice(overflow) : mergedClickyRows,
     lastSequence: event.sequence,
     dropped: buffer.dropped + overflow,
   };
@@ -155,19 +191,27 @@ export interface UseLogTailOptions {
   params?: Record<string, unknown> | undefined;
   /** Base path of the session API, e.g. "/api/v1". */
   basePath?: string | undefined;
-  /** Start/stop is the caller's: flipping this to false DELETEs the session. */
+  /** Start/stop is the caller's: flipping this to false closes the stream; the server reaps the unsubscribed session. */
   following?: boolean | undefined;
   /** Rows kept in memory; older ones are evicted and counted in `droppedRows`. */
   maxRows?: number | undefined;
-  /** Poll interval (ms) for the fallback transport. */
-  pollMs?: number | undefined;
-  /** Force polling even when EventSource exists (mainly tests). */
-  forcePoll?: boolean | undefined;
+  /**
+   * Called once per applied `event` frame, in sequence order, before the frame
+   * reaches the buffer — so a reducer sees every row even after `maxRows` starts
+   * evicting. A replayed sequence is not delivered again, and `done` frames are
+   * never delivered. The latest callback is always used; changing its identity
+   * does not restart the session. A throw is reported as a `stream` error.
+   */
+  onEvent?: ((event: LogTailEvent) => void) | undefined;
 }
 
 export interface UseLogTailResult {
   /** Accumulated rows, oldest first. */
   rows: Record<string, unknown>[];
+  /** Each row's presented ClickyRow, index-aligned with `rows`; `undefined`
+   *  where the event carried none (a plain log tail, or a top-session
+   *  snapshot event). */
+  clickyRows: (ClickyRow | undefined)[];
   status: LogTailStatus;
   error: LogTailError | null;
   sessionId: string | null;
@@ -182,23 +226,10 @@ export interface UseLogTailResult {
 }
 
 const DEFAULT_BASE = "/api/v1";
-const DEFAULT_POLL_MS = 1_000;
 const DEFAULT_MAX_ROWS = 5_000;
 
 function hasEventSource(): boolean {
   return typeof globalThis !== "undefined" && typeof globalThis.EventSource !== "undefined";
-}
-
-/** DELETE the session. Exported because a caller that owns the id (a saved tail,
- *  a beforeunload handler) has to be able to release it without the hook. */
-export async function stopLogSession(basePath: string, id: string): Promise<void> {
-  const res = await fetch(`${basePath}/sessions/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    keepalive: true,
-  });
-  if (!res.ok) {
-    throw new Error((await res.text()) || `stopping session ${id} failed with HTTP ${res.status}`);
-  }
 }
 
 export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
@@ -208,8 +239,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     basePath = DEFAULT_BASE,
     following: wantFollow = false,
     maxRows = DEFAULT_MAX_ROWS,
-    pollMs = DEFAULT_POLL_MS,
-    forcePoll = false,
+    onEvent,
   } = options;
 
   const [buffer, setBuffer] = useState<LogTailBuffer>(emptyLogTailBuffer);
@@ -221,6 +251,8 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
   // much history to keep never tears down a live session to do it.
   const maxRowsRef = useRef(maxRows);
   maxRowsRef.current = maxRows;
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   // Profile parameters travel in the query string because that is where the
   // session endpoint reads them from: it builds its params by walking
@@ -241,19 +273,45 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     setBuffer(emptyLogTailBuffer);
     setError(null);
     setSession(null);
+
+    // Checked before the session exists: a session nobody can subscribe to
+    // would hold a server slot until the reaper noticed.
+    if (!hasEventSource()) {
+      setStatus("failed");
+      setError({
+        scope: "start",
+        message: `cannot follow ${profile}: this browser has no EventSource, and session events are served only as SSE`,
+      });
+      return;
+    }
     setStatus("starting");
 
     let cancelled = false;
+    const aborter = new AbortController();
     let source: EventSource | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let liveSessionId: string | null = null;
     let ended = false;
+    // onEvent's own watermark, tracked here rather than read from the buffer:
+    // the buffer only dedupes inside a state updater, which React may run twice,
+    // so a callback there would double-count. Same rule as appendTailEvent.
+    let delivered: number | null = null;
+
+    const deliver = (event: LogTailEvent) => {
+      if (delivered !== null && event.sequence <= delivered) return;
+      delivered = event.sequence;
+      try {
+        onEventRef.current?.(event);
+      } catch (cause) {
+        setError({ scope: "stream", message: `onEvent threw on sequence ${event.sequence}: ${String(cause)}` });
+      }
+    };
 
     const apply = (event: LogTailEvent) => {
-      setBuffer((prev) => appendTailEvent(prev, event, maxRowsRef.current));
       // An event-level error does not end the session, so it is reported beside
-      // the rows rather than in place of them.
+      // the rows rather than in place of them. Set before delivery so a reducer
+      // that throws on the same frame is the error left standing.
       if (event.error) setError({ scope: "stream", message: event.error });
+      deliver(event);
+      setBuffer((prev) => appendTailEvent(prev, event, maxRowsRef.current));
     };
 
     // Unlike the task stream this does not skip what it cannot parse: a tail
@@ -304,59 +362,14 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
       };
     };
 
-    // The polling transport asks for the same replay the SSE reconnect gets:
-    // `after` is Last-Event-ID by another name.
-    const poll = (id: string) => {
-      let after: number | null = null;
-      const tick = async () => {
-        try {
-          const query = after === null ? "" : `?after=${after}`;
-          const res = await fetch(
-            `${basePath}/sessions/${encodeURIComponent(id)}/events${query}`,
-            { headers: { Accept: "application/json" } },
-          );
-          if (!res.ok) {
-            // A refused request is the session answering that it is gone or
-            // broken; retrying it forever would render as an empty tail.
-            ended = true;
-            setStatus("failed");
-            setError({
-              scope: "session",
-              httpStatus: res.status,
-              message: `reading events for session ${id} failed with HTTP ${res.status}: ${
-                (await res.text()).trim() || "no detail"
-              }`,
-            });
-            return;
-          }
-          for (const event of (await res.json()) as LogTailEvent[]) {
-            apply(event);
-            if (after === null || event.sequence > after) after = event.sequence;
-          }
-          setStatus("polling");
-        } catch {
-          setStatus("connection lost — retrying");
-        }
-        if (!cancelled) timer = setTimeout(tick, pollMs);
-      };
-      void tick();
-    };
-
-    // Releasing can run while the component is already gone, so a failure here
-    // cannot be raised into state — but it is the failure that costs everyone
-    // else a session slot, so it is never swallowed either.
-    const release = (id: string) =>
-      stopLogSession(basePath, id).catch((cause: unknown) => {
-        console.error(`[useLogTail] could not stop follow session ${id}`, cause);
-      });
-
     const start = async () => {
       let info: LogSessionInfo;
       try {
         const res = await fetch(
           `${basePath}/profile/${encodeURIComponent(profile)}/sessions?follow=true${paramsQuery}`,
-          { method: "POST", headers: { Accept: "application/json" } },
+          { method: "POST", headers: { Accept: "application/json" }, signal: aborter.signal },
         );
+        if (cancelled) return;
         if (!res.ok) {
           const detail = (await res.text()).trim() || "no detail";
           setStatus("failed");
@@ -372,6 +385,8 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
         }
         info = (await res.json()) as LogSessionInfo;
       } catch (cause) {
+        // Our own abort on unmount or a parameter change: nothing is left to report to.
+        if (cancelled) return;
         setStatus("failed");
         setError({
           scope: "start",
@@ -380,41 +395,36 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
         return;
       }
 
-      if (cancelled) {
-        // The caller stopped following while the POST was in flight. The session
-        // exists on the server regardless, so it still has to be released.
-        void release(info.id);
-        return;
-      }
-      liveSessionId = info.id;
+      // The caller stopped following while the POST was in flight. If the
+      // session was created, nothing ever subscribes, so the server ends it.
+      if (cancelled) return;
       setSession(info);
-      if (forcePoll || !hasEventSource()) poll(info.id);
-      else subscribe(info.id);
+      subscribe(info.id);
     };
 
     void start();
-    // A session left running is not untidy, it is a slot the next reader cannot
-    // have — so it is released on every exit path, unmount included.
+    // Aborting the start and closing the stream is the whole release: a view
+    // session without a subscriber ends server-side.
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      aborter.abort();
       source?.close();
-      if (liveSessionId && !ended) void release(liveSessionId);
     };
-  }, [profile, paramsQuery, basePath, wantFollow, pollMs, forcePoll]);
+  }, [profile, paramsQuery, basePath, wantFollow]);
 
   // Stopping returns the surface to idle, but a session that ended on its own
   // keeps its terminal status so the reason it ended stays on screen.
   useEffect(() => {
-    if (!wantFollow) setStatus((prev) => (TERMINAL.has(prev) ? prev : "idle"));
+    if (!wantFollow) setStatus((prev) => (isTerminalTailStatus(prev) ? prev : "idle"));
   }, [wantFollow]);
 
   return {
     rows: buffer.rows,
+    clickyRows: buffer.clickyRows,
     status,
     error,
     sessionId: session?.id ?? null,
-    following: wantFollow && !TERMINAL.has(status),
+    following: wantFollow && !isTerminalTailStatus(status),
     droppedRows: buffer.dropped,
     lastSequence: buffer.lastSequence,
     session,

@@ -64,7 +64,7 @@ describe("summaries", () => {
     ).toBe("Sonnet 4.5 · medium");
     // Temperature rides along in the spec but is not part of the runtime line.
     expect(summarizeModel(VALUE)).toBe("anthropic/claude-sonnet-4-5 · medium");
-    expect(summarizeModel({})).toBe("Default model");
+    expect(summarizeModel({})).toBe("-");
   });
 
   it("counts prompt overrides", () => {

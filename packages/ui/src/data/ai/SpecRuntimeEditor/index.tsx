@@ -18,6 +18,7 @@ import { PromptAdvanced, PromptSection } from "./PromptSection";
 import { Rail } from "./Rail";
 import { SandboxSection } from "./SandboxSection";
 import { SectionCard } from "./SectionCard";
+import { SectionTabs } from "./SectionTabs";
 import { VerifySection } from "./VerifySection";
 import { WorkspaceSection } from "./WorkspaceSection";
 import {
@@ -30,8 +31,11 @@ import { summarizeTarget } from "./summaries";
 import {
   SPEC_RUNTIME_SECTIONS,
   type SpecRuntimeSandboxCatalog,
+  type SpecRuntimeHostField,
   type SpecRuntimeSecretSelectorConfig,
+  type SpecRuntimeTab,
   type SpecSectionId,
+  type SpecSectionMeta,
 } from "./types";
 import {
   SPEC_RUNTIME_FAMILIES,
@@ -57,7 +61,9 @@ export type {
   SpecRuntimeSandboxBackend,
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSandboxKind,
+  SpecRuntimeHostField,
   SpecRuntimeSecretSelectorConfig,
+  SpecRuntimeTab,
 } from "./types";
 export type { SpecRuntimeCLIOptions } from "./CLIArgsSection";
 export {
@@ -89,8 +95,18 @@ export type SpecRuntimeEditorProps = {
   sandboxCreate?: SpecRuntimeSandboxCreateConfig | undefined;
   /** Optional ordered section selection for embedded editors that only need part of the runtime spec. */
   sections?: readonly SpecSectionId[] | undefined;
-  /** Presents prompt.user as a complete .prompt document body. */
-  promptVariant?: "runtime" | "document" | undefined;
+  /** Groups sections behind a tab strip instead of stacking them; exclusive with `sections`. */
+  tabs?: readonly SpecRuntimeTab[] | undefined;
+  /** Controlled active tab id; falls back to the first visible tab when filtered out. */
+  activeTab?: string | undefined;
+  onActiveTabChange?: ((id: string) => void) | undefined;
+  /** Model fields the host renders beside the editor; the Model section omits them. */
+  hostFields?: readonly SpecRuntimeHostField[] | undefined;
+  /**
+   * `document` presents prompt.user as a complete .prompt body; `system` omits
+   * prompt.user for hosts that edit it in their own composer.
+   */
+  promptVariant?: "runtime" | "document" | "system" | undefined;
   /** Disables value controls while preserving section navigation and disclosures. */
   readOnly?: boolean | undefined;
   className?: string | undefined;
@@ -119,9 +135,14 @@ const ADVANCED_HINTS: Partial<Record<SpecSectionId, string>> = {
   environment: "dotenv files",
 };
 
+const PROMPT_VARIANT_HINTS = {
+  document: "The .prompt document body and its explicit system fields.",
+  system: "System prompt fields layered on top of the base agent prompt.",
+} as const;
+
 // Full-page runtime spec editor (design "Runtime Spec Editor v2"): a live
-// summary rail with scrollspy nav, preset quick-starts, and stacked numbered
-// sections. Container-responsive so it works embedded in a modal or standalone.
+// summary rail with scrollspy nav and stacked numbered sections.
+// Container-responsive so it works embedded in a modal or standalone.
 export function SpecRuntimeEditor({
   value,
   onChange,
@@ -137,6 +158,10 @@ export function SpecRuntimeEditor({
   sandboxCatalog,
   sandboxCreate,
   sections: sectionFilter,
+  tabs,
+  activeTab,
+  onActiveTabChange,
+  hostFields,
   promptVariant = "runtime",
   readOnly = false,
   className,
@@ -207,27 +232,27 @@ export function SpecRuntimeEditor({
       supports(`permissions.${entry.domain}`),
   );
   const hasPermissionSection =
+    supports("permissions.mode") ||
     (skillsSection === "permissions" && supports("permissions.skills")) ||
     (["tools", "mcp", "plugins"] as const).some((domain) =>
       supports(`permissions.${domain}`),
     );
 
-  const requestedSections = useMemo(
-    () =>
-      sectionFilter
-        ? sectionFilter.map((id) => {
-            const section = SPEC_RUNTIME_SECTIONS.find(
-              (candidate) => candidate.id === id,
-            );
-            if (!section)
-              throw new Error(
-                `unknown runtime editor section ${JSON.stringify(id)}`,
-              );
-            return section;
-          })
-        : SPEC_RUNTIME_SECTIONS,
-    [sectionFilter],
-  );
+  if (tabs && sectionFilter) {
+    throw new Error("SpecRuntimeEditor: pass either sections or tabs, not both");
+  }
+  const requestedSections = useMemo(() => {
+    const ids = tabs ? tabs.flatMap((tab) => tab.sections ?? []) : sectionFilter;
+    if (!ids) return SPEC_RUNTIME_SECTIONS;
+    return ids.map((id) => {
+      const section = SPEC_RUNTIME_SECTIONS.find(
+        (candidate) => candidate.id === id,
+      );
+      if (!section)
+        throw new Error(`unknown runtime editor section ${JSON.stringify(id)}`);
+      return section;
+    });
+  }, [sectionFilter, tabs]);
   // Sandbox modes come from the selected runtime schema. The adapter catalog is
   // optional metadata for configured Docker and Git Agent backends.
   const sections = requestedSections.filter(
@@ -268,6 +293,7 @@ export function SpecRuntimeEditor({
             effectiveMode={effectiveMode}
             effectiveModel={effectiveModel}
             families={runtimeFamilies}
+            {...(hostFields ? { hostFields } : {})}
           />
         );
       case "prompt":
@@ -296,7 +322,6 @@ export function SpecRuntimeEditor({
             onChange={commitChange}
             schema={runtimeSchema}
             {...(sandboxCatalog ? { catalog: sandboxCatalog } : {})}
-            families={runtimeFamilies}
             {...(sandboxCreate ? { createConfig: sandboxCreate } : {})}
           />
         ) : null;
@@ -305,7 +330,9 @@ export function SpecRuntimeEditor({
           <PermissionsSection
             value={value}
             onChange={commitChange}
-            entries={permissionEntries}
+            families={runtimeFamilies}
+            {...(runtimeSchema ? { schema: runtimeSchema } : {})}
+            effectiveMode={effectiveMode}
           />
         ) : null;
       case "environment":
@@ -395,9 +422,38 @@ export function SpecRuntimeEditor({
       content
     );
 
+  const sectionCard = (
+    section: SpecSectionMeta,
+    { number, bare = false }: { number?: string; bare?: boolean },
+  ) => (
+    <SectionCard
+      key={section.id}
+      meta={
+        section.id === "prompt" && promptVariant !== "runtime"
+          ? { ...section, hint: PROMPT_VARIANT_HINTS[promptVariant] }
+          : section
+      }
+      {...(number ? { number } : {})}
+      bare={bare}
+      domId={domId(section.id)}
+      sectionRef={sectionRef(domId(section.id))}
+      advanced={valueControls(sectionAdvanced(section.id))}
+      advancedHint={ADVANCED_HINTS[section.id]}
+      defaultCollapsed={collapsedSections.has(section.id)}
+    >
+      {valueControls(sectionBody(section.id))}
+    </SectionCard>
+  );
+
   return (
     <div className={cn("@container", className)}>
-      <div className="mx-auto max-w-[820px] px-density-4 py-density-4">
+      <div
+        className={
+          tabs
+            ? "grid grid-cols-1 gap-density-3"
+            : "mx-auto max-w-[820px] px-density-4 py-density-4"
+        }
+      >
         {showHeader && (
           <Rail
             eyebrow={eyebrow}
@@ -415,27 +471,19 @@ export function SpecRuntimeEditor({
           </div>
         ) : null}
         {beforeSections}
-        {sections.map((section, index) => (
-          <SectionCard
-            key={section.id}
-            meta={
-              section.id === "prompt" && promptVariant === "document"
-                ? {
-                    ...section,
-                    hint: "The .prompt document body and its explicit system fields.",
-                  }
-                : section
-            }
-            number={String(index + 1).padStart(2, "0")}
-            domId={domId(section.id)}
-            sectionRef={sectionRef(domId(section.id))}
-            advanced={valueControls(sectionAdvanced(section.id))}
-            advancedHint={ADVANCED_HINTS[section.id]}
-            defaultCollapsed={collapsedSections.has(section.id)}
-          >
-            {valueControls(sectionBody(section.id))}
-          </SectionCard>
-        ))}
+        {tabs ? (
+          <SectionTabs
+            tabs={tabs}
+            sections={sections}
+            activeTab={activeTab}
+            onActiveTabChange={onActiveTabChange}
+            renderSection={(section, { bare }) => sectionCard(section, { bare })}
+          />
+        ) : (
+          sections.map((section, index) =>
+            sectionCard(section, { number: String(index + 1).padStart(2, "0") }),
+          )
+        )}
       </div>
       {(onSave || onCancel) && (
         <Footer

@@ -16,7 +16,9 @@ export type AIPromptRunValue = {
   spec?: AIPromptRunSpec;
   runtimes?: AISpecRuntimeModel[];
   chat?: boolean;
-  /** Saved runtime profile (id or name) layered under `spec` by the host. */
+  /** Ordered runtime presets layered under spec. */
+  presets?: string[];
+  /** @deprecated Ignored by current hosts; use presets. */
   runtimeProfile?: string;
 };
 
@@ -62,6 +64,88 @@ export function withRuntimeRows(
     return next;
   }
   return { ...value, spec, runtimes: rows };
+}
+
+export type PromptRunModelMode = "single" | "multi";
+
+export function modelModeOf(value: AIPromptRunValue): PromptRunModelMode {
+  return runtimeRows(value).length > 1 ? "multi" : "single";
+}
+
+// Multi-model means at least two comparison rows, so switching seeds a second
+// row on the first row's mode and switching back keeps only the first row.
+export function withModelMode(
+  value: AIPromptRunValue,
+  mode: PromptRunModelMode,
+): AIPromptRunValue {
+  const rows = runtimeRows(value);
+  if (mode === "single") return withRuntimeRows(value, rows.slice(0, 1));
+  if (rows.length > 1) return value;
+  const first = rows[0] ?? {};
+  return withRuntimeRows(value, [
+    first,
+    first.mode ? { mode: first.mode } : {},
+  ]);
+}
+
+export type AISingleRuntime = AISpecRuntimeModel &
+  Pick<AISpecRuntimeValue, "budget">;
+
+export function singleRuntimeOf(value: AIPromptRunValue): AISingleRuntime {
+  const runtime: AISingleRuntime = { ...runtimeRows(value)[0] };
+  if (value.spec?.budget) runtime.budget = value.spec.budget;
+  return runtime;
+}
+
+export function withSingleRuntime(
+  value: AIPromptRunValue,
+  { budget, ...runtime }: AISingleRuntime,
+): AIPromptRunValue {
+  const spec = { ...value.spec };
+  if (budget) spec.budget = budget;
+  else delete spec.budget;
+  return withRuntimeRows({ ...value, spec }, [runtime]);
+}
+
+// A recent runtime replaces the single run's model identity (limits stay on the
+// spec) or joins a multi-model run as another comparison row.
+export function withRecentRuntime(
+  value: AIPromptRunValue,
+  runtime: AISpecRuntimeModel,
+): AIPromptRunValue {
+  return withRuntimeRows(
+    value,
+    modelModeOf(value) === "single"
+      ? [runtime]
+      : [...runtimeRows(value), runtime],
+  );
+}
+
+export const RECENT_RUNTIME_LIMIT = 5;
+
+// Newest first. A row that inherits both model and mode says nothing about
+// which runtime was used, so it is not worth offering again.
+export function recordRecentRuntimes(
+  recent: readonly AISpecRuntimeModel[],
+  used: readonly AISpecRuntimeModel[],
+): AISpecRuntimeModel[] {
+  const next = [
+    ...used.filter((runtime) => runtime.model || runtime.mode),
+    ...recent,
+  ];
+  const seen = new Set<string>();
+  return next
+    .filter((runtime) => {
+      const key = recentRuntimeKey(runtime);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, RECENT_RUNTIME_LIMIT);
+}
+
+export function recentRuntimeKey(runtime: AISpecRuntimeModel): string {
+  return JSON.stringify(MODEL_KEYS.map((key) => runtime[key] ?? null));
 }
 
 function withRuntimeModel(

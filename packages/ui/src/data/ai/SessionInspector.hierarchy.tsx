@@ -58,56 +58,73 @@ export function SessionHierarchyPicker({
       }
     >
       {() => (
-        <Tree
-          roots={state.roots}
-          ariaLabel="Session content"
+        <SessionHierarchyTree
+          collection={collection}
+          state={state}
+          {...(renderSessionActions ? { renderSessionActions } : {})}
           className="h-full"
-          showControls
-          getKey={(node) => node.key}
-          getChildren={(node) => node.children}
-          getSearchText={(node) =>
-            [node.label, node.model, node.effort, node.mode]
-              .filter(Boolean)
-              .join(" ")
-          }
-          defaultOpen={(node) =>
-            node.key === sessionKey(collection.currentSessionId)
-          }
-          hasMoreChildren={(node) =>
-            node.kind === "session" &&
-            Boolean(
-              node.item &&
-              !state.loadedSessionIds.has(node.item.id) &&
-              collection.loadSession,
-            )
-          }
-          loadChildren={state.loadChildren}
-          renderRow={({ node, loading, error }) => {
-            const message = error
-              ? String(error)
-              : state.errors.get(node.itemId);
-            const actions =
-              node.kind === "session" && node.item
-                ? renderSessionActions?.(node.item)
-                : undefined;
-            return (
-              <HierarchyRow
-                node={node}
-                checkState={hierarchyCheckState(node, state.checked)}
-                loading={loading || state.loading.has(node.itemId)}
-                onChecked={(include) => {
-                  void state
-                    .setBranchChecked(node, include)
-                    .catch(() => undefined);
-                }}
-                {...(message ? { error: message } : {})}
-                {...(actions ? { actions } : {})}
-              />
-            );
-          }}
         />
       )}
     </DropdownMenu>
+  );
+}
+
+export function SessionHierarchyTree({
+  collection,
+  state,
+  renderSessionActions,
+  className,
+}: {
+  collection: SessionCollectionInput;
+  state: SessionHierarchyState;
+  renderSessionActions?: (item: SessionCollectionItem) => ReactNode;
+  className?: string;
+}) {
+  return (
+    <Tree
+      roots={state.roots}
+      ariaLabel="Session content"
+      {...(className ? { className } : {})}
+      showControls
+      getKey={(node) => node.key}
+      getChildren={(node) => node.children}
+      getSearchText={(node) =>
+        [node.label, node.model, node.effort, node.mode]
+          .filter(Boolean)
+          .join(" ")
+      }
+      defaultOpen={(node) =>
+        node.key === sessionKey(collection.currentSessionId)
+      }
+      hasMoreChildren={(node) =>
+        node.kind === "session" &&
+        Boolean(
+          node.item &&
+          !state.loadedSessionIds.has(node.item.id) &&
+          collection.loadSession,
+        )
+      }
+      loadChildren={state.loadChildren}
+      renderRow={({ node, loading, error }) => {
+        const message = error ? String(error) : state.errors.get(node.itemId);
+        const actions =
+          node.kind === "session" && node.item
+            ? renderSessionActions?.(node.item)
+            : undefined;
+        return (
+          <HierarchyRow
+            node={node}
+            checkState={hierarchyCheckState(node, state.checked)}
+            loading={loading || state.loading.has(node.itemId)}
+            onChecked={(include) => {
+              void state.setBranchChecked(node, include).catch(() => undefined);
+            }}
+            {...(message ? { error: message } : {})}
+            {...(actions ? { actions } : {})}
+          />
+        );
+      }}
+    />
   );
 }
 
@@ -226,9 +243,7 @@ function modeIcon(mode: string) {
     return WORKFLOW_PHASES[key as keyof typeof WORKFLOW_PHASES];
   }
   for (const family of SPEC_RUNTIME_FAMILIES) {
-    const match = family.modes.find(
-      (candidate) => candidate.id === key,
-    );
+    const match = family.modes.find((candidate) => candidate.id === key);
     if (match) return { icon: match.icon, label: match.label };
   }
   return undefined;

@@ -13,6 +13,7 @@ import {
   isSpecRuntimeMode,
   type SpecRuntimeMode,
 } from "../../lib/runtime-family";
+import { UNSPECIFIED_LABEL } from "./unspecified";
 export {
   familyForModel,
   isSpecRuntimeMode,
@@ -21,6 +22,13 @@ export {
   SPEC_RUNTIME_MODES,
   type SpecRuntimeMode,
 } from "../../lib/runtime-family";
+export {
+  UNSPECIFIED_HINT,
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
+  unspecifiedHint,
+} from "./unspecified";
 
 // A runtime has two independent axes: the model selects a provider family and
 // `spec.mode` selects api | agent | cli | cmux. The mode never contains a
@@ -112,6 +120,7 @@ export type RuntimePermissionSupport = {
         flag?: string | undefined;
         sandbox?: string | undefined;
         approval?: string | undefined;
+        reviewer?: string | undefined;
         note?: string | undefined;
       }
     | undefined;
@@ -265,6 +274,12 @@ const MODE_ICONS: Record<string, StaticIconComponent> = {
   cli: UiTerminal,
   cmux: UiColumns,
 };
+
+export function runtimeModeIcon(
+  mode?: string | undefined,
+): StaticIconComponent | undefined {
+  return mode ? MODE_ICONS[mode.toLowerCase()] : undefined;
+}
 
 // Mode ids are lowercase tokens; only the acronyms and the lowercase brand
 // "cmux" need spelling out. `agent` falls through to plain title case.
@@ -493,7 +508,7 @@ export function labelForMode(
       }
     }
   }
-  return "Prompt default";
+  return UNSPECIFIED_LABEL;
 }
 
 /** Lists selectable models for one provider family. */

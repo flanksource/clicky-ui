@@ -11,6 +11,7 @@ import {
   UiLockOpen,
   UiPauseCircle,
   UiPencilSimpleLine,
+  UiRobotAi,
   UiShieldSlash,
 } from "../../../icons";
 
@@ -24,7 +25,7 @@ const CODEX_PERMISSION_MODES: PermissionModeVisuals = {
     tone: "sky",
     label: "Ask for approval",
   },
-  auto: { icon: UiHandPalm, tone: "sky", label: "Ask for approval" },
+  auto: { icon: UiRobotAi, tone: "violet", label: "Auto review" },
   bypassPermissions: {
     icon: UiLockOpen,
     tone: "rose",
@@ -54,7 +55,6 @@ const PROVIDER_VISUALS: Partial<Record<string, PermissionModeVisuals>> = {
 };
 
 const PROVIDER_ALIASES: Partial<Record<string, AliasPair[]>> = {
-  codex: [["acceptEdits", "auto"]],
   gemini: [
     ["acceptEdits", "auto"],
     ["bypassPermissions", "dontAsk"],
@@ -99,7 +99,12 @@ function aliasRepresentative(
   return left;
 }
 
-const ENFORCEMENT_EFFECT_KEYS = ["flag", "sandbox", "approval"] as const;
+const ENFORCEMENT_EFFECT_KEYS = [
+  "flag",
+  "sandbox",
+  "approval",
+  "reviewer",
+] as const;
 
 function equivalentEnforcement(
   left: RuntimePermissionSupport | undefined,

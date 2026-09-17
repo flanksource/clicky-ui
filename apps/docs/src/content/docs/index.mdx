@@ -1,0 +1,38 @@
+---
+title: Clicky UI
+description: React components and schema-driven UI primitives from Flanksource.
+template: splash
+hero:
+  tagline: Reusable React components with consistent theming, density, data display, overlays, and schema-driven forms.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+    - text: JSON Schema form
+      link: /guides/json-schema-form/
+      variant: minimal
+      icon: document
+    - text: Storybook
+      link: /storybook/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<CardGrid>
+  <Card title="Component library" icon="seti:react">
+    Import focused package entry points for controls, data views, layouts,
+    overlays, RPC explorers, and AI surfaces.
+  </Card>
+  <Card title="Schema-driven forms" icon="puzzle">
+    Turn JSON Schema objects into nested, extensible React forms without
+    embedding domain knowledge in the renderer.
+  </Card>
+  <Card title="Generated API" icon="document">
+    Component props are extracted from the TypeScript source with
+    `react-docgen-typescript` each time the docs build.
+  </Card>
+</CardGrid>
+
+Explore every interactive state in [Storybook](/storybook/), browse the
+[Kitchen Sink](/kitchen-sink/), or open the [live Clicky JSON demo](/demo.html).

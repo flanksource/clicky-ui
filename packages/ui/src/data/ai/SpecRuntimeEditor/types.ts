@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   KeyPreview,
   SecretKind,
@@ -166,4 +167,33 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
     hint: "Extra interactive CLI flags passed straight to the agent binary.",
     icon: UiTerminal,
   },
+];
+
+/** Model-section fields a host renders beside the editor, so the section omits them. */
+export type SpecRuntimeHostField = "runtime" | "budget.timeout" | "budget.cost";
+
+/**
+ * A tab in the editor's tabbed layout. It either groups spec sections (hidden
+ * when the selected runtime filters all of them out) or carries a host-owned
+ * panel such as a prompt composer or a request preview.
+ */
+export type SpecRuntimeTab = {
+  id: string;
+  label: string;
+  icon?: StaticIconComponent | undefined;
+  sections?: readonly SpecSectionId[] | undefined;
+  content?: ReactNode | undefined;
+};
+
+export const SPEC_RUNTIME_TABS: SpecRuntimeTab[] = [
+  { id: "system", label: "System Prompt", icon: UiFileText, sections: ["prompt"] },
+  {
+    id: "environment",
+    label: "Environment",
+    icon: UiBraces,
+    sections: ["workspace", "sandbox", "environment"],
+  },
+  { id: "permissions", label: "Permissions", icon: UiShield, sections: ["permissions"] },
+  { id: "model", label: "Model", icon: UiRobotAi, sections: ["model", "cli"] },
+  { id: "workflow", label: "Workflow", icon: UiSealCheck, sections: ["verify", "commit"] },
 ];

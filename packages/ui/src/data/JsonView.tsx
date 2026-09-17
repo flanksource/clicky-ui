@@ -56,7 +56,15 @@ export function JsonView({ data, name, depth = 0, defaultOpenDepth = 2 }: JsonVi
         {name && <span className="text-muted-foreground">: </span>}
         {!open && (
           <span className="text-muted-foreground">
-            {openB} {entries.length} {isArray ? "items" : "keys"} {closeB}
+            {openB} {entries.length}{" "}
+            {isArray
+              ? entries.length === 1
+                ? "item"
+                : "items"
+              : entries.length === 1
+                ? "key"
+                : "keys"}{" "}
+            {closeB}
           </span>
         )}
         {open && <span className="text-muted-foreground">{openB}</span>}

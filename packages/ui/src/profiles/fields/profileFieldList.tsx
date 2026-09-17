@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { AccordionList } from "../../components/AccordionList";
 import { IconButton } from "../../components/IconButton";
+import { Button } from "../../components/button";
 import {
+  DropdownMenu,
+  type DropdownMenuItem,
+} from "../../overlay/DropdownMenu";
+import {
+  UiAdd,
+  UiDotsVertical,
   UiEye,
   UiEyeClosed,
   UiFilter,
@@ -25,7 +32,7 @@ const inputClassName =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15";
 
 const inputClassNameSm =
-  "w-full rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15";
+  "h-7 min-w-0 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15";
 
 /** Search, type and selection filters. `compact` lays them out on one row for
  * the editor route's pinned toolbar; the wizard stacks them in its card. */
@@ -54,20 +61,24 @@ export function ProfileFieldFilters({
       <select
         value={state.filter.type}
         aria-label="Filter by field type"
-        className={compact ? `${className} w-auto` : className}
+        className={compact ? `${className} w-[5.25rem]` : className}
         onChange={(event) => patch({ type: event.target.value })}
       >
         <option value="">All types</option>
         {state.types.map((type) => (
-          <option key={type} value={type}>{type}</option>
+          <option key={type} value={type}>
+            {type}
+          </option>
         ))}
       </select>
       <select
         value={state.filter.selection}
         aria-label="Filter by selection"
-        className={compact ? `${className} w-auto` : className}
+        className={compact ? `${className} w-[5.5rem]` : className}
         onChange={(event) =>
-          patch({ selection: event.target.value as ProfileFieldFilter["selection"] })
+          patch({
+            selection: event.target.value as ProfileFieldFilter["selection"],
+          })
         }
       >
         <option value="all">All fields</option>
@@ -77,13 +88,245 @@ export function ProfileFieldFilters({
     </>
   );
   if (compact) {
-    return <div className="grid grid-cols-[1fr_auto_auto] gap-2">{search}{selects}</div>;
+    return (
+      <div
+        data-profile-field-filters="compact"
+        className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1"
+      >
+        {search}
+        {selects}
+      </div>
+    );
   }
   return (
     <div className="space-y-3">
       {search}
       <div className="grid grid-cols-2 gap-2">{selects}</div>
     </div>
+  );
+}
+
+export function ProfileFieldSidebarList({
+  state,
+  reset,
+  onFieldSelect,
+  onAdd,
+}: {
+  state: ProfileFieldState;
+  reset?: {
+    disabled: boolean;
+    title: string;
+    onReset: () => void;
+  };
+  onFieldSelect?: (name: string) => void;
+  onAdd?: () => void;
+}) {
+  const [dragFrom, setDragFrom] = useState<number>();
+  const [dragOver, setDragOver] = useState<number>();
+  const fields = state.visibleFields;
+
+  return (
+    <div className="space-y-2 py-1">
+      <ProfileFieldFilters state={state} compact />
+      <div className="space-y-0.5">
+        {fields.map((field, index) => {
+          const selected = state.selectedNames.has(field.name);
+          const active = field.name === state.activeField?.name;
+          const draggable = selected;
+          const dropEdge =
+            dragFrom === undefined || dragOver !== index || dragFrom === index
+              ? undefined
+              : dragFrom < index
+                ? "bottom"
+                : "top";
+          return (
+            <div
+              key={field.name}
+              data-profile-tree-item
+              data-profile-column-row
+              data-drop-edge={dropEdge}
+              className={`group relative flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5 ${
+                active ? "bg-primary/[0.08]" : "hover:bg-muted/50"
+              } ${
+                dropEdge === "top"
+                  ? "shadow-[inset_0_2px_0_0_var(--color-primary)]"
+                  : dropEdge === "bottom"
+                    ? "shadow-[inset_0_-2px_0_0_var(--color-primary)]"
+                    : ""
+              }`}
+              onDragOver={(event) => {
+                if (!draggable || dragFrom === undefined) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOver(index);
+              }}
+              onDrop={(event) => {
+                if (!draggable || dragFrom === undefined) return;
+                event.preventDefault();
+                const source = fields[dragFrom];
+                if (source) state.reorderField(source.name, field.name);
+                setDragFrom(undefined);
+                setDragOver(undefined);
+              }}
+            >
+              <button
+                type="button"
+                draggable={draggable}
+                disabled={!draggable}
+                aria-label={`Reorder ${field.name}`}
+                className="shrink-0 cursor-grab rounded text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-30"
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  setDragFrom(index);
+                }}
+                onDragEnd={() => {
+                  setDragFrom(undefined);
+                  setDragOver(undefined);
+                }}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "ArrowUp"
+                      ? fields[index - 1]
+                      : event.key === "ArrowDown"
+                        ? fields[index + 1]
+                        : undefined;
+                  if (!next || !state.selectedNames.has(next.name)) return;
+                  event.preventDefault();
+                  state.reorderField(field.name, next.name);
+                }}
+              >
+                <UiDotsVertical className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-current={active ? "page" : undefined}
+                className={`flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  selected
+                    ? ""
+                    : "text-muted-foreground line-through opacity-60"
+                }`}
+                onClick={() => {
+                  if (onFieldSelect) onFieldSelect(field.name);
+                  else state.setActiveName(field.name);
+                }}
+              >
+                <span className="truncate font-mono font-medium">
+                  {field.name}
+                </span>
+              </button>
+              <ProfileFieldRowMenu field={field} state={state} />
+            </div>
+          );
+        })}
+        {fields.length === 0 ? (
+          <p
+            data-profile-tree-item
+            className="relative rounded-md px-2 py-2 text-xs text-muted-foreground"
+          >
+            No fields match these filters.
+          </p>
+        ) : null}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {state.configuredCount} of {state.available.length} included
+      </p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {reset ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={reset.disabled}
+            title={reset.title}
+            onClick={reset.onReset}
+          >
+            Reset
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          data-profile-tree-item
+          className={`relative justify-start ${reset ? "" : "col-span-2"}`}
+          onClick={() => {
+            state.addField();
+            onAdd?.();
+          }}
+        >
+          <UiAdd className="size-3.5" />
+          Add column
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileFieldRowMenu({
+  field,
+  state,
+}: {
+  field: ProfileColumn;
+  state: ProfileFieldState;
+}) {
+  const selected = state.selectedNames.has(field.name);
+  const filterable = !field.filter?.disabled;
+  const items: DropdownMenuItem[] = selected
+    ? [
+        {
+          label: field.hidden ? "Show column" : "Hide column",
+          icon: field.hidden ? UiEye : UiEyeClosed,
+          onSelect: () => state.patchField(field, { hidden: !field.hidden }),
+        },
+        {
+          label: filterable ? "Disable filtering" : "Enable filtering",
+          icon: filterable ? UiFilterFilled : UiFilter,
+          onSelect: () =>
+            state.patchField(field, {
+              filter: patchColumnFilter(field.filter, {
+                disabled: filterable ? true : undefined,
+              }),
+            }),
+        },
+        {
+          label: "Remove column",
+          icon: UiTrash,
+          iconColor: "var(--color-destructive)",
+          onSelect: () => state.removeField(field),
+        },
+      ]
+    : [
+        {
+          label: "Restore column",
+          icon: UiRefresh,
+          onSelect: () => state.setFieldSelection(field, true),
+        },
+      ];
+
+  return (
+    <DropdownMenu
+      align="right"
+      menuLabel={`${field.name} field actions`}
+      menuClassName="min-w-40"
+      header={
+        <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <LabelIcon icon={profileTypeIcon(field.type)} className="text-sm" />
+          <span>{field.type ?? "auto"} type</span>
+        </span>
+      }
+      trigger={
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`More actions for ${field.name}`}
+          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <UiDotsVertical className="size-3.5" />
+          <span className="sr-only">More actions for {field.name}</span>
+        </span>
+      }
+      items={items}
+    />
   );
 }
 
@@ -106,7 +349,9 @@ export function ProfileFieldList({ state }: { state: ProfileFieldState }) {
   // no "no active column" state to close the list into).
   const [collapsed, setCollapsed] = useState(false);
   const fields = state.visibleFields;
-  const activeIndex = fields.findIndex((field) => field.name === state.activeField?.name);
+  const activeIndex = fields.findIndex(
+    (field) => field.name === state.activeField?.name,
+  );
   const expanded = collapsed || activeIndex < 0 ? null : activeIndex;
 
   return (
@@ -133,8 +378,12 @@ export function ProfileFieldList({ state }: { state: ProfileFieldState }) {
         // Hiding and filtering are states the row has to show at rest, not
         // actions to be discovered on hover.
         revealActions={false}
-        renderActions={({ item }) => <ProfileFieldRowActions field={item} state={state} />}
-        renderHeader={({ item }) => <ProfileFieldRowHeader field={item} state={state} />}
+        renderActions={({ item }) => (
+          <ProfileFieldRowActions field={item} state={state} />
+        )}
+        renderHeader={({ item }) => (
+          <ProfileFieldRowHeader field={item} state={state} />
+        )}
         renderBody={({ item }) => (
           <ProfileFieldEditorForm
             field={item}
@@ -159,7 +408,11 @@ function ProfileFieldRowHeader({
   state: ProfileFieldState;
 }) {
   const selected = state.selectedNames.has(field.name);
-  const fieldState = !selected ? "deleted" : field.hidden ? "hidden" : "visible";
+  const fieldState = !selected
+    ? "deleted"
+    : field.hidden
+      ? "hidden"
+      : "visible";
   return (
     <span
       data-field-state={fieldState}
@@ -175,9 +428,13 @@ function ProfileFieldRowHeader({
         icon={profileTypeIcon(field.type)}
         className="shrink-0 text-[15px] text-muted-foreground"
       />
-      <span className="shrink-0 font-mono text-sm font-medium">{field.name}</span>
+      <span className="shrink-0 font-mono text-sm font-medium">
+        {field.name}
+      </span>
       {field.label ? (
-        <span className="shrink-0 truncate text-sm text-muted-foreground">{field.label}</span>
+        <span className="shrink-0 truncate text-sm text-muted-foreground">
+          {field.label}
+        </span>
       ) : null}
       <code className="truncate font-mono text-xs text-muted-foreground">
         {summarizeColumn(field)}
@@ -252,7 +509,9 @@ function ProfileFieldRowActions({
  *  and how it is filtered. */
 function summarizeColumn(field: ProfileColumn): string {
   const kind = field.filter?.kind ?? inferredFilterKind(field);
-  const label = PROFILE_FILTER_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
+  const label =
+    PROFILE_FILTER_KIND_OPTIONS.find((option) => option.value === kind)
+      ?.label ?? kind;
   return [
     field.type ?? "auto",
     field.filter?.disabled ? "no filter" : label.toLowerCase(),

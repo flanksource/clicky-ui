@@ -23,11 +23,16 @@ export {
 } from "./data/code-diff";
 export { inferColumns } from "./data/data-table-utils";
 export {
+  parseBoundsValue,
+  parseDurationBoundsValue,
   parseMultiFilterValue,
+  serializeBoundsValue,
+  serializeDurationBoundsValue,
   serializeMultiFilterValue,
   splitCommaValues,
   updateFilterSelection,
   type DataTableFilterSelection,
+  type FilterDefaultOperator,
 } from "./data/data-table-filter-values";
 export {
   DATA_TABLE_FILTER_LOOKUP_LIMIT,
@@ -332,6 +337,24 @@ export {
   type ObjectGraphNode,
 } from "./data/object-graph-nodes";
 export { ExecutionTree, type ExecutionNode, type ExecutionTreeProps } from "./data/ExecutionTree";
+export {
+  GraphDiagram,
+  type GraphDiagramEdge,
+  type GraphDiagramLayout,
+  type GraphDiagramNode,
+  type GraphDiagramProps,
+} from "./data/GraphDiagram";
+export {
+  ringLayout,
+  routeEdges,
+  type EdgeRoute,
+  type GraphLayoutEdge,
+  type GraphLayoutNode,
+  type GraphLayoutPosition,
+  type GraphLayoutResult,
+  type RingLayoutOptions,
+  type RouteEdgesDimensions,
+} from "./data/graph-layout";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
@@ -459,6 +482,10 @@ export {
 export {
   StackFrameRow,
   type StackFrameActions,
+  type StackFrameActionsVisibility,
+  type StackFrameDetailRenderer,
+  type StackFramePart,
+  type StackFramePartRenderer,
   type StackFrameRowProps,
 } from "./data/diagnostics/StackFrameRow";
 export {

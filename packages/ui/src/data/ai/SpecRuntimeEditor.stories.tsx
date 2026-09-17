@@ -188,6 +188,7 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
   },
   permissions: {
     ...GENERATED_INITIAL_VALUE.permissions,
+    mode: "acceptEdits",
     presets: ["edit"],
     tools: {
       ...recordValue(GENERATED_INITIAL_VALUE.permissions?.tools),
@@ -216,7 +217,7 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
     ...GENERATED_INITIAL_VALUE.memory,
     skipHooks: true,
   },
-  sandbox: { mode: "native", approval: "acceptEdits" },
+  sandbox: { mode: "native" },
   setup: {
     ...GENERATED_INITIAL_VALUE.setup,
     cwd: ".",
@@ -379,7 +380,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Full-page runtime spec editor: live summary rail with scrollspy nav and run-budget card, preset quick-starts, and stacked sections for model, prompt, workspace, permissions, environment, verification, commit, and per-backend CLI flags.",
+          "Full-page runtime spec editor: live summary rail with scrollspy nav and run-budget card, and stacked sections for model, prompt, workspace, permissions, environment, verification, commit, and per-backend CLI flags.",
       },
     },
   },

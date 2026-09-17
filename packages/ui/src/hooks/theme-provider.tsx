@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { onMediaChange } from "./use-media-query";
 import {
+  PREFERS_DARK_QUERY,
   THEME_STORAGE_KEY,
   ThemeContext,
   applyTheme,
@@ -37,15 +39,12 @@ export function ThemeProvider({
   }, [theme, storageKey]);
 
   useEffect(() => {
-    if (theme !== "system" || typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      const next: ResolvedTheme = mq.matches ? "dark" : "light";
+    if (theme !== "system") return;
+    return onMediaChange(PREFERS_DARK_QUERY, (dark) => {
+      const next: ResolvedTheme = dark ? "dark" : "light";
       setResolvedTheme(next);
       applyTheme(next);
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    });
   }, [theme]);
 
   const setTheme = useCallback((next: Theme) => setThemeState(next), []);

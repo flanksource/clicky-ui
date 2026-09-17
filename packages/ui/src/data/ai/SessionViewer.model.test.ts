@@ -31,6 +31,44 @@ describe("normalizeSession", () => {
     expect(summarizeSession(events).messageCount).toBe(2);
   });
 
+  it("preserves unified file parts as renderable attachment events", () => {
+    const events = normalizeSession({
+      messages: [
+        {
+          id: "user-image",
+          role: "user",
+          parts: [
+            {
+              type: "file",
+              mediaType: "image/png",
+              url: "/api/attachments/sha256:image",
+              filename: "scorecard.png",
+              attachmentId: "sha256:image",
+            },
+            { type: "text", text: "Classify the attached report" },
+          ],
+        },
+      ],
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: "user",
+        file: {
+          type: "file",
+          mediaType: "image/png",
+          url: "/api/attachments/sha256:image",
+          filename: "scorecard.png",
+          attachmentId: "sha256:image",
+        },
+      }),
+      expect.objectContaining({
+        kind: "user",
+        text: "Classify the attached report",
+      }),
+    ]);
+  });
+
   it("carries response, model, source and cwd from a consolidated tool_use row", () => {
     const events = normalizeSession(SAMPLE_SESSION);
     const read = events.find((e) => e.tool === "Read");

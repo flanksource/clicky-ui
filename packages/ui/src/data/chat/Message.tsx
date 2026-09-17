@@ -1,11 +1,11 @@
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import { UiFile, UiGitBranch } from "../../icons";
+import { UiGitBranch } from "../../icons";
 import { Markdown } from "../Markdown";
 import { ToolCall } from "./ToolCall";
 import { MessageActions } from "./MessageActions";
 import { Reasoning } from "./Reasoning";
-import type { UIMessage, FileUIPart } from "./types";
+import type { UIMessage } from "./types";
 import {
   isDynamicToolPart,
   isTypedToolPart,
@@ -15,6 +15,7 @@ import {
   type ToolResultRenderer,
 } from "./types";
 import { forkSeedProvenance, isForkSeedMessage } from "./fork-seed";
+import { MessageFilePart } from "./MessageFilePart";
 
 /** Callbacks the conversation threads down to each message. */
 export type MessageActionHandlers = {
@@ -148,7 +149,7 @@ function MessagePart({
     return <Reasoning text={part.text} />;
   }
   if (isFilePart(part)) {
-    return <FilePart part={part} />;
+    return <MessageFilePart part={part} />;
   }
   if (isDynamicToolPart(part) || isTypedToolPart(part)) {
     return (
@@ -160,32 +161,4 @@ function MessagePart({
     );
   }
   return null;
-}
-
-/** Renders an attachment: images inline as a thumbnail, everything else as a
- *  labelled file chip. */
-function FilePart({ part }: { part: FileUIPart }) {
-  const isImage = part.mediaType?.startsWith("image/");
-  if (isImage && part.url) {
-    return (
-      <img
-        src={part.url}
-        alt={part.filename ?? "attachment"}
-        className="max-h-48 max-w-full rounded-md border border-border"
-      />
-    );
-  }
-  return (
-    <a
-      href={part.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-    >
-      <Icon icon={UiFile} className="size-3.5 shrink-0" />
-      <span className="truncate">
-        {part.filename ?? part.mediaType ?? "file"}
-      </span>
-    </a>
-  );
 }

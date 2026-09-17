@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SetStateAction } from "react";
 import {
   dataTablePaginationFromForm,
+  lookupOptionsToFieldOptions,
   OFFSET_DEPTH_LIMIT,
   packLookupParameterValues,
   packParameterValues,
@@ -92,6 +93,54 @@ describe("packLookupParameterValues", () => {
         ],
       ),
     ).toEqual({ status: "ready", query: "api", args: ["payments"] });
+  });
+});
+
+describe("lookupOptionsToFieldOptions", () => {
+  it("carries the per-value row count from the lookup response onto each option", () => {
+    const options = lookupOptionsToFieldOptions({
+      label: "Status",
+      options: {
+        ready: { kind: "text", text: "Ready", plain: "Ready" },
+        failed: { kind: "text", text: "Failed", plain: "Failed" },
+      },
+      counts: { ready: 42, failed: 3 },
+    });
+
+    expect(options).toEqual([
+      { value: "ready", label: "Ready", title: "Ready", count: 42 },
+      { value: "failed", label: "Failed", title: "Failed", count: 3 },
+    ]);
+  });
+
+  it("leaves options uncounted when the source only counts some values", () => {
+    const options = lookupOptionsToFieldOptions({
+      label: "Status",
+      options: {
+        ready: { kind: "text", text: "Ready", plain: "Ready" },
+        failed: { kind: "text", text: "Failed", plain: "Failed" },
+      },
+      counts: { ready: 42 },
+    });
+
+    expect(options.find((option) => option.value === "ready")?.count).toBe(42);
+    expect(
+      options.find((option) => option.value === "failed")?.count,
+    ).toBeUndefined();
+  });
+
+  it("renders exactly as before when the source sends no counts at all", () => {
+    const options = lookupOptionsToFieldOptions({
+      label: "Status",
+      options: {
+        ready: { kind: "text", text: "Ready", plain: "Ready" },
+      },
+    });
+
+    expect(options).toEqual([
+      { value: "ready", label: "Ready", title: "Ready" },
+    ]);
+    expect("count" in options[0]).toBe(false);
   });
 });
 
@@ -234,6 +283,7 @@ describe("parametersToFormConfig", () => {
                 ready: { kind: "text", text: "Ready" },
                 failed: { kind: "text", text: "Failed" },
               },
+              counts: { ready: 12 },
             },
           },
         },
@@ -245,6 +295,14 @@ describe("parametersToFormConfig", () => {
     if (filter.kind !== "multi") throw new Error("expected multi filter");
 
     expect(filter.value).toEqual({ ready: "include", failed: "exclude" });
+    // The per-value row count reaches the rendered option list; a value the
+    // source did not count stays absent rather than reading as zero rows.
+    expect(
+      filter.options.find((option) => option.value === "ready")?.count,
+    ).toBe(12);
+    expect(
+      filter.options.find((option) => option.value === "failed")?.count,
+    ).toBeUndefined();
     filter.onChange({ ready: "exclude", failed: "include" });
 
     expect(updates).toEqual([{ status: "!ready,failed" }]);
@@ -616,6 +674,86 @@ describe("parametersToFormConfig — shape without live lookup data", () => {
     expect(filter.kind).toBe("date-range");
     if (filter.kind !== "date-range") throw new Error("expected date-range");
     expect(filter.from).toBe("now-1h");
+  });
+
+  it("keeps numeric units and comparison operators while lookup values are in flight", () => {
+    const config = parametersToFormConfig(
+      [shapeParam("amount", "amount")],
+      { amount: ">100,<=500" },
+      () => {},
+      {
+        components: {
+          amount: { type: "number", label: "Amount", unit: "USD" },
+        },
+      },
+    );
+
+    expect(config.filters[0]).toMatchObject({
+      kind: "number",
+      label: "Amount",
+      unit: "USD",
+      value: {
+        min: "100",
+        minOperator: ">",
+        max: "500",
+        maxOperator: "<=",
+      },
+    });
+  });
+
+  it("keeps duration identity and storage unit from the static shape", () => {
+    const config = parametersToFormConfig(
+      [shapeParam("elapsed", "elapsed")],
+      { elapsed: ">2m30s" },
+      () => {},
+      {
+        components: {
+          elapsed: { type: "duration", label: "Elapsed", unit: "s" },
+        },
+        lookup: { filters: { elapsed: { type: "number", unit: "ms" } } },
+      },
+    );
+
+    expect(config.filters[0]).toMatchObject({
+      kind: "duration",
+      unit: "s",
+      value: { min: "150", minOperator: ">", minUnit: "s" },
+    });
+  });
+
+  it.each([
+    ["m", "90"],
+    ["h", "1.5"],
+  ] as const)("accepts %s as a duration storage unit", (unit, min) => {
+    const config = parametersToFormConfig(
+      [shapeParam("elapsed", "elapsed")],
+      { elapsed: ">90m" },
+      () => {},
+      { components: { elapsed: { type: "duration", unit } } },
+    );
+    expect(config.filters[0]).toMatchObject({
+      kind: "duration",
+      unit,
+      value: { min, minOperator: ">", minUnit: unit },
+    });
+  });
+
+  it("shows a declared bare-value default while preserving explicit operators", () => {
+    const numeric = parametersToFormConfig(
+      [shapeParam("count", "count")],
+      { count: "5" },
+      () => {},
+      { components: { count: { type: "number", defaultOperator: ">" } } },
+    );
+    expect(numeric.filters[0]).toMatchObject({ kind: "number", value: { min: "5", minOperator: ">" } });
+
+    const duration = parametersToFormConfig(
+      [shapeParam("elapsed", "elapsed")],
+      { elapsed: "<=1s" },
+      () => {},
+      { components: { elapsed: { type: "duration", unit: "ms", defaultOperator: ">" } } },
+    );
+    expect(duration.filters[0]).toMatchObject({ kind: "duration", value: { max: "1000", maxOperator: "<=" } });
   });
 
   it("prefers live options once the lookup resolves, without changing the control", () => {

@@ -5,6 +5,7 @@ import {
 } from "../chat/tool-policy";
 import {
   compactRuntimeSandbox,
+  SPEC_PERMISSION_MODES,
   type AISpecRuntimeSandbox,
   type SpecPermissionMode,
 } from "./SpecRuntimeEditor.sandbox-model";
@@ -575,8 +576,13 @@ function compactPermissions(
 ): AISpecRuntimePermissions | undefined {
   if (!value && !legacySkills?.length) return undefined;
   const permissions: AISpecRuntimePermissions = {};
-  const mode = cleanString(value?.mode) as SpecPermissionMode | undefined;
-  if (mode) permissions.mode = mode;
+  const mode = cleanString(value?.mode);
+  if (mode) {
+    if (!SPEC_PERMISSION_MODES.includes(mode as SpecPermissionMode)) {
+      throw new Error(`permissions.mode ${JSON.stringify(mode)} is invalid`);
+    }
+    permissions.mode = mode as SpecPermissionMode;
+  }
   const presets = compactList(value?.presets);
   if (presets) permissions.presets = presets;
 

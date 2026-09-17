@@ -20,7 +20,11 @@ export {
 export { buttonVariants } from "./components/button-variants";
 export { IconButton, type IconButtonProps } from "./components/IconButton";
 export { CopyButton, type CopyButtonProps } from "./components/CopyButton";
-export { copyText, useCopyFlash, type CopyFlashState } from "./components/clipboard";
+export {
+  copyText,
+  useCopyFlash,
+  type CopyFlashState,
+} from "./components/clipboard";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
 export {
@@ -61,6 +65,16 @@ export { nextTriState, type TriState } from "./components/tri-state";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
 export {
+  ScheduleEditor,
+  type ScheduleEditorProps,
+  type ScheduleValue,
+} from "./components/ScheduleEditor";
+export {
+  COMMON_CRON_SUGGESTIONS,
+  DEFAULT_CRON,
+  type CronSuggestion,
+} from "./components/schedule-types";
+export {
   FormatOptionsDropdown,
   type FormatOptionsDropdownProps,
 } from "./components/FormatOptionsDropdown";
@@ -92,7 +106,11 @@ export {
 } from "./components/RangeSlider";
 export {
   FilterBar,
+  FilterBarFilterPanel,
   type FilterBarBooleanFilter,
+  type FilterBarDurationFilter,
+  type FilterBarDurationUnit,
+  type FilterBarDurationValue,
   type FilterBarEnumFilter,
   type FilterBarFilter,
   type FilterBarLookupFilter,
@@ -409,6 +427,12 @@ export {
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export {
+  ConfirmDialog,
+  type ConfirmDialogProps,
+  type ConfirmOptions,
+} from "./overlay/ConfirmDialog";
+export { useConfirm, useConfirmMemory } from "./overlay/useConfirm";
 export {
   useModalStack,
   useEscapeLayer,

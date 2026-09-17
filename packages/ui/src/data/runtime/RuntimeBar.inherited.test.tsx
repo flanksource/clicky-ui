@@ -28,9 +28,9 @@ describe("RuntimeBar inherited identity", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /^Second family/ }));
     expect(screen.getByTitle("Family — Second family")).toBeInTheDocument();
     expect(screen.getByTestId("value")).toHaveTextContent('{"mode":"api"}');
-    fireEvent.click(screen.getByTitle("Model — prompt default"));
+    fireEvent.click(screen.getByTitle("Model — unspecified"));
     fireEvent.click(screen.getByRole("menuitem", { name: /^Second model/ }));
-    expect(JSON.parse(screen.getByTestId("value").textContent ?? "{}")).toEqual({ mode: "api", model: "second-model", effort: "medium" });
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "{}")).toEqual({ mode: "api", model: "second-model" });
   });
 
   it("uses a new inherited profile identity after a previous family selection", () => {

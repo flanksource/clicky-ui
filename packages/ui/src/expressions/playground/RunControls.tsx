@@ -7,18 +7,20 @@ import type { Evaluator } from "./useEvaluator.ts";
 
 interface RunControlsProps {
   evaluator: Evaluator;
+  /** Defaults to "Run". */
+  label?: string;
 }
 
-export function RunControls({ evaluator }: RunControlsProps) {
-  useGlobalRunShortcut(evaluator.run);
+export function RunControls({ evaluator, label = "Run" }: RunControlsProps) {
+  useGlobalRunShortcut(() => { void evaluator.run(); });
 
   return (
     <div className="flex items-center gap-3">
-      <Switch
+      {!evaluator.explicit ? <Switch
         checked={evaluator.autoRun}
         onChange={evaluator.setAutoRun}
         label={<span className="text-xs text-muted-foreground">Auto-run</span>}
-      />
+      /> : null}
       <Button
         onClick={evaluator.run}
         // No `loadingLabel`: Button renders it whenever it is defined, not only
@@ -29,10 +31,10 @@ export function RunControls({ evaluator }: RunControlsProps) {
         variant={evaluator.stale ? "default" : "outline"}
         size="sm"
         className="[&_svg]:size-3.5"
-        title={`Run (${RUN_SHORTCUT_LABEL})`}
+        title={`${label} (${RUN_SHORTCUT_LABEL})`}
       >
         <UiPlay className="mr-1.5" />
-        Run
+        {label}
         <kbd className="ml-2 rounded border border-current/25 px-1 text-[10px] leading-4 opacity-70">
           {RUN_SHORTCUT_LABEL}
         </kbd>

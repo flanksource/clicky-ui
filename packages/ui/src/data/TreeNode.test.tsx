@@ -142,6 +142,50 @@ describe("TreeNode", () => {
     expect(screen.queryByText("x")).toBeNull();
   });
 
+  it("renders renderDetail beneath the row for both a leaf and a parent, and nothing when it returns null", () => {
+    renderTree({
+      defaultOpen: () => true,
+      renderDetail: (node) => (node.id === "a1" || node.id === "a" ? <span>detail:{node.id}</span> : null),
+    });
+    // "a1" is a leaf, "a" is a parent — both get a detail row.
+    expect(screen.getByText("detail:a1")).toBeInTheDocument();
+    expect(screen.getByText("detail:a")).toBeInTheDocument();
+    // "root" and "b" return null from renderDetail — no wrapper, no text.
+    expect(screen.queryByText("detail:root")).toBeNull();
+    expect(screen.queryByText("detail:b")).toBeNull();
+  });
+
+  it("renders a call's footer after its nested calls and keeps it visible when collapsed", () => {
+    const { container } = renderTree({
+      renderDetail: (node) => node.id === "a" ? <span>arguments</span> : null,
+      renderAfterChildren: (node) => node.id === "a" ? <span>return value</span> : null,
+    });
+    const call = screen.getByText("a").closest("[role='treeitem']")!;
+    fireEvent.click(screen.getByText("a"));
+    expect(call.textContent).toContain("aargumentsa1return value");
+    fireEvent.click(screen.getByText("a"));
+    expect(call.textContent).toContain("aargumentsreturn value");
+    expect(container.querySelectorAll("[role='treeitem']")).toHaveLength(3);
+  });
+
+  it("does not toggle the node when a click lands inside renderDetail", () => {
+    renderTree({
+      renderDetail: (node) => (node.id === "a" ? <button type="button">detail-btn</button> : null),
+    });
+    expect(screen.queryByText("a1")).toBeNull();
+    fireEvent.click(screen.getByText("detail-btn"));
+    expect(screen.queryByText("a1")).toBeNull();
+  });
+
+  it("does not toggle the node when a keydown lands inside renderDetail", () => {
+    renderTree({
+      renderDetail: (node) => (node.id === "a" ? <span tabIndex={0}>detail-key</span> : null),
+    });
+    expect(screen.queryByText("a1")).toBeNull();
+    fireEvent.keyDown(screen.getByText("detail-key"), { key: "Enter" });
+    expect(screen.queryByText("a1")).toBeNull();
+  });
+
   it("applies depth-based indentation", () => {
     renderTree({ defaultOpen: () => true });
     const rootRow = screen.getByText("root").closest("div[style]") as HTMLElement;

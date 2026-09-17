@@ -27,10 +27,29 @@ const fixtureSchemas: FixtureFenceSchemas = {
 
 Omitting the prop keeps the existing generic fixture editor behavior. The shared library does not fetch schemas or define runner-specific contracts.
 
-Run the example with `pnpm --filter storybook dev`, then open [the verification fixture story](http://localhost:5270/?path=/story/ai-promptruneditor-verification-fixture--host-schemas). Open **Edit spec**, expand the **contract** fence, and edit **Policy**. Close the modal to inspect the resulting fixture markdown.
+Run the example with `pnpm --filter storybook dev`, then open [the verification fixture story](http://localhost:5270/?path=/story/ai-promptruneditor-verification-fixture--host-schemas). Open the runtime bar's **⋮ → Advanced**, expand the **contract** fence, and edit **Policy**. Close the modal to inspect the resulting fixture markdown.
 
 ## Resolved runtime display
 
 Pass the render response's `resolution` to display the effective model family and mode while keeping `value.spec` limited to operator overrides. A profile or preset's inherited model belongs in `resolution.spec`; copying it into `value.spec` makes it an explicit override on the next request.
 
 Open [the resolved profile story](http://localhost:5270/?path=/story/ai-promptruneditor-resolved-profile--inherited-runtime) to see a profile with an empty request spec. Switch the family and select a model to inspect the explicit request override. The family control filters model choices; selecting a model changes the request's model identity.
+
+## Recently used runtimes
+
+Pass `recentRuntimes` to list the operator's recent runtimes under the runtime bar. The host owns where they come from, such as session history or local storage. After a run, record its rows with `recordRecentRuntimes`, which keeps the newest runtimes first, drops repeats and rows that inherit both model and mode, and keeps at most `RECENT_RUNTIME_LIMIT` runtimes.
+
+```tsx
+import { PromptRunEditor, recordRecentRuntimes, runtimeRows } from "@flanksource/clicky-ui/ai";
+
+const [recent, setRecent] = useState<AISpecRuntimeModel[]>([]);
+
+<PromptRunEditor value={value} onChange={setValue} recentRuntimes={recent} />
+<Button onClick={() => { run(value); setRecent((current) => recordRecentRuntimes(current, runtimeRows(value))); }}>Run</Button>
+```
+
+In single-model mode a chip replaces the runtime's model identity and keeps the spec's timeout and max cost. In multi-model mode it adds another comparison row. Open [the tabbed spec story](http://localhost:5270/?path=/story/ai-promptruneditor--tabbed-spec) and click the **Recent** chip.
+
+## Raw YAML request
+
+`promptRunYaml(value)` serializes the request for a raw editor tab. `parsePromptRunYaml(text)` parses an edit back. It throws on non-mapping documents, unknown top-level fields, and top-level fields of the wrong shape, so hosts can keep the invalid text and show the error instead of rendering a broken form. The library ships no editor for it; the playground's `captain/prompt-run` page pairs these helpers with `MonacoEditor` from `@flanksource/clicky-ui/monaco`.

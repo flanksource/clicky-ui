@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
+import type {
+  RuntimePermissionSupport,
+  SpecRuntimeFamily,
+} from "../../runtime/runtime-mode";
 import { SPEC_PERMISSION_MODES } from "../SpecRuntimeEditor.model";
 import { PermissionModeField } from "./PermissionModeField";
 
@@ -38,10 +41,11 @@ const FAMILIES: SpecRuntimeFamily[] = [
               },
             },
             auto: {
-              kind: "approximated",
+              kind: "native",
               effects: {
                 sandbox: "workspace-write",
                 approval: "on-request",
+                reviewer: "auto_review",
               },
             },
             bypassPermissions: {
@@ -58,15 +62,41 @@ const FAMILIES: SpecRuntimeFamily[] = [
   },
 ];
 
+const IDENTICAL_AUTOMATIC_EFFECTS = {
+  sandbox: "workspace-write",
+  approval: "on-request",
+};
+
+function codexFamilyWith(
+  acceptEdits: RuntimePermissionSupport,
+  auto: RuntimePermissionSupport,
+): SpecRuntimeFamily[] {
+  return [
+    {
+      id: "codex",
+      label: "Codex",
+      provider: "codex-agent",
+      modes: [
+        {
+          id: "agent",
+          label: "Agent",
+          permissions: {
+            modes: { default: { kind: "approximated" }, acceptEdits, auto },
+            toolPolicies: {},
+            resources: {},
+          },
+        },
+      ],
+    },
+  ];
+}
+
 describe("PermissionModeField", () => {
-  it("offers only permission postures implemented by the selected runtime", () => {
+  it("offers Unspecified plus only the postures implemented by the selected runtime", () => {
     const onChange = vi.fn();
     render(
       <PermissionModeField
-        value={{
-          mode: "agent",
-          sandbox: { mode: "native", approval: "default" },
-        }}
+        value={{ mode: "agent", permissions: { mode: "default" } }}
         onChange={onChange}
         families={FAMILIES}
         availableModes={CODEX_MODES}
@@ -80,6 +110,9 @@ describe("PermissionModeField", () => {
       screen.getByRole("radiogroup", { name: "Permission posture" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("radio", { name: "-" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("radio", { name: "Read only" }),
     ).toBeInTheDocument();
     expect(
@@ -89,6 +122,9 @@ describe("PermissionModeField", () => {
       screen.getAllByRole("radio", { name: "Ask for approval" }),
     ).toHaveLength(1);
     expect(
+      screen.getByRole("radio", { name: "Auto review" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("radio", { name: "Full access" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Don't ask" })).toBeNull();
@@ -96,76 +132,14 @@ describe("PermissionModeField", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Plan" }));
     expect(onChange).toHaveBeenCalledWith({
       mode: "agent",
-      sandbox: { mode: "native", approval: "plan" },
+      permissions: { mode: "plan" },
     });
   });
 
-  it("shows one automatic posture when accept-edits and auto have identical approximated effects", () => {
-    const onChange = vi.fn();
+  it("shows Unspecified, not a permission mode id, when none is set", () => {
     render(
       <PermissionModeField
-        value={{
-          mode: "agent",
-          sandbox: { mode: "native", approval: "default" },
-        }}
-        onChange={onChange}
-        availableModes={["default", "acceptEdits", "auto"]}
-        families={[
-          {
-            id: "codex",
-            label: "Codex",
-            provider: "codex-agent",
-            modes: [
-              {
-                id: "agent",
-                label: "Agent",
-                permissions: {
-                  modes: {
-                    default: { kind: "approximated" },
-                    acceptEdits: {
-                      kind: "approximated",
-                      effects: {
-                        sandbox: "workspace-write",
-                        approval: "on-request",
-                        note: "workspace writes are granted as one tier",
-                      },
-                    },
-                    auto: {
-                      kind: "approximated",
-                      effects: {
-                        sandbox: "workspace-write",
-                        approval: "on-request",
-                        note: "auto and accept-edits resolve identically",
-                      },
-                    },
-                  },
-                  toolPolicies: {},
-                  resources: {},
-                },
-              },
-            ],
-          },
-        ]}
-      />,
-    );
-
-    expect(screen.queryByRole("radio", { name: "Accept edits" })).toBeNull();
-    expect(screen.queryByRole("radio", { name: "Auto" })).toBeNull();
-    const automatic = screen.getByRole("radio", { name: "Ask for approval" });
-    fireEvent.click(automatic);
-    expect(onChange).toHaveBeenCalledWith({
-      mode: "agent",
-      sandbox: { mode: "native", approval: "acceptEdits" },
-    });
-  });
-
-  it("preserves a selected codex alias while presenting one native posture", () => {
-    render(
-      <PermissionModeField
-        value={{
-          mode: "agent",
-          sandbox: { mode: "native", approval: "auto" },
-        }}
+        value={{ mode: "agent" }}
         onChange={vi.fn()}
         families={FAMILIES}
         availableModes={CODEX_MODES}
@@ -173,17 +147,106 @@ describe("PermissionModeField", () => {
     );
 
     expect(
-      screen.getByRole("radio", { name: "Ask for approval" }),
+      screen.getByRole("radio", { name: "-" }),
     ).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("radio", { name: "Read only" }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("clears permissions.mode by selecting Unspecified", () => {
+    const onChange = vi.fn();
+    render(
+      <PermissionModeField
+        value={{ mode: "agent", permissions: { mode: "plan" } }}
+        onChange={onChange}
+        families={FAMILIES}
+        availableModes={CODEX_MODES}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "-" }));
+    expect(onChange).toHaveBeenCalledWith({ mode: "agent" });
+  });
+
+  it("still offers Unspecified and the published modes without a known runtime mode", () => {
+    render(
+      <PermissionModeField
+        value={{}}
+        onChange={vi.fn()}
+        families={FAMILIES}
+        availableModes={CODEX_MODES}
+      />,
+    );
+
+    expect(
+      screen.getByRole("radiogroup", { name: "Permission posture" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "-" }),
+    ).toHaveAttribute("aria-checked", "true");
+    // No runtime is known yet, so the modes fall back to their generic
+    // (non-provider-specific) labels rather than Codex's "Read only" etc.
+    expect(screen.getByRole("radio", { name: "Manual" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Plan" })).toBeInTheDocument();
+  });
+
+  it("offers codex auto review apart from ask-for-approval when only the reviewer differs", () => {
+    const onChange = vi.fn();
+    render(
+      <PermissionModeField
+        value={{ mode: "agent", permissions: { mode: "default" } }}
+        onChange={onChange}
+        availableModes={["default", "acceptEdits", "auto"]}
+        families={codexFamilyWith(
+          {
+            kind: "approximated",
+            effects: { ...IDENTICAL_AUTOMATIC_EFFECTS, reviewer: "user" },
+          },
+          {
+            kind: "native",
+            effects: {
+              ...IDENTICAL_AUTOMATIC_EFFECTS,
+              reviewer: "auto_review",
+            },
+          },
+        )}
+      />,
+    );
+
+    expect(
+      screen.getByRole("radio", { name: "Ask for approval" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Auto review" }));
+    expect(onChange).toHaveBeenCalledWith({
+      mode: "agent",
+      permissions: { mode: "auto" },
+    });
+  });
+
+  it("selects codex auto review for a persisted auto posture", () => {
+    render(
+      <PermissionModeField
+        value={{ mode: "agent", permissions: { mode: "auto" } }}
+        onChange={vi.fn()}
+        families={FAMILIES}
+        availableModes={CODEX_MODES}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: "Auto review" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(
+      screen.getByRole("radio", { name: "Ask for approval" }),
+    ).toHaveAttribute("aria-checked", "false");
   });
 
   it("keeps claude native postures distinct and uses its mode tones", () => {
     render(
       <PermissionModeField
-        value={{
-          mode: "cli",
-          sandbox: { mode: "native", approval: "plan" },
-        }}
+        value={{ mode: "cli", permissions: { mode: "plan" } }}
         onChange={vi.fn()}
         availableModes={ALL_MODES}
         families={[
@@ -272,10 +335,7 @@ describe("PermissionModeField", () => {
     };
     render(
       <PermissionModeField
-        value={{
-          mode: "cli",
-          sandbox: { mode: "docker", approval: "default" },
-        }}
+        value={{ mode: "cli", permissions: { mode: "default" } }}
         onChange={onChange}
         availableModes={ALL_MODES}
         families={[
@@ -306,17 +366,14 @@ describe("PermissionModeField", () => {
     fireEvent.click(screen.getByRole("radio", { name: "YOLO" }));
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
-      sandbox: { mode: "docker", approval: "bypassPermissions" },
+      permissions: { mode: "bypassPermissions" },
     });
   });
 
   it("preserves a selected Gemini approximation inside a collapsed native posture", () => {
     render(
       <PermissionModeField
-        value={{
-          mode: "cli",
-          sandbox: { mode: "docker", approval: "dontAsk" },
-        }}
+        value={{ mode: "cli", permissions: { mode: "dontAsk" } }}
         onChange={vi.fn()}
         availableModes={["bypassPermissions", "dontAsk"]}
         families={[
@@ -358,7 +415,7 @@ describe("PermissionModeField", () => {
   it("uses the resolved mode when the editable spec inherits it", () => {
     render(
       <PermissionModeField
-        value={{ sandbox: { mode: "native", approval: "plan" } }}
+        value={{ permissions: { mode: "plan" } }}
         effectiveMode="agent"
         onChange={vi.fn()}
         families={FAMILIES}
@@ -407,10 +464,7 @@ describe("PermissionModeField", () => {
     const onChange = vi.fn();
     render(
       <PermissionModeField
-        value={{
-          mode: "agent",
-          sandbox: { mode: "native", approval: "dontAsk" },
-        }}
+        value={{ mode: "agent", permissions: { mode: "dontAsk" } }}
         onChange={onChange}
         families={FAMILIES}
         availableModes={CODEX_MODES}
@@ -422,20 +476,5 @@ describe("PermissionModeField", () => {
     );
     expect(screen.queryByRole("radio", { name: "Don't ask" })).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("requires a runtime mode for a persisted posture", () => {
-    render(
-      <PermissionModeField
-        value={{ sandbox: { mode: "native", approval: "plan" } }}
-        onChange={vi.fn()}
-        families={FAMILIES}
-        availableModes={CODEX_MODES}
-      />,
-    );
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Permission posture requires a runtime mode",
-    );
   });
 });

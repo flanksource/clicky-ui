@@ -8,6 +8,12 @@ import {
   modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
+import {
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
+  unspecifiedHint,
+} from "../../runtime/unspecified";
 import { SegmentedControl } from "../../../components/SegmentedControl";
 import { sessionTone } from "../session-tones";
 import { SpecField } from "./fields";
@@ -15,8 +21,17 @@ import {
   collapsePermissionModeAliases,
   permissionModeVisual,
 } from "./permission-mode-visuals";
-import { sandboxRef, withSandboxApproval } from "./update";
+import { withPermissionMode } from "./update";
 
+type SelectableMode = SpecPermissionMode | typeof UNSPECIFIED_ID;
+
+/**
+ * Edits `permissions.mode` — the base posture, independent of the sandbox
+ * (see `AISpecRuntimePermissions` doc comment). A runtime mode narrows which
+ * postures the schema publishes and how the provider labels them, but the
+ * field itself never requires one: Unspecified and the published modes are
+ * always offered.
+ */
 export function PermissionModeField({
   value,
   onChange,
@@ -31,16 +46,9 @@ export function PermissionModeField({
   effectiveMode?: string | undefined;
 }) {
   const specMode = value.mode?.trim() || effectiveMode?.trim();
-  const current = sandboxRef(value).approval;
-  if (!specMode) {
-    return current ? (
-      <PermissionPostureError>
-        Permission posture requires a runtime mode.
-      </PermissionPostureError>
-    ) : null;
-  }
-  const runtime = modeOptionFor(families, specMode);
-  const family = familyForMode(families, specMode);
+  const current = value.permissions?.mode;
+  const runtime = specMode ? modeOptionFor(families, specMode) : undefined;
+  const family = specMode ? familyForMode(families, specMode) : undefined;
   const capabilities = runtime?.permissions;
   const publishedModes = SPEC_PERMISSION_MODES.filter((mode) =>
     availableModes.includes(mode),
@@ -59,11 +67,11 @@ export function PermissionModeField({
   );
   const invalid = current && !publishedModes.includes(current);
   if (visibleModes.length === 0 && !invalid) return null;
-  const selected = current || "default";
-  const selectedSupport = support[selected];
+  const selected: SelectableMode = current ?? UNSPECIFIED_ID;
+  const selectedSupport = current ? support[current] : undefined;
   const runtimeLabel = runtime
     ? `${family?.label ?? specMode} ${runtime.label}`
-    : specMode;
+    : (specMode ?? "the current runtime");
   return (
     <div className="grid gap-density-2">
       {invalid && (
@@ -75,36 +83,52 @@ export function PermissionModeField({
       {visibleModes.length > 0 && (
         <SpecField
           label="Permission posture"
-          hint={selectedSupport?.effects?.note || selectedSupport?.kind}
+          hint={
+            selected === UNSPECIFIED_ID
+              ? unspecifiedHint()
+              : selectedSupport?.effects?.note || selectedSupport?.kind
+          }
           composite
         >
-          <SegmentedControl
+          <SegmentedControl<SelectableMode>
             aria-label="Permission posture"
             value={selected}
-            onChange={(mode: SpecPermissionMode) =>
-              onChange(withSandboxApproval(value, mode))
+            onChange={(mode) =>
+              onChange(
+                withPermissionMode(
+                  value,
+                  mode === UNSPECIFIED_ID ? undefined : mode,
+                ),
+              )
             }
             size="sm"
             wrap
             className="w-full"
-            options={visibleModes.map((mode) => {
-              const cell = support[mode];
-              if (!cell) {
-                throw new Error(
-                  `permission posture ${JSON.stringify(mode)} disappeared from runtime capabilities`,
-                );
-              }
-              const visual = permissionModeVisual(family?.id, mode);
-              const tone = sessionTone(visual.tone);
-              return {
-                id: mode,
-                label: visual.label,
-                icon: visual.icon,
-                iconClassName: tone.text,
-                activeClassName: `${tone.disc} ${tone.border}`,
-                title: cell.effects?.note || permissionSupportLabel(cell.kind),
-              };
-            })}
+            options={[
+              {
+                id: UNSPECIFIED_ID,
+                label: UNSPECIFIED_LABEL,
+                title: `${UNSPECIFIED_NAME}: ${unspecifiedHint()}`,
+              },
+              ...visibleModes.map((mode) => {
+                const cell = support[mode];
+                if (!cell) {
+                  throw new Error(
+                    `permission posture ${JSON.stringify(mode)} disappeared from runtime capabilities`,
+                  );
+                }
+                const visual = permissionModeVisual(family?.id, mode);
+                const tone = sessionTone(visual.tone);
+                return {
+                  id: mode as SelectableMode,
+                  label: visual.label,
+                  icon: visual.icon,
+                  iconClassName: tone.text,
+                  activeClassName: `${tone.disc} ${tone.border}`,
+                  title: cell.effects?.note || permissionSupportLabel(cell.kind),
+                };
+              }),
+            ]}
           />
         </SpecField>
       )}

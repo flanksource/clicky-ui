@@ -40,6 +40,8 @@ export function SessionInspectorPanel({
   onResolveApproval?: ApprovalResolveHandler;
 }) {
   switch (tab) {
+    case "output":
+      return <StructuredOutputPanel value={detail?.structuredOutput} />;
     case "files":
       return <SessionFilesPanel files={detail?.files} />;
     case "plan":
@@ -72,6 +74,19 @@ export function SessionInspectorPanel({
     default:
       return null;
   }
+}
+
+function StructuredOutputPanel({ value }: { value: unknown }) {
+  if (value === undefined || value === null)
+    return <EmptyState>No structured output.</EmptyState>;
+  return (
+    <CodeBlock
+      language="json"
+      source={jsonSource(value)}
+      copyable
+      jsonDefaultOpenDepth={3}
+    />
+  );
 }
 
 function CostsPanel({

@@ -41,6 +41,7 @@ import {
 } from "../../runtime/runtime-mode";
 import { familyForModel } from "../../../lib/runtime-family";
 import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
+import type { SpecRuntimeHostField } from "./types";
 import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
 
 type FallbackDraftPatch = {
@@ -59,6 +60,7 @@ export function ModelSection({
   families,
   effectiveMode,
   effectiveModel,
+  hostFields = [],
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
@@ -66,6 +68,7 @@ export function ModelSection({
   families?: SpecRuntimeFamily[] | undefined;
   effectiveMode?: string | undefined;
   effectiveModel?: string | undefined;
+  hostFields?: readonly SpecRuntimeHostField[] | undefined;
 }) {
   const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
   const selectedFamily = familyForModel(
@@ -87,18 +90,20 @@ export function ModelSection({
   // entry for families the catalog does not describe.
   return (
     <div className="grid gap-density-2">
-      <RuntimeBar
-        value={value}
-        onChange={onChange}
-        models={models}
-        effectiveMode={effectiveMode}
-        effectiveModel={effectiveModel}
-        showModel={supports("model")}
-        showEffort={supports("effort")}
-        families={runtimeFamilies}
-      />
+      {!hostFields.includes("runtime") && (
+        <RuntimeBar
+          value={value}
+          onChange={onChange}
+          models={models}
+          effectiveMode={effectiveMode}
+          effectiveModel={effectiveModel}
+          showModel={supports("model")}
+          showEffort={supports("effort")}
+          families={runtimeFamilies}
+        />
+      )}
       <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
-        {supports("budget.cost") && (
+        {supports("budget.cost") && !hostFields.includes("budget.cost") && (
           <NumberField
             label="Max cost (USD)"
             value={value.budget?.cost}
@@ -133,17 +138,19 @@ export function ModelSection({
             integer
           />
         )}
-        <SpecField label="Timeout">
-          <SpecInput
-            value={value.budget?.timeout}
-            onChange={(timeout) =>
-              onChange(withBudgetValue(value, "timeout", timeout))
-            }
-            placeholder="30m"
-            icon={UiTimer}
-            mono
-          />
-        </SpecField>
+        {!hostFields.includes("budget.timeout") && (
+          <SpecField label="Timeout">
+            <SpecInput
+              value={value.budget?.timeout}
+              onChange={(timeout) =>
+                onChange(withBudgetValue(value, "timeout", timeout))
+              }
+              placeholder="30m"
+              icon={UiTimer}
+              mono
+            />
+          </SpecField>
+        )}
       </div>
       <ProviderStatusPanel
         models={models}

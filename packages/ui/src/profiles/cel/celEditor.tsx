@@ -5,33 +5,25 @@ import { Button } from "../../components/button";
 import { Icon } from "../../data/Icon";
 import { Modal } from "../../overlay/Modal";
 import { Tree } from "../../data/Tree";
-import { cn } from "../../lib/utils";
 import { createLazyJSONPathTree, type JSONPathNode } from "../../components/jsonPathTree";
 import type {
   FieldControl,
   PostExtensionContext,
 } from "../../components/json-schema-form-types";
-import { UiArrowRight, UiCheck, UiCode2, UiSparkles, UiWarningTriangle } from "../../icons";
+import { UiArrowRight, UiCheck, UiCode2, UiWarningTriangle } from "../../icons";
 import { useJsonPathSample } from "../query/jsonPathSample";
 import { celPathFor } from "./celPath";
+import { Coverage, ResultStrip, Tally } from "./celEditorResults";
+import { celExamplesFor } from "./celExamples";
 
 import {
-  bindingsFor,
-  celExamplesFor,
   coverage,
-  evaluateCel,
-  explainCelError,
   isClean,
   nextBarren,
-  unreachableKeys,
+  profileCelEnvironment,
+  type CelEnvironment,
   type CelScope,
 } from "./celExpression";
-
-const SCOPE_LABEL: Record<CelScope, string> = {
-  row: "Row",
-  batch: "Batch",
-  boundary: "Boundary",
-};
 
 function scopeOf(schema: Record<string, unknown>): CelScope {
   const declared = schema["x-clicky-cel-scope"];
@@ -58,12 +50,18 @@ export function CelEditorDialog(props: CelEditorProps) {
 
 type CelEditorProps = {
   value: string;
-  scope: CelScope;
+  /** A profile scope, or the host's own environment for CEL that is not a profile's. */
+  scope: CelScope | CelEnvironment;
   rows: Record<string, unknown>[];
   title: string;
   onChange: (next: string) => void;
   onClose: () => void;
 };
+
+/** "3 users", "1 user" — the header's count, in the environment's own noun. */
+function countOf(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
 
 /**
  * The dialog's contents, separated from the Modal that carries them.
@@ -72,6 +70,10 @@ type CelEditorProps = {
  * portals, and a portal renders to nothing server-side.
  */
 export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEditorProps) {
+  const environment = useMemo(
+    () => (typeof scope === "string" ? profileCelEnvironment(scope) : scope),
+    [scope],
+  );
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(0);
   const [picked, setPicked] = useState<JSONPathNode | undefined>(undefined);
@@ -94,16 +96,16 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
     });
   };
 
-  // Evaluated server-side, debounced by react-query's key rather than a timer:
-  // the rows are already in the browser, so a keystroke costs one small request
-  // and no backend query.
+  // Evaluated by the environment's own engine, debounced by react-query's key
+  // rather than a timer: the rows are already in the browser, so a keystroke
+  // costs one small request and no backend query.
   const { data, isFetching, error } = useQuery({
-    queryKey: ["cel-expression", scope, draft, rows.length],
+    queryKey: ["cel-expression", environment.id, draft, rows.length],
     enabled: draft.trim() !== "" && rows.length > 0,
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
-    queryFn: () => evaluateCel({ cel: draft, scope, rows }),
+    queryFn: () => environment.evaluate(draft, rows),
   });
 
   const results = data?.results ?? [];
@@ -111,8 +113,13 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
   const focusedResult = results.find((result) => result.index === focused) ?? results[0];
   const jump = nextBarren(found, focused);
   const row = rows[focused];
-  const bindings = bindingsFor(scope, row);
-  const unreachable = unreachableKeys(row);
+  const bindings = environment.bindings(row);
+  const unreachable = environment.unreachable?.(row) ?? [];
+  const noun = environment.rowNoun ?? "sampled row";
+  const nameRow = (index: number) => {
+    const target = rows[index];
+    return environment.rowLabel && target ? environment.rowLabel(target, index) : `row ${index + 1}`;
+  };
 
   // Rebuilt per focused row: the tree caches nodes by key, so without a prefix
   // that changes with the row, row 2 would show row 1's loaded branches.
@@ -120,16 +127,20 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
     () => createLazyJSONPathTree(row, { keyPrefix: `row${focused}:` }),
     [row, focused],
   );
-  const pickedPath = picked ? celPathFor(picked) : undefined;
+  const pickedPath = picked ? celPathFor(picked, environment.rowName) : undefined;
 
   return (
     <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="info" variant="soft" size="md">
-            {SCOPE_LABEL[scope]} scope
+            {environment.label}
           </Badge>
           <span className="text-xs text-muted-foreground">
-            {rows.length === 0 ? "nothing sampled yet" : `${rows.length} sampled rows`}
+            {rows.length === 0
+              ? environment.rowNoun
+                ? `no ${noun}s`
+                : "nothing sampled yet"
+              : countOf(rows.length, noun)}
           </span>
         </div>
 
@@ -157,7 +168,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
 
             <ResultStrip
               result={focusedResult}
-              index={focused}
+              label={nameRow(focused)}
               pending={isFetching}
               draft={draft}
               onFix={setDraft}
@@ -174,7 +185,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {celExamplesFor(pickedPath, picked?.value).map((example) => (
+                  {celExamplesFor(pickedPath, picked?.value, { predicate: environment.predicate }).map((example) => (
                     <button
                       key={example.label}
                       type="button"
@@ -190,7 +201,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Tally ok={found.ok} empty={found.empty} failed={found.failed} />
+              <Tally found={found} results={results} predicate={environment.predicate} />
               {jump !== undefined && (
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setFocused(jump)}>
                   <Icon icon={UiArrowRight} className="text-[12px]" />
@@ -204,7 +215,14 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
               )}
             </div>
 
-            <Coverage results={results} rowCount={rows.length} focused={focused} onFocus={setFocused} />
+            <Coverage
+              results={results}
+              rowCount={rows.length}
+              focused={focused}
+              onFocus={setFocused}
+              rowLabel={environment.rowLabel ? nameRow : undefined}
+              predicate={environment.predicate}
+            />
           </section>
 
           <section className="space-y-2 rounded-lg border border-border bg-muted/20 p-2">
@@ -212,7 +230,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
               <h4 className="text-xs font-semibold">In scope</h4>
               {rows.length > 0 && (
                 <Badge tone="neutral" variant="soft" size="md">
-                  row {focused + 1}
+                  {nameRow(focused)}
                 </Badge>
               )}
             </div>
@@ -244,7 +262,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
               <div className="flex h-72 min-h-0 flex-col overflow-hidden rounded border border-border bg-background">
                 <Tree<JSONPathNode>
                   className="min-h-0 flex-1"
-                  ariaLabel="Row values"
+                  ariaLabel={environment.rowNoun ? `${environment.rowNoun} values` : "Row values"}
                   // Expand-all only walks children already loaded, so on a lazy
                   // tree it is a button that appears to do nothing. The filter
                   // box still appears on its own once the row is wide enough.
@@ -264,7 +282,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
                   renderRow={({ node }) => (
                     <span className="flex min-w-0 items-baseline gap-1.5" title={node.path}>
                       <code className="shrink-0 font-mono text-[11px] text-primary">
-                        {node.path === "$" ? "row" : lastSegment(node.path)}
+                        {node.path === "$" ? environment.rowName || nameRow(focused) : lastSegment(node.path)}
                       </code>
                       <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
                         {node.summary}
@@ -274,9 +292,10 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
                 />
               </div>
             )}
-            {scope !== "row" && unreachable.length > 0 && (
+            {unreachable.length > 0 && (
               <p className="border-t border-border/60 pt-1 text-[10px] text-muted-foreground">
-                Reachable only through <code className="font-mono">row</code>, not as a bare name:{" "}
+                Reachable only through <code className="font-mono">{environment.rowName}</code>, not as a bare
+                name:{" "}
                 {unreachable.map((key) => (
                   <code key={key} className="font-mono">
                     {key}{" "}
@@ -304,7 +323,7 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
           </Button>
           {!isClean(found) && results.length > 0 && (
             <span className="text-[11px] text-muted-foreground">
-              {found.empty + found.failed} of {results.length} sampled rows produce nothing — applying anyway is a
+              {found.empty + found.failed} of {countOf(results.length, noun)} produce nothing — applying anyway is a
               choice, not a mistake, but it should be one you make on purpose.
             </span>
           )}
@@ -313,145 +332,10 @@ export function CelEditorPanel({ value, scope, rows, onChange, onClose }: CelEdi
   );
 }
 
-function Tally({ ok, empty, failed }: { ok: number; empty: number; failed: number }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Badge tone="success" variant="soft" size="md">
-        {ok} evaluated
-      </Badge>
-      {empty > 0 && (
-        <Badge tone="warning" variant="soft" size="md">
-          {empty} empty
-        </Badge>
-      )}
-      {failed > 0 && (
-        <Badge tone="danger" variant="soft" size="md" icon={UiWarningTriangle}>
-          {failed} failed
-        </Badge>
-      )}
-    </div>
-  );
-}
-
-/**
- * One row's result, in one line.
- *
- * `String()` on a list of objects is a row of `[object Object]`, which is the
- * same non-answer the scope panel used to give — an expression that returns
- * structure has to show its structure to be judged at all.
- */
-function preview(value: unknown): string {
-  if (value === null || value === undefined) return "null";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
 /** The trailing key or index of a path, which is what a tree row is named by. */
 function lastSegment(path: string): string {
   const match = /\.([^.[\]]+)$|\[([^[\]]+)\]$/.exec(path);
   return match?.[1] ?? match?.[2]?.replace(/^"|"$/g, "") ?? path;
-}
-
-function ResultStrip({
-  result,
-  index,
-  pending,
-  draft,
-  onFix,
-}: {
-  result: { value?: unknown; type?: string; error?: string } | undefined;
-  index: number;
-  pending: boolean;
-  draft: string;
-  onFix: (next: string) => void;
-}) {
-  if (result?.error) {
-    // The engine reports in the vocabulary of the Go library underneath it and
-    // interpolates the whole offending value, so what it says is translated
-    // and what it quotes is trimmed.
-    const failure = explainCelError(result.error, draft);
-    return (
-      <div className="space-y-1 rounded border border-destructive/40 bg-destructive/[0.06] p-2">
-        <div className="text-[11px] font-medium text-destructive">row {index + 1} — evaluation failed</div>
-        <p className="text-[11px] text-destructive">{failure.message}</p>
-        {failure.fix && (
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => onFix(failure.fix!)}>
-            <Icon icon={UiSparkles} className="text-[12px]" />
-            Fix it
-          </Button>
-        )}
-        <code
-          className="block break-all font-mono text-[10px] text-muted-foreground"
-          title={result.error}
-        >
-          {failure.raw}
-        </code>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-baseline gap-2 rounded border border-border bg-muted/40 p-2">
-      <span className="text-[11px] font-medium">row {index + 1}</span>
-      <Icon icon={UiArrowRight} className="text-[11px] text-muted-foreground" />
-      <code
-        className={cn(
-          "min-w-0 flex-1 truncate font-mono text-[11px]",
-          result?.value === null || result?.value === undefined ? "text-muted-foreground" : "",
-        )}
-      >
-        {pending ? "…" : preview(result?.value)}
-      </code>
-      {result?.type && <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{result.type}</span>}
-    </div>
-  );
-}
-
-/** Every sampled row as one cell, coloured by what the expression made of it. */
-function Coverage({
-  results,
-  rowCount,
-  focused,
-  onFocus,
-}: {
-  results: { index: number; value?: unknown; error?: string }[];
-  rowCount: number;
-  focused: number;
-  onFocus: (index: number) => void;
-}) {
-  if (rowCount === 0) return null;
-  const byIndex = new Map(results.map((result) => [result.index, result]));
-
-  return (
-    <div className="space-y-1">
-      <span className="text-[11px] text-muted-foreground">Sample coverage</span>
-      <div className="flex flex-wrap gap-0.5">
-        {Array.from({ length: rowCount }, (_, index) => {
-          const result = byIndex.get(index);
-          const failed = Boolean(result?.error);
-          const empty = !failed && (result?.value === null || result?.value === undefined);
-          return (
-            <button
-              key={index}
-              type="button"
-              aria-label={`Row ${index + 1}`}
-              onClick={() => onFocus(index)}
-              className={cn(
-                "h-5 w-5 rounded-sm border text-[9px] tabular-nums",
-                failed
-                  ? "border-destructive/50 bg-destructive/20 text-destructive"
-                  : empty
-                    ? "border-border bg-muted text-muted-foreground"
-                    : "border-green-600/40 bg-green-500/20 text-green-800 [[data-theme=dark]_&]:text-green-300",
-                index === focused && "ring-2 ring-primary ring-offset-1",
-              )}
-            >
-              {index + 1}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -471,7 +355,7 @@ export function CelTestButton({
   onChange,
 }: {
   value: string;
-  scope: CelScope;
+  scope: CelScope | CelEnvironment;
   rows: unknown[];
   title: string;
   disabled?: boolean;

@@ -1,37 +1,38 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Button } from "../../../components/button";
+import { useState, type ReactNode } from "react";
 import type { JsonSchemaObject } from "../../../components/json-schema-form-types";
+import { SegmentedControl } from "../../../components/SegmentedControl";
 import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
-import { UiAdd, UiGearSix, UiLayers, UiTrash } from "../../../icons";
+import { UiGearSix } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import { Modal } from "../../../overlay/Modal";
-import { Icon } from "../../Icon";
 import { DEFAULT_REASONING_EFFORTS } from "../../chat/effort-icons";
-import { AttachmentButton, AttachmentList } from "../../chat/Attachment";
-import {
-  createAttachmentUploadAdapter,
-  type AttachmentFilePart,
-  type AttachmentLimits,
-  type AttachmentUploadAdapter,
+import type {
+  AttachmentLimits,
+  AttachmentUploadAdapter,
 } from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
-import type { FileUIPart } from "../../chat/types";
-import { RuntimeBar } from "../../runtime/RuntimeBar";
-import { runtimeModelForValue } from "../../runtime/RuntimeBar.model";
+import type {
+  RuntimeBarAction,
+  RuntimeBarActionsProps,
+} from "../../runtime/RuntimeBarActions";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
   labelForMode,
 } from "../../runtime/runtime-mode";
-import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import {
+  SpecRuntimeEditor,
+  type SpecRuntimeEditorProps,
+} from "../SpecRuntimeEditor";
 import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import type { SpecRuntimeCLIOptions } from "../SpecRuntimeEditor/CLIArgsSection";
-import type { SpecRuntimeSandboxCatalog } from "../SpecRuntimeEditor/types";
 import type {
+  SpecRuntimeHostField,
+  SpecRuntimeSandboxCatalog,
   SpecRuntimeSecretSelectorConfig,
+  SpecRuntimeTab,
   SpecSectionId,
 } from "../SpecRuntimeEditor/types";
-import { withPrompt } from "../SpecRuntimeEditor/update";
 import type { AISpecRuntimePermissionCatalog } from "../SpecRuntimeEditor.model";
 import type {
   ResolvedRuntimeProfile,
@@ -41,14 +42,19 @@ import type {
   RuntimeProfileResolveRequest,
 } from "../runtime-profile";
 import { authoredRuntimeSpec } from "../../../lib/runtime-profile-model";
-import { RuntimeProfilePicker } from "../runtime-profiles/RuntimeProfilePicker";
+import { OrderedPresetSelect } from "../runtime-profiles/OrderedPresetSelect";
 import {
-  inheritedRuntime,
-  profileForRef,
-} from "../runtime-profiles/RuntimeProfilePicker.model";
-import { useRuntimeProfilePicker } from "../runtime-profiles/use-runtime-profile-picker";
-import { runtimeRows, withRuntimeRows, type AIPromptRunValue } from "./model";
-import { VariablesField } from "./VariablesField";
+  modelModeOf,
+  withModelMode,
+  withRecentRuntime,
+  type AIPromptRunValue,
+  type AISpecRuntimeModel,
+  type PromptRunModelMode,
+} from "./model";
+import { Block, PromptBlocks } from "./PromptBlocks";
+import { RecentRuntimes } from "./RecentRuntimes";
+import { permissionField, presetsField } from "./runtimeActions";
+import { RuntimeRows } from "./RuntimeRows";
 
 export type PromptRunEditorProps = {
   value: AIPromptRunValue;
@@ -66,6 +72,12 @@ export type PromptRunEditorProps = {
   /** Host-owned sandbox creation and credential-reference adapter. */
   sandboxCreate?: SpecRuntimeSandboxCreateConfig | undefined;
   reasoningEfforts?: string[] | undefined;
+  /**
+   * Runtimes the operator ran recently, newest first, listed under the runtime
+   * bar (see `recordRecentRuntimes`). A chip replaces the single runtime or adds
+   * a multi-model row.
+   */
+  recentRuntimes?: readonly AISpecRuntimeModel[] | undefined;
 
   /** Schema-driven variables form; omit to render a raw-JSON editor. */
   variablesSchema?: JsonSchemaObject | undefined;
@@ -80,20 +92,26 @@ export type PromptRunEditorProps = {
   attachmentUpload?: AttachmentUploadAdapter | undefined;
   attachmentLimits?: AttachmentLimits | undefined;
 
-  /** Extra fields injected inside the Runtime block, below Model/Effort. */
+  /** Extra fields injected inside the Runtime block, below the runtime rows. */
   children?: ReactNode | undefined;
   header?: ReactNode | undefined;
   footer?: ReactNode | undefined;
   className?: string | undefined;
 
-  editSpecLabel?: string | undefined;
+  /** Label of the runtime bar's ⋮ entry that opens the full spec modal. */
+  advancedLabel?: string | undefined;
   specModalTitle?: string | undefined;
-  /** Restrict which SpecRuntimeEditor sections the "Edit spec" modal shows. */
+  /** Restrict which SpecRuntimeEditor sections the "Advanced" modal shows. */
   specSections?: readonly SpecSectionId[] | undefined;
+  /**
+   * Replaces the "Advanced" modal with inline tabs of spec sections (see
+   * `SPEC_RUNTIME_TABS`), led by a tab holding Variables and the prompt.
+   */
+  specTabs?: readonly SpecRuntimeTab[] | undefined;
 
-  /** Saved runtime profiles; enables the profile picker inside the spec modal. */
+  /** @deprecated Profiles are no longer exposed by the prompt editor. */
   profiles?: RuntimeProfile[] | undefined;
-  /** Presets the profiles reference, for ordering and inherited model/mode. */
+  /** Available presets for direct ordered run selection. */
   presets?: RuntimePreset[] | undefined;
   onSaveProfile?:
     | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
@@ -110,11 +128,23 @@ export type PromptRunEditorProps = {
   resolution?: ResolvedRuntimeSpec | undefined;
 };
 
+const MODEL_MODES: { id: PromptRunModelMode; label: string }[] = [
+  { id: "single", label: "Single model" },
+  { id: "multi", label: "Multi-model" },
+];
+
+// The single-model bar owns the run's timeout and max cost; the model tab only
+// repeats limits that no bar shows.
+const HOST_FIELDS: Record<PromptRunModelMode, SpecRuntimeHostField[]> = {
+  single: ["runtime", "budget.timeout", "budget.cost"],
+  multi: ["runtime"],
+};
+
 // The inline "prompt + variables + runtime" composer shared by captain's prompt
 // workbench and gavel's todo run dialog. It edits Captain's complete prompt-run
 // request without making hosts project that contract into editor-specific state.
 // Hosts should mount it with a `key` per prompt/todo so internal draft state
-// (raw-JSON text, modal open) resets on selection change.
+// (raw-JSON text, modal open, active tab) resets on selection change.
 export function PromptRunEditor({
   value,
   onChange,
@@ -128,6 +158,7 @@ export function PromptRunEditor({
   sandboxCatalog,
   sandboxCreate,
   reasoningEfforts = DEFAULT_REASONING_EFFORTS,
+  recentRuntimes = [],
   variablesSchema,
   onVariablesValidityChange,
   promptEditor,
@@ -140,291 +171,194 @@ export function PromptRunEditor({
   header,
   footer,
   className,
-  editSpecLabel = "Edit spec",
+  advancedLabel = "Advanced",
   specModalTitle = "Runtime spec",
   specSections,
-  profiles,
-  presets = [],
-  onSaveProfile,
-  onCreateProfile,
-  onResolveProfile,
+  specTabs,
+  presets,
   resolution,
 }: PromptRunEditorProps) {
+  if (specTabs && specSections) {
+    throw new Error(
+      "PromptRunEditor: pass either specSections or specTabs, not both",
+    );
+  }
   const [specOpen, setSpecOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const spec = value.spec ?? {};
-  const rows = runtimeRows(value);
-  const selectedModel = runtimeModelForValue(models, spec);
-  const picker = useRuntimeProfilePicker({
-    value,
-    onChange,
-    profiles: profiles ?? [],
-    presets,
-    onSaveProfile,
-    onCreateProfile,
-    onResolveProfile,
-  });
-  const profileDraft =
-    profiles !== undefined && picker.state.layer === "profile"
-      ? picker.state.draft
-      : undefined;
-  const runRuntime = inheritedRuntime({
-    draft: picker.state.draft,
-    presets,
-    resolution,
-  });
-  const presetRuntime = profileDraft
-    ? authoredRuntimeSpec({ ...profileDraft, spec: {} }, presets)
-    : {};
-  const editorRuntime = profileDraft ? presetRuntime : runRuntime;
-  const selectedProfile = profileForRef(value.runtimeProfile, profiles ?? []);
-  const resolvedAttachmentUpload = useMemo(
-    () => attachmentUpload ?? createAttachmentUploadAdapter(),
-    [attachmentUpload],
+  const modelMode = modelModeOf(value);
+  const presetCatalog = presets ?? [];
+  const runRuntime =
+    resolution?.spec ??
+    authoredRuntimeSpec(
+      {
+        id: "selection",
+        name: "Selection",
+        spec,
+        presets: value.presets ?? [],
+      },
+      presetCatalog,
+    );
+
+  // Spec-level run settings shown on the runtime bar. The permission field is
+  // dropped under `specTabs` because the inline Permissions tab already owns it,
+  // and a value with two editors in one layout is a value that drifts.
+  const barActions: RuntimeBarActionsProps = {
+    fields: [
+      ...(specTabs
+        ? []
+        : [
+            permissionField({
+              spec,
+              families,
+              effectiveMode: runRuntime.mode,
+              onChange: (next) => onChange({ ...value, spec: next }),
+            }),
+          ]),
+      ...(presets === undefined
+        ? []
+        : [
+            presetsField({
+              presets: presetCatalog,
+              value: value.presets ?? [],
+              onChange: (next) => onChange({ ...value, presets: next }),
+              onReorder: () => setPresetsOpen(true),
+            }),
+          ]),
+    ].filter((field): field is RuntimeBarAction => field !== undefined),
+    menu: specTabs
+      ? []
+      : [
+          {
+            label: advancedLabel,
+            icon: UiGearSix,
+            onSelect: () => setSpecOpen(true),
+          },
+        ],
+  };
+
+  const specEditorProps: SpecRuntimeEditorProps = {
+    value: spec,
+    onChange: (next) => onChange({ ...value, spec: next }),
+    models,
+    families,
+    tools,
+    effectiveModel: runRuntime.model,
+    effectiveMode: runRuntime.mode,
+    ...(permissionCatalog ? { permissionCatalog } : {}),
+    ...(secretSelector ? { secretSelector } : {}),
+    ...(cliOptions ? { cliOptions } : {}),
+    ...(fixtureSchemas ? { fixtureSchemas } : {}),
+    ...(sandboxCatalog ? { sandboxCatalog } : {}),
+    ...(sandboxCreate ? { sandboxCreate } : {}),
+  };
+  const promptBlocks = (
+    <PromptBlocks
+      value={value}
+      onChange={onChange}
+      models={models}
+      variablesSchema={variablesSchema}
+      onVariablesValidityChange={onVariablesValidityChange}
+      promptEditor={promptEditor}
+      promptLabel={promptLabel}
+      promptPlaceholder={promptPlaceholder}
+      enableAttachments={enableAttachments}
+      attachmentUpload={attachmentUpload}
+      attachmentLimits={attachmentLimits}
+    />
   );
-  const attachmentFiles: FileUIPart[] = (spec.prompt?.attachments ?? []).map(
-    (attachment) => ({
-      type: "file",
-      url: attachment.id
-        ? `/api/attachments/${attachment.id}`
-        : (attachment.url ?? ""),
-      mediaType: attachment.mediaType ?? "application/octet-stream",
-      ...(attachment.id ? { attachmentId: attachment.id } : {}),
-      ...(attachment.size != null ? { size: attachment.size } : {}),
-      ...(attachment.filename ? { filename: attachment.filename } : {}),
-      ...(!attachment.filename && attachment.path
-        ? { filename: attachment.path }
-        : {}),
-    }),
-  ) as FileUIPart[];
 
   return (
-    <div className={cn("grid gap-density-4", className)}>
+    <div className={cn("grid grid-cols-1 gap-density-4", className)}>
+      <SegmentedControl
+        aria-label="Model mode"
+        size="sm"
+        value={modelMode}
+        options={MODEL_MODES}
+        onChange={(mode) => onChange(withModelMode(value, mode))}
+        className="w-fit"
+      />
       {header}
 
       <Block title="Runtime">
-        <div className="grid gap-density-2">
-          {rows.map((runtime, index) => (
-            <div
-              key={index}
-              role="group"
-              aria-label={`Runtime ${index + 1}`}
-              className="flex min-w-0 items-center gap-density-2"
-            >
-              <RuntimeBar
-                value={runtime}
-                onChange={(next) =>
-                  onChange(
-                    withRuntimeRows(
-                      value,
-                      rows.map((item, itemIndex) =>
-                        itemIndex === index ? next : item,
-                      ),
-                    ),
-                  )
-                }
-                models={models}
-                effectiveModel={runRuntime.model}
-                effectiveMode={runRuntime.mode}
-                families={families}
-                reasoningEfforts={reasoningEfforts}
-                ariaLabel={`Runtime ${index + 1} controls`}
-              />
-              {rows.length > 1 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Remove runtime ${index + 1}`}
-                  onClick={() =>
-                    onChange(
-                      withRuntimeRows(
-                        value,
-                        rows.filter((_, itemIndex) => itemIndex !== index),
-                      ),
-                    )
-                  }
-                >
-                  <Icon icon={UiTrash} className="size-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-          <div className="flex flex-wrap items-center gap-density-2">
-            <Button
-              size="sm"
-              variant="outline"
-              aria-label="Add runtime"
-              onClick={() =>
-                onChange(
-                  withRuntimeRows(value, [
-                    ...rows,
-                    rows[0]?.mode ? { mode: rows[0].mode } : {},
-                  ]),
-                )
-              }
-            >
-              <Icon icon={UiAdd} className="size-4" />
-              Add runtime
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setSpecOpen(true)}
-            >
-              <Icon icon={UiGearSix} className="size-4" />
-              {editSpecLabel}
-            </Button>
-            {value.runtimeProfile && (
-              <span
-                data-testid="runtime-profile-chip"
-                className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-300"
-              >
-                <Icon icon={UiLayers} className="size-3.5" />
-                Profile · {selectedProfile?.name ?? value.runtimeProfile}
-              </span>
-            )}
-          </div>
-        </div>
+        <RuntimeRows
+          value={value}
+          onChange={onChange}
+          models={models}
+          families={families}
+          reasoningEfforts={reasoningEfforts}
+          effectiveRuntime={runRuntime}
+          actions={barActions}
+        />
+        <RecentRuntimes
+          runtimes={recentRuntimes}
+          models={models}
+          families={families}
+          onSelect={(runtime) => onChange(withRecentRuntime(value, runtime))}
+        />
         {children}
       </Block>
 
-      <Block title="Variables">
-        <VariablesField
-          {...(variablesSchema ? { schema: variablesSchema } : {})}
-          value={value.variables ?? {}}
-          onChange={(variables) => onChange({ ...value, variables })}
-          {...(onVariablesValidityChange
-            ? { onValidityChange: onVariablesValidityChange }
-            : {})}
+      {specTabs ? (
+        <SpecRuntimeEditor
+          {...specEditorProps}
+          tabs={[
+            {
+              id: "prompt",
+              label: promptLabel,
+              content: (
+                <div className="grid grid-cols-1 gap-density-4">
+                  {promptBlocks}
+                </div>
+              ),
+            },
+            ...specTabs,
+          ]}
+          showHeader={false}
+          hostFields={HOST_FIELDS[modelMode]}
+          promptVariant="system"
         />
-      </Block>
-
-      <Block title={promptLabel}>
-        {promptEditor ?? (
-          <textarea
-            value={spec.prompt?.user ?? ""}
-            onChange={(event) =>
-              onChange({
-                ...value,
-                spec: withPrompt(spec, { user: event.target.value }),
-              })
-            }
-            spellCheck={false}
-            placeholder={promptPlaceholder}
-            aria-label={promptLabel}
-            className="min-h-[7rem] w-full resize-y rounded-md border border-border bg-background px-density-2 py-density-1 text-sm outline-none focus:ring-2 focus:ring-ring"
-          />
-        )}
-        {enableAttachments && (
-          <div className="space-y-density-2">
-            <AttachmentList
-              files={attachmentFiles}
-              onRemove={(index) =>
-                onChange({
-                  ...value,
-                  spec: withPrompt(spec, {
-                    attachments: (spec.prompt?.attachments ?? []).filter(
-                      (_, itemIndex) => itemIndex !== index,
-                    ),
-                  }),
-                })
-              }
-            />
-            <AttachmentButton
-              files={attachmentFiles}
-              upload={resolvedAttachmentUpload}
-              onAdd={(parts) =>
-                onChange({
-                  ...value,
-                  spec: withPrompt(spec, {
-                    attachments: [
-                      ...(spec.prompt?.attachments ?? []),
-                      ...parts.map((part) => {
-                        const uploaded = part as AttachmentFilePart;
-                        return {
-                          id: uploaded.attachmentId,
-                          mediaType: uploaded.mediaType,
-                          size: uploaded.size,
-                          ...(uploaded.filename
-                            ? { filename: uploaded.filename }
-                            : {}),
-                        };
-                      }),
-                    ],
-                  }),
-                })
-              }
-              {...(selectedModel?.inputMediaTypes
-                ? { acceptedMediaTypes: selectedModel.inputMediaTypes }
-                : {})}
-              {...(attachmentLimits ? { limits: attachmentLimits } : {})}
-            />
-          </div>
-        )}
-      </Block>
+      ) : (
+        promptBlocks
+      )}
 
       {footer}
 
-      <Modal
-        open={specOpen}
-        onClose={() => setSpecOpen(false)}
-        title={specModalTitle}
-        size="full"
-        closeOnEsc
-        className="h-[95vh]"
-      >
-        <SpecRuntimeEditor
-          value={profileDraft ? profileDraft.spec : spec}
-          onChange={(next) =>
-            profileDraft
-              ? picker.editDraft({ ...profileDraft, spec: next })
-              : onChange({ ...value, spec: next })
-          }
-          models={models}
-          families={families}
-          tools={tools}
-          effectiveModel={editorRuntime.model}
-          effectiveMode={editorRuntime.mode}
-          {...(permissionCatalog ? { permissionCatalog } : {})}
-          {...(secretSelector ? { secretSelector } : {})}
-          {...(cliOptions ? { cliOptions } : {})}
-          {...(fixtureSchemas ? { fixtureSchemas } : {})}
-          {...(sandboxCatalog ? { sandboxCatalog } : {})}
-          {...(sandboxCreate ? { sandboxCreate } : {})}
-          {...(specSections ? { sections: specSections } : {})}
-          {...(profiles !== undefined
-            ? {
-                beforeSections: (
-                  <RuntimeProfilePicker
-                    controller={picker}
-                    profiles={profiles}
-                    presets={presets}
-                    resolution={resolution}
-                    effectiveRuntime={runRuntime}
-                  />
-                ),
-              }
-            : {})}
-          onSave={() => setSpecOpen(false)}
-          onCancel={() => setSpecOpen(false)}
-          saveLabel="Done"
-          footerStatus={
-            profileDraft
-              ? `Editing profile «${profileDraft.name}»`
-              : labelForMode(spec.mode, families)
-          }
-        />
-      </Modal>
-    </div>
-  );
-}
+      {presets !== undefined && (
+        <Modal
+          open={presetsOpen}
+          onClose={() => setPresetsOpen(false)}
+          title="Presets"
+          size="lg"
+          closeOnEsc
+        >
+          <OrderedPresetSelect
+            presets={presetCatalog}
+            value={value.presets ?? []}
+            onChange={(next) => onChange({ ...value, presets: next })}
+          />
+        </Modal>
+      )}
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-density-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </div>
-      {children}
-    </section>
+      {!specTabs && (
+        <Modal
+          open={specOpen}
+          onClose={() => setSpecOpen(false)}
+          title={specModalTitle}
+          size="full"
+          closeOnEsc
+          className="h-[95vh]"
+        >
+          <SpecRuntimeEditor
+            {...specEditorProps}
+            {...(specSections ? { sections: specSections } : {})}
+            onSave={() => setSpecOpen(false)}
+            onCancel={() => setSpecOpen(false)}
+            saveLabel="Done"
+            footerStatus={labelForMode(spec.mode, families)}
+          />
+        </Modal>
+      )}
+    </div>
   );
 }

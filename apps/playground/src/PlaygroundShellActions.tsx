@@ -29,8 +29,6 @@ export type PlaygroundShellActionsProps = {
   reviewActive: boolean;
   reviewCount: number;
   onToggleReview: () => void;
-  commentMode: boolean;
-  onToggleCommentMode: () => void;
   onCommentWholePage: () => void;
   feedbackCopied: boolean;
   onCopyFeedback: () => void;
@@ -91,21 +89,14 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
             <UiComment className="size-3.5" />
             Review resolved ({props.reviewCount})
           </button>
-          <SplitButton
-            label={props.commentMode ? "Pick an element…" : "Comment"}
-            icon={UiComment}
-            onClick={props.onToggleCommentMode}
-            items={[
-              {
-                label: "Comment on whole page",
-                icon: UiFileText,
-                onSelect: props.onCommentWholePage,
-              },
-            ]}
-            variant={props.commentMode ? "default" : "outline"}
-            size="sm"
-            title="Choose comment scope"
-          />
+          <button
+            type="button"
+            onClick={props.onCommentWholePage}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <UiFileText className="size-3.5" />
+            Comment on page
+          </button>
         </>
       )}
       <SplitButton

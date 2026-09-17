@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
+import { UiGearSix } from "../../icons";
+import { cn } from "../../lib/utils";
 import type { ChatModel } from "../chat/types";
 import type { AISpecRuntimeValue } from "../ai/SpecRuntimeEditor.model";
 import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
+import { RuntimeBarActions } from "./RuntimeBarActions";
 
 // A catalog wide enough for every segment to have somewhere to go: agent/CLI
 // families that carry their own models, plus a hosted-API family that does not.
@@ -113,6 +116,112 @@ export const WithModelAndEffort: Story = {
   ),
 };
 
+function NarrowRuntimeBarStory() {
+  const [value, setValue] = useState<AISpecRuntimeValue>({
+    mode: "cli",
+    model: "anthropic/claude-sonnet-4-6",
+    effort: "medium",
+    budget: { timeout: "30m", cost: 2 },
+  });
+  return (
+    <div className="w-80 max-w-full p-4">
+      <RuntimeBar
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        showTimeout
+        showCost
+        ariaLabel="Narrow runtime"
+      />
+    </div>
+  );
+}
+
+// Too narrow for one strip: the run settings (effort, timeout, max cost) wrap
+// onto their own row instead of being clipped. On a phone viewport the bar
+// also spans the full width and the family collapses to its brand icon.
+export const NarrowContainer: Story = {
+  args: { variant: "segmented" },
+  render: () => <NarrowRuntimeBarStory />,
+  play: async ({ canvasElement }) => {
+    const bar = within(canvasElement).getByRole("group", { name: "Narrow runtime" });
+    const identity = bar.querySelector("[data-runtime-bar-section=identity]");
+    const settings = bar.querySelector("[data-runtime-bar-section=settings]");
+
+    await expect(settings!.getBoundingClientRect().top).toBeGreaterThan(
+      identity!.getBoundingClientRect().top,
+    );
+    await expect(bar.scrollWidth).toBe(bar.clientWidth);
+    await expect(settings!.scrollWidth).toBe(settings!.clientWidth);
+    // A narrow bar must keep its limit values legible: the run settings give up
+    // the static "Effort" key label rather than ellipsing "30m" or "$2.00".
+    for (const caption of ["Medium", "30m", "$2.00"]) {
+      const span = within(settings!).getByText(caption);
+      await expect(span.scrollWidth).toBeLessThanOrEqual(span.clientWidth);
+    }
+  },
+};
+
+function HostActionsStory({ inline }: { inline: boolean }) {
+  const [value, setValue] = useState<AISpecRuntimeValue>({
+    mode: "cli",
+    model: "anthropic/claude-sonnet-4-6",
+    effort: "medium",
+  });
+  return (
+    <div className={cn("p-4", inline ? "max-w-3xl" : "w-80 max-w-full")}>
+      <RuntimeBar
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        ariaLabel={inline ? "Wide runtime" : "Narrow runtime"}
+        actions={
+          <RuntimeBarActions
+            inline={inline}
+            fields={[
+              {
+                id: "presets",
+                label: "Presets",
+                title: "Presets — Guardrails",
+                caption: <span className="text-xs">Presets 1</span>,
+                items: [{ label: "Guardrails", onSelect: () => {} }],
+              },
+            ]}
+            menu={[{ label: "Advanced", icon: UiGearSix, onSelect: () => {} }]}
+          />
+        }
+      />
+    </div>
+  );
+}
+
+// Spec-level settings the host fuses onto the bar. Wide enough, they are their
+// own segments; in a narrow column the host flips `inline` off and the same
+// items become submenus of the ⋮ segment that always carries Advanced.
+export const HostActions: Story = {
+  args: { variant: "segmented" },
+  render: () => (
+    <div className="grid gap-4">
+      <HostActionsStory inline />
+      <HostActionsStory inline={false} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const wide = canvas.getByRole("group", { name: "Wide runtime" });
+    const narrow = canvas.getByRole("group", { name: "Narrow runtime" });
+
+    await expect(within(wide).getByTitle("Presets — Guardrails")).toBeInTheDocument();
+    await expect(within(narrow).queryByTitle("Presets — Guardrails")).not.toBeInTheDocument();
+
+    await userEvent.click(within(narrow).getByTitle("Runtime options"));
+    const menu = within(document.body).getAllByRole("menu")[0]!;
+    await expect(
+      within(menu).getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Presets", "Advanced"]);
+  },
+};
+
 export const Combo: Story = {
   args: {
     variant: "combo",
@@ -158,7 +267,7 @@ export const Combo: Story = {
     await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     await expect(
       canvas.getByRole("button", {
-        name: "Runtime: Claude, CLI, Prompt default, effort High",
+        name: "Runtime: Claude, CLI, Unspecified, effort High",
       }),
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
@@ -185,7 +294,7 @@ export const NoModelsForFamily: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTitle("Model — prompt default"));
+    await userEvent.click(canvas.getByTitle("Model — unspecified"));
     await userEvent.type(
       await within(document.body).findByLabelText("Model id"),
       "gemini-3-pro",
@@ -217,7 +326,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
     // CLI survives the family switch; the Claude-only model does not.
     await expect(canvas.getByTitle("Codex CLI")).toHaveTextContent("CLI");
     await expect(
-      canvas.getByTitle("Model — prompt default"),
+      canvas.getByTitle("Model — unspecified"),
     ).toBeInTheDocument();
   },
 };

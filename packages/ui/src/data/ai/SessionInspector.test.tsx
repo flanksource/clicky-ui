@@ -187,6 +187,40 @@ describe("SessionInspector", () => {
     expect(screen.getByText('"session-parity"')).toBeInTheDocument();
   });
 
+  it("renders schema-constrained results in a dedicated Output tab", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector
+          session={{
+            ...INSPECTOR_SESSION,
+            structuredOutput: {
+              scorecards: [{ dimension: "answer-relevancy", score: 5 }],
+            },
+          }}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
+
+    expect(document.body.textContent).toContain("scorecards");
+    expect(document.body.textContent).toContain("answer-relevancy");
+  });
+
+  it("falls back to Transcript when Output is requested for a legacy session", () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={[]} defaultTab="output" />
+      </div>,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Output" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Transcript" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
   it("keeps the hierarchy picker left aligned across detail tabs", () => {
     render(
       <div className="h-[720px]">

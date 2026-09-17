@@ -40,7 +40,9 @@ export function captureElementHtml(element: Element): string {
 
 export async function captureElementContext(
   element: Element,
+  fallbackSource?: string,
 ): Promise<CommentElementContext> {
+  const html = captureElementHtml(element);
   const api = window.__REACT_GRAB__;
   if (!api) {
     throw new Error(
@@ -51,7 +53,7 @@ export async function captureElementContext(
   const directSource = await api
     .getSource(element)
     .then(sourceLocation, () => "");
-  const source = await resolveStack(api, element, directSource);
+  const source = await resolveStack(api, element, directSource || fallbackSource || "");
   if (!source) {
     throw new Error(
       "React Grab could not resolve source context for the selected element",
@@ -62,6 +64,6 @@ export async function captureElementContext(
   return {
     ...(componentName ? { componentName } : {}),
     source,
-    html: captureElementHtml(element),
+    html,
   };
 }

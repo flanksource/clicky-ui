@@ -25,7 +25,9 @@ export function applyFilterExtensions(
 // It is also how a date-range filter is promoted out of the filter list into a
 // bar's trailing range slot, which is why it lives here rather than beside the
 // controls that spread it.
-export function dateRangeFilterProps(filter: FilterBarDateRangeFilter): FilterBarRangeProps {
+export function dateRangeFilterProps(
+  filter: FilterBarDateRangeFilter,
+): FilterBarRangeProps {
   const {
     key: _key,
     kind: _kind,
@@ -53,7 +55,7 @@ export function clearFilterBarFilter(filter: FilterBarFilter) {
     return;
   }
 
-  if (filter.kind === "number") {
+  if (filter.kind === "number" || filter.kind === "duration") {
     filter.onChange({});
     return;
   }
@@ -78,7 +80,10 @@ export function clearFilterBarFilter(filter: FilterBarFilter) {
 
 export function isFilterBarFilterActive(filter: FilterBarFilter) {
   if (filter.kind === "date-range") {
-    return String(filter.from ?? "").trim() !== "" || String(filter.to ?? "").trim() !== "";
+    return (
+      String(filter.from ?? "").trim() !== "" ||
+      String(filter.to ?? "").trim() !== ""
+    );
   }
   if (
     filter.kind === "text" ||
@@ -91,9 +96,10 @@ export function isFilterBarFilterActive(filter: FilterBarFilter) {
   if (filter.kind === "lookup-multi" || filter.kind === "select-multi") {
     return filter.value.length > 0;
   }
-  if (filter.kind === "number") {
+  if (filter.kind === "number" || filter.kind === "duration") {
     return (
-      String(filter.value.min ?? "").trim() !== "" || String(filter.value.max ?? "").trim() !== ""
+      String(filter.value.min ?? "").trim() !== "" ||
+      String(filter.value.max ?? "").trim() !== ""
     );
   }
   if (filter.kind === "boolean") return filter.value;

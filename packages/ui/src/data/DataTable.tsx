@@ -27,6 +27,7 @@ import {
   type FilterBarFilter,
   type FilterBarMultiFilterMode,
   type FilterBarNumberValue,
+  type FilterBarDurationValue,
   type FilterBarProps,
   type FilterBarRangePreset,
   type FilterBarRangeProps,
@@ -40,7 +41,8 @@ import {
 import {
   getFilterCandidate,
   getFilterTokens,
-  prettifyKey,
+  isColumnHideable,
+  labelText,
   resolveColumnValue,
 } from "./data-table-utils";
 import { assertDataTableFilterProps } from "./data-table-server-filters";
@@ -60,17 +62,16 @@ import {
   UiFilterFilled,
   UiFilter,
   UiFullscreen,
-  UiResizeVertical,
-  UiCheck,
-  UiDesktop,
-  UiListDashes,
-  UiListFlat,
-  UiMoon,
   UiArrowLeft,
   UiArrowRight,
-  UiRows,
-  UiSun,
 } from "../icons";
+import { useMediaQuery } from "../hooks/use-media-query";
+import {
+  DensityMenuSection,
+  MenuActionSection,
+  ThemeMenuSection,
+} from "./DataTableMenuSections";
+import { DataTablePreferencesSheet } from "./DataTablePreferencesSheet";
 import { SortableHeader } from "./SortableHeader";
 import { Timestamp } from "./cells/Timestamp";
 import {
@@ -111,6 +112,7 @@ import {
 } from "./DataTable.grouping";
 import { DataTableGroupingControls } from "./DataTableGroupingControls";
 import { SelectionActionBar } from "./SelectionActionBar";
+import { DataTableOverflowCue } from "./DataTableOverflowCue";
 
 export type { TimestampOptions, TagsOptions };
 
@@ -165,7 +167,7 @@ type RowStreamItem<T> =
 
 type GeneratedFilter<T extends Record<string, unknown>> = {
   column: DataTableColumn<T>;
-  kind: "text" | "multi" | "nested-multi" | "number";
+  kind: "text" | "multi" | "nested-multi" | "number" | "duration";
   options: MultiSelectOption[];
   groups?: Array<{
     groupKey: string;
@@ -189,16 +191,6 @@ const COLUMN_WIDTH_STORAGE_PREFIX = "clicky-ui-data-table-column-widths";
 const COLUMN_VISIBILITY_STORAGE_PREFIX =
   "clicky-ui-data-table-column-visibility";
 const DENSITY_STORAGE_PREFIX = "clicky-ui-data-table-density";
-
-const DENSITY_OPTIONS: Array<{
-  value: Density;
-  icon: StaticIconComponent;
-  label: string;
-}> = [
-  { value: "compact", icon: UiRows, label: "Compact" },
-  { value: "comfortable", icon: UiListFlat, label: "Comfortable" },
-  { value: "spacious", icon: UiListDashes, label: "Spacious" },
-];
 
 const DATA_TABLE_HEADER_DENSITY_CLASS =
   "px-2.5 py-1.5 density-compact:px-2 density-compact:py-1 density-comfortable:px-2.5 density-comfortable:py-1.5 density-spacious:px-4 density-spacious:py-3";
@@ -250,6 +242,12 @@ export type DataTableColumn<
   sortable?: boolean;
   /** Enables a generated column filter when `autoFilter` is true. */
   filterable?: boolean;
+  /** Declares a stable bounded control even when the result set is empty. */
+  filterKind?: "number" | "duration";
+  /** Unit of duration values returned by filterValue. */
+  filterUnit?: "ms" | "s" | "m" | "h";
+  /** Unit suffix shown by a numeric bounded control. */
+  numberUnit?: string;
   /** Native server-filter parameter associated with this rendered column. */
   filterKey?: string;
   /** Converts the raw cell value to the exact scalar sent to the native server filter. */
@@ -672,6 +670,9 @@ type DataTableInnerProps<
   scrollContainerClassName?: string;
   /** Generate filters from filterable columns. */
   autoFilter?: boolean;
+  /** Controlled bounded filter selections, e.g. when persisted in the route URL. */
+  boundedFilters?: Record<string, FilterBarDurationValue>;
+  onBoundedFiltersChange?: (filters: Record<string, FilterBarDurationValue>) => void;
   /**
    * Show the built-in global search input. Defaults to `autoFilter` — the box
    * narrows rows client-side, so it only mounts by default where DataTable
@@ -817,6 +818,8 @@ type DataTableInnerProps<
     row: T,
     context: DataTableRowDetailContext<T>,
   ) => ReactNode;
+  /** Render each result as a full-width card while retaining filters and paging. */
+  renderCard?: (row: T) => ReactNode;
   /**
    * How `renderExpandedRow` detail is surfaced when a row is clicked.
    * - "row" (default): expands an inline detail row beneath the clicked row.
@@ -954,6 +957,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   className,
   scrollContainerClassName,
   autoFilter = false,
+  boundedFilters,
+  onBoundedFiltersChange,
   showGlobalFilter,
   manualFilter = false,
   globalFilter,
@@ -987,6 +992,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   isRowClickable,
   getRowHref,
   renderExpandedRow,
+  renderCard,
   detailStyle = "row",
   detailDialogTitle,
   detailDialogSize = "lg",
@@ -1060,13 +1066,18 @@ function DataTableInner<T extends Record<string, unknown>>({
   const [columnMenu, setColumnMenu] = useState<ColumnMenuState | null>(null);
   const [headerFilterMenu, setHeaderFilterMenu] =
     useState<ColumnMenuState | null>(null);
+  const preferencesSheet = useMediaQuery("(max-width: 639px)");
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
   >({});
-  const [numberFilters, setNumberFilters] = useState<
-    Record<string, FilterBarNumberValue>
-  >({});
+  const [numberFilters, setNumberFilters] = useState<Record<string, FilterBarDurationValue>>({});
+  const effectiveNumberFilters = boundedFilters ?? numberFilters;
+  const changeNumberFilter = (key: string, next: FilterBarDurationValue) => {
+    const updated = updateNumberFilterValue(effectiveNumberFilters, key, next);
+    if (boundedFilters) onBoundedFiltersChange?.(updated);
+    else setNumberFilters(updated);
+  };
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [detailRow, setDetailRow] = useState<InternalRow<T> | null>(null);
   const [localGroupingMode, setLocalGroupingMode] = useState<
@@ -1158,15 +1169,25 @@ function DataTableInner<T extends Record<string, unknown>>({
     setHeaderFilterMenu(null);
   }, []);
 
-  useEscapeLayer(Boolean(columnMenu || headerFilterMenu), closeFloatingMenus);
+  // While the column menu is a mobile sheet, the Modal it renders into owns its
+  // own Escape handling and outside-tap dismissal — layering this closer on top
+  // would race it and can close the sheet before Modal's own focus trap settles.
+  const columnMenuIsSheet = Boolean(columnMenu) && preferencesSheet;
+
+  useEscapeLayer(
+    Boolean(columnMenu || headerFilterMenu),
+    closeFloatingMenus,
+    !columnMenuIsSheet,
+  );
 
   useEffect(() => {
     if (!columnMenu && !headerFilterMenu) return;
+    if (columnMenuIsSheet) return;
     document.addEventListener("click", closeFloatingMenus);
     return () => {
       document.removeEventListener("click", closeFloatingMenus);
     };
-  }, [closeFloatingMenus, columnMenu, headerFilterMenu]);
+  }, [closeFloatingMenus, columnMenu, columnMenuIsSheet, headerFilterMenu]);
 
   const rows = useMemo<InternalRow<T>[]>(
     () =>
@@ -1258,7 +1279,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
 
   const showColumnVisibilityControl =
-    hideableColumns && hideableColumnCount > 1;
+    !renderCard && hideableColumns && hideableColumnCount > 1;
   const resolvedShowDensityControl =
     showDensityControl ?? showColumnVisibilityControl;
   const hasMenuActions = Boolean(menuActions && menuActions.length > 0);
@@ -1317,16 +1338,16 @@ function DataTableInner<T extends Record<string, unknown>>({
   );
 
   const generatedFilters = useMemo<GeneratedFilter<T>[]>(() => {
-    if (!autoFilter || loading) return [];
+    if (!autoFilter) return [];
 
     return filterableColumns.map((column) => {
       const numberBounds = getNumericFilterBounds(rows, column);
-      if (numberBounds) {
+      if (column.filterKind || numberBounds) {
         return {
           column,
-          kind: "number" as const,
+          kind: column.filterKind ?? ("number" as const),
           options: [],
-          numberBounds,
+          ...(numberBounds ? { numberBounds } : {}),
         };
       }
 
@@ -1373,7 +1394,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         options,
       };
     });
-  }, [autoFilter, filterableColumns, loading, rows]);
+  }, [autoFilter, filterableColumns, rows]);
 
   // For every multi / nested-multi column (which includes kind:"tags"), expose a
   // TagActions value backed by this table's multiFilters slot. The + / − icons in
@@ -1446,16 +1467,24 @@ function DataTableInner<T extends Record<string, unknown>>({
             groups: filter.groups ?? [],
           };
         }
-        if (filter.kind === "number") {
+        if (filter.kind === "number" || filter.kind === "duration") {
+          if (filter.kind === "duration") {
+            return {
+              key: columnKey,
+              kind: "duration",
+              label: labelText(filter.column),
+              unit: filter.column.filterUnit ?? "ms",
+              value: effectiveNumberFilters[columnKey] ?? {},
+              onChange: (next: FilterBarDurationValue) => changeNumberFilter(columnKey, next),
+            };
+          }
           const numberFilter: Extract<FilterBarFilter, { kind: "number" }> = {
             key: columnKey,
             kind: "number",
             label: labelText(filter.column),
-            value: numberFilters[columnKey] ?? {},
-            onChange: (next: FilterBarNumberValue) =>
-              setNumberFilters((current) =>
-                updateNumberFilterValue(current, columnKey, next),
-              ),
+            value: effectiveNumberFilters[columnKey] ?? {},
+            onChange: (next: FilterBarNumberValue) => changeNumberFilter(columnKey, next),
+            ...(filter.column.numberUnit ? { unit: filter.column.numberUnit } : {}),
           };
           if (filter.numberBounds?.min !== undefined) {
             numberFilter.domainMin = filter.numberBounds.min;
@@ -1479,7 +1508,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             ),
         };
       }),
-    [generatedFilters, multiFilters, numberFilters, textFilters],
+    [generatedFilters, multiFilters, effectiveNumberFilters, textFilters],
   );
   const serverFilterByKey = useMemo(
     () =>
@@ -1666,10 +1695,10 @@ function DataTableInner<T extends Record<string, unknown>>({
           ) {
             return false;
           }
-        } else if (filter.kind === "number") {
-          const range = numberFilters[filter.column.key] ?? {};
-          const min = parseNumberInput(range.min);
-          const max = parseNumberInput(range.max);
+        } else if (filter.kind === "number" || filter.kind === "duration") {
+          const range = effectiveNumberFilters[filter.column.key] ?? {};
+          const min = boundedOperand(range.min, filter.kind === "duration" ? range.minUnit : undefined, filter.column.filterUnit);
+          const max = boundedOperand(range.max, filter.kind === "duration" ? range.maxUnit : undefined, filter.column.filterUnit);
           const hasMin = String(range.min ?? "").trim() !== "";
           const hasMax = String(range.max ?? "").trim() !== "";
 
@@ -1677,7 +1706,8 @@ function DataTableInner<T extends Record<string, unknown>>({
             const values = getFilterNumbers(row, filter.column);
             const matches = values.some(
               (value) =>
-                (min == null || value >= min) && (max == null || value <= max),
+                (min == null || (range.minOperator === ">" ? value > min : value >= min)) &&
+                (max == null || (range.maxOperator === "<" ? value < max : value <= max)),
             );
 
             if (!matches) {
@@ -1717,7 +1747,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     generatedFilters,
     manualFilter,
     multiFilters,
-    numberFilters,
+    effectiveNumberFilters,
     rows,
     textFilters,
     timeRangeColumn,
@@ -2069,6 +2099,7 @@ function DataTableInner<T extends Record<string, unknown>>({
         ) : null}
         {showTablePreferencesControl ? (
           <ColumnVisibilityTrigger
+            opensSheet={preferencesSheet}
             onOpen={(event) => setColumnMenu(menuStateFromTrigger(event))}
           />
         ) : null}
@@ -2188,6 +2219,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     Record<string, number>
   >({});
   const headRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const tableColumnCount = renderCard ? 1 : visibleColumns.length + (rowSelection ? 1 : 0);
   // Hiding or showing a column changes what width the rest should get, so
   // the pins are keyed on the visible set rather than the declared one.
   const visibleColumnKeysSignature = visibleColumns
@@ -2195,7 +2228,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     .join(" ");
 
   useEffect(() => {
-    if (!virtualOptions) {
+    if (!virtualOptions || renderCard) {
       setPinnedColumnWidths({});
       return;
     }
@@ -2227,7 +2260,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       observer.disconnect();
     };
     // Density changes cell padding, so it changes the natural widths too.
-  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density]);
+  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density, renderCard]);
 
   // The virtualizer needs the scroll element during render, before a ref would
   // be attached — hence the state-backed setter — while callers may also have
@@ -2235,6 +2268,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   const composeScrollRef = useCallback(
     (node: HTMLDivElement | null) => {
       virtual.setScrollEl(node);
+      setScrollElement(node);
       if (scrollContainerRef) {
         (scrollContainerRef as { current: HTMLDivElement | null }).current =
           node;
@@ -2294,6 +2328,10 @@ function DataTableInner<T extends Record<string, unknown>>({
     },
     [requestMoreRows, sentinelActive],
   );
+
+  if (renderCard && (renderExpandedRow || rowSelection)) {
+    throw new Error("DataTable card rendering cannot be combined with row detail or row selection");
+  }
 
   const startColumnResize = (
     event: ReactMouseEvent<HTMLElement>,
@@ -2420,6 +2458,38 @@ function DataTableInner<T extends Record<string, unknown>>({
           />
         )}
 
+        {renderCard && !pageLocalSort && effectiveColumns.some((column) => column.sortable !== false) && (
+          <div className="flex shrink-0 items-center gap-2 px-1 text-xs text-muted-foreground">
+            <label className="flex items-center gap-1.5">
+              Sort by
+              <select
+                aria-label="Sort cards by"
+                className="h-7 rounded-md border border-input bg-background px-2 text-foreground"
+                value={sort?.key ?? ""}
+                onChange={(event) => {
+                  const key = event.target.value;
+                  if (!key) onSortChange?.(null);
+                  else if (onSortChange) onSortChange({ key, dir: "asc" });
+                  else toggle(key);
+                }}
+              >
+                <option value="">Default order</option>
+                {effectiveColumns.filter((column) => column.sortable !== false).map((column) => (
+                  <option key={column.key} value={column.key}>{labelText(column)}</option>
+                ))}
+              </select>
+            </label>
+            {sort && (
+              <button type="button" className="h-7 rounded-md border border-input px-2 text-foreground hover:bg-accent"
+                onClick={() => {
+                  if (onSortChange) onSortChange({ key: sort.key, dir: sort.dir === "asc" ? "desc" : "asc" });
+                  else toggle(sort.key);
+                }}
+              >{sort.dir === "asc" ? "Ascending" : "Descending"}</button>
+            )}
+          </div>
+        )}
+
         <div className="relative flex min-h-0 max-w-full flex-1 flex-col">
           {loading && error == null ? (
             <LoadingBar
@@ -2434,6 +2504,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             // parameter is compared by variance rather than structurally. The
             // two shapes are the same object; the cast is what says so.
             ref={composeScrollRef}
+            data-testid="data-table-scroll"
             className={cn(
               "min-h-0 max-w-full flex-1 overflow-auto overscroll-x-contain rounded-md border border-border bg-background",
               scrollContainerClassName,
@@ -2442,7 +2513,7 @@ function DataTableInner<T extends Record<string, unknown>>({
           >
             <table
               className={cn(
-                "w-max min-w-full text-left text-sm",
+                renderCard ? "w-full text-left text-sm" : "w-max min-w-full text-left text-sm",
                 // Only once the widths are pinned: switching to fixed layout
                 // before there is anything to fix them to would collapse every
                 // column to an equal share.
@@ -2451,7 +2522,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   : "table-auto",
               )}
             >
-              <colgroup>
+              {renderCard ? <colgroup><col /></colgroup> : <colgroup>
                 {rowSelection && error == null ? (
                   <col className="w-10" />
                 ) : null}
@@ -2475,7 +2546,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                     }
                   />
                 ))}
-              </colgroup>
+              </colgroup>}
+              {renderCard ? (
+                <thead className="sr-only"><tr><th scope="col">Results</th></tr></thead>
+              ) : (
               <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
                 <tr
                   ref={headRowRef}
@@ -2599,10 +2673,11 @@ function DataTableInner<T extends Record<string, unknown>>({
                   ))}
                 </tr>
               </thead>
+              )}
               <tbody ref={virtual.setTbodyEl}>
                 {error != null ? (
                   <DataTableErrorRow
-                    colSpan={visibleColumns.length}
+                    colSpan={tableColumnCount}
                     error={error}
                   />
                 ) : loading && visibleSorted.length === 0 ? (
@@ -2615,7 +2690,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                 ) : filteredRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      colSpan={tableColumnCount}
                       className="px-4 py-10 text-center text-sm text-muted-foreground"
                     >
                       {emptyMessage}
@@ -2631,7 +2706,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   {virtual.enabled && virtual.spacers.top > 0 && (
                     <tr aria-hidden data-virtual-spacer="top">
                       <td
-                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        colSpan={tableColumnCount}
                         style={{
                           height: virtual.spacers.top,
                           padding: 0,
@@ -2656,12 +2731,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                           {...rowHooks}
                         >
                           <td
-                            colSpan={
-                              visibleColumns.length + (rowSelection ? 1 : 0)
-                            }
+                            colSpan={tableColumnCount}
                             className="bg-muted/40 p-density-3"
                           >
-                            <div className="rounded-md border border-border bg-background p-density-3">
+                            <div className="w-0 min-w-full overflow-x-auto rounded-md border border-border bg-background p-density-3">
                               {item.content}
                             </div>
                           </td>
@@ -2685,9 +2758,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                             ? { metaClassName: effectiveGrouping.metaClassName }
                             : {})}
                           count={item.group.records.length}
-                          colSpan={
-                            visibleColumns.length + (rowSelection ? 1 : 0)
-                          }
+                          colSpan={tableColumnCount}
                           collapsed={item.group.collapsed}
                           onToggleCollapsed={() =>
                             setCollapseStateByMode((current) => ({
@@ -2735,6 +2806,13 @@ function DataTableInner<T extends Record<string, unknown>>({
                       );
                     }
                     const record = item.record;
+                    if (renderCard) {
+                      return (
+                        <tr key={record.id} {...rowHooks} className="align-top">
+                          <td className="border-b border-border/60 p-density-2">{renderCard(record.row)}</td>
+                        </tr>
+                      );
+                    }
                     const href = getRowHref?.(record.row);
                     const expanded = expandedRows[record.id] ?? false;
                     const expandedContent =
@@ -2917,8 +2995,15 @@ function DataTableInner<T extends Record<string, unknown>>({
                                       // reveals the include/exclude buttons.
                                       renderLink({
                                         to: href,
+                                        // A stretched anchor over the whole row would
+                                        // otherwise start a native link drag on
+                                        // pointerdown-and-move, which swallows the
+                                        // horizontal touch pan a wide table needs.
+                                        draggable: false,
+                                        onDragStart: (event) =>
+                                          event.preventDefault(),
                                         className:
-                                          "hover:underline after:absolute after:inset-0 after:content-['']",
+                                          "hover:underline after:absolute after:inset-0 after:content-[''] [-webkit-user-drag:none]",
                                         children: hasCellFilterActions ? (
                                           <span className="relative z-10 inline-flex min-w-0 items-center">
                                             {content}
@@ -2942,7 +3027,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   {virtual.enabled && virtual.spacers.bottom > 0 && (
                     <tr aria-hidden data-virtual-spacer="bottom">
                       <td
-                        colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                        colSpan={tableColumnCount}
                         style={{
                           height: virtual.spacers.bottom,
                           padding: 0,
@@ -2956,7 +3041,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                 {error == null && sentinelActive && (
                   <tr ref={infiniteSentinelRef} aria-hidden>
                     <td
-                      colSpan={visibleColumns.length + (rowSelection ? 1 : 0)}
+                      colSpan={tableColumnCount}
                       className="p-density-2 text-center text-xs text-muted-foreground"
                     >
                       {sentinelLabel}
@@ -2966,6 +3051,7 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tbody>
             </table>
           </div>
+          {!renderCard && <DataTableOverflowCue scroll={scrollElement} />}
         </div>
 
         {renderedFooter !== null && (
@@ -3004,7 +3090,27 @@ function DataTableInner<T extends Record<string, unknown>>({
               : null}
           </Modal>
         )}
-        {columnMenu && showTablePreferencesControl && (
+        {columnMenu && showTablePreferencesControl && preferencesSheet && (
+          <DataTablePreferencesSheet
+            open
+            columns={effectiveColumns}
+            hiddenColumns={hiddenColumns}
+            activeColumnKey={columnMenu.columnKey}
+            actions={menuActions ?? []}
+            showColumnVisibilityControl={showColumnVisibilityControl}
+            showDensityControl={resolvedShowDensityControl}
+            showThemeControl={showThemeControl}
+            themeMenuValue={themeMenuValue}
+            densityOverride={densityOverride}
+            visibleHideableColumnCount={visibleHideableColumnCount}
+            onToggle={toggleColumnVisibility}
+            onShowAll={showAllColumns}
+            onDensityChange={setDensityOverride}
+            {...(onThemeChange ? { onThemeChange } : {})}
+            onClose={() => setColumnMenu(null)}
+          />
+        )}
+        {columnMenu && showTablePreferencesControl && !preferencesSheet && (
           <ColumnVisibilityMenu
             columns={effectiveColumns}
             hiddenColumns={hiddenColumns}
@@ -3255,14 +3361,18 @@ function DataTablePaginationFooter({
     cursor.onCursorChange(cursor.next);
   };
 
+  const compact = useMediaQuery("(max-width: 639px)");
+
   return (
-    <div className="flex min-h-9 shrink-0 flex-row items-stretch gap-3 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div aria-live="polite">{rangeLabel}</div>
-      <div className="flex flex-wrap  items-center gap-2 sm:gap-3">
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground max-sm:flex-nowrap sm:gap-3">
+      <div aria-live="polite" className="min-w-0 truncate whitespace-nowrap">
+        {rangeLabel}
+      </div>
+      <div className="flex items-center gap-2 max-sm:flex-nowrap sm:flex-wrap sm:gap-3">
         <label className="flex items-center gap-1.5">
-          <span>Rows per page</span>
+          <span className="max-sm:sr-only">Rows per page</span>
           <select
-            className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-7"
             value={pageSize}
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
           >
@@ -3275,13 +3385,17 @@ function DataTablePaginationFooter({
         </label>
         {steppable ? (
           <>
-            <span className="min-w-20 text-center">
-              Page {safePage + 1}
-              {totalPages != null ? ` of ${totalPages}` : ""}
+            <span
+              className={cn("text-center", !compact && "min-w-20")}
+              title={`Page ${safePage + 1}${totalPages != null ? ` of ${totalPages}` : ""}`}
+            >
+              {compact
+                ? `${safePage + 1}${totalPages != null ? `/${totalPages}` : ""}`
+                : `Page ${safePage + 1}${totalPages != null ? ` of ${totalPages}` : ""}`}
             </span>
             <button
               type="button"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:h-7 sm:w-7"
               aria-label="Previous page"
               title="Previous page"
               disabled={atFirst}
@@ -3291,7 +3405,7 @@ function DataTablePaginationFooter({
             </button>
             <button
               type="button"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:h-7 sm:w-7"
               aria-label="Next page"
               title="Next page"
               disabled={atLast}
@@ -3602,16 +3716,18 @@ function HeaderFilterMenu({
 }
 
 function ColumnVisibilityTrigger({
+  opensSheet,
   onOpen,
 }: {
+  opensSheet: boolean;
   onOpen: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
       type="button"
       aria-label="Open column menu"
-      aria-haspopup="menu"
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      aria-haspopup={opensSheet ? "dialog" : "menu"}
+      className="inline-flex h-8 w-8 max-sm:h-9 max-sm:w-9 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={(event) => {
         event.stopPropagation();
         onOpen(event);
@@ -3770,298 +3886,6 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
   );
 }
 
-// Groups menu actions by their `section` heading, preserving the order each
-// section first appears. Actions without a section fall under "Download" so the
-// existing download menu is unchanged.
-function groupMenuActions(
-  actions: DataTableMenuAction[],
-): { section: string; actions: DataTableMenuAction[] }[] {
-  const groups: { section: string; actions: DataTableMenuAction[] }[] = [];
-  for (const action of actions) {
-    const section = action.section ?? "Download";
-    let group = groups.find((g) => g.section === section);
-    if (!group) {
-      group = { section, actions: [] };
-      groups.push(group);
-    }
-    group.actions.push(action);
-  }
-  return groups;
-}
-
-function MenuActionSection({
-  actions,
-  separated,
-  onClose,
-}: {
-  actions: DataTableMenuAction[];
-  separated: boolean;
-  onClose: () => void;
-}) {
-  const groups = groupMenuActions(actions);
-  // Which submenu is open, if any. One at a time: hovering a sibling takes the
-  // flyout with it, which is what every menu does and what stops two levels
-  // from being open over each other.
-  const [openSubmenu, setOpenSubmenu] = useState<{
-    id: string;
-    x: number;
-    y: number;
-  } | null>(null);
-
-  return (
-    <>
-      {groups.map((group, index) => (
-        <div
-          key={group.section}
-          className={cn(
-            (separated || index > 0) && "mt-1 border-t border-border pt-1",
-          )}
-        >
-          {group.section && (
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-              {group.section}
-            </div>
-          )}
-          {group.actions.map((action) => (
-            <MenuActionItem
-              key={action.id}
-              action={action}
-              submenu={openSubmenu?.id === action.id ? openSubmenu : null}
-              onOpenSubmenu={setOpenSubmenu}
-              onClose={onClose}
-            />
-          ))}
-        </div>
-      ))}
-    </>
-  );
-}
-
-function MenuActionItem({
-  action,
-  submenu,
-  onOpenSubmenu,
-  onClose,
-}: {
-  action: DataTableMenuAction;
-  submenu: { id: string; x: number; y: number } | null;
-  onOpenSubmenu: (state: { id: string; x: number; y: number } | null) => void;
-  onClose: () => void;
-}) {
-  const hasDescription = Boolean(action.description);
-  const children = action.children ?? [];
-  const isSubmenu = children.length > 0;
-
-  const openFrom = (element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    // Flip to the left when the flyout would run off the right edge, using the
-    // same minimum width the panel below is given.
-    const width = 224;
-    const x =
-      rect.right + width > window.innerWidth ? rect.left - width : rect.right;
-    onOpenSubmenu({ id: action.id, x, y: rect.top });
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        role="menuitem"
-        aria-haspopup={isSubmenu ? "menu" : undefined}
-        aria-expanded={isSubmenu ? submenu != null : undefined}
-        disabled={action.disabled}
-        className={cn(
-          "flex w-full gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-          hasDescription ? "items-start" : "items-center",
-          action.disabled && "cursor-not-allowed opacity-50",
-          submenu && "bg-accent text-accent-foreground",
-        )}
-        onClick={(event) => {
-          if (action.disabled) return;
-          // Click, never hover: a flyout that opens on the way past is one the
-          // user did not ask for, and it covers the rows they were reaching for.
-          if (isSubmenu) {
-            if (submenu) onOpenSubmenu(null);
-            else openFrom(event.currentTarget);
-            return;
-          }
-          action.onSelect();
-          onClose();
-        }}
-      >
-        {action.icon && (
-          <Icon
-            icon={action.icon}
-            className={cn(
-              "shrink-0 text-sm",
-              hasDescription && "mt-0.5",
-              action.iconClassName ?? "text-muted-foreground",
-            )}
-          />
-        )}
-        <span className="min-w-0 flex-1">
-          <span className={cn(hasDescription && "font-medium")}>
-            {action.label}
-          </span>
-          {action.description && (
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {action.description}
-            </span>
-          )}
-        </span>
-        {isSubmenu && (
-          <Icon
-            icon={UiChevronRight}
-            className="shrink-0 text-sm text-muted-foreground"
-          />
-        )}
-      </button>
-
-      {isSubmenu && submenu && (
-        <div
-          role="menu"
-          aria-label={
-            typeof action.label === "string" ? action.label : "Submenu"
-          }
-          className="fixed z-50 max-h-[calc(100vh-1rem)] min-w-[14rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
-          style={{ left: submenu.x, top: submenu.y }}
-        >
-          {children.map((child) => (
-            <MenuActionItem
-              key={child.id}
-              action={child}
-              submenu={null}
-              onOpenSubmenu={onOpenSubmenu}
-              onClose={onClose}
-            />
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-function DensityMenuSection({
-  densityOverride,
-  separated,
-  onDensityChange,
-}: {
-  densityOverride: Density | undefined;
-  separated: boolean;
-  onDensityChange: (density: Density | undefined) => void;
-}) {
-  const current = densityOverride ?? "inherit";
-
-  return (
-    <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
-      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-        Density
-      </div>
-      <button
-        type="button"
-        role="menuitemradio"
-        aria-checked={current === "inherit"}
-        className={densityMenuItemClassName(current === "inherit")}
-        onClick={() => onDensityChange(undefined)}
-      >
-        <Icon
-          icon={UiResizeVertical}
-          className="text-sm text-muted-foreground"
-        />
-        <span className="min-w-0 flex-1 truncate">Use page density</span>
-        {current === "inherit" ? (
-          <Icon icon={UiCheck} className="text-sm text-foreground" />
-        ) : (
-          <span className="inline-block h-4 w-4" aria-hidden />
-        )}
-      </button>
-      {DENSITY_OPTIONS.map((option) => {
-        const active = current === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="menuitemradio"
-            aria-checked={active}
-            className={densityMenuItemClassName(active)}
-            onClick={() => onDensityChange(option.value)}
-          >
-            <Icon
-              icon={option.icon}
-              className="text-sm text-muted-foreground"
-            />
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>
-            {active ? (
-              <Icon icon={UiCheck} className="text-sm text-foreground" />
-            ) : (
-              <span className="inline-block h-4 w-4" aria-hidden />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function densityMenuItemClassName(active: boolean) {
-  return cn(
-    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none",
-    active && "text-foreground",
-  );
-}
-
-const THEME_MENU_OPTIONS: Array<{
-  value: Theme;
-  icon: StaticIconComponent;
-  label: string;
-}> = [
-  { value: "system", icon: UiDesktop, label: "Use system theme" },
-  { value: "light", icon: UiSun, label: "Light" },
-  { value: "dark", icon: UiMoon, label: "Dark" },
-];
-
-function ThemeMenuSection({
-  value,
-  separated,
-  onChange,
-}: {
-  value: Theme;
-  separated: boolean;
-  onChange: (theme: Theme) => void;
-}) {
-  return (
-    <div className={cn(separated && "mt-1 border-t border-border pt-1")}>
-      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-        Theme
-      </div>
-      {THEME_MENU_OPTIONS.map((option) => {
-        const active = value === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="menuitemradio"
-            aria-checked={active}
-            className={densityMenuItemClassName(active)}
-            onClick={() => onChange(option.value)}
-          >
-            <Icon
-              icon={option.icon}
-              className="text-sm text-muted-foreground"
-            />
-            <span className="min-w-0 flex-1 truncate">{option.label}</span>
-            {active ? (
-              <Icon icon={UiCheck} className="text-sm text-foreground" />
-            ) : (
-              <span className="inline-block h-4 w-4" aria-hidden />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function CellContent<T extends Record<string, unknown>>({
   column,
   children,
@@ -4188,13 +4012,18 @@ function pruneNumberFilterState(
   state: Record<string, FilterBarNumberValue>,
   filters: GeneratedFilter<any>[],
 ) {
-  return pruneFilterState(
-    state,
-    filters,
-    "number",
-    (value) =>
-      !String(value.min ?? "").trim() && !String(value.max ?? "").trim(),
+  const allowed = new Set(filters.filter((filter) => filter.kind === "number" || filter.kind === "duration").map((filter) => filter.column.key));
+  return Object.fromEntries(
+    Object.entries(state).filter(([key, value]) => allowed.has(key) && (String(value.min ?? "").trim() || String(value.max ?? "").trim())),
   );
+}
+
+const durationUnitMs = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000 };
+
+function boundedOperand(value: unknown, selectedUnit?: "ms" | "s" | "m" | "h", storageUnit?: "ms" | "s" | "m" | "h"): number | null {
+  const parsed = parseNumberInput(value);
+  if (parsed == null) return null;
+  return parsed * durationUnitMs[selectedUnit ?? storageUnit ?? "ms"] / durationUnitMs[storageUnit ?? "ms"];
 }
 
 function pruneFilterState<T>(
@@ -4342,19 +4171,6 @@ function applyKindDefaults<T extends Record<string, unknown>>(
   }
 
   return column;
-}
-
-function labelText<T extends Record<string, unknown>>(
-  column: DataTableColumn<T>,
-) {
-  if (typeof column.label === "string") return column.label;
-  return prettifyKey(column.key.split(".").at(-1) ?? column.key);
-}
-
-function isColumnHideable<T extends Record<string, unknown>>(
-  column: DataTableColumn<T>,
-) {
-  return column.hideable !== false;
 }
 
 function menuStateFromPointer(
@@ -4830,7 +4646,7 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       data-theme={resolvedTheme}
-      className={cn("flex min-h-0 flex-col text-foreground", className)}
+      className={cn("flex min-h-0 flex-1 flex-col text-foreground", className)}
     >
       {renderTable({ inFullscreen: false })}
       {showFullscreenControl && (

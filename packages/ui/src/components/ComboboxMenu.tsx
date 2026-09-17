@@ -145,6 +145,7 @@ export function ComboboxMenu({
                     }
                     onModeChange={(next) => onSetMode(option.value, next)}
                     className="w-full justify-between"
+                    {...(option.count !== undefined ? { count: option.count } : {})}
                   />
                   <ComboboxOptionDescription description={option.description} />
                 </div>

@@ -106,6 +106,7 @@ export function App() {
               }
               onReviewExit={() => navigateRoute(standardRoute(route.page))}
               onCommentAndReopen={comments.commentAndReopen}
+              onPrepareCommentSelection={comments.prepareSelection}
             />
           </CommentProvider>
         </RouterProvider>

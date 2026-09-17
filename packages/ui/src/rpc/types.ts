@@ -1,5 +1,6 @@
 import type { ClickyNode } from "../data/Clicky";
 import type { TimeRangePresetGroup } from "../components/TimeRange";
+import type { CronSuggestion } from "../components/schedule-types";
 
 export type OperationRequestValues = Record<string, string | string[]>;
 
@@ -119,6 +120,8 @@ export interface ClickyParameterLookup {
 export interface ClickyFilterShape {
   label?: string;
   type?: OperationLookupFilterType;
+  unit?: string;
+  defaultOperator?: ">" | ">=" | "<" | "<=";
   multi?: boolean;
 }
 
@@ -223,6 +226,12 @@ export interface ClickyOperationMeta {
   group?: string;
   toolHints?: ClickyToolHints;
   export?: ClickyExportMeta;
+  schedule?: ClickyScheduleMeta;
+}
+
+export interface ClickyScheduleMeta {
+  suggestions?: CronSuggestion[];
+  timeout?: number;
 }
 
 export interface ClickyExportMeta {
@@ -284,16 +293,22 @@ export interface OperationLookupFilter {
   truncated?: boolean;
   /** True distinct count behind a truncated option set; drives "… and N more". */
   total?: number;
+  /**
+   * Per-value row counts, keyed the same as `options`. A value absent from
+   * this map is a value the source did not count — never rendered as zero —
+   * and the whole field is omitted when the source doesn't count at all.
+   */
+  counts?: Record<string, number>;
   presets?: Array<
     { label: string; from: string; to: string } | TimeRangePresetGroup
   >;
   timeEnabled?: boolean;
   timeZone?: string;
   timeZones?: string[];
-  /** The unit a "duration" filter's operands are written in ("ms" or "s"), so
-   *  the control labels itself in the numbers the column is stored in. Absent
-   *  means milliseconds. */
+  /** Unit used by numeric values. For durations this is the storage unit
+   *  ("ms", "s", "m", or "h"); absent duration units mean milliseconds. */
   unit?: string;
+  defaultOperator?: ">" | ">=" | "<" | "<=";
 }
 
 export interface OperationLookupResponse {

@@ -119,10 +119,7 @@ export function withSandboxMode(
 ): AISpecRuntimeValue {
   const current = sandboxRef(value);
   if (current.mode === mode) return value;
-  if (mode === "off") return withRoot(value, { sandbox: { mode } });
-  return withRoot(value, {
-    sandbox: { mode, ...(current.approval ? { approval: current.approval } : {}) },
-  });
+  return withRoot(value, { sandbox: { mode } });
 }
 
 export function withSandboxBackend(
@@ -147,14 +144,21 @@ export function withSandboxAgent(
   return withRoot(value, { sandbox: next });
 }
 
-export function withSandboxApproval(
+// The base posture is independent of the sandbox (see AISpecRuntimePermissions
+// doc comment), so unlike sandbox settings it deletes cleanly to Unspecified
+// without needing a mode to be configured first.
+export function withPermissionMode(
   value: AISpecRuntimeValue,
-  approval: SpecPermissionMode,
+  mode: SpecPermissionMode | undefined,
 ): AISpecRuntimeValue {
-  if (sandboxRef(value).mode === "off") {
-    throw new Error("sandbox mode off does not accept approval");
+  const next = { ...value.permissions } as AISpecRuntimePermissions;
+  if (mode) next.mode = mode;
+  else delete next.mode;
+  if (Object.keys(next).length === 0) {
+    const { permissions: _permissions, ...rest } = value;
+    return rest as AISpecRuntimeValue;
   }
-  return withSandbox(value, { approval });
+  return withRoot(value, { permissions: next });
 }
 
 export function withSandboxPolicy(

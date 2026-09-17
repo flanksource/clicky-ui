@@ -33,6 +33,12 @@ export type MultiSelectOption = {
   disabled?: boolean;
   /** Optional browser tooltip for truncated or explanatory labels. */
   title?: string;
+  /**
+   * Row count behind this option (e.g. a facet's per-value count). Consumers
+   * render it where it fits their layout — a trailing badge, a pill count —
+   * rather than this component drawing it itself.
+   */
+  count?: number;
 };
 
 export type MultiSelectProps = {

@@ -17,6 +17,7 @@ interface GraphPanelProps {
   languageId: string;
   /** Writes an expression at the source editor's cursor. */
   onInsert: (expression: string) => void;
+  formatPath?: (segments: Array<string | number>) => string | null;
 }
 
 /**
@@ -31,6 +32,7 @@ export function GraphPanel({
   document,
   languageId,
   onInsert,
+  formatPath,
 }: GraphPanelProps) {
   const [selectedId, setSelectedId] = useState<string>();
   const [note, setNote] = useState<string>();
@@ -64,7 +66,7 @@ export function GraphPanel({
       setNote("That row has no addressable path.");
       return;
     }
-    const expression = pathExpression(languageId, segments);
+    const expression = formatPath ? formatPath(segments) : pathExpression(languageId, segments);
     if (expression === null) {
       setNote(
         "A go template reaches a list element or a non-identifier key through `index`, " +

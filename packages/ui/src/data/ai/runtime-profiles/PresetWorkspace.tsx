@@ -21,8 +21,9 @@ import { ToolSchemaBrowser } from "../ToolSchemaBrowser";
 import { referencedBy, uniqueName } from "../../../lib/runtime-profile-model";
 import { PermissionStrategiesEditor } from "./PermissionStrategiesEditor";
 import { PresetSpecEditor } from "./PresetSpecEditor";
+import { ResolutionInspector } from "./ResolutionInspector";
 import { RuntimeLibraryList } from "./RuntimeLibraryList";
-import type { RuntimeRecordMeta } from "./types";
+import type { RuntimeProfileResolutionState, RuntimeRecordMeta } from "./types";
 
 type PresetTab = "behavior" | "permissions";
 
@@ -35,6 +36,7 @@ export function PresetWorkspace({
   presets,
   profiles,
   selectedId,
+  resolution,
   tools,
   effectivePermissions,
   families,
@@ -50,6 +52,7 @@ export function PresetWorkspace({
   presets: RuntimePreset[];
   profiles: RuntimeProfile[];
   selectedId: string | undefined;
+  resolution: RuntimeProfileResolutionState;
   tools: ToolMeta[];
   effectivePermissions: Record<string, ToolPolicy>;
   families: SpecRuntimeFamily[];
@@ -66,7 +69,7 @@ export function PresetWorkspace({
   const preset = presets.find((item) => item.id === selectedId);
 
   return (
-    <div className="grid min-h-0 items-start gap-4 xl:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="grid min-h-0 items-start gap-4 xl:grid-cols-[14rem_minmax(30rem,0.9fr)_minmax(36rem,1.1fr)]">
       <RuntimeLibraryList
         title="Presets"
         items={presets.map((item) => ({
@@ -96,11 +99,11 @@ export function PresetWorkspace({
           {tab === "behavior" ? (
             <div className="p-4">
               <div className="mb-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-muted-foreground">
-                Presets contain reusable global behavior, sandbox, permissions,
-                environment references, and checkout behavior. Runtime catalog
-                availability belongs to Captain&apos;s Whoami configuration;
-                prompt, verification, and checkout location belong to a profile
-                run spec.
+                Presets contain a complete reusable task spec, including
+                prompts, verification, checkout, sandbox, environment, and
+                permissions. Nested preset references are stored by the API but
+                intentionally not authored here until their resolution semantics
+                land.
               </div>
               <PresetSpecEditor
                 value={preset.spec}
@@ -153,6 +156,10 @@ export function PresetWorkspace({
           Create a preset to begin.
         </p>
       )}
+      <ResolutionInspector
+        request={{ selected: preset ? [preset.id] : [], presets }}
+        state={resolution}
+      />
     </div>
   );
 }

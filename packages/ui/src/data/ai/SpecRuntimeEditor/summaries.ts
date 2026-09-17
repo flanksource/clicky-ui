@@ -1,5 +1,6 @@
 import type { ChatModel } from "../../chat/types";
 import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
+import { UNSPECIFIED_LABEL } from "../../runtime/unspecified";
 import { checkoutMode, commitPhase, worktreeMode } from "./update";
 import { isDenyMode, type PermissionListEntry } from "./permissions-model";
 
@@ -13,7 +14,7 @@ export function summarizeModel(
     parts.push(models.find((m) => m.id === model)?.label ?? model);
   }
   if (value.effort) parts.push(value.effort);
-  return parts.length > 0 ? parts.join(" · ") : "Default model";
+  return parts.length > 0 ? parts.join(" · ") : UNSPECIFIED_LABEL;
 }
 
 export function summarizePrompt(value: AISpecRuntimeValue): string {

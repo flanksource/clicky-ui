@@ -2,6 +2,7 @@ import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type {
   ResolvedRuntimeProfile,
   RuntimePreset,
+  RuntimePresetResolveRequest,
   RuntimeProfile,
   RuntimeProfileResolveRequest,
 } from "../runtime-profile";
@@ -13,7 +14,12 @@ export type RuntimePermissionTarget = {
 };
 
 export type RuntimeProfilesClient = {
-  resolve: (
+  resolvePresets: (
+    request: RuntimePresetResolveRequest,
+    signal?: AbortSignal,
+  ) => Promise<ResolvedRuntimeProfile>;
+  /** @deprecated Runtime profile resolution is a warning-only no-op. */
+  resolve?: (
     request: RuntimeProfileResolveRequest,
     signal?: AbortSignal,
   ) => Promise<ResolvedRuntimeProfile>;

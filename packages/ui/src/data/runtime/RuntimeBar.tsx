@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
+import { withBudgetLimit, type RuntimeBarBudget } from "./RuntimeBar.limits";
 import { applyRuntimeMode, runtimeModelForValue } from "./RuntimeBar.model";
 import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import { RuntimeBarSegments } from "./RuntimeBarSegments";
@@ -21,6 +22,8 @@ import {
 
 export type RuntimeBarValue = ChatModelRuntime & {
   cliArgs?: Record<string, unknown>;
+  /** Run limits edited by the opt-in timeout and max cost segments. */
+  budget?: RuntimeBarBudget;
 };
 
 export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
@@ -44,6 +47,16 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   showModel?: boolean | undefined;
   /** Whether the selected runtime exposes reasoning effort. */
   showEffort?: boolean | undefined;
+  /** Opt-in `budget.timeout` segment; segmented variant only. */
+  showTimeout?: boolean | undefined;
+  /** Opt-in `budget.cost` segment; segmented variant only. */
+  showCost?: boolean | undefined;
+  /**
+   * Trailing section fused onto the bar's border, for settings that belong to
+   * the surrounding spec rather than this runtime row (see `RuntimeBarActions`).
+   * Segmented variant only — the combo variant has no segment chrome to fuse to.
+   */
+  actions?: ReactNode | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
 };
@@ -61,9 +74,18 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   locked = false,
   showModel = true,
   showEffort = true,
+  showTimeout = false,
+  showCost = false,
+  actions,
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
+  if (variant === "combo" && (showTimeout || showCost)) {
+    throw new Error("RuntimeBar: showTimeout and showCost require the segmented variant");
+  }
+  if (variant === "combo" && actions) {
+    throw new Error("RuntimeBar: actions require the segmented variant");
+  }
   const [preference, setPreference] = useState<{
     model: string | undefined;
     family: string | undefined;
@@ -98,6 +120,16 @@ export function RuntimeBar<T extends RuntimeBarValue>({
     resolvedModel,
     reasoningEfforts,
   );
+  // The name an Unspecified model would resolve to, so the picker can say what
+  // it inherits instead of leaving the operator guessing.
+  const inheritedModelLabel =
+    value.model || value.id
+      ? undefined
+      : (runtimeModelForValue(
+          models,
+          effectiveModel !== undefined ? { model: effectiveModel } : {},
+          isSelectableModel,
+        )?.label ?? effectiveModel);
 
   const applyMode = (familyId: string, modeId: string) => {
     setPreference({ model: effectiveModel, family: familyId });
@@ -145,6 +177,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
         models={modelOptions}
         selectedModel={resolvedModel}
         selectedModelUnavailable={selectedModelUnavailable}
+        inheritedModelLabel={inheritedModelLabel}
         supportedEfforts={supportedEfforts}
         locked={locked}
         showModel={showModel}
@@ -167,6 +200,7 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       modelOptions={modelOptions}
       resolvedModel={resolvedModel}
       selectedModelUnavailable={selectedModelUnavailable}
+      inheritedModelLabel={inheritedModelLabel}
       families={families}
       family={family}
       mode={mode}
@@ -176,6 +210,9 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       locked={locked}
       showModel={showModel}
       showEffort={showEffort}
+      showTimeout={showTimeout}
+      showCost={showCost}
+      actions={actions}
       ariaLabel={ariaLabel}
       className={className}
       onModeChange={applyMode}
@@ -183,6 +220,8 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       onModelSelect={applyModel}
       onModelClear={clearModel}
       onEffortChange={applyEffort}
+      onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
+      onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
     />
   );
 }

@@ -18,6 +18,12 @@ import {
   type SpecRuntimeFamily,
   type SpecRuntimeModeOption,
 } from "./runtime-mode";
+import {
+  UNSPECIFIED_ID,
+  UNSPECIFIED_LABEL,
+  UNSPECIFIED_NAME,
+  unspecifiedHint,
+} from "./unspecified";
 
 export type RuntimeBarComboProps = {
   value: RuntimeBarValue;
@@ -28,6 +34,8 @@ export type RuntimeBarComboProps = {
   models: ChatModel[];
   selectedModel: ChatModel | undefined;
   selectedModelUnavailable: boolean;
+  /** Display name of the model this layer would inherit when unspecified. */
+  inheritedModelLabel?: string | undefined;
   supportedEfforts: string[];
   locked: boolean;
   showModel: boolean;
@@ -50,6 +58,7 @@ export function RuntimeBarCombo({
   models,
   selectedModel,
   selectedModelUnavailable,
+  inheritedModelLabel,
   supportedEfforts,
   locked,
   showModel,
@@ -66,13 +75,15 @@ export function RuntimeBarCombo({
   const modelLabel = showModel
     ? selectedModelUnavailable
       ? "Unavailable selection"
-      : (selectedModel?.label ?? value.model ?? "Prompt default")
+      : (selectedModel?.label ?? value.model ?? UNSPECIFIED_LABEL)
     : `${family.label} ${mode.label}`;
-  const effortLabel = value.effort ? effortLevelLabel(value.effort) : "None";
+  const effortLabel = value.effort
+    ? effortLevelLabel(value.effort)
+    : UNSPECIFIED_LABEL;
   const effortIcon = value.effort ? effortLevelIcon(value.effort) : undefined;
   const summaryParts = [family.label, mode.label];
-  if (showModel) summaryParts.push(modelLabel);
-  if (showEffort) summaryParts.push(`effort ${effortLabel}`);
+  if (showModel) summaryParts.push(modelLabel === UNSPECIFIED_LABEL ? UNSPECIFIED_NAME : modelLabel);
+  if (showEffort) summaryParts.push(`effort ${value.effort ? effortLabel : UNSPECIFIED_NAME}`);
   const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and mode are locked for this conversation; fork it to change them" : ""}`;
 
   return (
@@ -155,6 +166,7 @@ export function RuntimeBarCombo({
               models={models}
               familyBrand={brand}
               selectedId={selectedModel?.id ?? value.model}
+              inheritedModelLabel={inheritedModelLabel}
               locked={locked}
               onSelect={onModelSelect}
               onClear={onModelClear}
@@ -237,6 +249,7 @@ function ModelChoices({
   models,
   familyBrand,
   selectedId,
+  inheritedModelLabel,
   locked,
   onSelect,
   onClear,
@@ -244,6 +257,7 @@ function ModelChoices({
   models: ChatModel[];
   familyBrand: ReturnType<typeof runtimeFamilyBrand>;
   selectedId?: string | undefined;
+  inheritedModelLabel?: string | undefined;
   locked: boolean;
   onSelect: (model: ChatModel) => void;
   onClear: () => void;
@@ -251,7 +265,8 @@ function ModelChoices({
   return (
     <div className="space-y-0.5 py-1">
       <ModelChoice
-        label="Prompt default"
+        label={UNSPECIFIED_LABEL}
+        detail={unspecifiedHint(inheritedModelLabel)}
         selected={!selectedId}
         disabled={locked}
         onClick={onClear}
@@ -359,15 +374,15 @@ function EffortSlider({
     );
   }
 
-  const options = ["", ...supported];
-  const current = value?.trim() ?? "";
+  const options = [UNSPECIFIED_ID, ...supported];
+  const current = value?.trim() ?? UNSPECIFIED_ID;
   const currentIndex = options.indexOf(current);
   const sliderIndex = currentIndex >= 0 ? currentIndex : 0;
   const label =
     currentIndex >= 0
       ? current
         ? effortLevelLabel(current)
-        : "None"
+        : UNSPECIFIED_LABEL
       : `${effortLevelLabel(current)} unsupported`;
   const percent = (sliderIndex / (options.length - 1)) * 100;
   const firstIcon = effortLevelIcon(supported[0]!);

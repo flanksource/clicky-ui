@@ -10,6 +10,7 @@ import {
   COMBOBOX_MOBILE_QUERY,
   type ComboboxMenuPosition,
 } from "../lib/combobox";
+import { mediaMatches } from "../hooks/use-media-query";
 
 export function useComboboxLabelWidth(
   label: ReactNode,
@@ -39,7 +40,7 @@ export function useComboboxMenuPosition(
       anchor: anchor.getBoundingClientRect(),
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
-      mobile: window.matchMedia(COMBOBOX_MOBILE_QUERY).matches,
+      mobile: mediaMatches(COMBOBOX_MOBILE_QUERY),
       ...(listRef.current
         ? { naturalHeight: listRef.current.scrollHeight }
         : {}),

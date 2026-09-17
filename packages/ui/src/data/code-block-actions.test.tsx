@@ -53,6 +53,14 @@ describe("CodeBlockActions", () => {
       expect(downloadName).toBe("snippet.yaml");
     });
 
+    it("uses the caller's filename when the file has a meaning of its own", () => {
+      render(
+        <CodeBlockActions source="<deadlock/>" language="xml" downloadable downloadFilename="deadlock-1.xdl" />,
+      );
+      fireEvent.click(screen.getByLabelText("Download code"));
+      expect(downloadName).toBe("deadlock-1.xdl");
+    });
+
     it("falls back to a .txt extension for an unknown language", () => {
       render(<CodeBlockActions source="plain" downloadable />);
       fireEvent.click(screen.getByLabelText("Download code"));

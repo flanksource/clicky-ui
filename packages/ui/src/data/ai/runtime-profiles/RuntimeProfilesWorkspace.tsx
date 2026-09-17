@@ -1,7 +1,3 @@
-import {
-  SegmentedControl,
-  type SegmentedOption,
-} from "../../../components/SegmentedControl";
 import { cn } from "../../../lib/utils";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type { RuntimePreset, RuntimeProfile } from "../runtime-profile";
@@ -10,15 +6,12 @@ import type {
   SpecRuntimeSecretSelectorConfig,
 } from "../SpecRuntimeEditor/types";
 import {
-  authoredRuntimeSpec,
   duplicateRecord,
   newPresetRecord,
-  newProfileRecord,
   referencedBy,
   selectionAfterDelete,
 } from "../../../lib/runtime-profile-model";
 import { PresetWorkspace } from "./PresetWorkspace";
-import { ProfileWorkspace } from "./ProfileWorkspace";
 import { RuntimePersistenceBar } from "./RuntimePersistenceBar";
 import { RuntimeStatusNotice } from "./RuntimeStatusNotice";
 import type {
@@ -29,12 +22,7 @@ import type {
   RuntimeRecordMeta,
 } from "./types";
 import { useRuntimePermissionCatalog } from "./use-permission-catalog";
-import { useRuntimeProfileResolution } from "./use-resolution";
-
-const VIEW_OPTIONS: SegmentedOption<RuntimeProfilesView>[] = [
-  { id: "profiles", label: "Profiles" },
-  { id: "presets", label: "Presets" },
-];
+import { useRuntimePresetResolution } from "./use-resolution";
 
 export type RuntimeProfilesWorkspaceProps = {
   presets: RuntimePreset[];
@@ -59,12 +47,8 @@ export type RuntimeProfilesWorkspaceProps = {
 export function RuntimeProfilesWorkspace({
   presets,
   profiles,
-  view,
-  onViewChange,
   selectedPresetId,
-  selectedProfileId,
   onSelectPreset,
-  onSelectProfile,
   store,
   client,
   families,
@@ -75,27 +59,22 @@ export function RuntimeProfilesWorkspace({
   newId = () => crypto.randomUUID(),
   className,
 }: RuntimeProfilesWorkspaceProps) {
-  const selectedProfile = profiles.find(
-    (profile) => profile.id === selectedProfileId,
+  const selectedPreset = presets.find(
+    (preset) => preset.id === selectedPresetId,
   );
-  const resolution = useRuntimeProfileResolution(
+  const resolution = useRuntimePresetResolution(
     client,
-    selectedProfile,
+    selectedPreset,
     presets,
   );
   const effectiveRuntime =
-    resolution.result?.resolved.spec ??
-    authoredRuntimeSpec(selectedProfile, presets);
+    resolution.result?.resolved.spec ?? selectedPreset?.spec ?? {};
   const permissionCatalog = useRuntimePermissionCatalog(
     client,
     effectiveRuntime,
     families,
   );
 
-  const addProfile = (profile: RuntimeProfile) => {
-    store.createProfile(profile);
-    onSelectProfile(profile.id);
-  };
   const addPreset = (preset: RuntimePreset) => {
     store.createPreset(preset);
     onSelectPreset(preset.id);
@@ -112,20 +91,11 @@ export function RuntimeProfilesWorkspace({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <div className="flex flex-wrap items-center gap-density-3">
-        <SegmentedControl
-          aria-label="Runtime library view"
-          value={view}
-          options={VIEW_OPTIONS}
-          onChange={onViewChange}
-        />
-        {persistence && (
-          <RuntimePersistenceBar
-            persistence={persistence}
-            className="ml-auto"
-          />
-        )}
-      </div>
+      {persistence && (
+        <div className="flex justify-end">
+          <RuntimePersistenceBar persistence={persistence} />
+        </div>
+      )}
       <RuntimeStatusNotice
         status={permissionCatalog.status}
         loadingText="Loading Tool, MCP, Plugin, and Skill permissions from Captain…"
@@ -133,49 +103,23 @@ export function RuntimeProfilesWorkspace({
         onRetry={permissionCatalog.retry}
         retryLabel="Retry permissions"
       />
-      {view === "profiles" ? (
-        <ProfileWorkspace
-          presets={presets}
-          profiles={profiles}
-          selectedId={selectedProfileId}
-          resolution={resolution}
-          effectiveRuntime={effectiveRuntime}
-          permissionCatalog={permissionCatalog.catalog}
-          families={families}
-          sandboxCatalog={sandboxCatalog}
-          secretSelector={secretSelector}
-          recordMeta={recordMeta}
-          onSelect={onSelectProfile}
-          onCreate={() => addProfile(newProfileRecord(profiles, newId()))}
-          onDuplicate={(id) =>
-            addProfile(duplicateRecord(profiles, id, newId()))
-          }
-          onDelete={(id) => {
-            store.deleteProfile(id);
-            onSelectProfile(
-              selectionAfterDelete(profiles, id, selectedProfileId),
-            );
-          }}
-          onChange={store.updateProfile}
-        />
-      ) : (
-        <PresetWorkspace
-          presets={presets}
-          profiles={profiles}
-          selectedId={selectedPresetId}
-          tools={resolution.result?.tools ?? []}
-          effectivePermissions={resolution.result?.permissions ?? {}}
-          families={families}
-          sandboxCatalog={sandboxCatalog}
-          secretSelector={secretSelector}
-          recordMeta={recordMeta}
-          onSelect={onSelectPreset}
-          onCreate={() => addPreset(newPresetRecord(presets, newId()))}
-          onDuplicate={(id) => addPreset(duplicateRecord(presets, id, newId()))}
-          onDelete={deletePreset}
-          onChange={store.updatePreset}
-        />
-      )}
+      <PresetWorkspace
+        presets={presets}
+        profiles={profiles}
+        selectedId={selectedPresetId}
+        resolution={resolution}
+        tools={resolution.result?.tools ?? []}
+        effectivePermissions={resolution.result?.permissions ?? {}}
+        families={families}
+        sandboxCatalog={sandboxCatalog}
+        secretSelector={secretSelector}
+        recordMeta={recordMeta}
+        onSelect={onSelectPreset}
+        onCreate={() => addPreset(newPresetRecord(presets, newId()))}
+        onDuplicate={(id) => addPreset(duplicateRecord(presets, id, newId()))}
+        onDelete={deletePreset}
+        onChange={store.updatePreset}
+      />
     </div>
   );
 }

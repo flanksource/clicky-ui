@@ -153,36 +153,38 @@ function WorkspacePaneView({
         pane.className,
       )}
     >
-      <header
-        className={cn(
-          "flex h-9 shrink-0 items-center gap-1 border-b border-border bg-muted/40 px-2",
-          compact && "h-auto min-h-12 flex-col px-1 py-2",
-        )}
-      >
-        {pane.collapsible === false ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            {headerContent}
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={cn(
-              "flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              compact && "flex-col",
-            )}
-            aria-expanded={!collapsed}
-            aria-label={`${collapsed ? "Expand" : "Collapse"} ${typeof pane.label === "string" ? pane.label : pane.id}`}
-            onClick={onToggle}
-          >
-            {headerContent}
-          </button>
-        )}
-        {!compact && pane.slots?.headerTrailing && (
-          <div className="flex shrink-0 items-center gap-1">
-            {pane.slots.headerTrailing}
-          </div>
-        )}
-      </header>
+      {pane.showHeader !== false ? (
+        <header
+          className={cn(
+            "flex h-9 shrink-0 items-center gap-1 border-b border-border bg-muted/40 px-2",
+            compact && "h-auto min-h-12 flex-col px-1 py-2",
+          )}
+        >
+          {pane.collapsible === false ? (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              {headerContent}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                compact && "flex-col",
+              )}
+              aria-expanded={!collapsed}
+              aria-label={`${collapsed ? "Expand" : "Collapse"} ${typeof pane.label === "string" ? pane.label : pane.id}`}
+              onClick={onToggle}
+            >
+              {headerContent}
+            </button>
+          )}
+          {!compact && pane.slots?.headerTrailing && (
+            <div className="flex shrink-0 items-center gap-1">
+              {pane.slots.headerTrailing}
+            </div>
+          )}
+        </header>
+      ) : null}
       {!collapsed && (
         <div
           className={cn(

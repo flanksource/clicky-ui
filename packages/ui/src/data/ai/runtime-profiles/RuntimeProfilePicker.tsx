@@ -9,16 +9,9 @@ import {
 } from "../../../components/SegmentedControl";
 import { UiFilePlus, UiGitMerge, UiLayers, UiSave } from "../../../icons";
 import { Icon } from "../../Icon";
-import type {
-  ResolvedRuntimeSpec,
-  RuntimePreset,
-  RuntimeProfile,
-} from "../runtime-profile";
-import { Disclosure } from "../SpecRuntimeEditor/fields";
-import type { AISpecRuntimeSpec } from "../SpecRuntimeEditor.model";
-import { uniqueName } from "../../../lib/runtime-profile-model";
-import { OrderedPresetSelect } from "./OrderedPresetSelect";
-import { ResolutionTrace } from "./ResolutionTrace";
+import type { RuntimePreset, RuntimeProfile } from "../runtime-profile";
+import { presetsOf, uniqueName } from "../../../lib/runtime-profile-model";
+import { ProfilePresetChips } from "./ProfilePresetChips";
 import type { RuntimeProfileLayer } from "./RuntimeProfilePicker.model";
 import type { RuntimeProfilePickerController } from "./use-runtime-profile-picker";
 
@@ -28,16 +21,15 @@ export type RuntimeProfilePickerProps = {
   controller: RuntimeProfilePickerController;
   profiles: RuntimeProfile[];
   presets: RuntimePreset[];
-  resolution?: ResolvedRuntimeSpec | undefined;
-  effectiveRuntime: Pick<AISpecRuntimeSpec, "model" | "mode">;
 };
 
+// Compact profile row that sits beside the runtime bar: profile, its ordered
+// presets, which layer the spec editor writes to, and save actions once the
+// profile draft diverges from the saved profile.
 export function RuntimeProfilePicker({
   controller,
   profiles,
   presets,
-  resolution,
-  effectiveRuntime,
 }: RuntimeProfilePickerProps) {
   const { state } = controller;
   const { draft } = state;
@@ -50,16 +42,14 @@ export function RuntimeProfilePicker({
     { id: "profile", label: `Profile «${draft?.name ?? ""}»` },
   ];
   const nameTaken = draft ? !uniqueName(draft.name, draft.id, profiles) : false;
+  const included = draft ? presetsOf(draft, presets) : { found: [], missing: [] };
 
   return (
-    <section
-      aria-label="Runtime profile"
-      className="mb-density-3 space-y-density-2 rounded-lg border border-border bg-card p-density-3"
-    >
+    <section aria-label="Runtime profile" className="grid gap-density-2">
       <div className="flex flex-wrap items-center gap-density-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
           <Icon icon={UiLayers} className="size-3.5" />
-          Runtime profile
+          Profile
         </span>
         <Combobox
           ariaLabel="Runtime profile"
@@ -79,9 +69,69 @@ export function RuntimeProfilePicker({
           }
           allowCustomValue={false}
           required
-          className="min-w-56 flex-1"
+          className="w-52"
         />
+        {draft && (
+          <SegmentedControl
+            aria-label="Editing layer"
+            size="sm"
+            value={state.layer}
+            options={layers}
+            onChange={controller.setLayer}
+          />
+        )}
+        {draft && controller.dirty && (
+          <>
+            <Button
+              size="sm"
+              disabled={!controller.canSave || nameTaken || Boolean(controller.busy)}
+              onClick={() => void controller.save()}
+            >
+              <Icon icon={UiSave} className="size-3.5" />
+              Save profile
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!controller.canCreate || Boolean(controller.busy)}
+              onClick={() => void controller.saveAsNew()}
+            >
+              <Icon icon={UiFilePlus} className="size-3.5" />
+              Save as new
+            </Button>
+          </>
+        )}
+        {draft && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={Boolean(controller.busy)}
+            onClick={() => void controller.detach()}
+          >
+            <Icon icon={UiGitMerge} className="size-3.5" />
+            Detach
+          </Button>
+        )}
+        {controller.busy && (
+          <span role="status" className="text-xs text-muted-foreground">
+            {controller.busy === "detach" ? "Resolving…" : "Saving…"}
+          </span>
+        )}
       </div>
+      {draft && presets.length > 0 && (
+        <ProfilePresetChips
+          included={included.found}
+          presets={presets}
+          onChange={(presetIds) =>
+            controller.editDraft({ ...draft, presets: [...presetIds, ...included.missing] })
+          }
+        />
+      )}
+      {included.missing.length > 0 && (
+        <p role="alert" className="text-xs text-destructive">
+          Missing presets: {included.missing.join(", ")}
+        </p>
+      )}
       {controller.pending && (
         <div
           role="alert"
@@ -106,80 +156,21 @@ export function RuntimeProfilePicker({
           </Button>
         </div>
       )}
-      {draft && (
-        <>
-          <SegmentedControl
-            aria-label="Editing layer"
-            size="sm"
-            value={state.layer}
-            options={layers}
-            onChange={controller.setLayer}
+      {draft && state.layer === "profile" && (
+        <Field
+          label="Profile name"
+          htmlFor={nameId}
+          labelClassName="text-xs"
+          error={nameTaken ? "A unique profile name is required." : undefined}
+        >
+          <InputField
+            id={nameId}
+            value={draft.name}
+            invalid={nameTaken}
+            onChange={(name) => controller.editDraft({ ...draft, name })}
+            className="max-w-sm"
           />
-          {state.layer === "profile" && (
-            <div className="space-y-density-2">
-              <Field
-                label="Profile name"
-                htmlFor={nameId}
-                labelClassName="text-xs"
-                error={
-                  nameTaken ? "A unique profile name is required." : undefined
-                }
-              >
-                <InputField
-                  id={nameId}
-                  value={draft.name}
-                  invalid={nameTaken}
-                  onChange={(name) => controller.editDraft({ ...draft, name })}
-                />
-              </Field>
-              <OrderedPresetSelect
-                presets={presets}
-                value={draft.presets}
-                onChange={(next) =>
-                  controller.editDraft({ ...draft, presets: next })
-                }
-              />
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-density-2">
-            <Button
-              size="sm"
-              disabled={
-                !controller.canSave ||
-                !controller.dirty ||
-                nameTaken ||
-                Boolean(controller.busy)
-              }
-              onClick={() => void controller.save()}
-            >
-              <Icon icon={UiSave} className="size-3.5" />
-              Save profile
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!controller.canCreate || Boolean(controller.busy)}
-              onClick={() => void controller.saveAsNew()}
-            >
-              <Icon icon={UiFilePlus} className="size-3.5" />
-              Save as new
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={Boolean(controller.busy)}
-              onClick={() => void controller.detach()}
-            >
-              <Icon icon={UiGitMerge} className="size-3.5" />
-              Detach
-            </Button>
-            {controller.busy && (
-              <span role="status" className="text-xs text-muted-foreground">
-                {controller.busy === "detach" ? "Resolving…" : "Saving…"}
-              </span>
-            )}
-          </div>
-        </>
+        </Field>
       )}
       {controller.error && (
         <p role="alert" className="text-xs text-destructive">
@@ -191,14 +182,6 @@ export function RuntimeProfilePicker({
           {controller.notice}
         </p>
       )}
-      <Disclosure label="Resolution" hint={effectiveLabel(effectiveRuntime)}>
-        <ResolutionTrace trace={resolution?.trace ?? []} />
-      </Disclosure>
     </section>
   );
-}
-
-function effectiveLabel(runtime: Pick<AISpecRuntimeSpec, "model" | "mode">) {
-  const parts = [runtime.model, runtime.mode].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "inherits prompt defaults";
 }

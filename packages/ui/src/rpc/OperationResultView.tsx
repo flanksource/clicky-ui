@@ -13,8 +13,13 @@ import {
 import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
+  ClickyRowDetailRenderer,
+  ClickyCellRenderers,
+  ClickyRowCardRenderer,
+  ClickyRowDetailTitle,
   ClickyTableRowSelection,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type {
   CellFilterChange,
   CellFilterMode,
@@ -61,6 +66,16 @@ export type ResultRenderContext = {
    * surface cannot page forward.
    */
   infinite?: DataTableInfinite;
+  /** Host row-detail renderer the default view would have wired to the table. */
+  renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
+  /** How `renderRowDetail` content is surfaced. */
+  detailStyle?: "row" | "dialog";
+  /** Dialog size when `detailStyle` is "dialog". */
+  detailDialogSize?: ModalSize;
+  /** Dialog title when `detailStyle` is "dialog". */
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 // ResultRenderer lets the host app swap the result presentation per surface. It
@@ -104,7 +119,19 @@ export type OperationResultViewProps = {
   /** Load-more handle for that walk, forwarded to the table's sentinel. */
   infinite?: DataTableInfinite;
   rowSelection?: ClickyTableRowSelection;
+  hiddenColumns?: string[];
   getRowDetailHref?: (id: string) => string | undefined;
+  /** Host row-detail renderer, given raw values keyed by column name. */
+  renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  /** Host card renderer, given raw values keyed by column name. */
+  renderRowCard?: ClickyRowCardRenderer;
+  /** How `renderRowDetail` content is surfaced when a row is clicked. */
+  detailStyle?: "row" | "dialog";
+  /** Dialog size when `detailStyle` is "dialog". */
+  detailDialogSize?: ModalSize;
+  /** Dialog title when `detailStyle` is "dialog". */
+  detailDialogTitle?: ClickyRowDetailTitle;
 };
 
 type ErrorResultRow = {
@@ -144,7 +171,14 @@ export function OperationResultView({
   pages,
   infinite,
   rowSelection,
+  hiddenColumns,
   getRowDetailHref,
+  renderRowDetail,
+  cellRenderers,
+  renderRowCard,
+  detailStyle,
+  detailDialogSize,
+  detailDialogTitle,
 }: OperationResultViewProps) {
   const rowNav = useRowDetailNavigation(detailOperation, getRowDetailHref);
   const filters = filterConfig?.filters;
@@ -224,6 +258,13 @@ export function OperationResultView({
       {...(infinite ? { infinite } : {})}
       {...(download ? { download } : {})}
       {...(rowSelection ? { rowSelection } : {})}
+      {...(hiddenColumns ? { hiddenColumns } : {})}
+      {...(renderRowDetail ? { renderRowDetail } : {})}
+      {...(cellRenderers ? { cellRenderers } : {})}
+      {...(renderRowCard ? { renderRowCard } : {})}
+      {...(detailStyle ? { detailStyle } : {})}
+      {...(detailDialogSize ? { detailDialogSize } : {})}
+      {...(detailDialogTitle ? { detailDialogTitle } : {})}
     />
   );
 }

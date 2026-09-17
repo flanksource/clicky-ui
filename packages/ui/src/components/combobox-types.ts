@@ -30,6 +30,12 @@ export type ComboboxOption = {
   group?: string;
   /** Browser tooltip on the option row (for truncated or explanatory labels). */
   title?: string;
+  /**
+   * Row count behind this option (e.g. a facet's per-value count). Renders as
+   * a badge on a tristate pill row; pair with `trailing` for the plain
+   * (non-tristate) row, which ignores this field.
+   */
+  count?: number;
 };
 
 type ComboboxBaseProps = {

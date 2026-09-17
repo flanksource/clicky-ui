@@ -21,7 +21,12 @@ import type {
   ClickyDownloadOptions,
   ClickyRemoteFormat,
   ClickyRow,
+  ClickyRowDetailRenderer,
+  ClickyCellRenderers,
+  ClickyRowCardRenderer,
+  ClickyRowDetailTitle,
 } from "../data/Clicky";
+import type { ModalSize } from "../overlay/Modal";
 import type { CellFilterChange } from "../data/cells/CellFilterActions";
 import { EndpointList, type RenderLink } from "./EndpointList";
 import { OperationCatalogActions } from "./OperationCatalogActions";
@@ -61,10 +66,15 @@ import {
 } from "../data/data-table-filter-values";
 import { Loading } from "../components/loading";
 import { getClickyRowId } from "./rowNavigation";
+import { useOperationCatalogFilterState } from "./operationCatalogFilterState";
 import {
-  readOperationFiltersFromUrl,
-  writeOperationFiltersToUrl,
-} from "./operationCatalogUrl";
+  followRowOrder,
+  mergeFollowRowsIntoResponse,
+  partitionFollowRows,
+} from "./operationCatalogFollow";
+import { OperationCatalogFollowStatus } from "./OperationCatalogFollowStatus";
+import { useOperationCatalogFollow, type OperationCatalogFollowOption } from "./useOperationCatalogFollow";
+import type { LogTailError } from "../hooks/use-log-tail";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -107,9 +117,76 @@ export type OperationCatalogProps = {
   actionInitialValues?: Record<string, Record<string, string>>;
   /** Plural noun used by the cross-page selection notice. */
   selectionNoun?: string;
+  /**
+   * Parameter values pinned by the host — sent on every list request, every
+   * filter lookup (both `client.lookupFilters` and per-filter type-ahead), and
+   * every export/download URL. Never rendered as an editable filter chip or
+   * form field, and never round-tripped through the URL: the host, not the
+   * reader, owns them (e.g. the `stream` a trace-results panel is scoped to).
+   */
+  lockedValues?: Record<string, string>;
+  /**
+   * Editable seed values for filters the URL has no value for yet — e.g. a
+   * database filter that should start at the host's current environment but
+   * stay changeable. Applied per-key only when the URL is silent on that key
+   * (a URL value always wins), still rendered as an ordinary editable filter
+   * field, and never sent as a locked value or written back to the URL as
+   * anything other than the resulting filter edit. Unlike `lockedValues`,
+   * these seed the FilterBar's own state, not an overlay on top of it.
+   */
+  initialValues?: Record<string, string>;
+  /**
+   * Controls whether list filters/pagination/sort read and write the URL.
+   * Omit for today's behaviour: unprefixed query params. `false` neither
+   * reads nor writes the URL — for a catalog embedded where the host owns the
+   * whole URL. `{ prefix }` reads and writes only `<prefix>.<name>` keys, so
+   * the catalog can live inside a host route with its own `?step=`/`?tab=`
+   * params without colliding.
+   */
+  urlState?: false | { prefix: string };
+  /** Omit to infer cursor walking automatically; set when a host requires a specific paging presentation. */
+  paginationMode?: "paged" | "infinite";
+  /** Column names retained in raw rows for detail rendering but omitted from the table. */
+  hiddenColumns?: string[];
+  /**
+   * Host row-detail configuration for the result table. `render` receives raw
+   * row values keyed by column name, including columns hidden from `columns`
+   * — see `ClickyRowDetailRenderer`. Never disturbs server paging, filters,
+   * sort or export.
+   */
+  rowDetail?: {
+    render: ClickyRowDetailRenderer;
+    /** How the detail is surfaced when a row is clicked. Defaults to "row". */
+    style?: "row" | "dialog";
+    /** Dialog size when `style` is "dialog". Defaults to DataTable's "lg". */
+    dialogSize?: ModalSize;
+    /** Dialog title when `style` is "dialog", given the same raw row values as `render`. */
+    title?: ClickyRowDetailTitle;
+  };
+  /** Override selected result table cells using raw server values. */
+  cellRenderers?: ClickyCellRenderers;
+  /** Render each list result as a card from its raw row values. */
+  rowCard?: ClickyRowCardRenderer;
+  /**
+   * Follows the surface's list results live over the commons-db sessions SSE
+   * API instead of polling: rows the server has appended since the last
+   * fetch appear in the table without a refetch. Requires the list
+   * operation to advertise a session-start operation (`POST
+   * <listPath>/sessions`) in the loaded OpenAPI document — when it does not,
+   * the catalog fails loudly with an explicit error naming the surface
+   * rather than silently rendering as if `follow` had never been set.
+   *
+   * The session opens with the same locked values and active filters the
+   * list request itself sends, and restarts whenever either changes.
+   * Pass `{ maxRows }` to size the in-memory live buffer (default 5,000 —
+   * see `useLogTail`); older rows are evicted and counted as `dropped`.
+   */
+  follow?: OperationCatalogFollowOption;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
+const EMPTY_LOCKED_VALUES: Record<string, string> = {};
+const EMPTY_INITIAL_VALUES: Record<string, string> = {};
 
 export function OperationCatalog({
   definition,
@@ -131,7 +208,20 @@ export function OperationCatalog({
   getRowDetailHref,
   actionInitialValues,
   selectionNoun,
+  lockedValues = EMPTY_LOCKED_VALUES,
+  initialValues = EMPTY_INITIAL_VALUES,
+  urlState,
+  paginationMode,
+  hiddenColumns,
+  rowDetail,
+  cellRenderers,
+  rowCard,
+  follow,
 }: OperationCatalogProps) {
+  const renderRowDetail = rowDetail?.render;
+  const rowDetailStyle = rowDetail?.style;
+  const rowDetailDialogSize = rowDetail?.dialogSize;
+  const rowDetailTitle = rowDetail?.title;
   const { operations, spec, isLoading } = useOperations(client);
   const filterShapes = spec?.components?.["x-clicky-filters"];
 
@@ -159,13 +249,17 @@ export function OperationCatalog({
         : undefined,
     [domainOps, surfaceKey, useSurfaceMetadata]
   );
-  const [filters, setFilters] = useState<Record<string, string>>(() =>
-    readOperationFiltersFromUrl()
-  );
+  const listParameters = listEndpoint?.operation.parameters ?? [];
+  const { filters, setFilters, effectiveFilters } =
+    useOperationCatalogFilterState({
+      listParameters,
+      lockedValues,
+      urlState,
+      initialValues,
+    });
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<ClickyRow[]>([]);
   const [selectedScopeId, setSelectedScopeId] = useState<string>();
-  const listParameters = listEndpoint?.operation.parameters ?? [];
   const membershipFilterParameterNames = useMemo(
     () =>
       listParameters
@@ -198,8 +292,8 @@ export function OperationCatalog({
     }
   }, [membershipFilterKey]);
   const lookupParameters = useMemo(
-    () => packLookupParameterValues(filters, listParameters),
-    [filters, listParameters]
+    () => packLookupParameterValues(effectiveFilters, listParameters),
+    [effectiveFilters, listParameters]
   );
   const download = useMemo<ClickyDownloadOptions | undefined>(() => {
     const meta = listEndpoint?.operation["x-clicky"]?.export;
@@ -221,19 +315,37 @@ export function OperationCatalog({
     };
   }, [definition.title, listEndpoint]);
 
-  useEffect(() => {
-    writeOperationFiltersToUrl(
-      filters,
-      listParameters.map((parameter) => parameter.name)
-    );
-  }, [filters, listParameters]);
-
   const list = useOperationPages({
     client,
     endpoint: listEndpoint,
     parameters: listParameters,
-    filters,
+    filters: effectiveFilters,
+    ...(paginationMode ? { paginationMode } : {}),
   });
+
+  const { followEnabled, sessionOperation, followMissing, tail } =
+    useOperationCatalogFollow({
+      follow,
+      operations,
+      listEndpoint,
+      listParameters,
+      effectiveFilters,
+      showTable: !!listEndpoint,
+    });
+  const reconcileFollow = typeof follow === "object" && follow?.mode === "reconcile";
+  const refetchList = useRef(list.refetch);
+  refetchList.current = list.refetch;
+  const onReconcile = useRef(reconcileFollow ? follow.onReconcile : undefined);
+  onReconcile.current = reconcileFollow ? follow.onReconcile : undefined;
+  useEffect(() => {
+    if (!reconcileFollow || tail.lastSequence === null) return;
+    const sequence = tail.lastSequence;
+    const timer = setTimeout(() => {
+      refetchList.current();
+      onReconcile.current?.(sequence);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [reconcileFollow, tail.lastSequence]);
 
   useCursorStaleRecovery({
     error: list.error,
@@ -287,7 +399,7 @@ export function OperationCatalog({
   const lookupSearch = useOperationFilterSearch(
     client,
     listEndpoint,
-    filters,
+    effectiveFilters,
     listParameters
   );
 
@@ -296,24 +408,54 @@ export function OperationCatalog({
       includeLocations: ["query"],
       lookupSearch,
       components: filterShapes,
+      lockedValues,
+      hideLocked: true,
     };
     if (lookupQuery.data != null) {
       options.lookup = lookupQuery.data;
     }
     return parametersToFormConfig(listParameters, filters, setFilters, options);
-  }, [filters, filterShapes, listParameters, lookupQuery.data, lookupSearch]);
+  }, [
+    filters,
+    filterShapes,
+    listParameters,
+    lockedValues,
+    lookupQuery.data,
+    lookupSearch,
+  ]);
   const dataTablePagination = useMemo(
     () =>
       dataTablePaginationFromForm(filterBarConfig.pagination, list.response),
     [filterBarConfig.pagination, list.response]
   );
-  const decoratedFilters = useMemo(
+  const followOrder = followRowOrder(filterBarConfig.sort?.value?.dir);
+  const decoratedTimeRange = useMemo(
     () =>
-      filterBarConfig.filters.map((filter) =>
-        applyFilterExtensions(filter, filterPre)
-      ),
-    [filterBarConfig.filters, filterPre]
+      filterBarConfig.timeRange
+        ? applyFilterExtensions(
+            {
+              key: "timeRange",
+              kind: "date-range",
+              label:
+                filterBarConfig.timeRange.timeEnabled === false
+                  ? "Date range"
+                  : "Time range",
+              ...filterBarConfig.timeRange,
+            },
+            filterPre
+          )
+        : undefined,
+    [filterBarConfig.timeRange, filterPre]
   );
+  const decoratedFilters = useMemo(() => {
+    const next = filterBarConfig.filters.map((filter) =>
+      applyFilterExtensions(filter, filterPre)
+    );
+    if (decoratedTimeRange?.placement === "overflow") {
+      next.push(decoratedTimeRange);
+    }
+    return next;
+  }, [decoratedTimeRange, filterBarConfig.filters, filterPre]);
   const cellFilters = useMemo(
     () =>
       Object.fromEntries(
@@ -372,7 +514,8 @@ export function OperationCatalog({
       cellFilters,
       onCellFilterChange,
       ...(filterBarConfig.search ? { search: filterBarConfig.search } : {}),
-      ...(filterBarConfig.timeRange
+      ...(filterBarConfig.timeRange &&
+      decoratedTimeRange?.placement !== "overflow"
         ? { timeRange: filterBarConfig.timeRange }
         : {}),
     }),
@@ -381,6 +524,7 @@ export function OperationCatalog({
       decoratedFilters,
       filterBarConfig.search,
       filterBarConfig.timeRange,
+      decoratedTimeRange?.placement,
       onCellFilterChange,
     ]
   );
@@ -411,6 +555,42 @@ export function OperationCatalog({
       ? renderError(listError, `Failed to load ${listEndpoint?.path ?? ""}`)
       : undefined;
   const tableResponse = list.response?.success === false ? null : list.response;
+  // The presented ClickyRow rides next to each raw follow row (see
+  // LogTailEvent.clickyRow); a row-shaped event without one is a stream
+  // contract violation for a tabular follow surface, never guessed at as
+  // plain text, so it is surfaced as an error rather than merged.
+  const followPartition = partitionFollowRows(tail.rows, tail.clickyRows);
+  const followStreamError: LogTailError | null =
+    tail.error ??
+    (!reconcileFollow && followPartition.missingClickyRow
+      ? {
+          scope: "stream",
+          message:
+            "a follow event arrived without its presented row (clickyRow) — the profile stopped sending it",
+        }
+      : null);
+  const followMerge =
+    followEnabled && sessionOperation && !reconcileFollow
+      ? mergeFollowRowsIntoResponse(
+          tableResponse,
+          followPartition.rows,
+          followOrder
+        )
+      : undefined;
+  const mergedTableResponse = followMerge
+    ? followMerge.response
+    : tableResponse;
+  // The last fetch's total undercounts once live rows have been folded in
+  // that it never saw — reported as a lower bound ("gte"), never restated as
+  // an exact count nobody promised.
+  const resultsPagination =
+    followMerge && followMerge.addedCount > 0 && dataTablePagination
+      ? {
+          ...dataTablePagination,
+          total: (dataTablePagination.total ?? 0) + followMerge.addedCount,
+          totalRelation: "gte" as const,
+        }
+      : dataTablePagination;
   const walkProps = list.infinite
     ? { pages: list.pages, infinite: list.infinite }
     : {};
@@ -464,98 +644,140 @@ export function OperationCatalog({
 
       {showTable ? (
         <div className="min-h-0 flex-1" data-slot="operation-catalog-results">
-          {(() => {
-            const defaultView = (
-              <OperationResultView
-                response={tableResponse}
-                loading={list.isFetching}
-                loadingMessage={`Loading ${definition.title} results…`}
-                emptyMessage="No records returned"
-                ariaLabel={`${definition.title} results`}
-                className="mt-0 h-full min-h-0"
-                detailOperation={detailOperation}
-                {...(getRowDetailHref ? { getRowDetailHref } : {})}
-                {...(selectionActionOps.length > 0
-                  ? {
-                      rowSelection: {
-                        selectedRowIds,
-                        onSelectionChange: (
-                          ids: string[],
-                          rows: ClickyRow[]
-                        ) => {
-                          setSelectedRowIds(ids);
-                          setSelectedRows(rows);
-                          setSelectedScopeId(undefined);
-                        },
-                        ...(dataTablePagination?.total != null &&
-                        dataTablePagination.totalRelation === "eq"
-                          ? {
-                              selectAllPages: {
-                                ...(selectedScopeId ? { selectedScopeId } : {}),
-                                noun:
-                                  selectionNoun ??
-                                  definition.title.toLocaleLowerCase(),
-                                scopes: [
-                                  {
-                                    id: "all-matching",
-                                    total: dataTablePagination.total,
-                                    onSelectAll: () =>
-                                      setSelectedScopeId("all-matching"),
+          {followMissing ? (
+            renderError(
+              new Error(
+                `Surface "${surfaceKey ?? definition.title}" set follow, but ${listEndpoint?.path} advertises no session to follow (expected POST ${listEndpoint?.path}/sessions)`
+              ),
+              "Live follow is not available"
+            )
+          ) : (
+            <>
+              {followEnabled && sessionOperation && (
+                <OperationCatalogFollowStatus
+                  status={tail.status}
+                  error={followStreamError}
+                  droppedRows={reconcileFollow ? 0 : tail.droppedRows}
+                  addedCount={followMerge?.addedCount ?? 0}
+                  className="mb-2"
+                />
+              )}
+              {(() => {
+                const defaultView = (
+                  <OperationResultView
+                    response={mergedTableResponse}
+                    loading={list.isFetching}
+                    loadingMessage={`Loading ${definition.title} results…`}
+                    emptyMessage="No records returned"
+                    ariaLabel={`${definition.title} results`}
+                    className="mt-0 h-full min-h-0"
+                    detailOperation={detailOperation}
+                    {...(hiddenColumns ? { hiddenColumns } : {})}
+                    {...(getRowDetailHref ? { getRowDetailHref } : {})}
+                    {...(selectionActionOps.length > 0
+                      ? {
+                          rowSelection: {
+                            selectedRowIds,
+                            onSelectionChange: (
+                              ids: string[],
+                              rows: ClickyRow[]
+                            ) => {
+                              setSelectedRowIds(ids);
+                              setSelectedRows(rows);
+                              setSelectedScopeId(undefined);
+                            },
+                            ...(dataTablePagination?.total != null &&
+                            dataTablePagination.totalRelation === "eq"
+                              ? {
+                                  selectAllPages: {
+                                    ...(selectedScopeId
+                                      ? { selectedScopeId }
+                                      : {}),
+                                    noun:
+                                      selectionNoun ??
+                                      definition.title.toLocaleLowerCase(),
+                                    scopes: [
+                                      {
+                                        id: "all-matching",
+                                        total: dataTablePagination.total,
+                                        onSelectAll: () =>
+                                          setSelectedScopeId("all-matching"),
+                                      },
+                                    ],
                                   },
-                                ],
-                              },
-                            }
-                          : {}),
-                        getRowId: (row: ClickyRow) => {
-                          const id = getClickyRowId(row);
-                          if (!id) {
-                            throw new Error(
-                              "Clicky bulk action row is missing an _id or id cell"
-                            );
-                          }
-                          return id;
-                        },
-                        isRowSelectable: (row: ClickyRow) =>
-                          getClickyRowId(row) != null,
-                      },
-                    }
-                  : {})}
-                filterConfig={resultFilterConfig}
-                {...(tableError ? { error: tableError } : {})}
-                {...(commandRuntime ? { commandRuntime } : {})}
-                {...(dataTablePagination
-                  ? { pagination: dataTablePagination }
-                  : {})}
-                {...(filterBarConfig.sort
-                  ? { sort: filterBarConfig.sort }
-                  : {})}
-                {...(download ? { download } : {})}
-                {...walkProps}
-              />
-            );
-            return resultRenderer
-              ? resultRenderer({
-                  response: list.response,
-                  loading: list.isFetching,
-                  defaultView,
-                  filterConfig: resultFilterConfig,
-                  // A renderer that replaces the table owns the whole surface,
-                  // pager and download menu included. Without these it can only
-                  // drop them, which is how a replaced view silently loses the
-                  // ability to reach page two — or, under a walk, page one's
-                  // rows the moment page two arrives.
-                  ...(dataTablePagination
-                    ? { pagination: dataTablePagination }
-                    : {}),
-                  ...(filterBarConfig.sort
-                    ? { sort: filterBarConfig.sort }
-                    : {}),
-                  ...(download ? { download } : {}),
-                  ...(surfaceKey ? { surfaceKey } : {}),
-                  ...walkProps,
-                })
-              : defaultView;
-          })()}
+                                }
+                              : {}),
+                            getRowId: (row: ClickyRow) => {
+                              const id = getClickyRowId(row);
+                              if (!id) {
+                                throw new Error(
+                                  "Clicky bulk action row is missing an _id or id cell"
+                                );
+                              }
+                              return id;
+                            },
+                            isRowSelectable: (row: ClickyRow) =>
+                              getClickyRowId(row) != null,
+                          },
+                        }
+                      : {})}
+                    filterConfig={resultFilterConfig}
+                    {...(tableError ? { error: tableError } : {})}
+                    {...(commandRuntime ? { commandRuntime } : {})}
+                    {...(resultsPagination
+                      ? { pagination: resultsPagination }
+                      : {})}
+                    {...(filterBarConfig.sort
+                      ? { sort: filterBarConfig.sort }
+                      : {})}
+                    {...(download ? { download } : {})}
+                    {...(renderRowDetail ? { renderRowDetail } : {})}
+                    {...(cellRenderers ? { cellRenderers } : {})}
+                    {...(rowCard ? { renderRowCard: rowCard } : {})}
+                    {...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {})}
+                    {...(rowDetailDialogSize
+                      ? { detailDialogSize: rowDetailDialogSize }
+                      : {})}
+                    {...(rowDetailTitle
+                      ? { detailDialogTitle: rowDetailTitle }
+                      : {})}
+                    {...walkProps}
+                  />
+                );
+                return resultRenderer
+                  ? resultRenderer({
+                      response: list.response,
+                      loading: list.isFetching,
+                      defaultView,
+                      filterConfig: resultFilterConfig,
+                      // A renderer that replaces the table owns the whole surface,
+                      // pager and download menu included. Without these it can only
+                      // drop them, which is how a replaced view silently loses the
+                      // ability to reach page two — or, under a walk, page one's
+                      // rows the moment page two arrives.
+                      ...(dataTablePagination
+                        ? { pagination: dataTablePagination }
+                        : {}),
+                      ...(filterBarConfig.sort
+                        ? { sort: filterBarConfig.sort }
+                        : {}),
+                      ...(download ? { download } : {}),
+                      ...(surfaceKey ? { surfaceKey } : {}),
+                      ...(renderRowDetail ? { renderRowDetail } : {}),
+                      ...(rowCard ? { renderRowCard: rowCard } : {}),
+                      ...(rowDetailStyle ? { detailStyle: rowDetailStyle } : {}),
+                      ...(rowDetailDialogSize
+                        ? { detailDialogSize: rowDetailDialogSize }
+                        : {}),
+                      ...(rowDetailTitle
+                        ? { detailDialogTitle: rowDetailTitle }
+                        : {}),
+                      ...walkProps,
+                    })
+                  : defaultView;
+              })()}
+            </>
+          )}
         </div>
       ) : (
         <EndpointList

@@ -113,6 +113,53 @@ function resolveTheme(input: string | undefined): SupportedTheme {
   return DEFAULT_THEME;
 }
 
+// Highlighting is synchronous once the highlighter has loaded, so a page of
+// code cells awaiting it ran back to back in one microtask chain — an 8 s
+// long task for a page of trace SQL. Queue the work and drain it in slices,
+// yielding to the event loop between them.
+const SLICE_BUDGET_MS = 8;
+const sliceQueue: Array<() => void> = [];
+let draining = false;
+
+function inSlice<T>(work: () => T): Promise<T> {
+  return new Promise((resolve, reject) => {
+    sliceQueue.push(() => {
+      try {
+        resolve(work());
+      } catch (error) {
+        reject(error);
+      }
+    });
+    if (!draining) {
+      draining = true;
+      setTimeout(drainSlice, 0);
+    }
+  });
+}
+
+function drainSlice() {
+  const deadline = performance.now() + SLICE_BUDGET_MS;
+  while (sliceQueue.length > 0 && performance.now() < deadline) sliceQueue.shift()!();
+  if (sliceQueue.length > 0) setTimeout(drainSlice, 0);
+  else draining = false;
+}
+
+// Rows re-mount on sort, filter and paging and ask for the same code again.
+// Keep recent results, least recently used first out, bounded by total size.
+const CACHE_BUDGET_CHARS = 2_000_000;
+const htmlCache = new Map<string, string>();
+let cachedChars = 0;
+
+function cacheHtml(key: string, html: string) {
+  htmlCache.set(key, html);
+  cachedChars += html.length;
+  for (const [oldestKey, oldestHtml] of htmlCache) {
+    if (cachedChars <= CACHE_BUDGET_CHARS) break;
+    htmlCache.delete(oldestKey);
+    cachedChars -= oldestHtml.length;
+  }
+}
+
 export async function highlightCode(
   source: string,
   opts: HighlightOptions,
@@ -120,13 +167,26 @@ export async function highlightCode(
   if (!source || !opts.lang) return null;
   const lang = resolveLang(opts.lang);
   if (!lang) return null;
+  const theme = resolveTheme(opts.theme);
+  // Transformers are functions, so a result that used them has no cache key.
+  const key = opts.transformers ? undefined : `${lang} ${theme} ${source}`;
+  const cached = key === undefined ? undefined : htmlCache.get(key);
+  if (key !== undefined && cached !== undefined) {
+    htmlCache.delete(key);
+    htmlCache.set(key, cached);
+    return cached;
+  }
   try {
     const highlighter = await loadHighlighter();
-    return highlighter.codeToHtml(source, {
-      lang,
-      theme: resolveTheme(opts.theme),
-      ...(opts.transformers ? { transformers: opts.transformers } : {}),
-    });
+    const html = await inSlice(() =>
+      highlighter.codeToHtml(source, {
+        lang,
+        theme,
+        ...(opts.transformers ? { transformers: opts.transformers } : {}),
+      }),
+    );
+    if (key !== undefined) cacheHtml(key, html);
+    return html;
   } catch {
     return null;
   }
@@ -152,10 +212,12 @@ export async function highlightToLines(
   if (!lang) return null;
   try {
     const highlighter = await loadHighlighter();
-    const { tokens } = highlighter.codeToTokens(source, {
-      lang,
-      theme: resolveTheme(opts.theme),
-    });
+    const { tokens } = await inSlice(() =>
+      highlighter.codeToTokens(source, {
+        lang,
+        theme: resolveTheme(opts.theme),
+      }),
+    );
     return tokens.map((line) =>
       line.map((token) => ({
         content: token.content,
