@@ -458,4 +458,20 @@ describe("OperationCatalog rowDetail", () => {
       detail: { execution: [{ label: "process" }] },
     });
   });
+
+  it("renders cards from raw rows without losing the catalog's filters or pager", async () => {
+    const client = makeClient();
+    client.executeMock.mockResolvedValue(tableResponseWithDetail());
+    const renderCard = vi.fn((row: Record<string, unknown>) => (
+      <article>Invocation {String(row.name)}: {JSON.stringify(row.detail)}</article>
+    ));
+    renderCatalog(client, { hiddenColumns: ["detail"], rowCard: renderCard });
+
+    expect(await screen.findByRole("article")).toHaveTextContent("Invocation Row one");
+    expect(renderCard).toHaveBeenCalledWith({
+      name: "Row one",
+      detail: { execution: [{ label: "process" }] },
+    });
+    expect(screen.queryByRole("columnheader", { name: "name" })).not.toBeInTheDocument();
+  });
 });

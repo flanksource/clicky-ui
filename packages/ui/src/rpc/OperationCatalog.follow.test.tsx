@@ -6,6 +6,7 @@ import type { RenderLink } from "./EndpointList";
 import type { ExecutionResponse, OpenAPISpec } from "./types";
 import type { OperationsApiClient } from "./useOperations";
 import type { LogSessionInfo } from "../hooks/use-log-tail";
+import type { OperationCatalogFollowOption } from "./useOperationCatalogFollow";
 
 // OperationCatalog.follow.test.tsx exercises the `follow` prop end to end:
 // starting a session with the effective params, folding live rows into the
@@ -128,13 +129,13 @@ const jsonResponse = (status: number, body: unknown) => ({
   text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
 });
 
-/** Answers every POST with a fresh session id ("sess-1", "sess-2", …) and every DELETE with 204. */
+/** Answers every POST with a fresh session id ("sess-1", "sess-2", …); DELETE is not a served route. */
 function stubFetch() {
   let nextId = 1;
   const mock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "POST") return jsonResponse(201, sessionInfo({ id: `sess-${nextId++}` }));
-    if (method === "DELETE") return jsonResponse(204, "");
+    if (method === "DELETE") return jsonResponse(405, "DELETE /sessions/{id} is not served");
     return jsonResponse(200, []);
   });
   vi.stubGlobal("fetch", mock);
@@ -148,7 +149,7 @@ const deleteCalls = (mock: ReturnType<typeof stubFetch>) =>
 
 function renderCatalog(props: {
   client: OperationsApiClient;
-  follow?: boolean;
+  follow?: OperationCatalogFollowOption;
   lockedValues?: Record<string, string>;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -226,6 +227,27 @@ describe("OperationCatalog follow mode", () => {
     expect(await screen.findByText("+1")).toBeInTheDocument();
   });
 
+  it("reconciles a live root page from all stream events instead of retaining displaced rows", async () => {
+    const fetchMock = stubFetch();
+    const client = makeClient(makeSpec(), listResponse([tableRow("child", "open")]));
+    vi.mocked(client.executeCommand)
+      .mockResolvedValueOnce(listResponse([tableRow("child", "open")]))
+      .mockResolvedValue(listResponse([tableRow("parent", "open")]));
+    renderCatalog({ client, lockedValues: { stream: "s1", status: "open" },
+      follow: { mode: "reconcile", params: { stream: "s1" }, maxRows: 1 } });
+
+    await screen.findByText("child");
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    expect(postCalls(fetchMock)[0]?.[0]).toBe(`/api/v1/profile/things/sessions?follow=true&stream=s1`);
+    act(() => MockEventSource.instances[0]!.emit("event", {
+      sessionId: SESSION_ID, sequence: 1, row: { _id: "parent", status: "closed" },
+    }));
+
+    await screen.findByText("parent");
+    expect(screen.queryByText("child")).not.toBeInTheDocument();
+    expect(screen.queryByText(/without its presented row/)).not.toBeInTheDocument();
+  });
+
   it("shows a stream error and does not merge a row whose event carries no clickyRow", async () => {
     stubFetch();
     const client = makeClient(makeSpec(), listResponse([tableRow("a1", "open")]));
@@ -246,7 +268,7 @@ describe("OperationCatalog follow mode", () => {
     expect(screen.queryByText("a2")).not.toBeInTheDocument();
   });
 
-  it("restarts the session when lockedValues change and stops the old one", async () => {
+  it("restarts the session when lockedValues change and closes the old stream", async () => {
     const fetchMock = stubFetch();
     const client = makeClient(makeSpec(), listResponse([tableRow("a1", "open")]));
     const { rerenderWithLockedValues } = renderCatalog({ client, lockedValues: { stream: "s1" } });
@@ -258,11 +280,13 @@ describe("OperationCatalog follow mode", () => {
 
     await waitFor(() => expect(postCalls(fetchMock)).toHaveLength(2));
     expect(postCalls(fetchMock)[1]?.[0]).toBe(`/api/v1/profile/things/sessions?follow=true&stream=s2`);
-    await waitFor(() => expect(deleteCalls(fetchMock)).toHaveLength(1));
-    expect(deleteCalls(fetchMock)[0]?.[0]).toBe(`/api/v1/sessions/${SESSION_ID}`);
+    const old = MockEventSource.instances.find((es) => es.url.includes(`/sessions/${SESSION_ID}/`));
+    await waitFor(() => expect(old?.closed).toBe(true));
+    // The server reaps the unsubscribed view session; nothing is deleted.
+    expect(deleteCalls(fetchMock)).toHaveLength(0);
   });
 
-  it("stops the session on unmount", async () => {
+  it("closes the stream on unmount without deleting the session", async () => {
     const fetchMock = stubFetch();
     const client = makeClient(makeSpec(), listResponse([tableRow("a1", "open")]));
     const { unmount } = renderCatalog({ client, lockedValues: { stream: "s1" } });
@@ -270,10 +294,12 @@ describe("OperationCatalog follow mode", () => {
     await screen.findByText("a1");
     await waitFor(() => expect(postCalls(fetchMock)).toHaveLength(1));
 
+    await waitFor(() => expect(MockEventSource.instances.length).toBeGreaterThan(0));
+    const live = MockEventSource.instances.at(-1)!;
     unmount();
 
-    await waitFor(() => expect(deleteCalls(fetchMock)).toHaveLength(1));
-    expect(deleteCalls(fetchMock)[0]?.[0]).toBe(`/api/v1/sessions/${SESSION_ID}`);
+    expect(live.closed).toBe(true);
+    expect(deleteCalls(fetchMock)).toHaveLength(0);
   });
 
   it("fails loudly, naming the surface, when the list operation advertises no session to follow", async () => {

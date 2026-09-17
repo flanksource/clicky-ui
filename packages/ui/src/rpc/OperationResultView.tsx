@@ -14,6 +14,8 @@ import type {
   ClickyCommandRuntime,
   ClickyDownloadOptions,
   ClickyRowDetailRenderer,
+  ClickyCellRenderers,
+  ClickyRowCardRenderer,
   ClickyRowDetailTitle,
   ClickyTableRowSelection,
 } from "../data/Clicky";
@@ -66,6 +68,8 @@ export type ResultRenderContext = {
   infinite?: DataTableInfinite;
   /** Host row-detail renderer the default view would have wired to the table. */
   renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
   /** How `renderRowDetail` content is surfaced. */
   detailStyle?: "row" | "dialog";
   /** Dialog size when `detailStyle` is "dialog". */
@@ -119,6 +123,9 @@ export type OperationResultViewProps = {
   getRowDetailHref?: (id: string) => string | undefined;
   /** Host row-detail renderer, given raw values keyed by column name. */
   renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  /** Host card renderer, given raw values keyed by column name. */
+  renderRowCard?: ClickyRowCardRenderer;
   /** How `renderRowDetail` content is surfaced when a row is clicked. */
   detailStyle?: "row" | "dialog";
   /** Dialog size when `detailStyle` is "dialog". */
@@ -167,6 +174,8 @@ export function OperationResultView({
   hiddenColumns,
   getRowDetailHref,
   renderRowDetail,
+  cellRenderers,
+  renderRowCard,
   detailStyle,
   detailDialogSize,
   detailDialogTitle,
@@ -251,6 +260,8 @@ export function OperationResultView({
       {...(rowSelection ? { rowSelection } : {})}
       {...(hiddenColumns ? { hiddenColumns } : {})}
       {...(renderRowDetail ? { renderRowDetail } : {})}
+      {...(cellRenderers ? { cellRenderers } : {})}
+      {...(renderRowCard ? { renderRowCard } : {})}
       {...(detailStyle ? { detailStyle } : {})}
       {...(detailDialogSize ? { detailDialogSize } : {})}
       {...(detailDialogTitle ? { detailDialogTitle } : {})}

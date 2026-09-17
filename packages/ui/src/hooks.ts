@@ -11,6 +11,7 @@ export {
   onMediaChange,
   useMediaQuery,
 } from "./hooks/use-media-query";
+export { useContainerWiderThan } from "./hooks/use-container-width";
 export { useDensity, useDensityValue, type Density } from "./hooks/use-density";
 export {
   DensityProvider,
@@ -51,7 +52,6 @@ export {
 } from "./hooks/use-hotkey";
 export {
   useLogTail,
-  stopLogSession,
   appendTailEvent,
   emptyLogTailBuffer,
   encodeTailParams,

@@ -17,6 +17,8 @@ import {
   type ClickyDocument,
   type ClickyNode,
   type ClickyRowDetailRenderer,
+  type ClickyCellRenderers,
+  type ClickyRowCardRenderer,
   type ClickyRowDetailTitle,
   type ClickyTableRowClick,
   type ClickyTableRowHref,
@@ -62,6 +64,8 @@ export type CommandOutputProps = {
   hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
   renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
   detailStyle?: "row" | "dialog";
   detailDialogSize?: ModalSize;
   detailDialogTitle?: ClickyRowDetailTitle;
@@ -106,6 +110,8 @@ export function CommandOutput({
   hiddenColumns,
   download,
   renderRowDetail,
+  cellRenderers,
+  renderRowCard,
   detailStyle,
   detailDialogSize,
   detailDialogTitle,
@@ -166,6 +172,8 @@ export function CommandOutput({
         {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
         {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(cellRenderers ? { cellRenderers } : {})}
+        {...(renderRowCard ? { renderRowCard } : {})}
         {...(detailStyle ? { detailStyle } : {})}
         {...(detailDialogSize ? { detailDialogSize } : {})}
         {...(detailDialogTitle ? { detailDialogTitle } : {})}
@@ -270,6 +278,8 @@ function OutputBody({
   hiddenColumns,
   download,
   renderRowDetail,
+  cellRenderers,
+  renderRowCard,
   detailStyle,
   detailDialogSize,
   detailDialogTitle,
@@ -298,6 +308,8 @@ function OutputBody({
   hiddenColumns?: string[];
   download?: ClickyDownloadOptions;
   renderRowDetail?: ClickyRowDetailRenderer;
+  cellRenderers?: ClickyCellRenderers;
+  renderRowCard?: ClickyRowCardRenderer;
   detailStyle?: "row" | "dialog";
   detailDialogSize?: ModalSize;
   detailDialogTitle?: ClickyRowDetailTitle;
@@ -350,6 +362,8 @@ function OutputBody({
         {...(hiddenColumns ? { hiddenColumns } : {})}
         {...(download ? { download } : {})}
         {...(renderRowDetail ? { renderRowDetail } : {})}
+        {...(cellRenderers ? { cellRenderers } : {})}
+        {...(renderRowCard ? { renderRowCard } : {})}
         {...(detailStyle ? { detailStyle } : {})}
         {...(detailDialogSize ? { detailDialogSize } : {})}
         {...(detailDialogTitle ? { detailDialogTitle } : {})}
