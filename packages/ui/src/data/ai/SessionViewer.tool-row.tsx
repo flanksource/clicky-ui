@@ -321,26 +321,28 @@ function QuestionDecisionControls({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const answerFor = (question: SessionQuestion): string | string[] => {
+    const selected = answers[question.id];
+    const other = details[question.id]?.trim();
+    if (question.options.length && question.isOther && other) {
+      return question.multiSelect ? [...(Array.isArray(selected) ? selected : []), other] : other;
+    }
+    return selected ?? "";
+  };
+  const canSend = questions.length > 0 && questions.every((question) => {
+    const answer = answerFor(question);
+    return Array.isArray(answer)
+      ? answer.length > 0 && answer.every((value) => value.trim() !== "")
+      : answer.trim() !== "";
+  });
   const decide = async (allow: boolean, message?: string) => {
     setBusy(true);
     setError("");
-    const submittedAnswers = Object.fromEntries(
-      Object.entries(answers).map(([question, answer]) => {
-        const detail = details[question]?.trim();
-        if (!detail) return [question, answer];
-        return [
-          question,
-          Array.isArray(answer)
-            ? [...answer, `Additional details: ${detail}`]
-            : `${answer}\nAdditional details: ${detail}`,
-        ];
-      }),
-    );
     try {
       await onDecision({
         event,
         allow,
-        answers: submittedAnswers,
+        ...(allow ? { answers: Object.fromEntries(questions.map((question) => [question.id, answerFor(question)])) } : {}),
         ...(message ? { message } : {}),
       });
     } catch (cause) {
@@ -365,17 +367,17 @@ function QuestionDecisionControls({
                 <input
                   type="checkbox"
                   checked={
-                    Array.isArray(answers[question.text]) &&
-                    (answers[question.text] as string[]).includes(option.value)
+                    Array.isArray(answers[question.id]) &&
+                    (answers[question.id] as string[]).includes(option.value)
                   }
                   onChange={(event) =>
                     setAnswers((current) => {
-                      const selected = Array.isArray(current[question.text])
-                        ? (current[question.text] as string[])
+                      const selected = Array.isArray(current[question.id])
+                        ? (current[question.id] as string[])
                         : [];
                       return {
                         ...current,
-                        [question.text]: event.target.checked
+                        [question.id]: event.target.checked
                           ? [...selected, option.value]
                           : selected.filter((value) => value !== option.value),
                       };
@@ -400,13 +402,14 @@ function QuestionDecisionControls({
                   type="radio"
                   name={`question-${event.id}-${question.id}`}
                   value={option.value}
-                  checked={answers[question.text] === option.value}
-                  onChange={() =>
+                  checked={answers[question.id] === option.value && !details[question.id]?.trim()}
+                  onChange={() => {
+                    setDetails((current) => ({ ...current, [question.id]: "" }));
                     setAnswers((current) => ({
                       ...current,
-                      [question.text]: option.value,
-                    }))
-                  }
+                      [question.id]: option.value,
+                    }));
+                  }}
                 />
                 <span>
                   {option.label}
@@ -419,31 +422,31 @@ function QuestionDecisionControls({
               </label>
             ),
           )}
-          <textarea
-            aria-label={`${question.text} additional details`}
+          {(!question.options.length || question.isOther) && <textarea
+            aria-label={`${question.text} ${question.options.length ? "other answer" : "answer"}`}
             value={
               question.options.length
-                ? (details[question.text] ?? "")
-                : typeof answers[question.text] === "string"
-                  ? (answers[question.text] as string)
+                ? (details[question.id] ?? "")
+                : typeof answers[question.id] === "string"
+                  ? (answers[question.id] as string)
                   : ""
             }
             onChange={(event) =>
               question.options.length
                 ? setDetails((current) => ({
                     ...current,
-                    [question.text]: event.target.value,
+                    [question.id]: event.target.value,
                   }))
                 : setAnswers((current) => ({
                     ...current,
-                    [question.text]: event.target.value,
+                    [question.id]: event.target.value,
                   }))
             }
             placeholder={
-              question.options.length ? "Additional details" : "Your answer"
+              question.options.length ? "Other answer" : "Your answer"
             }
             className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-          />
+          />}
         </fieldset>
       ))}
       <textarea
@@ -454,7 +457,7 @@ function QuestionDecisionControls({
         className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
       />
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} onClick={() => decide(true)}>
+        <Button size="sm" loading={busy} disabled={!canSend} onClick={() => decide(true)}>
           <Icon icon={UiCheck} />
           Send answer
         </Button>

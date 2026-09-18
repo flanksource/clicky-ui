@@ -42,6 +42,7 @@ export interface SessionQuestion {
   text: string;
   context?: string;
   multiSelect?: boolean;
+  isOther?: boolean;
   options: SessionQuestionOption[];
 }
 
@@ -288,6 +289,7 @@ function questionFromValue(value: unknown, index: number): SessionQuestion | nul
     text,
     ...optionalContext(value),
     multiSelect: booleanField(value, "multiSelect") || booleanField(value, "multi_select"),
+    isOther: booleanField(value, "isOther") || booleanField(value, "is_other"),
     options: optionList(value.options),
   };
 }
