@@ -109,7 +109,7 @@ describe("SessionViewer", () => {
     expect(screen.getByText("Scope: Project")).toBeInTheDocument();
   });
 
-  it("renders a pending question overlay and returns answers keyed by question text", async () => {
+  it("renders a pending question overlay and returns answers keyed by question id", async () => {
     const onDecision = vi.fn();
     render(
       <SessionViewer
@@ -124,14 +124,54 @@ describe("SessionViewer", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: /Send answer/ })).toBeDisabled();
+    expect(screen.queryByLabelText("Which scope? additional details")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Project/ }));
     fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
 
     await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
         allow: true,
-        answers: { "Which scope?": "project" },
+        answers: { scope: "project" },
       })),
     );
+  });
+
+  it("keeps duplicate question text separate and rejects without answers", async () => {
+    const onDecision = vi.fn();
+    render(<SessionViewer showHeader={false} session={[]} pendingTools={[{
+      tool: "AskUserQuestion", toolCallId: "ask-2", input: { questions: [
+        { id: "first", question: "Choose a scope", options: [{ label: "Local" }] },
+        { id: "second", question: "Choose a scope", options: [{ label: "Global" }] },
+      ] },
+    }]} onPendingToolDecision={onDecision} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /Local/ }));
+    expect(screen.getByRole("button", { name: /Send answer/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: /Global/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
+    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
+      allow: true, answers: { first: "Local", second: "Global" },
+    })));
+
+    fireEvent.click(screen.getByRole("button", { name: /^Reject$/ }));
+    await waitFor(() => expect(onDecision).toHaveBeenLastCalledWith(expect.objectContaining({ allow: false })));
+    expect(onDecision.mock.lastCall?.[0]).not.toHaveProperty("answers");
+  });
+
+  it("accepts a free text answer only when the question permits it", async () => {
+    const onDecision = vi.fn();
+    render(<SessionViewer showHeader={false} session={[]} pendingTools={[{
+      tool: "AskUserQuestion", toolCallId: "ask-3", input: { questions: [{
+        id: "location", question: "Where should it go?", isOther: true,
+        options: [{ label: "Project" }],
+      }] },
+    }]} onPendingToolDecision={onDecision} />);
+
+    fireEvent.change(screen.getByLabelText("Where should it go? other answer"), { target: { value: "Inline plan" } });
+    fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
+    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
+      allow: true, answers: { location: "Inline plan" },
+    })));
   });
 
   it("keeps permission decision errors on the pending tool row", async () => {
