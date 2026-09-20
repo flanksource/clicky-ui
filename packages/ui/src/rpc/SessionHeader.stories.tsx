@@ -4,6 +4,7 @@ import { SessionHeader } from "./SessionHeader";
 import {
   KV_STORE_EVENTS,
   STOPPED_JVM_TRACE_SESSION,
+  STOPPED_SQL_XEVENT_SESSION,
   runningSessionFixture,
   sessionFixture,
 } from "./session-story.fixtures";
@@ -100,6 +101,10 @@ export const NotControllable: Story = {
       owner: { host: "mission-control-oipa-7a01", pid: 1, boot: "e93a1f7c" },
     }),
   },
+};
+
+export const SqlTraceStartedWith: Story = {
+  args: { session: STOPPED_SQL_XEVENT_SESSION },
 };
 
 export const FailedWithWarning: Story = {

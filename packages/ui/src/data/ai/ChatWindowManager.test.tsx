@@ -1,5 +1,5 @@
 import { render, renderHook, act } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { ChatWindowManagerProvider } from "./ChatWindowManager";
 import { useChatWindowManager } from "./chat-window-context";
@@ -10,9 +10,36 @@ function wrapper(storageId: string) {
   );
 }
 
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  localStorage.clear();
+  vi.unstubAllGlobals();
+});
 
 describe("ChatWindowManager", () => {
+  it("opens a window with its full height inside a short viewport", () => {
+    const viewportHeight = 577;
+    vi.stubGlobal("innerHeight", viewportHeight);
+    const { result } = renderHook(() => useChatWindowManager(), { wrapper: wrapper("short") });
+
+    act(() => result.current.openPanel());
+
+    const panel = result.current.panels[0]!;
+    expect(panel.y + panel.height).toBeLessThanOrEqual(viewportHeight);
+  });
+
+  it("fits a saved window after the viewport shrinks", () => {
+    const viewportHeight = 577;
+    vi.stubGlobal("innerHeight", viewportHeight);
+    localStorage.setItem("chat-panels:shrunken", JSON.stringify([{
+      id: "saved-panel", threadId: null, x: 745, y: 40, width: 520, height: 700, maximized: false,
+    }]));
+
+    const { result } = renderHook(() => useChatWindowManager(), { wrapper: wrapper("shrunken") });
+
+    const panel = result.current.panels[0]!;
+    expect(panel.y + panel.height).toBeLessThanOrEqual(viewportHeight);
+  });
+
   it("opens up to MAX_PANELS windows and no more", () => {
     const { result } = renderHook(() => useChatWindowManager(), { wrapper: wrapper("max") });
     act(() => {

@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
-import { DataTable, type DataTableColumn } from "./DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableProps,
+} from "./DataTable";
 import type { DataTableGroupingMode } from "./DataTable.grouping";
 import { RouterProvider } from "../rpc/RouterProvider";
 import type { RouterAdapter } from "../rpc/router";
@@ -2589,6 +2593,129 @@ describe("DataTable", () => {
     expect(
       screen.queryByRole("button", { name: /open column menu/i }),
     ).not.toBeInTheDocument();
+  });
+
+  describe("default-hidden columns", () => {
+    const storageKey = "clicky-ui-test-default-hidden";
+    const renderTable = (props: Partial<DataTableProps<ServiceRow>> = {}) =>
+      render(
+        <DataTable
+          data={rows}
+          columns={columns}
+          defaultHiddenColumns={["notes"]}
+          columnVisibilityStorageKey={storageKey}
+          {...props}
+        />,
+      );
+    const notesHeader = () =>
+      screen.queryByRole("columnheader", { name: /notes/i });
+
+    it("starts hidden but is listed unchecked in the column menu", () => {
+      renderTable();
+
+      expect(notesHeader()).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Production API service"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+      expect(screen.getByRole("checkbox", { name: /notes/i })).not.toBeChecked();
+      expect(screen.getByRole("checkbox", { name: /status/i })).toBeChecked();
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it("persists showing it as a false override that survives a remount", () => {
+      const { unmount } = renderTable();
+
+      fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /notes/i }));
+
+      expect(notesHeader()).toBeInTheDocument();
+      expect(window.localStorage.getItem(storageKey)).toBe(
+        JSON.stringify({ notes: false }),
+      );
+
+      unmount();
+      renderTable();
+      expect(notesHeader()).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /notes/i }));
+
+      expect(notesHeader()).not.toBeInTheDocument();
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it("persists Show all as shown for default-hidden columns", () => {
+      window.localStorage.setItem(storageKey, JSON.stringify({ status: true }));
+      const { unmount } = renderTable();
+
+      expect(
+        screen.queryByRole("columnheader", { name: /status/i }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+      fireEvent.click(screen.getByRole("button", { name: /show all/i }));
+
+      expect(notesHeader()).toBeInTheDocument();
+      expect(window.localStorage.getItem(storageKey)).toBe(
+        JSON.stringify({ notes: false }),
+      );
+
+      unmount();
+      renderTable();
+      expect(notesHeader()).toBeInTheDocument();
+      expect(
+        screen.getByRole("columnheader", { name: /status/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("prunes stored overrides for missing columns and false overrides for non-default columns", () => {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({ removed: true, retired: false, status: false }),
+      );
+      renderTable();
+
+      expect(notesHeader()).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("columnheader", { name: /status/i }),
+      ).toBeInTheDocument();
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it("applies only the defaults when persistence is off", () => {
+      window.localStorage.setItem(storageKey, JSON.stringify({ notes: false }));
+      renderTable({ persistColumnVisibility: false });
+
+      expect(notesHeader()).not.toBeInTheDocument();
+      expect(window.localStorage.getItem(storageKey)).toBe(
+        JSON.stringify({ notes: false }),
+      );
+    });
+
+    it("ignores defaults for missing or non-hideable columns and keeps one hideable column visible", () => {
+      renderTable({
+        columns: [{ ...columns[0]!, hideable: false }, ...columns.slice(1)],
+        defaultHiddenColumns: [
+          "missing",
+          "service",
+          "status",
+          "restarts",
+          "notes",
+          "tags",
+        ],
+      });
+
+      expect(
+        screen.getByRole("columnheader", { name: /service/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("columnheader", { name: /status/i }),
+      ).toBeInTheDocument();
+      expect(notesHeader()).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("columnheader", { name: /tags/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("overrides table density from the column menu and persists the choice", () => {

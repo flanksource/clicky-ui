@@ -155,3 +155,21 @@ export const WithMenuActions: Story = {
     menuActions,
   },
 };
+
+// `owner` arrives with `defaultHidden: true`: it starts hidden, and the column
+// menu lists it unchecked so a viewer can show it.
+export const WithDefaultHiddenColumn: Story = {
+  args: {
+    columns: [
+      ...columns,
+      { name: "owner", label: "Owner", shrink: true, defaultHidden: true },
+    ],
+    rows: rows.map((row, index) => ({
+      ...row,
+      cells: {
+        ...row.cells,
+        owner: { kind: "text", text: index === 0 ? "team-edge" : "team-data" },
+      },
+    })),
+  },
+};

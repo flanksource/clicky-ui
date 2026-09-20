@@ -26,6 +26,7 @@ export {
   sessionDurationParam,
   sessionParamsDurationMs,
   type SessionInfo,
+  type SessionMetadata,
   type SessionOwner,
   type SessionProfileKind,
   type SessionRole,

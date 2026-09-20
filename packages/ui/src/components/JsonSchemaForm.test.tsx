@@ -697,6 +697,20 @@ describe("JsonSchemaForm nested object", () => {
     expect(container.querySelector(".rounded-md.border.border-input.p-2")).toBeNull();
   });
 
+  it("renders a section with no header when the schema gives it an empty title", () => {
+    // A host that already titled the field (its own collapsible section, a
+    // dialog heading) says so with `title: ""`; repeating the name inside would
+    // be the same word twice. A MISSING title still falls back to the key.
+    const untitled: JsonSchemaObject = {
+      type: "object",
+      properties: { db: { ...(schema.properties!.db as JsonSchemaObject), title: "" } },
+    };
+    const { container } = render(<JsonSchemaForm schema={untitled} value={{ db: { host: "x" } }} onChange={vi.fn()} />);
+
+    expect([...container.querySelectorAll("div")].filter((el) => el.className.includes("font-semibold"))).toEqual([]);
+    expect(screen.getByText("host")).toBeInTheDocument();
+  });
+
   it("renders allOf-composed object fields as a structured form, not a string map", () => {
     const policySchema: JsonSchemaObject = {
       type: "object",

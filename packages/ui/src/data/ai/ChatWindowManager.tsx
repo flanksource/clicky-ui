@@ -8,6 +8,7 @@ import {
   MAX_PANELS,
   DEFAULT_WIDTH,
   DEFAULT_HEIGHT,
+  fitPanelToViewport,
   CASCADE_OFFSET,
   Z_BASE,
   type ChatWindowManagerValue,
@@ -70,7 +71,7 @@ export function ChatWindowManagerProvider({
       setPanels((prev) => {
         if (prev.length >= MAX_PANELS) return prev;
         const pos = defaultPosition(prev.length);
-        const panel: ChatWindowState = {
+        const panel: ChatWindowState = fitPanelToViewport({
           id,
           threadId: opts?.threadId ?? null,
           initialModel: opts?.initialModel ?? null,
@@ -84,7 +85,7 @@ export function ChatWindowManagerProvider({
           proposedPrompts: opts?.proposedPrompts ?? [],
           contextItems: opts?.contextItems ?? [],
           toolPolicy: opts?.toolPolicy ?? [],
-        };
+        });
         const updated = reindex([...prev, panel], id);
         scheduleSave(updated);
         return updated;

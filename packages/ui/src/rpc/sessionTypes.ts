@@ -50,6 +50,18 @@ export type SessionStreamRef = {
   store: SessionStoreLocation;
 };
 
+/**
+ * One thing a capture reported about how it runs once armed — the statements
+ * that opened an Extended Events session, say. `name` keys it within the
+ * session; `language` names `value`'s language when it is code (`sql`).
+ */
+export type SessionMetadata = {
+  name: string;
+  label: string;
+  language?: string;
+  value: string;
+};
+
 export type SessionInfo = {
   // SessionStart — written once.
   schemaVersion: number;
@@ -79,6 +91,8 @@ export type SessionInfo = {
   events?: SessionStreamRef;
   summary?: unknown;
   result?: unknown;
+  /** Written once the capture is armed, then kept. */
+  metadata?: SessionMetadata[];
 
   // Derived by the serving process.
   /** Live in this process's registry: Stop and Extend act on it. */
@@ -143,10 +157,27 @@ export function parseSessionInfo(value: unknown, source: string): SessionInfo {
     fail("restartedAs", "an array of session ids");
   }
   if (value.events !== undefined) checkStreamRef(value.events, fail);
+  if (value.metadata !== undefined) checkMetadata(value.metadata, fail);
   return value as SessionInfo;
 }
 
 type FieldFailure = (field: string, expected: string, got?: unknown) => never;
+
+function checkMetadata(metadata: unknown, fail: FieldFailure): void {
+  if (!Array.isArray(metadata)) return fail("metadata", "an array of metadata entries", metadata);
+  metadata.forEach((entry: unknown, index) => {
+    const at = `metadata[${index}]`;
+    if (!isRecord(entry)) return fail(at, "{name, label, value: string, language?: string}", entry);
+    for (const field of ["name", "label", "value"]) {
+      if (typeof entry[field] !== "string" || entry[field] === "") {
+        fail(`${at}.${field}`, "a non-empty string", entry[field]);
+      }
+    }
+    if (entry.language !== undefined && typeof entry.language !== "string") {
+      fail(`${at}.language`, "a string when present", entry.language);
+    }
+  });
+}
 
 function checkStreamRef(events: unknown, fail: FieldFailure): void {
   if (!isRecord(events)) return fail("events", "a stream reference object", events);
