@@ -7,6 +7,7 @@ import {
   JVM_TRACE_EVENTS,
   KV_STORE_EVENTS,
   STOPPED_JVM_TRACE_SESSION,
+  STOPPED_SQL_XEVENT_SESSION,
   runningSessionFixture,
   sessionFixture,
 } from "./session-story.fixtures";
@@ -262,6 +263,34 @@ describe("SessionHeader identity", () => {
       "via=http",
       "environment=oipa.lab",
     ]);
+  });
+});
+
+describe("SessionHeader metadata", () => {
+  const withStatements = STOPPED_SQL_XEVENT_SESSION;
+  const disclosure = (container: HTMLElement) =>
+    container.querySelector<HTMLDetailsElement>('[data-slot="session-metadata"]');
+
+  it("renders each entry collapsed, labelled with its language", () => {
+    const { container } = renderHeader({ session: withStatements });
+    const details = disclosure(container)!;
+    expect(details.open).toBe(false);
+    expect(within(details.querySelector("summary")!).getByText("Started with")).toBeInTheDocument();
+    expect(within(details.querySelector("summary")!).getByText("sql")).toBeInTheDocument();
+  });
+
+  it("shows the value with a copy button once expanded", () => {
+    const { container } = renderHeader({ session: withStatements });
+    const details = disclosure(container)!;
+    fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(true);
+    expect(details.textContent).toContain("ALTER EVENT SESSION [trace_7c1e2f4a] ON SERVER STATE = START;");
+    expect(within(details).getByRole("button", { name: /copy/i })).toBeInTheDocument();
+  });
+
+  it("renders no disclosure for a session that reported no metadata", () => {
+    const { container } = renderHeader();
+    expect(disclosure(container)).toBeNull();
   });
 });
 

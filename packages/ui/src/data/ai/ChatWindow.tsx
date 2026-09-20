@@ -516,8 +516,8 @@ export function ChatWindow({
           height: panel.height,
         }}
         style={{ pointerEvents: "auto" }}
-        minWidth={360}
-        minHeight={400}
+        minWidth={Math.min(360, Math.max(1, window.innerWidth - 32))}
+        minHeight={Math.min(400, Math.max(1, window.innerHeight - 32))}
         bounds="parent"
         dragHandleClassName="chat-drag-handle"
         disableDragging={panel.maximized}

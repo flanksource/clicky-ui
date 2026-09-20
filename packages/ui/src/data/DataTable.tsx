@@ -71,6 +71,12 @@ import {
   MenuActionSection,
   ThemeMenuSection,
 } from "./DataTableMenuSections";
+import {
+  menuStateFromPointer,
+  menuStateFromTrigger,
+  useMenuPanelPosition,
+  type ColumnMenuState,
+} from "./dataTableMenuPosition";
 import { DataTablePreferencesSheet } from "./DataTablePreferencesSheet";
 import { SortableHeader } from "./SortableHeader";
 import { Timestamp } from "./cells/Timestamp";
@@ -196,12 +202,6 @@ const DATA_TABLE_HEADER_DENSITY_CLASS =
   "px-2.5 py-1.5 density-compact:px-2 density-compact:py-1 density-comfortable:px-2.5 density-comfortable:py-1.5 density-spacious:px-4 density-spacious:py-3";
 const DATA_TABLE_CELL_DENSITY_CLASS =
   "px-2.5 py-1.5 density-compact:px-2 density-compact:py-0.5 density-comfortable:px-2.5 density-comfortable:py-1.5 density-spacious:px-4 density-spacious:py-3";
-
-type ColumnMenuState = {
-  x: number;
-  y: number;
-  columnKey?: string;
-};
 
 export type DataTableRowDetailContext<
   T extends Record<string, unknown> = Record<string, unknown>,
@@ -847,6 +847,12 @@ type DataTableInnerProps<
   persistColumnVisibility?: boolean;
   /** Storage key for persisted column visibility. */
   columnVisibilityStorageKey?: string;
+  /**
+   * Column keys that start hidden but stay listed in the column menu, unlike
+   * Clicky's `hiddenColumns`, which removes a column outright. Persisted
+   * visibility is stored as overrides of these defaults.
+   */
+  defaultHiddenColumns?: string[];
   /** Controlled row density. */
   density?: Density;
   /** Initial row density for uncontrolled usage. */
@@ -1002,6 +1008,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   hideableColumns = true,
   persistColumnVisibility = true,
   columnVisibilityStorageKey,
+  defaultHiddenColumns: defaultHiddenColumnsInput,
   density,
   defaultDensity,
   onDensityChange,
@@ -1046,11 +1053,20 @@ function DataTableInner<T extends Record<string, unknown>>({
         ? readStoredColumnWidths(resolvedColumnResizeStorageKey, columns)
         : {},
   );
+  const defaultHiddenSignature = (defaultHiddenColumnsInput ?? []).join("|");
+  const defaultHiddenColumns = useMemo<ReadonlySet<string>>(
+    () => new Set(defaultHiddenColumnsInput ?? []),
+    [defaultHiddenSignature],
+  );
   const [hiddenColumns, setHiddenColumns] = useState<Record<string, boolean>>(
     () =>
       persistColumnVisibility
-        ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
-        : {},
+        ? readStoredHiddenColumns(
+            resolvedColumnVisibilityStorageKey,
+            columns,
+            defaultHiddenColumns,
+          )
+        : pruneHiddenColumns({}, columns, defaultHiddenColumns),
   );
   const densityControlled = density !== undefined;
   const [localDensityOverride, setLocalDensityOverride] = useState<
@@ -1119,21 +1135,35 @@ function DataTableInner<T extends Record<string, unknown>>({
   useEffect(() => {
     setHiddenColumns((current) => {
       const stored = persistColumnVisibility
-        ? readStoredHiddenColumns(resolvedColumnVisibilityStorageKey, columns)
+        ? readStoredHiddenColumns(
+            resolvedColumnVisibilityStorageKey,
+            columns,
+            defaultHiddenColumns,
+          )
         : {};
-      const next = pruneHiddenColumns({ ...stored, ...current }, columns);
+      const next = pruneHiddenColumns(
+        { ...stored, ...current },
+        columns,
+        defaultHiddenColumns,
+      );
       return sameHiddenColumns(current, next) ? current : next;
     });
   }, [
     columnKeysSignature,
+    defaultHiddenColumns,
     persistColumnVisibility,
     resolvedColumnVisibilityStorageKey,
   ]);
 
   useEffect(() => {
     if (!persistColumnVisibility) return;
-    writeStoredHiddenColumns(resolvedColumnVisibilityStorageKey, hiddenColumns);
+    writeStoredHiddenColumns(
+      resolvedColumnVisibilityStorageKey,
+      hiddenColumns,
+      defaultHiddenColumns,
+    );
   }, [
+    defaultHiddenColumns,
     hiddenColumns,
     persistColumnVisibility,
     resolvedColumnVisibilityStorageKey,
@@ -2401,17 +2431,26 @@ function DataTableInner<T extends Record<string, unknown>>({
       if (!hidden && visibleHideableColumnCount <= 1) return current;
 
       const next = { ...current };
-      if (hidden) {
-        delete next[column.key];
-      } else {
+      if (!hidden) {
         next[column.key] = true;
+      } else if (defaultHiddenColumns.has(column.key)) {
+        next[column.key] = false;
+      } else {
+        delete next[column.key];
       }
 
-      return pruneHiddenColumns(next, columns);
+      return pruneHiddenColumns(next, columns, defaultHiddenColumns);
     });
   };
 
-  const showAllColumns = () => setHiddenColumns({});
+  const showAllColumns = () =>
+    setHiddenColumns(
+      pruneHiddenColumns(
+        Object.fromEntries([...defaultHiddenColumns].map((key) => [key, false])),
+        columns,
+        defaultHiddenColumns,
+      ),
+    );
 
   const openHeaderColumnMenu = (
     event: ReactMouseEvent<HTMLTableCellElement>,
@@ -3655,6 +3694,7 @@ function HeaderFilterMenu({
   anchor: ColumnMenuState;
   onClose: () => void;
 }) {
+  const position = useMenuPanelPosition(anchor);
   if (!filter && !timeRange) return null;
 
   const label = filter?.label ?? "Time range";
@@ -3662,10 +3702,11 @@ function HeaderFilterMenu({
 
   return (
     <div
+      ref={position.ref}
       role="dialog"
       aria-label={`${label} column filter`}
-      className="fixed z-50 max-h-[calc(100vh-1rem)] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
-      style={{ left: anchor.x, top: anchor.y }}
+      className="z-50 max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg shadow-black/5"
+      style={position.style}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
@@ -3779,13 +3820,15 @@ function ColumnVisibilityMenu<T extends Record<string, unknown>>({
     isColumnHideable(activeColumn) &&
     visibleHideableColumnCount > 1;
   const hasActions = actions.length > 0;
+  const position = useMenuPanelPosition(anchor);
 
   return (
     <div
+      ref={position.ref}
       role="menu"
       aria-label="Column menu"
-      className="fixed z-50 max-h-[calc(100vh-1rem)] min-w-[16rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
-      style={{ left: anchor.x, top: anchor.y }}
+      className="z-50 min-w-[16rem] max-w-[calc(100vw-1rem)] overflow-auto rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg shadow-black/5"
+      style={position.style}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
@@ -4173,56 +4216,6 @@ function applyKindDefaults<T extends Record<string, unknown>>(
   return column;
 }
 
-function menuStateFromPointer(
-  event: ReactMouseEvent<HTMLElement>,
-  columnKey?: string,
-): ColumnMenuState {
-  const padding = 8;
-  const width = 256;
-  const height = 320;
-  const viewportWidth =
-    typeof window === "undefined" ? event.clientX + width : window.innerWidth;
-  const viewportHeight =
-    typeof window === "undefined" ? event.clientY + height : window.innerHeight;
-
-  const position = {
-    x: Math.max(
-      padding,
-      Math.min(event.clientX, viewportWidth - width - padding),
-    ),
-    y: Math.max(
-      padding,
-      Math.min(event.clientY, viewportHeight - height - padding),
-    ),
-  };
-  return columnKey ? { ...position, columnKey } : position;
-}
-
-function menuStateFromTrigger(
-  event: ReactMouseEvent<HTMLElement>,
-  columnKey?: string,
-): ColumnMenuState {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const padding = 8;
-  const width = 256;
-  const height = 320;
-  const viewportWidth =
-    typeof window === "undefined" ? rect.right + width : window.innerWidth;
-  const viewportHeight =
-    typeof window === "undefined" ? rect.bottom + height : window.innerHeight;
-
-  const position = {
-    x: Math.max(
-      padding,
-      Math.min(rect.right - width, viewportWidth - width - padding),
-    ),
-    y: Math.max(
-      padding,
-      Math.min(rect.bottom + 6, viewportHeight - height - padding),
-    ),
-  };
-  return columnKey ? { ...position, columnKey } : position;
-}
 
 function columnStyle<T extends Record<string, unknown>>(
   column: DataTableColumn<T>,
@@ -4307,37 +4300,51 @@ function writeStoredColumnWidths(
   } catch {}
 }
 
+// Stored visibility is a diff against the defaults: `true` hides a column that
+// is not default-hidden, `false` shows one that is.
 function readStoredHiddenColumns<T extends Record<string, unknown>>(
   storageKey: string,
   columns: DataTableColumn<T>[],
+  defaultHidden: ReadonlySet<string>,
 ): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
+  const defaults = pruneHiddenColumns({}, columns, defaultHidden);
+  if (typeof window === "undefined") return defaults;
 
   try {
     const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {};
+    if (!raw) return defaults;
 
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-      return {};
+      return defaults;
 
-    return pruneHiddenColumns(parsed as Record<string, unknown>, columns);
+    return pruneHiddenColumns(
+      parsed as Record<string, unknown>,
+      columns,
+      defaultHidden,
+    );
   } catch {
-    return {};
+    return defaults;
   }
 }
 
 function writeStoredHiddenColumns(
   storageKey: string,
   hiddenColumns: Record<string, boolean>,
+  defaultHidden: ReadonlySet<string>,
 ) {
   if (typeof window === "undefined") return;
 
+  const overrides = Object.fromEntries(
+    Object.entries(hiddenColumns).filter(
+      ([key, hidden]) => hidden !== defaultHidden.has(key),
+    ),
+  );
   try {
-    if (Object.keys(hiddenColumns).length === 0) {
+    if (Object.keys(overrides).length === 0) {
       window.localStorage.removeItem(storageKey);
     } else {
-      window.localStorage.setItem(storageKey, JSON.stringify(hiddenColumns));
+      window.localStorage.setItem(storageKey, JSON.stringify(overrides));
     }
   } catch {}
 }
@@ -4390,26 +4397,34 @@ function pruneColumnWidths<T extends Record<string, unknown>>(
   return next;
 }
 
+// Returns the effective map for the current columns: default-hidden hideable
+// columns start `true`, then `hiddenColumns` overlays them. `false` is kept
+// only for a default-hidden column the viewer chose to show.
 function pruneHiddenColumns<T extends Record<string, unknown>>(
   hiddenColumns: Record<string, unknown>,
   columns: DataTableColumn<T>[],
+  defaultHidden: ReadonlySet<string>,
 ): Record<string, boolean> {
-  const byKey = new Map(columns.map((column) => [column.key, column]));
+  const hideable = columns.filter(isColumnHideable);
+  const hideableKeys = new Set(hideable.map((column) => column.key));
   const next: Record<string, boolean> = {};
 
+  for (const key of defaultHidden) {
+    if (hideableKeys.has(key)) next[key] = true;
+  }
   for (const [key, hidden] of Object.entries(hiddenColumns)) {
-    const column = byKey.get(key);
-    if (!column || hidden !== true || !isColumnHideable(column)) continue;
-
-    next[key] = true;
+    if (!hideableKeys.has(key)) continue;
+    if (hidden === true) next[key] = true;
+    else if (hidden === false && defaultHidden.has(key)) next[key] = false;
   }
 
-  const hideable = columns.filter(isColumnHideable);
   const visibleHideableCount = hideable.filter(
     (column) => next[column.key] !== true,
   ).length;
   if (hideable.length > 0 && visibleHideableCount === 0) {
-    delete next[hideable[0]!.key];
+    const firstKey = hideable[0]!.key;
+    if (defaultHidden.has(firstKey)) next[firstKey] = false;
+    else delete next[firstKey];
   }
 
   return next;

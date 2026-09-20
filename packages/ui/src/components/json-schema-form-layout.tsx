@@ -251,6 +251,12 @@ export function HelpHint({ label, helper }: { label: string; helper: string }) {
 // read as flat, headed groups rather than indented sub-forms. `col-span-full`
 // makes it span both tracks of an inline FieldsGrid (full width, not crammed
 // into the value column); in a stacked single-column grid it is a no-op.
+//
+// A field whose schema gives it an EMPTY title renders with no header at all:
+// the host already titled it (a collapsible section of its own, a dialog), and
+// a headed section inside that one would say the same word twice. A missing
+// title is not this — it falls back to the humanised key, as every other
+// control does — so only an explicit `"title": ""` opts out.
 export function ObjectSection({
   label,
   required,
@@ -271,6 +277,7 @@ export function ObjectSection({
   children: ReactNode;
 }) {
   const hoverHelp = helpDisplay === "hover" && !!helper;
+  const headed = label !== "";
   return (
     <div
       className={cn(
@@ -278,6 +285,7 @@ export function ObjectSection({
         fieldInnerGapClass[size],
       )}
     >
+      {headed && (
       <div
         className={cn(
           "flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold",
@@ -297,6 +305,7 @@ export function ObjectSection({
         )}
         {hoverHelp && helper && <HelpHint label={label} helper={helper} />}
       </div>
+      )}
       {helper && !hoverHelp && (
         <p className="min-w-0 break-words text-xs text-muted-foreground">
           {helper}

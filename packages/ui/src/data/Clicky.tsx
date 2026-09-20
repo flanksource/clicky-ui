@@ -139,6 +139,11 @@ export type ClickyColumn = {
   /** Maximum column width in pixels — bounds a `grow` column's share of the leftover space. */
   maxWidth?: number;
   kind?: "timestamp" | "tags" | "status";
+  /**
+   * Starts hidden but stays listed in the column menu, so a viewer can show
+   * it. Unlike a `hiddenColumns` entry, which removes the column outright.
+   */
+  defaultHidden?: boolean;
 };
 
 export type ClickyRow = {
@@ -3311,6 +3316,10 @@ export function ClickyTable({
     return <ClickyCollapsedStructRows columns={visibleColumns} rows={rows} />;
   }
 
+  // Keyed by every column the server declared, not just the visible ones: a
+  // host reads hidden columns' values too, and reads their absences the same way.
+  const columnsByName = new Map(columns.map((column) => [column.name, column]));
+
   const tableColumns: DataTableColumn<ClickyRow>[] = visibleColumns.map<DataTableColumn<ClickyRow>>((column) => {
     const tagColumn = isClickyTagColumn(column);
     const keyValueColumn = isClickyKeyValueColumn(column);
@@ -3359,7 +3368,7 @@ export function ClickyTable({
       return {
         ...base,
         kind: "timestamp",
-        accessor: (row) => clickyCellRawValue(row.cells[column.name]),
+        accessor: (row) => clickyCellRawValue(row.cells[column.name], column),
         serverFilterValue: (value) =>
           typeof value === "string" || typeof value === "number"
             ? String(value)
@@ -3422,7 +3431,7 @@ export function ClickyTable({
   }).map((tableColumn, index) => {
     const render = effectiveCellRenderers?.[visibleColumns[index]!.name];
     return render
-      ? { ...tableColumn, render: (value: unknown, row: ClickyRow) => render(clickyCellRawValue(value as ClickyNode), clickyRowRawValues(row)) }
+      ? { ...tableColumn, render: (value: unknown, row: ClickyRow) => render(clickyCellRawValue(value as ClickyNode, visibleColumns[index]), clickyRowRawValues(row, columnsByName)) }
       : tableColumn;
   });
 
@@ -3475,6 +3484,9 @@ export function ClickyTable({
       className="min-h-0 flex-1"
       data={rows}
       columns={tableColumns}
+      defaultHiddenColumns={visibleColumns
+        .filter((column) => column.defaultHidden)
+        .map((column) => `cells.${column.name}`)}
       {...(autoFilter !== undefined ? { autoFilter } : {})}
       {...(defaultSortColumn
         ? {
@@ -3492,8 +3504,8 @@ export function ClickyTable({
         : {})}
       getRowId={(row, index) =>
         effectiveRowSelection?.getRowId(row, index) ??
-        (effectiveRenderRowCard && typeof clickyRowRawValues(row).id === "string"
-          ? String(clickyRowRawValues(row).id)
+        (effectiveRenderRowCard && typeof clickyRowRawValues(row, columnsByName).id === "string"
+          ? String(clickyRowRawValues(row, columnsByName).id)
           : undefined) ??
         `${index}-${visibleColumns
           .map((column) => clickyNodeText(row.cells[column.name]))
@@ -3526,11 +3538,11 @@ export function ClickyTable({
       {...(effectiveRenderRowDetail
         ? {
             renderExpandedRow: (row: ClickyRow) =>
-              effectiveRenderRowDetail(clickyRowRawValues(row)),
+              effectiveRenderRowDetail(clickyRowRawValues(row, columnsByName)),
           }
         : {})}
       {...(effectiveRenderRowCard
-        ? { renderCard: (row: ClickyRow) => effectiveRenderRowCard(clickyRowRawValues(row)) }
+        ? { renderCard: (row: ClickyRow) => effectiveRenderRowCard(clickyRowRawValues(row, columnsByName)) }
         : {})}
       {...(effectiveDetailStyle ? { detailStyle: effectiveDetailStyle } : {})}
       {...(effectiveDetailDialogSize
@@ -3539,7 +3551,7 @@ export function ClickyTable({
       {...(effectiveDetailDialogTitle
         ? {
             detailDialogTitle: (row: ClickyRow) =>
-              effectiveDetailDialogTitle(clickyRowRawValues(row)),
+              effectiveDetailDialogTitle(clickyRowRawValues(row, columnsByName)),
           }
         : {})}
     />
@@ -4330,13 +4342,32 @@ function clickyNodeSortValue(
 }
 
 /**
+ * Column types whose values are not text. A cell in one of these carries its
+ * value as `filterValue`, with its text being the formatted display ("4.3 s"
+ * for 4289), so a cell with neither holds no value — where in a text column an
+ * empty cell holds "". Both producers are covered: the types a clicky pretty
+ * field declares and the ones a query profile's column declares (`number`,
+ * `datetime`). It stays an allowlist on purpose — a type not named here keeps
+ * the text reading it has always had, rather than a guess about its values.
+ */
+const NON_TEXT_COLUMN_TYPES: ReadonlySet<string> = new Set([
+  "number", "int", "integer", "float", "decimal", "currency", "bytes", "duration",
+  "boolean", "bool", "date", "datetime", "time", "timestamp",
+]);
+
+/**
  * clickyCellRawValue is the raw value a host row-detail renderer sees for one
  * cell — the server's scalar over its rendered text, and the structured
  * payload itself for the two tree/graph node kinds, so a renderer can hand
  * `executionRoots` straight to `<ExecutionTree>` / `objects` to `<ObjectGraph>`
  * without re-parsing text the server already gave it structured.
+ *
+ * `column` is what the cell's absence is read against: a valueless cell in a
+ * non-text column is null, not the "" its empty display text would give, so a
+ * host decoding a nullable number or date reads the same absence it reads from
+ * the server's JSON rows instead of a string its column can never hold.
  */
-function clickyCellRawValue(node: ClickyNode | null | undefined): unknown {
+function clickyCellRawValue(node: ClickyNode | null | undefined, column?: ClickyColumn): unknown {
   if (node == null) return undefined;
   if (node.kind === "execution-tree") return node.executionRoots ?? [];
   if (node.kind === "object-graph") return node.objects ?? [];
@@ -4344,7 +4375,11 @@ function clickyCellRawValue(node: ClickyNode | null | undefined): unknown {
     return clickyNodeJSONValue(node);
   }
   if (node.filterValue !== undefined) return node.filterValue;
-  return clickyNodeText(node);
+  const text = clickyNodeText(node);
+  if (text === "" && column?.type !== undefined && NON_TEXT_COLUMN_TYPES.has(column.type)) {
+    return null;
+  }
+  return text;
 }
 
 /**
@@ -4352,13 +4387,17 @@ function clickyCellRawValue(node: ClickyNode | null | undefined): unknown {
  * a host `renderRowDetail` receives: every cell the server sent, keyed by
  * column name, including columns the server omitted from `columns` (and so
  * never render as a visible header/cell) — a hidden JSON column carrying a
- * call tree is exactly this case.
+ * call tree is exactly this case. Those cells have no column to read an
+ * absence against, and keep their text reading.
  */
-function clickyRowRawValues(row: ClickyRow): Record<string, unknown> {
+function clickyRowRawValues(
+  row: ClickyRow,
+  columnsByName: ReadonlyMap<string, ClickyColumn>,
+): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(row.cells).map(([name, node]) => [
       name,
-      clickyCellRawValue(node),
+      clickyCellRawValue(node, columnsByName.get(name)),
     ]),
   );
 }

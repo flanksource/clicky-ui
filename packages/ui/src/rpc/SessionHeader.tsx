@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { Badge } from "../data/Badge";
 import { Callout } from "../data/Callout";
+import { CodeBlock } from "../data/CodeBlock";
 import { Icon } from "../data/Icon";
 import { useResourceClock } from "../hooks/use-resource-clock";
-import { UiClockCountdown, UiServer, UiWarningTriangle } from "../icons";
+import { UiChevronRight, UiClockCountdown, UiServer, UiWarningTriangle } from "../icons";
 import { cn } from "../lib/utils";
 import type { RenderLink } from "./EndpointList";
 import {
@@ -147,6 +148,25 @@ export function SessionHeader({
               )}
             </div>
           )}
+          {session.metadata?.map((entry) => (
+            <details key={entry.name} className="group text-xs" data-slot="session-metadata">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-muted-foreground hover:text-foreground">
+                <Icon icon={UiChevronRight} className="size-3.5 transition-transform group-open:rotate-90" />
+                {entry.label}
+                {entry.language && (
+                  <Badge tone="neutral" variant="outline" size="xs" className="uppercase">
+                    {entry.language}
+                  </Badge>
+                )}
+              </summary>
+              <CodeBlock
+                language={entry.language ?? "text"}
+                source={entry.value}
+                copyable
+                className="mt-2"
+              />
+            </details>
+          ))}
         </div>
         <SessionHeaderControls
           session={session}

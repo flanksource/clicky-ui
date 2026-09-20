@@ -73,6 +73,20 @@ export const DEFAULT_HEIGHT = 700;
 export const CASCADE_OFFSET = 30;
 export const Z_BASE = zIndex.chatWindow;
 
+export function fitPanelToViewport(panel: ChatWindowState): ChatWindowState {
+  if (typeof window === "undefined") return panel;
+  const margin = Math.min(16, Math.floor(window.innerWidth / 4), Math.floor(window.innerHeight / 4));
+  const width = Math.min(panel.width, Math.max(1, window.innerWidth - 2 * margin));
+  const height = Math.min(panel.height, Math.max(1, window.innerHeight - 2 * margin));
+  return {
+    ...panel,
+    x: Math.min(Math.max(margin, panel.x), window.innerWidth - width - margin),
+    y: Math.min(Math.max(margin, panel.y), window.innerHeight - height - margin),
+    width,
+    height,
+  };
+}
+
 function storageKey(storageId: string) {
   return `chat-panels:${storageId}`;
 }
@@ -93,7 +107,7 @@ export function loadPanels(storageId: string): ChatWindowState[] {
     const raw = localStorage.getItem(storageKey(storageId));
     if (!raw) return [];
     const persisted: PersistedPanel[] = JSON.parse(raw);
-    return persisted.map((p, i) => ({
+    return persisted.map((p, i) => fitPanelToViewport({
       ...p,
       initialModel: null,
       zIndex: Z_BASE + i,

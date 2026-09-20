@@ -251,7 +251,9 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
   const base: FieldControl = {
     key,
     kind: "string",
-    label: typeof prop.title === "string" && prop.title ? prop.title : key,
+    // An explicit empty title is a field saying it needs no label of its own —
+    // its host already named it. Only a MISSING title falls back to the key.
+    label: typeof prop.title === "string" ? prop.title : key,
     required,
     schema: prop,
     value,

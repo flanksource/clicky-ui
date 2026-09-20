@@ -1,4 +1,4 @@
-import type { SessionInfo, SessionStreamRef } from "./sessionTypes";
+import type { SessionInfo, SessionMetadata, SessionStreamRef } from "./sessionTypes";
 
 export const JVM_TRACE_EVENTS: SessionStreamRef = {
   stream: "probe:FileMessageListener.onMessage.617519d6",
@@ -88,3 +88,34 @@ export function runningSessionFixture(stopAt: string, overrides: Partial<Session
 
 /** The same events in a kv store: the server omits host and file, since a kv backend has neither. */
 export const KV_STORE_EVENTS: SessionStreamRef = { ...JVM_TRACE_EVENTS, store: { backend: "kv" } };
+
+/** What a SQL Server Extended Events capture reports once armed: the statements that opened it. */
+export const SQL_XEVENT_STATEMENTS: SessionMetadata = {
+  name: "sql_xevent.statements",
+  label: "Started with",
+  language: "sql",
+  value: `CREATE EVENT SESSION [trace_7c1e2f4a] ON SERVER
+ADD EVENT sqlserver.rpc_completed (
+    ACTION (package0.event_sequence, sqlserver.client_app_name, sqlserver.client_hostname, sqlserver.database_name, sqlserver.session_id, sqlserver.sql_text, sqlserver.username)
+    WHERE ([duration] >= 1000 AND sqlserver.like_i_sql_unicode_string(sqlserver.database_name, N'POLICY[_]%') AND NOT (sqlserver.equal_i_sql_unicode_string(sqlserver.client_app_name, N'go/example-cli')) AND sqlserver.like_i_sql_unicode_string(sqlserver.client_hostname, N'cycle%'))
+),
+ADD EVENT sqlserver.sql_batch_completed (
+    ACTION (package0.event_sequence, sqlserver.client_app_name, sqlserver.client_hostname, sqlserver.database_name, sqlserver.session_id, sqlserver.sql_text, sqlserver.username)
+    WHERE ([duration] >= 1000 AND sqlserver.like_i_sql_unicode_string(sqlserver.database_name, N'POLICY[_]%') AND NOT (sqlserver.equal_i_sql_unicode_string(sqlserver.client_app_name, N'go/example-cli')) AND sqlserver.like_i_sql_unicode_string(sqlserver.client_hostname, N'cycle%'))
+)
+ADD TARGET package0.ring_buffer (SET max_memory = 4096, max_events_limit = 8192)
+WITH (MAX_DISPATCH_LATENCY = 1 SECONDS, TRACK_CAUSALITY = OFF, STARTUP_STATE = OFF);
+
+ALTER EVENT SESSION [trace_7c1e2f4a] ON SERVER STATE = START;`,
+};
+
+/** A stopped SQL Server trace, with the statements that opened its Extended Events session. */
+export const STOPPED_SQL_XEVENT_SESSION: SessionInfo = sessionFixture({
+  profile: "trace-capture/sql_xevent",
+  params: { database: "POLICY_*", host: "cycle*", minDuration: "1ms", durationMs: 600000 },
+  labels: { target: "sql", origin: "web", label: "SQL trace · cycle*", environment: "oipa.lab" },
+  handle: "trace_7c1e2f4a",
+  events: { ...JVM_TRACE_EVENTS, stream: "sql_xevent:trace_7c1e2f4a", kind: "sql_xevent" },
+  summary: { events: 1843, errors: 0 },
+  metadata: [SQL_XEVENT_STATEMENTS],
+});

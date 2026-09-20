@@ -40,3 +40,28 @@ describe("parseSessionInfo events", () => {
     expect(() => parseSessionInfo(session, SOURCE)).toThrow(`got ${got}`);
   });
 });
+
+describe("parseSessionInfo metadata", () => {
+  const STATEMENTS = { name: "sql_xevent.statements", label: "Started with", language: "sql", value: "CREATE EVENT SESSION [t] ON SERVER;" };
+
+  it.each([
+    { name: "an entry with a language", metadata: [STATEMENTS] },
+    { name: "an entry without one", metadata: [{ name: "target", label: "Target", value: "cycle-0" }] },
+  ])("accepts $name", ({ metadata }) => {
+    const session = sessionFixture({ metadata });
+    expect(parseSessionInfo(JSON.parse(JSON.stringify(session)), SOURCE)).toEqual(session);
+  });
+
+  it.each([
+    { field: "metadata", metadata: STATEMENTS, got: JSON.stringify(STATEMENTS) },
+    { field: "metadata[0]", metadata: ["CREATE EVENT SESSION"], got: '"CREATE EVENT SESSION"' },
+    { field: "metadata[0].name", metadata: [{ ...STATEMENTS, name: "" }], got: '""' },
+    { field: "metadata[0].label", metadata: [{ ...STATEMENTS, label: 1 }], got: "1" },
+    { field: "metadata[0].value", metadata: [{ ...STATEMENTS, value: undefined }], got: "undefined" },
+    { field: "metadata[1].language", metadata: [STATEMENTS, { ...STATEMENTS, name: "b", language: 7 }], got: "7" },
+  ])("names $field when it breaks the contract", ({ field, metadata, got }) => {
+    const session = { ...sessionFixture(), metadata };
+    expect(() => parseSessionInfo(session, SOURCE)).toThrow(`${SOURCE}: session field "${field}" must be`);
+    expect(() => parseSessionInfo(session, SOURCE)).toThrow(`got ${got}`);
+  });
+});
