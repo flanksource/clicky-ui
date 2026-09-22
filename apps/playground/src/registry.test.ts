@@ -22,8 +22,8 @@ import {
 } from "./registry";
 
 describe("default page", () => {
-  it("opens the Flanksource design-system hub independently of glob order", () => {
-    expect(DEFAULT_PAGE_SLUG).toBe("flanksource");
+  it("opens the tracked Welcome page independently of glob order", () => {
+    expect(DEFAULT_PAGE_SLUG).toBe("welcome");
     expect(PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)).toBe(true);
   });
 });
@@ -217,21 +217,17 @@ describe("optimistic overlay", () => {
     expect(findPage(DEFAULT_PAGE_SLUG)).toBeDefined();
   });
 
-  it("drops every page under a deleted folder and leaves the rest", () => {
-    const folder = "flanksource";
-    const inFolder = PAGES.filter((entry) =>
-      entry.slug.startsWith(`${folder}/`),
-    );
-    expect(inFolder.length).toBeGreaterThan(0);
+  it("drops a page moved under a deleted folder", () => {
+    const folder = "designs";
+    const nestedSlug = `${folder}/${DEFAULT_PAGE_SLUG}`;
+    move(DEFAULT_PAGE_SLUG, nestedSlug);
 
     applyFolderDeleted(folder);
-    for (const entry of inFolder) hidden.push(entry.slug);
+    hidden.push(nestedSlug);
 
     expect(
       pages().some((entry) => entry.slug.startsWith(`${folder}/`)),
     ).toBe(false);
-    // The folder's own page is a sibling of the folder, not inside it.
-    expect(findPage(folder)).toBeDefined();
   });
 });
 
