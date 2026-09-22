@@ -7,6 +7,7 @@ import {
   sessionDurationParam,
   type SessionInfo,
 } from "./sessionTypes";
+import { stripTrailingSlashes } from "../lib/string";
 
 // useSession reads one commons-db query session for a session page and drives
 // its control routes. It polls rather than subscribing: SessionInfo changes a
@@ -54,7 +55,7 @@ const DEFAULT_BASE_PATH = "/api/v1";
 type ActionRequest = { action: SessionAction; durationMs?: number };
 
 function sessionPath(basePath: string, id: string, action?: SessionAction, durationMs?: number) {
-  const path = `${basePath.replace(/\/+$/, "")}/sessions/${encodeURIComponent(id)}`;
+  const path = `${stripTrailingSlashes(basePath)}/sessions/${encodeURIComponent(id)}`;
   if (!action) return path;
   if (action === "stop") return `${path}/stop`;
   if (durationMs === undefined) throw new Error(`session ${action} requires a duration`);

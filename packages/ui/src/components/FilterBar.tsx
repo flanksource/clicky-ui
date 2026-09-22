@@ -2846,16 +2846,25 @@ function useDebouncedTextDraft(
   const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
   const latestOnChange = useRef(onChange);
+  const lastValue = useRef(value);
+  const skipDraftChange = useRef(false);
 
   useEffect(() => {
     latestOnChange.current = onChange;
   }, [onChange]);
 
   useEffect(() => {
+    if (lastValue.current === value) return;
+    lastValue.current = value;
+    skipDraftChange.current = true;
     setDraft(value);
   }, [value]);
 
   useEffect(() => {
+    if (skipDraftChange.current) {
+      skipDraftChange.current = false;
+      return;
+    }
     if (draft === value) return;
 
     if (!autoSubmit || draft === "") {
