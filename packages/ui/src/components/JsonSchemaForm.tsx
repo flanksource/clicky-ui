@@ -88,6 +88,7 @@ export function JsonSchemaForm({
   persistPreferences = true,
   preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
   lookupFetcher,
+  applyDefaults = true,
 }: JsonSchemaFormProps) {
   // When the menu is hidden, never touch localStorage and start from an empty
   // override so behaviour is identical to before this feature existed.
@@ -113,7 +114,13 @@ export function JsonSchemaForm({
   // pointers) is resolved once into a self-contained tree the renderer walks
   // directly; a non-bundled schema passes through untouched.
   const resolvedSchema = useMemo(() => rehydrateRefs(schema), [schema]);
-  const effectiveValue = useMemo(() => applySchemaDefaults(resolvedSchema, value), [resolvedSchema, value]);
+  // Suppressing at the value (not only at the commit effect below) is deliberate:
+  // renderObjectFields spreads `effectiveValue` when a single field changes, so a
+  // render-only application would still leak the defaults on the first edit.
+  const effectiveValue = useMemo(
+    () => (applyDefaults ? applySchemaDefaults(resolvedSchema, value) : value),
+    [applyDefaults, resolvedSchema, value],
+  );
   const preExtensions = pre ?? [];
   const unmatchedErrors = useMemo(
     () =>

@@ -328,4 +328,16 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    * distinct key to isolate a screen or form.
    */
   preferencesStorageKey?: string;
+  /**
+   * Whether JSON Schema `default` keywords are materialized into the form value.
+   * Defaults to true: for a form that authors a new document, a default is part
+   * of the value (a defaulted discriminator selects its if/then branch), so the
+   * form commits it through onChange on first render.
+   *
+   * Set false when `value` is a source-of-truth document the form only edits —
+   * a YAML file, a saved record — where committing defaults the file never wrote
+   * silently rewrites it. Defaults are then neither rendered nor committed: the
+   * form shows exactly what the document holds.
+   */
+  applyDefaults?: boolean;
 }

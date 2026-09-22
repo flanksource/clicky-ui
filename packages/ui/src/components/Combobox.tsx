@@ -358,6 +358,7 @@ export function Combobox(props: ComboboxProps) {
     setQuery("");
     setHighlighted(-1);
     inputRef.current?.focus();
+    setOpen(false);
   }
 
   // A tristate pill is removed by returning its value to neutral — there is no

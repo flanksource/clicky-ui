@@ -316,6 +316,59 @@ describe("JsonSchemaForm defaults", () => {
       authentication: { authType: "none" },
     });
   });
+
+  // A document the form only EDITS — a YAML file on disk, a saved record — must
+  // survive being opened. applyDefaults={false} makes the form show exactly what
+  // the document holds: no default is rendered, none is committed, and an edit to
+  // one field rewrites that leaf alone.
+  describe("applyDefaults={false}", () => {
+    const planFields: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        SchemeNumber: { type: "string", title: "Scheme number" },
+        AdminFee: { type: "string", title: "Admin fee", default: "00" },
+        AutoRenew: { type: "boolean", title: "Auto renew", default: true },
+      },
+    };
+    const authored = { SchemeNumber: "G0000011" };
+
+    it("commits and renders the defaults when the prop is left at its default", () => {
+      const onChange = vi.fn();
+      render(<JsonSchemaForm schema={planFields} value={authored} onChange={onChange} />);
+
+      expect(onChange).toHaveBeenCalledWith({
+        SchemeNumber: "G0000011",
+        AdminFee: "00",
+        AutoRenew: true,
+      });
+      expect(screen.getByDisplayValue("00")).toBeInTheDocument();
+      expect(screen.getByRole("checkbox")).toBeChecked();
+    });
+
+    it("commits no default and renders none", () => {
+      const onChange = vi.fn();
+      render(
+        <JsonSchemaForm schema={planFields} value={authored} onChange={onChange} applyDefaults={false} />,
+      );
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByDisplayValue("G0000011")).toBeInTheDocument();
+      expect(screen.queryByDisplayValue("00")).toBeNull();
+      expect(screen.getByRole("checkbox")).not.toBeChecked();
+    });
+
+    // Editing one field spreads the form's effective value, so suppressing only
+    // the commit effect would still leak every default on the first keystroke.
+    it("rewrites only the edited leaf, leaking no default on first edit", () => {
+      const onChange = vi.fn();
+      render(
+        <JsonSchemaForm schema={planFields} value={authored} onChange={onChange} applyDefaults={false} />,
+      );
+
+      fireEvent.change(screen.getByDisplayValue("G0000011"), { target: { value: "G0000012" } });
+      expect(onChange).toHaveBeenCalledWith({ SchemeNumber: "G0000012" });
+    });
+  });
 });
 
 describe("JsonSchemaForm field suffix slot", () => {

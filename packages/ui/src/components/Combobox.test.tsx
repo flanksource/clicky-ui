@@ -36,12 +36,22 @@ describe("Combobox clear button", () => {
     expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
   });
 
-  it("clears the value and input when clicked", () => {
+  it("requests an empty value when cleared", () => {
     const onChange = vi.fn();
     render(<Combobox value="PrimaryDB" onChange={onChange} options={OPTIONS} />);
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(onChange).toHaveBeenCalledWith("");
-    expect(screen.getByRole("combobox")).toHaveValue("");
+  });
+
+  it("keeps the preset menu closed after clearing a value", () => {
+    const onChange = vi.fn();
+    render(<Combobox value="PrimaryDB" onChange={onChange} options={OPTIONS} />);
+    const clearButton = screen.getByRole("button", { name: "Clear" });
+    fireEvent.focus(clearButton);
+    fireEvent.click(clearButton);
+
+    expect(onChange).toHaveBeenCalledWith("");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
   it("hides the clear button when required, even with a value", () => {
