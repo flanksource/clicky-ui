@@ -1,5 +1,5 @@
 import { parse } from "yaml";
-import { stripSurroundingDashes } from "../../lib/string";
+import { stripSurroundingChars } from "../../lib/string";
 import type { ProfileWizardDraft } from "../wizard/profileWizardModel";
 
 export function parseProfileYamlDocument(value: string): ProfileWizardDraft {
@@ -12,7 +12,7 @@ export function profileYamlFilename(name?: string): string {
   const safeName =
     name === undefined
       ? undefined
-      : stripSurroundingDashes(name.trim().replace(/[^a-zA-Z0-9._-]+/g, "-"));
+      : stripSurroundingChars(name.trim().replace(/[^a-zA-Z0-9._-]+/g, "-"), "-");
   return `${safeName || "profile"}.yaml`;
 }
 

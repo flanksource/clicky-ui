@@ -76,10 +76,25 @@ export function componentNameForSelection(row: SelectionRow): string {
 export function resolveAliasTarget(consumerName: string): string | null {
   const arrow = consumerName.indexOf(" -> ");
   if (arrow < 0) return null;
-  return consumerName
-    .slice(arrow + 4)
-    .replace(/\s*\(.*\)\s*$/, "")
-    .trim();
+  // Index scan instead of `.replace(/\s*\(.*\)\s*$/, "")`, whose `.*` rescans
+  // the tail from every "(" in a row of them.
+  const target = consumerName.slice(arrow + 4).trimEnd();
+  const note = target.indexOf("(");
+  return (note >= 0 && target.endsWith(")") ? target.slice(0, note) : target).trim();
+}
+
+/** The alias side of a `"<alias> -> <target>"` row. */
+export function stripAliasArrow(consumerName: string): string {
+  const arrow = consumerName.indexOf("->");
+  return (arrow < 0 ? consumerName : consumerName.slice(0, arrow)).trimEnd();
+}
+
+/** Span of the root `<svg …>` open tag, or null when the text has none. */
+export function svgOpenTag(svg: string): { start: number; end: number } | null {
+  const start = svg.search(/<svg[\s/>]/i);
+  if (start < 0) return null;
+  const close = svg.indexOf(">", start);
+  return close < 0 ? null : { start, end: close + 1 };
 }
 
 export function cacheFileName(spec: string): string {
@@ -126,7 +141,8 @@ export function hasJetbrainsApacheHeader(svg: string): boolean {
 }
 
 export function validateDownloadedSvg(spec: string, svg: string): string {
-  if (!/<svg\b[^>]*>[\s\S]*<\/svg>\s*$/i.test(svg)) {
+  const open = svgOpenTag(svg);
+  if (!open || !svg.slice(open.end).trimEnd().toLowerCase().endsWith("</svg>")) {
     throw new Error(`JetBrains icon "${spec}" is not complete SVG artwork`);
   }
   if (

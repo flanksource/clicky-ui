@@ -1,5 +1,5 @@
 import type { JsonSchemaObject } from "../../components/json-schema-form-types";
-import { stripSurroundingDashes } from "../../lib/string";
+import { stripSurroundingChars } from "../../lib/string";
 import { profileSchema } from "../profileApi";
 import { validateProfileParams } from "../fields/profileParamModel";
 import type {
@@ -228,7 +228,7 @@ export function profileUpdateConflictTarget(error: string): string | null {
 }
 
 export function profileRoute(name: string): string {
-  const slug = stripSurroundingDashes(
+  const slug = stripSurroundingChars(
     Array.from(name.trim().toLowerCase())
       .map((character) =>
         /[a-z0-9]/.test(character)
@@ -238,6 +238,7 @@ export function profileRoute(name: string): string {
             : "",
       )
       .join(""),
+    "-",
   );
   return `/profile-${slug}`;
 }
