@@ -1,1 +1,0 @@
-import{r as e}from"./iframe-Cvtq5r5o.js";function u(t){const[r,o]=e.useState(Date.now);return e.useEffect(()=>{if(!t)return;const n=setInterval(()=>o(Date.now()),1e3);return()=>clearInterval(n)},[t]),r}export{u};
