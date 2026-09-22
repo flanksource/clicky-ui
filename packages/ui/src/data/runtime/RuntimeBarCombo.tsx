@@ -1,9 +1,13 @@
 import { Button } from "../../components/button";
+import { InputField } from "../../components/InputField";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
+import { RuntimeBarLimitFields } from "./RuntimeBarLimits";
+import { formatCost } from "./RuntimeBar.limits";
+import { SEGMENT_KEY_CLASS } from "./RuntimeBarSegment";
 import {
   effortLevelColor,
   effortLevelIcon,
@@ -40,13 +44,18 @@ export type RuntimeBarComboProps = {
   locked: boolean;
   showModel: boolean;
   showEffort: boolean;
+  showTimeout: boolean;
+  showCost: boolean;
   ariaLabel: string;
   className?: string | undefined;
   onFamilyChange: (familyId: string) => void;
   onModeChange: (modeId: string) => void;
   onModelSelect: (model: ChatModel) => void;
   onModelClear: () => void;
+  onCustomModel: (model: string) => void;
   onEffortChange: (effort: string) => void;
+  onTimeoutChange: (timeout: string | undefined) => void;
+  onCostChange: (cost: number | undefined) => void;
 };
 
 export function RuntimeBarCombo({
@@ -63,13 +72,18 @@ export function RuntimeBarCombo({
   locked,
   showModel,
   showEffort,
+  showTimeout,
+  showCost,
   ariaLabel,
   className,
   onFamilyChange,
   onModeChange,
   onModelSelect,
   onModelClear,
+  onCustomModel,
   onEffortChange,
+  onTimeoutChange,
+  onCostChange,
 }: RuntimeBarComboProps) {
   const brand = runtimeFamilyBrand(family);
   const modelLabel = showModel
@@ -84,6 +98,8 @@ export function RuntimeBarCombo({
   const summaryParts = [family.label, mode.label];
   if (showModel) summaryParts.push(modelLabel === UNSPECIFIED_LABEL ? UNSPECIFIED_NAME : modelLabel);
   if (showEffort) summaryParts.push(`effort ${value.effort ? effortLabel : UNSPECIFIED_NAME}`);
+  if (showTimeout) summaryParts.push(`timeout ${value.budget?.timeout ?? "none"}`);
+  if (showCost) summaryParts.push(`max cost ${formatCost(value.budget?.cost) ?? "none"}`);
   const summary = `${ariaLabel}: ${summaryParts.join(", ")}${locked ? ". Model and mode are locked for this conversation; fork it to change them" : ""}`;
 
   return (
@@ -91,7 +107,7 @@ export function RuntimeBarCombo({
       align="left"
       menuLabel={`${ariaLabel} controls`}
       {...(className ? { className } : {})}
-      menuClassName="max-h-[70vh] w-80 max-w-[calc(100vw-24px)] overflow-y-auto"
+      menuClassName="max-h-[70vh] w-[28rem] max-w-[calc(100vw-24px)] overflow-y-auto"
       trigger={
         <Button
           type="button"
@@ -124,6 +140,16 @@ export function RuntimeBarCombo({
                 value.effort ? effortLevelColor(value.effort) : undefined,
               )}
             />
+          )}
+          {showTimeout && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {value.budget?.timeout ?? "No timeout"}
+            </span>
+          )}
+          {showCost && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {formatCost(value.budget?.cost) ?? "No max cost"}
+            </span>
           )}
           <Icon
             icon={UiChevronDown}
@@ -161,16 +187,42 @@ export function RuntimeBarCombo({
               />
             )}
           </div>
-          {showModel && (
-            <ModelChoices
-              models={models}
-              familyBrand={brand}
-              selectedId={selectedModel?.id ?? value.model}
-              inheritedModelLabel={inheritedModelLabel}
-              locked={locked}
-              onSelect={onModelSelect}
-              onClear={onModelClear}
+          {(showTimeout || showCost) && (
+            <RuntimeBarLimitFields
+              timeout={value.budget?.timeout}
+              cost={value.budget?.cost}
+              showTimeout={showTimeout}
+              showCost={showCost}
+              onTimeoutChange={onTimeoutChange}
+              onCostChange={onCostChange}
             />
+          )}
+          {showModel && (
+            <>
+              <div className="grid gap-1 border-b border-border px-2 py-3">
+                <span className={SEGMENT_KEY_CLASS}>Model id</span>
+                <InputField
+                  value={selectedModelUnavailable ? "" : (value.model ?? "")}
+                  onChange={onCustomModel}
+                  {...(selectedModelUnavailable
+                    ? { placeholder: "Unavailable selection" }
+                    : {})}
+                  aria-label="Model id"
+                  disabled={locked}
+                  inputClassName="font-mono text-xs"
+                  className="bg-background"
+                />
+              </div>
+              <ModelChoices
+                models={models}
+                familyBrand={brand}
+                selectedId={selectedModel?.id ?? value.model}
+                inheritedModelLabel={inheritedModelLabel}
+                locked={locked}
+                onSelect={onModelSelect}
+                onClear={onModelClear}
+              />
+            </>
           )}
         </div>
       )}

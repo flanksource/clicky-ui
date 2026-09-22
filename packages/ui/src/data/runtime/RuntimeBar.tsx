@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
+import { cn } from "../../lib/utils";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 import { withBudgetLimit, type RuntimeBarBudget } from "./RuntimeBar.limits";
 import { applyRuntimeMode, runtimeModelForValue } from "./RuntimeBar.model";
 import { RuntimeBarCombo } from "./RuntimeBarCombo";
 import { RuntimeBarSegments } from "./RuntimeBarSegments";
+import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 import { isSelectableModel } from "./availability";
 import {
   effortOptionsForModel,
@@ -22,7 +24,7 @@ import {
 
 export type RuntimeBarValue = ChatModelRuntime & {
   cliArgs?: Record<string, unknown>;
-  /** Run limits edited by the opt-in timeout and max cost segments. */
+  /** Run limits edited by the opt-in timeout and max cost controls. */
   budget?: RuntimeBarBudget;
 };
 
@@ -47,15 +49,11 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   showModel?: boolean | undefined;
   /** Whether the selected runtime exposes reasoning effort. */
   showEffort?: boolean | undefined;
-  /** Opt-in `budget.timeout` segment; segmented variant only. */
+  /** Opt-in control for `budget.timeout`. */
   showTimeout?: boolean | undefined;
-  /** Opt-in `budget.cost` segment; segmented variant only. */
+  /** Opt-in control for `budget.cost`. */
   showCost?: boolean | undefined;
-  /**
-   * Trailing section fused onto the bar's border, for settings that belong to
-   * the surrounding spec rather than this runtime row (see `RuntimeBarActions`).
-   * Segmented variant only — the combo variant has no segment chrome to fuse to.
-   */
+  /** Host-level settings belonging to the surrounding spec rather than this runtime row. */
   actions?: ReactNode | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
@@ -74,18 +72,12 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   locked = false,
   showModel = true,
   showEffort = true,
-  showTimeout = true,
-  showCost = true,
+  showTimeout = false,
+  showCost = false,
   actions,
   ariaLabel = "Runtime",
   className,
 }: RuntimeBarProps<T>) {
-  if (variant === "combo" && (showTimeout || showCost)) {
-    throw new Error("RuntimeBar: showTimeout and showCost require the segmented variant");
-  }
-  if (variant === "combo" && actions) {
-    throw new Error("RuntimeBar: actions require the segmented variant");
-  }
   const [preference, setPreference] = useState<{
     model: string | undefined;
     family: string | undefined;
@@ -168,61 +160,78 @@ export function RuntimeBar<T extends RuntimeBarValue>({
 
   if (variant === "combo") {
     return (
-      <RuntimeBarCombo
-        value={value}
-        families={families}
-        family={family}
-        mode={mode}
-        selectedMode={selection.mode}
-        models={modelOptions}
-        selectedModel={resolvedModel}
-        selectedModelUnavailable={selectedModelUnavailable}
-        inheritedModelLabel={inheritedModelLabel}
-        supportedEfforts={supportedEfforts}
-        locked={locked}
-        showModel={showModel}
-        showEffort={showEffort}
-        ariaLabel={ariaLabel}
-        className={className}
-        onFamilyChange={(familyId) => applyMode(familyId, selection.mode)}
-        onModeChange={(modeId) => applyMode(family.id, modeId)}
-        onModelSelect={applyModel}
-        onModelClear={clearModel}
-        onEffortChange={applyEffort}
-      />
+      <RuntimeBarVariantContext.Provider value="combo">
+        <div
+          role="group"
+          aria-label={ariaLabel}
+          data-runtime-bar-variant="combo"
+          className={cn("inline-flex max-w-full flex-wrap items-stretch gap-1", className)}
+        >
+          <RuntimeBarCombo
+            value={value}
+            families={families}
+            family={family}
+            mode={mode}
+            selectedMode={selection.mode}
+            models={modelOptions}
+            selectedModel={resolvedModel}
+            selectedModelUnavailable={selectedModelUnavailable}
+            inheritedModelLabel={inheritedModelLabel}
+            supportedEfforts={supportedEfforts}
+            locked={locked}
+            showModel={showModel}
+            showEffort={showEffort}
+            showTimeout={showTimeout}
+            showCost={showCost}
+            ariaLabel={ariaLabel}
+            className="max-w-full"
+            onFamilyChange={(familyId) => applyMode(familyId, selection.mode)}
+            onModeChange={(modeId) => applyMode(family.id, modeId)}
+            onModelSelect={applyModel}
+            onModelClear={clearModel}
+            onCustomModel={applyCustomModel}
+            onEffortChange={applyEffort}
+            onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
+            onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
+          />
+          {actions}
+        </div>
+      </RuntimeBarVariantContext.Provider>
     );
   }
 
   return (
-    <RuntimeBarSegments
-      value={value}
-      models={models}
-      modelOptions={modelOptions}
-      resolvedModel={resolvedModel}
-      selectedModelUnavailable={selectedModelUnavailable}
-      inheritedModelLabel={inheritedModelLabel}
-      families={families}
-      family={family}
-      mode={mode}
-      selectedMode={selection.mode}
-      reasoningEfforts={reasoningEfforts}
-      supportedEfforts={supportedEfforts}
-      locked={locked}
-      showModel={showModel}
-      showEffort={showEffort}
-      showTimeout={showTimeout}
-      showCost={showCost}
-      actions={actions}
-      ariaLabel={ariaLabel}
-      className={className}
-      onModeChange={applyMode}
-      onCustomModel={applyCustomModel}
-      onModelSelect={applyModel}
-      onModelClear={clearModel}
-      onEffortChange={applyEffort}
-      onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
-      onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
-    />
+    <RuntimeBarVariantContext.Provider value="segmented">
+      <RuntimeBarSegments
+        value={value}
+        models={models}
+        modelOptions={modelOptions}
+        resolvedModel={resolvedModel}
+        selectedModelUnavailable={selectedModelUnavailable}
+        inheritedModelLabel={inheritedModelLabel}
+        families={families}
+        family={family}
+        mode={mode}
+        selectedMode={selection.mode}
+        reasoningEfforts={reasoningEfforts}
+        supportedEfforts={supportedEfforts}
+        locked={locked}
+        showModel={showModel}
+        showEffort={showEffort}
+        showTimeout={showTimeout}
+        showCost={showCost}
+        actions={actions}
+        ariaLabel={ariaLabel}
+        className={className}
+        onModeChange={applyMode}
+        onCustomModel={applyCustomModel}
+        onModelSelect={applyModel}
+        onModelClear={clearModel}
+        onEffortChange={applyEffort}
+        onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
+        onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
+      />
+    </RuntimeBarVariantContext.Provider>
   );
 }
 

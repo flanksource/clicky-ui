@@ -43,6 +43,10 @@ export {
   type ToolPolicy,
 } from "./ToolPreferences";
 export {
+  AdvancedChatConfig,
+  type AdvancedChatConfigProps,
+} from "./AdvancedChatConfig";
+export {
   effectiveToolPolicies,
   withUserRule,
   type ToolGroup,
