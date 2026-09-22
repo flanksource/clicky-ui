@@ -1,4 +1,9 @@
 import type { FilterBarMultiFilterMode } from "../components/filter-bar-field-utils";
+import {
+  DURATION_SCALE_MS,
+  parseGoDurationMs,
+  readDurationNumber,
+} from "../lib/duration";
 
 /**
  * A filter selection as one flat, URL-safe record: filter key → comma-joined
@@ -175,20 +180,6 @@ export function serializeBoundsValue(value: FilterBoundsValue): string {
   return tokens.join(",");
 }
 
-const durationUnits = ["ns", "us", "µs", "μs", "ms", "s", "m", "h"] as const;
-type DurationComponentUnit = (typeof durationUnits)[number];
-
-const durationScaleMs: Record<DurationComponentUnit, number> = {
-  ns: 1 / 1_000_000,
-  us: 1 / 1_000,
-  µs: 1 / 1_000,
-  μs: 1 / 1_000,
-  ms: 1,
-  s: 1_000,
-  m: 60_000,
-  h: 3_600_000,
-};
-
 export function parseDurationBoundsValue(
   raw: string,
   storageUnit: DurationFilterUnit = "ms",
@@ -235,65 +226,16 @@ function durationOperandInUnit(
   unit: DurationFilterUnit,
 ): string {
   const trimmed = operand.trim();
-  let offset = 0;
-  let sign = 1;
-  if (trimmed[offset] === "+" || trimmed[offset] === "-") {
-    if (trimmed[offset] === "-") sign = -1;
-    offset++;
-  }
+  const signed = trimmed[0] === "+" || trimmed[0] === "-";
+  const sign = trimmed[0] === "-" ? -1 : 1;
+  const unsigned = signed ? trimmed.slice(1) : trimmed;
 
-  const number = readDurationNumber(trimmed, offset);
-  if (number?.next === trimmed.length) return trimmed;
+  // A bare number carries the caller's unit already.
+  if (readDurationNumber(unsigned, 0)?.next === unsigned.length) return trimmed;
 
-  let totalMs = 0;
-  while (offset < trimmed.length) {
-    const component = readDurationNumber(trimmed, offset);
-    const componentUnit = component && durationUnitAt(trimmed, component.next);
-    if (!component || !componentUnit) {
-      throw new Error(`Invalid duration bound ${operand}`);
-    }
-    totalMs += component.value * durationScaleMs[componentUnit];
-    offset = component.next + componentUnit.length;
-  }
-  if (number === null || offset === 0)
-    throw new Error(`Invalid duration bound ${operand}`);
-  return formatDurationNumber((sign * totalMs) / durationScaleMs[unit]!);
-}
-
-function readDurationNumber(
-  value: string,
-  start: number,
-): { value: number; next: number } | null {
-  let next = start;
-  let integerDigits = 0;
-  while (isAsciiDigit(value[next])) {
-    integerDigits++;
-    next++;
-  }
-  let fractionalDigits = 0;
-  if (value[next] === ".") {
-    next++;
-    while (isAsciiDigit(value[next])) {
-      fractionalDigits++;
-      next++;
-    }
-  }
-  if (integerDigits === 0 && fractionalDigits === 0) return null;
-  return { value: Number(value.slice(start, next)), next };
-}
-
-function isAsciiDigit(value: string | undefined): boolean {
-  return value !== undefined && value >= "0" && value <= "9";
-}
-
-function durationUnitAt(
-  value: string,
-  start: number,
-): DurationComponentUnit | null {
-  for (const unit of durationUnits) {
-    if (value.startsWith(unit, start)) return unit;
-  }
-  return null;
+  const totalMs = parseGoDurationMs(unsigned);
+  if (totalMs === null) throw new Error(`Invalid duration bound ${operand}`);
+  return formatDurationNumber((sign * totalMs) / DURATION_SCALE_MS[unit]);
 }
 
 function formatDurationNumber(value: number): string {
