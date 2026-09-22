@@ -289,7 +289,7 @@ function questionFromValue(value: unknown, index: number): SessionQuestion | nul
     text,
     ...optionalContext(value),
     multiSelect: booleanField(value, "multiSelect") || booleanField(value, "multi_select"),
-    isOther: booleanField(value, "isOther") || booleanField(value, "is_other"),
+    ...(booleanField(value, "isOther") || booleanField(value, "is_other") ? { isOther: true } : {}),
     options: optionList(value.options),
   };
 }

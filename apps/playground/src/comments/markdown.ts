@@ -56,7 +56,7 @@ function renderSection(
   }: CommentMarkdownOptions,
 ): string[] {
   const out = [
-    `## Playground feedback — ${page}`,
+    `## Playground feedback — ${page.split("/").at(-1) ?? page}`,
     `- URL: ${pageUrl(page)}`,
     `- source: \`${pagePath(page)}\``,
     "",
