@@ -126,7 +126,7 @@ export const PAGES: PageEntry[] = buildRegistry(
   ) as Record<string, GuidanceLoader>,
 );
 
-export const DEFAULT_PAGE_SLUG = "flanksource";
+export const DEFAULT_PAGE_SLUG = "welcome";
 export function fallbackPageSlug(
   entries: readonly PageEntry[],
   excludedSlug?: string,
