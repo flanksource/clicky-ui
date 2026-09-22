@@ -1,14 +1,14 @@
-export type RuntimeBarBudget = { cost?: number; timeout?: string };
+import { parseGoDurationMs } from "../../lib/duration";
+
+export type RuntimeBarBudget ={ cost?: number; timeout?: string };
 
 export const TIMEOUT_PRESETS = ["5m", "15m", "30m", "1h", "2h"] as const;
 export const COST_PRESETS = [0.5, 1, 2, 5, 10] as const;
 
 // Captain parses timeouts with Go's time.ParseDuration.
-const GO_DURATION = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
-
 export function parseTimeout(text: string): string | undefined {
   const trimmed = text.trim();
-  return GO_DURATION.test(trimmed) ? trimmed : undefined;
+  return parseGoDurationMs(trimmed) === null ? undefined : trimmed;
 }
 
 export function parseCost(text: string): number | undefined {
