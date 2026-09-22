@@ -175,7 +175,10 @@ export function serializeBoundsValue(value: FilterBoundsValue): string {
   return tokens.join(",");
 }
 
-const durationScaleMs: Record<string, number> = {
+const durationUnits = ["ns", "us", "µs", "μs", "ms", "s", "m", "h"] as const;
+type DurationComponentUnit = (typeof durationUnits)[number];
+
+const durationScaleMs: Record<DurationComponentUnit, number> = {
   ns: 1 / 1_000_000,
   us: 1 / 1_000,
   µs: 1 / 1_000,
@@ -232,22 +235,65 @@ function durationOperandInUnit(
   unit: DurationFilterUnit,
 ): string {
   const trimmed = operand.trim();
-  if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)) return trimmed;
-
-  const sign = trimmed.startsWith("-") ? -1 : 1;
-  const unsigned = /^[+-]/.test(trimmed) ? trimmed.slice(1) : trimmed;
-  const component = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)/g;
   let offset = 0;
-  let totalMs = 0;
-  for (const match of unsigned.matchAll(component)) {
-    if (match.index !== offset)
-      throw new Error(`Invalid duration bound ${operand}`);
-    totalMs += Number(match[1]) * durationScaleMs[match[2]!]!;
-    offset += match[0].length;
+  let sign = 1;
+  if (trimmed[offset] === "+" || trimmed[offset] === "-") {
+    if (trimmed[offset] === "-") sign = -1;
+    offset++;
   }
-  if (offset !== unsigned.length || offset === 0)
+
+  const number = readDurationNumber(trimmed, offset);
+  if (number?.next === trimmed.length) return trimmed;
+
+  let totalMs = 0;
+  while (offset < trimmed.length) {
+    const component = readDurationNumber(trimmed, offset);
+    const componentUnit = component && durationUnitAt(trimmed, component.next);
+    if (!component || !componentUnit) {
+      throw new Error(`Invalid duration bound ${operand}`);
+    }
+    totalMs += component.value * durationScaleMs[componentUnit];
+    offset = component.next + componentUnit.length;
+  }
+  if (number === null || offset === 0)
     throw new Error(`Invalid duration bound ${operand}`);
   return formatDurationNumber((sign * totalMs) / durationScaleMs[unit]!);
+}
+
+function readDurationNumber(
+  value: string,
+  start: number,
+): { value: number; next: number } | null {
+  let next = start;
+  let integerDigits = 0;
+  while (isAsciiDigit(value[next])) {
+    integerDigits++;
+    next++;
+  }
+  let fractionalDigits = 0;
+  if (value[next] === ".") {
+    next++;
+    while (isAsciiDigit(value[next])) {
+      fractionalDigits++;
+      next++;
+    }
+  }
+  if (integerDigits === 0 && fractionalDigits === 0) return null;
+  return { value: Number(value.slice(start, next)), next };
+}
+
+function isAsciiDigit(value: string | undefined): boolean {
+  return value !== undefined && value >= "0" && value <= "9";
+}
+
+function durationUnitAt(
+  value: string,
+  start: number,
+): DurationComponentUnit | null {
+  for (const unit of durationUnits) {
+    if (value.startsWith(unit, start)) return unit;
+  }
+  return null;
 }
 
 function formatDurationNumber(value: number): string {

@@ -156,7 +156,12 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     server: {
       deps: {
-        inline: ["@floating-ui/react"],
+        // `@tanstack/react-virtual` backs DataTable's row virtualiser. Left
+        // external, vitest loads it by node resolution, which in this checkout
+        // reaches a sibling repo's store and hands it a second copy of React —
+        // "Invalid hook call" on every test that renders a DataTable. Inlined,
+        // vite resolves its `react` import and `resolve.dedupe` applies.
+        inline: ["@floating-ui/react", "@tanstack/react-virtual"],
       },
     },
   },

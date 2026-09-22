@@ -64,17 +64,16 @@ export default function Welcome() {
         </Step>
 
         <Step n={3} title="Leave anchored feedback">
-          Press{" "}
-          <kbd className="rounded border border-border px-1 text-xs">c</kbd> (or
-          the Comment button), click an element, and write a note. Pins are
+          Select an element with react-grab, then choose Comment or Comment with
+          screenshot. Write a note in the focused rail and choose Post comment or
+          Post with screenshot. Pins are
           anchored to the element and persist to{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             apps/playground/.playground/comments.json
           </code>
-          , together with its React component/source path, a 4 KB HTML snapshot,
-          and a screenshot attempt. If browser capture is unavailable or
-          cancelled, the note is still saved with that state recorded
-          explicitly.
+          , together with its React component/source path and a 4 KB HTML
+          snapshot. Screenshot capture is optional; if requested but unavailable
+          or cancelled, the note is still saved with that state recorded.
         </Step>
 
         <Step n={4} title="Hand the notes over">
