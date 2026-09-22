@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { UiDotsVertical } from "../../icons";
 import { cn } from "../../lib/utils";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "../Icon";
 import { RuntimeSegment } from "./RuntimeBarSegment";
+import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 
 /**
  * A run setting offered by the runtime bar. Its choices are `DropdownMenuItem`s
@@ -38,10 +39,8 @@ export type RuntimeBarActionsProps = {
 };
 
 /**
- * The runtime bar's third section: spec-level run settings plus a ⋮ menu. Fused
- * onto the bar's border by default (same chrome as the settings section, whose
- * dividers are pulled 1px outside the padding box so the bar's overflow hides
- * whichever one the current wrap does not need).
+ * The runtime bar's host-level settings plus a ⋮ menu. It fuses onto the
+ * segmented bar border and becomes a separate control group in combo layouts.
  */
 export function RuntimeBarActions({
   fields = [],
@@ -51,6 +50,8 @@ export function RuntimeBarActions({
   standalone = false,
   className,
 }: RuntimeBarActionsProps) {
+  const variant = useContext(RuntimeBarVariantContext);
+  const useStandalone = standalone || variant === "combo";
   const inlineFields = inline ? fields : [];
   const menuItems: DropdownMenuItem[] = [
     ...(inline ? [] : fields).map((field) => ({
@@ -69,7 +70,7 @@ export function RuntimeBarActions({
       data-runtime-bar-section="actions"
       className={cn(
         "flex h-control-h min-w-0 items-stretch",
-        standalone
+        useStandalone
           ? "w-fit overflow-hidden rounded-md border border-input bg-background"
           : "-ml-px -mt-px border-l border-t border-border",
         className,

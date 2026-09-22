@@ -104,7 +104,7 @@ describe("RuntimeBar", () => {
     expect(
       within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
     ).toBeInTheDocument();
-    expect(within(menu).queryByLabelText("Model id")).not.toBeInTheDocument();
+    expect(within(menu).getByLabelText("Model id")).toBeInTheDocument();
     const modelChoice = within(menu).getByRole("button", {
       name: "GPT-5",
     });
@@ -114,6 +114,43 @@ describe("RuntimeBar", () => {
     expect(
       within(menu).getByRole("slider", { name: "Reasoning effort" }),
     ).toHaveAttribute("aria-valuetext", "High");
+  });
+
+  it("uses a wider panel for combo controls", () => {
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{ mode: "cli" }}
+        onChange={vi.fn()}
+        models={MODELS}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Runtime:/ }));
+
+    expect(screen.getByRole("menu")).toHaveClass("w-[28rem]");
+  });
+
+  it("accepts an uncatalogued model id in the combo menu", () => {
+    const onChange = vi.fn();
+    render(
+      <RuntimeBar
+        variant="combo"
+        value={{ mode: "api" }}
+        onChange={onChange}
+        models={MODELS}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Runtime:/ }));
+    fireEvent.change(screen.getByLabelText("Model id"), {
+      target: { value: "gemini-3-pro" },
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      mode: "api",
+      model: "gemini-3-pro",
+    });
   });
 
   it("renders an inherited mode without persisting it on unrelated edits", () => {

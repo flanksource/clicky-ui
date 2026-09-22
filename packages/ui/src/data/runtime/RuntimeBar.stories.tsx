@@ -49,10 +49,14 @@ function RuntimeBarStory({
   initial,
   variant = "segmented",
   families,
+  showTimeout = false,
+  showCost = false,
 }: {
   initial: AISpecRuntimeValue;
   variant?: RuntimeBarProps["variant"];
   families?: RuntimeBarProps["families"];
+  showTimeout?: boolean;
+  showCost?: boolean;
 }) {
   const [value, setValue] = useState<AISpecRuntimeValue>(initial);
   return (
@@ -63,6 +67,8 @@ function RuntimeBarStory({
         models={MODELS}
         families={families}
         variant={variant}
+        showTimeout={showTimeout}
+        showCost={showCost}
       />
       <pre className="rounded-md border border-border bg-muted/30 p-3 font-mono text-xs text-muted-foreground">
         {JSON.stringify(value, null, 2)}
@@ -233,14 +239,17 @@ export const Combo: Story = {
         mode: "cli",
         model: "openai/gpt-5-codex",
         effort: "high",
+        budget: { timeout: "30m", cost: 2 },
       }}
+      showTimeout
+      showCost
     />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
     const trigger = canvas.getByRole("button", {
-      name: "Runtime: Codex, CLI, GPT-5 Codex, effort High",
+      name: "Runtime: Codex, CLI, GPT-5 Codex, effort High, timeout 30m, max cost $2.00",
     });
 
     await userEvent.click(trigger);
@@ -255,9 +264,9 @@ export const Combo: Story = {
     await expect(
       within(menu).getByRole("slider", { name: "Reasoning effort" }),
     ).toHaveAttribute("aria-valuetext", "High");
-    await expect(
-      within(menu).queryByLabelText("Model id"),
-    ).not.toBeInTheDocument();
+    await expect(within(menu).getByLabelText("Model id")).toBeInTheDocument();
+    await expect(within(menu).getByLabelText("Timeout duration")).toHaveValue("30m");
+    await expect(within(menu).getByLabelText("Max cost (USD)")).toHaveValue("2");
     const modelChoice = within(menu).getByRole("button", {
       name: "GPT-5 Codex",
     });
@@ -267,7 +276,7 @@ export const Combo: Story = {
     await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
     await expect(
       canvas.getByRole("button", {
-        name: "Runtime: Claude, CLI, Unspecified, effort High",
+        name: "Runtime: Claude, CLI, Unspecified, effort High, timeout 30m, max cost $2.00",
       }),
     ).toBeInTheDocument();
     await expect(body.getByRole("menu")).toBeInTheDocument();
@@ -282,11 +291,11 @@ export const Combo: Story = {
   },
 };
 
-/** A hosted-API family the catalog does not describe keeps the Model segment;
- *  its menu offers the free-text entry alone. */
+/** A hosted-API family the catalog does not describe keeps model entry available
+ *  as free text even when there are no catalog rows. */
 export const NoModelsForFamily: Story = {
-  // Pinned: the free-text model entry these interactions drive belongs to the
-  // segmented variant; the combo variant renders no SpecInput.
+  // Pinned to exercise the standalone Model segment; Combo covers its equivalent
+  // free-text field inside the main menu.
   args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory initial={{ mode: "api" }} variant={variant} />
