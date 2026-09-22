@@ -24,7 +24,9 @@ import {
   readIconSource,
   resolveAliasTarget,
   selectionsPath,
+  stripAliasArrow,
   stripUirPrefix,
+  svgOpenTag,
   type SelectionRow,
   type Selections,
 } from "./icon-sources";
@@ -294,8 +296,8 @@ function normalizeSvg(
   const viewBox = viewBoxMatch ? viewBoxMatch[1] : "0 0 24 24";
 
   // Capture root <svg> presentation attributes that children may be inheriting.
-  const svgOpenMatch = svg.match(/<svg[^>]*>/i);
-  const svgOpen = svgOpenMatch ? svgOpenMatch[0] : "";
+  const rootTag = svgOpenTag(svg);
+  const svgOpen = rootTag ? svg.slice(rootTag.start, rootTag.end) : "";
   const rootFill = (svgOpen.match(/\bfill="([^"]+)"/i) || [])[1];
   const rootStroke = (svgOpen.match(/\bstroke="([^"]+)"/i) || [])[1];
   const rootStrokeWidth = (svgOpen.match(/\bstroke-width="([^"]+)"/i) || [])[1];
@@ -306,9 +308,11 @@ function normalizeSvg(
   const rootHasInherit = !!(rootFill || rootStroke || rootStrokeWidth);
 
   // Drop the outer <svg ...>...</svg> and keep inner.
-  const inner = svg
-    .replace(/^[\s\S]*?<svg[^>]*>/i, "")
-    .replace(/<\/svg>\s*$/i, "");
+  const afterOpen = rootTag ? svg.slice(rootTag.end) : svg;
+  const withoutClose = afterOpen.trimEnd();
+  const inner = withoutClose.toLowerCase().endsWith("</svg>")
+    ? withoutClose.slice(0, -"</svg>".length)
+    : afterOpen;
   let out = inner;
 
   if (opts.recolor) {
@@ -920,7 +924,7 @@ export async function buildIcons({
         (!aliasHasFilled || reExportFilled);
       if (aliasFullyCovered && (reExportOutline || reExportFilled)) {
         const targetBase = `Ui${pascalCase(stripUirPrefix(aliasTarget))}`;
-        const aliasBase = `Ui${pascalCase(stripUirPrefix(row.consumerName.replace(/\s*->.*$/, "")))}`;
+        const aliasBase = `Ui${pascalCase(stripUirPrefix(stripAliasArrow(row.consumerName)))}`;
         if (aliasBase !== targetBase) {
           const exports: string[] = [];
           if (reExportOutline) exports.push(`${targetBase} as ${aliasBase}`);

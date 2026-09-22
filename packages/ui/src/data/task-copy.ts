@@ -1,4 +1,5 @@
 import { shellCommandLine } from "../lib/shell-command";
+import { stripTrailingNewlines } from "../lib/string";
 import { isTaskExecDetails } from "./task-exec-details";
 import { isTaskProcessDetails } from "./task-process-details";
 import type { TaskSnapshot } from "./TaskSnapshot";
@@ -27,7 +28,7 @@ export function taskGroupErrorCount(tasks: TaskSnapshot[]): number {
 }
 
 function fence(label: string, body: string, language = ""): string[] {
-  return [`${label}:`, "```" + language, body.replace(/\n+$/, ""), "```"];
+  return [`${label}:`, "```" + language, stripTrailingNewlines(body), "```"];
 }
 
 function streamBlock(label: string, text: string, truncated: boolean | undefined): string[] {

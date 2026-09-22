@@ -36,6 +36,7 @@ import {
   type ResolvedOperation,
 } from "../rpc/types";
 import { type OperationsApiClient, useOperations } from "../rpc/useOperations";
+import { stripHtmlTags, stripSurroundingChars } from "../lib/string";
 import { cn } from "../lib/utils";
 import {
   DataTable,
@@ -1990,12 +1991,14 @@ function filenameStemFromUrl(url: string) {
 }
 
 function sanitizeFilenameStem(value: string) {
-  const cleaned = value
-    .trim()
-    .replace(/\.[a-z0-9]+$/i, "")
-    .replace(/[^a-z0-9._-]+/gi, "-")
-    .replace(/-+/g, "-")
-    .replace(/^[._-]+|[._-]+$/g, "");
+  const cleaned = stripSurroundingChars(
+    value
+      .trim()
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/-+/g, "-"),
+    "._-",
+  );
 
   return cleaned || "clicky-output";
 }
@@ -4431,9 +4434,7 @@ function clickyNodeText(node: ClickyNode | null | undefined): string {
   if (node.plain) return node.plain;
   if (node.text) return node.text;
   if (node.kind === "html")
-    return sanitizeHtml(node.html ?? "")
-      .replace(/<[^>]+>/g, " ")
-      .trim();
+    return stripHtmlTags(sanitizeHtml(node.html ?? "")).trim();
   if (node.kind === "code") return node.source ?? "";
   if (
     (node.kind === "link" || node.kind === "link-command") &&
