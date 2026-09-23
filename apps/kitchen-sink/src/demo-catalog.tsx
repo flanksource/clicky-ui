@@ -8,6 +8,7 @@ import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { JsonSchemaFormListenersDemo } from "./demos/listeners/JsonSchemaFormListenersDemo";
+import { JsonSchemaFormAnnotationsDemo } from "./demos/JsonSchemaFormAnnotationsDemo";
 import { JSONPathFieldDemo } from "./demos/JSONPathFieldDemo";
 import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
 import { ConnectionLoggingPolicyDemo } from "./demos/ConnectionLoggingPolicyDemo";
@@ -274,6 +275,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "Form listeners",
         component: JsonSchemaFormListenersDemo,
         icon: UiForm,
+      },
+      {
+        id: "json-schema-form-annotations",
+        label: "Form annotations",
+        component: JsonSchemaFormAnnotationsDemo,
+        icon: UiListTree,
       },
       {
         id: "accordion-list",

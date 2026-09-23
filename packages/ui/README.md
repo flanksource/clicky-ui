@@ -54,6 +54,16 @@ export function ClickyPanel() {
 
 `OperationCatalog` and `EntityExplorerApp` (both exported from `@flanksource/clicky-ui/rpc`) render an OpenAPI spec — fetched via an `OperationsApiClient` — as a navigable list of operations grouped by entity surface. They expect the spec to declare `x-clicky` surface metadata for the surfaces they should expose. See `apps/kitchen-sink/src/demos/OperationExplorerDemo.tsx` for a fake-client example.
 
+## JsonSchemaForm schema annotations
+
+`JsonSchemaForm` renders a standard JSON Schema 2020-12 document and reads a set of `x-*` presentation keywords from it (`x-order`, `x-enum-labels`, `x-array-display`, `x-item`, `x-columns`, `x-on-change`, `x-clicky-lookup`, …). Each one is documented, with its allowed values, precedence rules and examples, in a published meta-schema:
+
+```text
+node_modules/@flanksource/clicky-ui/schemas/json-schema-form.schema.json
+```
+
+It extends the official 2020-12 meta-schema at every depth, so validating a form schema against it catches a mistyped annotation anywhere in the tree (a misspelled `x-on-change` action, an unknown `x-enum-display`). Unknown `x-*` keys are still allowed, because consumers read their own keys from pre/post extensions. To get validation and hover docs in an editor, map your form schemas to this file (for example through VS Code's `json.schemas` setting). To validate from code, import it as `@flanksource/clicky-ui/json-schema-form.schema.json` and compile it with a 2020-12 validator such as `ajv/dist/2020`.
+
 ## Markdown editor field
 
 `JsonSchemaForm` fields with `format: md` — and the standalone `MdxEditorField` exported from `@flanksource/clicky-ui/mdx-editor` — render an [MDXEditor](https://mdxeditor.dev/)-backed rich-text field. Its base styles ship as a **separate** stylesheet so apps that don't use the field don't pay its weight (the editor's JavaScript is also loaded lazily, on first render). Import it once at the app root, in addition to `styles.css`:
