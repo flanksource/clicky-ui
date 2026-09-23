@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { BadgeTone } from "./Badge";
 import type { StaticIconComponent } from "./Icon";
 import type { ProgressBarsOrientation } from "./ProgressBars";
@@ -19,15 +20,33 @@ export interface WorkloadCardReplicas {
 }
 
 export interface WorkloadCardStatus {
+  /** Badge text; falls back to `code`, then `health`. Never affects the tone. */
   label?: string;
   code?: string;
+  /** Drives the tone: healthy → success, warning → warning, unhealthy → danger. */
   health?: string;
+  /** Hover text for the status badge. */
   message?: string;
+  /** Explicit badge tone; overrides the `health` mapping. */
   tone?: BadgeTone;
 }
 
+/** One caller-defined fact shown in the card's subtitle row, e.g. a region. */
+export interface WorkloadCardMetadataItem {
+  label: string;
+  value: ReactNode;
+}
+
+/**
+ * The workload a card describes. Kubernetes workloads set `kind` (which picks
+ * the icon and type label); anything else sets a free-form `type` label and
+ * its own `icon`, and describes itself through `metadata`.
+ */
 export interface WorkloadCardWorkload {
-  kind: WorkloadCardKind;
+  /** Kubernetes kind; picks the default icon and type label. */
+  kind?: WorkloadCardKind;
+  /** Display label for the workload type, e.g. "EC2 instance". Overrides the kind label. */
+  type?: string;
   name: string;
   namespace?: string;
   role?: string;
@@ -35,6 +54,8 @@ export interface WorkloadCardWorkload {
   replicas?: WorkloadCardReplicas;
   status?: WorkloadCardStatus;
   icon?: WorkloadCardIcon;
+  /** Extra label/value facts rendered after the built-ins in the subtitle row. */
+  metadata?: ReadonlyArray<WorkloadCardMetadataItem>;
 }
 
 export interface WorkloadCardResourceMetric {
@@ -75,29 +96,40 @@ export function workloadKindLabel(kind: WorkloadCardKind): string {
   }
 }
 
+/** The type label shown in the subtitle: `type`, else the kind's label. */
+export function workloadTypeLabel(
+  workload: Pick<WorkloadCardWorkload, "kind" | "type">,
+): string | undefined {
+  if (workload.type) return workload.type;
+  return workload.kind ? workloadKindLabel(workload.kind) : undefined;
+}
+
 export function workloadStatusLabel(
   status: WorkloadCardStatus | undefined,
 ): string | undefined {
   return status?.label ?? status?.code ?? status?.health;
 }
 
+/**
+ * The status badge tone: an explicit `tone`, else a fixed mapping of `health`
+ * (healthy → success, warning → warning, unhealthy → danger, anything else →
+ * neutral). Free-text `label`/`code` never affect the tone — substring guesses
+ * misfire ("NotReady" contains "ready", "Broken" contains "ok").
+ */
 export function workloadStatusTone(
   status: WorkloadCardStatus | undefined,
 ): BadgeTone {
   if (status?.tone) return status.tone;
-  const token = [status?.label, status?.code, status?.health]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  if (!token) return "neutral";
-  if (/(unhealthy|error|failed|failure|crash|down|unavailable)/.test(token))
-    return "danger";
-  if (/(warning|warn|degraded|pending|progress|starting|reconcil)/.test(token))
-    return "warning";
-  if (/(healthy|ready|running|available|ok|success)/.test(token))
-    return "success";
-  if (/(info|unknown)/.test(token)) return "info";
-  return "neutral";
+  switch (status?.health?.trim().toLowerCase()) {
+    case "healthy":
+      return "success";
+    case "warning":
+      return "warning";
+    case "unhealthy":
+      return "danger";
+    default:
+      return "neutral";
+  }
 }
 
 export function formatReplicaCounts(

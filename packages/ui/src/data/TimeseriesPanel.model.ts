@@ -11,10 +11,35 @@ export interface TimeseriesResponse {
   points: TimeseriesPoint[];
 }
 
-/** One metric plotted on a panel. Its request URL is `baseUrl + id`. */
+/** What a {@link SeriesLoader} receives from the widget polling it. */
+export interface SeriesLoadContext {
+  /** The widget's look-back window, e.g. "1h". */
+  range: string;
+  /** Aborted when the query is cancelled, e.g. the widget unmounts mid-request. */
+  signal: AbortSignal;
+}
+
+/**
+ * Loads a series directly, instead of the widget requesting `baseUrl + id`
+ * through its `fetcher`. Called again whenever the range changes and on every
+ * poll.
+ */
+export type SeriesLoader = (ctx: SeriesLoadContext) => Promise<TimeseriesResponse>;
+
+/**
+ * One metric plotted on a panel. Its request URL is `baseUrl + id`, unless a
+ * `load` function supplies the data.
+ */
 export interface TimeseriesSeries {
-  /** Metric id appended to the panel's baseUrl, e.g. "sqlserver.iops.read". */
+  /**
+   * Metric id appended to the panel's baseUrl, e.g. "sqlserver.iops.read".
+   * With `load`, the id is the series' cache identity instead: loaded series
+   * are cached under `["timeseries", "load", id, range]`, so it must be unique
+   * per data source (two series sharing an id share one cached response).
+   */
   id: string;
+  /** Loads the series' points; when set, `baseUrl` and `fetcher` are not used. */
+  load?: SeriesLoader;
   /** Tooltip/legend label; defaults to the id. */
   label?: string;
   /**
@@ -39,6 +64,17 @@ export interface TimeseriesSeries {
   current?: number;
 }
 
+/** A horizontal marker line at a fixed value, e.g. a static capacity. */
+export interface TimeseriesReferenceLine {
+  value: number;
+  /** Legend label, e.g. "capacity". */
+  label: string;
+  /** CSS color value or Tailwind color class; defaults to the muted foreground. */
+  color?: string;
+  /** Grafana-style unit key for the legend value; falls back to the panel `unit`. */
+  unit?: string;
+}
+
 export interface TimeseriesPanelProps {
   url?: string;
   baseUrl?: string;
@@ -52,6 +88,8 @@ export interface TimeseriesPanelProps {
   variant?: "area" | "line" | "stacked" | "breakdown";
   expandVariant?: "area" | "line" | "stacked";
   total?: number;
+  /** Flat lines drawn across the time-series chart, e.g. a fixed capacity. */
+  referenceLines?: TimeseriesReferenceLine[];
   expandable?: boolean;
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
@@ -76,6 +114,7 @@ export interface ResolvedSeries {
   color: string;
   unit?: string;
   transform?: (value: number) => number;
+  load?: SeriesLoader;
   current?: number;
 }
 
@@ -90,6 +129,7 @@ export function resolveSeries(props: TimeseriesPanelProps): ResolvedSeries[] {
     color: s.color ?? paletteColor(i),
     ...(s.unit ?? props.unit ? { unit: s.unit ?? props.unit } : {}),
     ...(s.transform ? { transform: s.transform } : {}),
+    ...(s.load ? { load: s.load } : {}),
     ...(s.current !== undefined ? { current: s.current } : {}),
   }));
 }

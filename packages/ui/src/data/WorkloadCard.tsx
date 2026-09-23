@@ -15,15 +15,22 @@ import { TimeseriesCoreBars } from "./TimeseriesCoreBars";
 import { TimeseriesGauge } from "./TimeseriesGauge";
 import {
   TimeseriesPanel,
+  type TimeseriesReferenceLine,
   type TimeseriesResponse,
   type TimeseriesSeries,
 } from "./TimeseriesPanel";
-import { UiChip, UiFullscreen, UiHardDrive, UiMemoryStick } from "../icons";
+import {
+  UiBox,
+  UiChip,
+  UiFullscreen,
+  UiHardDrive,
+  UiMemoryStick,
+} from "../icons";
 import {
   formatReplicaCounts,
-  workloadKindLabel,
   workloadStatusLabel,
   workloadStatusTone,
+  workloadTypeLabel,
   type WorkloadCardIcon,
   type WorkloadCardKind,
   type WorkloadCardMetrics,
@@ -33,6 +40,11 @@ import {
 
 export interface WorkloadCardProps {
   workload: WorkloadCardWorkload;
+  /**
+   * CPU/memory/disk series. Each is requested as `baseUrl + id` via `fetcher`,
+   * or loaded by its own `load` function (then `id` is the cache key and must
+   * be unique per data source).
+   */
   metrics: WorkloadCardMetrics;
   baseUrl?: string;
   range?: string;
@@ -146,9 +158,9 @@ function metricGridClass(count: number): string {
   return "grid-cols-3";
 }
 
-// Memory renders as cores-style bars at one bar per gigabyte, matching CPU; bytes
-// are fed raw and TimeseriesCoreBars divides by perBar so captions read "x GB".
-const MEMORY_BAR_UNIT = { perBar: 1024 ** 3, label: "GB", barLabel: "GB" };
+// Memory renders as cores-style bars at one bar per gibibyte, matching CPU; bytes
+// are fed raw and TimeseriesCoreBars divides by perBar so captions read "x GiB".
+const MEMORY_BAR_UNIT = { perBar: 1024 ** 3, label: "GiB", barLabel: "GiB" };
 
 function WorkloadIcon({
   icon,
@@ -171,44 +183,101 @@ function WorkloadIcon({
 
 function metricSeries(metric: WorkloadCardResourceMetric): TimeseriesSeries[] {
   const series: TimeseriesSeries[] = [
-    {
-      id: metric.value.id,
-      label: metric.valueLabel ?? "usage",
-      ...(metric.value.transform ? { transform: metric.value.transform } : {}),
-    },
+    { ...metric.value, label: metric.valueLabel ?? "usage" },
   ];
   if (typeof metric.max === "object") {
-    series.push({
-      id: metric.max.id,
-      label: metric.maxLabel ?? "limit",
-      ...(metric.max.transform ? { transform: metric.max.transform } : {}),
-    });
+    series.push({ ...metric.max, label: metric.maxLabel ?? "limit" });
   }
   return series;
+}
+
+// A fixed numeric max has no series to plot, so the history chart draws it as
+// a flat capacity line instead.
+function metricReferenceLines(
+  metric: WorkloadCardResourceMetric,
+): TimeseriesReferenceLine[] {
+  if (typeof metric.max !== "number") return [];
+  return [{ value: metric.max, label: metric.maxLabel ?? "capacity" }];
 }
 
 function hasMetric(metrics: WorkloadCardMetrics): boolean {
   return Boolean(metrics.cpu || metrics.memory || metrics.disk);
 }
 
-function HeaderMeta({ children }: { children: ReactNode }) {
+type HeaderMetaItem = { key: string; content: ReactNode; title?: string };
+
+function HeaderMeta({
+  separator,
+  title,
+  children,
+}: {
+  separator: boolean;
+  title?: string | undefined;
+  children: ReactNode;
+}) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-1">
-      <span
-        className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40"
-        aria-hidden
-      />
+    <span className="inline-flex min-w-0 items-center gap-1" title={title}>
+      {separator ? (
+        <span
+          className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40"
+          aria-hidden
+        />
+      ) : null}
       <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }
 
+function headerMetaItems(
+  workload: WorkloadCardWorkload,
+  typeLabel: string | undefined,
+): HeaderMetaItem[] {
+  const items: HeaderMetaItem[] = [];
+  if (typeLabel) items.push({ key: "type", content: typeLabel });
+  if (workload.namespace) {
+    items.push({ key: "namespace", content: workload.namespace });
+  }
+  if (workload.role) items.push({ key: "role", content: workload.role });
+  const replicaText = formatReplicaCounts(workload.replicas);
+  if (replicaText) items.push({ key: "replicas", content: replicaText });
+  if (workload.createdAt !== undefined) {
+    items.push({
+      key: "age",
+      content: (
+        <>
+          age <Timestamp value={workload.createdAt} format="relative" />
+        </>
+      ),
+    });
+  }
+  workload.metadata?.forEach((item, i) => {
+    const plain =
+      typeof item.value === "string" || typeof item.value === "number";
+    items.push({
+      key: `meta-${i}`,
+      content: (
+        <>
+          <span className="text-muted-foreground/70">{item.label}</span>{" "}
+          {item.value}
+        </>
+      ),
+      title: plain ? `${item.label}: ${item.value}` : item.label,
+    });
+  });
+  return items;
+}
+
 /**
- * WorkloadCard is a compact resource card for Kubernetes-style workloads. It
- * shows workload identity, status, replica/age metadata, and CPU/memory/disk
- * utilization backed by the existing time-series primitives: CPU and memory as
- * core-style bars (memory at one bar per GB) and disk as a linear progress bar.
- * Callers own the metric ids; the card only composes the supplied series.
+ * WorkloadCard is a compact resource card for a workload: a Kubernetes
+ * resource (`kind`) or anything else (a free-form `type`, `icon` and
+ * `metadata`). It shows identity, status, subtitle metadata, and
+ * CPU/memory/disk utilization backed by the existing time-series primitives:
+ * CPU and memory as core-style bars (memory at one bar per GiB) and disk as a
+ * linear progress bar. Callers own the metric series (URL ids or `load`
+ * functions); the card only composes them.
+ *
+ * Like the timeseries widgets it renders, it needs a react-query
+ * `QueryClientProvider` above it.
  */
 export function WorkloadCard({
   workload,
@@ -224,10 +293,11 @@ export function WorkloadCard({
   className,
 }: WorkloadCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const kindLabel = workloadKindLabel(workload.kind);
+  const typeLabel = workloadTypeLabel(workload);
   const statusLabel = workloadStatusLabel(workload.status);
-  const replicaText = formatReplicaCounts(workload.replicas);
-  const workloadIcon = workload.icon ?? KIND_ICONS[workload.kind];
+  const metaItems = headerMetaItems(workload, typeLabel);
+  const workloadIcon =
+    workload.icon ?? (workload.kind ? KIND_ICONS[workload.kind] : UiBox);
   const sizeClasses = SIZE_CLASSES[size];
 
   const panelMetrics = useMemo(() => {
@@ -290,7 +360,7 @@ export function WorkloadCard({
           >
             <WorkloadIcon
               icon={workloadIcon}
-              title={kindLabel}
+              title={typeLabel ?? workload.name}
               className={cn("shrink-0 text-muted-foreground", sizeClasses.icon)}
             />
             <span
@@ -300,24 +370,24 @@ export function WorkloadCard({
               {workload.name}
             </span>
           </div>
-          <div
-            className={cn(
-              "flex flex-wrap items-center text-muted-foreground",
-              sizeClasses.meta,
-            )}
-          >
-            <span>{kindLabel}</span>
-            {workload.namespace ? (
-              <HeaderMeta>{workload.namespace}</HeaderMeta>
-            ) : null}
-            {workload.role ? <HeaderMeta>{workload.role}</HeaderMeta> : null}
-            {replicaText ? <HeaderMeta>{replicaText}</HeaderMeta> : null}
-            {workload.createdAt !== undefined ? (
-              <HeaderMeta>
-                age <Timestamp value={workload.createdAt} format="relative" />
-              </HeaderMeta>
-            ) : null}
-          </div>
+          {metaItems.length > 0 ? (
+            <div
+              className={cn(
+                "flex flex-wrap items-center text-muted-foreground",
+                sizeClasses.meta,
+              )}
+            >
+              {metaItems.map((item, i) => (
+                <HeaderMeta
+                  key={item.key}
+                  separator={i > 0}
+                  title={item.title}
+                >
+                  {item.content}
+                </HeaderMeta>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {statusLabel ? (
@@ -446,6 +516,7 @@ export function WorkloadCard({
               title={title}
               icon={icon}
               series={metricSeries(metric)}
+              referenceLines={metricReferenceLines(metric)}
               {...(unit ? { unit } : {})}
               {...metricProps}
               expandable={false}

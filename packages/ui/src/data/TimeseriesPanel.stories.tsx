@@ -1,8 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, type ComponentProps } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { expect, within } from "storybook/test";
 import { UiChip } from "../icons";
-import { TimeseriesPanel, type TimeseriesResponse } from "./TimeseriesPanel";
+import {
+  TimeseriesPanel,
+  type SeriesLoader,
+  type TimeseriesResponse,
+} from "./TimeseriesPanel";
 
 /** Anchor so generated timestamps are stable across renders (no Date.now()). */
 const BASE_TIME = Date.parse("2026-06-02T12:00:00Z");
@@ -44,6 +49,17 @@ function makeFetcher(
       id: url,
       points: buildPoints(url, entry.scale, entry.offset ?? 0),
     };
+  };
+}
+
+/**
+ * A `load` function standing in for a typed API client: it receives the range
+ * and an AbortSignal, and returns the series without any URL involved.
+ */
+function makeLoader(id: string, scale: number, offset = 0): SeriesLoader {
+  return async ({ signal }) => {
+    signal.throwIfAborted();
+    return { id, points: buildPoints(id, scale, offset) };
   };
 }
 
@@ -105,6 +121,7 @@ const meta: Meta<typeof TimeseriesPanel> = {
     icon: { table: { disable: true } },
     fetcher: { table: { disable: true } },
     series: { table: { disable: true } },
+    referenceLines: { table: { disable: true } },
     className: { table: { disable: true } },
   },
   render: (args) => <PanelShowcase {...args} />,
@@ -395,5 +412,38 @@ export const CollectingData: Story = {
     url: "/api/v1/metrics/cpu",
     refreshMs: 0,
     fetcher: emptyResponse,
+  },
+};
+
+/**
+ * Function-backed series: each entry supplies `load({ range, signal })` instead
+ * of a URL, so no `baseUrl`/`fetcher` is needed. The `id` is then the cache
+ * identity and must be unique per data source. `referenceLines` draws a fixed
+ * value (here a static capacity) as a dashed line with its own legend entry.
+ */
+export const LoaderSeries: Story = {
+  args: {
+    title: "Memory (vm-42)",
+    unit: "bytes",
+    refreshMs: 0,
+    series: [
+      {
+        id: "vm-42.memory.used",
+        label: "used",
+        load: makeLoader("vm-42.memory.used", 4_000_000_000, 2_000_000_000),
+      },
+      {
+        id: "vm-42.memory.cache",
+        label: "cache",
+        load: makeLoader("vm-42.memory.cache", 1_000_000_000, 500_000_000),
+      },
+    ],
+    referenceLines: [{ value: 8 * 1024 ** 3, label: "capacity" }],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("used")).toBeInTheDocument();
+    await expect(canvas.getByText("cache")).toBeInTheDocument();
+    await expect(canvas.getByText("capacity")).toBeInTheDocument();
   },
 };
