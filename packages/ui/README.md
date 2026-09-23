@@ -5,10 +5,10 @@ Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com
 ## Install
 
 ```bash
-pnpm add @flanksource/clicky-ui react react-dom tailwindcss
-npm install @flanksource/clicky-ui react react-dom tailwindcss
-yarn add @flanksource/clicky-ui react react-dom tailwindcss
-bun add @flanksource/clicky-ui react react-dom tailwindcss
+pnpm add @flanksource/clicky-ui @tanstack/react-query react react-dom tailwindcss
+npm install @flanksource/clicky-ui @tanstack/react-query react react-dom tailwindcss
+yarn add @flanksource/clicky-ui @tanstack/react-query react react-dom tailwindcss
+bun add @flanksource/clicky-ui @tanstack/react-query react react-dom tailwindcss
 ```
 
 ## Usage
@@ -56,7 +56,7 @@ export function ClickyPanel() {
 
 ## Timeseries widgets and WorkloadCard
 
-`TimeseriesPanel`, `TimeseriesGauge`, `TimeseriesCoreBars` and `WorkloadCard` (from `@flanksource/clicky-ui/data`) poll their series with `@tanstack/react-query`, so they **must render under a `QueryClientProvider`** created from the same `@tanstack/react-query` copy that clicky-ui resolves — otherwise they throw `No QueryClient set`. If your app also depends on `@tanstack/react-query`, keep it on a compatible `^5` range so the package manager dedupes both to one copy.
+`TimeseriesPanel`, `TimeseriesGauge`, `TimeseriesCoreBars` and `WorkloadCard` (from `@flanksource/clicky-ui/data`) poll their series with `@tanstack/react-query`, so they **must render under the host application's `QueryClientProvider`**. React Query v5 is a required peer dependency, ensuring clicky-ui and its host use the same Query Client context rather than installing isolated copies.
 
 Each series is either URL-backed (`baseUrl + id`, loaded through `fetcher(url)`) or function-backed via `load`:
 
