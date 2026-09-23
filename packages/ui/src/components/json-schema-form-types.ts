@@ -12,6 +12,8 @@ export type * from "./json-schema-form-listener-types";
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
 // stamp arbitrary extension keys (read by their own extension functions).
+// Every `x-*` key declared here must also be documented in the published
+// meta-schema, schemas/json-schema-form.schema.json (enforced by its test).
 export interface JsonSchemaProperty {
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
@@ -156,6 +158,13 @@ export interface JsonSchemaProperty {
   // Object-level: extra classes merged onto the object's fields-grid container,
   // e.g. `"gap-2"` to set the section's row/column gap, or padding/background.
   "x-classes"?: string;
+  // Leading label glyph: a runtime icon name resolved by the icon provider.
+  "x-icon"?: string;
+  // Per-field layout override, winning over `x-label-position` and the form
+  // layout. "table" renders an array of objects (or a map) as compact rows.
+  "x-layout"?: "inline" | "stack" | "table";
+  // Async entity-reference picker; see LookupDescriptor.
+  "x-clicky-lookup"?: LookupDescriptor;
   // Consumer extension keys pass through untouched.
   [key: string]: unknown;
 }

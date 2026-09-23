@@ -1,0 +1,517 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/flanksource/clicky-ui/json-schema-form.schema.json",
+  "$dynamicAnchor": "meta",
+  "title": "clicky-ui JsonSchemaForm schema",
+  "description": "A JSON Schema 2020-12 document annotated for @flanksource/clicky-ui's JsonSchemaForm. It is the standard 2020-12 meta-schema plus the `x-*` presentation keywords the form reads, applied at every depth (nested `properties`, `items`, `allOf` branches, map value schemas). Set `$schema` to this document's `$id` to validate a form schema and get hover documentation in editors.\n\nControl resolution is first-match-wins on schema keywords, never on field names: `x-clicky-lookup` → `enum` (or an `anyOf`/`oneOf` branch carrying an `enum`) → `format: date|date-time` → `format: textarea` → `format: md` → `boolean` → `integer`/`number` → `array` → open string map (`additionalProperties`/`patternProperties`/`propertyNames`) → nested object (`properties`) → string.\n\nUnknown `x-*` keys are allowed: consumers read their own extension keys from `PreExtension`/`PostExtension` functions and the form passes them through untouched.",
+  "allOf": [{ "$ref": "https://json-schema.org/draft/2020-12/schema" }],
+  "properties": {
+    "title": {
+      "description": "The field label. A missing title falls back to the property key; an explicit empty string renders no label at all (for a field whose host already names it)."
+    },
+    "description": {
+      "description": "Helper text for the field, shown under the control or behind a `?` beside the label (see `x-help-display`). Combined with `x-help.body` when both are present and differ."
+    },
+    "default": {
+      "description": "Seeds the value of a field that has none, and is the value an `x-on-change` `reset` action restores (the key is removed when there is no default)."
+    },
+    "enum": {
+      "description": "Renders the field as a picker over these values. Label, icon, description and tone per value come from `x-enum-labels`, `x-enum-icons`, `x-enum-descriptions` and `x-enum-tones`; the presentation from `x-enum-display`. On `propertyNames`, restricts a map's keys to a picker. On an array's `items`, renders a tag list (or `x-array-display: filter-pills`)."
+    },
+    "format": {
+      "description": "Standard string format. Formats with form-specific meaning: `date` and `date-time` render a date picker; `textarea` a multi-line text box; `md` the MDXEditor-backed markdown editor (options in `x-md-editor`); `percent` (on a number) shows a static `%` unit inside the input; `password` masks the input and excludes the field from text filtering. Any other format renders a plain string input.",
+      "anyOf": [
+        { "enum": ["date", "date-time", "textarea", "md", "percent", "password"] },
+        { "type": "string" }
+      ]
+    },
+    "readOnly": {
+      "description": "Renders the field as a read-only value display (no input), or drops it entirely when the form sets `hideReadOnlyFields`. Contrast `x-disabled`, which keeps the real control and disables it."
+    },
+    "maximum": {
+      "description": "Upper bound of a number field. Required for `x-number-display: slider`."
+    },
+    "multipleOf": {
+      "description": "Its presence opts a number field into a native `<input type=\"number\">` (with step/min/max) instead of the token-friendly text input."
+    },
+    "minItems": {
+      "description": "The form stops offering per-item \"remove\" at this length. Not validation: an array already outside its bounds is left alone rather than trapped."
+    },
+    "maxItems": {
+      "description": "The form stops offering \"add\" at this length. Not validation: an array already outside its bounds is left alone rather than trapped."
+    },
+    "additionalProperties": {
+      "description": "`false` closes the object; `true` opens it as a free string map; a subschema types every extra entry's value (a typed map)."
+    },
+    "patternProperties": {
+      "description": "Per-key-pattern value schemas for a map: the first regex matching an entry's key types that entry's value, falling back to `additionalProperties`. Lets a keyed map render a different value form per key."
+    },
+    "propertyNames": {
+      "description": "An `enum` here turns a map's key input into a picker limited to those keys (labelled from `propertyNames.title`, options labelled by `x-enum-labels`)."
+    },
+    "allOf": {
+      "description": "Each member is either an `if`/`then`/`else` conditional — the matched branch's `properties`/`required` are merged into the object against the current value, replacing a property wholesale — or an unconditional composition member (a flattened `$ref`) whose `properties`/`required` always merge. An `if` the form cannot evaluate fails closed to `else`."
+    },
+    "anyOf": {
+      "description": "Not validated, but mined: a branch carrying an `enum` renders the field as a dropdown (a value-or-template union), and a two-branch union of a string `pattern` plus a number/integer/boolean/date branch renders the native control of the non-template branch."
+    },
+    "oneOf": {
+      "description": "Not validated, but mined like `anyOf`: a branch carrying an `enum` renders the field as a dropdown."
+    },
+    "x-order": {
+      "description": "Object-level. Property render order: listed keys render first, in this order; unlisted keys keep document order after them. Lets producers whose serializer alphabetizes maps (e.g. Go) state the intended order. For order that composes across merged `allOf` branches use the per-field `x-clicky-order`.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "examples": [["name", "type", "url"]]
+    },
+    "x-clicky-order": {
+      "description": "Field-level render order: lower values sort first; properties without it keep document order after the ordered ones. Unlike `x-order`, it composes across merged `allOf`/`then` branches because each field carries its own rank.",
+      "type": "number",
+      "examples": [10]
+    },
+    "x-hidden": {
+      "description": "Render nothing for this property — no label, no control, at any depth (a hidden object takes its whole section with it). The value is untouched: hiding is a presentation decision, not a data one. Flippable by an `allOf` branch (a matching branch replaces the property wholesale, so re-declare it with `\"x-hidden\": false` to reveal it) or by an `x-on-change` `show`/`hide` action.",
+      "type": "boolean",
+      "examples": [true]
+    },
+    "x-disabled": {
+      "description": "Render the field's real control, disabled (containers disable their whole subtree). Unlike `readOnly`, which swaps the input for plain value text. Flippable by an `allOf` branch like `x-hidden`, and set/cleared by an `x-on-change` `enable`/`disable` action.",
+      "type": "boolean",
+      "examples": [true]
+    },
+    "x-on-change": {
+      "description": "Change listeners on this field. Each entry's actions target SIBLING keys of the object that declares this property, applying while `when` holds (always, when `when` is omitted) and `else` applying while it does not. State actions (`hide`/`show`, `enable`/`disable`, `require`/`optional`) are derived: re-evaluated from the current value on every render, so a reloaded record shows the shape it was saved with. Value actions (`reset`/`set`) are transitional: they fire only when this field is committed through the form, and cascade into the listeners of the fields they change (each key fires at most once per commit).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/ChangeListener" },
+      "examples": [
+        [
+          { "when": { "const": "manual" }, "show": ["amount"], "require": ["amount"], "else": { "hide": ["amount"], "reset": ["amount"] } }
+        ]
+      ]
+    },
+    "x-icon": {
+      "description": "Leading glyph for the field label: a runtime icon name resolved by the form's icon provider.",
+      "type": "string",
+      "minLength": 1,
+      "examples": ["database"]
+    },
+    "x-help": {
+      "description": "Inline help metadata emitted by CLI/schema generators. `body` is rendered together with `description` as the field's helper text.",
+      "$ref": "#/$defs/HelpBlock"
+    },
+    "x-help-display": {
+      "description": "How this field's description is presented, overriding the form-level `layout.help`. `inline` is a paragraph under the control; `hover` moves it behind a `?` beside the label.",
+      "enum": ["inline", "hover"]
+    },
+    "x-label-position": {
+      "description": "Friendlier alias for the per-field layout: `top` stacks the label above the value (`x-layout: stack`); `left` places it beside the value (`x-layout: inline`). `x-layout` wins when both are set.",
+      "enum": ["top", "left"]
+    },
+    "x-label-classes": {
+      "description": "Extra CSS classes merged onto the field's `<label>`. Tailwind classes only compile if the consumer's Tailwind build scans a file containing them.",
+      "type": "string",
+      "examples": ["font-semibold"]
+    },
+    "x-input-classes": {
+      "description": "Extra CSS classes merged onto the field's input element. Tailwind classes only compile if the consumer's Tailwind build scans a file containing them.",
+      "type": "string",
+      "examples": ["font-mono"]
+    },
+    "x-input-prefix": {
+      "description": "Static text rendered inside the input at its left edge (display only, never part of the value). `x-input-prefix-icon` wins when both are set.",
+      "type": "string",
+      "examples": ["https://"]
+    },
+    "x-input-suffix": {
+      "description": "Static text rendered inside the input at its right edge (display only, never part of the value). `x-input-suffix-icon` wins when both are set.",
+      "type": "string",
+      "examples": ["ms"]
+    },
+    "x-input-prefix-icon": {
+      "description": "Runtime icon name rendered inside the input at its left edge. Wins over `x-input-prefix`.",
+      "type": "string",
+      "examples": ["search"]
+    },
+    "x-input-suffix-icon": {
+      "description": "Runtime icon name rendered inside the input at its right edge. Wins over `x-input-suffix`.",
+      "type": "string",
+      "examples": ["lock"]
+    },
+    "x-layout": {
+      "description": "Per-field layout override, taking precedence over the form-level layout. `inline` and `stack` force the field's subtree into label-beside-value or label-above-value mode; `table` renders an array of objects (or a map) as compact rows under column headers. On a map's value schema, `stack` renders each key above its value as one full-width unit.",
+      "enum": ["inline", "stack", "table"]
+    },
+    "x-columns": {
+      "description": "Object-level. Lay the object's fields out in N equal columns (stacked layout); fields span one column unless they set `x-col-span`. `auto` fits as many equal columns as the container width allows, each at least `x-column-min-width` wide.",
+      "type": ["integer", "string"],
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "const": "auto" }
+      ],
+      "examples": [2, "auto"]
+    },
+    "x-column-min-width": {
+      "description": "Object-level, with `x-columns: auto` only. Minimum width of one column as a CSS length (default `15rem`). A length rather than a class, because a class inside a schema is data no Tailwind scanner ever reads.",
+      "type": "string",
+      "examples": ["12rem"]
+    },
+    "x-columns-max-width": {
+      "description": "Object-level, with `x-columns: auto` only. Optional cap on the whole grid's width, as a CSS length.",
+      "type": "string",
+      "examples": ["60rem"]
+    },
+    "x-col-span": {
+      "description": "How many of the enclosing object's columns this field occupies (honoured when the object sets `x-columns`). `full` spans the whole row — the only meaningful answer under `x-columns: auto` — and lifts the stacked value-width cap.",
+      "type": ["integer", "string"],
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "const": "full" }
+      ],
+      "examples": [2, "full"]
+    },
+    "x-classes": {
+      "description": "Object-level. Extra CSS classes merged onto the object's fields-grid container, e.g. `gap-2` for the section's row/column gap.",
+      "type": "string",
+      "examples": ["gap-2"]
+    },
+    "x-enum-labels": {
+      "description": "Human label per enum value. The option renders as `Label (value)` while the raw value is what is stored. Also applies to `propertyNames.enum` key pickers.",
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "examples": [{ "20": "Business", "30": "Personal" }]
+    },
+    "x-enum-icons": {
+      "description": "Runtime icon name per enum value. Its presence switches the enum control to a selectable icon grid unless `x-enum-display` says otherwise; `x-item.glyph` and `x-item.badge` also read it.",
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "examples": [{ "postgres": "postgres", "mysql": "mysql" }]
+    },
+    "x-enum-descriptions": {
+      "description": "Secondary descriptive line per enum value, rendered by the `segmented` (as descriptive cards) and `grid` displays.",
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "examples": [{ "plan": "No tool execution", "auto": "Runs tools without asking" }]
+    },
+    "x-enum-tones": {
+      "description": "Hue per enum value. Purely decorative — unlike `x-enum-icons` it does not change which enum control renders. Read by displays that colour a value, e.g. the accordion array's leading glyph (`x-item.glyph`).",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/FieldTone" },
+      "examples": [{ "list": "indigo", "text": "emerald" }]
+    },
+    "x-enum-display": {
+      "description": "Force the enum presentation. `combobox` (the default) is a searchable dropdown; `radio` a segmented radio group for small fixed sets; `grid` a filterable grid of icon cards (the default when `x-enum-icons` is present); `segmented` the shared SegmentedControl, rendering large descriptive cards when `x-enum-descriptions` is present.",
+      "enum": ["combobox", "radio", "grid", "segmented"]
+    },
+    "x-array-display": {
+      "description": "Force an array's presentation. `filter-pills` renders each enum item option as a compact toggle (an empty array means all options); `accordion` (the default for object items) collapses each item to a summary row and opens one at a time; `cards` keeps every item open under a titled header; both read `x-item`. `stacked` opts out to one full sub-form per item labelled *Item N*; `list` renders scalar values as compact editable list items.",
+      "enum": ["filter-pills", "accordion", "cards", "stacked", "list"]
+    },
+    "x-item": {
+      "description": "Array-level. How to summarize one item in a collapsed accordion row or card header. Every value names a property of the item. Lives on the array rather than on `items` because one shared item schema may be summarized differently by each array that uses it.",
+      "$ref": "#/$defs/ArrayItemSpec"
+    },
+    "x-number-display": {
+      "description": "Render a bounded number (requires `maximum`) as a single-thumb slider with a progress-filled track instead of a numeric input.",
+      "const": "slider"
+    },
+    "x-discriminator": {
+      "description": "Object-level. Names the property whose value selects a \"kind\" (e.g. a connection `type`). The form renders that property first as a picker; once chosen, it shows the matched `allOf` branch's fields and collapses the picker to a compact header with a \"change\" affordance.",
+      "type": "string",
+      "examples": ["type"]
+    },
+    "x-md-editor": {
+      "description": "Options for the MDXEditor-backed markdown field rendered for `format: md`. Only the JSON-serializable subset of `MdxEditorPluginOptions` can be declared in a schema; function-valued options (image upload/preview handlers, `jsxComponents`, `plugins`, code block `editorDescriptors`, toolbar `extra`) must be supplied programmatically.",
+      "$ref": "#/$defs/MdxEditorOptions"
+    },
+    "x-clicky-lookup": {
+      "description": "Turns the field into an async entity-reference picker: options are fetched lazily from another entity's list endpoint via the form's `lookupFetcher`. Single-select also accepts free-form entry; set `multi` for an array field.",
+      "$ref": "#/$defs/LookupDescriptor"
+    },
+    "x-clicky-unit": {
+      "description": "Opt-in: honoured only when the consumer passes `createUnitFormExtensions()` to the form. Renders a positive integer as a unit-scaled input with step controls — `count` (K/M/B/T) or `bytes` (KiB/MiB/GiB/TiB).",
+      "enum": ["count", "bytes"]
+    },
+    "x-clicky-component": {
+      "description": "Opt-in: honoured only when the consumer passes `createSecretFormExtensions(...)` to the form. Replaces the control with a Kubernetes value-source selector — `k8s-secret-selector` for a secret/configmap/value reference, `k8s-url-selector` for the same plus a workload endpoint.",
+      "enum": ["k8s-secret-selector", "k8s-url-selector"]
+    },
+    "x-clicky-default-source": {
+      "description": "Opt-in, with `x-clicky-component`. The source a new, empty secret reference starts on.",
+      "enum": ["value", "secret", "configmap", "helm", "onepassword", "serviceaccount"]
+    }
+  },
+  "$defs": {
+    "FieldTone": {
+      "description": "The closed palette of decorative hues. Each tone tracks the light/dark theme.",
+      "enum": ["neutral", "slate", "violet", "amber", "sky", "teal", "indigo", "emerald", "rose"]
+    },
+    "HelpBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "description": "Where the help text came from (e.g. a CLI command).", "type": "string" },
+        "section": { "description": "The section of the source it was taken from.", "type": "string" },
+        "body": { "description": "Help text, appended to `description` in the rendered helper text.", "type": "string" }
+      },
+      "examples": [{ "body": "Must be unique within the namespace." }]
+    },
+    "ChangeActionTargets": {
+      "description": "Sibling property keys the action applies to.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "ChangeActions": {
+      "type": "object",
+      "properties": {
+        "hide": { "description": "Derived: hide these siblings while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "show": { "description": "Derived: show these siblings (clearing `x-hidden`) while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "enable": { "description": "Derived: enable these siblings (clearing `x-disabled`) while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "disable": { "description": "Derived: disable these siblings while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "require": { "description": "Derived: mark these siblings required while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "optional": { "description": "Derived: mark these siblings optional while the condition holds.", "$ref": "#/$defs/ChangeActionTargets" },
+        "reset": { "description": "Transitional: on commit, restore these siblings to their schema `default`, or remove them when they have none.", "$ref": "#/$defs/ChangeActionTargets" },
+        "set": {
+          "description": "Transitional: on commit, set each sibling key to the literal value given.",
+          "type": "object",
+          "examples": [{ "mode": "manual", "retries": 3 }]
+        }
+      }
+    },
+    "ChangeListener": {
+      "description": "One `x-on-change` entry: its actions apply while `when` holds (always, when omitted), and `else` applies while it does not.",
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/ChangeActions" }],
+      "properties": {
+        "when": {
+          "description": "Condition on THIS field's value, in the `if`-predicate grammar the form evaluates (`const`, `enum`, `not`, nested `properties`/`required`), plus an optional `expr` handed to the form's `expressionEvaluator`. When both are present both must hold. A condition with nothing evaluable is an error.",
+          "$dynamicRef": "#meta",
+          "properties": {
+            "expr": { "description": "Expression evaluated by the host's `expressionEvaluator`; must return a boolean.", "type": "string" }
+          }
+        },
+        "else": {
+          "description": "Actions applied while `when` does not hold.",
+          "$ref": "#/$defs/ChangeActions",
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "ArrayItemSummaryPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["property"],
+      "properties": {
+        "property": { "description": "Item property whose value is shown.", "type": "string" },
+        "pattern": { "description": "Wraps the value; a single literal `{}` marks where it goes.", "type": "string", "examples": ["{{.params.{}}}"] }
+      }
+    },
+    "ArrayItemSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "description": "Item property keys tried in order; the first with a non-empty value is the row title.", "type": "array", "items": { "type": "string" } },
+        "fallback": { "description": "Title used when every `title` candidate is empty. Defaults to `Item <n>`.", "type": "string" },
+        "summary": {
+          "description": "The monospace trailing line, parts joined with \" · \". A string names an item property; an object wraps it in a `pattern`.",
+          "type": "array",
+          "items": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/ArrayItemSummaryPart" }] }
+        },
+        "glyph": { "description": "Enum item property supplying the leading glyph's icon (`x-enum-icons`) and tone (`x-enum-tones`).", "type": "string" },
+        "badge": { "description": "Enum item property supplying a secondary chip.", "type": "string" },
+        "flag": { "description": "Boolean item property rendered as the required mark.", "type": "string" },
+        "actions": {
+          "description": "Which per-item actions rows offer. Omit for all of them; `[]` for none. `reorder` covers both the up and the down button.",
+          "type": "array",
+          "items": { "enum": ["reorder", "duplicate", "remove"] },
+          "uniqueItems": true
+        },
+        "noun": { "description": "Noun for the add row (\"Add parameter\"). Defaults to `items.title`, then \"item\".", "type": "string" },
+        "nounPlural": { "description": "Plural for the count line (\"4 parameters\"). Defaults to the array title, then \"items\".", "type": "string" },
+        "empty": { "description": "Copy shown by the add row at zero items. Defaults to the array's own description.", "type": "string" }
+      },
+      "examples": [
+        { "title": ["name", "key"], "summary": ["type", { "property": "name", "pattern": "{{.params.{}}}" }], "glyph": "type", "flag": "required", "noun": "parameter" }
+      ]
+    },
+    "LookupDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "filter"],
+      "properties": {
+        "url": { "description": "Entity list path that serves the lookup.", "type": "string", "examples": ["/api/v1/connection"] },
+        "filter": { "description": "Filter key sent as `__lookup_filter`; the response keys its options (and the committed value) under it.", "type": "string", "examples": ["name"] },
+        "searchParam": { "description": "Query-string key for the search term. Informational — the client always sends `__lookup_q`.", "type": "string" },
+        "multi": { "description": "Allow multiple selected values (for an array field). Single-select also accepts free-form entry.", "type": "boolean" },
+        "scope": {
+          "description": "Derive an extra query param from another field so the option set is filtered by it.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["param", "from"],
+          "properties": {
+            "param": { "description": "Query-string key to send.", "type": "string", "examples": ["types"] },
+            "from": { "description": "Dotted path into the form's root value.", "type": "string", "examples": ["provider.type"] },
+            "map": {
+              "description": "Maps the source value to the emitted values. When absent the source value is sent verbatim.",
+              "type": "object",
+              "additionalProperties": { "type": "array", "items": { "type": "string" } },
+              "examples": [{ "sql": ["postgres", "mysql"] }]
+            },
+            "join": { "description": "Joins mapped values into the param. Defaults to \",\".", "type": "string" }
+          }
+        },
+        "hierarchy": {
+          "description": "Render options as a browsable tree by splitting each label on any character in `delimiters`. Presentational only — the committed value is the unsplit option value.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["delimiters"],
+          "properties": {
+            "delimiters": { "description": "Characters separating one level from the next.", "type": "string", "minLength": 1, "examples": ["./"] }
+          }
+        }
+      }
+    },
+    "MdxViewMode": { "enum": ["rich-text", "source", "diff"] },
+    "MdxEditorOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "toolbar": {
+          "description": "Show the toolbar, optionally positioned and styled.",
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "className": { "type": "string" },
+                "position": { "enum": ["top", "bottom"] }
+              }
+            }
+          ]
+        },
+        "headings": {
+          "description": "Enable headings, optionally limited to some levels.",
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "allowedHeadingLevels": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 6 } }
+              }
+            }
+          ]
+        },
+        "lists": { "type": "boolean" },
+        "quote": { "type": "boolean" },
+        "links": {
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "disableAutoLink": { "type": "boolean" },
+                "linkAutocompleteSuggestions": { "type": "array", "items": { "type": "string" } },
+                "showLinkTitleField": { "type": "boolean" }
+              }
+            }
+          ]
+        },
+        "tables": { "type": "boolean" },
+        "thematicBreak": { "type": "boolean" },
+        "codeBlocks": {
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "defaultLanguage": { "type": "string" } }
+            }
+          ]
+        },
+        "codeMirror": {
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "languages": {
+                  "description": "Language id → display name, or a list of language descriptors.",
+                  "anyOf": [
+                    { "type": "object", "additionalProperties": { "type": "string" } },
+                    { "type": "array", "items": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } } }
+                  ]
+                },
+                "autoLoadLanguageSupport": { "type": "boolean" }
+              }
+            }
+          ]
+        },
+        "frontmatter": { "type": "boolean" },
+        "admonitions": {
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "escapeUnknownTextDirectives": { "type": "boolean" } }
+            }
+          ]
+        },
+        "callouts": {
+          "description": "Register `<CalloutBox>` with its own node editor. Off by default.",
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": { "description": "Tag to register. Defaults to `CalloutBox`.", "type": "string" },
+                "source": { "description": "Module the component is imported from, if the document needs the import.", "type": "string" }
+              }
+            }
+          ]
+        },
+        "images": {
+          "anyOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "imageAutocompleteSuggestions": { "type": "array", "items": { "type": "string" } },
+                "disableImageResize": { "type": "boolean" },
+                "disableImageSettingsButton": { "type": "boolean" },
+                "allowSetImageDimensions": { "type": "boolean" }
+              }
+            }
+          ]
+        },
+        "markdownShortcuts": { "type": "boolean" },
+        "diffMode": {
+          "description": "Enable the rich-text/source/diff view switcher, or start in a given view mode.",
+          "anyOf": [
+            { "type": "boolean" },
+            { "$ref": "#/$defs/MdxViewMode" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "viewMode": { "$ref": "#/$defs/MdxViewMode" },
+                "viewModes": { "type": "array", "items": { "$ref": "#/$defs/MdxViewMode" } },
+                "diffMarkdown": { "description": "Baseline markdown the diff view compares against.", "type": "string" },
+                "readOnlyDiff": { "type": "boolean" }
+              }
+            }
+          ]
+        }
+      },
+      "examples": [{ "tables": true, "diffMode": { "viewMode": "rich-text", "viewModes": ["rich-text", "source"] } }]
+    }
+  }
+}
