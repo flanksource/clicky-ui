@@ -17,6 +17,7 @@
     "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "monaco-editor": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "shiki": "catalog:"

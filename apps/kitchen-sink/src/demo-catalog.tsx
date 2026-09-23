@@ -7,6 +7,7 @@ import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
+import { JsonSchemaFormListenersDemo } from "./demos/listeners/JsonSchemaFormListenersDemo";
 import { JSONPathFieldDemo } from "./demos/JSONPathFieldDemo";
 import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
 import { ConnectionLoggingPolicyDemo } from "./demos/ConnectionLoggingPolicyDemo";
@@ -266,6 +267,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         id: "form-fields",
         label: "Form fields",
         component: FormFieldsDemo,
+        icon: UiForm,
+      },
+      {
+        id: "json-schema-form-listeners",
+        label: "Form listeners",
+        component: JsonSchemaFormListenersDemo,
         icon: UiForm,
       },
       {
