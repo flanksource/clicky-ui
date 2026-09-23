@@ -1,13 +1,14 @@
 import {
-  effectiveProperties,
   resolveControl,
   scalarItemsType,
 } from "./json-schema-form-resolve";
+import { applyListenerState } from "./json-schema-form-listeners";
 import { isPlainObject } from "../lib/collections";
 import { isEmptyValue } from "./json-schema-form-utils";
 import { matchesFieldFilter } from "./json-schema-form-filter";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import type {
+  ExpressionEvaluator,
   FieldControl,
   JsonSchemaObject,
   JsonSchemaProperty,
@@ -54,6 +55,7 @@ export function unmatchedFormErrors({
   pre,
   rootValue = value,
   instancePath = "",
+  expressionEvaluator,
 }: {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
@@ -65,6 +67,7 @@ export function unmatchedFormErrors({
   pre: PreExtension[];
   rootValue?: Record<string, unknown>;
   instancePath?: string;
+  expressionEvaluator?: ExpressionEvaluator;
 }): JsonSchemaFormError[] {
   const rendered = new Set<string>();
   collectObjectPaths(schema, value, instancePath, rendered, {
@@ -75,6 +78,7 @@ export function unmatchedFormErrors({
     rootValue,
     root: true,
     ...(fieldFilter ? { fieldFilter } : {}),
+    ...(expressionEvaluator ? { expressionEvaluator } : {}),
   });
   return errors.filter((error) => !rendered.has(error.instancePath));
 }
@@ -87,6 +91,7 @@ interface CollectOptions {
   pre: PreExtension[];
   rootValue: Record<string, unknown>;
   root: boolean;
+  expressionEvaluator?: ExpressionEvaluator;
 }
 
 function collectObjectPaths(
@@ -96,7 +101,10 @@ function collectObjectPaths(
   paths: Set<string>,
   options: CollectOptions
 ) {
-  const { properties, required } = effectiveProperties(schema, value);
+  const { properties, required } = applyListenerState(schema, value, {
+    root: options.rootValue,
+    ...(options.expressionEvaluator ? { evaluate: options.expressionEvaluator } : {}),
+  });
   const discriminator =
     options.root && typeof schema["x-discriminator"] === "string"
       ? schema["x-discriminator"]
@@ -106,6 +114,8 @@ function collectObjectPaths(
     (value[discriminator] == null || value[discriminator] === "");
 
   for (const [key, prop] of Object.entries(properties)) {
+    // Mirrors buildField: a hidden field renders nothing to hang an error on.
+    if (prop["x-hidden"]) continue;
     if (options.root && options.hiddenKeys.has(key)) continue;
     if (
       options.root &&

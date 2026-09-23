@@ -11,7 +11,7 @@ import { FormLookupProvider } from "./FormLookupProvider";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
-import { applySchemaDefaults } from "./json-schema-form-resolve";
+import { applySchemaDefaults } from "./json-schema-form-defaults";
 import {
   cssLength,
   DEFAULT_COLUMN_MIN_WIDTH,
@@ -88,6 +88,7 @@ export function JsonSchemaForm({
   persistPreferences = true,
   preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
   lookupFetcher,
+  expressionEvaluator,
   applyDefaults = true,
 }: JsonSchemaFormProps) {
   // When the menu is hidden, never touch localStorage and start from an empty
@@ -135,8 +136,9 @@ export function JsonSchemaForm({
         instancePath,
         ...(hiddenKeys ? { hiddenKeys } : {}),
         ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
+        ...(expressionEvaluator ? { expressionEvaluator } : {}),
       }),
-    [effectiveValue, errors, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, resolvedSchema, rootValue],
+    [effectiveValue, errors, expressionEvaluator, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, resolvedSchema, rootValue],
   );
   // Defaults are part of the submitted form value, not only presentation. This
   // is especially important for required discriminator fields whose default
@@ -161,6 +163,7 @@ export function JsonSchemaForm({
     errors,
     depth: 0,
     render: renderApi,
+    ...(expressionEvaluator ? { expressionEvaluator } : {}),
     ...(idPrefix ? { idPrefix } : {}),
     ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
   };

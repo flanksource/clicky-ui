@@ -6,7 +6,8 @@
     "paths": {
       "@flanksource/clicky-ui": ["../../packages/ui/src/index.ts"],
       "@flanksource/clicky-ui/icons": ["../../packages/ui/src/icons.ts"],
-      "@flanksource/clicky-ui/profiles": ["../../packages/ui/src/profiles.ts"]
+      "@flanksource/clicky-ui/profiles": ["../../packages/ui/src/profiles.ts"],
+      "@flanksource/clicky-ui/monaco": ["../../packages/ui/src/monaco.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

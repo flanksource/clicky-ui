@@ -314,10 +314,12 @@ export type {
 } from "./components/json-schema-form-preferences";
 export {
   resolveControl,
-  effectiveProperties,
-  matchesIf,
   isOpenStringMap,
 } from "./components/json-schema-form-resolve";
+export {
+  effectiveProperties,
+  matchesIf,
+} from "./components/json-schema-form-conditionals";
 export { rehydrateRefs } from "./components/json-schema-form-refs";
 export { templateValuePre } from "./components/json-schema-form-template";
 export {
@@ -356,6 +358,10 @@ export type {
   LookupHierarchy,
   LookupScope,
   LookupFetcher,
+  ChangeActions,
+  ChangeCondition,
+  ChangeListener,
+  ExpressionEvaluator,
 } from "./components/json-schema-form-types";
 export type { JsonSchemaFormError } from "./components/json-schema-form-error-types";
 export {

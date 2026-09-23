@@ -22,6 +22,10 @@ export default defineConfig({
         replacement: resolve(uiSrc, "icons.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/monaco$/,
+        replacement: resolve(uiSrc, "monaco.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/rpc$/,
         replacement: resolve(uiSrc, "rpc.ts"),
       },

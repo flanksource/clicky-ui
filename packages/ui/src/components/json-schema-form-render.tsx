@@ -26,7 +26,9 @@ import { FieldErrorMessages, FieldErrorText } from "./json-schema-form-error-dis
 import { appendInstancePath, errorsAtInstancePath } from "./json-schema-form-errors";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import { applyPostExtensions } from "./json-schema-form-extensions";
-import { effectiveProperties, resolveControl, schemaRendersAsObject } from "./json-schema-form-resolve";
+import { resolveControl, schemaRendersAsObject } from "./json-schema-form-resolve";
+import { effectiveProperties } from "./json-schema-form-conditionals";
+import { applyChangeEffects, applyListenerState } from "./json-schema-form-listeners";
 import type {
   FieldArgs,
   FieldControl,
@@ -152,6 +154,11 @@ function buildField(
   messages: JsonSchemaFormError[];
   help: HelpDisplay;
 } | null {
+  // `x-hidden` is a property of the schema, not of the resolved control, so no
+  // extension can set or clear it — checked before anything is resolved. A
+  // matching `allOf` branch that re-declares the property without the flag is
+  // what reveals it; see effectiveProperties.
+  if (args.prop["x-hidden"]) return null;
   const base = resolveControl(args);
   let field: FieldControl | null = base;
   for (const ext of ctx.pre) {
@@ -200,8 +207,11 @@ function buildField(
   const overrideMode =
     field.layout === "inline" ? "inline" : field.layout === "stack" ? "stacked" : undefined;
   const nestedProperty = ctx.layout.mode === "properties" && (field.kind === "object" || field.kind === "string-map");
+  // A disabled field keeps its real control (unlike readOnly's value text), and
+  // containers read ctx.readOnly, so a disabled object disables its subtree.
   const valueCtx: RenderContext = {
     ...ctx,
+    ...(field.disabled ? { readOnly: true } : {}),
     ...(ctx.layout.mode === "properties" && !nestedProperty ? { size: propertyControlSize[ctx.size] } : {}),
     instancePath,
     ...(overrideMode && !nestedProperty ? { layout: { ...ctx.layout, mode: overrideMode } } : {}),
@@ -356,7 +366,8 @@ export function renderFieldRow(
 
 // renderObjectFields maps an object subschema's effective properties to field
 // rows. It is the recursive heart, shared by the top-level form and the nested
-// ObjectControl. Edits spread immutably onto the object.
+// ObjectControl. Edits spread immutably onto the object, carrying the value
+// effects of the edited field's `x-on-change` listeners in the same commit.
 export function renderObjectFields(
   schema: JsonSchemaObject,
   value: Record<string, unknown>,
@@ -364,7 +375,11 @@ export function renderObjectFields(
   ctx: RenderContext,
   opts?: { hiddenKeys?: string[] },
 ): ReactNode[] {
-  const { properties, required } = effectiveProperties(schema, value);
+  const listenerOptions = {
+    root: ctx.rootValue ?? value,
+    ...(ctx.expressionEvaluator ? { evaluate: ctx.expressionEvaluator } : {}),
+  };
+  const { properties, required } = applyListenerState(schema, value, listenerOptions);
   const hidden = new Set(opts?.hiddenKeys ?? []);
   // Per-property `x-clicky-order` wins (composes across merged branches); the
   // object-level `x-order` array is the fallback; document order otherwise.
@@ -396,7 +411,7 @@ export function renderObjectFields(
         prop,
         required: required.includes(key),
         value: value[key],
-        onChange: (next) => onChange({ ...value, [key]: next }),
+        onChange: (next) => onChange(applyChangeEffects(schema, { ...listenerOptions, value, key, next })),
         instancePath: appendInstancePath(ctx.instancePath, key),
       },
       ctx,
