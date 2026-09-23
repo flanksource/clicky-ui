@@ -3,9 +3,11 @@ import type { LabelIconSpec } from "../data/Icon";
 import type { FieldTone } from "./json-schema-form-tone";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
 import type { LookupDescriptor } from "./json-schema-form-runtime-types";
+import type { ChangeListener } from "./json-schema-form-listener-types";
 
 export type { FieldTone };
 export type * from "./json-schema-form-runtime-types";
+export type * from "./json-schema-form-listener-types";
 
 // JsonSchemaProperty is the subset of JSON Schema (2020-12) the form reads. It
 // is intentionally permissive: unknown keywords are ignored, and consumers may
@@ -55,6 +57,10 @@ export interface JsonSchemaProperty {
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
   else?: JsonSchemaProperty;
+  // Standard JSON Schema negation. Read inside an `if` predicate, where
+  // `not: { const: "01" }` is how a schema says "this field is not 01" — the
+  // only way to express a `!=` guard the form can act on.
+  not?: JsonSchemaProperty;
   // Explicit property render order for an object: listed keys render first (in
   // this order), unlisted keys keep document order after them. Lets emitters
   // whose serializer alphabetizes maps (e.g. Go) state the intended UX order.
@@ -103,6 +109,24 @@ export interface JsonSchemaProperty {
   // Optional inline help metadata emitted by CLI/schema generators. The form
   // renders `body` together with `description` as helper text.
   "x-help"?: JsonSchemaHelpBlock;
+  // Render nothing for this property — no label, no control, at any depth
+  // (an object marked hidden takes its whole section with it). The value is
+  // untouched: hiding is a presentation decision, not a data one.
+  //
+  // Generic and unprefixed like the rest of the presentation family
+  // (`x-order`, `x-help`, `x-layout`, `x-col-span`, `x-enum-*`) — hidden is a
+  // form concern, not a product one. Because it is a plain schema keyword and a
+  // matching `allOf` branch REPLACES a property wholesale, a branch can flip it:
+  // declare the field `"x-hidden": true` at the base and re-declare it with
+  // `"x-hidden": false` in the `then` that should reveal it.
+  "x-hidden"?: boolean;
+  // Render the field's real control, disabled — unlike `readOnly`, which swaps
+  // the input for plain value text. Flippable by an `allOf` branch the same way
+  // as `x-hidden`, and set/cleared by an `x-on-change` enable/disable action.
+  "x-disabled"?: boolean;
+  // Change listeners on this property; see ChangeListener. Targets are sibling
+  // keys of the object that declares this property.
+  "x-on-change"?: ChangeListener[];
   // Presentation extensions (all optional, additive). Extra classes merged onto
   // the field's label / input; text or runtime-icon-name adornments rendered
   // inside the input; label stacked on top vs. inline; and a grid column span
@@ -154,6 +178,9 @@ export type JsonSchemaType =
 export interface JsonSchemaConditional {
   if?: JsonSchemaProperty;
   then?: JsonSchemaProperty;
+  // The branch merged when `if` does NOT hold — including when the `if` names a
+  // predicate the form cannot evaluate, which fails closed to this branch.
+  else?: JsonSchemaProperty;
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
   additionalProperties?: boolean | JsonSchemaProperty;
@@ -315,6 +342,11 @@ export interface FieldControl {
   // prop, and is dropped entirely when the form sets hideReadOnlyFields. A
   // pre-extension may set or clear it.
   readOnly?: boolean;
+
+  // Resolved from `x-disabled`: the field keeps its real control but renders it
+  // disabled (containers disable their whole subtree). A pre-extension may set
+  // or clear it.
+  disabled?: boolean;
 
   // True when the form was given a validation error at this field's instance
   // path. Set by the renderer, not by resolveControl, and consumed only through

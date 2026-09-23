@@ -10,6 +10,8 @@ import {
   useHistoryRoute,
   type AppShellNavSection,
 } from "@flanksource/clicky-ui";
+import { MonacoProvider } from "@flanksource/clicky-ui/monaco";
+import { getMonacoWorker } from "./monaco-workers";
 import {
   DEFAULT_DEMO_ID,
   DEMO_GROUPS,
@@ -64,54 +66,56 @@ export function App() {
   return (
     <ThemeProvider>
       <DensityProvider>
-        <RouterProvider adapter={router}>
-          <AppShell
-            brand={
-              <>
-                <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-                  C
-                </span>
-                <span className="font-semibold tracking-tight">
-                  Clicky UI · Kitchen Sink
-                </span>
-              </>
-            }
-            search={
-              <input
-                value={query}
-                onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
-                placeholder="Filter components…"
-                aria-label="Filter components"
-                className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
-              />
-            }
-            actions={
-              <>
-                <ThemeSwitcher />
-                <DensitySwitcher />
-              </>
-            }
-            navSections={navSections}
-            collapsedStorageKey="kitchen-sink:sidebar:collapsed"
-            bodyHeader={
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {activeGroup.title}
-                </span>
-                <span className="text-muted-foreground">›</span>
-                <span className="font-medium">{activeDemo.label}</span>
-              </div>
-            }
-          >
-            <div
-              id={`demo-panel-${activeDemo.id}`}
-              role="tabpanel"
-              className="min-w-0 p-density-4"
+        <MonacoProvider getWorker={getMonacoWorker}>
+          <RouterProvider adapter={router}>
+            <AppShell
+              brand={
+                <>
+                  <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                    C
+                  </span>
+                  <span className="font-semibold tracking-tight">
+                    Clicky UI · Kitchen Sink
+                  </span>
+                </>
+              }
+              search={
+                <input
+                  value={query}
+                  onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
+                  placeholder="Filter components…"
+                  aria-label="Filter components"
+                  className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
+                />
+              }
+              actions={
+                <>
+                  <ThemeSwitcher />
+                  <DensitySwitcher />
+                </>
+              }
+              navSections={navSections}
+              collapsedStorageKey="kitchen-sink:sidebar:collapsed"
+              bodyHeader={
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {activeGroup.title}
+                  </span>
+                  <span className="text-muted-foreground">›</span>
+                  <span className="font-medium">{activeDemo.label}</span>
+                </div>
+              }
             >
-              <ActiveDemoComponent />
-            </div>
-          </AppShell>
-        </RouterProvider>
+              <div
+                id={`demo-panel-${activeDemo.id}`}
+                role="tabpanel"
+                className="min-w-0 p-density-4"
+              >
+                <ActiveDemoComponent />
+              </div>
+            </AppShell>
+          </RouterProvider>
+        </MonacoProvider>
       </DensityProvider>
     </ThemeProvider>
   );

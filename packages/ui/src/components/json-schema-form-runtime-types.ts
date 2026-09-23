@@ -72,6 +72,19 @@ export type LookupFetcher = (args: {
   rootValue?: Record<string, unknown>;
 }) => Promise<FieldOption[]>;
 
+// ExpressionEvaluator runs an `x-on-change` listener's `when.expr`. The form
+// ships no expression language: the host plugs one in (a client-side CEL, a
+// hand-rolled matcher, …). It is synchronous because listener state is derived
+// during render. `value` is the source field's value, `self` the object that
+// holds it, `root` the form's top-level value. It must return a boolean.
+export type ExpressionEvaluator = (args: {
+  expr: string;
+  key: string;
+  value: unknown;
+  self: Record<string, unknown>;
+  root: Record<string, unknown>;
+}) => boolean;
+
 // PreExtension transforms a resolved control before it renders, or returns null
 // to drop the field. Composed in array order; each sees the prior's output.
 // `ctx.rootValue` is the form's top-level value (the same object at every depth),
@@ -187,6 +200,8 @@ export interface RenderContext extends FormErrorContext {
   // Commits a replacement top-level value. Consumer extensions use this to
   // atomically update sibling fields from a composite editor.
   onRootChange?: (next: Record<string, unknown>) => void;
+  // Evaluates `x-on-change` `when.expr`; see JsonSchemaFormProps.expressionEvaluator.
+  expressionEvaluator?: ExpressionEvaluator;
   depth: number;
   // The recursion entry points (see RenderApi).
   render: RenderApi;
@@ -302,6 +317,12 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    * Hosts typically build it from the operations api client's lookup endpoint.
    */
   lookupFetcher?: LookupFetcher;
+  /**
+   * Evaluates the `when.expr` of `x-on-change` listeners. The form has no
+   * built-in expression language; a schema that uses `expr` without this prop
+   * fails loudly instead of guessing.
+   */
+  expressionEvaluator?: ExpressionEvaluator;
   /**
    * Show the top-right three-dot display-options menu (size, layout, and sort).
    * Defaults to true. The menu controls only this form's appearance — never
