@@ -43,7 +43,8 @@ apps/playground/.playground/
 .playwright-mcp/
 
 # AI agent worktrees
-.claude/
+.claude/*
+!.claude/settings.json
 hack/
 *.png
 .antigravitycli/
