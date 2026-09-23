@@ -1,4 +1,3 @@
-import { useQueries } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -28,25 +27,23 @@ import {
   type MergedRow,
   type ResolvedSeries,
   type TimeseriesPanelProps,
-  type TimeseriesResponse,
+  type TimeseriesReferenceLine,
 } from "./TimeseriesPanel.model";
+import { defaultTimeseriesFetcher, useTimeseriesQueries } from "./timeseries-query";
 
 export type { AxisAssignment, AxisOrientation, AxisSpec } from "./TimeseriesPanel.axes";
 export type {
   BreakdownItem,
   MergedRow,
   ResolvedSeries,
+  SeriesLoadContext,
+  SeriesLoader,
   TimeseriesPanelProps,
   TimeseriesPoint,
+  TimeseriesReferenceLine,
   TimeseriesResponse,
   TimeseriesSeries,
 } from "./TimeseriesPanel.model";
-
-const defaultFetcher = async (url: string): Promise<TimeseriesResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`metrics request failed: ${res.status}`);
-  return res.json();
-};
 
 function formatClock(at: string): string {
   const date = new Date(at);
@@ -65,7 +62,8 @@ export function TimeseriesPanel(props: TimeseriesPanelProps) {
     variant = "area",
     expandable = true,
     total,
-    fetcher = defaultFetcher,
+    referenceLines,
+    fetcher = defaultTimeseriesFetcher,
     className,
   } = props;
   const isBreakdown = variant === "breakdown";
@@ -77,25 +75,11 @@ export function TimeseriesPanel(props: TimeseriesPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
   const series = useMemo(() => resolveSeries(props), [props]);
-  const requestUrls = useMemo(
-    () =>
-      series.map((s) => {
-        const u = new URL(s.url, window.location.origin);
-        if (range) u.searchParams.set("since", range);
-        return u.pathname + u.search;
-      }),
-    [series, range],
+  const results = useTimeseriesQueries(
+    series.map((s) => ({ id: s.key, load: s.load })),
+    { baseUrl: props.baseUrl ?? "", range, refreshMs, fetcher },
   );
-
-  const results = useQueries({
-    queries: requestUrls.map((requestUrl) => ({
-      queryKey: ["timeseries", requestUrl],
-      queryFn: () => fetcher(requestUrl),
-      refetchInterval: refreshMs > 0 ? refreshMs : false,
-      staleTime: 0,
-      retry: 0,
-    })),
-  });
+  const refs = referenceLines ?? [];
 
   const isError = results.some((r) => r.isError);
   const error = results.find((r) => r.isError)?.error;
@@ -147,18 +131,34 @@ export function TimeseriesPanel(props: TimeseriesPanelProps) {
         ) : rows.length < 2 ? (
           <PanelMessage>Collecting data…</PanelMessage>
         ) : (
-          <Chart rows={rows} series={series} variant={chartVariant} unit={unit} showZeroLine={hasMirrored} />
+          <Chart
+            rows={rows}
+            series={series}
+            variant={chartVariant}
+            unit={unit}
+            showZeroLine={hasMirrored}
+            referenceLines={refs}
+          />
         )}
       </div>
-      {!breakdown && !isError && !isLoading && rows.length >= 2 && series.length > 1 ? (
-        <ChartLegend series={series} rows={rows} />
+      {!breakdown && !isError && !isLoading && rows.length >= 2 && series.length + refs.length > 1 ? (
+        <ChartLegend series={series} rows={rows} referenceLines={refs} unit={unit} />
       ) : null}
       {canExpand ? (
         <Modal open={expanded} onClose={() => setExpanded(false)} title={title} size="xl">
           <div style={{ height: 360 }}>
-            <Chart rows={rows} series={series} variant={expandVariant} unit={unit} showZeroLine={hasMirrored} />
+            <Chart
+              rows={rows}
+              series={series}
+              variant={expandVariant}
+              unit={unit}
+              showZeroLine={hasMirrored}
+              referenceLines={refs}
+            />
           </div>
-          {series.length > 1 ? <ChartLegend series={series} rows={rows} /> : null}
+          {series.length + refs.length > 1 ? (
+            <ChartLegend series={series} rows={rows} referenceLines={refs} unit={unit} />
+          ) : null}
         </Modal>
       ) : null}
     </div>
@@ -178,8 +178,27 @@ function LatestReadout({ series, rows }: { series: ResolvedSeries[]; rows: Merge
   return <span className="tabular-nums">{formatUnit(Math.abs(v), only.unit)}</span>;
 }
 
-/** Wrapping color-keyed legend for the time-series variants: dot + label + latest value. */
-function ChartLegend({ series, rows }: { series: ResolvedSeries[]; rows: MergedRow[] }) {
+const REFERENCE_LINE_COLOR = "var(--muted-foreground, #64748b)";
+
+function referenceColor(ref: TimeseriesReferenceLine): string {
+  return resolveCssColor(ref.color ?? REFERENCE_LINE_COLOR);
+}
+
+/**
+ * Wrapping color-keyed legend for the time-series variants: dot + label + latest
+ * value, then each reference line with its fixed value.
+ */
+function ChartLegend({
+  series,
+  rows,
+  referenceLines,
+  unit,
+}: {
+  series: ResolvedSeries[];
+  rows: MergedRow[];
+  referenceLines: TimeseriesReferenceLine[];
+  unit: string | undefined;
+}) {
   return (
     <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
       {series.map((s) => {
@@ -198,6 +217,17 @@ function ChartLegend({ series, rows }: { series: ResolvedSeries[]; rows: MergedR
           </li>
         );
       })}
+      {referenceLines.map((ref, i) => (
+        <li key={`ref-${i}`} className="inline-flex min-w-0 items-center gap-1.5">
+          <span
+            className="h-0.5 w-2.5 shrink-0"
+            style={{ backgroundColor: referenceColor(ref) }}
+            aria-hidden
+          />
+          <span className="truncate text-foreground">{ref.label}</span>
+          <span className="tabular-nums">{formatUnit(ref.value, ref.unit ?? unit)}</span>
+        </li>
+      ))}
     </ul>
   );
 }
@@ -273,12 +303,14 @@ function Chart({
   variant,
   unit,
   showZeroLine,
+  referenceLines,
 }: {
   rows: MergedRow[];
   series: ResolvedSeries[];
   variant: ChartVariant;
   unit: string | undefined;
   showZeroLine: boolean;
+  referenceLines: TimeseriesReferenceLine[];
 }) {
   const stacked = variant === "stacked";
   // Mirrored series carry negative values; show magnitudes on axis and tooltip.
@@ -289,6 +321,9 @@ function Chart({
   // against the axis for its unit so mixed-unit panels keep independent scales.
   const { axes: yAxes, axisOfKey } = useMemo(() => assignAxes(series), [series]);
   const axisOf = (key: string): "left" | "right" => axisOfKey.get(key) ?? "left";
+  // A reference line draws against the axis formatting its unit, else the left.
+  const axisOfUnit = (u: string | undefined): "left" | "right" =>
+    yAxes.find((ax) => ax.unit === u)?.id ?? "left";
   const axes = (
     <>
       <CartesianGrid strokeOpacity={0.12} vertical={false} />
@@ -323,6 +358,16 @@ function Chart({
       {showZeroLine ? (
         <ReferenceLine yAxisId="left" y={0} stroke="currentColor" strokeOpacity={0.35} />
       ) : null}
+      {referenceLines.map((ref, i) => (
+        <ReferenceLine
+          key={`ref-${i}`}
+          yAxisId={axisOfUnit(ref.unit ?? unit)}
+          y={ref.value}
+          stroke={referenceColor(ref)}
+          strokeDasharray="4 4"
+          ifOverflow="extendDomain"
+        />
+      ))}
     </>
   );
 

@@ -1,5 +1,3 @@
-import { useQueries } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { type StaticIconComponent } from "./Icon";
 import type { GaugeSeries } from "./TimeseriesGauge";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
@@ -10,9 +8,10 @@ import {
   type ProgressBarsVariant,
 } from "./ProgressBars";
 import { seriesStats } from "./gauge-stats";
+import { defaultTimeseriesFetcher, latestValue, useTimeseriesQueries } from "./timeseries-query";
 
 export interface TimeseriesCoreBarsProps {
-  /** Common prefix; the value/max requests are `baseUrl + id`. */
+  /** Common prefix; the value/max requests are `baseUrl + id` (unless a series has `load`). */
   baseUrl?: string;
   /** The metric whose latest value (CPU millicores) fills the bars. */
   value: GaugeSeries;
@@ -61,18 +60,6 @@ export interface TimeseriesCoreBarsProps {
   className?: string;
 }
 
-const defaultFetcher = async (url: string): Promise<TimeseriesResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`metrics request failed: ${res.status}`);
-  return res.json();
-};
-
-function latestValue(resp: TimeseriesResponse | undefined): number | undefined {
-  const points = resp?.points;
-  if (!points || points.length === 0) return undefined;
-  return points[points.length - 1]?.value;
-}
-
 /**
  * TimeseriesCoreBars reads usage and limit live from the timeseries store
  * (mirroring TimeseriesGauge's data plumbing) and renders them as quantised
@@ -96,30 +83,15 @@ export function TimeseriesCoreBars({
   showCapacity = false,
   orientation,
   hoverCard = true,
-  fetcher = defaultFetcher,
+  fetcher = defaultTimeseriesFetcher,
   className,
 }: TimeseriesCoreBarsProps) {
-  const maxIsSeries = typeof max === "object";
-  const maxSeries = maxIsSeries ? max : undefined;
-  const ids = useMemo(() => {
-    const list = [value.id];
-    if (maxSeries) list.push(maxSeries.id);
-    return list;
-  }, [value.id, maxSeries]);
-
-  const results = useQueries({
-    queries: ids.map((id) => {
-      const u = new URL(baseUrl + id, window.location.origin);
-      if (range) u.searchParams.set("since", range);
-      const requestUrl = u.pathname + u.search;
-      return {
-        queryKey: ["timeseries", requestUrl],
-        queryFn: () => fetcher(requestUrl),
-        refetchInterval: refreshMs > 0 ? refreshMs : false,
-        staleTime: 0,
-        retry: 0,
-      };
-    }),
+  const maxSeries = typeof max === "object" ? max : undefined;
+  const results = useTimeseriesQueries(maxSeries ? [value, maxSeries] : [value], {
+    baseUrl,
+    range,
+    refreshMs,
+    fetcher,
   });
 
   const rawValue = latestValue(results[0]?.data);

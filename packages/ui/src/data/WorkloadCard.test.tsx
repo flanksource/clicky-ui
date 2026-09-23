@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WorkloadCard } from "./WorkloadCard";
 import type { TimeseriesResponse } from "./TimeseriesPanel";
 import type {
@@ -91,8 +91,8 @@ describe("WorkloadCard", () => {
     expect(screen.getByText("CPU")).toBeInTheDocument();
     expect(screen.getByText("Memory")).toBeInTheDocument();
     expect(screen.getByText("Disk")).toBeInTheDocument();
-    // Memory renders as GB bars (3.2 GB of 8 GB), disk as a linear progress bar.
-    expect(await screen.findByText("3.0 GB")).toBeInTheDocument();
+    // Memory renders as GiB bars (3.2 GB is 3.0 GiB), disk as a linear progress bar.
+    expect(await screen.findByText("3.0 GiB")).toBeInTheDocument();
     expect(container.querySelector('[data-shape="linear"]')).toBeInTheDocument();
   });
 
@@ -146,6 +146,89 @@ describe("WorkloadCard", () => {
     expect(within(dialog).getByText("CPU")).toBeInTheDocument();
     expect(within(dialog).getByText("Memory")).toBeInTheDocument();
     expect(within(dialog).getByText("Disk")).toBeInTheDocument();
+  });
+
+  it("renders a non-Kubernetes workload from type, icon-less identity, and metadata", async () => {
+    const cpu = vi.fn(async () => ({
+      id: "i-0abc.cpu",
+      points: [
+        { at: "2026-06-02T12:00:00Z", value: 900 },
+        { at: "2026-06-02T12:01:00Z", value: 1200 },
+      ],
+    }));
+    const { container } = renderWithQueryClient(
+      <WorkloadCard
+        workload={{
+          type: "EC2 instance",
+          name: "build-runner-1",
+          status: { label: "running", health: "healthy" },
+          metadata: [
+            { label: "region", value: "us-east-1" },
+            { label: "size", value: <strong>m6i.large</strong> },
+          ],
+        }}
+        metrics={{ cpu: { value: { id: "i-0abc.cpu", load: cpu }, max: 2000 } }}
+        refreshMs={0}
+        fetcher={fetcher}
+      />,
+    );
+
+    expect(screen.getByText("build-runner-1")).toBeInTheDocument();
+    expect(screen.getByText("EC2 instance")).toBeInTheDocument();
+    expect(screen.getByText("region")).toBeInTheDocument();
+    expect(screen.getByText("us-east-1")).toBeInTheDocument();
+    expect(screen.getByTitle("region: us-east-1")).toBeInTheDocument();
+    expect(screen.getByText("m6i.large").tagName).toBe("STRONG");
+    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.queryByText(/ready/)).not.toBeInTheDocument();
+    expect(await screen.findByText("1.2 cores")).toBeInTheDocument();
+    expect(cpu).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("lets className override the root border, padding, and background", () => {
+    const { container } = renderWithQueryClient(
+      <WorkloadCard
+        workload={workload}
+        metrics={{}}
+        className="border-0 bg-transparent p-0"
+        refreshMs={0}
+        fetcher={fetcher}
+      />,
+    );
+
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveClass("border-0", "bg-transparent", "p-0");
+    expect(root).not.toHaveClass("bg-card");
+    expect(root).not.toHaveClass("p-3");
+    expect(root.getAttribute("style")).toBeNull();
+  });
+
+  it("plots a numeric max as a capacity line without nested expand buttons", async () => {
+    renderWithQueryClient(
+      <WorkloadCard
+        workload={workload}
+        metrics={{
+          cpu: { value: { id: "workload.cpu.usage" }, max: 4000 },
+          memory: {
+            value: { id: "workload.memory.usage" },
+            max: { id: "workload.memory.limit" },
+          },
+        }}
+        refreshMs={0}
+        fetcher={fetcher}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open cycle history" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "cycle history" });
+    expect(await within(dialog).findByText("capacity")).toBeInTheDocument();
+    // The series-backed memory max still plots as its own "limit" series.
+    expect(within(dialog).getByText("limit")).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Expand chart" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows an empty metric state without a history action", () => {

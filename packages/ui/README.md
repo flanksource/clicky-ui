@@ -54,6 +54,42 @@ export function ClickyPanel() {
 
 `OperationCatalog` and `EntityExplorerApp` (both exported from `@flanksource/clicky-ui/rpc`) render an OpenAPI spec — fetched via an `OperationsApiClient` — as a navigable list of operations grouped by entity surface. They expect the spec to declare `x-clicky` surface metadata for the surfaces they should expose. See `apps/kitchen-sink/src/demos/OperationExplorerDemo.tsx` for a fake-client example.
 
+## Timeseries widgets and WorkloadCard
+
+`TimeseriesPanel`, `TimeseriesGauge`, `TimeseriesCoreBars` and `WorkloadCard` (from `@flanksource/clicky-ui/data`) poll their series with `@tanstack/react-query`, so they **must render under a `QueryClientProvider`** created from the same `@tanstack/react-query` copy that clicky-ui resolves — otherwise they throw `No QueryClient set`. If your app also depends on `@tanstack/react-query`, keep it on a compatible `^5` range so the package manager dedupes both to one copy.
+
+Each series is either URL-backed (`baseUrl + id`, loaded through `fetcher(url)`) or function-backed via `load`:
+
+```tsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { WorkloadCard } from "@flanksource/clicky-ui/data";
+
+const queryClient = new QueryClient();
+
+<QueryClientProvider client={queryClient}>
+  <WorkloadCard
+    workload={{
+      type: "EC2 instance",
+      name: "build-runner-1",
+      status: { label: "running", health: "healthy" },
+      metadata: [{ label: "region", value: "us-east-1" }],
+    }}
+    metrics={{
+      cpu: {
+        value: {
+          id: "i-0a1b2c3d.cpu", // cache identity: unique per data source
+          load: ({ range, signal }) =>
+            api.instanceCpu("i-0a1b2c3d", { range, signal }),
+        },
+        max: 4000,
+      },
+    }}
+  />
+</QueryClientProvider>;
+```
+
+A `load`-backed series is cached under `["timeseries", "load", id, range]`: **the `id` is the cache identity**, so two series that share an id share one cached response. The loader receives the widget's `range` and react-query's `AbortSignal`, which aborts when the query is cancelled (for example on unmount). URL-backed series keep their `["timeseries", requestUrl]` key. See the [timeseries guide](../../apps/docs/src/content/docs/guides/timeseries.md) for details.
+
 ## Markdown editor field
 
 `JsonSchemaForm` fields with `format: md` — and the standalone `MdxEditorField` exported from `@flanksource/clicky-ui/mdx-editor` — render an [MDXEditor](https://mdxeditor.dev/)-backed rich-text field. Its base styles ship as a **separate** stylesheet so apps that don't use the field don't pay its weight (the editor's JavaScript is also loaded lazily, on first render). Import it once at the app root, in addition to `styles.css`:

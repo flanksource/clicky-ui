@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, type ComponentProps } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { expect, within } from "storybook/test";
 import {
   WorkloadCard,
   type WorkloadCardSize,
   type WorkloadCardVariant,
 } from "./WorkloadCard";
-import type { TimeseriesResponse } from "./TimeseriesPanel";
+import type { SeriesLoader, TimeseriesResponse } from "./TimeseriesPanel";
 import type {
   WorkloadCardKind,
   WorkloadCardMetrics,
@@ -311,6 +312,86 @@ function WorkloadCardVariantGallery() {
   );
 }
 
+/** Stands in for a typed API client call: no URL, just range + AbortSignal. */
+function makeLoader(id: string, latest: number): SeriesLoader {
+  return async ({ signal }) => {
+    signal.throwIfAborted();
+    return { id, points: buildPoints(latest) };
+  };
+}
+
+const GiB = 1024 ** 3;
+
+function NonKubernetesWorkloads() {
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      }),
+    [],
+  );
+  const instances = [
+    {
+      id: "i-0a1b2c3d",
+      name: "build-runner-1",
+      region: "us-east-1",
+      size: "m6i.large",
+      health: "healthy",
+      label: "running",
+      cpu: 1200,
+      memory: 5.5 * GiB,
+    },
+    {
+      id: "i-9f8e7d6c",
+      name: "build-runner-2",
+      region: "eu-west-1",
+      size: "m6i.xlarge",
+      health: "warning",
+      label: "impaired",
+      cpu: 3500,
+      memory: 13 * GiB,
+    },
+  ];
+  return (
+    <QueryClientProvider client={queryClient}>
+      <div className="grid w-[52rem] grid-cols-2 gap-3">
+        {instances.map((vm) => (
+          <WorkloadCard
+            key={vm.id}
+            workload={{
+              type: "EC2 instance",
+              name: vm.name,
+              createdAt: "2026-05-28T09:30:00Z",
+              status: { label: vm.label, health: vm.health },
+              metadata: [
+                { label: "region", value: vm.region },
+                { label: "size", value: vm.size },
+                { label: "id", value: <code>{vm.id}</code> },
+              ],
+            }}
+            metrics={{
+              // Loader-backed series: each id is unique per instance because it
+              // is the cache key for the loaded data.
+              cpu: {
+                value: { id: `${vm.id}.cpu`, load: makeLoader(`${vm.id}.cpu`, vm.cpu) },
+                max: 4000,
+              },
+              memory: {
+                value: {
+                  id: `${vm.id}.memory`,
+                  load: makeLoader(`${vm.id}.memory`, vm.memory),
+                },
+                max: 16 * GiB,
+              },
+            }}
+            refreshMs={0}
+          />
+        ))}
+      </div>
+    </QueryClientProvider>
+  );
+}
+
 const DEFAULT_ARGS: WorkloadCardStoryArgs = {
   workload: {
     kind: "deployment",
@@ -528,4 +609,19 @@ export const Variants: Story = {
 
 export const Grid: Story = {
   render: () => <WorkloadCardGrid />,
+};
+
+/**
+ * Workloads that aren't Kubernetes resources: no `kind`, a free-form `type`
+ * label, caller-defined `metadata`, and metrics loaded by `load` functions
+ * with fixed numeric capacities (drawn as a "capacity" line in the history).
+ */
+export const NonKubernetes: Story = {
+  render: () => <NonKubernetesWorkloads />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("EC2 instance")).toHaveLength(2);
+    await expect(canvas.getByText("us-east-1")).toBeInTheDocument();
+    await expect(await canvas.findByText("1.2 cores")).toBeInTheDocument();
+  },
 };

@@ -1,4 +1,3 @@
-import { useQueries } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { cn } from "../lib/utils";
 import { formatUnit } from "../lib/format";
@@ -7,18 +6,30 @@ import { UiFullscreen } from "../icons";
 import { Icon, type StaticIconComponent } from "./Icon";
 import {
   TimeseriesPanel,
+  type SeriesLoader,
   type TimeseriesResponse,
   type TimeseriesSeries,
 } from "./TimeseriesPanel";
+import { defaultTimeseriesFetcher, latestValue, useTimeseriesQueries } from "./timeseries-query";
 import { GaugeHoverCard, type GaugeHoverRow } from "./GaugeHoverCard";
 import { seriesStats } from "./gauge-stats";
 
-/** A metric series whose latest value drives the gauge fill or its maximum. */
+/**
+ * A metric series whose latest value drives the gauge fill or its maximum. It
+ * is requested as `baseUrl + id` through the widget's `fetcher`, or, when
+ * `load` is set, loaded by calling `load` directly.
+ */
 export interface GaugeSeries {
-  /** Metric id appended to the gauge's baseUrl, e.g. "k8s.statefulset.cycle.cpu.usage". */
+  /**
+   * Metric id appended to the gauge's baseUrl, e.g. "k8s.statefulset.cycle.cpu.usage".
+   * With `load`, the id is the cache identity: loaded series are cached under
+   * `["timeseries", "load", id, range]`, so keep it unique per data source.
+   */
   id: string;
   /** Maps the latest value before display (e.g. unit scaling). Identity when omitted. */
   transform?: (value: number) => number;
+  /** Loads the series' points; when set, `baseUrl` and `fetcher` are not used. */
+  load?: SeriesLoader;
 }
 
 export type TimeseriesGaugeVariant = "default" | "cell";
@@ -26,7 +37,7 @@ export type TimeseriesGaugeVariant = "default" | "cell";
 export type TimeseriesGaugeShape = "radial" | "linear";
 
 export interface TimeseriesGaugeProps {
-  /** Common prefix; the value/max requests are `baseUrl + id`. */
+  /** Common prefix; the value/max requests are `baseUrl + id` (unless a series has `load`). */
   baseUrl?: string;
   /** The metric whose latest value fills the gauge. */
   value: GaugeSeries;
@@ -72,12 +83,6 @@ export interface TimeseriesGaugeProps {
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
   className?: string;
 }
-
-const defaultFetcher = async (url: string): Promise<TimeseriesResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`metrics request failed: ${res.status}`);
-  return res.json();
-};
 
 // Half-gauge SVG geometry: a 100×50 viewBox semicircle (radius 40, centre 50,50)
 // swept 180°. The arc length is π·r; stroke-dashoffset reveals value/max of it.
@@ -132,12 +137,6 @@ function GaugeBar({ pct, toneBg, className }: { pct: number; toneBg: string; cla
   );
 }
 
-function latestValue(resp: TimeseriesResponse | undefined): number | undefined {
-  const points = resp?.points;
-  if (!points || points.length === 0) return undefined;
-  return points[points.length - 1]?.value;
-}
-
 function GaugeIcon({ icon }: { icon: string | StaticIconComponent }) {
   if (typeof icon === "string") {
     return <Icon name={icon} width={14} height={14} className="text-muted-foreground" />;
@@ -170,32 +169,18 @@ export function TimeseriesGauge({
   shape = "radial",
   showLabel = true,
   hoverCard = true,
-  fetcher = defaultFetcher,
+  fetcher = defaultTimeseriesFetcher,
   className,
 }: TimeseriesGaugeProps) {
   const [expanded, setExpanded] = useState(false);
 
   const maxIsSeries = typeof max === "object";
   const maxSeries = maxIsSeries ? max : undefined;
-  const ids = useMemo(() => {
-    const list = [value.id];
-    if (maxSeries) list.push(maxSeries.id);
-    return list;
-  }, [value.id, maxSeries]);
-
-  const results = useQueries({
-    queries: ids.map((id) => {
-      const u = new URL(baseUrl + id, window.location.origin);
-      if (range) u.searchParams.set("since", range);
-      const requestUrl = u.pathname + u.search;
-      return {
-        queryKey: ["timeseries", requestUrl],
-        queryFn: () => fetcher(requestUrl),
-        refetchInterval: refreshMs > 0 ? refreshMs : false,
-        staleTime: 0,
-        retry: 0,
-      };
-    }),
+  const results = useTimeseriesQueries(maxSeries ? [value, maxSeries] : [value], {
+    baseUrl,
+    range,
+    refreshMs,
+    fetcher,
   });
 
   const rawValue = latestValue(results[0]?.data);
@@ -229,10 +214,10 @@ export function TimeseriesGauge({
   const readoutTone = bounded ? tone : "text-foreground";
 
   const chartSeries: TimeseriesSeries[] = useMemo(() => {
-    const s: TimeseriesSeries[] = [{ id: value.id, label: "value", ...(value.transform ? { transform: value.transform } : {}) }];
-    if (maxSeries) s.push({ id: maxSeries.id, label: "max", ...(maxSeries.transform ? { transform: maxSeries.transform } : {}) });
+    const s: TimeseriesSeries[] = [{ ...value, label: "value" }];
+    if (maxSeries) s.push({ ...maxSeries, label: "max" });
     return s;
-  }, [value.id, value.transform, maxSeries]);
+  }, [value, maxSeries]);
 
   // Hover card: reduce the value's points to current/min/max/avg (transformed to
   // the display unit), plus the resolved capacity. The current row is tinted by

@@ -251,3 +251,27 @@ export const CellVariants: Story = {
   },
   render: () => <GaugeCellVariants />,
 };
+
+/**
+ * The value series is loaded by a function (`value.load`) rather than
+ * requested as `baseUrl + id`; the id becomes the series' cache key.
+ */
+export const LoaderSeries: Story = {
+  args: {
+    ...Healthy.args,
+    title: "CPU (vm-42)",
+    value: {
+      id: "vm-42.cpu.percent",
+      load: async ({ signal }) => {
+        signal.throwIfAborted();
+        return {
+          id: "vm-42.cpu.percent",
+          points: Array.from({ length: 12 }, (_, i) => ({
+            at: new Date(BASE_TIME + i * 30_000).toISOString(),
+            value: 55 + i * 1.5,
+          })),
+        };
+      },
+    },
+  },
+};

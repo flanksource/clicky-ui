@@ -33,6 +33,7 @@ export default defineConfig({
               slug: "guides/json-schema-form-examples",
             },
             { label: "Expressions", slug: "guides/expressions" },
+            { label: "Timeseries widgets", slug: "guides/timeseries" },
           ],
         },
         {

@@ -113,6 +113,13 @@ concepts leak in).
   through `transform` before plotting. Per-series negation is `transform:(v)=>-v`, not a `mirror` flag
   (Y-axis/tooltip use `Math.abs`). The legacy single-`url` form normalizes to a one-element list — one
   render path. Values flow through clicky's `/api/v1/metrics/<id>` route.
+- **Function-backed series: `{id, load}`** — any series (`TimeseriesPanel.series[]`, gauge/core-bars
+  `value`/`max`, `WorkloadCard` metrics) may set `load({range, signal})` instead of going through
+  `baseUrl + id` + `fetcher(url)`. Query building lives in one internal helper
+  (`data/timeseries-query.ts`): loaded series key on `["timeseries","load",id,range]` (the **id is the
+  cache identity** — unique per data source), URL series keep `["timeseries", requestUrl]`. Never tunnel
+  loaders through fake URLs parsed back in `fetcher`. All of these widgets need a `QueryClientProvider`
+  from the same react-query copy clicky-ui resolves.
 - **`TimeseriesGauge`** (`data/TimeseriesGauge.tsx`) — half-radial gauge reading latest value/max live
   from the timeseries store. Props `{baseUrl, value:{id,transform?}, max?:{id,transform?}|number, title,
   icon, unit, range, refreshMs, expandable, thresholds:[warn,danger], fetcher}`; tone emerald<75% /
