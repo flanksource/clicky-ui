@@ -38,6 +38,8 @@ export interface WorkloadCardProps {
   range?: string;
   refreshMs?: number;
   expandable?: boolean;
+  /** Controls rendered beside status and history, owned by the host domain. */
+  headerActions?: ReactNode;
   size?: WorkloadCardSize;
   variant?: WorkloadCardVariant;
   fetcher?: (url: string) => Promise<TimeseriesResponse>;
@@ -215,6 +217,7 @@ export function WorkloadCard({
   range = "1h",
   refreshMs = 5000,
   expandable = true,
+  headerActions,
   size = "md",
   variant = "default",
   fetcher,
@@ -328,6 +331,7 @@ export function WorkloadCard({
               </Badge>
             </span>
           ) : null}
+          {headerActions}
           {canExpand ? (
             <button
               type="button"
