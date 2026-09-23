@@ -99,6 +99,9 @@ catalogs:
     ai:
       specifier: ^6.0.199
       version: 6.0.199
+    ajv:
+      specifier: ^8.18.0
+      version: 8.18.0
     country-flag-icons:
       specifier: ^1.6.20
       version: 1.6.20
@@ -219,6 +222,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.99.2(react@18.3.1)
+      monaco-editor:
+        specifier: 'catalog:'
+        version: 0.48.0
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -517,6 +523,9 @@ importers:
       ai:
         specifier: 'catalog:'
         version: 6.0.199(zod@4.4.3)
+      ajv:
+        specifier: 'catalog:'
+        version: 8.18.0
       jsdom:
         specifier: ^26.0.0
         version: 26.1.0(supports-color@8.1.1)

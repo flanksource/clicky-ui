@@ -1,9 +1,9 @@
 import { isPlainObject } from "../lib/collections";
 import {
-  effectiveProperties,
   isOpenStringMap,
   schemaRendersAsObject,
 } from "./json-schema-form-resolve";
+import { effectiveProperties } from "./json-schema-form-conditionals";
 import type {
   JsonSchemaObject,
   JsonSchemaProperty,
