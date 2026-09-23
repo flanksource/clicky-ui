@@ -184,12 +184,11 @@ export function enumBranch(
 function lookupDescriptor(
   prop: JsonSchemaProperty,
 ): LookupDescriptor | undefined {
-  const raw = prop["x-clicky-lookup"];
-  if (!raw || typeof raw !== "object") return undefined;
-  const d = raw as Record<string, unknown>;
-  if (typeof d.url !== "string" || typeof d.filter !== "string")
+  const raw: unknown = prop["x-clicky-lookup"];
+  if (!isPlainObject(raw)) return undefined;
+  if (typeof raw.url !== "string" || typeof raw.filter !== "string")
     return undefined;
-  return raw as LookupDescriptor;
+  return raw as unknown as LookupDescriptor;
 }
 
 export interface ResolveControlArgs {

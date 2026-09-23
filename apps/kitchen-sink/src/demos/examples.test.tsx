@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { findDemoEntry } from "../demo-catalog";
 import { AccordionListDemo } from "./AccordionListDemo";
 import { HierarchicalLookupDemo } from "./HierarchicalLookupDemo";
+import { JsonSchemaFormAnnotationsDemo } from "./JsonSchemaFormAnnotationsDemo";
 import { ProfilesDemo } from "./ProfilesDemo";
 import { QueryBrowserDemo } from "./QueryBrowserDemo";
 import { TourDemo } from "./TourDemo";
@@ -20,6 +21,20 @@ describe("kitchen sink examples", () => {
     expect(findDemoEntry("profiles")?.component).toBe(ProfilesDemo);
     expect(findDemoEntry("query-browser")?.component).toBe(QueryBrowserDemo);
     expect(findDemoEntry("accordion-list")?.component).toBe(AccordionListDemo);
+    expect(findDemoEntry("json-schema-form-annotations")?.component).toBe(
+      JsonSchemaFormAnnotationsDemo,
+    );
+  });
+
+  it("browses the annotations meta-schema with $defs resolved into keyword fields", () => {
+    render(<JsonSchemaFormAnnotationsDemo />);
+
+    expect(screen.getByText("x-on-change")).toBeTruthy();
+    expect(screen.queryByText("glyph")).toBeNull();
+
+    fireEvent.click(screen.getByText("x-item"));
+
+    expect(screen.getByText("glyph")).toBeTruthy();
   });
 
   it("reorders the accordion list demo through the named row action", () => {
