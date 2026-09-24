@@ -1,21 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Button } from "../components/button";
-import type { ClickyDocument, ClickyNode, ClickyRow } from "../data/Clicky";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import type { ClickyRow } from "../data/Clicky";
 import type { StaticIconComponent } from "../data/Icon";
 import type { ChatContextItem } from "../data/ai/context";
 import { UiAdd, UiTable } from "../icons";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
-import { Modal } from "../overlay/Modal";
-import { CommandOutput } from "./CommandOutput";
-import {
-  dataTablePaginationFromForm,
-  packLookupParameterValues,
-  packParameterValues,
-  parametersToFormConfig,
-  useDebouncedRecord,
-  type ParameterValues,
-} from "./formMetadata";
+import { packParameterValues, type ParameterValues } from "./formMetadata";
 import {
   filterOperationsBySurface,
   findSurfaceDetailOperation,
@@ -23,6 +12,7 @@ import {
   getClickySurfaces,
   getOperationClickyMeta,
 } from "./clickyMetadata";
+import { OperationEntityPicker } from "./OperationEntityPicker";
 import { getClickyRowId } from "./rowNavigation";
 import { resolveSurfaceIcon } from "./surfaceIconMap";
 import type {
@@ -117,6 +107,8 @@ type ContextSurface = {
   detailOperation?: ResolvedOperation;
 };
 
+const plural = (count: number) => (count === 1 ? "" : "s");
+
 export function OperationEntityContextPicker({
   client,
   items,
@@ -139,12 +131,6 @@ export function OperationEntityContextPicker({
   } = useOperations(client);
   const [open, setOpen] = useState(false);
   const [surfaceKey, setSurfaceKey] = useState("");
-  const [filters, setFilters] = useState<ParameterValues>({});
-  const [selectedRows, setSelectedRows] = useState<Record<string, ClickyRow>>(
-    {},
-  );
-  const [attaching, setAttaching] = useState(false);
-  const [attachError, setAttachError] = useState("");
 
   const surfaces = useMemo<ContextSurface[]>(() => {
     return getClickySurfaces(spec)
@@ -188,93 +174,14 @@ export function OperationEntityContextPicker({
       });
   }, [operations, spec, surfaceFilter, surfaceGroup]);
 
-  useEffect(() => {
-    setFilters({});
-    setSelectedRows({});
-    setAttachError("");
-  }, [surfaceKey]);
-
   const selected = surfaces.find((entry) => entry.surface.key === surfaceKey);
-  const parameters = selected?.listOperation.operation.parameters ?? [];
-  const debouncedFilters = useDebouncedRecord(filters, 250);
-  const packedFilters = useMemo(
-    () => packParameterValues(debouncedFilters, parameters),
-    [debouncedFilters, parameters],
-  );
-  const packedLookupFilters = useMemo(
-    () => packLookupParameterValues(debouncedFilters, parameters),
-    [debouncedFilters, parameters],
-  );
-
-  const lookupQuery = useQuery({
-    queryKey: [
-      "entity-context-lookup",
-      selected?.listOperation.path,
-      packedLookupFilters,
-    ],
-    queryFn: async () =>
-      (await client.lookupFilters?.(
-        selected!.listOperation.path,
-        selected!.listOperation.method,
-        packedLookupFilters,
-        { Accept: "application/json+clicky" },
-      )) ?? { filters: {} },
-    enabled:
-      open &&
-      !!selected &&
-      !!client.lookupFilters &&
-      parameters.some((parameter) => parameter.in === "query"),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-    retry: 0,
-  });
-
-  const listQuery = useQuery<ExecutionResponse>({
-    queryKey: [
-      "entity-context-list",
-      selected?.listOperation.path,
-      packedFilters,
-    ],
-    queryFn: () =>
-      client.executeCommand(
-        selected!.listOperation.path,
-        selected!.listOperation.method,
-        packedFilters,
-        { Accept: "application/json+clicky" },
-      ),
-    enabled: open && !!selected,
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-    retry: 0,
-  });
-
-  // Shapes come from the spec so a control keeps its identity while the lookup
-  // that fills it is in flight; see parametersToFormConfig.
-  const filterShapes = spec?.components?.["x-clicky-filters"];
-  const filterConfig = useMemo(
-    () =>
-      parametersToFormConfig(parameters, filters, setFilters, {
-        includeLocations: ["query"],
-        lookup: lookupQuery.data,
-        components: filterShapes,
-      }),
-    [filters, filterShapes, lookupQuery.data, parameters],
-  );
-  const pagination = useMemo(
-    () => dataTablePaginationFromForm(filterConfig.pagination, listQuery.data),
-    [filterConfig.pagination, listQuery.data],
-  );
   const existingIDs = useMemo(
     () => new Set(items.map((item) => item.id)),
     [items],
   );
-  const markedListResponse = useMemo(
-    () => markAttachedRows(listQuery.data, selected?.surface.key, existingIDs),
-    [existingIDs, listQuery.data, selected?.surface.key],
-  );
 
   const hydrateRow = useCallback(
-    async (row: ClickyRow) => {
+    async (row: ClickyRow, listFilters: ParameterValues) => {
       if (!selected) throw new Error("Select an entity type first.");
       const recordID = getClickyRowId(row);
       if (!recordID) {
@@ -298,6 +205,12 @@ export function OperationEntityContextPicker({
           selected.detailOperation.operation.parameters?.map(
             (parameter) => parameter.name,
           ) ?? [],
+        );
+        // The list's own scope (a database, an environment) rides along to the
+        // detail call wherever the detail operation accepts the same parameter.
+        const packedFilters = packParameterValues(
+          listFilters,
+          selected.listOperation.operation.parameters ?? [],
         );
         const detailParams = Object.fromEntries(
           Object.entries(packedFilters).filter(([key]) =>
@@ -323,36 +236,35 @@ export function OperationEntityContextPicker({
         throw new Error("This row does not expose a stable record ID.");
       return contextItem;
     },
-    [client, existingIDs, packedFilters, selected],
+    [client, existingIDs, selected],
   );
 
-  const attachSelected = useCallback(async () => {
-    const rows = Object.values(selectedRows);
-    if (rows.length === 0) return;
-    setAttaching(true);
-    setAttachError("");
-    const results = await Promise.allSettled(rows.map(hydrateRow));
-    const added = results.flatMap((result) =>
-      result.status === "fulfilled" ? [result.value] : [],
-    );
-    const failures = results.flatMap((result) =>
-      result.status === "rejected" ? [result.reason] : [],
-    );
-    if (added.length > 0) {
-      if (onAddMany) onAddMany(added);
-      else added.forEach(onAdd);
-    }
-    setAttaching(false);
-    if (failures.length > 0) {
-      const first = failures[0];
-      setAttachError(
-        `${failures.length} record${failures.length === 1 ? "" : "s"} could not be attached: ${first instanceof Error ? first.message : String(first)}`,
+  // Adds every record that hydrates, then rejects with the failures so the
+  // picker keeps the dialog open and shows them.
+  const attachRows = useCallback(
+    async (rows: ClickyRow[], listFilters: ParameterValues) => {
+      const results = await Promise.allSettled(
+        rows.map((row) => hydrateRow(row, listFilters)),
       );
-      return;
-    }
-    setSelectedRows({});
-    setOpen(false);
-  }, [hydrateRow, onAdd, onAddMany, selectedRows]);
+      const added = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      const failures = results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      );
+      if (added.length > 0) {
+        if (onAddMany) onAddMany(added);
+        else added.forEach(onAdd);
+      }
+      if (failures.length > 0) {
+        const first = failures[0];
+        throw new Error(
+          `${failures.length} record${plural(failures.length)} could not be attached: ${first instanceof Error ? first.message : String(first)}`,
+        );
+      }
+    },
+    [hydrateRow, onAdd, onAddMany],
+  );
 
   const menuItems = useMemo<DropdownMenuItem[]>(() => {
     // `surfaces` is pre-sorted by group then title, so bucketing by group in
@@ -425,12 +337,6 @@ export function OperationEntityContextPicker({
     surfaces,
   ]);
 
-  const selectedCount = Object.keys(selectedRows).length;
-  const selectedLabel = selected
-    ? (surfaceLabel?.(selected.surface, selected.listOperation) ??
-      selected.surface.title)
-    : "records";
-
   const trigger = (
     <DropdownMenu
       label={triggerLabel}
@@ -456,140 +362,53 @@ export function OperationEntityContextPicker({
     />
   );
 
+  if (!selected) return trigger;
+
+  const selectedLabel =
+    surfaceLabel?.(selected.surface, selected.listOperation) ??
+    selected.surface.title;
+  const selectedSurfaceKey = selected.surface.key;
   const defaultDialog = (
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`Add ${selectedLabel} context`}
-        size="2xl"
-        expandable
-        scrollBody={false}
-        footer={
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">
-              {selectedCount === 0
-                ? "Select one or more records from the table."
-                : `${selectedCount} record${selectedCount === 1 ? "" : "s"} selected`}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={attaching}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void attachSelected()}
-                disabled={selectedCount === 0 || attaching}
-              >
-                {attaching
-                  ? "Adding…"
-                  : selectedCount > 0
-                    ? `Add ${selectedCount} record${selectedCount === 1 ? "" : "s"}`
-                    : "Add records"}
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          {surfaces.length === 0 && !operationsLoading ? (
-            <p className="text-sm text-muted-foreground">
-              No attachable entity surfaces are available.
-            </p>
-          ) : null}
-          {lookupQuery.error ? (
-            <PickerError error={lookupQuery.error} prefix="Load filters" />
-          ) : null}
-          {listQuery.error ? (
-            <PickerError error={listQuery.error} prefix="Load records" />
-          ) : null}
-          {attachError ? (
-            <PickerError error={attachError} prefix="Attach record" />
-          ) : null}
-          {attaching ? (
-            <div role="status" className="text-xs text-muted-foreground">
-              Loading full record details and adding context…
-            </div>
-          ) : null}
-
-          {selected ? (
-            <CommandOutput
-              bare
-              className="mt-0 flex-1"
-              response={markedListResponse ?? null}
-              loading={listQuery.isLoading || listQuery.isFetching}
-              loadingMessage="Loading records…"
-              emptyMessage="No matching records."
-              ariaLabel="Context records"
-              rowSelection={{
-                selectedRowIds: Object.keys(selectedRows),
-                // Keep selections made on other pages: reconcile the table's
-                // next id set against the rows on the current page, falling back
-                // to the already-known row for ids from previously-viewed pages.
-                onSelectionChange: (nextIds, rows) => {
-                  const rowByID = new Map(
-                    rows.flatMap((row) => {
-                      const id = getClickyRowId(row);
-                      return id ? [[id, row] as const] : [];
-                    }),
-                  );
-                  setSelectedRows((prev) =>
-                    Object.fromEntries(
-                      nextIds.flatMap((id) => {
-                        const row = rowByID.get(id) ?? prev[id];
-                        return row ? [[id, row] as const] : [];
-                      }),
-                    ),
-                  );
-                },
-                getRowId: (row, index) =>
-                  getClickyRowId(row) ?? `context-row-${index}`,
-                isRowSelectable: (row) => {
-                  const id = getClickyRowId(row);
-                  return (
-                    !!id &&
-                    !existingIDs.has(
-                      entityContextItemID(selected.surface.key, id),
-                    )
-                  );
-                },
-                toggleOnRowClick: true,
-              }}
-              {...(filterConfig.search ? { search: filterConfig.search } : {})}
-              {...(filterConfig.timeRange
-                ? { timeRange: filterConfig.timeRange }
-                : {})}
-              {...(filterConfig.filters.length
-                ? { externalFilters: filterConfig.filters }
-                : {})}
-              {...(pagination ? { pagination } : {})}
-              {...(filterConfig.sort
-                ? {
-                    sort: filterConfig.sort.value,
-                    onSortChange: filterConfig.sort.onChange,
-                  }
-                : {})}
-            />
-          ) : null}
-
-          {items.length ? (
-            <p className="text-xs text-muted-foreground">
-              {items.length} context {items.length === 1 ? "record" : "records"}{" "}
-              attached. Attached rows are disabled.
-            </p>
-          ) : null}
-        </div>
-      </Modal>
+    <OperationEntityPicker
+      open={open}
+      onClose={() => setOpen(false)}
+      title={`Add ${selectedLabel} context`}
+      client={client}
+      surfaceKey={selectedSurfaceKey}
+      mode="multi"
+      onSelect={(_ids, rows, { filters }) => attachRows(rows, filters)}
+      unavailableRows={{
+        isUnavailable: (row) => {
+          const id = getClickyRowId(row);
+          return (
+            !!id && existingIDs.has(entityContextItemID(selectedSurfaceKey, id))
+          );
+        },
+        label: "Attached",
+        columnLabel: "Context",
+      }}
+      selectLabel={({ count, pending }) =>
+        pending
+          ? "Adding…"
+          : count > 0
+            ? `Add ${count} record${plural(count)}`
+            : "Add records"
+      }
+      note={
+        items.length ? (
+          <p className="text-xs text-muted-foreground">
+            {items.length} context {items.length === 1 ? "record" : "records"}{" "}
+            attached. Attached rows are disabled.
+          </p>
+        ) : null
+      }
+    />
   );
 
   return (
     <>
       {trigger}
-      {selected && surfaceRenderer
+      {surfaceRenderer
         ? surfaceRenderer({
             surface: selected.surface,
             listOperation: selected.listOperation,
@@ -617,59 +436,4 @@ function parseResponseJSON(response: ExecutionResponse): unknown {
   } catch {
     return undefined;
   }
-}
-
-function markAttachedRows(
-  response: ExecutionResponse | undefined,
-  surfaceKey: string | undefined,
-  existingIDs: Set<string>,
-): ExecutionResponse | undefined {
-  if (!response || !surfaceKey || existingIDs.size === 0 || !response.parsed)
-    return response;
-  const parsed = response.parsed as Partial<ClickyDocument> &
-    Partial<ClickyNode>;
-  const node = parsed.version === 1 && parsed.node ? parsed.node : parsed;
-  if (node.kind !== "table" || !node.rows?.length) return response;
-  const tableNode = node as ClickyNode;
-  const attached = tableNode.rows!.map((row) => {
-    const id = getClickyRowId(row);
-    return !!id && existingIDs.has(entityContextItemID(surfaceKey, id));
-  });
-  if (!attached.some(Boolean)) return response;
-
-  const markerColumn = {
-    name: "__chat_context",
-    label: "Context",
-    shrink: true,
-  };
-  const markedNode: ClickyNode = {
-    ...tableNode,
-    kind: "table",
-    columns: [...(tableNode.columns ?? []), markerColumn],
-    rows: tableNode.rows!.map((row, index) => ({
-      ...row,
-      cells: {
-        ...row.cells,
-        __chat_context: attached[index]
-          ? { kind: "badge", badgeLabel: "Attached" }
-          : { kind: "text", text: "", plain: "" },
-      },
-    })),
-  };
-  return {
-    ...response,
-    parsed:
-      parsed.version === 1
-        ? { ...(parsed as ClickyDocument), node: markedNode }
-        : markedNode,
-  };
-}
-
-function PickerError({ error, prefix }: { error: unknown; prefix: string }) {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-      <span className="font-medium">{prefix}:</span> {message}
-    </div>
-  );
 }

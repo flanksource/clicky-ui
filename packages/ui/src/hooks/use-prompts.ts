@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { useEventSourceFactory } from "./event-source";
 
 // use-prompts is the generic clicky-ui client for the clicky `prompt` manager
 // (the Go-side question/elicitation broker). Like use-task-runs it is SSE-first —
@@ -96,6 +97,10 @@ export function usePrompts(options: UsePromptsOptions = {}): UsePromptsResult {
   const [prompts, setPrompts] = useState<PromptSnapshot[]>([]);
   const [status, setStatus] = useState("idle");
 
+  const eventSourceFactory = useEventSourceFactory();
+  const eventSourceFactoryRef = useRef(eventSourceFactory);
+  eventSourceFactoryRef.current = eventSourceFactory;
+
   const labelsKey = JSON.stringify(labels ?? {});
   useEffect(() => {
     if (!enabled) return;
@@ -125,7 +130,7 @@ export function usePrompts(options: UsePromptsOptions = {}): UsePromptsResult {
       };
     }
 
-    const es = new EventSource(`${basePath}/prompts/stream${query ? `?${query}` : ""}`);
+    const es = eventSourceFactoryRef.current(`${basePath}/prompts/stream${query ? `?${query}` : ""}`);
     setStatus("connected");
     es.addEventListener("prompts", (e) => {
       try {

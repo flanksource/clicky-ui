@@ -1,6 +1,9 @@
+import { createElement } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTaskRun, useTaskRuns } from "./use-task-run";
+import type { EventSourceFactory, EventSourceLike } from "./event-source";
+import { EventSourceProvider } from "./event-source-provider";
 import type { TaskRunMeta, TaskSnapshot } from "../data/TaskSnapshot";
 
 // MockEventSource is a minimal stand-in for the browser EventSource so the
@@ -366,5 +369,84 @@ describe("useTaskRuns (polling fallback)", () => {
       first.resolve(new Response(JSON.stringify([runMeta("older-run", "success")])));
     });
     expect(result.current.runs.map(({ id }) => id)).toEqual(["newer-run"]);
+  });
+});
+
+// A minimal EventSourceLike — deliberately not built on the DOM EventSource —
+// so this proves the hooks work against the injected surface alone (no
+// `instanceof EventSource` anywhere in the implementation).
+class InjectedEventSource implements EventSourceLike {
+  closed = false;
+  readyState = 0;
+  onopen: EventSourceLike["onopen"] = null;
+  onmessage: EventSourceLike["onmessage"] = null;
+  onerror: EventSourceLike["onerror"] = null;
+  private listeners: Record<string, ((e: MessageEvent) => void)[]> = {};
+
+  constructor(public url: string) {}
+
+  addEventListener(type: string, fn: EventListenerOrEventListenerObject) {
+    (this.listeners[type] ||= []).push(fn as (e: MessageEvent) => void);
+  }
+  removeEventListener(type: string, fn: EventListenerOrEventListenerObject) {
+    this.listeners[type] = (this.listeners[type] ?? []).filter((l) => l !== fn);
+  }
+  close() {
+    this.closed = true;
+  }
+}
+
+describe("useTaskRun (injected EventSourceFactory)", () => {
+  // hasEventSource() still gates on the *global* EventSource existing (a
+  // browser without SSE at all falls back to polling regardless of a host's
+  // injected transport) — stub something truthy so the gate opens and the
+  // hook reaches the injected factory instead.
+  beforeEach(() => {
+    vi.stubGlobal("EventSource", class {} as unknown as typeof EventSource);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("opens through the provided factory with the expected URL and closes it on unmount", () => {
+    const created: InjectedEventSource[] = [];
+    const factory: EventSourceFactory = (url) => {
+      const source = new InjectedEventSource(url);
+      created.push(source);
+      return source;
+    };
+
+    const { unmount } = renderHook(() => useTaskRun({ id: "g1" }), {
+      wrapper: ({ children }) => createElement(EventSourceProvider, { value: factory }, children),
+    });
+
+    expect(created).toHaveLength(1);
+    expect(created[0]?.url).toContain("tasks=g1");
+    expect(created[0]?.closed).toBe(false);
+
+    unmount();
+
+    expect(created[0]?.closed).toBe(true);
+  });
+
+  it("opens the runs listing stream through the provided factory and closes it on unmount", () => {
+    const created: InjectedEventSource[] = [];
+    const factory: EventSourceFactory = (url) => {
+      const source = new InjectedEventSource(url);
+      created.push(source);
+      return source;
+    };
+
+    const { unmount } = renderHook(() => useTaskRuns({ kind: "sql-fix" }), {
+      wrapper: ({ children }) => createElement(EventSourceProvider, { value: factory }, children),
+    });
+
+    expect(created).toHaveLength(1);
+    expect(created[0]?.url).toContain("/tasks/runs/stream");
+    expect(created[0]?.url).toContain("kind=sql-fix");
+
+    unmount();
+
+    expect(created[0]?.closed).toBe(true);
   });
 });

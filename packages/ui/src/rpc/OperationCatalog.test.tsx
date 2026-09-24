@@ -390,9 +390,12 @@ describe("OperationCatalog", () => {
       '[data-slot="operation-catalog-results"]'
     );
 
-    expect(catalog).toHaveClass("h-full", "min-h-0", "flex-col");
-    expect(results).toHaveClass("min-h-0", "flex-1");
-    expect(region).toHaveClass("h-full", "min-h-0", "flex-col");
+    // Each link is flex-driven as well as h-full, so the chain stays bounded
+    // under a parent with only a max-height (a non-expanded Modal), where
+    // percentage heights resolve to auto.
+    expect(catalog).toHaveClass("h-full", "min-h-0", "flex-1", "flex-col");
+    expect(results).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(region).toHaveClass("h-full", "min-h-0", "flex-1", "flex-col");
     await waitFor(() =>
       expect(document.querySelector(".detail-output")).toHaveClass(
         "min-h-0",

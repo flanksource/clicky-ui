@@ -64,6 +64,30 @@ node_modules/@flanksource/clicky-ui/schemas/json-schema-form.schema.json
 
 It extends the official 2020-12 meta-schema at every depth, so validating a form schema against it catches a mistyped annotation anywhere in the tree (a misspelled `x-on-change` action, an unknown `x-enum-display`). Unknown `x-*` keys are still allowed, because consumers read their own keys from pre/post extensions. To get validation and hover docs in an editor, map your form schemas to this file (for example through VS Code's `json.schemas` setting). To validate from code, import it as `@flanksource/clicky-ui/json-schema-form.schema.json` and compile it with a 2020-12 validator such as `ajv/dist/2020`.
 
+### Change listeners (`x-on-change`)
+
+A property's `x-on-change` entries act on its sibling fields while `when` holds (and `else` while it does not). `hide`/`show`, `enable`/`disable`, `require`/`optional` and `patch` are derived state, recomputed from the current value on every render. `set` and `reset` fire only when the field is edited. `patch` merges standard keywords over a sibling, so a listener can make it `readOnly` or `writeOnly`, or change its `title`, `enum` or bounds:
+
+```json
+"Status": {
+  "type": "string",
+  "enum": ["draft", "signed"],
+  "x-on-change": [{
+    "when": { "const": "signed" },
+    "patch": {
+      "Amount": { "readOnly": true },
+      "Rate": { "title": "Agreed rate", "minimum": 0, "maximum": 25 }
+    }
+  }]
+}
+```
+
+A patch may not change a field's shape (`type`, `properties`, `items`, `allOf`, …), its `required`-ness or its value (`default`, `const`); the form throws, pointing at the action that does. The Form listeners kitchen-sink demo has runnable examples of every action.
+
+A `hide`/`show`/`enable`/`disable` target or a `patch` key may be a `/`-separated path into a sibling's subtree: `groups/Rates` hides a group, and `groups/Rates/Fee` hides one column of it, because an array is crossed into its `items`. An object's `x-on-load` entries have the same shape. Their `when` reads the object itself, they apply before any `x-on-change`, and they allow only the derived actions and `patch`. See the JSON Schema extensions reference in the docs app for the full grammar and ordering.
+
+A `writeOnly: true` field is an input that is never read back: an editable form renders it normally, while a view renders nothing for it. A view is a `readOnly` form, anything under a `readOnly` object, array or map, or a field that is itself `readOnly`. `x-disabled` is not a view, so a disabled subtree keeps its controls. Use `format: "password"` to mask the value while it is edited.
+
 ## Markdown editor field
 
 `JsonSchemaForm` fields with `format: md` — and the standalone `MdxEditorField` exported from `@flanksource/clicky-ui/mdx-editor` — render an [MDXEditor](https://mdxeditor.dev/)-backed rich-text field. Its base styles ship as a **separate** stylesheet so apps that don't use the field don't pay its weight (the editor's JavaScript is also loaded lazily, on first render). Import it once at the app root, in addition to `styles.css`:
