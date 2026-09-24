@@ -22,6 +22,11 @@ export type TreeProps<T> = Omit<
    * are owned externally.
    */
   showControls?: boolean;
+  /** Keep search visible for small or empty trees. */
+  showSearch?: boolean;
+  /** URL or parent-controlled search query. */
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
   /**
    * Externally controlled expand-all state. When provided together with
    * `onExpandAllChange`, the tree is controlled; otherwise it manages the
@@ -253,6 +258,9 @@ export function Tree<T>({
   className,
   ariaLabel,
   showControls = true,
+  showSearch = false,
+  searchQuery,
+  onSearchQueryChange,
   expandAll: controlledExpandAll,
   onExpandAllChange,
   toolbarClassName,
@@ -262,7 +270,12 @@ export function Tree<T>({
   ...nodeProps
 }: TreeProps<T>) {
   const [internalExpandAll, setInternalExpandAll] = useState<boolean | null>(null);
-  const [filterQuery, setFilterQuery] = useState("");
+  const [internalFilterQuery, setInternalFilterQuery] = useState("");
+  const filterQuery = searchQuery ?? internalFilterQuery;
+  const setFilterQuery = (next: string) => {
+    if (searchQuery !== undefined) onSearchQueryChange?.(next);
+    else setInternalFilterQuery(next);
+  };
   const basePaddingPx = nodeProps.basePaddingPx ?? 8;
   const isControlled = onExpandAllChange !== undefined;
   const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
@@ -270,7 +283,7 @@ export function Tree<T>({
     () => countTreeEdges(roots, nodeProps.getChildren),
     [roots, nodeProps.getChildren],
   );
-  const showFilter = totalEdges > 20;
+  const showFilter = showSearch || totalEdges > 20 || Boolean(searchQuery);
   const activeFilter = showFilter ? filterQuery : "";
   const filteredTree = useMemo(
     () =>
