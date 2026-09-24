@@ -37,6 +37,7 @@ export interface SessionUIPart {
   /** Already-parsed JSON (the server embeds it, not a string). */
   input?: unknown;
   output?: unknown;
+  data?: unknown;
   approval?: SessionApproval;
   pending?: boolean;
 }
@@ -217,6 +218,13 @@ export interface SessionLiveProcess {
 
 export interface UnifiedSessionInput {
   id?: string;
+  /** Monotonic aggregate revision; a follow stream's `state` frame carrying a
+   *  higher one means aggregate facets (plan, approvals, …) changed. */
+  revision?: number;
+  /** captain lifecycle: created, running, succeeded, partial, failed,
+   *  cancelled, interrupted, completed. */
+  lifecycleStatus?: string;
+  activityState?: string;
   source?: string;
   executionMode?: string;
   project?: string;
@@ -254,4 +262,9 @@ export interface UnifiedSessionInput {
   live?: SessionLiveProcess;
   prompt?: unknown;
   structuredOutput?: unknown;
+  verifications?: Array<{
+    iteration: number;
+    report: import("../verification/verify-report").VerifyReport;
+    sourceSessionId?: string;
+  }>;
 }

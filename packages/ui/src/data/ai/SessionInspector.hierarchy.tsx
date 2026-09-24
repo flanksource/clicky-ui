@@ -101,7 +101,7 @@ export function SessionHierarchyTree({
         Boolean(
           node.item &&
           !state.loadedSessionIds.has(node.item.id) &&
-          collection.loadSession,
+          (node.item.src || collection.loadSession),
         )
       }
       loadChildren={state.loadChildren}

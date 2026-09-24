@@ -19,7 +19,7 @@ describe("SessionInspector", () => {
     expect(screen.getByText("Continue session")).toBeInTheDocument();
   });
 
-  it("renders the provider-aware summary, runtime details, and usage sidebar", () => {
+  it("renders the provider-aware header without a details sidebar", () => {
     render(
       <div className="h-[720px]">
         <SessionInspector session={INSPECTOR_SESSION} />
@@ -35,12 +35,7 @@ describe("SessionInspector", () => {
     expect(
       within(screen.getByRole("banner")).getByText("High"),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("session-runtime-mode")).toHaveTextContent(
-      "cmux",
-    );
-    expect(screen.getByText("1234")).toBeInTheDocument();
-    expect(screen.getByText("1.5k")).toBeInTheDocument();
-    expect(screen.getByText("$0.03")).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.queryByText("Queued")).not.toBeInTheDocument();
     // The context meter now leads the header (moved from the right), with the
     // provider brand glyph — carrying its brand color — nested inside its ring.

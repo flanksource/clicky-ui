@@ -6,70 +6,52 @@ import {
   within,
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { emptyVerifySummary } from "../verification/verify-report";
 import { SessionInspector } from "./SessionInspector";
 import type { SessionCollectionInput } from "./SessionInspector.collection";
-import type { UnifiedSessionInput } from "./SessionViewer.unified";
-
-function session(
-  id: string,
-  model: string,
-  text: string,
-  cost: number,
-): UnifiedSessionInput {
-  const turnId = `${id}-turn`;
-  return {
-    id,
-    provider: "openai",
-    model,
-    messages: [
-      {
-        id: `${id}-message`,
-        role: "assistant",
-        turnId,
-        parts: [{ type: "text", text }],
-        provenance: {
-          sessionId: id,
-          agentId: id,
-          timestamp: "2026-07-15T10:00:00Z",
-        },
-      },
-    ],
-    turns: [
-      {
-        id: turnId,
-        index: 1,
-        model,
-        usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-        cost: { model, inputCost: cost },
-      },
-    ],
-    usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-    cost: { model, inputCost: cost },
-    agents: [{ id, isRoot: true }],
-  };
-}
-
-const COLLECTION: SessionCollectionInput = {
-  kind: "session-collection",
-  id: "comparison",
-  currentSessionId: "primary",
-  sessions: [
-    {
-      id: "primary",
-      label: "Primary run",
-      mode: "headless",
-      session: session("primary", "gpt-5", "primary answer", 0.01),
-    },
-    {
-      id: "parallel",
-      label: "Parallel run",
-      mode: "api",
-      session: session("parallel", "gpt-5-mini", "parallel answer", 0.02),
-    },
-  ],
-};
+import {
+  COLLECTION,
+  collectionSession,
+} from "./SessionInspector.collection.fixtures";
 
 describe("SessionInspector session collections", () => {
+  it("shows verification from a selected child session", () => {
+    const collection: SessionCollectionInput = {
+      ...COLLECTION,
+      defaultSelectedSessionIds: ["primary", "parallel"],
+      sessions: [
+        COLLECTION.sessions[0]!,
+        {
+          ...COLLECTION.sessions[1]!,
+          session: {
+            ...COLLECTION.sessions[1]!.session,
+            verifications: [
+              {
+                iteration: 1,
+                report: {
+                  kind: "fixture",
+                  name: "fixture",
+                  ran: true,
+                  passed: false,
+                  state: "failed",
+                  reason: "fixture failed",
+                  summary: emptyVerifySummary(),
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    render(<SessionInspector session={collection} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verification 1" }));
+    expect(screen.getByText("fixture failed")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "parallel · 1. fixture · failed" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders compact controls on one overflow-safe line and moves the hierarchy into session options", () => {
     render(
       <div className="h-[720px]">
@@ -254,7 +236,7 @@ describe("SessionInspector session collections", () => {
   });
 
   it("loads an unchecked session when its hierarchy branch is included", async () => {
-    const parallel = session(
+    const parallel = collectionSession(
       "parallel",
       "gpt-5-mini",
       "lazy parallel answer",

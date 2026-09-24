@@ -22,7 +22,7 @@ export type {
   SessionInspectorInput,
 } from "./SessionInspector.collection-types";
 export function isSessionCollectionInput(
-  value: SessionInspectorInput
+  value: SessionInspectorInput,
 ): value is SessionCollectionInput {
   return (
     typeof value === "object" &&
@@ -34,28 +34,28 @@ export function isSessionCollectionInput(
 }
 export function validateSessionCollection(collection: SessionCollectionInput) {
   const current = collection.sessions.find(
-    (item) => item.id === collection.currentSessionId
+    (item) => item.id === collection.currentSessionId,
   );
   if (!current) {
     throw new Error(
-      `Session collection ${collection.id} does not contain current session ${collection.currentSessionId}`
+      `Session collection ${collection.id} does not contain current session ${collection.currentSessionId}`,
     );
   }
   if (!current.session) {
     throw new Error(
-      `Current session ${collection.currentSessionId} must be loaded`
+      `Current session ${collection.currentSessionId} must be loaded`,
     );
   }
 }
 export function collectionSession(
   item: SessionCollectionItem,
-  loaded: ReadonlyMap<string, UnifiedSessionInput>
+  loaded: ReadonlyMap<string, UnifiedSessionInput>,
 ) {
   return item.session ?? loaded.get(item.id);
 }
 export function buildSessionHierarchy(
   collection: SessionCollectionInput,
-  loaded: ReadonlyMap<string, UnifiedSessionInput>
+  loaded: ReadonlyMap<string, UnifiedSessionInput>,
 ): SessionHierarchyNode[] {
   const nodes = new Map<string, SessionHierarchyNode>();
   for (const item of collection.sessions) {
@@ -73,20 +73,20 @@ export function buildSessionHierarchy(
 }
 function buildSessionNode(
   item: SessionCollectionItem,
-  session?: UnifiedSessionInput
+  session?: UnifiedSessionInput,
 ): SessionHierarchyNode {
   const summary = item.summary;
   const rootAgent =
     session?.root ?? session?.agents?.find((agent) => agent.isRoot);
   const agents = session ? agentForest(item.id, session, rootAgent?.id) : [];
   const rootTurns = session
-    ? session.turns
+    ? (session.turns
         ?.filter(
           (turn) =>
             !turnAgentId(session, turn.id) ||
-            turnAgentId(session, turn.id) === rootAgent?.id
+            turnAgentId(session, turn.id) === rootAgent?.id,
         )
-        .map((turn) => turnNode(item.id, turn, session)) ?? []
+        .map((turn) => turnNode(item.id, turn, session)) ?? [])
     : [];
   return {
     key: sessionKey(item.id),
@@ -113,7 +113,7 @@ function buildSessionNode(
 function agentForest(
   itemId: string,
   session: UnifiedSessionInput,
-  rootAgentId?: string
+  rootAgentId?: string,
 ) {
   const agents = flattenAgents(session);
   const nodes = new Map<string, SessionHierarchyNode>();
@@ -146,7 +146,7 @@ function flattenAgents(session: UnifiedSessionInput) {
 function agentNode(
   itemId: string,
   session: UnifiedSessionInput,
-  agent: SessionAgent
+  agent: SessionAgent,
 ): SessionHierarchyNode {
   const turns =
     session.turns
@@ -176,7 +176,7 @@ function agentNode(
 function turnNode(
   itemId: string,
   turn: SessionTurn,
-  session: UnifiedSessionInput
+  session: UnifiedSessionInput,
 ): SessionHierarchyNode {
   return {
     key: `${itemId}:turn:${turn.id}`,
@@ -214,7 +214,7 @@ export function branchKeys(node: SessionHierarchyNode): string[] {
 
 export function initialCheckedKeys(
   roots: SessionHierarchyNode[],
-  sessionIds: readonly string[]
+  sessionIds: readonly string[],
 ) {
   const checked = new Set<string>();
   for (const sessionId of sessionIds) {
@@ -228,7 +228,7 @@ export function toggleHierarchyBranch(
   roots: SessionHierarchyNode[],
   checked: ReadonlySet<string>,
   key: string,
-  include: boolean
+  include: boolean,
 ) {
   const next = new Set(checked);
   const node = findNode(roots, key);
@@ -243,7 +243,7 @@ export function toggleHierarchyBranch(
 
 function normalizeCheckedRoots(
   roots: SessionHierarchyNode[],
-  checked: Set<string>
+  checked: Set<string>,
 ) {
   const visit = (node: SessionHierarchyNode): boolean => {
     if (node.children.length === 0) return checked.has(node.key);
@@ -257,7 +257,7 @@ function normalizeCheckedRoots(
 
 export function hierarchyCheckState(
   node: SessionHierarchyNode,
-  checked: ReadonlySet<string>
+  checked: ReadonlySet<string>,
 ) {
   if (checked.has(node.key)) return "checked" as const;
   if (node.children.some((child) => hasCheckedNode(child, checked)))
@@ -267,7 +267,7 @@ export function hierarchyCheckState(
 
 function hasCheckedNode(
   node: SessionHierarchyNode,
-  checked: ReadonlySet<string>
+  checked: ReadonlySet<string>,
 ): boolean {
   return (
     checked.has(node.key) ||
@@ -277,7 +277,7 @@ function hasCheckedNode(
 
 function findNode(
   roots: SessionHierarchyNode[],
-  key: string
+  key: string,
 ): SessionHierarchyNode | undefined {
   for (const root of roots) {
     if (root.key === key) return root;
@@ -286,27 +286,36 @@ function findNode(
   }
 }
 
-export function selectedSessionCount(
+/** Ids of the sessions with any checked node — the session-level selection. */
+export function checkedSessionIds(
   roots: SessionHierarchyNode[],
-  checked: ReadonlySet<string>
-) {
-  let count = 0;
+  checked: ReadonlySet<string>,
+): string[] {
+  const ids: string[] = [];
   const visit = (node: SessionHierarchyNode) => {
-    if (node.kind === "session" && hasCheckedNode(node, checked)) count++;
+    if (node.kind === "session" && hasCheckedNode(node, checked))
+      ids.push(node.itemId);
     node.children.forEach(visit);
   };
   roots.forEach(visit);
-  return count;
+  return ids;
+}
+
+export function selectedSessionCount(
+  roots: SessionHierarchyNode[],
+  checked: ReadonlySet<string>,
+) {
+  return checkedSessionIds(roots, checked).length;
 }
 
 export function filterSessionCollection(
   collection: SessionCollectionInput,
   loaded: ReadonlyMap<string, UnifiedSessionInput>,
   roots: SessionHierarchyNode[],
-  checked: ReadonlySet<string>
+  checked: ReadonlySet<string>,
 ): UnifiedSessionInput {
   const current = collection.sessions.find(
-    (item) => item.id === collection.currentSessionId
+    (item) => item.id === collection.currentSessionId,
   )!;
   const base = collectionSession(current, loaded)!;
   const selected = collection.sessions.flatMap((item) => {
@@ -318,11 +327,13 @@ export function filterSessionCollection(
     ];
   });
   const sessions = selected.map(({ itemId, session }) =>
-    selected.length > 1 ? namespaceSession(session, itemId) : session
+    selected.length > 1 ? namespaceSession(session, itemId) : session,
   );
   const messages = sessions.flatMap((session) => session.messages ?? []);
   messages.sort((a, b) =>
-    (a.provenance?.timestamp || "").localeCompare(b.provenance?.timestamp || "")
+    (a.provenance?.timestamp || "").localeCompare(
+      b.provenance?.timestamp || "",
+    ),
   );
   const usage = sumUsage(sessions.map((session) => session.usage));
   const cost = sumCosts(sessions.map((session) => session.cost));
@@ -332,6 +343,12 @@ export function filterSessionCollection(
     messages,
     turns: sessions.flatMap((session) => session.turns ?? []),
     events: sessions.flatMap((session) => session.events ?? []),
+    verifications: selected.flatMap(({ itemId, session }) =>
+      (session.verifications ?? []).map((verification) => ({
+        ...verification,
+        sourceSessionId: itemId,
+      })),
+    ),
     ...(usage ? { usage } : {}),
     ...(cost ? { cost } : {}),
     toolCosts: sessions.flatMap((session) => session.toolCosts ?? []),
@@ -340,11 +357,11 @@ export function filterSessionCollection(
 
 function namespaceSession(
   session: UnifiedSessionInput,
-  itemId: string
+  itemId: string,
 ): UnifiedSessionInput {
   const namespace = (id: string) => `${itemId}:${id}`;
   const messageIds = new Set(
-    session.messages?.flatMap((message) => (message.id ? [message.id] : []))
+    session.messages?.flatMap((message) => (message.id ? [message.id] : [])),
   );
   const messages = session.messages?.map((message, index) => ({
     ...message,
@@ -374,7 +391,7 @@ function namespaceSession(
 function filterOneSession(
   session: UnifiedSessionInput,
   node: SessionHierarchyNode,
-  checked: ReadonlySet<string>
+  checked: ReadonlySet<string>,
 ): UnifiedSessionInput {
   if (checked.has(node.key)) return session;
   const turnIds = new Set<string>();
@@ -395,16 +412,16 @@ function filterOneSession(
   const messages = session.messages?.filter(
     (message) =>
       (message.turnId && turnIds.has(message.turnId)) ||
-      (message.provenance?.agentId && agentIds.has(message.provenance.agentId))
+      (message.provenance?.agentId && agentIds.has(message.provenance.agentId)),
   );
   const includedTurns = new Set(
-    messages?.flatMap((message) => (message.turnId ? [message.turnId] : []))
+    messages?.flatMap((message) => (message.turnId ? [message.turnId] : [])),
   );
   turnIds.forEach((id) => includedTurns.add(id));
   const events = session.events?.filter(
     (event) =>
       (event.turnId && includedTurns.has(event.turnId)) ||
-      (event.uuid && messages?.some((message) => message.id === event.uuid))
+      (event.uuid && messages?.some((message) => message.id === event.uuid)),
   );
   const usage = sumUsage(costNodes.map((entry) => entry.usage));
   const cost = sumCosts(costNodes.map((entry) => entry.costDetail));
@@ -425,20 +442,20 @@ function collectAgentIds(node: SessionHierarchyNode, ids: Set<string>) {
 }
 
 function sumUsage(
-  values: Array<SessionUsage | undefined>
+  values: Array<SessionUsage | undefined>,
 ): SessionUsage | undefined {
   const present = values.filter((value): value is SessionUsage =>
-    Boolean(value)
+    Boolean(value),
   );
   if (!present.length) return undefined;
   return sumFields(present);
 }
 
 function sumCosts(
-  values: Array<SessionCost | undefined>
+  values: Array<SessionCost | undefined>,
 ): SessionCost | undefined {
   const present = values.filter((value): value is SessionCost =>
-    Boolean(value)
+    Boolean(value),
   );
   if (!present.length) return undefined;
   const costFields = [
@@ -455,7 +472,7 @@ function sumCosts(
       costFields.map((field) => [
         field,
         present.reduce((sum, value) => sum + (value[field] ?? 0), 0),
-      ])
+      ]),
     ),
     ...(model ? { model } : {}),
   };
@@ -474,6 +491,6 @@ function sumFields(values: SessionUsage[]): SessionUsage {
     fields.map((field) => [
       field,
       values.reduce((sum, value) => sum + (value[field] ?? 0), 0),
-    ])
+    ]),
   );
 }

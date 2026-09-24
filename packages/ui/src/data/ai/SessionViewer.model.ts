@@ -98,9 +98,27 @@ export interface SessionEntry {
 }
 
 /**
- * A session to render: the unified `SessionUIMessage[]` (preferred — what
- * `GET /api/captain/sessions/{id}` serves), a legacy `SessionEntry[]` log, or
- * raw log text (JSON array or JSONL).
+ * A session to render: a `UnifiedSessionInput` (preferred — what
+ * `GET /api/captain/sessions/{id}` serves), bare `SessionUIMessage[]`, a legacy
+ * `SessionEntry[]` log, or raw log text (JSON array or JSONL).
+ *
+ * `SessionInspector` (and `SessionCollectionItem`) also accept a session URL
+ * as `src` instead, with this contract:
+ * - `GET {src}` with `Accept: application/json` returns one
+ *   `UnifiedSessionInput`. A non-2xx body is `{ error, … }` JSON or plain text
+ *   and is shown verbatim.
+ * - `GET {src}?follow=1` (appended to any existing query) is an SSE stream of
+ *   `entry` frames (one `SessionUIMessage`, upserted by `id`), `state` frames
+ *   (`{ revision, lifecycleStatus, activityState, facets }` — a higher
+ *   revision, or a `facets` that differs from the last one seen, refetches
+ *   the aggregate; `facets` is an opaque fingerprint of the non-message
+ *   session facets — plan, todos, files, approval requests — and its first
+ *   reported value is the baseline, not itself a refetch trigger), `error`
+ *   frames (`{ error }`) and `: ping` comments; the server closes it once the
+ *   session is terminal.
+ * - The stream is opened only while `lifecycleStatus` is non-terminal (not
+ *   succeeded/partial/failed/cancelled/interrupted/completed) unless the host
+ *   passes `follow`. See `useRemoteSession`.
  */
 export type SessionInput =
   | string
@@ -413,9 +431,7 @@ export function getSessionMetadata(
     ...(input.reasoningEffort
       ? { reasoningEffort: input.reasoningEffort }
       : {}),
-    ...(input.permissionMode
-      ? { permissionMode: input.permissionMode }
-      : {}),
+    ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
     ...(input.usage ? { usage: input.usage } : {}),
     ...(input.cost ? { cost: input.cost } : {}),
   };
@@ -610,7 +626,11 @@ export function normalizeMessages(
     // rendered as a system-style row (not a fourth top-level kind) carrying the
     // pass/fail tone and the workflow verify glyph as data.
     const verifyPassed =
-      msg.role === "verified" ? true : msg.role === "verify_failed" ? false : undefined;
+      msg.role === "verified"
+        ? true
+        : msg.role === "verify_failed"
+          ? false
+          : undefined;
     const role: "system" | "user" | "assistant" =
       msg.role === "system" || verifyPassed !== undefined
         ? "system"
@@ -631,8 +651,18 @@ export function normalizeMessages(
       ...(msg.raw !== undefined ? { raw: msg.raw } : {}),
       ...(verifyPassed !== undefined ? { verifyPassed } : {}),
     };
+    const verifyKind = asRecord(
+      msg.parts.find((part) => part.type === "data-verify")?.data,
+    )?.kind;
     msg.parts.forEach((part, i) => {
-      const ev = partEvent(part, role, `${baseId}-${i}`, meta);
+      const shownPart =
+        verifyPassed !== undefined &&
+        part.type === "text" &&
+        typeof verifyKind === "string" &&
+        !part.text?.startsWith(`${verifyKind} ·`)
+          ? { ...part, text: `${verifyKind} · ${part.text ?? ""}` }
+          : part;
+      const ev = partEvent(shownPart, role, `${baseId}-${i}`, meta);
       if (ev) events.push(ev);
     });
   });

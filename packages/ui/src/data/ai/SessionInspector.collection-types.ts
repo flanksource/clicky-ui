@@ -28,6 +28,11 @@ export interface SessionCollectionItem {
   status?: string;
   summary?: SessionCollectionSummary;
   session?: UnifiedSessionInput;
+  /** Session URL (see `SessionInput`'s src contract) loaded — and followed
+   *  while live — when the item is current or selected. Ignored when
+   *  `session` is present; takes precedence over the collection's
+   *  `loadSession`. */
+  src?: string;
 }
 
 export interface SessionCollectionInput {
