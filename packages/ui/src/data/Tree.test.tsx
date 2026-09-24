@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Tree } from "./Tree";
 
 type Node = { id: string; label: string; children?: Node[] };
@@ -84,6 +84,23 @@ function renderSecondaryTree(roots: SecondaryNode[]) {
 }
 
 describe("Tree", () => {
+  it("shows and updates a controlled filter on a small tree", () => {
+    const onSearchQueryChange = vi.fn();
+    const roots = [{ id: "root", label: "root", children: [{ id: "match", label: "matching node" }, { id: "other", label: "other node" }] }];
+    const props = { roots, getChildren: (node: Node) => node.children, getKey: (node: Node) => node.id,
+      renderRow: ({ node }: { node: Node }) => <span>{node.label}</span>, showSearch: true, onSearchQueryChange };
+    const { rerender } = render(<Tree<Node> {...props} searchQuery="match" />);
+
+    expect(screen.getByLabelText("Filter tree nodes")).toHaveValue("match");
+    expect(screen.getByText("matching node")).toBeInTheDocument();
+    expect(screen.queryByText("other node")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Filter tree nodes"), { target: { value: "other" } });
+    expect(onSearchQueryChange).toHaveBeenCalledWith("other");
+    rerender(<Tree<Node> {...props} searchQuery="other" />);
+    expect(screen.getByText("other node")).toBeInTheDocument();
+    expect(screen.queryByText("matching node")).toBeNull();
+  });
+
   it("shows the filter input only for trees with more than 20 edges", () => {
     const { rerender } = renderTree([
       {
