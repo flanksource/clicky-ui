@@ -8,22 +8,42 @@ import {
 } from "./SessionViewer.model";
 import { SAMPLE_SESSION, SAMPLE_SESSION_JSONL } from "./SessionViewer.fixtures";
 import { WORKFLOW_PHASES } from "./agent-action-icons";
-import { UiAsterisk, UiEye, UiPalette, UiProhibit, UiStrategy, UiWrench } from "../../icons";
+import {
+  UiAsterisk,
+  UiEye,
+  UiPalette,
+  UiProhibit,
+  UiStrategy,
+  UiWrench,
+} from "../../icons";
 
 describe("normalizeSession", () => {
   it("flattens entries into ordered events, splitting message content blocks", () => {
     const events = normalizeSession(SAMPLE_SESSION);
     const kinds = events.map((e) => e.kind);
     // user text, then a1's thinking + assistant text, then the tool rows, then the error.
-    expect(kinds.slice(0, 4)).toEqual(["user", "thinking", "assistant", "tool"]);
+    expect(kinds.slice(0, 4)).toEqual([
+      "user",
+      "thinking",
+      "assistant",
+      "tool",
+    ]);
     expect(kinds.at(-1)).toBe("error");
   });
 
   it("preserves system roles instead of presenting them as assistant messages", () => {
     const events = normalizeSession({
       messages: [
-        { id: "system", role: "system", parts: [{ type: "text", text: "# AGENTS.md instructions" }] },
-        { id: "user", role: "user", parts: [{ type: "text", text: "Fix the parser" }] },
+        {
+          id: "system",
+          role: "system",
+          parts: [{ type: "text", text: "# AGENTS.md instructions" }],
+        },
+        {
+          id: "user",
+          role: "user",
+          parts: [{ type: "text", text: "Fix the parser" }],
+        },
       ],
     });
 
@@ -94,13 +114,17 @@ describe("normalizeSession", () => {
 
   it("parses a JSONL string and a pretty-printed JSON array identically", () => {
     const fromJsonl = normalizeSession(SAMPLE_SESSION_JSONL);
-    const fromArray = normalizeSession(JSON.stringify(SAMPLE_SESSION.slice(0, 3), null, 2));
+    const fromArray = normalizeSession(
+      JSON.stringify(SAMPLE_SESSION.slice(0, 3), null, 2),
+    );
     expect(fromJsonl.map((e) => e.kind)).toEqual(fromArray.map((e) => e.kind));
     expect(fromJsonl[0]?.text).toBe("Add a session viewer component.");
   });
 
   it("throws loudly on a malformed JSONL line rather than dropping it", () => {
-    expect(() => normalizeSession('{"type":"user"}\n{not json}')).toThrow(/invalid session JSON line/);
+    expect(() => normalizeSession('{"type":"user"}\n{not json}')).toThrow(
+      /invalid session JSON line/,
+    );
   });
 
   it("returns no events for empty input", () => {
@@ -110,7 +134,13 @@ describe("normalizeSession", () => {
 
   it("maps a verified role to a system row with the verify glyph and a passing tone", () => {
     const events = normalizeSession({
-      messages: [{ id: "v1", role: "verified", parts: [{ type: "text", text: "All checks passed" }] }],
+      messages: [
+        {
+          id: "v1",
+          role: "verified",
+          parts: [{ type: "text", text: "All checks passed" }],
+        },
+      ],
     });
 
     expect(events).toEqual([
@@ -124,9 +154,33 @@ describe("normalizeSession", () => {
     ]);
   });
 
+  it("shows a verification notice's report kind in the transcript", () => {
+    const events = normalizeSession({
+      messages: [
+        {
+          id: "v-kind",
+          role: "verified",
+          parts: [
+            { type: "text", text: "passed in 1s — fixture" },
+            { type: "data-verify", data: { kind: "fixture", state: "passed" } },
+          ],
+        },
+      ],
+    });
+    expect(events).toEqual([
+      expect.objectContaining({ text: "fixture · passed in 1s — fixture" }),
+    ]);
+  });
+
   it("maps a verify_failed role to a system row with a failing tone", () => {
     const events = normalizeSession({
-      messages: [{ id: "v1", role: "verify_failed", parts: [{ type: "text", text: "2 checks failed" }] }],
+      messages: [
+        {
+          id: "v1",
+          role: "verify_failed",
+          parts: [{ type: "text", text: "2 checks failed" }],
+        },
+      ],
     });
 
     expect(events).toEqual([
@@ -142,7 +196,12 @@ describe("normalizeSession", () => {
 
   it("maps a verified role to the same verify row on the legacy SessionEntry path, not assistant", () => {
     const entries: SessionEntry[] = [
-      { message: { role: "verified", content: [{ type: "text", text: "All checks passed" }] } },
+      {
+        message: {
+          role: "verified",
+          content: [{ type: "text", text: "All checks passed" }],
+        },
+      },
     ];
 
     expect(normalizeSession(entries)).toEqual([
@@ -158,7 +217,12 @@ describe("normalizeSession", () => {
 
   it("maps a verify_failed role to the same verify row on the legacy SessionEntry path", () => {
     const entries: SessionEntry[] = [
-      { message: { role: "verify_failed", content: [{ type: "text", text: "2 checks failed" }] } },
+      {
+        message: {
+          role: "verify_failed",
+          content: [{ type: "text", text: "2 checks failed" }],
+        },
+      },
     ];
 
     expect(normalizeSession(entries)).toEqual([
@@ -215,8 +279,14 @@ describe("getSessionAction", () => {
 
 describe("splitMcpTool", () => {
   it("splits both the mcp-prefixed and bare server__name forms", () => {
-    expect(splitMcpTool("mcp__postgres__execute_sql")).toEqual({ server: "postgres", name: "execute_sql" });
-    expect(splitMcpTool("iconify__get_icon")).toEqual({ server: "iconify", name: "get_icon" });
+    expect(splitMcpTool("mcp__postgres__execute_sql")).toEqual({
+      server: "postgres",
+      name: "execute_sql",
+    });
+    expect(splitMcpTool("iconify__get_icon")).toEqual({
+      server: "iconify",
+      name: "get_icon",
+    });
   });
 
   it("returns null for a plain tool name", () => {
@@ -235,7 +305,10 @@ describe("summarizeSession", () => {
 
   it("omits the model when none was recorded", () => {
     const entries: SessionEntry[] = [
-      { type: "assistant", tool_use: { tool: "Glob", input: { pattern: "*.ts" } } },
+      {
+        type: "assistant",
+        tool_use: { tool: "Glob", input: { pattern: "*.ts" } },
+      },
     ];
     expect(summarizeSession(normalizeSession(entries)).model).toBeUndefined();
   });

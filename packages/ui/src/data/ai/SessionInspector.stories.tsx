@@ -1,6 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
-import { SessionInspector } from "./SessionInspector";
+import type { Decorator, Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
+import { useEffect, useRef, useState } from "react";
+import type { EventSourceLike } from "../../hooks/event-source";
+import { EventSourceProvider } from "../../hooks/event-source-provider";
+import { SessionInspector, type SessionInspectorTab } from "./SessionInspector";
 import type { SessionCollectionInput } from "./SessionInspector.collection";
 import { INSPECTOR_SESSION, SAMPLE_SESSION } from "./SessionViewer.fixtures";
 import {
@@ -281,6 +284,162 @@ export const MultiSession: Story = {
           }),
         ).toBeInTheDocument();
       },
+    );
+  },
+};
+
+// The host owns the tab and the session selection (a router would keep them in
+// the URL); the echo line shows what the inspector reported back.
+function ControlledInspector() {
+  const [tab, setTab] = useState<SessionInspectorTab>("costs");
+  const [selected, setSelected] = useState<string[]>([
+    INSPECTOR_SESSION.id!,
+    PARALLEL_SESSION.id!,
+  ]);
+  return (
+    <div className="flex h-screen flex-col">
+      <p data-testid="host-state" className="p-2 font-mono text-xs">
+        tab={tab} sessions={selected.join(",")}
+      </p>
+      <SessionInspector
+        session={SESSION_COLLECTION}
+        tab={tab}
+        onTabChange={setTab}
+        selectedSessionIds={selected}
+        onSelectedSessionIdsChange={setSelected}
+      />
+    </div>
+  );
+}
+
+export const ControlledTabAndSelection: Story = {
+  args: { session: SESSION_COLLECTION },
+  render: () => <ControlledInspector />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    await expect(
+      canvas.getByRole("tab", { name: /^Costs/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(canvas.getByRole("tab", { name: /^Metadata/ }));
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: "Select session content: 2 of 2 sessions",
+      }),
+    );
+    await userEvent.click(
+      page.getByRole("checkbox", { name: "Include GPT parallel" }),
+    );
+    await expect(canvas.getByTestId("host-state")).toHaveTextContent(
+      `tab=metadata sessions=${INSPECTOR_SESSION.id}`,
+    );
+  },
+};
+
+// A URL-backed inspector against a scripted server: the fetch serves the
+// session (or a 404), and the follow stream appends one message and then
+// reports the session finished, which closes it.
+const REMOTE_SRC = "/stories/captain/sessions/session-parity";
+const STREAMED_TEXT = "Streamed from the follow stream";
+
+const remoteFetch: typeof fetch = async (input) =>
+  String(input) === REMOTE_SRC
+    ? new Response(
+        JSON.stringify({ ...INSPECTOR_SESSION, revision: 1, lifecycleStatus: "running" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    : new Response(JSON.stringify({ error: `session ${String(input)} not found` }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+
+function scriptedFollowStream(url: string): EventSourceLike {
+  const listeners = new Map<string, EventListenerOrEventListenerObject[]>();
+  const source: EventSourceLike = {
+    url,
+    readyState: 1,
+    onopen: null,
+    onmessage: null,
+    onerror: null,
+    addEventListener: (type, listener) =>
+      listeners.set(type, [...(listeners.get(type) ?? []), listener]),
+    removeEventListener: (type, listener) =>
+      listeners.set(type, (listeners.get(type) ?? []).filter((l) => l !== listener)),
+    close: () => {
+      timers.forEach(clearTimeout);
+      listeners.clear();
+    },
+  };
+  const emit = (type: string, data: unknown) => {
+    const event = new MessageEvent(type, { data: JSON.stringify(data) });
+    for (const listener of listeners.get(type) ?? []) {
+      if (typeof listener === "function") listener(event);
+      else listener.handleEvent(event);
+    }
+  };
+  const timers = [
+    setTimeout(
+      () =>
+        emit("entry", {
+          id: "streamed-1",
+          role: "assistant",
+          parts: [{ type: "text", text: STREAMED_TEXT }],
+          provenance: { sessionId: INSPECTOR_SESSION.id, timestamp: "2026-07-16T06:40:00Z" },
+        }),
+      800,
+    ),
+    setTimeout(
+      () =>
+        emit("state", {
+          revision: 1,
+          lifecycleStatus: "succeeded",
+          activityState: "idle",
+          facets: "facets-v1",
+        }),
+      1600,
+    ),
+  ];
+  return source;
+}
+
+const withScriptedSessionServer: Decorator = (Story) => {
+  const originalFetch = useRef<typeof globalThis.fetch | undefined>(undefined);
+  if (globalThis.fetch !== remoteFetch) {
+    originalFetch.current = globalThis.fetch;
+    globalThis.fetch = remoteFetch;
+  }
+  useEffect(
+    () => () => {
+      if (originalFetch.current) globalThis.fetch = originalFetch.current;
+    },
+    [],
+  );
+  return (
+    <EventSourceProvider value={scriptedFollowStream}>
+      <Story />
+    </EventSourceProvider>
+  );
+};
+
+export const RemoteSource: Story = {
+  args: { src: REMOTE_SRC },
+  decorators: [withScriptedSessionServer],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(
+      () => expect(canvas.getByText(STREAMED_TEXT)).toBeInTheDocument(),
+      { timeout: 3000 },
+    );
+  },
+};
+
+export const RemoteSourceNotFound: Story = {
+  args: { src: "/stories/captain/sessions/missing" },
+  decorators: [withScriptedSessionServer],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("alert")).toHaveTextContent(
+      "session /stories/captain/sessions/missing not found",
     );
   },
 };
