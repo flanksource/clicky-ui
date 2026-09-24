@@ -10,11 +10,13 @@ type FakeEditor = { getValue: () => string; setValue: (value: string) => void };
 // onto the model already registered at `path`, which holds `modelText`.
 const mounted: { editor?: FakeEditor } = {};
 let modelText = "";
+let editorOptions: Record<string, unknown> = {};
 
 vi.mock("monaco-editor", () => ({}));
 vi.mock("@monaco-editor/react", () => ({
   loader: { config: () => undefined },
-  default: function FakeMonacoEditor({ onMount }: { onMount?: (editor: FakeEditor, monaco: unknown) => void }) {
+  default: function FakeMonacoEditor({ onMount, options }: { onMount?: (editor: FakeEditor, monaco: unknown) => void; options?: Record<string, unknown> }) {
+    editorOptions = options ?? {};
     useEffect(() => {
       const editor: FakeEditor = {
         getValue: () => modelText,
@@ -39,6 +41,14 @@ function mount(value: string, onMount = vi.fn()) {
 }
 
 describe("MonacoEditor", () => {
+  it("configures a read-only viewer without an edit callback", () => {
+    render(<MonacoProvider getWorker={() => ({}) as Worker}>
+      <MonacoEditor value="package example\n" language="go" path="file:///example.go" readOnly />
+    </MonacoProvider>);
+
+    expect(editorOptions.readOnly).toBe(true);
+  });
+
   it("shows the current value when it remounts onto a kept model holding older text", () => {
     modelText = "user: before the form edit\n";
 

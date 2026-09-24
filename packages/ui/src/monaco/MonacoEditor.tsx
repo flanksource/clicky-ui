@@ -10,6 +10,7 @@ loader.config({ monaco });
 export function MonacoEditor({
   value,
   onChange,
+  readOnly = false,
   language,
   path,
   height = "20rem",
@@ -17,6 +18,7 @@ export function MonacoEditor({
   onMount,
   onValidate,
 }: MonacoEditorProps) {
+  if (!readOnly && !onChange) throw new Error("MonacoEditor requires onChange when editing");
   const workers = useMonacoWorkerFactory();
   const theme = useResolvedTheme() === "dark" ? "vs-dark" : "light";
   // @monaco-editor/react keeps the first onMount it sees, so read the value at
@@ -32,7 +34,7 @@ export function MonacoEditor({
     <div className="overflow-hidden rounded-md border border-input" data-slot="monaco-editor">
       <Editor
         value={value}
-        onChange={(next) => onChange(next ?? "")}
+        onChange={(next) => onChange?.(next ?? "")}
         language={language}
         path={path}
         height={height}
@@ -47,6 +49,7 @@ export function MonacoEditor({
         }}
         {...(onValidate ? { onValidate } : {})}
         options={{
+          readOnly,
           automaticLayout: true,
           fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace)",
           fontSize: 13,
