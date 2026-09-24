@@ -37,6 +37,8 @@ const INITIAL_STATE: Record<string, { hidden: string[]; shown: string[]; disable
   expressions: { hidden: ["Approver", "State / province"], shown: ["Coupon"], disabled: ["Discount %"] },
   cascade: { hidden: ["Region", "City"], shown: ["Country"], disabled: [] },
   nested: { hidden: [], shown: ["Shipping street"], disabled: ["Billing street", "Billing city"] },
+  patch: { hidden: ["Agreed rate"], shown: ["Amount", "Rate", "API token"], disabled: [] },
+  paths: { hidden: ["Loan term rates"], shown: ["Loan terms", "Fees", "Rates"], disabled: [] },
 };
 
 function labelled(label: string): HTMLInputElement {
@@ -70,6 +72,36 @@ describe("JsonSchemaForm listeners demo", () => {
       for (const label of expected.disabled) expect(labelled(label).disabled).toBe(true);
     },
   );
+
+  it("patches the signed contract: amount read-only, rate retitled and bounded, token gone", () => {
+    render(<JsonSchemaFormListenersDemo />);
+    fireEvent.click(screen.getByRole("radio", { name: "patch · readOnly · writeOnly" }));
+    expect(labelled("Amount").tagName).toBe("INPUT");
+
+    fireEvent.click(screen.getByRole("radio", { name: /^Signed/ }));
+
+    expect(screen.queryByRole("textbox", { name: /^Amount/ })).toBeNull();
+    expect(labelled("Agreed rate").max).toBe("25");
+    expect(screen.queryByText("API token")).toBeNull();
+  });
+
+  it("reveals the table and its fee column by path, and locks the rate column to value text", () => {
+    render(<JsonSchemaFormListenersDemo />);
+    fireEvent.click(screen.getByRole("radio", { name: "Paths · x-on-load" }));
+    expect(screen.queryByRole("table")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Override (01)" }));
+    const headers = () => within(screen.getByRole("table")).getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers()).toEqual(["Term", "Rate", ""]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "With fees (01)" }));
+    expect(headers()).toEqual(["Term", "Rate", "Fee", ""]);
+    expect(screen.getByDisplayValue("4.5").tagName).toBe("INPUT");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Locked (01)" }));
+    expect(screen.queryByDisplayValue("4.5")).toBeNull();
+    expect(screen.getByText("4.5").closest("[data-jsf-readonly]")).not.toBeNull();
+  });
 
   it("switches examples, replacing the form and its value", () => {
     render(<JsonSchemaFormListenersDemo />);

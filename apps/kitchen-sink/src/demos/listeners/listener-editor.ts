@@ -45,11 +45,18 @@ const keys = (description: string): JsonSchemaProperty => ({
   description,
 });
 
+const PATHS = " A target may be a path into a sibling's subtree (`groups/Table/Column`; arrays are crossed into their items).";
+
 const actionProperties: Record<string, JsonSchemaProperty> = {
-  hide: keys("Sibling keys hidden while this branch applies."),
-  show: keys("Sibling keys shown while this branch applies (overrides x-hidden)."),
-  enable: keys("Sibling keys enabled while this branch applies."),
-  disable: keys("Sibling keys rendered as disabled controls while this branch applies."),
+  hide: keys(`Sibling keys hidden while this branch applies.${PATHS}`),
+  show: keys(`Sibling keys shown while this branch applies (overrides x-hidden).${PATHS}`),
+  enable: keys(`Sibling keys enabled while this branch applies.${PATHS}`),
+  disable: keys(`Sibling keys rendered as disabled controls while this branch applies.${PATHS}`),
+  patch: {
+    type: "object",
+    additionalProperties: { type: "object" },
+    description: `Keywords (readOnly, title, bounds, x-*) merged over each target while this branch applies.${PATHS}`,
+  },
   require: keys("Sibling keys marked required while this branch applies."),
   optional: keys("Sibling keys made optional while this branch applies."),
   reset: keys("On edit: sibling keys reset to their schema default, or removed."),
@@ -97,8 +104,17 @@ export const LISTENER_META_SCHEMA: JsonSchemaObject = {
         format: { type: "string" },
         required: { type: "array", items: { type: "string" } },
         properties: { type: "object", additionalProperties: { $ref: "#/$defs/property" } },
+        items: { $ref: "#/$defs/property" },
+        readOnly: { type: "boolean", description: "Show the value as text, with no input." },
+        writeOnly: { type: "boolean", description: "Never shown back: omitted from a read-only view." },
+        "x-layout": { enum: ["inline", "stack", "table"] },
         "x-hidden": { type: "boolean", description: "Render nothing for this property." },
         "x-disabled": { type: "boolean", description: "Render the control disabled." },
+        "x-on-load": {
+          type: "array",
+          items: { $ref: "#/$defs/listener" },
+          description: "Object-level load listeners: `when` reads the object itself; applied before any x-on-change. hide/show/enable/disable/patch only.",
+        },
         "x-enum-labels": { type: "object", additionalProperties: { type: "string" } },
         "x-enum-display": { enum: ["combobox", "radio", "grid", "segmented"] },
         "x-on-change": {

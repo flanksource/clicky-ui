@@ -4,7 +4,7 @@ import {
 } from "./json-schema-form-resolve";
 import { applyListenerState } from "./json-schema-form-listeners";
 import { isPlainObject } from "../lib/collections";
-import { isEmptyValue } from "./json-schema-form-utils";
+import { hasObjectItemProperties, isEmptyValue } from "./json-schema-form-utils";
 import { matchesFieldFilter } from "./json-schema-form-filter";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import type {
@@ -49,6 +49,7 @@ export function unmatchedFormErrors({
   value,
   errors,
   hiddenKeys,
+  viewOnly,
   hideReadOnlyFields,
   hideEmpty,
   fieldFilter,
@@ -61,6 +62,9 @@ export function unmatchedFormErrors({
   value: Record<string, unknown>;
   errors: JsonSchemaFormError[];
   hiddenKeys?: string[];
+  // The form-level `readOnly` prop: a read-only form is a view, which omits
+  // writeOnly fields, so their errors cannot be shown on them.
+  viewOnly: boolean;
   hideReadOnlyFields: boolean;
   hideEmpty: boolean;
   fieldFilter?: string;
@@ -72,6 +76,7 @@ export function unmatchedFormErrors({
   const rendered = new Set<string>();
   collectObjectPaths(schema, value, instancePath, rendered, {
     hiddenKeys: new Set(hiddenKeys ?? []),
+    viewOnly,
     hideReadOnlyFields,
     hideEmpty,
     pre,
@@ -85,6 +90,9 @@ export function unmatchedFormErrors({
 
 interface CollectOptions {
   hiddenKeys: Set<string>;
+  // Mirrors RenderContext.viewOnly: the form is read-only, or an ancestor
+  // field is readOnly.
+  viewOnly: boolean;
   hideReadOnlyFields: boolean;
   hideEmpty: boolean;
   fieldFilter?: string;
@@ -147,12 +155,24 @@ function collectObjectPaths(
     if (!field || (options.hideReadOnlyFields && field.readOnly)) continue;
     // A field the form drops is not a place an error can be shown, so its error
     // has to surface as unmatched rather than vanish with the field.
+    if (omitsWriteOnly(field, options)) continue;
     if (options.hideEmpty && isEmptyValue(field.value)) continue;
 
     const path = appendInstancePath(basePath, key);
     paths.add(path);
-    collectControlPaths(field, path, paths, { ...options, root: false });
+    collectControlPaths(field, path, paths, { ...options, root: false, viewOnly: subtreeIsView(field, options) });
   }
+}
+
+// Mirrors buildField: a writeOnly value is never shown in a view, nor by a
+// field that is itself readOnly.
+function omitsWriteOnly(field: FieldControl, options: CollectOptions): boolean {
+  return field.writeOnly === true && (options.viewOnly || field.readOnly === true);
+}
+
+// Mirrors buildField: a readOnly field's subtree is a view.
+function subtreeIsView(field: FieldControl, options: CollectOptions): boolean {
+  return options.viewOnly || field.readOnly === true;
 }
 
 function applyPreExtensions(
@@ -219,10 +239,7 @@ function collectArrayPaths(
   }
 
   const itemSchema = field.itemSchema ?? { type: "string" };
-  const table =
-    field.layout === "table" &&
-    itemSchema.properties != null &&
-    Object.keys(itemSchema.properties).length > 0;
+  const table = field.layout === "table" && hasObjectItemProperties(itemSchema);
   for (const [index, item] of (Array.isArray(field.value)
     ? field.value
     : []
@@ -238,19 +255,16 @@ function collectArrayPaths(
       );
       continue;
     }
+    const itemField = resolveControl({
+      key: `${field.key}[${index}]`,
+      prop: itemSchema,
+      required: false,
+      value: item,
+      onChange: () => {},
+    });
+    if (omitsWriteOnly(itemField, options)) continue;
     paths.add(itemPath);
-    collectControlPaths(
-      resolveControl({
-        key: `${field.key}[${index}]`,
-        prop: itemSchema,
-        required: false,
-        value: item,
-        onChange: () => {},
-      }),
-      itemPath,
-      paths,
-      options
-    );
+    collectControlPaths(itemField, itemPath, paths, { ...options, viewOnly: subtreeIsView(itemField, options) });
   }
 }
 
@@ -276,19 +290,16 @@ function collectMapPaths(
   for (const key of keys) {
     const schema = known[key] ?? mapValueSchema(field, key);
     const path = appendInstancePath(instancePath, key);
+    const valueField = resolveControl({
+      key,
+      prop: schema,
+      required: false,
+      value: value[key],
+      onChange: () => {},
+    });
+    if (omitsWriteOnly(valueField, options)) continue;
     paths.add(path);
-    collectControlPaths(
-      resolveControl({
-        key,
-        prop: schema,
-        required: false,
-        value: value[key],
-        onChange: () => {},
-      }),
-      path,
-      paths,
-      options
-    );
+    collectControlPaths(valueField, path, paths, { ...options, viewOnly: subtreeIsView(valueField, options) });
   }
 }
 

@@ -166,6 +166,12 @@ export interface RenderApi {
 // level), and the current depth (for keys/labels).
 export interface RenderContext extends FormErrorContext {
   readOnly: boolean;
+  // This subtree is a view: set by the form-level `readOnly` prop and by any
+  // readOnly field (a read-only object, array or map) for its descendants.
+  // Unlike `readOnly`, a disabled container (`x-disabled`) does not set it: a
+  // disabled subtree is still an input. Drives writeOnly omission and makes a
+  // table show its cells as values.
+  viewOnly: boolean;
   /** Render value content only, including descendants of a properties preview. */
   presentation?: boolean;
   // Drop fields whose resolved control is read-only (schema `readOnly: true`)

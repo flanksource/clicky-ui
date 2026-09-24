@@ -10,7 +10,9 @@ import {
   controlMinHeightClass,
   inputSizeClass,
 } from "./json-schema-form-size";
-import { schemaHelper } from "./json-schema-form-resolve";
+import { resolveControl, schemaHelper } from "./json-schema-form-resolve";
+import { applyPostExtensions } from "./json-schema-form-extensions";
+import { effectiveProperties } from "./json-schema-form-conditionals";
 import { appendInstancePath } from "./json-schema-form-errors";
 import {
   canAddItem,
@@ -21,6 +23,7 @@ import {
 } from "./json-schema-form-utils";
 import type {
   FieldControl,
+  JsonSchemaObject,
   JsonSchemaProperty,
   RenderContext,
 } from "./json-schema-form-types";
@@ -39,15 +42,42 @@ export function TableArray({
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
-  // The item schema's explicit `x-order` is the authority for the keys it names:
-  // per-property `x-clicky-order` sorts first (so it still orders everything
-  // `x-order` leaves out, and composes across merged sources), then `x-order`
-  // pulls its listed columns to the front in its own sequence.
+  // A table read-only as a whole — a view (the form's `readOnly` prop or a
+  // readOnly ancestor; see RenderContext.viewOnly) or the array's own
+  // `readOnly` — renders every cell as its value, exactly as a column the
+  // schema (or a listener patch) marks readOnly does: a readOnly field is value
+  // text wherever it sits, and in a table the grid itself is the structure a
+  // disabled control would otherwise keep visible. `x-disabled`, which only
+  // reaches ctx.readOnly, keeps real controls, disabled.
+  const valueCells = ctx.viewOnly || field.readOnly === true;
+  // Columns are the item schema's effective properties — `allOf` members
+  // included, so a listener path that patches one cell (appended as an allOf
+  // member) reaches it — minus the columns no cell would render: `x-hidden`,
+  // a readOnly column under hideReadOnlyFields, and a writeOnly column in a
+  // read-only view. The item schema's explicit `x-order` is the authority for
+  // the keys it names: per-property `x-clicky-order` sorts first (so it still
+  // orders everything `x-order` leaves out, and composes across merged
+  // sources), then `x-order` pulls its listed columns to the front in its own
+  // sequence.
   const columns = orderByXOrder(
-    orderByClickyOrder(Object.entries(itemSchema.properties ?? {})),
+    orderByClickyOrder(
+      Object.entries(effectiveProperties(itemSchema as JsonSchemaObject, {}).properties).filter(
+        ([, prop]) =>
+          prop["x-hidden"] !== true &&
+          !(ctx.hideReadOnlyFields && prop.readOnly === true) &&
+          !(prop.writeOnly === true && (valueCells || prop.readOnly === true)),
+      ),
+    ),
     itemSchema["x-order"],
   );
-  const childCtx: RenderContext = { ...ctx, readOnly, depth: ctx.depth + 1 };
+  // hideReadOnlyFields already dropped the declared-readOnly columns; the
+  // cells a read-only table marks readOnly itself must still render.
+  const childCtx: RenderContext = {
+    ...ctx,
+    readOnly,
+    depth: ctx.depth + 1,
+    ...(valueCells ? { hideReadOnlyFields: false } : {}),
+  };
   // The trash column disappears with the buttons that would have filled it, so
   // an array of a fixed length reads as a table rather than one with a blank
   // gutter down the side.
@@ -63,7 +93,7 @@ export function TableArray({
     const nodes = ctx.render.renderFieldNodes(
       {
         key: `${field.key}[${rowIndex}].${col}`,
-        prop,
+        prop: valueCells ? { ...prop, readOnly: true } : prop,
         required: false,
         value: obj[col],
         onChange: (next) =>
@@ -89,6 +119,25 @@ export function TableArray({
     );
   }
 
+  // A column header is its column's label, so post extensions decorate it as
+  // they decorate every field label, on the column's field (keyed by the
+  // property name, after the pre-extensions). Only the returned label is used:
+  // a header holds no value, and value adornments belong in the cells. A
+  // column names no single value, so the context carries no instancePath.
+  function columnHeader(col: string, prop: JsonSchemaProperty, header: ReactNode): ReactNode {
+    const roots = {
+      ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
+      ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
+    };
+    let column: FieldControl | null = resolveControl({ key: col, prop, required: false, value: undefined, onChange: () => {} });
+    for (const ext of ctx.pre) {
+      if (!column) break;
+      column = ext(column, { key: col, prop, value: undefined, ...roots });
+    }
+    if (!column) return header;
+    return applyPostExtensions(column, { label: header, value: null }, ctx.post, roots).label;
+  }
+
   return (
     <div
       className={cn(
@@ -109,10 +158,10 @@ export function TableArray({
                 key={col}
                 className="px-2 py-1 text-xs font-medium text-muted-foreground [overflow-wrap:anywhere]"
               >
-                {ctx.presentation ? (
-                  prop.title || col
-                ) : (
-                  <TableColumnHeader name={col} schema={prop} />
+                {columnHeader(
+                  col,
+                  prop,
+                  ctx.presentation ? prop.title || col : <TableColumnHeader name={col} schema={prop} />,
                 )}
               </th>
             ))}

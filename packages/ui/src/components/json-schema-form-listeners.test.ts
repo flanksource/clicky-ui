@@ -131,6 +131,81 @@ describe("applyListenerState", () => {
   });
 });
 
+describe("applyListenerState patch", () => {
+  const OVERRIDE_TITLE = "Override rate";
+  const RATE_CEILING = 25;
+
+  function patched(listeners: ChangeListener[], value: Record<string, unknown>) {
+    return applyListenerState(loanSchema(listeners), value, { root: value }).properties;
+  }
+
+  it("merges the patch over the target while `when` holds, keeping its other keywords", () => {
+    const listeners: ChangeListener[] = [
+      { when: { const: YES }, patch: { LoanRate: { readOnly: true, title: OVERRIDE_TITLE, maximum: RATE_CEILING } } },
+    ];
+    expect(patched(listeners, { LoanOverride: YES }).LoanRate).toEqual({
+      type: "number",
+      default: 3,
+      readOnly: true,
+      title: OVERRIDE_TITLE,
+      maximum: RATE_CEILING,
+    });
+    expect(patched(listeners, { LoanOverride: NO }).LoanRate).toEqual({ type: "number", default: 3 });
+  });
+
+  it("applies `else.patch` while `when` does not hold", () => {
+    const listeners: ChangeListener[] = [
+      { when: { const: YES }, else: { patch: { LoanNote: { writeOnly: true } } } },
+    ];
+    expect(patched(listeners, { LoanOverride: NO }).LoanNote?.writeOnly).toBe(true);
+    expect(patched(listeners, { LoanOverride: YES }).LoanNote?.writeOnly).toBeUndefined();
+  });
+
+  it("lets a later listener win per keyword, leaving the earlier listener's other keywords", () => {
+    const listeners: ChangeListener[] = [
+      { patch: { LoanRate: { readOnly: true, title: OVERRIDE_TITLE } } },
+      { patch: { LoanRate: { readOnly: false } } },
+    ];
+    expect(patched(listeners, {}).LoanRate).toMatchObject({ readOnly: false, title: OVERRIDE_TITLE });
+  });
+
+  it("applies after the verbs, so a patch can set a keyword no verb covers alongside them", () => {
+    const listeners: ChangeListener[] = [{ show: ["LoanAmount"], patch: { LoanAmount: { readOnly: true } } }];
+    expect(patched(listeners, {}).LoanAmount).toMatchObject({ "x-hidden": false, readOnly: true });
+  });
+
+  it("leaves a target the current shape does not declare absent", () => {
+    const schema = loanSchema([{ patch: { BranchOnly: { readOnly: true } } }]);
+    schema.allOf = [
+      {
+        if: { properties: { LoanOverride: { const: "99" } } },
+        [thenKeyword]: { properties: { BranchOnly: { type: "string" } } },
+      },
+    ];
+    expect(applyListenerState(schema, {}, { root: {} }).properties).not.toHaveProperty("BranchOnly");
+  });
+
+  it("does not mutate the schema's property objects", () => {
+    const schema = loanSchema([{ patch: { LoanRate: { readOnly: true } } }]);
+    applyListenerState(schema, {}, { root: {} });
+    expect(schema.properties?.LoanRate).toEqual({ type: "number", default: 3 });
+  });
+
+  it.each<[string, ChangeListener, RegExp]>([
+    ["a structural keyword", { patch: { LoanRate: { type: "string" } } }, /LoanOverride.*patch "LoanRate" may not set type.*allOf/],
+    ["required", { patch: { LoanRate: { required: ["x"] } } }, /LoanOverride.*patch "LoanRate" may not set required.*require\/optional/],
+    ["a value keyword", { patch: { LoanRate: { default: 1 } } }, /LoanOverride.*patch "LoanRate" may not set default.*set\/reset/],
+    ["a nested listener", { patch: { LoanRate: { "x-on-change": [] } } }, /LoanOverride.*patch "LoanRate" may not set x-on-change/],
+    ["an unknown target", { patch: { Missing: { readOnly: true } } }, /LoanOverride.*unknown target "Missing"/],
+    ["a non-object patch", { patch: { LoanRate: true } } as unknown as ChangeListener, /LoanOverride.*patch "LoanRate" must be an object/],
+    ["hide clashing with a patched x-hidden", { hide: ["LoanAmount"], patch: { LoanAmount: { "x-hidden": false } } }, /LoanOverride.*both hide and patch x-hidden on "LoanAmount"/],
+    ["disable clashing with a patched x-disabled", { disable: ["LoanRate"], patch: { LoanRate: { "x-disabled": false } } }, /LoanOverride.*both disable and patch x-disabled on "LoanRate"/],
+    ["a clash inside `else`", { when: { const: YES }, else: { show: ["LoanAmount"], patch: { LoanAmount: { "x-hidden": true } } } }, /LoanOverride.*both show and patch x-hidden on "LoanAmount"/],
+  ])("throws on %s", (_name, listener, message) => {
+    expect(() => patched([listener], { LoanOverride: YES })).toThrow(message);
+  });
+});
+
 describe("applyChangeEffects", () => {
   function commit(schema: JsonSchemaObject, value: Record<string, unknown>, key: string, next: unknown) {
     return applyChangeEffects(schema, { value, key, next, root: value });

@@ -1,9 +1,12 @@
 import { cn } from "../lib/utils";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
+import { effectiveProperties } from "./json-schema-form-conditionals";
 import type {
   FieldControl,
   FieldOption,
+  FormLayout,
   GridColumns,
+  JsonSchemaObject,
   JsonSchemaProperty,
 } from "./json-schema-form-types";
 
@@ -100,15 +103,29 @@ export function toStringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
+// rendersAsSection reports whether a field renders as a full-width section
+// (ObjectSection) rather than an inline label + value row: objects, and
+// table/accordion/cards arrays, outside the properties layout.
+export function rendersAsSection(field: FieldControl, mode: FormLayout["mode"]): boolean {
+  return (
+    mode !== "properties" &&
+    (field.kind === "object" ||
+      field.layout === "table" ||
+      field.arrayDisplay === "accordion" ||
+      field.arrayDisplay === "cards")
+  );
+}
+
 // hasObjectItemProperties reports whether an array's items are objects with a
-// fixed `properties` set — the precondition for both the column-per-property
+// fixed set of properties — the precondition for both the column-per-property
 // table and the summary-row accordion, which need to know the item's shape.
+// Read through effectiveProperties, as TableArray reads its columns, so items
+// composed only of `allOf` members (flattened `$ref`s) count too.
 export function hasObjectItemProperties(
   items: JsonSchemaProperty | undefined,
 ): boolean {
-  return (
-    !!items && !!items.properties && Object.keys(items.properties).length > 0
-  );
+  if (!items) return false;
+  return Object.keys(effectiveProperties(items as JsonSchemaObject, {}).properties).length > 0;
 }
 
 // Object-level `x-columns`: how many equal columns to split a stacked object
