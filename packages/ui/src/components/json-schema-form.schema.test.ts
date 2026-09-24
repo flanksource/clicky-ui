@@ -92,6 +92,47 @@ describe("json-schema-form.schema.json", () => {
       },
     ],
     [
+      "a listener patching readOnly, writeOnly, title and bounds",
+      {
+        type: "object",
+        properties: {
+          mode: {
+            type: "string",
+            "x-on-change": [
+              {
+                when: { const: "locked" },
+                patch: { amount: { readOnly: true, title: "Locked amount", maximum: 25 }, token: { writeOnly: true } },
+                else: { patch: { amount: { readOnly: false } } },
+              },
+            ],
+          },
+          amount: { type: "number" },
+          token: { type: "string" },
+        },
+      },
+    ],
+    [
+      "path targets and x-on-load, at the root and in an allOf branch",
+      {
+        type: "object",
+        "x-on-load": [{ hide: ["groups/Rates/Amount"], patch: { "groups/Rates": { title: "Rates" } } }],
+        properties: {
+          mode: {
+            type: "string",
+            "x-on-change": [{ when: { const: "01" }, show: ["groups/Rates"], else: { hide: ["groups/Rates"] } }],
+          },
+          groups: { type: "object" },
+        },
+        allOf: [
+          { "x-on-load": [{ disable: ["mode"] }] },
+          {
+            if: { properties: { mode: { const: "02" } } },
+            then: { "x-on-load": [{ when: { properties: { mode: { const: "02" } } }, show: ["groups"] }] },
+          },
+        ],
+      },
+    ],
+    [
       "unknown consumer x-* keys",
       { type: "object", properties: { a: { type: "string", "x-acme-widget": { any: "shape" } } } },
     ],
@@ -115,6 +156,11 @@ describe("json-schema-form.schema.json", () => {
     ["a non-numeric x-columns", { type: "object", "x-columns": "two" }, "/x-columns"],
     ["x-on-change that is not an array", { type: "string", "x-on-change": { hide: ["a"] } }, "/x-on-change"],
     ["a misspelled x-on-change action", { type: "string", "x-on-change": [{ hides: ["a"] }] }, "/x-on-change/0"],
+    ["a patch setting a shape keyword", { type: "string", "x-on-change": [{ patch: { a: { type: "number" } } }] }, "/x-on-change/0/patch/a"],
+    ["a patch target that is not an object", { type: "string", "x-on-change": [{ patch: { a: true } }] }, "/x-on-change/0/patch/a"],
+    ["x-on-load that is not an array", { type: "object", "x-on-load": { hide: ["a"] } }, "/x-on-load"],
+    ["an x-on-load value action", { type: "object", "x-on-load": [{ set: { a: 1 } }] }, "/x-on-load/0"],
+    ["an x-on-load required action in else", { type: "object", "x-on-load": [{ when: { const: 1 }, else: { require: ["a"] } }] }, "/x-on-load/0/else"],
     ["an unknown x-item action", { type: "array", "x-item": { actions: ["delete"] } }, "/x-item/actions/0"],
     ["x-clicky-lookup without filter", { type: "string", "x-clicky-lookup": { url: "/x" } }, "/x-clicky-lookup"],
     ["an unknown x-enum-tones hue", { enum: ["x"], "x-enum-tones": { x: "red" } }, "/x-enum-tones/x"],

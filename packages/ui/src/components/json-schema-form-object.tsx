@@ -47,6 +47,9 @@ export function ObjectControl({
     properties: field.objectProperties ?? {},
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
+    // Copied whatever its shape, so a malformed value fails loudly in the
+    // listener collector rather than vanishing here.
+    ...(field.schema["x-on-load"] !== undefined ? { "x-on-load": field.schema["x-on-load"] } : {}),
     ...(Array.isArray(field.schema["x-order"])
       ? { "x-order": field.schema["x-order"] }
       : {}),

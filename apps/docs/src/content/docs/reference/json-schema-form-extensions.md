@@ -111,7 +111,7 @@ const mode = {
 | Extension | Value | Behavior |
 | --- | --- | --- |
 | `x-icon` | runtime icon name | Adds an icon before the field label. |
-| `x-layout` | `inline`, `stack`, or `table` | Overrides the field layout. `inline` uses label/value columns, `stack` puts the label above the control, and `table` uses compact table-like rendering where supported. |
+| `x-layout` | `inline`, `stack`, or `table` | Overrides the field layout. `inline` uses label/value columns, `stack` puts the label above the control, and `table` uses compact table-like rendering where supported. In a table, every read-only cell renders as value text, whichever way it became read-only: a `readOnly` column, the array's own `readOnly`, a `readOnly` object or array around it, or a read-only form. `x-disabled` keeps disabled inputs. |
 | `x-label-position` | `top` or `left` | Friendly alias for stacked or inline field layout. `x-layout` wins when both are set. |
 | `x-label-classes` | Tailwind class string | Merges classes onto the field label. |
 | `x-input-classes` | Tailwind class string | Merges classes onto the input/control. |
@@ -161,6 +161,85 @@ const connectionField = {
   },
 };
 ```
+
+## Listeners
+
+Listeners change a field's state from the values around it. Both keywords take a list of entries of the same shape: `{ when?, ...actions, else? }`. An entry's actions apply while `when` holds, or always when `when` is omitted, and `else` applies while it does not.
+
+| Extension | Applies to | `when` reads | Allowed actions |
+| --- | --- | --- | --- |
+| `x-on-change` | property | the property's own value | all of the actions below |
+| `x-on-load` | object | the object itself | `hide`, `show`, `enable`, `disable`, `patch` |
+
+`when` uses the `if` predicate grammar: `const`, `enum`, `not`, and nested `properties`/`required`. It can also carry an `expr`, which is passed to the form's `expressionEvaluator` prop. When both are present, both must hold. For `x-on-load` the evaluator receives `key: ""` and the object as `value` and `self`. A `when` that states nothing the form can evaluate throws.
+
+| Action | Kind | Targets | Behavior |
+| --- | --- | --- | --- |
+| `hide` / `show` | derived | keys or paths | Sets or clears `x-hidden`. |
+| `enable` / `disable` | derived | keys or paths | Clears or sets `x-disabled`. |
+| `patch` | derived | keys or paths | Shallow-merges keywords (`readOnly`, `title`, `enum`, bounds, presentation `x-*`) over the target. Shape keywords, `required`, `default`, `const` and `x-on-change` are refused. |
+| `require` / `optional` | derived | sibling keys | Adds the target to, or removes it from, the object's `required`. |
+| `reset` | on edit | sibling keys | Restores the target's `default`, or removes it when there is none. |
+| `set` | on edit | sibling keys | Writes a literal value. |
+
+Derived actions are recomputed from the current value on every render, so a reloaded record shows the state it was saved in. `reset` and `set` fire only when the listening field is edited, and cascade into the listeners of the fields they change.
+
+### Path targets
+
+A `hide`/`show`/`enable`/`disable` target or a `patch` key may be a `/`-separated path into a sibling's subtree. The first segment is a sibling key, and it must be declared by the object (in `properties` or any `allOf` branch). Each later segment names a property of the object reached so far. An array is crossed into its `items` without using up a segment.
+
+| Target | Reaches |
+| --- | --- |
+| `groups` | the sibling `groups` |
+| `groups/Rates` | the `Rates` property of `groups` |
+| `groups/Rates/Fee` | the `Fee` property of each `Rates` item. When `Rates` is a table, that is the Fee column, and a hidden column is dropped from the table. |
+
+Each segment is resolved against the effective properties at that level, so a property contributed by an `allOf` member or by a matching conditional branch can be targeted. A path whose segment the current shape does not declare leaves the sibling untouched, the same way a plain target that the current branch does not declare stays absent. An empty segment (`a//b`, `/a`, `a/`) throws. So does a key that is both a declared property and a path, and a path given to `require`, `optional`, `reset` or `set`.
+
+### Order
+
+`x-on-load` entries apply first, in this order: the object's own, then each `allOf` member's. That is an unconditional member's own entries, or those of the `then`/`else` branch that currently applies. Every property's `x-on-change` entries apply next, in property order. Each entry applies after the ones before it, and a later entry wins per target. Two entries targeting different paths under the same sibling both stay applied. Listeners apply after `allOf`, so they win over a branch's `x-hidden`.
+
+An object's `x-on-load` applies when that object renders, after anything its parent's listeners patched into it through a path. Do not target the same field from both.
+
+```json
+{
+  "type": "object",
+  "x-on-load": [{ "hide": ["groups/Rates", "groups/Rates/Fee"] }],
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Action": { "type": "string", "enum": ["01", "02"] },
+        "Fees": { "type": "boolean" }
+      },
+      "x-on-change": [
+        { "when": { "properties": { "Action": { "const": "01" } } }, "show": ["groups/Rates"] },
+        { "when": { "properties": { "Fees": { "const": true } } }, "show": ["groups/Rates/Fee"] }
+      ]
+    },
+    "groups": {
+      "type": "object",
+      "properties": {
+        "Rates": {
+          "type": "array",
+          "x-layout": "table",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Term": { "type": "integer" },
+              "Rate": { "type": "number" },
+              "Fee": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The `JsonSchemaForm/Listeners` Storybook entry runs this pattern as the *Path Targets And On Load* story.
 
 ## Custom extensions
 

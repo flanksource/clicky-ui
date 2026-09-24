@@ -19,6 +19,7 @@ import {
   FieldWrapper,
   HelpHint,
   ObjectSection,
+  SectionHeading,
 } from "./json-schema-form-layout";
 import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
@@ -42,6 +43,7 @@ import {
   fieldErrorId,
   fieldInputId,
   hasObjectItemProperties,
+  rendersAsSection,
   isEmptyValue,
   normalizeColSpan,
   normalizeColumns,
@@ -76,7 +78,8 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
   }
   // A field the schema marks `readOnly` is never editable: it shows its current
   // value as plain text, not a disabled input. (The form-level ctx.readOnly,
-  // below, instead disables the real controls so the structure stays visible.)
+  // below, instead disables the real controls so the structure stays visible;
+  // a table's grid is its structure, so TableArray shows its cells as values.)
   // Containers (array/object/map) still render structurally so nested read-only
   // values surface, and textarea/display/link own their non-editable rendering
   // (multi-line text / static element / hyperlink), so all of these are excluded
@@ -175,9 +178,14 @@ function buildField(
   // Drop read-only fields entirely when the form opts out of displaying them.
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
   if (ctx.hideReadOnlyFields && field.readOnly) return null;
+  // A writeOnly value is never read back, so a view has nothing to show for it.
+  if (field.writeOnly && (ctx.viewOnly || field.readOnly)) return null;
   // Same placement, same reason: an extension that supplies a value decides
   // whether the field has one.
   if (ctx.hideEmpty && isEmptyValue(field.value)) return null;
+  // A readOnly field's subtree is a view, like a read-only form's. Read before
+  // the presentation override, which marks fields readOnly only to show text.
+  const view = field.readOnly === true;
   if (ctx.presentation) field = { ...field, readOnly: true };
 
   const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
@@ -198,7 +206,11 @@ function buildField(
   // A field's own x-help-display wins over the form-level setting; both default
   // to the permanent paragraph every form renders today.
   const help = field.helpDisplay ?? ctx.layout.help ?? "inline";
-  let label: ReactNode = (
+  // A section's label is its header row (none for an empty title), so post
+  // extensions decorate it too.
+  let label: ReactNode = rendersAsSection(field, ctx.layout.mode) ? (
+    field.label === "" ? null : <SectionHeading field={field} size={ctx.size} helpDisplay={help} />
+  ) : (
     <FieldLabel field={field} fieldId={fieldId} size={ctx.layout.mode === "properties" ? propertyControlSize[ctx.size] : ctx.size} helpDisplay={help} />
   );
   // A field's `x-layout: inline|stack` overrides the form-level layout for its
@@ -212,6 +224,7 @@ function buildField(
   const valueCtx: RenderContext = {
     ...ctx,
     ...(field.disabled ? { readOnly: true } : {}),
+    ...(view ? { viewOnly: true } : {}),
     ...(ctx.layout.mode === "properties" && !nestedProperty ? { size: propertyControlSize[ctx.size] } : {}),
     instancePath,
     ...(overrideMode && !nestedProperty ? { layout: { ...ctx.layout, mode: overrideMode } } : {}),
@@ -295,21 +308,17 @@ export function renderFieldRow(
   // is unusable, and it needs the ObjectSection header to carry the array's own
   // title, required marker and help. Cards are the same shape of thing — a
   // full-width stack of item panels — so they join it too.
-  if (
-    field.kind === "object" ||
-    field.layout === "table" ||
-    field.arrayDisplay === "accordion" ||
-    field.arrayDisplay === "cards"
-  ) {
+  if (rendersAsSection(field, ctx.layout.mode)) {
     return (
       <ObjectSection
-        label={opts?.labelOverride ?? field.label}
-        required={field.required}
+        heading={
+          opts?.labelOverride === undefined ? built.label : opts.labelOverride === "" ? null : (
+            <SectionHeading field={field} label={opts.labelOverride} size={ctx.size} helpDisplay={built.help} />
+          )
+        }
         size={ctx.size}
         helpDisplay={built.help}
-        {...(field.badge ? { badge: field.badge } : {})}
         {...(field.helper ? { helper: field.helper } : {})}
-        {...(field.labelIcon != null ? { labelIcon: field.labelIcon } : {})}
       >
         <FieldErrorText
           id={fieldErrorId(built.fieldId)}

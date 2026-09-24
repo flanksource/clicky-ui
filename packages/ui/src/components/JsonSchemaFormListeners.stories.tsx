@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { JsonSchemaForm } from "./JsonSchemaForm";
-import type { ExpressionEvaluator, JsonSchemaObject } from "./json-schema-form-types";
+import type { ExpressionEvaluator, JsonSchemaObject, JsonSchemaProperty } from "./json-schema-form-types";
 
 // The same member-class screen as the Conditionals story, written as field
 // listeners instead of `allOf` branches: each picker says what it does to its
@@ -84,11 +84,82 @@ const demoEvaluator: ExpressionEvaluator = ({ expr, value }) => {
   return run(value);
 };
 
-function ListenersDemo({ schema }: { schema: JsonSchemaObject }) {
-  const [value, setValue] = useState<Record<string, unknown>>({
-    MemberClassGroupOption: "01",
-    LoanOverride: "00",
-  });
+const table = (title: string, columns: Record<string, JsonSchemaProperty>): JsonSchemaProperty => ({
+  type: "array",
+  title,
+  "x-layout": "table",
+  items: { type: "object", properties: columns },
+});
+
+// Groups of rows owned by a sibling object, switched from the `input` object's
+// listeners through path targets. The root `x-on-load` starts every group (and
+// the fee column) hidden; `input`'s `x-on-change` listeners run after it and
+// each reveal their own target, so toggling one group leaves the other alone.
+const groupsSchema: JsonSchemaObject = {
+  type: "object",
+  "x-on-load": [{ hide: ["groups/LoanTerms", "groups/LoanTerms/Fee", "groups/Benefits"] }],
+  properties: {
+    input: {
+      type: "object",
+      title: "Input",
+      properties: {
+        LoanTermAction: {
+          type: "string",
+          title: "Loan terms",
+          enum: ["01", "02"],
+          "x-enum-labels": { "01": "Override", "02": "Default" },
+          "x-enum-display": "segmented",
+        },
+        Fees: {
+          type: "string",
+          title: "Fees",
+          enum: ["00", "01"],
+          "x-enum-labels": { "00": "Without fees", "01": "With fees" },
+          "x-enum-display": "segmented",
+        },
+        BenefitOption: {
+          type: "string",
+          title: "Benefits",
+          enum: ["00", "01"],
+          "x-enum-labels": { "00": "No benefits", "01": "Benefit table" },
+          "x-enum-display": "segmented",
+        },
+      },
+      // `when` reads the whole `input` object through a nested predicate.
+      "x-on-change": [
+        { when: { properties: { LoanTermAction: { const: "01" } } }, show: ["groups/LoanTerms"] },
+        { when: { properties: { Fees: { const: "01" } } }, show: ["groups/LoanTerms/Fee"] },
+        { when: { properties: { BenefitOption: { const: "01" } } }, show: ["groups/Benefits"] },
+      ],
+    },
+    groups: {
+      type: "object",
+      title: "Groups",
+      properties: {
+        LoanTerms: table("Loan term rates", {
+          Term: { type: "integer", title: "Term" },
+          Rate: { type: "number", title: "Rate" },
+          Fee: { type: "number", title: "Fee" },
+        }),
+        Benefits: table("Benefits", {
+          Benefit: { type: "string", title: "Benefit" },
+          Cover: { type: "number", title: "Cover" },
+        }),
+      },
+    },
+  },
+};
+
+const memberClassInitial = { MemberClassGroupOption: "01", LoanOverride: "00" };
+
+function ListenersDemo({
+  schema,
+  initial = memberClassInitial,
+}: {
+  schema: JsonSchemaObject;
+  initial?: Record<string, unknown>;
+}) {
+  const [value, setValue] = useState<Record<string, unknown>>(initial);
   return (
     <div className="max-w-2xl space-y-4 p-4">
       <JsonSchemaForm
@@ -123,6 +194,11 @@ const meta = {
           "  re-evaluated from the current value every render, so a loaded record gets the right shape.",
           "- **Value actions** (`reset` → schema `default` or removed, `set` → literal) are *transitional*: they fire",
           "  in the same commit as the edit, and cascade into the listeners of any field they change.",
+          "- A `hide`/`show`/`enable`/`disable` target or `patch` key may be a **path** into a sibling's subtree:",
+          "  `groups/LoanTerms` hides a group, `groups/LoanTerms/Fee` one column of it (arrays are crossed into",
+          "  their `items`). Listeners on different paths under one sibling all stay applied.",
+          "- An object's **`x-on-load`** listeners (same shape, `when` read against the object itself) run before",
+          "  any `x-on-change`, so a change listener can override the load state. They allow state actions and `patch` only.",
           "- Unknown targets, contradictory actions, an unevaluable `when`, or an `expr` without an evaluator throw.",
         ].join("\n"),
       },
@@ -178,6 +254,52 @@ export const ChangeListeners: Story = {
       expect(canvas.queryByText("Approval code")).not.toBeInTheDocument();
       expect(formValue(canvas)).toMatchObject({ LoanOverride: "00", LoanRate: 3.5 });
       expect(formValue(canvas)).not.toHaveProperty("LoanAmount");
+    });
+  },
+};
+
+function columnHeaders(tableElement: HTMLElement): string[] {
+  return within(tableElement)
+    .getAllByRole("columnheader")
+    .map((header) => header.textContent ?? "")
+    .filter(Boolean);
+}
+
+export const PathTargetsAndOnLoad: Story = {
+  args: {
+    schema: groupsSchema,
+    initial: {
+      input: { LoanTermAction: "02", Fees: "00", BenefitOption: "00" },
+      groups: {
+        LoanTerms: [{ Term: 12, Rate: 4.5, Fee: 10 }],
+        Benefits: [{ Benefit: "Death", Cover: 100000 }],
+      },
+    },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("x-on-load starts every group hidden", async () => {
+      expect(canvas.queryAllByRole("table")).toHaveLength(0);
+    });
+
+    await step("A path listener reveals the loan-term group, without its load-hidden fee column", async () => {
+      await userEvent.click(canvas.getByRole("radio", { name: "Override (01)" }));
+      await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(1));
+      expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Term", "Rate"]);
+    });
+
+    await step("A cell path reveals the fee column", async () => {
+      await userEvent.click(canvas.getByRole("radio", { name: "With fees (01)" }));
+      await waitFor(() => expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Term", "Rate", "Fee"]));
+    });
+
+    await step("A second group toggles independently of the first", async () => {
+      await userEvent.click(canvas.getByRole("radio", { name: "Benefit table (01)" }));
+      await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(2));
+      await userEvent.click(canvas.getByRole("radio", { name: "Default (02)" }));
+      await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(1));
+      expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Benefit", "Cover"]);
     });
   },
 };

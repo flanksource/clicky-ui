@@ -129,6 +129,7 @@ export function JsonSchemaForm({
         schema: resolvedSchema,
         value: effectiveValue,
         errors,
+        viewOnly: readOnly,
         hideReadOnlyFields,
         hideEmpty,
         pre: preExtensions,
@@ -138,7 +139,7 @@ export function JsonSchemaForm({
         ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
         ...(expressionEvaluator ? { expressionEvaluator } : {}),
       }),
-    [effectiveValue, errors, expressionEvaluator, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, resolvedSchema, rootValue],
+    [effectiveValue, errors, expressionEvaluator, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, readOnly, resolvedSchema, rootValue],
   );
   // Defaults are part of the submitted form value, not only presentation. This
   // is especially important for required discriminator fields whose default
@@ -149,6 +150,7 @@ export function JsonSchemaForm({
 
   const ctx: RenderContext = {
     readOnly,
+    viewOnly: readOnly,
     hideReadOnlyFields,
     hideEmpty,
     autoSave,

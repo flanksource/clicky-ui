@@ -26,7 +26,7 @@
       ]
     },
     "readOnly": {
-      "description": "Renders the field as a read-only value display (no input), or drops it entirely when the form sets `hideReadOnlyFields`. Contrast `x-disabled`, which keeps the real control and disables it."
+      "description": "Renders the field as a read-only value display (no input), or drops it entirely when the form sets `hideReadOnlyFields`. Contrast `x-disabled`, which keeps the real control and disables it. On an object, array or map, the subtree becomes a view, as under a read-only form: its fields keep disabled controls, its tables show values, and its `writeOnly` fields are omitted. In an `x-layout: table` array every cell of a read-only table (the array's own `readOnly`, a `readOnly` ancestor, or a read-only form) renders the same value display as a `readOnly` column; a `readOnly` column is dropped, header and all, under `hideReadOnlyFields`, and a `writeOnly` column is dropped from a read-only table."
     },
     "maximum": {
       "description": "Upper bound of a number field. Required for `x-number-display: slider`."
@@ -71,22 +71,36 @@
       "examples": [10]
     },
     "x-hidden": {
-      "description": "Render nothing for this property — no label, no control, at any depth (a hidden object takes its whole section with it). The value is untouched: hiding is a presentation decision, not a data one. Flippable by an `allOf` branch (a matching branch replaces the property wholesale, so re-declare it with `\"x-hidden\": false` to reveal it) or by an `x-on-change` `show`/`hide` action.",
+      "description": "Render nothing for this property — no label, no control, at any depth (a hidden object takes its whole section with it). The value is untouched: hiding is a presentation decision, not a data one. Flippable by an `allOf` branch (a matching branch replaces the property wholesale, so re-declare it with `\"x-hidden\": false` to reveal it) or by an `x-on-change` `show`/`hide` action or `patch`.",
       "type": "boolean",
       "examples": [true]
     },
     "x-disabled": {
-      "description": "Render the field's real control, disabled (containers disable their whole subtree). Unlike `readOnly`, which swaps the input for plain value text. Flippable by an `allOf` branch like `x-hidden`, and set/cleared by an `x-on-change` `enable`/`disable` action.",
+      "description": "Render the field's real control, disabled (containers disable their whole subtree). Unlike `readOnly`, which swaps the input for plain value text. Flippable by an `allOf` branch like `x-hidden`, and set/cleared by an `x-on-change` `enable`/`disable` action or `patch`.",
       "type": "boolean",
       "examples": [true]
     },
     "x-on-change": {
-      "description": "Change listeners on this field. Each entry's actions target SIBLING keys of the object that declares this property, applying while `when` holds (always, when `when` is omitted) and `else` applying while it does not. State actions (`hide`/`show`, `enable`/`disable`, `require`/`optional`) are derived: re-evaluated from the current value on every render, so a reloaded record shows the shape it was saved with. Value actions (`reset`/`set`) are transitional: they fire only when this field is committed through the form, and cascade into the listeners of the fields they change (each key fires at most once per commit).",
+      "description": "Change listeners on this field. Each entry's actions target SIBLING keys of the object that declares this property, applying while `when` holds (always, when `when` is omitted) and `else` applying while it does not. A `hide`/`show`/`enable`/`disable` target or a `patch` key may instead be a `/`-separated path into a sibling's subtree (`groups/Rates/Amount`): each later segment names a property of the object reached so far, and an array is crossed into its `items` without spending a segment. State actions (`hide`/`show`, `enable`/`disable`, `require`/`optional`, `patch`) are derived: re-evaluated from the current value on every render, so a reloaded record shows the shape it was saved with. Value actions (`reset`/`set`) are transitional: they fire only when this field is committed through the form, and cascade into the listeners of the fields they change (each key fires at most once per commit). `require`/`optional`/`reset`/`set` take sibling keys only, never a path. Listeners apply in order after the object's `x-on-load`, a later one winning per target.",
       "type": "array",
       "items": { "$ref": "#/$defs/ChangeListener" },
       "examples": [
         [
           { "when": { "const": "manual" }, "show": ["amount"], "require": ["amount"], "else": { "hide": ["amount"], "reset": ["amount"] } }
+        ],
+        [
+          { "when": { "properties": { "Option": { "const": "01" } } }, "show": ["groups/Rates"], "else": { "hide": ["groups/Rates"] } }
+        ]
+      ]
+    },
+    "x-on-load": {
+      "description": "Object-level load listeners: the state the object's properties start in. Applied before any property's `x-on-change`, in order: the object's own, then each `allOf` member's — an unconditional member's own, or those of the `then`/`else` branch that currently applies. `when` is evaluated against the object itself (a nested `properties` predicate reads its fields; `expr` gets `key: \"\"` and the object as `value` and `self`). Only derived state is allowed — `hide`/`show`, `enable`/`disable` and `patch`, with the same path targets as `x-on-change`; `set`, `reset`, `require` and `optional` are refused.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/LoadListener" },
+      "examples": [
+        [
+          { "hide": ["groups/Rates"] },
+          { "when": { "properties": { "Mode": { "const": "01" } } }, "disable": ["Amount"] }
         ]
       ]
     },
@@ -257,7 +271,7 @@
       "examples": [{ "body": "Must be unique within the namespace." }]
     },
     "ChangeActionTargets": {
-      "description": "Sibling property keys the action applies to.",
+      "description": "Sibling property keys the action applies to. `hide`/`show`/`enable`/`disable` also accept a `/`-separated path into a sibling's subtree; the other actions take keys only.",
       "type": "array",
       "items": { "type": "string" },
       "uniqueItems": true
@@ -276,8 +290,25 @@
           "description": "Transitional: on commit, set each sibling key to the literal value given.",
           "type": "object",
           "examples": [{ "mode": "manual", "retries": 3 }]
+        },
+        "patch": {
+          "description": "Derived: per sibling key (or `/`-separated path into a sibling's subtree), keywords shallow-merged over that property while the condition holds — `readOnly`, `writeOnly`, `title`, `description`, `enum`, bounds, any presentation `x-*`. Applied after the other state actions; a later listener wins per keyword. A patch may not set a keyword a hide/show or enable/disable in the same actions also sets.",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/ChangePatch" },
+          "examples": [{ "amount": { "readOnly": true }, "rate": { "title": "Override rate", "minimum": 0, "maximum": 25 } }]
         }
       }
+    },
+    "ChangePatch": {
+      "description": "Keywords merged over one sibling property. Refused: keywords that change the property's shape (use an `allOf` branch), `required` (use `require`/`optional`), value keywords `default`/`const` (use `set`/`reset`), and the listener keywords `x-on-change`/`x-on-load`.",
+      "$dynamicRef": "#meta",
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["type", "properties", "items", "additionalProperties", "patternProperties", "allOf", "anyOf", "oneOf", "if", "then", "else", "not", "$ref", "$defs", "required", "default", "const", "x-on-change", "x-on-load"]
+        }
+      },
+      "examples": [{ "readOnly": true, "title": "Locked amount" }]
     },
     "ChangeListener": {
       "description": "One `x-on-change` entry: its actions apply while `when` holds (always, when omitted), and `else` applies while it does not.",
@@ -298,6 +329,18 @@
         }
       },
       "unevaluatedProperties": false
+    },
+    "LoadActionNames": {
+      "description": "Actions an `x-on-load` entry may not use: load state is derived, never a value or required-ness change.",
+      "not": { "enum": ["set", "reset", "require", "optional"] }
+    },
+    "LoadListener": {
+      "description": "One `x-on-load` entry: a ChangeListener whose `when` reads the object itself, limited to `hide`/`show`, `enable`/`disable` and `patch`.",
+      "$ref": "#/$defs/ChangeListener",
+      "propertyNames": { "$ref": "#/$defs/LoadActionNames" },
+      "properties": {
+        "else": { "propertyNames": { "$ref": "#/$defs/LoadActionNames" } }
+      }
     },
     "ArrayItemSummaryPart": {
       "type": "object",

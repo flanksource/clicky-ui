@@ -250,3 +250,61 @@ describe("empty and count copy", () => {
     expect(emptyItemsCopy(resolveItemSpec({ type: "array" }, PARAM_ITEM), { type: "array" })).toBeUndefined();
   });
 });
+
+// An item schema composed only of `allOf` members (flattened `$ref`s) must
+// summarize exactly like the same properties declared directly: the glyph and
+// badge read their icons, tones and labels from the effective properties.
+describe("item summaries over effective properties", () => {
+  const { type: typeProp, role: roleProp, ...plainProps } = PARAM_ITEM.properties!;
+  const ALLOF_ITEM: JsonSchemaProperty = {
+    type: "object",
+    title: "Parameter",
+    allOf: [{ properties: plainProps }, { properties: { type: typeProp!, role: roleProp! } }],
+  };
+
+  // Independent of the code under test: what PARAMS_ARRAY's x-item says the
+  // SERVICE row shows, read off the schema by hand.
+  const SERVICE_SUMMARY = {
+    title: "Service",
+    summary: "{{.params.service}}  ·  process.serviceName",
+    glyph: { icon: "list-dashes", tone: "indigo", label: "List (multi-select)" },
+    badge: { icon: "filter", label: "filters" },
+    flagged: true,
+  };
+  const SERVICE_HEURISTIC = {
+    title: "service",
+    glyph: { icon: "list-dashes", tone: "indigo", label: "List (multi-select)" },
+  };
+
+  it.each<[string, JsonSchemaProperty]>([
+    ["direct properties", PARAM_ITEM],
+    ["allOf-only members", ALLOF_ITEM],
+  ])("renders an explicit x-item title, summary, glyph and badge for %s", (_name, items) => {
+    expect(summarize(SERVICE, 0, { ...PARAMS_ARRAY, items })).toEqual(SERVICE_SUMMARY);
+  });
+
+  it.each<[string, JsonSchemaProperty]>([
+    ["direct properties", PARAM_ITEM],
+    ["allOf-only members", ALLOF_ITEM],
+  ])("derives the heuristic title and the automatic glyph for %s", (_name, items) => {
+    const array: JsonSchemaProperty = { type: "array", items };
+    expect(resolveItemSpec(array, items).glyph).toBe("type");
+    expect(summarize(SERVICE, 0, array)).toEqual(SERVICE_HEURISTIC);
+  });
+
+  it("reads a badge declared by a conditional branch that this item's value selects", () => {
+    const conditional: JsonSchemaProperty = {
+      type: "object",
+      properties: { name: { type: "string" }, kind: { type: "string", enum: ["remote", "local"] } },
+      allOf: [
+        {
+          if: { properties: { kind: { const: "remote" } } },
+          then: { properties: { region: { type: "string", enum: ["eu"], "x-enum-labels": { eu: "Europe" } } } },
+        },
+      ],
+    };
+    const array: JsonSchemaProperty = { type: "array", items: conditional, "x-item": { title: ["name"], badge: "region" } };
+    expect(summarize({ name: "a", kind: "remote", region: "eu" }, 0, array).badge).toEqual({ label: "Europe" });
+    expect(summarize({ name: "b", kind: "local", region: "eu" }, 1, array).badge).toEqual({ label: "eu" });
+  });
+});
