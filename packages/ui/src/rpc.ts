@@ -2,6 +2,16 @@ export {
   OperationCatalog,
   type OperationCatalogProps,
 } from "./rpc/OperationCatalog";
+export type {
+  OperationCatalogRowSelection,
+  OperationCatalogRowSelectionContext,
+  OperationCatalogRowSelectionMode,
+  OperationCatalogUnavailableRows,
+} from "./rpc/operationCatalogRowSelection";
+export {
+  OperationEntityPicker,
+  type OperationEntityPickerProps,
+} from "./rpc/OperationEntityPicker";
 export {
   SESSIONS_SURFACE_KEY,
   SessionsCatalog,

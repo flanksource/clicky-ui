@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   allGroupsTerminal,
   type TaskRunMeta,
@@ -12,6 +12,7 @@ import {
   withTaskStreams,
 } from "../data/task-streams";
 import { taskQueryKeys } from "../data/task-query-keys";
+import { useEventSourceFactory } from "./event-source";
 
 // use-task-run / use-task-runs are the generic clicky-ui task clients. They are
 // SSE-first: they subscribe to clicky's SSEHandler (event: task / event: done)
@@ -82,6 +83,13 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   const [streamsById, setStreamsById] = useState<Record<string, TaskStreams>>({});
   const [status, setStatus] = useState("idle");
   const [isComplete, setIsComplete] = useState(false);
+
+  // Read through a ref so a host's inline `value={(url) => ...}` factory prop
+  // does not restart the subscription every render — only the effect's own
+  // deps below do that.
+  const eventSourceFactory = useEventSourceFactory();
+  const eventSourceFactoryRef = useRef(eventSourceFactory);
+  eventSourceFactoryRef.current = eventSourceFactory;
 
   useEffect(() => {
     const runIds = runIdsKey ? runIdsKey.split(",") : [];
@@ -156,7 +164,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     }
 
     // SSE transport (default).
-    const es = new EventSource(streamUrl(basePath, query));
+    const es = eventSourceFactoryRef.current(streamUrl(basePath, query));
     setStatus("connecting");
     es.onopen = () => setStatus("connected");
     es.addEventListener("task", (e) => {
@@ -245,6 +253,10 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
   }>({ key: null, runs: [] });
   const [status, setStatus] = useState("idle");
 
+  const eventSourceFactory = useEventSourceFactory();
+  const eventSourceFactoryRef = useRef(eventSourceFactory);
+  eventSourceFactoryRef.current = eventSourceFactory;
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -285,7 +297,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     }
 
     // SSE transport (default).
-    const es = new EventSource(`${basePath}/tasks/runs/stream${query ? `?${query}` : ""}`);
+    const es = eventSourceFactoryRef.current(`${basePath}/tasks/runs/stream${query ? `?${query}` : ""}`);
     setStatus("connecting");
     es.onopen = () => setStatus("connected");
     es.addEventListener("runs", (e) => {

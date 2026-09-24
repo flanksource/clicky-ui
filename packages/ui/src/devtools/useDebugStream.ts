@@ -1,7 +1,8 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { DebugClient } from "./debugClient";
 import { debugStore, type DebugStore, type DebugStoreState } from "./debugStore";
 import type { DebugLogLine, ExecutionSummary } from "./types";
+import { useEventSourceFactory, type EventSourceFactory } from "../hooks/event-source";
 
 /**
  * The console's live connection: one SSE stream carrying both records and log
@@ -28,13 +29,22 @@ export function useDebugStream(options: UseDebugStreamOptions): DebugStoreState 
   const store = options.store ?? debugStore;
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 
+  // Falls back to the host's injected EventSourceFactory (see
+  // ../hooks/event-source) before the browser's native EventSource, so a host
+  // that multiplexes every SSE connection through its own transport picks up
+  // the console's stream too without a caller having to pass
+  // `createEventSource` explicitly.
+  const contextEventSourceFactory = useEventSourceFactory();
+  const contextEventSourceFactoryRef = useRef(contextEventSourceFactory);
+  contextEventSourceFactoryRef.current = contextEventSourceFactory;
+
   useEffect(() => {
     if (!options.enabled) {
       store.setConnected(false);
       return;
     }
     const client = options.client ?? new DebugClient();
-    const create = options.createEventSource ?? ((url: string) => new EventSource(url));
+    const create: EventSourceFactory = options.createEventSource ?? contextEventSourceFactoryRef.current;
     const source = create(client.streamUrl(store.lastSequence()));
 
     const onRecord = (event: MessageEvent) => {

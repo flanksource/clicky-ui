@@ -48,6 +48,7 @@ import type {
 } from "../components/json-schema-form-types";
 import {
   type DomainDefinition,
+  type ExecutionResponse,
   type OperationLookupResponse,
   type ResolvedOperation,
 } from "./types";
@@ -75,6 +76,12 @@ import {
 import { OperationCatalogFollowStatus } from "./OperationCatalogFollowStatus";
 import { useOperationCatalogFollow, type OperationCatalogFollowOption } from "./useOperationCatalogFollow";
 import type { LogTailError } from "../hooks/use-log-tail";
+import {
+  markUnavailableRows,
+  operationLookupQuery,
+  pickerTableRowSelection,
+  type OperationCatalogRowSelection,
+} from "./operationCatalogRowSelection";
 
 export type OperationCatalogProps = {
   definition: DomainDefinition;
@@ -182,6 +189,13 @@ export type OperationCatalogProps = {
    * see `useLogTail`); older rows are evicted and counted as `dropped`.
    */
   follow?: OperationCatalogFollowOption;
+  /**
+   * Turns the catalog into a picker: every row gets a checkbox, a row click
+   * toggles it instead of opening the detail page, and the surface's action
+   * bar (create and bulk actions) is not rendered — the host owns the
+   * selection and what happens to it. Requires a list operation.
+   */
+  rowSelection?: OperationCatalogRowSelection;
 };
 
 const defaultCommandHref = (operationId: string) => `/commands/${operationId}`;
@@ -217,6 +231,7 @@ export function OperationCatalog({
   cellRenderers,
   rowCard,
   follow,
+  rowSelection,
 }: OperationCatalogProps) {
   const renderRowDetail = rowDetail?.render;
   const rowDetailStyle = rowDetail?.style;
@@ -355,19 +370,7 @@ export function OperationCatalog({
   });
 
   const lookupQuery = useQuery<OperationLookupResponse>({
-    queryKey: [
-      "operation-lookup",
-      listEndpoint?.method,
-      listEndpoint?.path,
-      lookupParameters,
-    ],
-    queryFn: async () =>
-      (await client.lookupFilters?.(
-        listEndpoint!.path,
-        listEndpoint!.method,
-        lookupParameters,
-        { Accept: "application/json+clicky" }
-      )) ?? { filters: {} },
+    ...operationLookupQuery(client, listEndpoint, lookupParameters),
     enabled: !!listEndpoint && !!client.lookupFilters,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -529,7 +532,20 @@ export function OperationCatalog({
     ]
   );
 
+  const pickerSelection = useMemo(
+    () =>
+      rowSelection
+        ? pickerTableRowSelection(rowSelection, effectiveFilters)
+        : undefined,
+    [effectiveFilters, rowSelection]
+  );
+
   const showTable = !!listEndpoint;
+  if (rowSelection && !isLoading && !showTable) {
+    throw new Error(
+      `OperationCatalog rowSelection needs a list operation, but surface "${surfaceKey ?? definition.title}" has none`
+    );
+  }
   let listError: unknown;
   if (!list.isFetching) {
     if (list.isError) {
@@ -577,9 +593,14 @@ export function OperationCatalog({
           followOrder
         )
       : undefined;
-  const mergedTableResponse = followMerge
-    ? followMerge.response
-    : tableResponse;
+  const unavailableRows = rowSelection?.unavailableRows;
+  const markRows = (response: ExecutionResponse | null) =>
+    response && unavailableRows
+      ? markUnavailableRows(response, unavailableRows)
+      : response;
+  const mergedTableResponse = markRows(
+    followMerge ? followMerge.response : tableResponse
+  );
   // The last fetch's total undercounts once live rows have been folded in
   // that it never saw — reported as a lower bound ("gte"), never restated as
   // an exact count nobody promised.
@@ -592,7 +613,12 @@ export function OperationCatalog({
         }
       : dataTablePagination;
   const walkProps = list.infinite
-    ? { pages: list.pages, infinite: list.infinite }
+    ? {
+        pages: unavailableRows
+          ? list.pages.map((page) => markUnavailableRows(page, unavailableRows))
+          : list.pages,
+        infinite: list.infinite,
+      }
     : {};
   if (isLoading || (showTable && list.isPending && list.response == null)) {
     return (
@@ -602,13 +628,13 @@ export function OperationCatalog({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col gap-2"
+      className="flex h-full min-h-0 flex-1 flex-col gap-2"
       data-slot="operation-catalog"
     >
       {/* No title/description here by design: page headers and breadcrumbs are
           the host's to define (e.g. an app shell's bodyHeader), so the catalog
           never invents chrome the consumer would have to fight or duplicate. */}
-      <OperationCatalogActions
+      {!rowSelection && <OperationCatalogActions
         actions={collectionActionOps}
         selectionActions={selectionActionOps}
         filters={filters}
@@ -640,10 +666,10 @@ export function OperationCatalog({
         {...(formActions ? { formActions } : {})}
         {...(actionLabels ? { actionLabels } : {})}
         client={client}
-      />
+      />}
 
       {showTable ? (
-        <div className="min-h-0 flex-1" data-slot="operation-catalog-results">
+        <div className="flex min-h-0 flex-1 flex-col" data-slot="operation-catalog-results">
           {followMissing ? (
             renderError(
               new Error(
@@ -670,11 +696,15 @@ export function OperationCatalog({
                     loadingMessage={`Loading ${definition.title} results…`}
                     emptyMessage="No records returned"
                     ariaLabel={`${definition.title} results`}
-                    className="mt-0 h-full min-h-0"
-                    detailOperation={detailOperation}
+                    className="mt-0 h-full min-h-0 flex-1"
+                    detailOperation={pickerSelection ? undefined : detailOperation}
                     {...(hiddenColumns ? { hiddenColumns } : {})}
-                    {...(getRowDetailHref ? { getRowDetailHref } : {})}
-                    {...(selectionActionOps.length > 0
+                    {...(getRowDetailHref && !pickerSelection
+                      ? { getRowDetailHref }
+                      : {})}
+                    {...(pickerSelection
+                      ? { rowSelection: pickerSelection }
+                      : selectionActionOps.length > 0
                       ? {
                           rowSelection: {
                             selectedRowIds,
