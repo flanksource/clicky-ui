@@ -446,6 +446,12 @@ export type DataTableRowSelection<
   /** Toggle selection when the user clicks anywhere on a selectable row. */
   toggleOnRowClick?: boolean;
   /**
+   * Offer the header and group checkboxes that select many rows at once.
+   * Defaults to true; false leaves only per-row checkboxes, for a selection
+   * that must stay at one row.
+   */
+  selectAll?: boolean;
+  /**
    * Extends the selection past the loaded page. Without it the header checkbox
    * is the whole story and it only reaches rows the table is holding, which
    * reads as "select all" but stops at the page boundary.
@@ -1855,7 +1861,13 @@ function DataTableInner<T extends Record<string, unknown>>({
       ),
     [rowSelection, visibleSorted],
   );
+  const selectAllEnabled = rowSelection?.selectAll !== false;
   const selectAllPages = rowSelection?.selectAllPages;
+  if (!selectAllEnabled && selectAllPages) {
+    throw new Error(
+      "DataTable rowSelection sets selectAll: false and selectAllPages; selecting across pages needs select-all",
+    );
+  }
   const selectAllScopes = useMemo(
     () =>
       (selectAllPages?.scopes ?? []).flatMap((scope) => {
@@ -2601,17 +2613,20 @@ function DataTableInner<T extends Record<string, unknown>>({
                         DATA_TABLE_HEADER_DENSITY_CLASS,
                       )}
                     >
-                      <input
-                        ref={selectAllRef}
-                        type="checkbox"
-                        aria-label="Select all visible rows"
-                        checked={allVisibleSelected}
-                        disabled={
-                          !!selectedScope || selectableVisibleRows.length === 0
-                        }
-                        onChange={toggleVisibleSelection}
-                        className="size-3.5 rounded border-border accent-primary"
-                      />
+                      {selectAllEnabled ? (
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          aria-label="Select all visible rows"
+                          checked={allVisibleSelected}
+                          disabled={
+                            !!selectedScope ||
+                            selectableVisibleRows.length === 0
+                          }
+                          onChange={toggleVisibleSelection}
+                          className="size-3.5 rounded border-border accent-primary"
+                        />
+                      ) : null}
                     </th>
                   ) : null}
                   {visibleColumns.map((column) => (
@@ -2811,7 +2826,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                               },
                             }))
                           }
-                          {...(rowSelection
+                          {...(rowSelection && selectAllEnabled
                             ? {
                                 selection: {
                                   selectableCount: item.group.records.filter(
