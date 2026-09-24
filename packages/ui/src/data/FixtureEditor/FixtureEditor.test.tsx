@@ -108,7 +108,7 @@ describe("FixtureEditor", () => {
     specRuntimeCalls.props.length = 0;
   });
 
-  it("renders the whole fixture as one markdown editor", () => {
+  it("renders the whole fixture as one markdown editor", async () => {
     const changes: string[] = [];
     const value = [
       "# Verify",
@@ -128,6 +128,7 @@ describe("FixtureEditor", () => {
       />,
     );
 
+    await waitFor(() => expect(mdxEditorCalls.props.length).toBeGreaterThan(0));
     const editor = screen.getByRole("textbox", { name: "Fixture markdown" });
     expect(editor).toHaveValue(value);
     expect(screen.queryByText("Fixture markdown")).not.toBeInTheDocument();
@@ -142,9 +143,10 @@ describe("FixtureEditor", () => {
     expect(changes.at(-1)).toBe("next fixture");
   });
 
-  it("configures MDX rich/source editing and fixture code block descriptors", () => {
+  it("configures MDX rich/source editing and fixture code block descriptors", async () => {
     render(<FixtureEditor value="" schemas={schemas} onChange={() => {}} />);
 
+    await waitFor(() => expect(mdxEditorCalls.props.length).toBeGreaterThan(0));
     const props = mdxEditorCalls.props.at(-1);
     expect(props).toMatchObject({
       headings: true,
@@ -370,6 +372,7 @@ describe("FixtureEditor", () => {
       />,
     );
 
+    await waitFor(() => expect(mdxEditorCalls.props.length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: "Frontmatter" }));
 
     expect(
@@ -421,6 +424,7 @@ describe("FixtureEditor", () => {
       />,
     );
 
+    await waitFor(() => expect(mdxEditorCalls.props.length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: "Frontmatter" }));
 
     expect(
@@ -457,7 +461,7 @@ describe("FixtureEditor", () => {
     expect(next).not.toContain("verify:\n");
   });
 
-  it("marks editable controls read-only when requested", () => {
+  it("marks editable controls read-only when requested", async () => {
     render(
       <FixtureEditor
         value={"Some prose"}
@@ -467,6 +471,7 @@ describe("FixtureEditor", () => {
       />,
     );
 
+    await waitFor(() => expect(mdxEditorCalls.props.length).toBeGreaterThan(0));
     expect(screen.getByRole("textbox", { name: "Fixture markdown" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /add fence/i })).not.toBeInTheDocument();
   });
