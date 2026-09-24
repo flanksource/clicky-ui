@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClickyRow } from "../data/Clicky";
 import { isSessionState, isSessionTerminal, type SessionState } from "../rpc/sessionTypes";
+import { useEventSourceFactory, type EventSourceLike } from "./event-source";
 
 // use-log-tail is the clicky-ui client for a *follow* session: the server opens
 // a live source for a query profile and streams rows out of it until someone
@@ -254,6 +255,10 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
+  const eventSourceFactory = useEventSourceFactory();
+  const eventSourceFactoryRef = useRef(eventSourceFactory);
+  eventSourceFactoryRef.current = eventSourceFactory;
+
   // Profile parameters travel in the query string because that is where the
   // session endpoint reads them from: it builds its params by walking
   // r.URL.Query() and never looks at the body, so a posted body is a filter the
@@ -288,7 +293,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
 
     let cancelled = false;
     const aborter = new AbortController();
-    let source: EventSource | undefined;
+    let source: EventSourceLike | undefined;
     let ended = false;
     // onEvent's own watermark, tracked here rather than read from the buffer:
     // the buffer only dedupes inside a state updater, which React may run twice,
@@ -340,7 +345,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     };
 
     const subscribe = (id: string) => {
-      const es = new EventSource(`${basePath}/sessions/${encodeURIComponent(id)}/events`);
+      const es = eventSourceFactoryRef.current(`${basePath}/sessions/${encodeURIComponent(id)}/events`);
       source = es;
       setStatus("streaming");
       es.addEventListener("event", (e) => {

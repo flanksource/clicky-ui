@@ -27,6 +27,15 @@ export {
 } from "./hooks/use-sort";
 export { useHistoryRoute, type UseHistoryRouteOptions } from "./hooks/use-history-route";
 export {
+  useEventSourceFactory,
+  type EventSourceFactory,
+  type EventSourceLike,
+} from "./hooks/event-source";
+export {
+  EventSourceProvider,
+  type EventSourceProviderProps,
+} from "./hooks/event-source-provider";
+export {
   useTaskRun,
   useTaskRuns,
   type UseTaskRunOptions,
