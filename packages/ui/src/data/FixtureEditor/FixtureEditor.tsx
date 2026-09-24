@@ -1,6 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { Button } from "../../components/button";
-import { MdxEditorField } from "../../components/MdxEditorField";
 import type { MdxEditorCodeBlockEditorDescriptor } from "../../components/mdx-editor-options";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { cn } from "../../lib/utils";
@@ -38,6 +37,14 @@ import type {
 const LazyFixtureFrontmatterDialog = lazy(async () => {
   const mod = await import("./FixtureFrontmatterDialog");
   return { default: mod.FixtureFrontmatterDialog };
+});
+
+// Loaded lazily so a static import here doesn't pull @mdxeditor/editor into
+// every host that imports the `data`/main entry — mirrors the pattern in
+// components/json-schema-form-fields.tsx.
+const LazyMdxEditorField = lazy(async () => {
+  const mod = await import("../../components/MdxEditorField");
+  return { default: mod.MdxEditorField };
 });
 
 const FIXTURE_MDX_LANGUAGES: Record<string, string> = {
@@ -98,30 +105,43 @@ export function FixtureEditor({
         onAddFence={(info) => appendMarkdown(createFenceMarkdown(info, schemas))}
         onAddChecklist={() => appendMarkdown(createChecklistMarkdown())}
       />
-      <MdxEditorField
-        value={value}
-        onChange={onChange}
-        readOnly={readOnly}
-        size={size}
-        placeholder={placeholder}
-        aria-label="Fixture markdown"
-        headings
-        lists
-        quote
-        links
-        tables
-        thematicBreak
-        codeBlocks={{
-          defaultLanguage: "yaml",
-          editorDescriptors: [fixtureCodeBlockDescriptor],
-        }}
-        codeMirror={{ languages: FIXTURE_MDX_LANGUAGES }}
-        markdownShortcuts
-        diffMode={{ viewMode: "rich-text", viewModes: ["rich-text", "source"] }}
-        className="border-0 shadow-none"
-        contentClassName="min-h-96 px-4 py-3"
-        textareaClassName="min-h-96 rounded-none border-0 shadow-none"
-      />
+      <Suspense
+        fallback={
+          <textarea
+            aria-label="Fixture markdown"
+            className="min-h-96 w-full rounded-none border-0 px-4 py-3 font-mono text-sm shadow-none"
+            value={value}
+            disabled={readOnly}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        }
+      >
+        <LazyMdxEditorField
+          value={value}
+          onChange={onChange}
+          readOnly={readOnly}
+          size={size}
+          placeholder={placeholder}
+          aria-label="Fixture markdown"
+          headings
+          lists
+          quote
+          links
+          tables
+          thematicBreak
+          codeBlocks={{
+            defaultLanguage: "yaml",
+            editorDescriptors: [fixtureCodeBlockDescriptor],
+          }}
+          codeMirror={{ languages: FIXTURE_MDX_LANGUAGES }}
+          markdownShortcuts
+          diffMode={{ viewMode: "rich-text", viewModes: ["rich-text", "source"] }}
+          className="border-0 shadow-none"
+          contentClassName="min-h-96 px-4 py-3"
+          textareaClassName="min-h-96 rounded-none border-0 shadow-none"
+        />
+      </Suspense>
       {frontmatterOptions && (
         <Suspense fallback={null}>
           <LazyFixtureFrontmatterDialog
