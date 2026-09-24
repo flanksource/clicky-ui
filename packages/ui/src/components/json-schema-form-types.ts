@@ -26,6 +26,12 @@ export interface JsonSchemaProperty {
   // Standard JSON Schema 2020-12 keyword. When true the form renders the field
   // as a read-only value display (no input), or omits it under hideReadOnlyFields.
   readOnly?: boolean;
+  // Standard JSON Schema 2020-12 keyword: sent, never read back. An editable
+  // form renders the field normally; a view — a read-only form, or anything
+  // under a readOnly object/array/map — or a field that is also readOnly
+  // renders nothing for it (x-disabled is not a view). Masking is
+  // `format: "password"`'s job.
+  writeOnly?: boolean;
   minimum?: number;
   maximum?: number;
   // Standard JSON Schema step. Its presence opts a number field into a native
@@ -127,8 +133,15 @@ export interface JsonSchemaProperty {
   // as `x-hidden`, and set/cleared by an `x-on-change` enable/disable action.
   "x-disabled"?: boolean;
   // Change listeners on this property; see ChangeListener. Targets are sibling
-  // keys of the object that declares this property.
+  // keys of the object that declares this property, or `/`-separated paths into
+  // a sibling's subtree (hide/show/enable/disable/patch only).
   "x-on-change"?: ChangeListener[];
+  // Object-level load listeners; see ChangeListener. Applied before any
+  // property's `x-on-change`, with `when` evaluated against the object itself.
+  // Also read from each unconditional `allOf` member and from the `then`/`else`
+  // branch that applies. State actions and `patch` only: set/reset/require/
+  // optional throw.
+  "x-on-load"?: ChangeListener[];
   // Presentation extensions (all optional, additive). Extra classes merged onto
   // the field's label / input; text or runtime-icon-name adornments rendered
   // inside the input; label stacked on top vs. inline; and a grid column span
@@ -194,6 +207,8 @@ export interface JsonSchemaConditional {
   required?: string[];
   additionalProperties?: boolean | JsonSchemaProperty;
   description?: string;
+  // An unconditional member's load listeners, applied after the object's own.
+  "x-on-load"?: ChangeListener[];
 }
 
 // JsonSchemaObject is the flat object subschema the form renders — one control
@@ -351,6 +366,11 @@ export interface FieldControl {
   // prop, and is dropped entirely when the form sets hideReadOnlyFields. A
   // pre-extension may set or clear it.
   readOnly?: boolean;
+
+  // Resolved from the schema's standard `writeOnly` keyword: an input that is
+  // never read back, so the field renders nothing in a read-only form or when
+  // it is itself readOnly. A pre-extension may set or clear it.
+  writeOnly?: boolean;
 
   // Resolved from `x-disabled`: the field keeps its real control but renders it
   // disabled (containers disable their whole subtree). A pre-extension may set

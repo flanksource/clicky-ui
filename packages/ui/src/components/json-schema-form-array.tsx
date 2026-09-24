@@ -52,7 +52,8 @@ export function ArrayControl({
 }) {
   // A read-only array marks its whole subtree non-editable: no add/remove/reorder
   // and item inputs disabled (a child the schema marks readOnly still renders as
-  // a value span).
+  // a value span). A table shows every read-only cell as a value span instead;
+  // see TableArray.
   const readOnly = ctx.readOnly || field.readOnly === true;
   const choices = enumItemOptions(field);
   const scalarType = scalarItemsType(field.itemSchema);

@@ -1,10 +1,12 @@
 import { isPlainObject } from "../lib/collections";
+import { effectiveProperties } from "./json-schema-form-conditionals";
 import { normalizeTone } from "./json-schema-form-tone";
 import type {
   ArrayItemAction,
   ArrayItemSpec,
   ArrayItemSummary,
   ArrayItemSummaryPart,
+  JsonSchemaObject,
   JsonSchemaProperty,
 } from "./json-schema-form-types";
 
@@ -60,11 +62,23 @@ export function itemActionsAllow(spec: ArrayItemSpec, action: ArrayItemAction): 
   return spec.actions ? spec.actions.includes(action) : true;
 }
 
+// itemProperties is the item schema's effective properties — `allOf` members
+// included, so items composed of flattened `$ref`s summarize like any other —
+// resolved against `value`.
+function itemProperties(
+  itemSchema: JsonSchemaProperty | undefined,
+  value: Record<string, unknown>,
+): Record<string, JsonSchemaProperty> {
+  return itemSchema ? effectiveProperties(itemSchema as JsonSchemaObject, value).properties : {};
+}
+
 // autoGlyphKey picks the item property that can colour a row without being told:
 // the first enum carrying per-value icons. Keeps a schema that already declares
-// x-enum-icons from having to repeat itself in x-item.
+// x-enum-icons from having to repeat itself in x-item. The spec is one per
+// array, so there is no item value to select a conditional branch: only base
+// and unconditional properties (and `else` branches, which `{}` selects) count.
 function autoGlyphKey(itemSchema: JsonSchemaProperty | undefined): string | undefined {
-  for (const [key, prop] of Object.entries(itemSchema?.properties ?? {})) {
+  for (const [key, prop] of Object.entries(itemProperties(itemSchema, {}))) {
     const icons = prop["x-enum-icons"];
     if (Array.isArray(prop.enum) && icons && Object.keys(icons).length > 0) return key;
   }
@@ -86,7 +100,9 @@ export function itemSummaryFor({
   itemSchema: JsonSchemaProperty | undefined;
 }): ArrayItemSummary {
   const obj = isPlainObject(item) ? item : {};
-  const props = itemSchema?.properties ?? {};
+  // Resolved against this item's own value, as the item's body is rendered,
+  // so a property a matching `then`/`else` branch declares labels its chip.
+  const props = itemProperties(itemSchema, obj);
 
   const title =
     firstNonEmpty((spec.title ?? DEFAULT_TITLE_KEYS).map((key) => text(obj[key]))) ??

@@ -259,6 +259,7 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     value,
     onChange,
     ...(prop.readOnly === true ? { readOnly: true } : {}),
+    ...(prop.writeOnly === true ? { writeOnly: true } : {}),
     ...(prop["x-disabled"] === true ? { disabled: true } : {}),
     ...(typeof prop.description === "string"
       ? { description: prop.description }

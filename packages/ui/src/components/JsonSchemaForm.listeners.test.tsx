@@ -120,6 +120,47 @@ describe("JsonSchemaForm x-on-change", () => {
     expect(screen.getByText("Perk")).toBeInTheDocument();
   });
 
+  it("patches standard keywords onto a sibling while the guard holds, and drops them when it stops", () => {
+    const RATE_CEILING = 25;
+    const patchSchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        Mode: {
+          type: "string",
+          title: "Mode",
+          "x-on-change": [
+            {
+              when: { const: "locked" },
+              patch: {
+                Reference: { readOnly: true },
+                Rate: { title: "Override rate", minimum: 0, maximum: RATE_CEILING },
+              },
+            },
+          ],
+        },
+        Reference: { type: "string", title: "Reference" },
+        // multipleOf opts the field into a native number input, which carries min/max.
+        Rate: { type: "number", title: "Rate", multipleOf: 0.5 },
+      },
+    };
+    render(<Harness formSchema={patchSchema} initial={{ Mode: "open", Reference: "REF-1", Rate: 2 }} />);
+    expect(screen.getByLabelText(/^Reference/).tagName).toBe("INPUT");
+    expect(screen.queryByText("Override rate")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/^Mode/), { target: { value: "locked" } });
+
+    // readOnly swaps the input for value text; the title and bounds follow the patch.
+    expect(screen.queryByRole("textbox", { name: /^Reference/ })).toBeNull();
+    expect(screen.getByText("REF-1").closest("[data-jsf-readonly]")).not.toBeNull();
+    const rate = screen.getByLabelText(/^Override rate/);
+    expect(rate).toHaveAttribute("min", "0");
+    expect(rate).toHaveAttribute("max", String(RATE_CEILING));
+
+    fireEvent.change(screen.getByLabelText(/^Mode/), { target: { value: "open" } });
+    expect(screen.getByLabelText(/^Reference/).tagName).toBe("INPUT");
+    expect(screen.getByLabelText(/^Rate/)).not.toHaveAttribute("max");
+  });
+
   it("applies listeners inside a nested object", () => {
     const nested: JsonSchemaObject = {
       type: "object",
@@ -132,12 +173,103 @@ describe("JsonSchemaForm x-on-change", () => {
     expect(screen.getByLabelText(/^Loan amount/)).toHaveValue("1000");
   });
 
+  it("toggles a table-array group under a sibling object through a path target", () => {
+    const stepSchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        input: {
+          type: "object",
+          title: "Input",
+          properties: { X: { type: "string", title: "Option" } },
+          "x-on-change": [
+            { when: { properties: { X: { const: YES } } }, show: ["mf/G"], else: { hide: ["mf/G"] } },
+          ],
+        },
+        mf: {
+          type: "object",
+          title: "Multi fields",
+          properties: {
+            G: {
+              type: "array",
+              title: "Rates group",
+              "x-layout": "table",
+              items: { type: "object", properties: { Rate: { type: "number", title: "Rate" } } },
+            },
+          },
+        },
+      },
+    };
+    render(<Harness formSchema={stepSchema} initial={{ input: { X: NO }, mf: { G: [{ Rate: 4 }] } }} />);
+    expect(screen.queryByRole("table")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/^Option/), { target: { value: YES } });
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^Option/), { target: { value: NO } });
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("surfaces an error inside a path-hidden group in the form summary", () => {
+    const stepSchema: JsonSchemaObject = {
+      type: "object",
+      "x-on-load": [{ hide: ["mf/G"] }],
+      properties: {
+        mf: {
+          type: "object",
+          properties: {
+            G: { type: "array", "x-layout": "table", items: { type: "object", properties: { Rate: { type: "number" } } } },
+            H: { type: "array", "x-layout": "table", items: { type: "object", properties: { Rate: { type: "number" } } } },
+          },
+        },
+      },
+    };
+    const hiddenError = { instancePath: "/mf/G/0/Rate", message: "too large" };
+    const shownError = { instancePath: "/mf/H/0/Rate", message: "too small" };
+    const unmatched = unmatchedFormErrors({
+      schema: stepSchema,
+      value: { mf: { G: [{ Rate: 1 }], H: [{ Rate: 1 }] } },
+      errors: [hiddenError, shownError],
+      viewOnly: false,
+      hideReadOnlyFields: false,
+      hideEmpty: false,
+      pre: [],
+    });
+    expect(unmatched).toEqual([hiddenError]);
+  });
+
+  it("applies a nested object's x-on-load before its fields' x-on-change", () => {
+    const loadSchema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        Loan: {
+          type: "object",
+          title: "Loan",
+          "x-on-load": [{ hide: ["Note", "Rate"] }],
+          properties: {
+            Kind: { type: "string", title: "Kind", "x-on-change": [{ when: { const: "custom" }, show: ["Rate"] }] },
+            Rate: { type: "number", title: "Rate" },
+            Note: { type: "string", title: "Note" },
+          },
+        },
+      },
+    };
+    render(<Harness formSchema={loadSchema} initial={{ Loan: { Kind: "standard" } }} />);
+    expect(screen.queryByText("Note")).toBeNull();
+    expect(screen.queryByText("Rate")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/^Kind/), { target: { value: "custom" } });
+    expect(screen.getByLabelText(/^Rate/)).toBeInTheDocument();
+    expect(screen.queryByText("Note")).toBeNull();
+  });
+
   it("surfaces an error on a listener-hidden field in the form summary", () => {
     const errors = [{ instancePath: "/LoanAmount", message: "too large" }];
     const unmatched = unmatchedFormErrors({
       schema,
       value: { LoanOverride: NO },
       errors,
+      viewOnly: false,
       hideReadOnlyFields: false,
       hideEmpty: false,
       pre: [],

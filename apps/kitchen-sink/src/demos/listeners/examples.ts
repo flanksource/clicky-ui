@@ -257,4 +257,105 @@ const nested: ListenerExample = {
   },
 };
 
-export const LISTENER_EXAMPLES: ListenerExample[] = [loan, memberClass, shipping, expressions, cascade, nested];
+const patch: ListenerExample = {
+  id: "patch",
+  label: "patch · readOnly · writeOnly",
+  description:
+    "`patch` merges standard keywords over a sibling while the guard holds. Signing locks the amount (`readOnly` swaps the input for its value), retitles and bounds the rate, and makes the `writeOnly` API token read-only — which removes it, because a write-only value is never shown back.",
+  initialValue: { Status: "draft", Amount: 1200, Rate: 4.5 },
+  schema: {
+    type: "object",
+    properties: {
+      Status: {
+        type: "string",
+        title: "Status",
+        enum: ["draft", "signed"],
+        "x-enum-labels": { draft: "Draft", signed: "Signed" },
+        "x-enum-display": "segmented",
+        "x-on-change": [
+          {
+            when: { const: "signed" },
+            patch: {
+              Amount: { readOnly: true },
+              Rate: { title: "Agreed rate", minimum: 0, maximum: 25 },
+              ApiToken: { readOnly: true },
+            },
+          },
+        ],
+      },
+      Amount: { type: "number", title: "Amount" },
+      Rate: { type: "number", title: "Rate", multipleOf: 0.25 },
+      ApiToken: { type: "string", title: "API token", writeOnly: true },
+    },
+  },
+};
+
+const paths: ListenerExample = {
+  id: "paths",
+  label: "Paths · x-on-load",
+  description:
+    "Listeners on `input` reach into the sibling `groups` object by path: `groups/LoanTerms` is the table, `groups/LoanTerms/Fee` one of its columns (an array is crossed into its items). The root `x-on-load` starts the table and the fee column hidden; `x-on-change` runs after it, so each option reveals its own target. Locking patches the Rate column `readOnly`, which shows its values as text — the same cells a read-only table or form shows.",
+  initialValue: {
+    input: { LoanTermAction: "02", Fees: "00", Lock: "00" },
+    groups: { LoanTerms: [{ Term: 12, Rate: 4.5, Fee: 10 }] },
+  },
+  schema: {
+    type: "object",
+    "x-on-load": [{ hide: ["groups/LoanTerms", "groups/LoanTerms/Fee"] }],
+    properties: {
+      input: {
+        type: "object",
+        title: "Input",
+        properties: {
+          LoanTermAction: {
+            type: "string",
+            title: "Loan terms",
+            enum: ["01", "02"],
+            "x-enum-labels": { "01": "Override", "02": "Default" },
+            "x-enum-display": "segmented",
+          },
+          Fees: {
+            type: "string",
+            title: "Fees",
+            enum: ["00", "01"],
+            "x-enum-labels": { "00": "Without fees", "01": "With fees" },
+            "x-enum-display": "segmented",
+          },
+          Lock: {
+            type: "string",
+            title: "Rates",
+            enum: ["00", "01"],
+            "x-enum-labels": { "00": "Editable", "01": "Locked" },
+            "x-enum-display": "segmented",
+          },
+        },
+        "x-on-change": [
+          { when: { properties: { LoanTermAction: { const: "01" } } }, show: ["groups/LoanTerms"] },
+          { when: { properties: { Fees: { const: "01" } } }, show: ["groups/LoanTerms/Fee"] },
+          { when: { properties: { Lock: { const: "01" } } }, patch: { "groups/LoanTerms/Rate": { readOnly: true } } },
+        ],
+      },
+      groups: {
+        type: "object",
+        title: "Groups",
+        properties: {
+          LoanTerms: {
+            type: "array",
+            title: "Loan term rates",
+            "x-layout": "table",
+            items: {
+              type: "object",
+              properties: {
+                Term: { type: "integer", title: "Term" },
+                Rate: { type: "number", title: "Rate" },
+                Fee: { type: "number", title: "Fee" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const LISTENER_EXAMPLES: ListenerExample[] = [loan, memberClass, shipping, expressions, cascade, nested, patch, paths];

@@ -1,7 +1,7 @@
 import { useContext, type ReactNode } from "react";
 import { PropertiesContext } from "../data/properties-context";
 import { cn } from "../lib/utils";
-import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
+import { Icon, LabelIcon } from "../data/Icon";
 import { UiQuestion } from "../icons";
 import { HoverCard } from "../overlay/HoverCard";
 import type {
@@ -245,6 +245,40 @@ export function HelpHint({ label, helper }: { label: string; helper: string }) {
   );
 }
 
+// SectionHeading is the content of a section's header row: the label with its
+// icon, required marker, badge and hover help. It is the label node buildField
+// hands to post extensions for a field that renders as a section; a section
+// with an empty title has no heading at all (see ObjectSection).
+export function SectionHeading({
+  field,
+  label = field.label,
+  size,
+  helpDisplay,
+}: {
+  field: FieldControl;
+  label?: string;
+  size: FormSize;
+  helpDisplay?: HelpDisplay;
+}) {
+  const { required, badge, helper, labelIcon } = field;
+  return (
+    <span className={cn("flex min-w-0 items-center gap-2", labelSizeClass[size])}>
+      <LabelIcon
+        icon={labelIcon}
+        className="shrink-0 text-[15px] text-muted-foreground"
+      />
+      <span className="min-w-0 truncate">{label}</span>
+      {required && <span className="shrink-0 text-destructive">*</span>}
+      {badge && (
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {badge}
+        </span>
+      )}
+      {helpDisplay === "hover" && helper && <HelpHint label={label} helper={helper} />}
+    </span>
+  );
+}
+
 // ObjectSection renders a nested object as a labelled section: a header row
 // (the field label + required/badge) above its fields, which fill the full
 // width below. It replaces the inline label + bordered box so nested objects
@@ -257,27 +291,24 @@ export function HelpHint({ label, helper }: { label: string; helper: string }) {
 // a headed section inside that one would say the same word twice. A missing
 // title is not this — it falls back to the humanised key, as every other
 // control does — so only an explicit `"title": ""` opts out.
+//
+// The header row is a separate SectionHeading node (null for no header), so
+// the post extensions that decorate every other field's label decorate a
+// section's header too.
 export function ObjectSection({
-  label,
-  required,
+  heading,
   size,
-  badge,
   helper,
-  labelIcon,
   helpDisplay,
   children,
 }: {
-  label: string;
-  required: boolean;
+  heading: ReactNode;
   size: FormSize;
-  badge?: string;
   helper?: string;
-  labelIcon?: LabelIconSpec;
   helpDisplay?: HelpDisplay;
   children: ReactNode;
 }) {
   const hoverHelp = helpDisplay === "hover" && !!helper;
-  const headed = label !== "";
   return (
     <div
       className={cn(
@@ -285,26 +316,18 @@ export function ObjectSection({
         fieldInnerGapClass[size],
       )}
     >
-      {headed && (
-      <div
-        className={cn(
-          "flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold",
-          labelSizeClass[size],
-        )}
-      >
-        <LabelIcon
-          icon={labelIcon}
-          className="shrink-0 text-[15px] text-muted-foreground"
-        />
-        <span className="min-w-0 truncate">{label}</span>
-        {required && <span className="shrink-0 text-destructive">*</span>}
-        {badge && (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {badge}
-          </span>
-        )}
-        {hoverHelp && helper && <HelpHint label={label} helper={helper} />}
-      </div>
+      {heading != null && (
+        // The header row owns the rule and weight, so whatever a post
+        // extension puts beside the heading sits inline in the same row.
+        <div
+          data-jsf-section-heading
+          className={cn(
+            "flex min-w-0 items-center gap-2 border-b border-border pb-1 font-semibold",
+            labelSizeClass[size],
+          )}
+        >
+          {heading}
+        </div>
       )}
       {helper && !hoverHelp && (
         <p className="min-w-0 break-words text-xs text-muted-foreground">
