@@ -19,7 +19,8 @@ export type MonacoProviderProps = {
 
 export type MonacoEditorProps = {
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
+  readOnly?: boolean;
   language: string;
   path: string;
   height?: string | number;
