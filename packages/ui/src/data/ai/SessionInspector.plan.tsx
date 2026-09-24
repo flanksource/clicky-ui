@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { UiCheck, UiEdit, UiFileText } from "../../icons";
 import { Button } from "../../components/button";
-import { MdxEditorField } from "../../components/MdxEditorField";
 import { Icon } from "../Icon";
 import { Markdown } from "../Markdown";
 import type { SessionPlan } from "./SessionViewer.unified";
+
+// Loaded lazily so a static import here doesn't pull @mdxeditor/editor into
+// every host that imports the `data`/main entry — mirrors the pattern in
+// components/json-schema-form-fields.tsx.
+const LazyMdxEditorField = lazy(async () => {
+  const mod = await import("../../components/MdxEditorField");
+  return { default: mod.MdxEditorField };
+});
 
 export function SessionPlanPanel({
   plan,
@@ -60,18 +67,29 @@ export function SessionPlanPanel({
       </header>
       {editing ? (
         <div className="pt-density-3">
-          <MdxEditorField
-            value={content}
-            onChange={updateContent}
-            aria-label="Plan markdown"
-            toolbar
-            headings
-            lists
-            links
-            codeBlocks
-            codeMirror
-            className="min-h-80"
-          />
+          <Suspense
+            fallback={
+              <textarea
+                aria-label="Plan markdown"
+                className="min-h-80 w-full rounded-md border border-input bg-background p-density-2 font-mono text-sm"
+                value={content}
+                onChange={(e) => updateContent(e.target.value)}
+              />
+            }
+          >
+            <LazyMdxEditorField
+              value={content}
+              onChange={updateContent}
+              aria-label="Plan markdown"
+              toolbar
+              headings
+              lists
+              links
+              codeBlocks
+              codeMirror
+              className="min-h-80"
+            />
+          </Suspense>
         </div>
       ) : content ? (
         <Markdown text={content} className="px-density-1 py-density-4" />

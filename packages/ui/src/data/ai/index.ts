@@ -392,9 +392,24 @@ export {
 } from "./SessionViewer";
 export {
   SessionInspector,
+  type SessionInspectorOptions,
   type SessionInspectorProps,
   type SessionInspectorTab,
 } from "./SessionInspector";
+export {
+  fetchRemoteSession,
+  isTerminalSessionLifecycle,
+  mergeSessionMessages,
+  openRemoteSession,
+  sessionFollowUrl,
+  TERMINAL_SESSION_LIFECYCLES,
+  useRemoteSession,
+  type RemoteSessionHandle,
+  type RemoteSessionOptions,
+  type RemoteSessionState,
+  type SessionFollowState,
+} from "./SessionInspector.remote";
+export { isSessionInspectorTab } from "./SessionInspector.tabs.model";
 export { SessionApprovalsPanel } from "./SessionInspector.approvals";
 export {
   pendingApprovalRequests,

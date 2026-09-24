@@ -10,6 +10,7 @@ import {
 import { durationLabel, formatDate } from "./SessionInspector.model";
 import { SessionFilesPanel } from "./SessionInspector.files";
 import { SessionPlanPanel } from "./SessionInspector.plan";
+import { SessionVerificationPanel } from "./SessionInspector.verification";
 import {
   SessionApprovalsPanel,
   type ApprovalResolveHandler,
@@ -42,6 +43,8 @@ export function SessionInspectorPanel({
   switch (tab) {
     case "output":
       return <StructuredOutputPanel value={detail?.structuredOutput} />;
+    case "verification":
+      return <SessionVerificationPanel verifications={detail?.verifications} />;
     case "files":
       return <SessionFilesPanel files={detail?.files} />;
     case "plan":
@@ -141,7 +144,7 @@ function CostBreakdown({ costs }: { costs: SessionCost[] }) {
               <Td>{compactTokens(entry.outputTokens)}</Td>
               <Td>
                 {compactTokens(
-                  (entry.cacheReadTokens ?? 0) + (entry.cacheWriteTokens ?? 0)
+                  (entry.cacheReadTokens ?? 0) + (entry.cacheWriteTokens ?? 0),
                 )}
               </Td>
               <Td>{costLabel(entry)}</Td>
