@@ -42,7 +42,7 @@ const INITIAL_STATE: Record<string, { hidden: string[]; shown: string[]; disable
 };
 
 function labelled(label: string): HTMLInputElement {
-  return screen.getByLabelText(new RegExp(`^${label.replace(/[/%]/g, "\\$&")}`)) as HTMLInputElement;
+  return screen.getByLabelText(new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}`)) as HTMLInputElement;
 }
 
 describe("JsonSchemaForm listeners demo", () => {
