@@ -56,6 +56,8 @@ export interface AccordionListProps<T> {
   renderMeta?: (ctx: AccordionListItemContext<T>) => ReactNode;
   /** Content above the list — typically the item count. */
   summary?: ReactNode;
+  /** List-level actions, right-aligned on the summary line (e.g. a view menu). */
+  toolbar?: ReactNode;
   /** Names an item in its actions' accessible labels. Defaults to `Item <n>`. */
   itemLabel?: (ctx: { item: T; index: number }) => string;
 
@@ -131,6 +133,7 @@ export function AccordionList<T>({
   renderActions,
   renderMeta,
   summary,
+  toolbar,
   itemLabel,
   allowReorder = false,
   allowDrag = false,
@@ -282,8 +285,15 @@ export function AccordionList<T>({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      {summary !== undefined && (
-        <p className={cn("text-muted-foreground", labelSizeClass[size])}>{summary}</p>
+      {(summary !== undefined || toolbar !== undefined) && (
+        <div data-accordion-summary className="flex items-center justify-between gap-2">
+          {summary !== undefined && (
+            <p className={cn("text-muted-foreground", labelSizeClass[size])}>{summary}</p>
+          )}
+          {toolbar !== undefined && (
+            <div className="ml-auto flex shrink-0 items-center">{toolbar}</div>
+          )}
+        </div>
       )}
       <div
         className={cn("divide-y divide-border rounded-lg border border-border", listClassName)}

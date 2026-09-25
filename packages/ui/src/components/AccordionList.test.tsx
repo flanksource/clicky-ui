@@ -286,4 +286,20 @@ describe("AccordionList", () => {
     expect(meta.closest("[data-accordion-row]")).not.toBeNull();
     expect(within(headerFor("/users")).queryByRole("button")).toBeNull();
   });
+
+  it("renders the toolbar on the summary line, outside every row", () => {
+    render(<Harness summary="2 routes" toolbar={<button type="button">Route options</button>} />);
+
+    const line = screen.getByText("2 routes").closest<HTMLElement>("[data-accordion-summary]");
+    if (!line) throw new Error("the summary is not on a summary line");
+    expect(within(line).getByRole("button", { name: "Route options" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Route options" }).closest("[data-accordion-row]")).toBeNull();
+  });
+
+  it("renders a toolbar with no summary on its own summary line", () => {
+    render(<Harness toolbar={<button type="button">Route options</button>} />);
+
+    const toolbar = screen.getByRole("button", { name: "Route options" });
+    expect(toolbar.closest("[data-accordion-summary]")).not.toBeNull();
+  });
 });

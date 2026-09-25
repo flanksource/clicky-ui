@@ -608,10 +608,10 @@ describe("JsonSchemaForm array of objects", () => {
     },
   };
 
-  // Object items collapse to one summary row each without any schema hint:
-  // a full sub-form per item costs hundreds of pixels and says nothing about
-  // which item is which.
-  it("renders each item as a collapsed summary row by default", () => {
+  // Without a schema hint, an item whose columns fit (at most
+  // x-table-max-columns, default 4) opens as a grid row; a wider one opens as
+  // a collapsed summary row (see json-schema-form-array-view.test.ts).
+  it("renders a narrow item as a grid row by default", () => {
     render(
       <JsonSchemaForm
         schema={schema}
@@ -620,19 +620,17 @@ describe("JsonSchemaForm array of objects", () => {
       />,
     );
     expect(screen.getByText("2 items")).toBeInTheDocument();
-    expect(screen.getByText("api")).toBeInTheDocument();
-    expect(screen.getByText("worker")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("textbox").map((el) => (el as HTMLInputElement).value)).toEqual(["api", "8080", "worker", ""]);
   });
 
-  it("edits an item's field through the expanded row", () => {
+  it("edits an item's field through its grid cell", () => {
     const onChange = vi.fn();
     render(
       <JsonSchemaForm schema={schema} value={{ servers: [{ name: "a" }] }} onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^a$/ }));
-    const nameInput = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "a");
-    fireEvent.change(nameInput as HTMLElement, { target: { value: "b" } });
+    const nameInput = within(screen.getByRole("table")).getByDisplayValue("a");
+    fireEvent.change(nameInput, { target: { value: "b" } });
     expect(onChange).toHaveBeenCalledWith({ servers: [{ name: "b" }] });
   });
 

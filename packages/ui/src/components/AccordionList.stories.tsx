@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { AccordionList } from "./AccordionList";
@@ -34,6 +34,7 @@ function RouteList(props: {
   addable?: boolean;
   readOnly?: boolean;
   initial?: Route[];
+  toolbar?: ReactNode;
 }) {
   const { addable = true, initial = ROUTES, ...caps } = props;
   const [routes, setRoutes] = useState(initial);
@@ -101,6 +102,20 @@ export const ReadOnly: Story = {
 
 export const Empty: Story = {
   render: () => <RouteList initial={[]} />,
+};
+
+// List-level actions sit right-aligned on the summary line, outside every row.
+export const WithToolbar: Story = {
+  render: () => (
+    <RouteList
+      addable={false}
+      toolbar={
+        <button type="button" className="rounded px-2 text-xs text-muted-foreground hover:bg-accent">
+          Export
+        </button>
+      }
+    />
+  ),
 };
 
 export const AddsAndRemoves: Story = {

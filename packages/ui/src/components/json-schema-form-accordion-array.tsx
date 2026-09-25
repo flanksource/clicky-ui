@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AccordionList } from "./AccordionList";
 import {
   appendInstancePath,
@@ -37,10 +38,13 @@ export function AccordionArray({
   field,
   ctx,
   readOnly,
+  toolbar,
 }: {
   field: FieldControl;
   ctx: RenderContext;
   readOnly: boolean;
+  /** List-level actions for the summary line; see AccordionList. */
+  toolbar?: ReactNode;
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
@@ -133,6 +137,7 @@ export function AccordionArray({
           ? noItemsLabel(spec)
           : itemCountLabel(spec, items.length)
       }
+      {...(toolbar !== undefined ? { toolbar } : {})}
       size={ctx.size}
       readOnly={readOnly}
       itemId={(index) =>

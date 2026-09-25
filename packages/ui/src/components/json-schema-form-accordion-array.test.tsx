@@ -130,8 +130,12 @@ function renderAccordion({
   return { onChange };
 }
 
+// Row disclosures only: the view menu's trigger on the summary line carries
+// aria-expanded too.
 function headers(): HTMLElement[] {
-  return screen.getAllByRole("button").filter((b) => b.hasAttribute("aria-expanded"));
+  return screen
+    .getAllByRole("button")
+    .filter((b) => b.hasAttribute("aria-expanded") && b.closest("[data-accordion-row]") !== null);
 }
 
 function headerFor(title: string): HTMLElement {
@@ -152,6 +156,12 @@ describe("JsonSchemaForm accordion array", () => {
     for (const header of headers()) expect(header).toHaveAttribute("aria-expanded", "false");
     // The whole point: ten properties per item are not on screen at rest.
     expect(screen.queryByRole("textbox", { name: /^Name/ })).toBeNull();
+  });
+
+  it("offers the view menu on its summary line, beside the item count", () => {
+    renderAccordion();
+    const menu = screen.getByRole("button", { name: "View options for Params" });
+    expect(menu.closest("[data-accordion-summary]")).toHaveTextContent("2 parameters");
   });
 
   it("identifies the row by the schema's chosen properties", () => {

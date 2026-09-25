@@ -156,6 +156,12 @@
       "description": "Per-field layout override, taking precedence over the form-level layout. `inline` and `stack` force the field's subtree into label-beside-value or label-above-value mode; `table` renders an array of objects (or a map) as compact rows under column headers. On a map's value schema, `stack` renders each key above its value as one full-width unit.",
       "enum": ["inline", "stack", "table"]
     },
+    "x-table-max-columns": {
+      "description": "Array-level, for arrays of objects with no `x-layout: table` or `x-array-display: accordion` hint. The most visible columns (the union across rows under each row's listener state) the array opens as a grid with; a wider array opens as the inline item form. The array's view menu switches between grid, stack form and inline form either way.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 4
+    },
     "x-columns": {
       "description": "Object-level. Lay the object's fields out in N equal columns (stacked layout); fields span one column unless they set `x-col-span`. `auto` fits as many equal columns as the container width allows, each at least `x-column-min-width` wide.",
       "type": ["integer", "string"],
@@ -218,7 +224,7 @@
       "enum": ["combobox", "radio", "grid", "segmented"]
     },
     "x-array-display": {
-      "description": "Force an array's presentation. `filter-pills` renders each enum item option as a compact toggle (an empty array means all options); `accordion` (the default for object items) collapses each item to a summary row and opens one at a time; `cards` keeps every item open under a titled header; both read `x-item`. `stacked` opts out to one full sub-form per item labelled *Item N*; `list` renders scalar values as compact editable list items.",
+      "description": "Force an array's presentation. `filter-pills` renders each enum item option as a compact toggle (an empty array means all options); `accordion` opens object items as the item list — each item collapsed to a summary row, one open at a time — instead of the column-count default (see `x-table-max-columns`), with the view menu still offered; `cards` keeps every item open under a titled header; both read `x-item`. `stacked` opts out to one full sub-form per item labelled *Item N*; `list` renders scalar values as compact editable list items.",
       "enum": ["filter-pills", "accordion", "cards", "stacked", "list"]
     },
     "x-item": {

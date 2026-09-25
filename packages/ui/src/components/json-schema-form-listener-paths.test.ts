@@ -78,6 +78,17 @@ describe("applyListenerState path targets", () => {
     expect(groups.G1?.["x-hidden"]).toBeUndefined();
   });
 
+  // Row-scoped state comes from the item schema's own listeners, evaluated per
+  // row by the renderers; a path from outside the array names the column.
+  it("keeps an array path column-level: the patch lands on the shared items schema whatever rows the array holds", () => {
+    const listeners: ChangeListener[] = [{ patch: { "mf/G1/cell": { readOnly: true } } }];
+    const rows = { mf: { G1: [{ cell: 1 }, { cell: 2, other: "x" }] } };
+    const withRows = groupsOf(stateOf(stepSchema(listeners), rows), rows.mf).G1;
+    const withoutRows = groupsOf(stateOf(stepSchema(listeners))).G1;
+    expect(withRows).toEqual(withoutRows);
+    expect(cellsOf(withRows).cell).toEqual({ type: "number", readOnly: true });
+  });
+
   it("lets a later listener show a path an earlier one hid", () => {
     const groups = groupsOf(stateOf(stepSchema([{ hide: ["mf/G1"] }, { show: ["mf/G1"] }])));
     expect(groups.G1?.["x-hidden"]).toBe(false);

@@ -11,12 +11,11 @@ import {
   inputSizeClass,
   type FormSize,
 } from "./json-schema-form-size";
-import { AccordionArray } from "./json-schema-form-accordion-array";
 import { CardsArray } from "./json-schema-form-cards-array";
 import { FieldsGrid } from "./json-schema-form-layout";
 import { scalarItemsType } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
-import { TableArray } from "./json-schema-form-table-array";
+import { ObjectArrayView } from "./json-schema-form-object-array-view";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import { CompactListArray } from "./json-schema-form-list-array";
 import {
@@ -37,8 +36,9 @@ import type {
 const TAG_SEPARATORS = [","];
 
 // ArrayControl routes an array to the control its items call for: a flat list of
-// values (choices, scalars) is ONE tag combobox; object items are summary rows,
-// cards or a table; anything else renders a control per item with add / remove /
+// values (choices, scalars) is ONE tag combobox; object items are cards or a
+// switchable grid / item-form view (ObjectArrayView); anything else — and the
+// `x-array-display: stacked` opt-out — renders a control per item with add / remove /
 // reorder. Recursion goes through ctx.render so this module never imports the
 // renderer (no import cycle).
 export function ArrayControl({
@@ -117,21 +117,15 @@ export function ArrayControl({
     if (field.arrayDisplay === "cards") {
       return <CardsArray field={field} ctx={ctx} readOnly={readOnly} />;
     }
-    // The accordion is the DEFAULT for object items: stacked in full, a
-    // ten-property item costs ~700px of screen each and a list of them says
-    // nothing about which item is which. `x-array-display: "stacked"` opts back
-    // into the per-item sub-form below; `x-layout: "table"` into the row grid.
-    // An explicit accordion outranks the table, since it names the renderer.
-    if (
-      field.arrayDisplay === "accordion" ||
-      (field.arrayDisplay !== "stacked" && field.layout !== "table")
-    ) {
-      return <AccordionArray field={field} ctx={ctx} readOnly={readOnly} />;
-    }
-    // `x-layout: table` renders object-item arrays as compact rows with one
-    // column per item property — denser still than the summary rows.
-    if (field.layout === "table") {
-      return <TableArray field={field} ctx={ctx} readOnly={readOnly} />;
+    // Object items render as a switchable view: the row grid while the item's
+    // visible columns fit, the item list (one summary row per item, opening
+    // into its form) once they do not — stacked in full, a ten-property item
+    // costs ~700px of screen each. `x-layout: "table"` and
+    // `x-array-display: "accordion"` pick the view it opens in; see
+    // defaultArrayView. `x-array-display: "stacked"` opts back into the
+    // per-item sub-form below.
+    if (field.arrayDisplay !== "stacked") {
+      return <ObjectArrayView field={field} ctx={ctx} readOnly={readOnly} />;
     }
   }
   const items = Array.isArray(field.value) ? field.value : [];
